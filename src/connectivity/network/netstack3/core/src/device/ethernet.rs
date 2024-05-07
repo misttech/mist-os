@@ -37,8 +37,8 @@ use tracing::trace;
 use crate::{
     context::{
         CoreTimerContext, CounterContext, HandleableTimer, NestedIntoCoreTimerCtx,
-        RecvFrameContext, ResourceCounterContext, RngContext, SendFrameContext, TimerContext,
-        TimerHandler,
+        ReceivableFrameMeta, RecvFrameContext, ResourceCounterContext, RngContext,
+        SendableFrameMeta, TimerContext, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -947,7 +947,7 @@ impl DeviceReceiveFrameSpec for EthernetLinkDevice {
     type FrameMetadata<D> = RecvEthernetFrameMeta<D>;
 }
 
-impl<CC, BC> RecvFrameContext<BC, RecvEthernetFrameMeta<CC::DeviceId>> for CC
+impl<CC, BC> ReceivableFrameMeta<CC, BC> for RecvEthernetFrameMeta<CC::DeviceId>
 where
     BC: EthernetIpLinkDeviceBindingsContext
         + DeviceSocketBindingsContext<CC::DeviceId>
@@ -960,16 +960,16 @@ where
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
         + ResourceCounterContext<CC::DeviceId, EthernetDeviceCounters>,
 {
-    fn receive_frame<B: BufferMut + Debug>(
-        &mut self,
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CC,
         bindings_ctx: &mut BC,
-        metadata: RecvEthernetFrameMeta<CC::DeviceId>,
         mut buffer: B,
     ) {
         trace_duration!(bindings_ctx, c"device::ethernet::receive_frame");
-        let RecvEthernetFrameMeta { device_id } = metadata;
+        let Self { device_id } = self;
         trace!("ethernet::receive_frame: device_id = {:?}", device_id);
-        self.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
+        core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
         // NOTE(joshlf): We do not currently validate that the Ethernet frame
         // satisfies the minimum length requirement. We expect that if this
         // requirement is necessary (due to requirements of the physical medium),
@@ -983,20 +983,20 @@ where
         {
             frame
         } else {
-            self.increment(&device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
+            core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
             trace!("ethernet::receive_frame: failed to parse ethernet frame");
             return;
         };
 
         let dst = ethernet.dst_mac();
 
-        let frame_dest = self.with_ethernet_state(&device_id, |static_state, dynamic_state| {
+        let frame_dest = core_ctx.with_ethernet_state(&device_id, |static_state, dynamic_state| {
             deliver_as(static_state, dynamic_state, &dst)
         });
 
         let frame_dst = match frame_dest {
             None => {
-                self.increment(&device_id, |counters: &EthernetDeviceCounters| {
+                core_ctx.increment(&device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_ethernet_other_dest
                 });
                 trace!(
@@ -1010,7 +1010,7 @@ where
         };
         let ethertype = ethernet.ethertype();
 
-        self.handle_frame(
+        core_ctx.handle_frame(
             bindings_ctx,
             &device_id,
             ReceivedFrame::from_ethernet(ethernet, frame_dst).into(),
@@ -1027,7 +1027,7 @@ where
                 match types {
                     (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
                         ArpPacketHandler::handle_packet(
-                            self,
+                            core_ctx,
                             bindings_ctx,
                             device_id,
                             frame_dst,
@@ -1037,32 +1037,32 @@ where
                 }
             }
             Some(EtherType::Ipv4) => {
-                self.increment(&device_id, |counters: &DeviceCounters| {
+                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
                     &counters.recv_ipv4_delivered
                 });
-                self.receive_frame(
+                core_ctx.receive_frame(
                     bindings_ctx,
                     RecvIpFrameMeta::<_, Ipv4>::new(device_id, Some(frame_dst)),
                     buffer,
                 )
             }
             Some(EtherType::Ipv6) => {
-                self.increment(&device_id, |counters: &DeviceCounters| {
+                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
                     &counters.recv_ipv6_delivered
                 });
-                self.receive_frame(
+                core_ctx.receive_frame(
                     bindings_ctx,
                     RecvIpFrameMeta::<_, Ipv6>::new(device_id, Some(frame_dst)),
                     buffer,
                 )
             }
             Some(EtherType::Other(_)) => {
-                self.increment(&device_id, |counters: &EthernetDeviceCounters| {
+                core_ctx.increment(&device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_unsupported_ethertype
                 });
             }
             None => {
-                self.increment(&device_id, |counters: &EthernetDeviceCounters| {
+                core_ctx.increment(&device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_no_ethertype
                 });
             }
@@ -1200,23 +1200,16 @@ impl<
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    > SendFrameContext<BC, ArpFrameMetadata<EthernetLinkDevice, CC::DeviceId>> for CC
+    > SendableFrameMeta<CC, BC> for ArpFrameMetadata<EthernetLinkDevice, CC::DeviceId>
 {
-    fn send_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        ArpFrameMetadata { device_id, dst_addr }: ArpFrameMetadata<
-            EthernetLinkDevice,
-            CC::DeviceId,
-        >,
-        body: S,
-    ) -> Result<(), S>
+    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
+        let Self { device_id, dst_addr } = self;
         send_as_ethernet_frame_to_dst(
-            self,
+            core_ctx,
             bindings_ctx,
             &device_id,
             dst_addr,
@@ -1395,31 +1388,26 @@ impl<
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
             + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    > SendFrameContext<BC, DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>> for CC
+    > SendableFrameMeta<CC, BC> for DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>
 where
     CC: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<BC>>,
 {
-    fn send_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        metadata: DeviceSocketMetadata<EthernetLinkDevice, EthernetDeviceId<BC>>,
-        body: S,
-    ) -> Result<(), S>
+    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let DeviceSocketMetadata { device_id, metadata } = metadata;
+        let Self { device_id, metadata } = self;
         match metadata {
             Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
-                self,
+                core_ctx,
                 bindings_ctx,
                 &device_id,
                 dest_addr,
                 body,
                 protocol,
             ),
-            None => send_ethernet_frame(self, bindings_ctx, &device_id, body),
+            None => send_ethernet_frame(core_ctx, bindings_ctx, &device_id, body),
         }
     }
 }

@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 
 #include <lib/async-loop/loop.h>
-#include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -14,6 +13,7 @@
 #include <atomic>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 

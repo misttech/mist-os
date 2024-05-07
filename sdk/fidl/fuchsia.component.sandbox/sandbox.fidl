@@ -194,19 +194,12 @@ type RouteRequest = resource table {
 };
 
 @available(added=HEAD)
-type BedrockError = flexible enum : uint32 {
-    /// Routing the capability failed.
-    ROUTING = 1;
-
-    /// A lifecycle transition failed for some capability in the
-    /// routing chain.
-    LIFECYCLE = 2;
-
-    /// Could not open the capability in the provider component.
-    OPEN = 3;
+type RouterError = flexible enum : uint32 {
+    /// The router failed to find the capability.
+    NOT_FOUND = 1;
 
     /// The arguments provided to the function are invalid.
-    INVALID_ARGS = 4;
+    INVALID_ARGS = 2;
 };
 
 /// A router allows a client to request a capability.
@@ -214,7 +207,7 @@ type BedrockError = flexible enum : uint32 {
 open protocol Router {
     flexible Route(RouteRequest) -> (resource struct {
         capability Capability;
-    }) error BedrockError;
+    }) error RouterError;
 };
 
 /// A receiver is served by clients and allows them to receive channels
@@ -260,19 +253,6 @@ open protocol Factory {
 
     /// Creates a new empty [`Dictionary`].
     flexible CreateDictionary() -> (resource struct {
-        dictionary client_end:Dictionary;
-    });
-};
-
-/// Components can use [DictionaryGetter] to provide a [Dictionary] by serving
-//this protocol in their outgoing directory.
-@discoverable
-@available(added=HEAD)
-open protocol DictionaryGetter {
-    /// Returns the [Dictionary].
-    ///
-    /// Note: Consecutive calls to [Get] are not required to return the same [Dictionary].
-    flexible Get() -> (resource struct {
         dictionary client_end:Dictionary;
     });
 };

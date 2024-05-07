@@ -42,14 +42,10 @@ KernelMappedVmo::~KernelMappedVmo() {
 }
 
 Handle* KernelMappedVmo::Publish(ktl::string_view vmo_name, size_t content_size) {
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  zx_status_t status = ContentSizeManager::Create(content_size, &content_size_manager);
-  ZX_ASSERT(status == ZX_OK);
-
   zx_rights_t rights;
   KernelHandle<VmObjectDispatcher> handle;
-  status =
-      VmObjectDispatcher::Create(pinned_vmo_.vmo(), ktl::move(content_size_manager),
+  zx_status_t status =
+      VmObjectDispatcher::Create(pinned_vmo_.vmo(), content_size,
                                  VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
   ZX_ASSERT(status == ZX_OK);
   status = handle.dispatcher()->set_name(vmo_name.data(), vmo_name.size());

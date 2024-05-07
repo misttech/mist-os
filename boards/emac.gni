@@ -26,3 +26,8 @@ board_name = "emac"
 board_description = "A demo purpose board can be used on vim3 hardware"
 
 bazel_product_bundle_board = "emac"
+
+has_board = true
+
+# It's using the vim3 partitions because this is a demo that runs on the vim3 hardware
+partitions_config_label = "//boards/partitions/vim3:vim3"

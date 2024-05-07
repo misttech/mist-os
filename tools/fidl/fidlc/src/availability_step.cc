@@ -108,7 +108,7 @@ void AvailabilityStep::CompileAvailability(Element* element) {
   if (element->kind == Element::Kind::kLibrary) {
     ZX_ASSERT(element == library());
     library()->platform = Platform::Unversioned();
-    default_added = Version::Head();
+    default_added = Version::kHead;
   }
   bool valid = element->availability.Init({.added = default_added});
   ZX_ASSERT_MSG(valid, "initializing default availability should succeed");
@@ -149,7 +149,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
       ok &= reporter()->Fail(ErrLibraryAvailabilityMissingAdded, attribute->span);
     }
     if (replaced) {
-      ok &= reporter()->Fail(ErrCannotBeReplaced, replaced->span, element->kind);
+      ok &= reporter()->Fail(ErrLibraryReplaced, replaced->span);
     }
   } else {
     if (platform) {
@@ -158,9 +158,6 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     if (!library()->attributes->Get("available")) {
       ok &= reporter()->Fail(ErrMissingLibraryAvailability, attribute->span, library()->name);
     }
-  }
-  if (element->kind == Element::Kind::kProtocolCompose && replaced) {
-    ok &= reporter()->Fail(ErrCannotBeReplaced, replaced->span, element->kind);
   }
   if (removed && replaced) {
     ok &= reporter()->Fail(ErrRemovedAndReplaced, attribute->span);
@@ -276,8 +273,7 @@ std::optional<Platform> AvailabilityStep::GetPlatform(const AttributeArg* maybe_
   if (!(maybe_arg && maybe_arg->value->IsResolved())) {
     return std::nullopt;
   }
-  ZX_ASSERT(maybe_arg->value->Value().kind == ConstantValue::Kind::kString);
-  auto str = static_cast<const StringConstantValue&>(maybe_arg->value->Value()).value;
+  auto str = maybe_arg->value->Value().AsString();
   auto platform = Platform::Parse(std::string(str));
   if (!platform) {
     reporter()->Fail(ErrInvalidPlatform, maybe_arg->value->span, str);
@@ -290,18 +286,15 @@ std::optional<Version> AvailabilityStep::GetVersion(const AttributeArg* maybe_ar
   if (!(maybe_arg && maybe_arg->value->IsResolved())) {
     return std::nullopt;
   }
-  // Note: We only have to deal with integers here. If the argument was the
-  // identifier `HEAD`, it will have been resolved to Version::Head().ordinal()
-  // when we call CompileAttributeEarly. See AttributeArgSchema::ResolveArg.
-  ZX_ASSERT(maybe_arg->value->Value().kind == ConstantValue::Kind::kUint64);
-  uint64_t value =
-      static_cast<const NumericConstantValue<uint64_t>*>(&maybe_arg->value->Value())->value;
+  // CompileAttributeEarly resolves version arguments to uint32.
+  auto value = maybe_arg->value->Value().AsNumeric<uint32_t>();
   auto version = Version::From(value);
   // Do not allow referencing the LEGACY version directly. It may only be
   // specified on the command line, or in FIDL libraries via the `legacy`
   // argument to @available.
-  if (!version || version == Version::Legacy()) {
-    reporter()->Fail(ErrInvalidVersion, maybe_arg->value->span, value);
+  if (!version || version == Version::kLegacy) {
+    auto span = maybe_arg->value->span;
+    reporter()->Fail(ErrInvalidVersion, span, span.data());
     return std::nullopt;
   }
   return version;

@@ -40,12 +40,16 @@ def part_to_id(part: IdkPart) -> str:
       JSON object.
     """
     path = part["meta"]
+    meta_type = part["type"]
     if os.path.basename(path) == "meta.json":
         path = os.path.dirname(path)
     elif path.endswith("-meta.json"):
         path = path[: -len("-meta.json")]
 
-    return f'{part["type"]}://{path}'
+    if not part.get("stable", False):
+        path = f"{path} (unstable)"
+
+    return f"{meta_type}://{path}"
 
 
 def part_is_tool_for_other_cpu(part_id: str, host_cpu: str) -> bool:

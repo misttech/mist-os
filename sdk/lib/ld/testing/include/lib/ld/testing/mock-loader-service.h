@@ -142,6 +142,10 @@ class MockLoaderServiceForTest {
   // handle fuchsia.ldsvc.Loader requests made during the duration of `func()`.
   void CallWithLdsvcInstalled(fit::function<void()> func);
 
+  // Check that all the registered expectations on the mock_loader_ have been
+  // satisfied and then clear its expectations list.
+  void VerifyAndClearExpectations();
+
  private:
   // Fetch a dependency VMO from a specific path in the test package.
   static zx::vmo GetDepVmo(std::string_view name);

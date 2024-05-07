@@ -17,7 +17,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
-	pm_build "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
@@ -157,7 +156,7 @@ func prepareBlobsForPackage(
 	if !filepath.IsAbs(manifestAbsPath) {
 		manifestAbsPath = filepath.Join(buildDir, manifestPath)
 	}
-	manifest, err := pm_build.LoadPackageManifest(manifestAbsPath)
+	manifest, err := build.LoadPackageManifest(manifestAbsPath)
 	if err != nil {
 		return err
 	}

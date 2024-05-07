@@ -5,6 +5,7 @@
 #include "src/devices/misc/drivers/compat/driver.h"
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -510,6 +511,74 @@ zx_handle_t Driver::GetSmcResource() {
 }
 
 zx::vmo& Driver::GetConfigVmo() { return config_vmo_; }
+
+zx_status_t Driver::GetProperties(device_props_args_t* out_args,
+                                  const std::string& parent_node_name) {
+  if (!out_args) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto set_str_prop_value =
+      [this](
+          const ::fuchsia_driver_framework::NodePropertyValue& value) -> zx_device_str_prop_val_t {
+    zx_device_str_prop_val_t out_value;
+    switch (value.Which()) {
+      case fuchsia_driver_framework::NodePropertyValue::Tag::kIntValue:
+        out_value.data_type = ZX_DEVICE_PROPERTY_VALUE_INT;
+        out_value.data.int_val = value.int_value().value();
+        break;
+      case fuchsia_driver_framework::NodePropertyValue::Tag::kStringValue:
+        out_value.data_type = ZX_DEVICE_PROPERTY_VALUE_STRING;
+        out_value.data.str_val = value.string_value()->data();
+        break;
+      case fuchsia_driver_framework::NodePropertyValue::Tag::kBoolValue:
+        out_value.data_type = ZX_DEVICE_PROPERTY_VALUE_BOOL;
+        out_value.data.bool_val = value.bool_value().value();
+        break;
+      case fuchsia_driver_framework::NodePropertyValue::Tag::kEnumValue:
+        out_value.data_type = ZX_DEVICE_PROPERTY_VALUE_ENUM;
+        out_value.data.enum_val = value.enum_value()->data();
+        break;
+      default:
+        FDF_LOGL(ERROR, *logger_, "Unsupported property type, value: %lu",
+                 static_cast<fidl_xunion_tag_t>(value.Which()));
+        break;
+    }
+    return out_value;
+  };
+
+  auto props = node_properties(parent_node_name);
+  uint32_t prop_count = 0;
+  uint32_t str_prop_count = 0;
+  for (auto& prop : props) {
+    switch (prop.key().Which()) {
+      case fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue:
+        if (prop_count > out_args->prop_count) {
+          out_args->actual_prop_count = prop_count;
+          out_args->actual_str_prop_count = str_prop_count;
+          return ZX_ERR_BUFFER_TOO_SMALL;
+        }
+        out_args->props[prop_count - 1].id = static_cast<uint16_t>(prop.key().int_value().value());
+        if (!prop.value().int_value().has_value()) {
+          return ZX_ERR_INVALID_ARGS;
+        }
+        out_args->props[prop_count - 1].value = prop.value().int_value().value();
+        break;
+      case fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue:
+        if (str_prop_count > out_args->str_prop_count) {
+          out_args->actual_prop_count = prop_count;
+          out_args->actual_str_prop_count = str_prop_count;
+          return ZX_ERR_BUFFER_TOO_SMALL;
+        }
+        out_args->str_props[str_prop_count - 1].key = prop.key().string_value()->data();
+        out_args->str_props[str_prop_count - 1].property_value = set_str_prop_value(prop.value());
+        break;
+    }
+  }
+  out_args->actual_prop_count = prop_count;
+  out_args->actual_str_prop_count = str_prop_count;
+  return ZX_OK;
+}
 
 zx_handle_t Driver::GetInfoResource() {
   if (!info_resource_.is_valid()) {

@@ -234,10 +234,6 @@
                 "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv4_Stream",
                 "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv6_Stream",
 
-                // IP{V6}_MULTICAST_IF
-                "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrIfindex/IPv*_Datagram",
-                "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrAddress/IPv4_Datagram",
-
                 // TODO(https://fxbug.dev/327486994): The following tests return
                 // EINVAL instead of the expected ENETUNREACH because we don't
                 // allow connecting to port 0.

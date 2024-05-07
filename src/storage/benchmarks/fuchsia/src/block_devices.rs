@@ -29,7 +29,12 @@ use {
 const RAMDISK_FVM_SLICE_SIZE: usize = 1024 * 1024;
 const BLOBFS_VOLUME_NAME: &str = "blobfs";
 
-const BENCHMARK_FVM_SIZE_BYTES: u64 = 128 * 1024 * 1024;
+const BENCHMARK_FVM_SIZE_BYTES: u64 = 160 * 1024 * 1024;
+// 8MiB is the default slice size; use it so the test FVM partition matches the performance of the
+// system FVM partition (so they are interchangeable).
+// Note that this only affects the performance of minfs and blobfs, since these two filesystems are
+// the only ones that dynamically allocate from FVM.
+const BENCHMARK_FVM_SLICE_SIZE_BYTES: usize = 8 * 1024 * 1024;
 
 // On systems which don't have FVM (i.e. Fxblob), we create an FVM partition the test can use, with
 // this GUID.  See connect_to_test_fvm for details.
@@ -228,7 +233,7 @@ async fn connect_to_test_fvm() -> Option<VolumeManagerProxy> {
         .expect("get_topological_path failed");
     let dir = fuchsia_fs::directory::open_in_namespace(&topo_path, fuchsia_fs::OpenFlags::empty())
         .expect("failed to open device");
-    fvm::format_for_fvm(&dir, 32_768).expect("Failed to format FVM");
+    fvm::format_for_fvm(&dir, BENCHMARK_FVM_SLICE_SIZE_BYTES).expect("Failed to format FVM");
     let fvm = fvm::start_fvm_driver(&fvm_controller, &dir).await.expect("Failed to start FVM");
     Some(fvm)
 }

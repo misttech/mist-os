@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
@@ -28,6 +27,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
 

@@ -9,12 +9,13 @@ use {
             registry::{EventRegistry, EventSubscription},
             stream::EventStream,
         },
-        hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+        routing::router_ext::WeakComponentTokenExt,
     },
     async_trait::async_trait,
     cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl},
     errors::{EventsError, ModelError},
     futures::lock::Mutex,
+    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     moniker::{ExtendedMoniker, Moniker},
     std::{
         collections::HashMap,
@@ -184,7 +185,7 @@ impl Hook for EventStreamProvider {
             }
             EventPayload::Resolved { decl, component, .. } => {
                 self.on_component_resolved(
-                    &WeakExtendedInstance::Component(component.clone()),
+                    &WeakExtendedInstance::Component(component.clone().to_instance()),
                     decl,
                 )
                 .await?;

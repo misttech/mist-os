@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Wlan affordance implementation using SL4F."""
 
+from dataclasses import asdict
 import enum
 from collections.abc import Mapping
 
@@ -17,7 +18,7 @@ from honeydew.typing.wlan import (
     ClientStatusConnecting,
     ClientStatusIdle,
     ClientStatusResponse,
-    CountryCodeList,
+    CountryCode,
     Protection,
     QueryIfaceResponse,
     WlanChannel,
@@ -59,12 +60,12 @@ class _Sl4fMethods(enum.StrEnum):
     CREATE_IFACE = "wlan.create_iface"
     DESTROY_IFACE = "wlan.destroy_iface"
     DISCONNECT = "wlan.disconnect"
-    GET_COUNTRY = "wlan.get_country"
+    GET_COUNTRY = "wlan_phy.get_country"
     GET_IFACE_ID_LIST = "wlan.get_iface_id_list"
     GET_PHY_ID_LIST = "wlan.get_phy_id_list"
     QUERY_IFACE = "wlan.query_iface"
     SCAN_FOR_BSS_INFO = "wlan.scan_for_bss_info"
-    SET_REGION = "wlan.set_region"
+    SET_REGION = "location_regulatory_region_facade.set_region"
     STATUS = "wlan.status"
 
 
@@ -104,7 +105,7 @@ class Wlan(wlan.Wlan):
         method_params = {
             "target_ssid": ssid,
             "target_pwd": password,
-            "target_bss_desc": bss_desc,
+            "target_bss_desc": asdict(bss_desc),
         }
         resp: dict[str, object] = self._sl4f.run(
             method=_Sl4fMethods.CONNECT, params=method_params
@@ -153,7 +154,7 @@ class Wlan(wlan.Wlan):
         Raises:
             errors.Sl4fError: Sl4f run command failed.
         """
-        method_params = {"iface_id": iface_id}
+        method_params = {"identifier": iface_id}
         self._sl4f.run(method=_Sl4fMethods.DESTROY_IFACE, params=method_params)
 
     def disconnect(self) -> None:
@@ -164,7 +165,7 @@ class Wlan(wlan.Wlan):
         """
         self._sl4f.run(method=_Sl4fMethods.DISCONNECT)
 
-    def get_country(self, phy_id: int) -> CountryCodeList:
+    def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
 
         Args:
@@ -184,10 +185,12 @@ class Wlan(wlan.Wlan):
         )
         result = resp.get("result")
 
-        if not isinstance(result, str):
-            raise TypeError(f'Expected "result" to be str, got {type(result)}')
+        if not isinstance(result, list):
+            raise TypeError(f'Expected "result" to be list, got {type(result)}')
 
-        return CountryCodeList(result)
+        set_code = "".join([chr(ascii_char) for ascii_char in result])
+
+        return CountryCode(set_code)
 
     def get_iface_id_list(self) -> list[int]:
         """Get list of wlan iface IDs on device.
@@ -266,7 +269,7 @@ class Wlan(wlan.Wlan):
             sta_addr=sta_addr,
         )
 
-    def scan_for_bss_info(self) -> dict[str, BssDescription]:
+    def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
         """Scans and returns BSS info.
 
         Returns:
@@ -285,51 +288,57 @@ class Wlan(wlan.Wlan):
         if not isinstance(result, dict):
             raise TypeError(f'Expected "result" to be dict, got {type(result)}')
 
-        bss_descriptions = {}
-        for key, bss in result.items():
-            if not isinstance(bss, dict):
+        ssid_bss_desc_map: dict[str, list[BssDescription]] = {}
+        for ssid_key, bss_list in result.items():
+            if not isinstance(bss_list, list):
                 raise TypeError(
-                    f'Expected "bss_block" to be dict, got {type(bss)}'
+                    f'Expected "bss_list" to be list, got {type(bss_list)}'
                 )
 
-            bssid = bss.get("bssid")
-            if not isinstance(bssid, list):
-                raise TypeError(
-                    f'Expected "bssid" to be list, got {type(bssid)}'
+            # Create BssDescription type out of return values
+            bss_descriptions: list[BssDescription] = []
+            for bss in bss_list:
+                bssid = bss.get("bssid")
+                if not isinstance(bssid, list):
+                    raise TypeError(
+                        f'Expected "bssid" to be list, got {type(bssid)}'
+                    )
+
+                ies = bss.get("ies")
+                if not isinstance(ies, list):
+                    raise TypeError(
+                        f'Expected "ies" to be list, got {type(ies)}'
+                    )
+
+                channel = bss.get("channel")
+                if not isinstance(channel, dict):
+                    raise TypeError(
+                        f'Expected "channel" to be dict, got {type(channel)}'
+                    )
+
+                wlan_channel = WlanChannel(
+                    primary=_get_int(channel, "primary"),
+                    cbw=ChannelBandwidth(channel.get("cbw", None)),
+                    secondary80=_get_int(channel, "secondary80"),
                 )
 
-            ies = bss.get("ies")
-            if not isinstance(ies, list):
-                raise TypeError(f'Expected "ies" to be list, got {type(ies)}')
-
-            channel = bss.get("channel")
-            if not isinstance(channel, dict):
-                raise TypeError(
-                    f'Expected "channel" to be dict, got {type(channel)}'
+                bss_block = BssDescription(
+                    bssid=bssid,
+                    bss_type=BssType(bss.get("bss_type", None)),
+                    beacon_period=_get_int(bss, "beacon_period"),
+                    capability_info=_get_int(bss, "capability_info"),
+                    ies=ies,
+                    channel=wlan_channel,
+                    rssi_dbm=_get_int(bss, "rssi_dbm"),
+                    snr_db=_get_int(bss, "snr_db"),
                 )
+                bss_descriptions.append(bss_block)
 
-            wlan_channel = WlanChannel(
-                primary=_get_int(channel, "primary"),
-                cbw=ChannelBandwidth(channel.get("cbw", None)),
-                secondary80=_get_int(channel, "secondary80"),
-            )
+            ssid_bss_desc_map[ssid_key] = bss_descriptions
 
-            bss_block = BssDescription(
-                bssid=bssid,
-                bss_type=BssType(bss.get("bss_type", None)),
-                beacon_period=_get_int(bss, "beacon_period"),
-                capability_info=_get_int(bss, "capability_info"),
-                ies=ies,
-                channel=wlan_channel,
-                rssi_dbm=_get_int(bss, "rssi_dbm"),
-                snr_db=_get_int(bss, "snr_db"),
-            )
+        return ssid_bss_desc_map
 
-            bss_descriptions[key] = bss_block
-
-        return bss_descriptions
-
-    def set_region(self, region_code: str) -> None:
+    def set_region(self, region_code: CountryCode) -> None:
         """Set regulatory region.
 
         Args:
@@ -338,7 +347,7 @@ class Wlan(wlan.Wlan):
         Raises:
             errors.Sl4fError: Sl4f run command failed.
         """
-        method_params = {"region_code": region_code}
+        method_params = {"region": region_code.value}
         self._sl4f.run(method=_Sl4fMethods.SET_REGION, params=method_params)
 
     def status(self) -> ClientStatusResponse:

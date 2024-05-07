@@ -34,3 +34,5 @@ bool SupportsSysmemRenderableLinear() { return GetConfig().support_sysmem_render
 bool SupportsSysmemLinearNonRgba() { return GetConfig().support_sysmem_linear_nonrgba(); }
 
 bool SupportsProtectedMemory() { return GetConfig().support_protected_memory(); }
+
+std::string DisabledTestPattern() { return GetConfig().disabled_test_pattern(); }

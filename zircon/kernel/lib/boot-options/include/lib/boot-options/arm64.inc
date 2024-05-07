@@ -50,7 +50,7 @@ the early boot kernel will use if it needs to panic and crash.
 If this is "disabled", the machine may enter an infinite loop on panic.
 )""")
 
-DEFINE_OPTION("kernel.arm64.phys.mmu", bool, phys_mmu, {true}, R"""(
+DEFINE_OPTION("kernel.arm64.phys.mmu", bool, arm64_phys_mmu, {true}, R"""(
 This enables use of the MMU and caches during the kernel's early boot phase.
 )""")
 

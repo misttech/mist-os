@@ -50,53 +50,36 @@ class Platform final {
 
 // A version represents a particular state of a platform.
 //
-// Versions are categorized like so:
+// The primary use case of FIDL versioning is to version the "fuchsia" platform
+// by API level, so versions are designed to accommodate API levels. A version
+// is one of the following 32-bit unsigned integers:
 //
-//     Finite
-//         Numeric -- 1, 2, ..., 2^63-1
-//         HEAD    -- the unstable, most up-to-date version
-//         LEGACY  -- HEAD plus legacy elements
-//     Infinite
-//         -inf    -- the infinite past
-//         +inf    -- the infinite future
+//     Normal
+//         1, ..., 2^31-1
+//     Special: see RFC-0246 for the definitions
+//         0xFFD00000  NEXT
+//         0xFFE00000  HEAD
+//         0xFFF00000  PLATFORM / LEGACY
+//     Infinite: only used internally to simplify algorithms
+//         0x00000000  -inf
+//         0xFFFFFFFF  +inf
 //
-// Infinite versions help avoid special cases in algorithms. For example, in a
-// FIDL library that has no @available attributes at all, everything is
-// considered added at HEAD and removed at +inf.
-//
-// A finite version's ordinal is the uint64 format specified in RFC-0083:
-//
-//               { numeric versions }                       HEAD  LEGACY
-//        o------o------o--- ... ---o------o--- ... ---o------o------o
-//        0      1      2        2^63-1   2^63     2^64-3  2^64-2  2^64-1
-//
-// Internally, this class uses a different format to represent -inf and +inf:
-//
-//      -inf     { numeric versions }                HEAD  LEGACY  +inf
-//        o------o------o--- ... ---o------o--- ... ---o------o------o
-//        0      1      2        2^63-1   2^63     2^64-2   2^64-1
-//
-// Note that HEAD and LEGACY are bumped down to make comparisons work properly.
+// All others (i.e. 2^31 and up, apart from the listed exceptions) are invalid.
 class Version final {
  public:
-  // Succeeds if `ordinal` corresponds to a finite version.
-  static std::optional<Version> From(uint64_t ordinal);
-  // Succeeds if `str` can be parsed as a numeric version, or is "HEAD" or "LEGACY".
+  // Succeeds if `number` corresponds to a valid finite version.
+  static std::optional<Version> From(uint32_t number);
+  // Succeeds if `str` is the decimal number or name of a valid finite version.
   static std::optional<Version> Parse(std::string_view str);
 
-  // Special version before all others. "Added at -inf" means "no beginning".
-  static constexpr Version NegInf() { return Version(0); }
-  // Special version after all others. "Removed at +inf" means "no end".
-  static constexpr Version PosInf() { return Version(std::numeric_limits<uint64_t>::max()); }
-  // Special version meaning "the unstable, most up-to-date version".
-  static constexpr Version Head() { return Version(std::numeric_limits<uint64_t>::max() - 2); }
-  // Special version that is like HEAD but includes legacy elements.
-  static constexpr Version Legacy() { return Version(std::numeric_limits<uint64_t>::max() - 1); }
-
-  // Returns the version's ordinal. Assumes the version is finite.
-  uint64_t ordinal() const;
-  // Returns a string representation of the version.
+  // Returns the version's underlying number.
+  uint32_t number() const { return value_; }
+  // Returns the version's name. Panics if this is not a special version.
+  std::string_view name() const;
+  // Returns the RFC-0246 canonical string representation of the version.
   std::string ToString() const;
+  // Returns the version that comes before this one. Panics if infinite.
+  Version Predecessor() const;
 
   constexpr bool operator==(const Version& rhs) const { return value_ == rhs.value_; }
   constexpr bool operator!=(const Version& rhs) const { return value_ != rhs.value_; }
@@ -105,11 +88,26 @@ class Version final {
   constexpr bool operator>(const Version& rhs) const { return value_ > rhs.value_; }
   constexpr bool operator>=(const Version& rhs) const { return value_ >= rhs.value_; }
 
- private:
-  constexpr explicit Version(uint64_t value) : value_(value) {}
+  // These are defined below because the Version type is incomplete here.
+  static const Version kNegInf;
+  static const Version kPosInf;
+  static const Version kNext;
+  static const Version kHead;
+  static const Version kLegacy;
+  static const Version kSpecialVersions[];
 
-  uint64_t value_;
+ private:
+  constexpr explicit Version(uint32_t value) : value_(value) {}
+
+  uint32_t value_;
 };
+
+constexpr Version Version::kNegInf(0);
+constexpr Version Version::kPosInf(UINT32_MAX);
+constexpr Version Version::kNext(0xFFD00000);
+constexpr Version Version::kHead(0xFFE00000);
+constexpr Version Version::kLegacy(0xFFF00000);
+constexpr Version Version::kSpecialVersions[] = {kNext, kHead, kLegacy};
 
 // A version range is a nonempty set of versions in some platform, from an
 // inclusive lower bound to an exclusive upper bound.
@@ -217,8 +215,8 @@ class Availability final {
   // case for calling `Inherit`. It never occurs as a final result.
   static constexpr Availability Unbounded() {
     Availability unbounded(State::kInherited);
-    unbounded.added_ = Version::NegInf();
-    unbounded.removed_ = Version::PosInf();
+    unbounded.added_ = Version::kNegInf;
+    unbounded.removed_ = Version::kPosInf;
     unbounded.ending_ = Ending::kNone;
     unbounded.legacy_ = Legacy::kNotApplicable;
     return unbounded;

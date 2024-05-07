@@ -22,13 +22,10 @@ pub struct ApiLevel(u64);
 impl ApiLevel {
     /// The `HEAD` pseudo-API level, representing the bleeding edge of
     /// development.
-    pub const HEAD: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFE);
+    pub const HEAD: ApiLevel = ApiLevel(4292870144);
 
-    /// The `LEGACY` pseudo-API level, which is used in platform builds.
-    ///
-    /// TODO: https://fxbug.dev/42085274 - Remove this once `LEGACY` is actually
-    /// gone, and use `HEAD` instead.
-    pub const LEGACY: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFF);
+    /// The `PLATFORM` pseudo-API level, which is used in platform builds.
+    pub const PLATFORM: ApiLevel = ApiLevel(4293918720);
 
     pub const fn from_u64(value: u64) -> Self {
         Self(value)
@@ -43,7 +40,7 @@ impl fmt::Debug for ApiLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ApiLevel::HEAD => write!(f, "ApiLevel::HEAD"),
-            ApiLevel::LEGACY => write!(f, "ApiLevel::LEGACY"),
+            ApiLevel::PLATFORM => write!(f, "ApiLevel::PLATFORM"),
             ApiLevel(l) => f.debug_tuple("ApiLevel").field(&l).finish(),
         }
     }
@@ -53,7 +50,7 @@ impl fmt::Display for ApiLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ApiLevel::HEAD => write!(f, "HEAD"),
-            ApiLevel::LEGACY => write!(f, "LEGACY"),
+            ApiLevel::PLATFORM => write!(f, "PLATFORM"),
             ApiLevel(l) => write!(f, "{}", l),
         }
     }
@@ -65,7 +62,7 @@ impl std::str::FromStr for ApiLevel {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "HEAD" => Ok(ApiLevel::HEAD),
-            "LEGACY" => Ok(ApiLevel::LEGACY),
+            "PLATFORM" => Ok(ApiLevel::PLATFORM),
             s => Ok(ApiLevel::from_u64(s.parse()?)),
         }
     }
@@ -264,7 +261,7 @@ impl VersionHistory {
     /// something that makes more sense.
     pub fn get_misleading_version_for_ffx(&self) -> Version {
         self.supported_versions()
-            .filter(|v| v.api_level != ApiLevel::HEAD && v.api_level != ApiLevel::LEGACY)
+            .filter(|v| v.api_level != ApiLevel::HEAD && v.api_level != ApiLevel::PLATFORM)
             .last()
             .unwrap()
     }
@@ -488,9 +485,9 @@ fn parse_version_history(bytes: &[u8]) -> anyhow::Result<Vec<Version>> {
         abi_revision: latest_abi_revision,
         status: Status::InDevelopment,
     });
-    // LEGACY version.
+    // PLATFORM version.
     versions.push(Version {
-        api_level: ApiLevel::LEGACY,
+        api_level: ApiLevel::PLATFORM,
         abi_revision: latest_abi_revision,
         status: Status::InDevelopment,
     });
@@ -554,7 +551,7 @@ mod tests {
                     status: Status::InDevelopment
                 },
                 Version {
-                    api_level: ApiLevel::LEGACY,
+                    api_level: ApiLevel::PLATFORM,
                     abi_revision: 0x50CBC6E8A39E1E2C.into(),
                     status: Status::InDevelopment
                 },
@@ -683,7 +680,7 @@ mod tests {
                 status: Status::InDevelopment,
             },
             Version {
-                api_level: ApiLevel::LEGACY,
+                api_level: ApiLevel::PLATFORM,
                 abi_revision: AbiRevision::from_u64(0x58ea445e942a0007),
                 status: Status::InDevelopment,
             },
@@ -736,7 +733,7 @@ mod tests {
 └── 6 (0x58ea445e942a0006)
 └── 7 (0x58ea445e942a0007)
 └── HEAD (0x58ea445e942a0007)
-└── LEGACY (0x58ea445e942a0007)"
+└── PLATFORM (0x58ea445e942a0007)"
             );
         assert_eq!(
                 AbiRevisionError::Unsupported {
@@ -748,20 +745,20 @@ mod tests {
 └── 6 (0x58ea445e942a0006)
 └── 7 (0x58ea445e942a0007)
 └── HEAD (0x58ea445e942a0007)
-└── LEGACY (0x58ea445e942a0007)"
+└── PLATFORM (0x58ea445e942a0007)"
             );
     }
 
     #[test]
     fn test_pretty_print_api_error() {
         let supported: Vec<ApiLevel> =
-            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::LEGACY];
+            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::PLATFORM];
 
         assert_eq!(
             ApiLevelError::Unknown { api_level: 42.into(), supported: supported.clone() }
                 .to_string(),
             "Unknown target API level: 42. Is the SDK too old to support it?
-The following API levels are supported: 5, 6, 7, HEAD, LEGACY",
+The following API levels are supported: 5, 6, 7, HEAD, PLATFORM",
         );
         assert_eq!(
             ApiLevelError::Unsupported {
@@ -770,14 +767,14 @@ The following API levels are supported: 5, 6, 7, HEAD, LEGACY",
             }
             .to_string(),
             "The SDK no longer supports API level 4.
-The following API levels are supported: 5, 6, 7, HEAD, LEGACY"
+The following API levels are supported: 5, 6, 7, HEAD, PLATFORM"
         );
     }
 
     #[test]
     fn test_check_api_level() {
         let supported: Vec<ApiLevel> =
-            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::LEGACY];
+            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::PLATFORM];
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(42.into()),
@@ -804,7 +801,7 @@ The following API levels are supported: 5, 6, 7, HEAD, LEGACY"
             Ok(0x58ea445e942a0007.into())
         );
         assert_eq!(
-            FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::LEGACY),
+            FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::PLATFORM),
             Ok(0x58ea445e942a0007.into())
         );
     }

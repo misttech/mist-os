@@ -15,6 +15,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",

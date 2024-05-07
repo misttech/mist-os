@@ -9,7 +9,6 @@ use {
             remote_client::{ClientRejection, RemoteClient},
             BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
         },
-        buffer::Buffer,
         ddk_converter::softmac_key_configuration_from_mlme,
         device::{self, DeviceOps},
         error::Error,
@@ -31,6 +30,7 @@ use {
         timer::EventId,
         TimeUnit,
     },
+    wlan_ffi_transport::Buffer,
     zerocopy::ByteSlice,
 };
 
@@ -495,12 +495,9 @@ impl InfraBss {
     pub fn handle_ctrl_frame<B: ByteSlice, D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        frame_ctrl: mac::FrameControl,
-        body: B,
+        ctrl_frame: mac::CtrlFrame<B>,
     ) -> Result<(), Rejection> {
-        match mac::CtrlBody::parse(frame_ctrl.ctrl_subtype(), body)
-            .ok_or(Rejection::FrameMalformed)?
-        {
+        match ctrl_frame.try_into_ctrl_body().ok_or(Rejection::FrameMalformed)? {
             mac::CtrlBody::PsPoll { ps_poll } => {
                 let client = match self.clients.get_mut(&ps_poll.ta) {
                     Some(client) => client,
@@ -639,7 +636,6 @@ mod tests {
         super::*,
         crate::{
             ap::remote_client::ClientEvent,
-            buffer::FakeCBufferProvider,
             device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -655,6 +651,7 @@ mod tests {
             test_utils::fake_frames::fake_wpa2_rsne,
             timer::{self, create_timer},
         },
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
     };
 
     lazy_static! {
@@ -668,7 +665,15 @@ mod tests {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID), time_stream)
+        (
+            Context::new(
+                fake_device,
+                BufferProvider::new(FakeFfiBufferProvider::new()),
+                timer,
+                *BSSID,
+            ),
+            time_stream,
+        )
     }
 
     async fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
@@ -2055,14 +2060,16 @@ mod tests {
 
         bss.handle_ctrl_frame(
             &mut ctx,
-            mac::FrameControl(0)
-                .with_frame_type(mac::FrameType::CTRL)
-                .with_ctrl_subtype(mac::CtrlSubtype::PS_POLL),
-            &[
-                0b00000001, 0b11000000, // Masked AID
-                2, 2, 2, 2, 2, 2, // RA
-                4, 4, 4, 4, 4, 4, // TA
-            ][..],
+            mac::CtrlFrame {
+                frame_ctrl: mac::FrameControl(0)
+                    .with_frame_type(mac::FrameType::CTRL)
+                    .with_ctrl_subtype(mac::CtrlSubtype::PS_POLL),
+                body: &[
+                    0b00000001, 0b11000000, // Masked AID
+                    2, 2, 2, 2, 2, 2, // RA
+                    4, 4, 4, 4, 4, 4, // TA
+                ][..],
+            },
         )
         .expect("expected OK");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);

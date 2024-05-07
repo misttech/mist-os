@@ -68,8 +68,8 @@ void SoftmacIfcBridge::Recv(RecvRequest& fdf_request, RecvCompleter::Sync& compl
 
   auto fidl_request_persisted = ::fidl::Persist(fidl_request);
   if (fidl_request_persisted.is_ok()) {
-    frame_processor_.ops->wlan_rx(frame_processor_.ctx, fidl_request_persisted.value().data(),
-                                  fidl_request_persisted.value().size());
+    frame_processor_.wlan_rx(frame_processor_.ctx, fidl_request_persisted.value().data(),
+                             fidl_request_persisted.value().size());
   } else {
     lerror("Failed to persist FrameProcessor.WlanRx fidl_request (FIDL error %s)",
            fidl_request_persisted.error_value());
@@ -92,8 +92,8 @@ zx::result<> SoftmacIfcBridge::EthernetTx(eth::BorrowedOperation<>* op,
   }
 
   auto result = zx::make_result(
-      frame_processor_.ops->ethernet_tx(frame_processor_.ctx, fidl_request_persisted.value().data(),
-                                        fidl_request_persisted.value().size()));
+      frame_processor_.ethernet_tx(frame_processor_.ctx, fidl_request_persisted.value().data(),
+                                   fidl_request_persisted.value().size()));
   return result;
 }
 

@@ -22,7 +22,6 @@ use std::{fs::File, path::PathBuf};
 pub trait FfxTool: FfxMain + Sized {
     type Command: FromArgs + SubCommand + ArgsInfo;
 
-    fn forces_stdout_log(&self) -> bool;
     fn supports_machine_output(&self) -> bool;
     fn has_schema(&self) -> bool;
 
@@ -99,10 +98,6 @@ struct MetadataRunner {
 
 #[async_trait(?Send)]
 impl ToolRunner for MetadataRunner {
-    fn forces_stdout_log(&self) -> bool {
-        false
-    }
-
     async fn run(self: Box<Self>, _metrics: MetricsSession) -> Result<ExitStatus> {
         // We don't ever want to emit metrics for a metadata query, it's a tool-level
         // command
@@ -123,10 +118,6 @@ impl ToolRunner for MetadataRunner {
 
 #[async_trait(?Send)]
 impl<T: FfxTool> ToolRunner for FhoTool<T> {
-    fn forces_stdout_log(&self) -> bool {
-        self.main.forces_stdout_log()
-    }
-
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
         metrics.print_notice(&mut std::io::stderr()).await?;
         let writer = TryFromEnv::try_from_env(&self.env).await?;

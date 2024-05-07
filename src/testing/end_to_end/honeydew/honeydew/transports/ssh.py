@@ -152,7 +152,7 @@ class SSH(ssh_interface.SSH):
             if stdout:
                 _LOGGER.debug("stdout returned by the command is: %s", stdout)
             if stderr:
-                _LOGGER.debug("stderr returned by the command is: %s", stdout)
+                _LOGGER.debug("stderr returned by the command is: %s", stderr)
             raise errors.SSHCommandError(
                 f"Unexpected returncode: {process.returncode}"
             )

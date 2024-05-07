@@ -57,16 +57,10 @@ zx_status_t sys_vmo_create(uint64_t size, uint32_t options, zx_handle_t* out) {
   if (res != ZX_OK)
     return res;
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  res = ContentSizeManager::Create(size, &content_size_manager);
-  if (res != ZX_OK) {
-    return res;
-  }
-
   // create a Vm Object dispatcher
   KernelHandle<VmObjectDispatcher> kernel_handle;
   zx_rights_t rights;
-  zx_status_t result = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
+  zx_status_t result = VmObjectDispatcher::Create(ktl::move(vmo), size,
                                                   VmObjectDispatcher::InitialMutability::kMutable,
                                                   &kernel_handle, &rights);
   if (result != ZX_OK)
@@ -305,25 +299,22 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
     initial_mutability = VmObjectDispatcher::InitialMutability::kImmutable;
   }
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  // A reference child shares the same content size manager as the parent.
-  if (options & ZX_VMO_CHILD_REFERENCE) {
-    content_size_manager = fbl::RefPtr(vmo->content_size_manager());
-  } else {
-    status = ContentSizeManager::Create(size, &content_size_manager);
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
   // create a Vm Object dispatcher
   KernelHandle<VmObjectDispatcher> kernel_handle;
   zx_rights_t default_rights;
-  zx_status_t result =
-      VmObjectDispatcher::Create(ktl::move(child_vmo), ktl::move(content_size_manager),
-                                 initial_mutability, &kernel_handle, &default_rights);
-  if (result != ZX_OK)
-    return result;
+
+  // A reference child shares the same content size manager as the parent.
+  if (options & ZX_VMO_CHILD_REFERENCE) {
+    status = VmObjectDispatcher::CreateWithCsm(ktl::move(child_vmo),
+                                               fbl::RefPtr(vmo->content_size_manager()),
+                                               initial_mutability, &kernel_handle, &default_rights);
+  } else {
+    status = VmObjectDispatcher::Create(ktl::move(child_vmo), size, initial_mutability,
+                                        &kernel_handle, &default_rights);
+  }
+  if (status != ZX_OK) {
+    return status;
+  }
 
   // Set the rights to the new handle to no greater than the input (parent) handle minus the RESIZE
   // right, which is added independently based on ZX_VMO_CHILD_RESIZABLE; it is possible for a

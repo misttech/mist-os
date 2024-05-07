@@ -486,7 +486,6 @@ async fn main() {
           present_parameters = sched_lib.wait_to_update().fuse() => {
             trace::duration!(c"gfx", c"FlatlandApp::PresentBegin");
             app.draw(present_parameters.expected_presentation_time, renderer.deref_mut());
-            trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
             trace::flow_begin!(c"gfx", c"Flatland::PerAppPresent[flatland-view-provider-example]", present_count.into());
             present_count += 1;
             flatland

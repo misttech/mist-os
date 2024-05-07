@@ -5,17 +5,26 @@
 """Mobly test for wlan affordance."""
 
 import logging
+import time
 
+from antlion.controllers import access_point
+from antlion.controllers.ap_lib import hostapd_constants
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts, test_runner
+from mobly import asserts, signals, test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.wlan import WlanMacRole
+from honeydew.typing.wlan import (
+    ClientStatusConnected,
+    ClientStatusConnecting,
+    ClientStatusIdle,
+    CountryCode,
+    WlanMacRole,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+TIME_TO_WAIT_FOR_COUNTRY_CODE = 10
 
 
-# TODO(b/323406186): Add remaining mult-device functional tests
 class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
     """Wlan affordance tests"""
 
@@ -24,20 +33,23 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
 
         It does the following things:
             * Assigns `device` variable with FuchsiaDevice object
+            * Assigns `access_point` variable with AccessPoint object
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-    def test_get_phy_id_list(self) -> None:
-        """Test case for wlan.get_phy_id_list().
+        self.access_points: list[
+            access_point.AccessPoint
+        ] = self.register_controller(access_point)
 
-        This test gets physical specifications for implementing WLAN on this device.
-        """
-        res = self.device.wlan.get_phy_id_list()
-        asserts.assert_is_not_none(res, [])
+        if len(self.access_points) < 1:
+            raise signals.TestAbortClass(
+                "At least one access point is required"
+            )
+        self.access_point: access_point.AccessPoint = self.access_points[0]
 
     def test_iface_methods(self) -> None:
-        """Test case for basic single device wlan iface methods.
+        """Test case for device wlan iface methods.
 
         This test gets the list of phy IDs present, creates an iface, then checks that
         is exists by querying it, then calls destroy on the iface, and finally gets the
@@ -45,14 +57,13 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
 
         This test case calls the following wlan methods:
             * wlan.get_phy_id_list()
+            * wlan.get_iface_id_list()
             * wlan.create_iface()
             * wlan.query_iface()
             * wlan.destroy_iface()
-            * wlan.get_iface_id_list()
         """
-        # We check here to make sure there is an intel WiFi driver on the device. If
-        # there is not one, we pass because there is no create_iface for a null
-        # "sta_addr" field except in the intel WiFi drivers.
+        # We check here to make sure the device is running a softmac WLAN driver.
+        # If not, we run basic tests without create_iface().
         # TODO(b/328500376): Add WLAN affordance method for this or remove if not
         # needed.
         driver_list = self.device.ffx.run(["driver", "list"])
@@ -74,11 +85,84 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
 
             asserts.assert_equal(iface_ids, expected_iface_ids)
         else:
-            _LOGGER.info(
-                "This test is not applicable to the hardware setup. It is "
-                "only used to test a functionality present on intel WiFi "
-                "drivers."
+            phy_ids = self.device.wlan.get_phy_id_list()
+            iface_ids = self.device.wlan.get_iface_id_list()
+            if iface_ids:
+                self.device.wlan.destroy_iface(iface_ids[0])
+
+    def test_basic_device_methods(self) -> None:
+        """Test case for basic single device wlan methods.
+
+        This test sets the region then gets the phy_ids present. It then checks that the
+        country code set to the phy_id matches what was set at the start.
+
+        This test case calls the following wlan methods:
+            * wlan.set_region
+            * wlan.get_phy_id_list
+            * wlan.get_country
+        """
+        # TODO(http://b/337930095): Add the remaining board specific country code tests.
+        phy_ids = self.device.wlan.get_phy_id_list()
+        self.device.wlan.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
+
+        end_time = time.time() + TIME_TO_WAIT_FOR_COUNTRY_CODE
+        while time.time() < end_time:
+            country_resp = self.device.wlan.get_country(phy_ids[0])
+            if country_resp == CountryCode.UNITED_STATES_OF_AMERICA:
+                break
+            _LOGGER.debug(f"Country code resp: {country_resp}")
+            time.sleep(1)
+        else:
+            raise signals.TestFailure(
+                f"Failed to set country code: {country_resp}"
             )
+
+    def test_scan_and_connect(self) -> None:
+        """Test case for scanning, connecting and disconnecting to a network.
+
+        This test sets up an access point with a network, then scans and connects to
+        that network. If the connect returns true we know it was successful. The test
+        then calls disconnect and checks that the status is idle.
+
+        This test case calls the following wlan methods:
+            * wlan.scan_for_bss_info()
+            * wlan.connect()
+            * wlan.disconnect()
+            * wlan.status()
+        """
+        test_ssid = "test"
+        access_point.setup_ap(
+            access_point=self.access_point,
+            profile_name="whirlwind",
+            channel=hostapd_constants.AP_DEFAULT_CHANNEL_2G,
+            ssid=test_ssid,
+        )
+
+        bss_scan_response = self.device.wlan.scan_for_bss_info()
+        bss_desc_for_ssid = bss_scan_response.get(test_ssid)
+        if bss_desc_for_ssid:
+            asserts.assert_true(
+                self.device.wlan.connect(
+                    ssid=test_ssid, password=None, bss_desc=bss_desc_for_ssid[0]
+                ),
+                "Failed to connect.",
+            )
+        else:
+            asserts.fail("Scan did not find bss descriptions for test ssid")
+
+        self.device.wlan.disconnect()
+        status = self.device.wlan.status()
+        match status:
+            case ClientStatusIdle():
+                _LOGGER.debug(status)
+            case ClientStatusConnecting():
+                asserts.fail("Status did not return idle")
+            case ClientStatusConnected():
+                asserts.fail("Status did not return idle")
+            case _:
+                asserts.fail(
+                    f"Did not return a valid status response: {status}"
+                )
 
 
 if __name__ == "__main__":

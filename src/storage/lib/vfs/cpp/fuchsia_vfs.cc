@@ -184,17 +184,6 @@ bool FuchsiaVfs::IsTokenAssociatedWithVnode(zx::event token) {
   return TokenToVnode(std::move(token), nullptr) == ZX_OK;
 }
 
-zx::result<bool> FuchsiaVfs::EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
-                                          CreationType type, bool allow_existing,
-                                          fuchsia_io::Rights parent_rights,
-                                          fbl::RefPtr<Vnode>* out_vn) {
-  zx::result result = Vfs::EnsureExists(vndir, path, type, allow_existing, parent_rights, out_vn);
-  if (result.is_ok() && result.value()) {
-    vndir->Notify(path, fio::wire::WatchEvent::kAdded);
-  }
-  return result;
-}
-
 zx_status_t FuchsiaVfs::TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) {
   zx::result koid = GetObjectKoid(token);
   if (koid.is_error()) {
@@ -330,17 +319,23 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
   if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
     return result.error_value();
   }
-  VnodeProtocol protocol = VnodeProtocol::kNode;
-  if (!(options.flags & fio::OpenFlags::kNodeReference)) {
-    zx::result negotiated = NegotiateProtocol(options.protocols() & vnode->GetProtocols());
+  // Determine the protocol we should use to serve |vnode| based on |options|.
+  VnodeProtocol protocol;
+  if (options.flags & fio::OpenFlags::kNodeReference) {
+    protocol = VnodeProtocol::kNode;
+  } else {
+    zx::result negotiated = internal::NegotiateProtocol(vnode->GetProtocols(), options.protocols());
     if (negotiated.is_error()) {
       return negotiated.error_value();
     }
     protocol = *negotiated;
   }
+  // Downscope the set of rights granted to this connection to only include those which are relevant
+  // for the protocol which will be served.
+  options.rights = internal::DownscopeRights(options.rights, protocol);
+
   fidl::ServerEnd<fuchsia_io::Node> node(std::move(server_end));
   std::unique_ptr<internal::Connection> connection;
-
   switch (protocol) {
     case VnodeProtocol::kFile: {
       zx::result koid = GetObjectKoid(node.channel());

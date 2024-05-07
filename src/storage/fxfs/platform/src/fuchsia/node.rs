@@ -6,9 +6,11 @@ use {
     crate::fuchsia::{directory::FxDirectory, file::FxFile},
     futures::future::poll_fn,
     fxfs::object_store::ObjectDescriptor,
+    fxfs_macros::ToWeakNode,
     std::{
         any::TypeId,
         collections::{btree_map::Entry, BTreeMap},
+        mem::ManuallyDrop,
         sync::{Arc, Mutex, Weak},
         task::{Poll, Waker},
     },
@@ -16,7 +18,7 @@ use {
 };
 
 /// FxNode is a node in the filesystem hierarchy (either a file or directory).
-pub trait FxNode: IntoAny + Send + Sync + 'static {
+pub trait FxNode: IntoAny + ToWeakNode + Send + Sync + 'static {
     fn object_id(&self) -> u64;
     fn parent(&self) -> Option<Arc<FxDirectory>>;
     fn set_parent(&self, parent: Arc<FxDirectory>);
@@ -35,6 +37,7 @@ struct PlaceholderInner {
     wakers: Vec<Waker>,
 }
 
+#[derive(ToWeakNode)]
 struct Placeholder(Mutex<PlaceholderInner>);
 
 impl FxNode for Placeholder {
@@ -68,7 +71,7 @@ impl PlaceholderOwner<'_> {
         let this_object_id = self.inner.object_id();
         assert_eq!(node.object_id(), this_object_id);
         self.committed = true;
-        self.cache.commit(node.clone());
+        self.cache.commit(node);
     }
 }
 
@@ -101,8 +104,87 @@ impl<'a> GetResult<'a> {
     }
 }
 
+/// WeakNode permits `upgrade_and_downcast_node` below which only tries to upgrade if we know the
+/// downcast will work.  This makes for a simpler and more performant implementation of `FileIter`
+/// which would otherwise have to jump through some hoops to drop the reference count whilst not
+/// holding locks if the downcast fails.
+pub struct WeakNode {
+    vtable: &'static WeakNodeVTable,
+    node: *const (),
+}
+
+impl WeakNode {
+    // This is unsafe because the caller must make sure `node` comes from `Weak<T>::into_raw` and
+    // provide correct implementations for the functions in `vtable`.
+    pub(crate) unsafe fn new(vtable: &'static WeakNodeVTable, node: *const ()) -> Self {
+        Self { vtable, node }
+    }
+}
+
+impl Drop for WeakNode {
+    fn drop(&mut self) {
+        // SAFETY: See the implementation of `ToWeakNode` in `macros.rs`.  `node` should be a
+        // pointer that came from `Weak<T>::into_raw`.  The `drop` function needs to use
+        // `Weak::from_raw`.
+        unsafe {
+            (self.vtable.drop)(self.node);
+        }
+    }
+}
+
+// SAFETY: `node` comes from `Weak<T>::into_raw` which is safe to send across threads.
+unsafe impl Send for WeakNode {}
+
+pub(crate) struct WeakNodeVTable {
+    // This should convert the pointer back to `Weak<T>` to drop it.
+    drop: unsafe fn(*const ()),
+
+    // Returns the `TypeId::of::<T>` for `Weak<T>`.
+    type_id: unsafe fn() -> TypeId,
+
+    // Tries to upgrade the `Weak<T>` and returns `Arc<dyn FxNode>`.
+    upgrade: unsafe fn(*const ()) -> Option<Arc<dyn FxNode>>,
+}
+
+impl WeakNodeVTable {
+    pub(crate) const fn new(
+        drop: unsafe fn(*const ()),
+        type_id: unsafe fn() -> TypeId,
+        upgrade: unsafe fn(*const ()) -> Option<Arc<dyn FxNode>>,
+    ) -> Self {
+        Self { drop, type_id, upgrade }
+    }
+}
+
+/// Used to convert nodes into `WeakNode` which is stored in the cache.  This should be implemented
+/// using the `ToWeakNode` derive macro.
+pub trait ToWeakNode {
+    fn to_weak_node(self: Arc<Self>) -> WeakNode;
+}
+
+/// Upgrades and downcasts as a single step.  This won't do the upgrade if the downcast will fail,
+/// which avoids issues with dropping the reference whilst locks are held.
+fn upgrade_and_downcast_node<T: 'static>(weak_node: &WeakNode) -> Option<Arc<T>> {
+    // SAFETY: We check `T` matches before converting the pointer (which should be the result of
+    // `Weak<T>::into_raw`), back to `Weak<T>`.
+    unsafe {
+        if (weak_node.vtable.type_id)() == TypeId::of::<T>() {
+            ManuallyDrop::new(Weak::from_raw(weak_node.node as *const T)).upgrade()
+        } else {
+            None
+        }
+    }
+}
+
+/// Upgrades to `Arc<dyn FxNode>`.
+fn upgrade_node(weak_node: &WeakNode) -> Option<Arc<dyn FxNode>> {
+    // SAFETY: Safe if `WeakNode::new` is called correctly and the `upgrade` function is implemented
+    // correctly.  See the implementation in `macros.rs`.
+    unsafe { (weak_node.vtable.upgrade)(weak_node.node) }
+}
+
 struct NodeCacheInner {
-    map: BTreeMap<u64, Weak<dyn FxNode>>,
+    map: BTreeMap<u64, WeakNode>,
     next_waker_sequence: u64,
 }
 
@@ -123,9 +205,8 @@ impl<'a> Iterator for FileIter<'a> {
             None => cache.map.range(0..),
             Some(oid) => cache.map.range(oid + 1..),
         };
-        for (object_id, file) in range {
-            if let Some(file) = file.upgrade().and_then(|f| f.into_any().downcast::<FxFile>().ok())
-            {
+        for (object_id, node) in range {
+            if let Some(file) = upgrade_and_downcast_node(node) {
                 self.object_id = Some(*object_id);
                 return Some(file);
             }
@@ -151,7 +232,7 @@ impl NodeCache {
         poll_fn(|cx| {
             let mut this = self.0.lock().unwrap();
             if let Some(node) = this.map.get(&object_id) {
-                if let Some(node) = node.upgrade() {
+                if let Some(node) = upgrade_node(node) {
                     if let Ok(placeholder) = node.clone().into_any().downcast::<Placeholder>() {
                         let mut inner = placeholder.0.lock().unwrap();
                         if inner.waker_sequence == waker_sequence {
@@ -173,7 +254,7 @@ impl NodeCache {
                 waker_sequence: this.next_waker_sequence,
                 wakers: vec![],
             })));
-            this.map.insert(object_id, Arc::downgrade(&inner) as Weak<dyn FxNode>);
+            this.map.insert(object_id, inner.clone().to_weak_node());
             Poll::Ready(GetResult::Placeholder(PlaceholderOwner {
                 inner,
                 committed: false,
@@ -195,9 +276,7 @@ impl NodeCache {
             // Note this ugly cast in place of `std::ptr::eq(o.get().as_ptr(), node)` here is
             // to ensure we don't compare vtable pointers, which are not strictly guaranteed to be
             // the same across casts done in different code generation units at compilation time.
-            if o.get().as_ptr() as *const dyn FxNode as *const u8
-                == node as *const dyn FxNode as *const u8
-            {
+            if o.get().node == node as *const dyn FxNode as *const () {
                 o.remove();
             }
         }
@@ -205,7 +284,7 @@ impl NodeCache {
 
     /// Returns the given node if present in the cache.
     pub fn get(&self, object_id: u64) -> Option<Arc<dyn FxNode>> {
-        self.0.lock().unwrap().map.get(&object_id).and_then(Weak::upgrade)
+        self.0.lock().unwrap().map.get(&object_id).and_then(|n| upgrade_node(n))
     }
 
     /// Returns an iterator over all files in the cache.
@@ -216,15 +295,15 @@ impl NodeCache {
     pub fn terminate(&self) {
         let nodes = std::mem::take(&mut self.0.lock().unwrap().map);
         for (_, node) in nodes {
-            if let Some(node) = node.upgrade() {
+            if let Some(node) = upgrade_node(&node) {
                 node.terminate();
             }
         }
     }
 
-    fn commit(&self, node: Arc<dyn FxNode>) {
+    fn commit(&self, node: &Arc<dyn FxNode>) {
         let mut this = self.0.lock().unwrap();
-        this.map.insert(node.object_id(), Arc::downgrade(&node));
+        this.map.insert(node.object_id(), node.clone().to_weak_node());
     }
 }
 
@@ -284,6 +363,7 @@ mod tests {
         fuchsia_async as fasync,
         futures::future::join_all,
         fxfs::object_store::ObjectDescriptor,
+        fxfs_macros::ToWeakNode,
         std::{
             sync::{
                 atomic::{AtomicU64, Ordering},
@@ -293,6 +373,7 @@ mod tests {
         },
     };
 
+    #[derive(ToWeakNode)]
     struct FakeNode(u64, Arc<NodeCache>);
     impl FxNode for FakeNode {
         fn object_id(&self) -> u64 {

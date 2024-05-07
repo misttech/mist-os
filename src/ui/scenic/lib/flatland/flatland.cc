@@ -231,7 +231,6 @@ Flatland::~Flatland() {
 
 void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   TRACE_DURATION("gfx", "Flatland::Present", "debug_name", TA_STRING(debug_name_.c_str()));
-  TRACE_FLOW_END("gfx", "Flatland::Present", present_count_);
 
   std::string per_app_tracing_name = "Flatland::PerAppPresent[" + debug_name_ + "]";
   TRACE_DURATION("gfx", per_app_tracing_name.c_str());

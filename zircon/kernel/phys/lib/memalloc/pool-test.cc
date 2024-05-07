@@ -7,6 +7,7 @@
 #include <lib/fit/defer.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
+#include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
@@ -2505,6 +2506,406 @@ TEST(MemallocPoolTests, MarkAsPeripheralOverlapsWithNonPeripheral) {
                       .type = memalloc::Type::kPeripheral,
                   })
                   .is_error());
+}
+
+TEST(MemallocPoolTests, CoalescePeripheralSingleRunAtStart) {
+  PoolContext ctx;
+
+  // Try alignment with realistic values.
+  constexpr uint64_t kKb = 1ull << 10;
+  constexpr uint64_t kMb = 1ull << 20;
+  constexpr uint64_t kGb = 1ull << 30;
+
+  Range ranges[] = {
+      // free ram: [3, 5)]
+      {
+          .addr = 3 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+      // reserved: [5, 9)
+      {
+          .addr = 5 * kGb,
+          .size = 4 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 256 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 756 * kMb,
+                      .size = 1 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  ASSERT_TRUE(coalesce_result.is_ok());
+  constexpr Range kExpected[] = {
+      {
+          .addr = 0,
+          .size = kGb,
+          .type = Type::kPeripheral,
+      },
+      {
+          .addr = 3 * kGb,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kGb + kChunkSize,
+          .size = 6 * kGb - kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ctx.pool.PrintMemoryRanges("test");
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, CoalescePeripheralWorseAlignment) {
+  PoolContext ctx;
+
+  // Try alignment with realistic values.
+  constexpr uint64_t kKb = 1ull << 10;
+  constexpr uint64_t kMb = 1ull << 20;
+  constexpr uint64_t kGb = 1ull << 30;
+
+  Range ranges[] = {
+      // free ram: [3, 5.5)]
+      {
+          .addr = 3 * kGb,
+          .size = 2 * kGb + 512 * kMb,
+          .type = Type::kFreeRam,
+      },
+      // free ram: [6.5, 9)
+      {
+          .addr = 6 * kGb + 512 * kMb,
+          .size = 4 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 5 * kGb + 517 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 6 * kGb + 511 * kMb,
+                      .size = 1 * kMb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  ASSERT_TRUE(coalesce_result.is_ok());
+  constexpr Range kExpected[] = {
+      {
+          .addr = 3 * kGb,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kGb + kChunkSize,
+          .size = 2 * kGb + 512 * kMb - kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      {
+          // Aligned to 2 MB boundary since 1GB is not feasible.
+          .addr = 5 * kGb + 516 * kMb,
+          .size = 1020 * kMb,
+          .type = Type::kPeripheral,
+      },
+      {
+          .addr = 6 * kGb + 512 * kMb,
+          .size = 4 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, CoalescePeripheralSingleRunAtMiddle) {
+  PoolContext ctx;
+
+  // Try alignment with realistic values.
+  constexpr uint64_t kKb = 1ull << 10;
+  constexpr uint64_t kMb = 1ull << 20;
+  constexpr uint64_t kGb = 1ull << 30;
+
+  Range ranges[] = {
+      // free ram: [3, 5)]
+      {
+          .addr = 3 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+      // reserved: [5, 9)
+      {
+          .addr = 7 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 5 * kGb + 256 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 6 * kGb + 756 * kMb,
+                      .size = 1 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  ASSERT_TRUE(coalesce_result.is_ok());
+  constexpr Range kExpected[] = {
+      {
+          .addr = 3 * kGb,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kGb + kChunkSize,
+          .size = 2 * kGb - kChunkSize,
+          .type = Type::kFreeRam,
+      },
+
+      {
+          .addr = 5 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kPeripheral,
+      },
+      {
+          .addr = 7 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, CoalescePeripheralSingleRunAtEnd) {
+  PoolContext ctx;
+
+  // Try alignment with realistic values.
+  constexpr uint64_t kKb = 1ull << 10;
+  constexpr uint64_t kMb = 1ull << 20;
+  constexpr uint64_t kGb = 1ull << 30;
+
+  Range ranges[] = {
+      // free ram: [3, 5)]
+      {
+          .addr = 3 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+      // reserved: [5, 9)
+      {
+          .addr = 7 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 9 * kGb + 256 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 15 * kGb + 756 * kMb,
+                      .size = 1 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  ASSERT_TRUE(coalesce_result.is_ok());
+  constexpr Range kExpected[] = {
+      {
+          .addr = 3 * kGb,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kGb + kChunkSize,
+          .size = 2 * kGb - kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 7 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 9 * kGb,
+          .size = 7 * kGb,
+          .type = Type::kPeripheral,
+      },
+  };
+
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, CoalescePeripheralMultipleRuns) {
+  PoolContext ctx;
+
+  // Try alignment with realistic values.
+  constexpr uint64_t kKb = 1ull << 10;
+  constexpr uint64_t kMb = 1ull << 20;
+  constexpr uint64_t kGb = 1ull << 30;
+
+  Range ranges[] = {
+      // free ram: [3, 5)]
+      {
+          .addr = 3 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+      // free ram: [5, 9)
+      {
+          .addr = 7 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  // At start.
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 0 * kGb + 256 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 1 * kGb + 512 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 2 * kGb + 256 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  // At middle
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 5 * kGb + 256 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 6 * kGb,
+                      .size = 18 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 6 * kGb + 756 * kMb,
+                      .size = 15 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  // At end
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 11 * kGb + 900 * kMb,
+                      .size = 256 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 12 * kGb + 2 * kMb,
+                      .size = 1 * kKb,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_ok());
+
+  auto coalesce_result = ctx.pool.CoalescePeripherals(cpp20::to_array<size_t>({30, 21, 12}));
+  ASSERT_TRUE(coalesce_result.is_ok());
+  constexpr Range kExpected[] = {
+      {
+          .addr = 0 * kGb,
+          .size = 3 * kGb,
+          .type = Type::kPeripheral,
+      },
+      {
+          .addr = 3 * kGb,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kGb + kChunkSize,
+          .size = 2 * kGb - kChunkSize,
+          .type = Type::kFreeRam,
+      },
+
+      {
+          .addr = 5 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kPeripheral,
+      },
+
+      {
+          .addr = 7 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 11 * kGb,
+          .size = 2 * kGb,
+          .type = Type::kPeripheral,
+      },
+  };
+
+  TestPoolContents(ctx.pool, kExpected);
 }
 
 TEST(RangeTest, IntersectsWith) {

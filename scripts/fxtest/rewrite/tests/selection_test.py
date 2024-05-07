@@ -467,6 +467,31 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             selection.PERFECT_MATCH_DISTANCE,
         )
 
+        # Test that selecting for the full path of a host test matches exactly.
+        host_exact = await selection.select_tests(
+            tests,
+            ["host_x64/binary_test"],
+            exact_match=True,
+        )
+        self.assertEqual(1, len(host_exact.selected))
+        self.assertEqual(
+            host_exact.best_score["host_x64/binary_test"],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+
+        # Test that selecting for the final path segment of a host
+        # test matches exactly.
+        host_exact = await selection.select_tests(
+            tests,
+            ["binary_test"],
+            exact_match=True,
+        )
+        self.assertEqual(1, len(host_exact.selected))
+        self.assertEqual(
+            host_exact.best_score["host_x64/binary_test"],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+
     async def test_perfect_match_omits_approximate_match(self) -> None:
         """Test that fuzzy matching is not used if there is a perfect match."""
 

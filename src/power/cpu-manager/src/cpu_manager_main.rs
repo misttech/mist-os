@@ -1242,48 +1242,46 @@ mod tests {
     async fn test_thermal_state_validation() {
         // Since CpuManagerMainBuilder::build() exits early, we need a custom constructor for Handlers
         // that omits expectations for messages that are never sent.
-        impl Handlers {
-            fn new_for_failed_validation() -> Self {
-                let mut mock_maker = MockNodeMaker::new();
+        fn new_handlers_for_failed_validation() -> Handlers {
+            let mut mock_maker = MockNodeMaker::new();
 
-                // The big and little cluster handlers are initially queried for all performance
-                // states.
-                let big_cluster = mock_maker.make(
-                    "big_cluster_handler",
-                    vec![(
-                        msg_eq!(GetCpuOperatingPoints),
-                        msg_ok_return!(GetCpuOperatingPoints(Vec::from(&BIG_OPPS[..]))),
-                    )],
-                );
-                let little_cluster = mock_maker.make(
-                    "little_cluster_handler",
-                    vec![(
-                        msg_eq!(GetCpuOperatingPoints),
-                        msg_ok_return!(GetCpuOperatingPoints(Vec::from(&LITTLE_OPPS[..]))),
-                    )],
-                );
+            // The big and little cluster handlers are initially queried for all performance
+            // states.
+            let big_cluster = mock_maker.make(
+                "big_cluster_handler",
+                vec![(
+                    msg_eq!(GetCpuOperatingPoints),
+                    msg_ok_return!(GetCpuOperatingPoints(Vec::from(&BIG_OPPS[..]))),
+                )],
+            );
+            let little_cluster = mock_maker.make(
+                "little_cluster_handler",
+                vec![(
+                    msg_eq!(GetCpuOperatingPoints),
+                    msg_ok_return!(GetCpuOperatingPoints(Vec::from(&LITTLE_OPPS[..]))),
+                )],
+            );
 
-                // The syscall handler provides the number of CPUs during initialization.
-                let num_cpus = BIG_CPU_NUMBERS.len() + LITTLE_CPU_NUMBERS.len();
-                let syscall = mock_maker.make(
-                    "syscall_handler",
-                    vec![(msg_eq!(GetNumCpus), msg_ok_return!(GetNumCpus(num_cpus as u32)))],
-                );
+            // The syscall handler provides the number of CPUs during initialization.
+            let num_cpus = BIG_CPU_NUMBERS.len() + LITTLE_CPU_NUMBERS.len();
+            let syscall = mock_maker.make(
+                "syscall_handler",
+                vec![(msg_eq!(GetNumCpus), msg_ok_return!(GetNumCpus(num_cpus as u32)))],
+            );
 
-                Self {
-                    big_cluster,
-                    little_cluster,
-                    syscall,
-                    cpu_stats: mock_maker.make("cpu_stats_handler", Vec::new()),
-                    _mock_maker: mock_maker,
-                }
+            Handlers {
+                big_cluster,
+                little_cluster,
+                syscall,
+                cpu_stats: mock_maker.make("cpu_stats_handler", Vec::new()),
+                _mock_maker: mock_maker,
             }
         }
 
         let cluster_configs = make_default_cluster_configs();
 
         // Not allowed: Increasing dynamic power.
-        let handlers = Handlers::new_for_failed_validation();
+        let handlers = new_handlers_for_failed_validation();
         let thermal_state_configs = vec![
             ThermalStateConfig {
                 cluster_opps: vec![0, 0],
@@ -1310,7 +1308,7 @@ mod tests {
         assert!(builder.build().unwrap().init().await.is_err());
 
         // Not allowed: Increasing performance capacity.
-        let handlers = Handlers::new_for_failed_validation();
+        let handlers = new_handlers_for_failed_validation();
         let thermal_state_configs = vec![
             ThermalStateConfig {
                 cluster_opps: vec![2, 2],
@@ -1366,7 +1364,7 @@ mod tests {
 
         // Not allowed: The second state has higher power draw at the first performance at which
         // both states are admissible.
-        let handlers = Handlers::new_for_failed_validation();
+        let handlers = new_handlers_for_failed_validation();
         let thermal_state_configs = vec![
             ThermalStateConfig {
                 cluster_opps: vec![0, 0],

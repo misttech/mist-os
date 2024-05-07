@@ -46,6 +46,12 @@ struct ConstantValue {
   virtual bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const = 0;
   virtual std::unique_ptr<ConstantValue> Clone() const = 0;
 
+  // Assserts this is a NumericConstantValue and returns the number.
+  template <typename ValueType>
+  ValueType AsNumeric() const;
+  // Asserts this is a StringConstantValue and returns the string.
+  std::string_view AsString() const;
+
   const Kind kind;
 
  protected:
@@ -117,9 +123,6 @@ struct NumericConstantValue final : ConstantValue {
     return NumericConstantValue<ValueType>(std::numeric_limits<ValueType>::max());
   }
 
-  ValueType value;
-
- private:
   constexpr static Kind GetKind() {
     if constexpr (std::is_same_v<ValueType, uint64_t>)
       return Kind::kUint64;
@@ -143,6 +146,9 @@ struct NumericConstantValue final : ConstantValue {
       return Kind::kFloat32;
   }
 
+  ValueType value;
+
+ private:
   template <typename TargetType>
   bool ConvertTo(std::unique_ptr<ConstantValue>* out_value) const;
 };
@@ -150,6 +156,12 @@ struct NumericConstantValue final : ConstantValue {
 using SizeValue = NumericConstantValue<uint32_t>;
 using HandleSubtypeValue = NumericConstantValue<uint32_t>;
 using HandleRightsValue = NumericConstantValue<RightsWrappedType>;
+
+template <typename ValueType>
+ValueType ConstantValue::AsNumeric() const {
+  ZX_ASSERT(kind == NumericConstantValue<ValueType>::GetKind());
+  return static_cast<const NumericConstantValue<ValueType>*>(this)->value;
+}
 
 struct BoolConstantValue final : ConstantValue {
   explicit BoolConstantValue(bool value)

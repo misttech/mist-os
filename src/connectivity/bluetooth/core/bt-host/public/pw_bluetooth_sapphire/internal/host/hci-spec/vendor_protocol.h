@@ -20,7 +20,7 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 
-#include <pw_bluetooth/hci_vendor.emb.h>
+#include <pw_bluetooth/hci_android.emb.h>
 
 namespace bt::hci_spec::vendor::android {
 

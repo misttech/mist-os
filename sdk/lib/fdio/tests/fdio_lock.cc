@@ -35,9 +35,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <future>
-#include <memory>
-#include <semaphore>
 #include <thread>
 #include <vector>
 
@@ -45,8 +42,6 @@
 
 #ifdef __Fuchsia__
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/unsafe.h>
@@ -54,14 +49,11 @@
 #include <lib/zxio/zxio.h>
 #include <zircon/process.h>
 
-#include "src/storage/memfs/mounted_memfs.h"
-
-static constexpr char flock_root[] = "/flock_test";
-#else
-static constexpr char flock_root[] = "/tmp";
 #endif
 
 namespace {
+
+constexpr char kFlockFilePath[] = "/tmp/flock_smoke";
 
 // These tests are deterministic, but rely
 // on polling. We need to wait durings polls
@@ -157,33 +149,14 @@ class LockThread {
 };
 
 class TempFile {
-  std::string file_name_;
   ssize_t size_;
   std::vector<int> fds_;
   bool use_first_fd_;
-#ifdef __Fuchsia__
-  std::optional<MountedMemfs> memfs_;
-  async::Loop loop_;
-#endif
 
  public:
   TempFile() : TempFile(FILE_SIZE) {}
-  explicit TempFile(ssize_t size)
-      : file_name_(flock_root + std::string("/flock_smoke")),
-        size_(size)
-#ifdef __Fuchsia__
-        ,
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread)
-#endif
-  {
-
-#ifdef __Fuchsia__
-    ASSERT_OK(loop_.StartThread());
-    zx::result memfs = MountedMemfs::Create(loop_.dispatcher(), flock_root);
-    ASSERT_OK(memfs);
-    memfs_.emplace(std::move(memfs.value()));
-#endif
-    int fd = open(file_name_.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  explicit TempFile(ssize_t size) : size_(size) {
+    int fd = open(kFlockFilePath, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     use_first_fd_ = true;  // first |GetFd| gets this one
     EXPECT_LT(-1, fd);
     fds_.push_back(fd);
@@ -195,17 +168,7 @@ class TempFile {
 
   ~TempFile() {
     std::for_each(fds_.begin(), fds_.end(), &close);
-    unlink(file_name_.c_str());
-
-#ifdef __Fuchsia__
-    if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
-      std::promise<zx_status_t> promise;
-      memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
-      ASSERT_OK(promise.get_future().get(), );
-    }
-
-    loop_.Shutdown();
-#endif
+    unlink(kFlockFilePath);
   }
 
   int GetFd() {
@@ -214,15 +177,19 @@ class TempFile {
       use_first_fd_ = false;
       return fds_[0];
     }
-    int fd = open(file_name_.c_str(), O_RDWR);
+    int fd = open(kFlockFilePath, O_RDWR);
     EXPECT_LT(-1, fd);
     return fd;
   }
 };
 
 TEST(LockingTest, OpenClose) {
-  { TempFile tmp(FILE_SIZE); }
-  { TempFile tmp(FILE_SIZE); }
+  {
+    TempFile tmp(FILE_SIZE);
+  }
+  {
+    TempFile tmp(FILE_SIZE);
+  }
 }
 
 constexpr const char* kFlockDir = "/tmp/flock-dir";

@@ -6,7 +6,7 @@
 
 #include <drm_fourcc.h>
 #include <fuchsia/logger/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
@@ -87,15 +87,23 @@ class ScenicAllocatorFake : public fuchsia::ui::composition::Allocator,
       return;
     }
 
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
+    fuchsia::sysmem2::AllocatorSyncPtr sysmem2_allocator;
     auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(sysmem_allocator.NewRequest());
-    sysmem_allocator->SetDebugClientInfo(fsl::GetCurrentProcessName(),
-                                         fsl::GetCurrentProcessKoid());
+    context->svc()->Connect(sysmem2_allocator.NewRequest());
 
-    fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-    zx_status_t status = sysmem_allocator->BindSharedCollection(
-        std::move(*args.mutable_buffer_collection_token()), buffer_collection.NewRequest());
+    fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_info_request;
+    set_debug_info_request.set_name(fsl::GetCurrentProcessName());
+    set_debug_info_request.set_id(fsl::GetCurrentProcessKoid());
+    sysmem2_allocator->SetDebugClientInfo(std::move(set_debug_info_request));
+
+    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+    fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_request;
+    // Sysmem token channels serve both sysmem(1) and sysmem2 token protocols, so we can convert
+    // the incoming token here.
+    bind_request.set_token(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
+        (*args.mutable_buffer_collection_token()).TakeChannel()));
+    bind_request.set_buffer_collection_request(buffer_collection.NewRequest());
+    zx_status_t status = sysmem2_allocator->BindSharedCollection(std::move(bind_request));
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "BindSharedCollection failed: " << status;
       callback(
@@ -103,29 +111,22 @@ class ScenicAllocatorFake : public fuchsia::ui::composition::Allocator,
       return;
     }
 
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.min_buffer_count = 1;
-    constraints.usage.cpu =
-        fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
-    constraints.has_buffer_memory_constraints = true;
-    constraints.buffer_memory_constraints.ram_domain_supported = true;
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
+    constraints.set_min_buffer_count(1);
+    auto* buffer_usage = constraints.mutable_usage();
+    buffer_usage->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN |
+                          fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
+    auto* bmc = constraints.mutable_buffer_memory_constraints();
+    bmc->set_ram_domain_supported(true);
     // Disabling CPU domain to validate coherency domain in test HandleGetImageInfo
-    constraints.buffer_memory_constraints.cpu_domain_supported = false;
-    constraints.image_format_constraints_count = 1;
-    fuchsia::sysmem::ImageFormatConstraints& image_constraints =
-        constraints.image_format_constraints[0];
-    image_constraints = fuchsia::sysmem::ImageFormatConstraints();
-    image_constraints.min_coded_width = 0;
-    image_constraints.min_coded_height = 0;
-    image_constraints.max_coded_width = 0;
-    image_constraints.max_coded_height = 0;
-    image_constraints.min_bytes_per_row = 0;
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
-    image_constraints.pixel_format.has_format_modifier = false;
+    bmc->set_cpu_domain_supported(false);
+    auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
+    image_constraints.set_color_spaces({fuchsia::images2::ColorSpace::SRGB});
+    image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
 
-    status = buffer_collection->SetConstraints(true, constraints);
+    fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.set_constraints(std::move(constraints));
+    status = buffer_collection->SetConstraints(std::move(set_constraints_request));
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "SetConstraints failed: " << status;
       callback(
@@ -133,7 +134,7 @@ class ScenicAllocatorFake : public fuchsia::ui::composition::Allocator,
       return;
     }
 
-    buffer_collection->Close();
+    buffer_collection->Release();
 
     callback(fpromise::ok());
   }
@@ -192,6 +193,7 @@ class VirtioMagmaTest : public TestWithDevice {
                           Protocol{fuchsia::logger::LogSink::Name_},
                           Protocol{fuchsia::tracing::provider::Registry::Name_},
                           Protocol{fuchsia::sysmem::Allocator::Name_},
+                          Protocol{fuchsia::sysmem2::Allocator::Name_},
                           Protocol{fuchsia::vulkan::loader::Loader::Name_},
                           Directory{.name = kDevGpuDirectory, .rights = fuchsia::io::R_STAR_DIR},
                       },

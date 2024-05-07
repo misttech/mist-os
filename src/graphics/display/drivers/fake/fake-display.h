@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
-#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/inspector.h>
@@ -55,7 +55,7 @@ struct FakeDisplayDeviceConfig {
 class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
  public:
   explicit FakeDisplay(FakeDisplayDeviceConfig device_config,
-                       fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator,
+                       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
                        inspect::Inspector inspector);
 
   FakeDisplay(const FakeDisplay&) = delete;
@@ -146,22 +146,22 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
 
-  fuchsia_sysmem::BufferCollectionConstraints CreateBufferCollectionConstraints(
+  fuchsia_sysmem2::BufferCollectionConstraints CreateBufferCollectionConstraints(
       BufferCollectionUsage usage);
 
   // Constraints applicable to all buffers used for display images.
-  void SetBufferMemoryConstraints(fuchsia_sysmem::BufferMemoryConstraints& constraints);
+  void SetBufferMemoryConstraints(fuchsia_sysmem2::BufferMemoryConstraints& constraints);
 
   // Constraints applicable to all image buffers used in Display.
-  void SetCommonImageFormatConstraints(fuchsia_sysmem::PixelFormatType pixel_format_type,
-                                       fuchsia_sysmem::FormatModifier format_modifier,
-                                       fuchsia_sysmem::ImageFormatConstraints& constraints);
+  void SetCommonImageFormatConstraints(fuchsia_images2::PixelFormat pixel_format,
+                                       fuchsia_images2::PixelFormatModifier format_modifier,
+                                       fuchsia_sysmem2::ImageFormatConstraints& constraints);
 
   // Constraints applicable to images buffers used in image capture.
-  void SetCaptureImageFormatConstraints(fuchsia_sysmem::ImageFormatConstraints& constraints);
+  void SetCaptureImageFormatConstraints(fuchsia_sysmem2::ImageFormatConstraints& constraints);
 
   // Constraints applicable to image buffers that will be bound to layers.
-  void SetLayerImageFormatConstraints(fuchsia_sysmem::ImageFormatConstraints& constraints);
+  void SetLayerImageFormatConstraints(fuchsia_sysmem2::ImageFormatConstraints& constraints);
 
   // Records the display config to the inspector's root node. The root node must
   // be already initialized.
@@ -192,11 +192,11 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   mutable fbl::Mutex capture_mutex_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::SyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
+                     fidl::SyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
   // Imported display images, keyed by image ID.

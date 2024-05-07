@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.sysmem2") {
   sdk_category = "partner"
+  stable = true
 
   # Also Graphics
   sdk_area = "Media"

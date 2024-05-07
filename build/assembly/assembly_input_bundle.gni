@@ -63,14 +63,14 @@ import("//build/python/python_action.gni")
 #    like:
 #      "no dependency provides the input <package_name>/package_manifest.json"
 #
-#   boot_driver_packages [optional]
-#     [list, GN scopes] A list of GN scopes that hold the driver packages to
-#     include in the bootfs package set. Packages listed here should not be
-#     listed in the bootfs_packages and will be included automatically in
-#     the bootfs package set as driver packages. The scope must have a
-#     `package_target` field pointing to the GN target of the fuchsia_package,
-#     and `driver_components` field containing a list of relative paths to
-#     driver components provided by the package, e.g. "meta/driver.cm"
+#  boot_driver_packages [optional]
+#    [list, GN scopes] A list of GN scopes that hold the driver packages to
+#    include in the bootfs package set. Packages listed here should not be
+#    listed in the bootfs_packages and will be included automatically in the
+#    bootfs package set as driver packages. The scope must have a
+#    `package_target` field pointing to the GN target of the fuchsia_package,
+#    and `driver_components` field containing a list of relative paths to driver
+#    components provided by the package, e.g. "meta/driver.cm"
 #
 #  bootfs_files_labels [optional]
 #    [list, GN labels] A list of GN labels of bootfs_files_for_assembly()

@@ -11,6 +11,7 @@ config("virtgralloc_include") {
 sdk_source_set("virtgralloc_headers") {
   category = "partner"
   sdk_name = "virtgralloc_headers"
+  stable = true
   public = [
     "include/lib/virtgralloc/shared_metadata.h",
     "include/lib/virtgralloc/virtgralloc_ioctl.h",

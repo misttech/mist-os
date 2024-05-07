@@ -28,7 +28,9 @@ class DlImplTests : public Base {
   static constexpr bool kCanMatchExactError = true;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
-    // TODO(caslyn): verify and clear mock expectations.
+    // Check that all Needed/Expect* expectations for loaded objects were
+    // satisfied and then clear the expectation set.
+    auto verify_expectations = fit::defer([&]() { Base::VerifyAndClearNeeded(); });
     return dynamic_linker_.Open<typename Base::Loader>(
         file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
   }

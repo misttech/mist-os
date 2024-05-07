@@ -18,6 +18,7 @@
 namespace ld::testing {
 namespace {
 
+using ::testing::Mock;
 using ::testing::Return;
 
 }  // namespace
@@ -179,6 +180,10 @@ void MockLoaderServiceForTest::CallWithLdsvcInstalled(fit::function<void()> func
 
   // Now that the mock loader service is installed, call the function.
   func();
+}
+
+void MockLoaderServiceForTest::VerifyAndClearExpectations() {
+  Mock::VerifyAndClearExpectations(&mock_loader_);
 }
 
 zx::vmo MockLoaderServiceForTest::GetDepVmo(std::string_view name) {

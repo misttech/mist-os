@@ -105,17 +105,11 @@ zx_status_t sys_pager_create_vmo(zx_handle_t pager, uint32_t options, zx_handle_
     return status;
   }
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(size, &content_size_manager);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   KernelHandle<VmObjectDispatcher> kernel_handle;
   zx_rights_t rights;
-  status = VmObjectDispatcher::Create(
-      vmo, ktl::move(content_size_manager), pager_dispatcher->get_koid(),
-      VmObjectDispatcher::InitialMutability::kMutable, &kernel_handle, &rights);
+  status = VmObjectDispatcher::Create(vmo, size, pager_dispatcher->get_koid(),
+                                      VmObjectDispatcher::InitialMutability::kMutable,
+                                      &kernel_handle, &rights);
   if (status != ZX_OK) {
     return status;
   }

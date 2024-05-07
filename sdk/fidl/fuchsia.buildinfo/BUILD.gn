@@ -9,6 +9,7 @@ import("//build/fidl/fidl.gni")
 # that make up the library.
 fidl("fuchsia.buildinfo") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [ "buildinfo.fidl" ]

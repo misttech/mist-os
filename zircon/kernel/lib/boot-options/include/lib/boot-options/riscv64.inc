@@ -21,3 +21,6 @@ DEFINE_OPTION("kernel.riscv64.enable-asid", bool, riscv64_enable_asid, {true}, R
 This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
 )""")
 
+DEFINE_OPTION("kernel.riscv64.phys.mmu", bool, riscv64_phys_mmu, {true}, R"""(
+This enables use of the MMU in the kernel's early boot phase.
+)""")

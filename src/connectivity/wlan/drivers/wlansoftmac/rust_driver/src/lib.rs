@@ -20,9 +20,9 @@ use {
     },
     std::pin::Pin,
     tracing::{error, info},
+    wlan_ffi_transport::BufferProvider,
     wlan_fidl_ext::{ResponderExt, SendResultExt, WithName},
     wlan_mlme::{
-        buffer::CBufferProvider,
         device::{completers::InitCompleter, DeviceOps, FrameProcessor},
         DriverEvent, DriverEventSink,
     },
@@ -63,7 +63,7 @@ const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 pub async fn start_and_serve<D: DeviceOps + 'static>(
     init_completer: impl FnOnce(Result<(), zx::Status>) + 'static,
     device: D,
-    buffer_provider: CBufferProvider,
+    buffer_provider: BufferProvider,
 ) -> Result<(), zx::Status> {
     wtrace::duration_begin_scope!(c"rust_driver::start_and_serve");
     let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
@@ -116,7 +116,7 @@ async fn start<D: DeviceOps + 'static>(
     driver_event_sink: DriverEventSink,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     mut device: D,
-    buffer_provider: CBufferProvider,
+    buffer_provider: BufferProvider,
 ) -> Result<
     StartedDriver<
         Pin<Box<dyn Future<Output = Result<(), Error>>>>,
@@ -579,6 +579,7 @@ mod tests {
         std::pin::pin,
         test_case::test_case,
         wlan_common::assert_variant,
+        wlan_ffi_transport::FakeFfiBufferProvider,
         wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig},
         zx::Vmo,
     };
@@ -764,7 +765,7 @@ mod tests {
         ) {
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
             let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
-            let fake_buffer_provider = wlan_mlme::buffer::FakeCBufferProvider::new();
+            let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
 
             (
                 Box::pin(start(
@@ -772,7 +773,7 @@ mod tests {
                     driver_event_sink.clone(),
                     driver_event_stream,
                     fake_device,
-                    fake_buffer_provider,
+                    buffer_provider,
                 )),
                 Self { mlme_init_receiver: Box::pin(mlme_init_receiver), driver_event_sink },
             )
@@ -1319,7 +1320,7 @@ mod tests {
         fake_device: FakeDevice,
     ) -> Result<StartAndServeTestHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status>
     {
-        let fake_buffer_provider = wlan_mlme::buffer::FakeCBufferProvider::new();
+        let fake_buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (init_completer_sender, mut init_completer_receiver) =
             oneshot::channel::<Result<(), zx::Status>>();
         let start_and_serve_fut = start_and_serve(

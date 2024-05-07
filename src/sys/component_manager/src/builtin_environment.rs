@@ -5,7 +5,6 @@
 #[cfg(target_arch = "aarch64")]
 use builtins::smc_resource::SmcResource;
 
-use crate::{diagnostics, model::component::WeakComponentInstance};
 #[cfg(target_arch = "x86_64")]
 use builtins::ioport_resource::IoportResource;
 
@@ -27,7 +26,6 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
         },
         capability::{BuiltinCapability, CapabilitySource, DerivedCapability, FrameworkCapability},
-        diagnostics::{lifecycle::ComponentLifecycleTimeStats, task_metrics::ComponentTreeStats},
         framework::{
             binder::BinderFrameworkCapability,
             factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
@@ -43,6 +41,7 @@ use {
         model::events::registry::EventSubscription,
         model::{
             component::manager::ComponentManagerInstance,
+            component::WeakComponentInstance,
             environment::Environment,
             event_logger::EventLogger,
             events::{
@@ -51,7 +50,6 @@ use {
                 source_factory::{EventSourceFactory, EventSourceFactoryCapability},
                 stream_provider::EventStreamProvider,
             },
-            hooks::EventType,
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
             storage::admin_protocol::StorageAdminDerivedCapability,
@@ -61,6 +59,8 @@ use {
         root_stop_notifier::RootStopNotifier,
         sandbox_util::LaunchTaskOnReceive,
     },
+    ::diagnostics::lifecycle::ComponentLifecycleTimeStats,
+    ::diagnostics::task_metrics::ComponentTreeStats,
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
         component_instance::TopInstanceInterface,
@@ -100,6 +100,7 @@ use {
     fuchsia_zbi::{ZbiParser, ZbiType},
     fuchsia_zircon::{self as zx, Clock, Resource},
     futures::{future::BoxFuture, FutureExt, StreamExt},
+    hooks::EventType,
     moniker::{Moniker, MonikerBase},
     std::sync::Arc,
     tracing::{info, warn},
@@ -510,7 +511,7 @@ pub struct BuiltinEnvironment {
     // Keeps the inspect node alive.
     _component_lifecycle_time_stats: Arc<ComponentLifecycleTimeStats>,
     // Keeps the inspect node alive.
-    _component_escrow_duration_status: Arc<diagnostics::escrow::DurationStats>,
+    _component_escrow_duration_status: Arc<::diagnostics::escrow::DurationStats>,
     pub debug: bool,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
@@ -1172,7 +1173,7 @@ impl BuiltinEnvironment {
             Arc::new(ComponentLifecycleTimeStats::new(inspector.root().create_child("lifecycle")));
         model.root().hooks.install(component_lifecycle_time_stats.hooks()).await;
 
-        let component_escrow_duration_status = Arc::new(diagnostics::escrow::DurationStats::new(
+        let component_escrow_duration_status = Arc::new(::diagnostics::escrow::DurationStats::new(
             inspector.root().create_child("escrow"),
         ));
         model.root().hooks.install(component_escrow_duration_status.hooks()).await;

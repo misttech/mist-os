@@ -91,14 +91,12 @@ void Reference::MarkContextual() {
 }
 
 void Reference::ResolveTo(Target target) {
-  ZX_ASSERT_MSG(state() == State::kKey || state() == State::kContextual, "invalid state");
+  ZX_ASSERT_MSG(state() < State::kResolved, "invalid state");
   state_ = target;
 }
 
 void Reference::MarkFailed() {
-  ZX_ASSERT_MSG(
-      state() == State::kRawSourced || state() == State::kKey || state() == State::kContextual,
-      "invalid state");
+  ZX_ASSERT_MSG(state() < State::kResolved, "invalid state");
   state_ = Failed{};
 }
 

@@ -811,7 +811,7 @@ mod tests {
             file::vmo::read_only,
             mut_pseudo_directory,
             path::Path,
-            ToObjectRequest,
+            ObjectRequestRef, ToObjectRequest,
         },
     };
 
@@ -1355,6 +1355,19 @@ mod tests {
             flags.to_object_request(server_end).handle(|object_request| {
                 object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
+        }
+
+        fn open2(
+            self: Arc<Self>,
+            scope: ExecutionScope,
+            _path: Path,
+            protocols: fio::ConnectionProtocols,
+            object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), zx::Status> {
+            object_request.take().handle(|object_request| {
+                object_request.spawn_connection(scope, self, protocols, ImmutableConnection::create)
+            });
+            Ok(())
         }
 
         async fn read_dirents<'a>(

@@ -23,7 +23,10 @@ for best results, copy the exact address from ffx target list."
 )]
 
 pub struct RemoveCommand {
+    #[argh(switch)]
+    /// remove all manually added targets
+    pub all: bool,
     #[argh(positional)]
     /// name or IP address of the target.
-    pub name_or_addr: String,
+    pub name_or_addr: Option<String>,
 }

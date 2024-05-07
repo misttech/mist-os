@@ -31,6 +31,7 @@ use {
     input_pipeline::Size,
     math as fmath,
     std::collections::VecDeque,
+    std::ffi::CStr,
     std::process,
     std::sync::{Arc, Weak},
     tracing::{error, info, warn},
@@ -439,6 +440,14 @@ impl SceneManagerTrait for SceneManager {
     }
 }
 
+const DISPLAY_DEBUG_NAME: &str = "SceneManager Display";
+const POINTER_INJECTOR_DEBUG_NAME: &str = "SceneManager PointerInjector";
+const SCENE_DEBUG_NAME: &str = "SceneManager Scene";
+const DISPLAY_PRESENT_TRACING_NAME: &CStr = c"Flatland::PerAppPresent[SceneManager Display]";
+const POINTER_INJECTOR_PRESENT_TRACING_NAME: &CStr =
+    c"Flatland::PerAppPresent[SceneManager PointerInjector]";
+const SCENE_TRACING_NAME: &CStr = c"Flatland::PerAppPresent[SceneManager Scene]";
+
 impl SceneManager {
     pub async fn new(
         display: ui_comp::FlatlandDisplayProxy,
@@ -464,9 +473,9 @@ impl SceneManager {
         let a11y_viewport_transform_id = id_generator.next_transform_id();
         let a11y_viewport_content_id = id_generator.next_content_id();
 
-        root_flatland.set_debug_name("SceneManager Display")?;
-        pointerinjector_flatland.set_debug_name("SceneManager PointerInjector")?;
-        scene_flatland.set_debug_name("SceneManager Scene")?;
+        root_flatland.set_debug_name(DISPLAY_DEBUG_NAME)?;
+        pointerinjector_flatland.set_debug_name(POINTER_INJECTOR_DEBUG_NAME)?;
+        scene_flatland.set_debug_name(SCENE_DEBUG_NAME)?;
 
         let root_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
         let root_flatland = FlatlandInstance::new(
@@ -904,7 +913,21 @@ pub fn start_flatland_presentation_loop(
                 present_parameters = scheduler.wait_to_update().fuse() => {
                     trace::duration!(c"scene_manager", c"SceneManager::Present",
                                      "debug_name" => &*debug_name);
-                    trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
+
+                    match debug_name.as_str() {
+                        DISPLAY_DEBUG_NAME => {
+                            trace::flow_begin!(c"gfx", DISPLAY_PRESENT_TRACING_NAME, present_count.into());
+                        }
+                        POINTER_INJECTOR_DEBUG_NAME => {
+                            trace::flow_begin!(c"gfx", POINTER_INJECTOR_PRESENT_TRACING_NAME, present_count.into());
+                        }
+                        SCENE_DEBUG_NAME => {
+                            trace::flow_begin!(c"gfx", SCENE_TRACING_NAME, present_count.into());
+                        }
+                        _ => {
+                            warn!("SceneManager::Present with unknown debug_name {:?}", debug_name);
+                        }
+                    }
                     present_count += 1;
                     channels_awaiting_pingback.push_front(Vec::new());
                     if let Some(flatland) = weak_flatland.upgrade() {

@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        client::{connection_selection::bss_selection, roaming::lib::*, types},
+        client::{connection_selection::scoring_functions, roaming::lib::*, types},
         telemetry::{TelemetryEvent, TelemetrySender},
         util::pseudo_energy::SignalData,
     },
@@ -17,6 +17,11 @@ use {
 const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::Duration = zx::Duration::from_minutes(15);
 const MIN_TIME_BETWEEN_ROAM_SCANS: zx::Duration = zx::Duration::from_minutes(1);
 const MIN_RSSI_CHANGE_TO_ROAM_SCAN: f64 = 5.0;
+
+const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
+const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
+const LOCAL_ROAM_THRESHOLD_SNR_2G: f64 = 20.0;
+const LOCAL_ROAM_THRESHOLD_SNR_5G: f64 = 17.0;
 
 /// Trait so that RoamMonitor can be mocked in tests.
 pub trait RoamMonitorApi: Send + Sync {
@@ -65,7 +70,7 @@ impl RoamMonitorApi for RoamMonitor {
         });
 
         // Evaluate current BSS, and determine if roaming future should be triggered.
-        let (roam_reasons, bss_score) = bss_selection::evaluate_current_bss(
+        let (roam_reasons, bss_score) = check_signal_thresholds(
             self.connection_data.signal_data,
             self.connection_data.currently_fulfilled_connection.target.bss.channel,
         );
@@ -111,6 +116,28 @@ impl RoamMonitorApi for RoamMonitor {
     }
 }
 
+// Return roam reasons if the signal measurements fall below given thresholds.
+fn check_signal_thresholds(
+    signal_data: SignalData,
+    channel: types::WlanChan,
+) -> (Vec<RoamReason>, u8) {
+    let mut roam_reasons = vec![];
+    let (rssi_threshold, snr_threshold) = if channel.is_5ghz() {
+        (LOCAL_ROAM_THRESHOLD_RSSI_5G, LOCAL_ROAM_THRESHOLD_SNR_5G)
+    } else {
+        (LOCAL_ROAM_THRESHOLD_RSSI_2G, LOCAL_ROAM_THRESHOLD_SNR_2G)
+    };
+    if signal_data.ewma_rssi.get() <= rssi_threshold {
+        roam_reasons.push(RoamReason::RssiBelowThreshold)
+    }
+    if signal_data.ewma_snr.get() <= snr_threshold {
+        roam_reasons.push(RoamReason::SnrBelowThreshold)
+    }
+
+    let signal_score = scoring_functions::score_current_connection_signal_data(signal_data);
+    return (roam_reasons, signal_score);
+}
+
 #[cfg(test)]
 mod test {
     use {
@@ -122,8 +149,60 @@ mod test {
         fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async::TestExecutor,
         test_util::{assert_gt, assert_lt},
-        wlan_common::assert_variant,
+        wlan_common::{assert_variant, channel},
     };
+
+    #[fuchsia::test]
+    fn test_check_signal_thresholds_2g() {
+        let (roam_reasons, _) = check_signal_thresholds(
+            SignalData::new(
+                LOCAL_ROAM_THRESHOLD_RSSI_2G - 1.0,
+                LOCAL_ROAM_THRESHOLD_SNR_2G - 1.0,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
+            channel::Channel::new(11, channel::Cbw::Cbw20),
+        );
+        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
+
+        let (roam_reasons, _) = check_signal_thresholds(
+            SignalData::new(
+                LOCAL_ROAM_THRESHOLD_RSSI_2G + 1.0,
+                LOCAL_ROAM_THRESHOLD_SNR_2G + 1.0,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
+            channel::Channel::new(11, channel::Cbw::Cbw20),
+        );
+        assert!(roam_reasons.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_check_signal_thresholds_5g() {
+        let (roam_reasons, _) = check_signal_thresholds(
+            SignalData::new(
+                LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0,
+                LOCAL_ROAM_THRESHOLD_SNR_5G - 1.0,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
+            channel::Channel::new(36, channel::Cbw::Cbw80),
+        );
+        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
+
+        let (roam_reasons, _) = check_signal_thresholds(
+            SignalData::new(
+                LOCAL_ROAM_THRESHOLD_RSSI_5G + 1.0,
+                LOCAL_ROAM_THRESHOLD_SNR_5G + 1.0,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
+            channel::Channel::new(36, channel::Cbw::Cbw80),
+        );
+        assert!(roam_reasons.is_empty());
+    }
 
     struct RoamMonitorTestValues {
         roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,

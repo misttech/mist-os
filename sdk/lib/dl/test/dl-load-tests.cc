@@ -67,11 +67,15 @@ TYPED_TEST(DlTests, NotFound) {
   auto result = this->DlOpen(kNotFoundFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open " + std::string{kNotFoundFile});
+    EXPECT_EQ(result.error_value().take_str(), "cannot open does-not-exist.so");
   } else {
-    EXPECT_THAT(result.error_value().take_str(),
-                MatchesRegex(".*" + std::string{kNotFoundFile} +
-                             ":.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
+    EXPECT_THAT(
+        result.error_value().take_str(),
+        MatchesRegex(
+            // emitted by Fuchsia-musl
+            "Error loading shared library .*does-not-exist.so: ZX_ERR_NOT_FOUND"
+            // emitted by Linux-glibc
+            "|.*does-not-exist.so: cannot open shared object file: No such file or directory"));
   }
 }
 
@@ -226,6 +230,29 @@ TYPED_TEST(DlTests, ManyDeps) {
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
 }
 
+// TODO(https://fxbug.dev/339028040): Test missing symbol in transitive dep.
+// Load a module that depends on libld-dep-a.so, but this dependency does not
+// provide the b symbol referenced by the root module, so relocation fails.
+TYPED_TEST(DlTests, MissingSymbol) {
+  constexpr const char* kMissingSymbolFile = "missing-sym.module.so";
+
+  this->ExpectRootModule(kMissingSymbolFile);
+  this->Needed({"libld-dep-a.so"});
+
+  auto result = this->DlOpen(kMissingSymbolFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_error());
+  if constexpr (TestFixture::kCanMatchExactError) {
+    EXPECT_EQ(result.error_value().take_str(), "missing-sym.module.so: undefined symbol: b");
+  } else {
+    EXPECT_THAT(result.error_value().take_str(),
+                MatchesRegex(
+                    // emitted by Fuchsia-musl
+                    "Error relocating missing-sym.module.so: b: symbol not found"
+                    // emitted by Linux-glibc
+                    "|.*missing-sym.module.so: undefined symbol: b"));
+  }
+}
+
 TYPED_TEST(DlTests, MissingDependency) {
   constexpr const char* kMissingDepFile = "missing-dep.module.so";
 
@@ -241,16 +268,12 @@ TYPED_TEST(DlTests, MissingDependency) {
   if constexpr (TestFixture::kCanMatchExactError) {
     EXPECT_EQ(result.error_value().take_str(), "cannot open libmissing-dep-dep.so");
   } else {
-    // Match on musl/glibc's error message for a missing dependency.
-    // Fuchsia's musl generates the following:
-    //   "Error loading shared library libmissing-dep-dep.so: ZX_ERR_NOT_FOUND (needed by
-    //   missing-dep.module.so)"
-    // Linux's glibc generates the following:
-    //   "libmissing-dep-dep.so: cannot open shared object file: No such file or directory"
     EXPECT_THAT(
         result.error_value().take_str(),
         MatchesRegex(
+            // emitted by Fuchsia-musl
             "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.module.so\\)"
+            // emitted by Linux-glibc
             "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
   }
 }

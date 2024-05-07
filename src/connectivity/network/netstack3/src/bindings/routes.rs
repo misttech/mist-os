@@ -59,8 +59,8 @@ pub(crate) enum RouteOp<A: IpAddress> {
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(A, IpAddress)]
 pub(crate) enum Change<A: IpAddress> {
-    RouteOp(RouteOp<A>, WeakSetMembership),
-    RemoveSet(WeakUserRouteSet),
+    RouteOp(RouteOp<A>, WeakSetMembership<A::Version>),
+    RemoveSet(WeakUserRouteSet<A::Version>),
     RemoveMatchingDevice(WeakDeviceId),
 }
 
@@ -70,16 +70,15 @@ pub(crate) enum ChangeEither {
 }
 
 impl ChangeEither {
-    pub(crate) fn add(
+    pub(crate) fn global_add(
         entry: netstack3_core::routes::AddableEntryEither<WeakDeviceId>,
-        set: WeakSetMembership,
     ) -> Self {
         match entry {
             netstack3_core::routes::AddableEntryEither::V4(entry) => {
-                Self::V4(Change::RouteOp(RouteOp::Add(entry), set))
+                Self::V4(Change::RouteOp(RouteOp::Add(entry), SetMembership::Global))
             }
             netstack3_core::routes::AddableEntryEither::V6(entry) => {
-                Self::V6(Change::RouteOp(RouteOp::Add(entry), set))
+                Self::V6(Change::RouteOp(RouteOp::Add(entry), SetMembership::Global))
             }
         }
     }
@@ -119,7 +118,7 @@ pub(crate) struct WorkItem<A: IpAddress> {
 /// the concept of a route set to be implemented in core.
 #[derive(Clone, Debug)]
 struct Table<A: IpAddress> {
-    inner: HashMap<netstack3_core::routes::AddableEntry<A, DeviceId>, EntryData>,
+    inner: HashMap<netstack3_core::routes::AddableEntry<A, DeviceId>, EntryData<A::Version>>,
     /// The next [`netstack3_core::routes::Generation`] to be applied to new
     /// entries. This allows the routing table ordering to explicitly take into
     /// account the order in which routes are added to the table.
@@ -147,7 +146,7 @@ impl<A: IpAddress> Table<A> {
     fn insert(
         &mut self,
         route: netstack3_core::routes::AddableEntry<A, DeviceId>,
-        set: StrongSetMembership,
+        set: StrongSetMembership<A::Version>,
     ) -> TableModifyResult<(
         netstack3_core::routes::AddableEntry<A, DeviceId>,
         netstack3_core::routes::Generation,
@@ -191,7 +190,7 @@ impl<A: IpAddress> Table<A> {
     fn remove(
         &mut self,
         mut should_remove: impl FnMut(&netstack3_core::routes::AddableEntry<A, DeviceId>) -> bool,
-        set: WeakSetMembership,
+        set: WeakSetMembership<A::Version>,
     ) -> TableModifyResult<
         Vec<(
             netstack3_core::routes::AddableEntry<A, DeviceId>,
@@ -223,7 +222,7 @@ impl<A: IpAddress> Table<A> {
                         }
                         Some(membership) => {
                             // Was in the set, this is the corresponding strong ID.
-                            let _: StrongSetMembership = membership;
+                            let _: StrongSetMembership<_> = membership;
                             removed_any_from_set = true;
                         }
                     };
@@ -269,7 +268,7 @@ impl<A: IpAddress> Table<A> {
 
     fn remove_user_set(
         &mut self,
-        set: WeakUserRouteSet,
+        set: WeakUserRouteSet<A::Version>,
     ) -> Vec<(netstack3_core::routes::AddableEntry<A, DeviceId>, netstack3_core::routes::Generation)>
     {
         let Self { inner, next_generation: _ } = self;
@@ -313,11 +312,11 @@ pub(crate) enum SetMembership<T> {
     User(T),
 }
 
-type StrongSetMembership = SetMembership<StrongUserRouteSet>;
-type WeakSetMembership = SetMembership<WeakUserRouteSet>;
+type StrongSetMembership<I> = SetMembership<StrongUserRouteSet<I>>;
+type WeakSetMembership<I> = SetMembership<WeakUserRouteSet<I>>;
 
-impl StrongSetMembership {
-    fn downgrade(&self) -> WeakSetMembership {
+impl<I: Ip> StrongSetMembership<I> {
+    fn downgrade(&self) -> WeakSetMembership<I> {
         match self {
             SetMembership::Global => SetMembership::Global,
             SetMembership::CoreNdp => SetMembership::CoreNdp,
@@ -330,9 +329,9 @@ impl StrongSetMembership {
     }
 }
 
-impl WeakSetMembership {
+impl<I: Ip> WeakSetMembership<I> {
     #[cfg_attr(feature = "instrumented", track_caller)]
-    fn upgrade(self) -> Option<StrongSetMembership> {
+    fn upgrade(self) -> Option<StrongSetMembership<I>> {
         match self {
             SetMembership::Global => Some(SetMembership::Global),
             SetMembership::CoreNdp => Some(SetMembership::CoreNdp),
@@ -344,7 +343,7 @@ impl WeakSetMembership {
 }
 
 #[derive(Clone, Debug)]
-struct EntryData {
+struct EntryData<I: Ip> {
     generation: netstack3_core::routes::Generation,
     // Logically, this should be viewed as a `HashSet<StrongSetMembership>`, but
     // we use a `HashMap<WeakSetMembership, StrongSetMembership>` (where the
@@ -352,10 +351,10 @@ struct EntryData {
     // only a weak set ID. We want to keep strong set memberships in the map
     // so that we can assert that we have cleaned up all references to a user
     // route set by unwrapping the primary route set ID.
-    set_membership: HashMap<WeakSetMembership, StrongSetMembership>,
+    set_membership: HashMap<WeakSetMembership<I>, StrongSetMembership<I>>,
 }
 
-impl EntryData {
+impl<I: Ip> EntryData<I> {
     fn new(generation: netstack3_core::routes::Generation) -> Self {
         Self { generation, set_membership: HashMap::new() }
     }

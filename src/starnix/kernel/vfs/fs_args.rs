@@ -42,8 +42,9 @@ mod parse_mount_options {
     use nom::{
         branch::alt,
         bytes::complete::{is_not, tag},
+        combinator::opt,
         multi::separated_list,
-        sequence::{delimited, separated_pair},
+        sequence::{delimited, separated_pair, terminated},
         IResult,
     };
     use starnix_uapi::errors::{errno, error, Errno};
@@ -76,7 +77,8 @@ mod parse_mount_options {
 
     pub(super) fn parse_mount_options(input: &FsStr) -> Result<HashMap<FsString, FsString>, Errno> {
         let (input, options) =
-            separated_list(tag(b","), option)(input.into()).map_err(|_| errno!(EINVAL))?;
+            terminated(separated_list(tag(b","), option), opt(tag(b",")))(input.into())
+                .map_err(|_| errno!(EINVAL))?;
 
         // `[...],last_key="mis"quoted` not allowed.
         if input.len() > 0 {
@@ -101,6 +103,19 @@ mod tests {
     #[::fuchsia::test]
     fn empty_data() {
         assert!(generic_parse_mount_options(Default::default()).unwrap().is_empty());
+    }
+
+    #[::fuchsia::test]
+    fn parse_options_with_trailing_comma() {
+        let data = b"key0=value0,";
+        let parsed_data =
+            generic_parse_mount_options(data.into()).expect("mount options parse:  key0=value0,");
+        assert_eq!(
+            parsed_data,
+            hashmap! {
+                b"key0".into() => b"value0".into(),
+            }
+        );
     }
 
     #[::fuchsia::test]

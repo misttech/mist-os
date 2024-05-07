@@ -65,7 +65,7 @@ Once we're sure that fargo can produce a release binary for our target, run carg
 ```
 fargo cargo bloat -- --release -n 5
 Compiling ...
-Analyzing .../src/../out/cargo_target/x86_64-fuchsia/release/archivist
+Analyzing .../src/../out/cargo_target/x86_64-unknown-fuchsia/release/archivist
 
  File  .text     Size              Crate Name
  1.7%   4.5%  38.0KiB              regex <regex::exec::ExecNoSync as regex::re_trait::Regular...
@@ -90,7 +90,7 @@ Use the `--crates` flag to group bloat analysis by an estimate of the source cra
 ```
 fargo cargo bloat -- --release -n 5 --crates
 Compiling ...
-Analyzing .../src/../out/cargo_target/x86_64-fuchsia/release/archivist
+Analyzing .../src/../out/cargo_target/x86_64-unknown-fuchsia/release/archivist
 
  File  .text     Size Crate
 13.3%  34.9% 294.8KiB std
@@ -116,7 +116,7 @@ or regex over the function name (with the feature flag enabled) with the `--filt
 ```
 fargo cargo bloat -- --release -n 5 --filter regex_syntax
 Compiling ...
-Analyzing .../src/../out/cargo_target/x86_64-fuchsia/release/archivist
+Analyzing .../src/../out/cargo_target/x86_64-unknown-fuchsia/release/archivist
 
 File .text     Size        Crate Name
 1.0%  2.5%  21.4KiB regex_syntax regex_syntax::ast::parse::ParserI<P>::parse_with_comments

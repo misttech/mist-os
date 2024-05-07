@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{Action, ActionKey, ActionSet},
+        actions::{Action, ActionKey, ActionsManager},
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
     },
@@ -81,7 +81,7 @@ async fn shutdown_component(
             target.component.stop_instance_internal(true).await?;
         }
         ComponentRef::Child(_) => {
-            ActionSet::register(target.component, ShutdownAction::new(shutdown_type)).await?;
+            ActionsManager::register(target.component, ShutdownAction::new(shutdown_type)).await?;
         }
         ComponentRef::Capability(_) => {
             // This is just an intermediate node that exists to track dependencies on storage
@@ -938,7 +938,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::StopAction,
+            actions::{test_utils::MockAction, StopAction},
             component::StartReason,
             testing::{
                 test_helpers::{
@@ -2463,24 +2463,23 @@ mod tests {
         let component = test.model.root().clone();
         let mut action_set = component.lock_actions().await;
 
-        // Register some actions, and get notifications. Use `register_inner` so we can register
-        // the action without immediately running it.
-        let (task1, nf1) =
-            action_set.register_inner(&component, ShutdownAction::new(ShutdownType::Instance));
-        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false));
+        let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
+
+        // Register some actions, and get notifications.
+        let shutdown_notifier = action_set.register_no_wait(mock_shutdown_action).await;
+        let stop_notifier = action_set.register_no_wait(StopAction::new(false)).await;
 
         drop(action_set);
 
-        // Complete actions, while checking futures.
-        ActionSet::finish(&component, &ActionKey::Shutdown).await;
+        // The stop action should be blocked on the shutdown action completing.
+        assert!(stop_notifier.fut.peek().is_none());
 
-        // nf2 should be blocked on task1 completing.
-        assert!(nf1.fut.peek().is_none());
-        assert!(nf2.fut.peek().is_none());
-        task1.unwrap().tx.send(Ok(())).unwrap();
-        task2.unwrap().spawn();
-        nf1.await.unwrap();
-        nf2.await.unwrap();
+        // allow the shutdown action to finish running
+        mock_shutdown_barrier.send(Ok(())).unwrap();
+        shutdown_notifier.await.expect("shutdown failed unexpectedly");
+
+        // The stop action should now finish running.
+        stop_notifier.await.expect("stop failed unexpectedly");
     }
 
     #[fuchsia::test]
@@ -2488,28 +2487,26 @@ mod tests {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
         let mut action_set = component.lock_actions().await;
+        let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
 
-        // Register some actions, and get notifications. Use `register_inner` so we can register
-        // the action without immediately running it.
-        let (task1, nf1) =
-            action_set.register_inner(&component, ShutdownAction::new(ShutdownType::Instance));
-        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false));
-        let (task3, nf3) = action_set.register_inner(&component, StopAction::new(false));
+        // Register some actions, and get notifications.
+        let shutdown_notifier = action_set.register_no_wait(mock_shutdown_action).await;
+        let stop_notifier_1 = action_set.register_no_wait(StopAction::new(false)).await;
+        let stop_notifier_2 = action_set.register_no_wait(StopAction::new(false)).await;
 
         drop(action_set);
 
-        // Complete actions, while checking notifications.
-        ActionSet::finish(&component, &ActionKey::Shutdown).await;
+        // The stop action should be blocked on the shutdown action completing.
+        assert!(stop_notifier_1.fut.peek().is_none());
+        assert!(stop_notifier_2.fut.peek().is_none());
 
-        // nf2 and nf3 should be blocked on task1 completing.
-        assert!(nf1.fut.peek().is_none());
-        assert!(nf2.fut.peek().is_none());
-        task1.unwrap().tx.send(Ok(())).unwrap();
-        task2.unwrap().spawn();
-        assert!(task3.is_none());
-        nf1.await.unwrap();
-        nf2.await.unwrap();
-        nf3.await.unwrap();
+        // allow the shutdown action to finish running
+        mock_shutdown_barrier.send(Ok(())).unwrap();
+        shutdown_notifier.await.expect("shutdown failed unexpectedly");
+
+        // The stop actions should now finish running.
+        stop_notifier_1.await.expect("stop failed unexpectedly");
+        stop_notifier_2.await.expect("stop failed unexpectedly");
     }
 
     #[fuchsia::test]
@@ -2531,9 +2528,12 @@ mod tests {
 
         // Register shutdown action, and wait for it. Component should shut down (no more
         // `Execution`).
-        ActionSet::register(a_info.component.clone(), ShutdownAction::new(ShutdownType::Instance))
-            .await
-            .expect("shutdown failed");
+        ActionsManager::register(
+            a_info.component.clone(),
+            ShutdownAction::new(ShutdownType::Instance),
+        )
+        .await
+        .expect("shutdown failed");
         a_info.check_is_shut_down(&test.runner).await;
 
         // Trying to start the component should fail because it's shut down.
@@ -2542,9 +2542,12 @@ mod tests {
             .expect_err("successfully bound to a after shutdown");
 
         // Shut down the component again. This succeeds, but has no additional effect.
-        ActionSet::register(a_info.component.clone(), ShutdownAction::new(ShutdownType::Instance))
-            .await
-            .expect("shutdown failed");
+        ActionsManager::register(
+            a_info.component.clone(),
+            ShutdownAction::new(ShutdownType::Instance),
+        )
+        .await
+        .expect("shutdown failed");
         a_info.check_is_shut_down(&test.runner).await;
     }
 
@@ -2599,7 +2602,7 @@ mod tests {
         // Register shutdown action, and wait for it. Components should shut down (no more
         // `Execution`). Also, the instances in the collection should have been destroyed because
         // they were transient.
-        ActionSet::register(
+        ActionsManager::register(
             component_container_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -2730,7 +2733,7 @@ mod tests {
         // Register shutdown action, and wait for it. Components should shut down (no more
         // `Execution`). Also, the instances in the collection should have been destroyed because
         // they were transient.
-        ActionSet::register(
+        ActionsManager::register(
             component_container_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -2793,7 +2796,7 @@ mod tests {
         assert!(!component_b.is_started().await);
 
         // Register shutdown action on "a", and wait for it.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         assert!(execution_is_shut_down(&component_a).await);
@@ -2801,7 +2804,7 @@ mod tests {
 
         // Now "a" is shut down. There should be no events though because the component was
         // never started.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         assert!(execution_is_shut_down(&component_a).await);
@@ -2837,7 +2840,7 @@ mod tests {
         assert!(component_a.is_started().await);
 
         // Register shutdown action on "a", and wait for it.
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .expect("shutdown failed");
         assert!(execution_is_shut_down(&component_a).await);
@@ -2913,7 +2916,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3024,7 +3027,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3170,7 +3173,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3345,7 +3348,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3461,7 +3464,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up and dependency order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3556,7 +3559,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up and dependency order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3630,7 +3633,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3701,7 +3704,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3787,7 +3790,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3864,7 +3867,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -3941,7 +3944,7 @@ mod tests {
 
         // Register shutdown action on "a", and wait for it. This should cause all components
         // to shut down, in bottom-up and dependency order.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -4028,7 +4031,7 @@ mod tests {
         // Register shutdown action on "a", and wait for it. "d" fails to shutdown, so "a" fails
         // too. The state of "c" is unknown at this point. The shutdown of stop targets occur
         // simultaneously. "c" could've shutdown before "d" or it might not have.
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -4045,7 +4048,7 @@ mod tests {
         }
 
         // Register shutdown action on "a" again which should succeed
-        ActionSet::register(
+        ActionsManager::register(
             component_a_info.component.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )

@@ -9,7 +9,7 @@ import abc
 from honeydew.typing.wlan import (
     BssDescription,
     ClientStatusResponse,
-    CountryCodeList,
+    CountryCode,
     QueryIfaceResponse,
     WlanMacRole,
 )
@@ -73,7 +73,7 @@ class Wlan(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_country(self, phy_id: int) -> CountryCodeList:
+    def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
 
         Args:
@@ -103,7 +103,7 @@ class Wlan(abc.ABC):
         """
 
     @abc.abstractmethod
-    def scan_for_bss_info(self) -> dict[str, BssDescription]:
+    def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
         """Scans and returns BSS info.
 
         Returns:
@@ -112,7 +112,7 @@ class Wlan(abc.ABC):
         """
 
     @abc.abstractmethod
-    def set_region(self, region_code: str) -> None:
+    def set_region(self, region_code: CountryCode) -> None:
         """Set regulatory region.
 
         Args:

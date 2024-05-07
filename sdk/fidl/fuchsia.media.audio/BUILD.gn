@@ -9,6 +9,7 @@ fidl("fuchsia.media.audio") {
   excluded_checks = [ "invalid-case-for-decl-member" ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Media"
 
   sources = [

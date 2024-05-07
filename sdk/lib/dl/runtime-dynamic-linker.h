@@ -172,7 +172,12 @@ class RuntimeDynamicLinker {
   // if relocations succeeded on all modules.
   template <class Loader>
   bool Relocate(Diagnostics& diag, ModuleList<LoadModule<Loader>>& modules) {
-    auto relocate = [&](auto& module) -> bool { return module.Relocate(diag, modules); };
+    // Scope diagnostics to the root module so that its name will prefix error
+    // messages.
+    auto relocate = [&](auto& module) -> bool {
+      ld::ScopedModuleDiagnostics root_module_diag{diag, module.name().str()};
+      return module.Relocate(diag, modules);
+    };
     return std::all_of(std::begin(modules), std::end(modules), relocate);
   }
 

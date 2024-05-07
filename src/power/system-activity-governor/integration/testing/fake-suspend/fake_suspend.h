@@ -14,8 +14,8 @@
 #include <memory>
 #include <vector>
 
-#include "control_server.h"
-#include "device_server.h"
+#include "src/power/testing/fake-suspend/control_server.h"
+#include "src/power/testing/fake-suspend/device_server.h"
 
 namespace fake_suspend {
 

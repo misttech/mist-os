@@ -183,19 +183,20 @@ impl Broker {
             return;
         }
         if prev_level.unwrap() > level {
-            // If the level was lowered, find orphaned claims whose lease has
-            // been dropped and see if any of these claims no longer have any
-            // dependents and thus can be dropped.
-            let orphaned_active_claims_for_element =
-                self.catalog.active_claims.activated.orphaned_for_element(element_id);
+            // If the level was lowered, find activated claims whose lease has
+            // become contingent or dropped and see if any of these claims no
+            // longer have any dependents and thus can be deactivated or
+            // dropped.
+            let active_claims_to_deactivate =
+                self.catalog.active_claims.activated.marked_to_deactivate_for_element(element_id);
             let active_claims_to_drop =
-                self.find_claims_with_no_dependents(&orphaned_active_claims_for_element);
-            let orphaned_passive_claims_for_element =
-                self.catalog.passive_claims.activated.orphaned_for_element(element_id);
+                self.find_claims_with_no_dependents(&active_claims_to_deactivate);
+            let passive_claims_to_deactivate =
+                self.catalog.passive_claims.activated.marked_to_deactivate_for_element(element_id);
             let passive_claims_to_drop =
-                self.find_claims_with_no_dependents(&orphaned_passive_claims_for_element);
-            self.drop_active_claims(&active_claims_to_drop);
-            self.drop_passive_claims(&passive_claims_to_drop);
+                self.find_claims_with_no_dependents(&passive_claims_to_deactivate);
+            self.drop_or_deactivate_active_claims(&active_claims_to_drop);
+            self.drop_or_deactivate_passive_claims(&passive_claims_to_drop);
         }
     }
 
@@ -282,34 +283,45 @@ impl Broker {
                         "active claim {active_claim} changed status of lease {}",
                         &passive_claim.lease_id
                     );
-                    // Activate any pending claims for this lease whose
-                    // required elements have their dependencies satisfied.
-                    let pending_claims =
-                        self.catalog.active_claims.pending.for_lease(&passive_claim.lease_id);
-                    self.activate_active_claims_if_dependencies_satisfied(pending_claims);
-                    // Activate passive claims for this lease, if they are
-                    // (already) currently satisfied.
-                    for claim in
-                        self.catalog.passive_claims.pending.for_lease(&passive_claim.lease_id)
-                    {
-                        if !self.current_level_satisfies(claim.requires()) {
-                            continue;
-                        }
-                        self.catalog.passive_claims.activate_claim(&claim.id)
-                    }
-                    self.update_lease_status(&passive_claim.lease_id);
+                    self.on_lease_transition_to_noncontingent(&passive_claim.lease_id)
                 }
             }
         }
         Ok(lease)
     }
 
+    /// Runs when a lease becomes no longer contingent.
+    fn on_lease_transition_to_noncontingent(&mut self, lease_id: &LeaseID) {
+        // Reset any active or passive claims that were previously marked to
+        // deactivate. Since they weren't already deactivated, they must
+        // already be currently satisfied.
+        for claim in self.catalog.active_claims.activated.for_lease(lease_id) {
+            self.catalog.active_claims.activated.remove_from_claims_to_deactivate(&claim.id)
+        }
+        for claim in self.catalog.passive_claims.activated.for_lease(lease_id) {
+            self.catalog.passive_claims.activated.remove_from_claims_to_deactivate(&claim.id)
+        }
+        // Activate any pending active claims for this lease whose
+        // required elements have their dependencies satisfied.
+        let pending_claims = self.catalog.active_claims.pending.for_lease(&lease_id);
+        self.activate_active_claims_if_dependencies_satisfied(pending_claims);
+        // Activate pending passive claims for this lease, if they are
+        // (already) currently satisfied.
+        for claim in self.catalog.passive_claims.pending.for_lease(&lease_id) {
+            if !self.current_level_satisfies(claim.requires()) {
+                continue;
+            }
+            self.catalog.passive_claims.activate_claim(&claim.id)
+        }
+        self.update_lease_status(&lease_id);
+    }
+
     pub fn drop_lease(&mut self, lease_id: &LeaseID) -> Result<(), Error> {
         let (lease, active_claims, passive_claims) = self.catalog.drop(lease_id)?;
         let active_claims_dropped = self.find_claims_with_no_dependents(&active_claims);
         let passive_claims_dropped = self.find_claims_with_no_dependents(&passive_claims);
-        self.drop_active_claims(&active_claims_dropped);
-        self.drop_passive_claims(&passive_claims_dropped);
+        self.drop_or_deactivate_active_claims(&active_claims_dropped);
+        self.drop_or_deactivate_passive_claims(&passive_claims_dropped);
         self.catalog.lease_status.remove(lease_id);
         // Update the required level of the formerly leased element.
         self.update_required_levels(&vec![&lease.element_id]);
@@ -341,12 +353,14 @@ impl Broker {
                 .active_claims
                 .pending
                 .for_required_element(&claim.requires().element_id);
-            let matching_active_claim_found = activated_claims
+            let matching_active_claim = activated_claims
                 .into_iter()
                 .chain(pending_claims)
                 .filter(|c| !self.is_lease_contingent(&c.lease_id))
-                .any(|c| c.requires().level.satisfies(claim.requires().level));
-            if !matching_active_claim_found {
+                .find(|c| c.requires().level.satisfies(claim.requires().level));
+            if let Some(matching_active_claim) = matching_active_claim {
+                tracing::debug!("{matching_active_claim} satisfies passive {claim}");
+            } else {
                 return true;
             }
         }
@@ -408,14 +422,32 @@ impl Broker {
             tracing::warn!("update_lease_status: lease {lease_id} not found");
         }
         tracing::debug!("update_lease_status({lease_id}) to {status:?}");
-        // If this lease has transitioned into pending and is now contingent,
-        // scan active claims of this lease. If those active claims have any
-        // passive claims sharing the required element-level of D's active claims,
-        // then re-evaluate their lease to determine if it's newly pending.
+        // Lease has transitioned from satisfied to pending and contingent.
         if prev_status.as_ref() == Some(&LeaseStatus::Satisfied)
             && status == LeaseStatus::Pending
             && self.is_lease_contingent(lease_id)
         {
+            // Mark all activated claims of this lease to be deactivated once
+            // they are no longer in use.
+            tracing::debug!(
+                "drop(lease:{lease_id}): marking activated active claims to deactivate"
+            );
+            let active_claims_to_deactivate =
+                self.catalog.active_claims.activated.mark_to_deactivate(&lease_id);
+            self.update_required_levels(&element_ids_required_by_claims(
+                &active_claims_to_deactivate,
+            ));
+            tracing::debug!(
+                "drop(lease:{lease_id}): marking activated passive claims to deactivate"
+            );
+            let passive_claims_to_deactivate =
+                self.catalog.passive_claims.activated.mark_to_deactivate(&lease_id);
+            self.update_required_levels(&element_ids_required_by_claims(
+                &passive_claims_to_deactivate,
+            ));
+            // Scan active claims of this lease. If those active claims have any
+            // passive claims sharing the required element-level of D's active claims,
+            // then re-evaluate their lease to determine if it's newly pending.
             for active_claim in self.catalog.active_claims.activated.for_lease(lease_id) {
                 let element_of_pending_lease = &active_claim.requires().element_id;
                 for passive_claim in self
@@ -560,10 +592,17 @@ impl Broker {
         claims_to_drop
     }
 
-    fn drop_active_claims(&mut self, claims: &Vec<Claim>) {
+    /// Takes a Vec of active claims, deactivates them if their lease is open,
+    /// or drops them if their lease has been dropped. Then updates lease
+    /// status of leases affected and required levels of elements affected.
+    fn drop_or_deactivate_active_claims(&mut self, claims: &Vec<Claim>) {
         for claim in claims {
-            tracing::debug!("drop active claim: {claim}");
-            self.catalog.drop_activated_active_claim(&claim.id);
+            tracing::debug!("deactivate active claim: {claim}");
+            if self.catalog.is_lease_dropped(&claim.lease_id) {
+                self.catalog.active_claims.drop_claim(&claim.id);
+            } else {
+                self.catalog.active_claims.deactivate_claim(&claim.id);
+            }
         }
         let element_ids_affected = element_ids_required_by_claims(claims);
         self.update_required_levels(&element_ids_affected);
@@ -594,10 +633,18 @@ impl Broker {
         }
     }
 
-    fn drop_passive_claims(&mut self, claims: &Vec<Claim>) {
+    /// Takes a Vec of passive claims, deactivates them if their lease is open,
+    /// or drops them if their lease has been dropped. Then updates required
+    /// levels of elements affected.
+    fn drop_or_deactivate_passive_claims(&mut self, claims: &Vec<Claim>) {
         for claim in claims {
-            tracing::debug!("drop passive claim: {claim}");
-            self.catalog.drop_activated_passive_claim(&claim.id);
+            if self.catalog.is_lease_dropped(&claim.lease_id) {
+                tracing::debug!("drop passive claim: {claim}");
+                self.catalog.passive_claims.drop_claim(&claim.id);
+            } else {
+                tracing::debug!("deactivate passive claim: {claim}");
+                self.catalog.passive_claims.deactivate_claim(&claim.id);
+            }
         }
         self.update_required_levels(&element_ids_required_by_claims(claims));
     }
@@ -762,11 +809,8 @@ pub struct Lease {
 
 impl Lease {
     fn new(element_id: &ElementID, level: PowerLevel) -> Self {
-        let id = if ID_DEBUG_MODE {
-            format!("{element_id}@{level}")
-        } else {
-            LeaseID::from(Uuid::new_v4().as_simple().to_string())
-        };
+        let uuid = LeaseID::from(Uuid::new_v4().as_simple().to_string());
+        let id = if ID_DEBUG_MODE { format!("{element_id}@{level}:{uuid:.6}") } else { uuid };
         Lease { id: id.clone(), element_id: element_id.clone(), level: level.clone() }
     }
 }
@@ -782,7 +826,7 @@ struct Claim {
 
 impl fmt::Display for Claim {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Claim{{{:.6}:{:.6}: {}}}", self.lease_id, self.id, self.dependency)
+        write!(f, "Claim{{{}:{:.6}: {}}}", self.lease_id, self.id, self.dependency)
     }
 }
 
@@ -856,6 +900,11 @@ impl Catalog {
         self.topology.minimum_level(element_id)
     }
 
+    /// Returns true if the lease was dropped (or never existed).
+    fn is_lease_dropped(&self, lease_id: &LeaseID) -> bool {
+        !self.leases.contains_key(lease_id)
+    }
+
     /// Calculates the required level for each element, according to the
     /// Minimum Power Level Policy.
     /// The required level is equal to the maximum of all **activated** active
@@ -923,12 +972,12 @@ impl Catalog {
 
     /// Drops an existing lease, and initiates process of releasing all
     /// associated claims.
-    /// Returns the dropped lease, a Vec of active claims that have
-    /// been orphaned, and a Vec of passive claims that have been
-    /// orphaned.
+    /// Returns the dropped lease, a Vec of active claims marked to deactivate,
+    /// and a Vec of passive claims marked to deactivate.
     fn drop(&mut self, lease_id: &LeaseID) -> Result<(Lease, Vec<Claim>, Vec<Claim>), Error> {
         tracing::debug!("drop(lease:{lease_id})");
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
+        self.lease_status.remove(lease_id);
         tracing::debug!("dropping lease({:?})", &lease);
         // Pending claims should be dropped immediately.
         let pending_active_claims = self.active_claims.pending.for_lease(&lease.id);
@@ -947,22 +996,14 @@ impl Catalog {
                 tracing::error!("cannot remove pending passive claim: not found: {}", claim.id);
             }
         }
-        // Active and Passive claims should be marked to drop in an orderly sequence.
-        tracing::debug!("drop(lease:{lease_id}): marking activated active claims orphaned");
-        let active_claims_orphaned = self.active_claims.activated.mark_orphaned(&lease.id);
-        tracing::debug!("drop(lease:{lease_id}): marking activated passive claims orphaned");
-        let passive_claims_orphaned = self.passive_claims.activated.mark_orphaned(&lease.id);
-        Ok((lease, active_claims_orphaned, passive_claims_orphaned))
-    }
-
-    /// Drops an activated active claim, removing it from active_claims.
-    fn drop_activated_active_claim(&mut self, claim_id: &ClaimID) {
-        self.active_claims.activated.remove(&claim_id);
-    }
-
-    /// Drops an activated passive claim, removing it from passive_claims.
-    fn drop_activated_passive_claim(&mut self, claim_id: &ClaimID) {
-        self.passive_claims.activated.remove(&claim_id);
+        // Active and Passive claims should be marked to deactivate in an orderly sequence.
+        tracing::debug!("drop(lease:{lease_id}): marking activated active claims to deactivate");
+        let active_claims_to_deactivate =
+            self.active_claims.activated.mark_to_deactivate(&lease.id);
+        tracing::debug!("drop(lease:{lease_id}): marking activated passive claims to deactivate");
+        let passive_claims_to_deactivate =
+            self.passive_claims.activated.mark_to_deactivate(&lease.id);
+        Ok((lease, active_claims_to_deactivate, passive_claims_to_deactivate))
     }
 
     pub fn get_lease_status(&self, lease_id: &LeaseID) -> Option<LeaseStatus> {
@@ -986,6 +1027,17 @@ struct ClaimActivationTracker {
     activated: ClaimLookup,
 }
 
+impl fmt::Display for ClaimActivationTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "pending: [{}], activated: [{}]",
+            self.pending.claims.values().join(", "),
+            self.activated.claims.values().join(", ")
+        )
+    }
+}
+
 impl ClaimActivationTracker {
     fn new() -> Self {
         Self { pending: ClaimLookup::new(), activated: ClaimLookup::new() }
@@ -996,6 +1048,20 @@ impl ClaimActivationTracker {
         tracing::debug!("activate_claim: {claim_id}");
         self.pending.move_to(&claim_id, &mut self.activated);
     }
+
+    /// Deactivates an activated claim, moving it to pending.
+    fn deactivate_claim(&mut self, claim_id: &ClaimID) {
+        tracing::debug!("deactivate_claim: {claim_id}");
+        self.activated.move_to(&claim_id, &mut self.pending);
+        self.activated.remove_from_claims_to_deactivate(&claim_id);
+    }
+
+    /// Removes a claim from both pending and activated.
+    fn drop_claim(&mut self, claim_id: &ClaimID) {
+        tracing::debug!("drop_claim: {claim_id}");
+        self.pending.remove(&claim_id);
+        self.activated.remove(&claim_id);
+    }
 }
 
 #[derive(Debug)]
@@ -1003,7 +1069,7 @@ struct ClaimLookup {
     claims: HashMap<ClaimID, Claim>,
     claims_by_required_element_id: HashMap<ElementID, Vec<ClaimID>>,
     claims_by_lease: HashMap<LeaseID, Vec<ClaimID>>,
-    orphaned_claims_by_element_id: HashMap<ElementID, Vec<ClaimID>>,
+    claims_to_deactivate_by_element_id: HashMap<ElementID, Vec<ClaimID>>,
 }
 
 impl ClaimLookup {
@@ -1012,7 +1078,7 @@ impl ClaimLookup {
             claims: HashMap::new(),
             claims_by_required_element_id: HashMap::new(),
             claims_by_lease: HashMap::new(),
-            orphaned_claims_by_element_id: HashMap::new(),
+            claims_to_deactivate_by_element_id: HashMap::new(),
         }
     }
 
@@ -1046,29 +1112,36 @@ impl ClaimLookup {
                 self.claims_by_lease.remove(&claim.lease_id);
             }
         }
-        if let Some(claim_ids) =
-            self.orphaned_claims_by_element_id.get_mut(&claim.dependent().element_id)
-        {
-            claim_ids.retain(|x| x != id);
-            if claim_ids.is_empty() {
-                self.orphaned_claims_by_element_id.remove(&claim.dependent().element_id);
-            }
-        }
+        self.remove_from_claims_to_deactivate(id);
         Some(claim)
     }
 
-    /// Marks all claims associated with a dropped lease as orphaned. They will
-    /// be removed in an orderly sequence (each claim will be removed only once
-    /// all claims dependent on it have already been dropped).
+    fn remove_from_claims_to_deactivate(&mut self, id: &ClaimID) {
+        let Some(claim) = self.claims.remove(id) else {
+            return;
+        };
+        if let Some(claim_ids) =
+            self.claims_to_deactivate_by_element_id.get_mut(&claim.dependent().element_id)
+        {
+            claim_ids.retain(|x| x != id);
+            if claim_ids.is_empty() {
+                self.claims_to_deactivate_by_element_id.remove(&claim.dependent().element_id);
+            }
+        }
+    }
+    /// Marks all claims associated with a lease to deactivate.
+    /// They will be deactivated in an orderly sequence (each claim will be
+    /// deactivated only once all claims dependent on it have already been
+    /// deactivated).
     /// Returns a Vec of Claims marked to drop.
-    fn mark_orphaned(&mut self, lease_id: &LeaseID) -> Vec<Claim> {
+    fn mark_to_deactivate(&mut self, lease_id: &LeaseID) -> Vec<Claim> {
         let claims_marked = self.for_lease(lease_id);
         tracing::debug!(
-            "marking claims orphaned for lease {lease_id}: [{}]",
+            "marking claims to deactivate for lease {lease_id}: [{}]",
             &claims_marked.iter().join(", ")
         );
         for claim in &claims_marked {
-            self.orphaned_claims_by_element_id
+            self.claims_to_deactivate_by_element_id
                 .entry(claim.dependent().element_id.clone())
                 .or_insert(Vec::new())
                 .push(claim.id.clone());
@@ -1102,9 +1175,9 @@ impl ClaimLookup {
     }
 
     /// Claims with element_id as a dependent that belong to leases which have
-    /// been dropped. See ClaimLookup::mark_orphaned for more details.
-    fn orphaned_for_element(&self, element_id: &ElementID) -> Vec<Claim> {
-        let Some(claim_ids) = self.orphaned_claims_by_element_id.get(element_id) else {
+    /// been dropped. See ClaimLookup::mark_to_deactivate for more details.
+    fn marked_to_deactivate_for_element(&self, element_id: &ElementID) -> Vec<Claim> {
+        let Some(claim_ids) = self.claims_to_deactivate_by_element_id.get(element_id) else {
             return Vec::new();
         };
         self.for_claim_ids(claim_ids)
@@ -3375,6 +3448,364 @@ mod tests {
         assert_lease_cleaned_up(&broker.catalog, &lease_b_id);
         assert_lease_cleaned_up(&broker.catalog, &lease_c_id);
         assert_lease_cleaned_up(&broker.catalog, &lease_c_reacquired_id);
+    }
+
+    #[fuchsia::test]
+    async fn test_lease_passive_reuse() {
+        // Tests that a lease with a passive claim can be reused after
+        // the current level of the consumer element is lowered.
+        //
+        // B has an active dependency on A.
+        // C has a passive dependency on A.
+        //  A     B     C
+        // ON <= ON
+        // ON <------- ON
+        let mut broker = Broker::new();
+        let token_a_active = DependencyToken::create();
+        let token_a_passive = DependencyToken::create();
+        let element_a = broker
+            .add_element(
+                "A",
+                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![],
+                vec![token_a_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_a_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_b = broker
+            .add_element(
+                "B",
+                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_a_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c = broker
+            .add_element(
+                "C",
+                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Passive,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_a_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        // All initial required levels should be OFF.
+        // Set all current levels to OFF.
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        broker.update_current_level(&element_a, BinaryPowerLevel::Off.into_primitive());
+        broker.update_current_level(&element_b, BinaryPowerLevel::Off.into_primitive());
+        broker.update_current_level(&element_c, BinaryPowerLevel::Off.into_primitive());
+
+        // Lease C.
+        // A's required level should remain OFF because of C's passive claim.
+        // B's required level should remain OFF.
+        // C's required level should remain OFF because its lease is pending and contingent.
+        // Lease C should be pending and contingent on its passive claim.
+        let lease_c = broker
+            .acquire_lease(&element_c, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        let lease_c_id = lease_c.id.clone();
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Lease B.
+        // A's required level should become ON because of B's active claim.
+        // B's required level should remain OFF because its dependency is not satisfied.
+        // C's required level should remain OFF because its dependency is not satisfied.
+        // Lease B should be pending.
+        // Lease C should remain pending but no longer contingent because
+        // B's active claim would satisfy C's passive claim.
+        let lease_b = broker
+            .acquire_lease(&element_b, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        let lease_b_id = lease_b.id.clone();
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_b.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_b.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
+
+        // Update A's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should become ON because its dependency is satisfied.
+        // C's required level should become ON because its dependency is satisfied.
+        // Lease B & C should become satisfied.
+        broker.update_current_level(&element_a, BinaryPowerLevel::On.into_primitive());
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_b.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_b.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
+
+        // Update C's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should remain ON.
+        // Lease B & C should remain satisfied.
+        broker.update_current_level(&element_c, BinaryPowerLevel::On.into_primitive());
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_b.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_b.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
+
+        // Drop Lease on B.
+        // A's required level should remain ON.
+        // B's required level should become OFF because it is no longer leased.
+        // C's required level should become OFF because it now pending and contingent.
+        // Lease C should now be pending and contingent.
+        broker.drop_lease(&lease_b.id).expect("drop_lease failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Update C's current level to OFF.
+        // A's required level should become OFF.
+        // B's required level should remain OFF.
+        // C's required level should remain OFF because its lease is pending and contingent.
+        // Lease C should still be pending and contingent.
+        broker.update_current_level(&element_c, BinaryPowerLevel::Off.into_primitive());
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Update A's current level to OFF.
+        // A, B & C's required levels should remain OFF.
+        // Lease C should still be pending and contingent.
+        broker.update_current_level(&element_a, BinaryPowerLevel::Off.into_primitive());
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Update B's current level to OFF.
+        // A, B & C's required levels should remain OFF.
+        // Lease C should still be pending and contingent.
+        broker.update_current_level(&element_b, BinaryPowerLevel::Off.into_primitive());
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Reacquire Lease on B.
+        // A's required level should become ON because of B's active claim.
+        // B's required level should remain OFF because its dependency is not satisfied.
+        // C's required level should remain OFF because its dependency is not satisfied.
+        // Lease B should be pending.
+        // Lease C should remain pending but no longer contingent because
+        // B's active claim would satisfy C's passive claim.
+        let lease_b_reacquired = broker
+            .acquire_lease(&element_b, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        let lease_b_reacquired_id = lease_b_reacquired.id.clone();
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_b_reacquired.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_b_reacquired.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
+
+        // Update A's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should become ON because its dependency is satisfied.
+        // C's required level should become ON because its dependency is satisfied.
+        // Lease B & C should become satisfied.
+        broker.update_current_level(&element_a, BinaryPowerLevel::On.into_primitive());
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_b_reacquired.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_b_reacquired.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), false);
+
+        // Drop reacquired lease on B.
+        // A's required level should remain ON.
+        // B's required level should become OFF because it is no longer leased.
+        // C's required level should become OFF because it now pending and contingent.
+        // Lease C should now be pending and contingent.
+        broker.drop_lease(&lease_b_reacquired.id).expect("drop_lease failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Drop lease on C.
+        // A's required level should become OFF.
+        // B's required level should remain OFF.
+        // C's required level should remain OFF because its lease is pending and contingent.
+        broker.drop_lease(&lease_c.id).expect("drop_lease failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_c),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+
+        // All leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_b_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_c_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_b_reacquired_id);
     }
 
     #[fuchsia::test]

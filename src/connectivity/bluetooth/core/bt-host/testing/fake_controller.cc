@@ -17,7 +17,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
 
 #include <pw_bluetooth/hci_data.emb.h>
-#include <pw_bluetooth/hci_vendor.emb.h>
+#include <pw_bluetooth/hci_android.emb.h>
 
 namespace bt::testing {
 namespace {

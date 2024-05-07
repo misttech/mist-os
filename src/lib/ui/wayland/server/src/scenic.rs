@@ -58,7 +58,6 @@ impl Flatland {
     }
 
     pub fn present(&mut self, presentation_time: i64) {
-        ftrace::flow_begin!(c"gfx", c"Flatland::Present", self.alloc_trace_id());
         let release_fences: Vec<_> = self.release_fences.drain(..).collect();
         self.flatland
             .present(PresentArgs {

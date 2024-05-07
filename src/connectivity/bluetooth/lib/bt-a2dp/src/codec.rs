@@ -8,8 +8,8 @@ use fidl_fuchsia_media as media;
 use tracing::{trace, warn};
 
 use crate::media_types::{
-    AacChannels, AacCodecInfo, SbcAllocation, SbcBlockCount, SbcChannelMode, SbcCodecInfo,
-    SbcSamplingFrequency, SbcSubBands,
+    AacChannels, AacCodecInfo, AacObjectType, AacSamplingFrequency, SbcAllocation, SbcBlockCount,
+    SbcChannelMode, SbcCodecInfo, SbcSamplingFrequency, SbcSubBands,
 };
 use crate::rtp::{AacRtpPacketBuilder, RtpPacketBuilder, SbcRtpPacketBuilder};
 
@@ -66,7 +66,21 @@ impl MediaCodecConfig {
             29,
         )
         .expect("Minimum Codec Info should build");
-        Self::build(MediaCodecType::AUDIO_SBC, &codec_info.to_bytes()).expect("builds")
+        Self::build(MediaCodecType::AUDIO_SBC, &codec_info.to_bytes()).unwrap()
+    }
+
+    /// Mandatory sink configuration for AAC
+    /// As defined by the A2DP Specification Sectrion 4.5
+    pub fn min_aac_sink() -> Self {
+        let codec_info = AacCodecInfo::new(
+            AacObjectType::MANDATORY_SNK,
+            AacSamplingFrequency::MANDATORY_SNK,
+            AacChannels::MANDATORY_SNK,
+            true,
+            0,
+        )
+        .expect("Min Codec Info should build");
+        Self::build(MediaCodecType::AUDIO_AAC, &codec_info.to_bytes()).unwrap()
     }
 
     pub fn codec_type(&self) -> &MediaCodecType {

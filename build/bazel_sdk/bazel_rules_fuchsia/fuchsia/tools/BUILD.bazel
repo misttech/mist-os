@@ -125,6 +125,13 @@ py_binary(
 )
 
 py_binary(
+    name = "test_enumerated_components",
+    srcs = ["test_enumerated_components.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
     name = "clean_repo",
     srcs = ["clean_repo.py"],
     python_version = "PY3",

@@ -16,12 +16,12 @@ use {
         execution_scope::ExecutionScope,
         immutable_attributes,
         path::Path as VfsPath,
-        ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
 #[cfg(feature = "supports_open2")]
-use vfs::{ObjectRequestRef, ProtocolsExt};
+use vfs::ProtocolsExt;
 
 pub(crate) struct MetaAsDir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -136,6 +136,17 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
+    }
+
+    #[cfg(not(feature = "supports_open2"))]
+    fn open2(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _path: VfsPath,
+        _protocols: fio::ConnectionProtocols,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
     }
 
     #[cfg(feature = "supports_open2")]

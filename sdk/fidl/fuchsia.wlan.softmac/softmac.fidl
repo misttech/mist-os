@@ -940,7 +940,7 @@ closed protocol WlanSoftmac {
     compose WlanSoftmacBase;
 
     // At API level HEAD, WlanSoftmac composes all the methods below this line from WlanSoftmacBase.
-    @available(added=15, removed=HEAD)
+    @available(added=15, replaced=HEAD)
     compose WlanSoftmacBridge;
 
     // TODO(https://fxbug.dev/42168129): the need to nest query response within a struct {} is no longer

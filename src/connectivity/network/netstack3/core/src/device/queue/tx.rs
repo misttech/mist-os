@@ -272,7 +272,7 @@ mod tests {
 
     impl TransmitQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeBindingsCtxImpl {
         fn wake_tx_task(&mut self, device_id: &FakeLinkDeviceId) {
-            self.state_mut().woken_tx_tasks.push(device_id.clone())
+            self.state.woken_tx_tasks.push(device_id.clone())
         }
     }
 
@@ -367,7 +367,7 @@ mod tests {
             frame: Frame<&[u8]>,
             _whole_frame: &[u8],
         ) {
-            bindings_ctx.state_mut().delivered_to_sockets.push(frame.cloned())
+            bindings_ctx.state.delivered_to_sockets.push(frame.cloned())
         }
     }
 
@@ -389,7 +389,7 @@ mod tests {
             Ok(())
         );
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
-            bindings_ctx.state();
+            &bindings_ctx.state;
         assert_eq!(woken_tx_tasks, &[]);
         assert_eq!(
             delivered_to_sockets,
@@ -405,7 +405,7 @@ mod tests {
         );
 
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(bindings_ctx.state().woken_tx_tasks, []);
+        assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), []);
     }
 
@@ -432,7 +432,7 @@ mod tests {
                 );
                 // We should only ever be woken up once when the first packet
                 // was enqueued.
-                assert_eq!(bindings_ctx.state().woken_tx_tasks, [FakeLinkDeviceId]);
+                assert_eq!(bindings_ctx.state.woken_tx_tasks, [FakeLinkDeviceId]);
             }
 
             let body = Buf::new(vec![131], ..);
@@ -448,7 +448,7 @@ mod tests {
             );
 
             let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
-                bindings_ctx.state_mut();
+                &mut bindings_ctx.state;
             // We should only ever be woken up once when the first packet
             // was enqueued.
             assert_eq!(core::mem::take(woken_tx_tasks), [FakeLinkDeviceId]);
@@ -484,7 +484,7 @@ mod tests {
             // Should not have woken up the TX task since the queue should be
             // empty.
             let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
-                bindings_ctx.state_mut();
+                &mut bindings_ctx.state;
             assert_eq!(core::mem::take(woken_tx_tasks), []);
 
             // The queue should now be empty so the next iteration of queueing
@@ -517,10 +517,7 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(
-            core::mem::take(&mut bindings_ctx.state_mut().woken_tx_tasks),
-            [FakeLinkDeviceId]
-        );
+        assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_tx_tasks), [FakeLinkDeviceId]);
         assert_eq!(core_ctx.get_mut().transmitted_packets, []);
 
         core_ctx.get_mut().device_not_ready = true;
@@ -531,7 +528,7 @@ mod tests {
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.get_mut().transmitted_packets, []);
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
-            bindings_ctx.state();
+            &bindings_ctx.state;
         assert_eq!(woken_tx_tasks, &[]);
         // Frames were delivered to packet sockets before the device was found
         // to not be ready.
@@ -546,7 +543,7 @@ mod tests {
             Ok(WorkQueueReport::AllDone),
         );
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(bindings_ctx.state().woken_tx_tasks, []);
+        assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
     }
 
@@ -570,10 +567,7 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(
-            core::mem::take(&mut bindings_ctx.state_mut().woken_tx_tasks),
-            [FakeLinkDeviceId]
-        );
+        assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_tx_tasks), [FakeLinkDeviceId]);
         assert_eq!(core_ctx.get_mut().transmitted_packets, []);
 
         core_ctx.get_mut().device_not_ready = device_not_ready;
@@ -582,7 +576,7 @@ mod tests {
 
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
-            bindings_ctx.state();
+            &bindings_ctx.state;
         assert_eq!(woken_tx_tasks, &[]);
         assert_eq!(
             delivered_to_sockets,

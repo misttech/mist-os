@@ -28,6 +28,7 @@ use {
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
     },
+    fxfs_macros::ToWeakNode,
     std::{
         ops::Range,
         sync::{
@@ -58,6 +59,7 @@ use {
 const TO_BE_PURGED: usize = 1 << (usize::BITS - 1);
 
 /// FxFile represents an open connection to a file.
+#[derive(ToWeakNode)]
 pub struct FxFile {
     handle: PagedObjectHandle,
     open_count: AtomicUsize,

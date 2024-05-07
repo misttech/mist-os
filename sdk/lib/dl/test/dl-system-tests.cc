@@ -41,11 +41,12 @@ fit::result<Error, void*> DlSystemTests::DlSym(void* module, const char* ref) {
 }
 
 #ifdef __Fuchsia__
-// Call dlopen with the mock fuchsia_ldsvc::Loader installed.
+// Call dlopen with the mock fuchsia_ldsvc::Loader installed and check that all
+// its Needed/Expect* expectations were satisfied before clearing them.
 void* DlSystemTests::CallDlOpen(const char* file, int mode) {
   void* result;
-  // TODO(caslyn): verify and clear mock expectations.
   CallWithLdsvcInstalled([&]() { result = dlopen(file, mode); });
+  VerifyAndClearNeeded();
   return result;
 }
 #else

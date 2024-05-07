@@ -135,8 +135,8 @@ fn build_ssh_args(
     }
 
     let mut res: Vec<String> = vec![
-        // We want ipv6 binds for the port forwards
-        "-o AddressFamily inet6".into(),
+        // We want all binds for the port forwards, since the device may be using IPv4 or IPv6, and the server may be using an IPv6 address to look it up.
+        "-o AddressFamily any".into(),
         // We do not want multiplexing
         format!("-o ControlPath {}", control_master_path.as_ref()),
         "-o ControlMaster auto".into(),
@@ -246,7 +246,7 @@ mod test {
         let got = build_ssh_args(target, "/foo", vec![8081], vec![5555])?;
 
         let want: Vec<&str> = vec![
-            "-o AddressFamily inet6",
+            "-o AddressFamily any",
             "-o ControlPath /foo",
             "-o ControlMaster auto",
             "-o RequestTTY no",
@@ -286,7 +286,7 @@ mod test {
         let got = build_ssh_args(target, "/foo", vec![8081], vec![])?;
 
         let want: Vec<&str> = vec![
-            "-o AddressFamily inet6",
+            "-o AddressFamily any",
             "-o ControlPath /foo",
             "-o ControlMaster auto",
             "-o RequestTTY no",

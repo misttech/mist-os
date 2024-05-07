@@ -62,7 +62,7 @@ impl OneShotHandle {
         let one_shot = self.clone();
 
         // Move this capability into the registry.
-        registry::spawn_task(self.into(), koid, async move {
+        registry::insert(self.into(), koid, async move {
             one_shot
                 .serve_handle_capability(stream)
                 .await

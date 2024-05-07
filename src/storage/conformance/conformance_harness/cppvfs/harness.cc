@@ -82,10 +82,10 @@ class TestHarness : public fio_test::Io1Harness {
         AddEntry(std::move(*entry), *dir);
       }
     }
-
-    fs::VnodeConnectionOptions options = fs::VnodeConnectionOptions::FromOpen1Flags(
+    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(
         fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
-    zx_status_t status = vfs_->Serve(std::move(dir), directory_request.TakeChannel(), options);
+    ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
+    zx_status_t status = vfs_->Serve(std::move(dir), directory_request.TakeChannel(), *options);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Serving directory failed: " << zx_status_get_string(status);
       return;

@@ -48,7 +48,7 @@ type Foo = struct {};
 type Foo = resource struct {};
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "Foo", V2, "example.fidl:9:6");
+  library.ExpectFail(ErrRemovedWithReplacement, "struct 'Foo'", V2, "example.fidl:9:6");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -78,7 +78,7 @@ library example;
 type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrReplacedWithoutReplacement, "Foo", V2);
+  library.ExpectFail(ErrReplacedWithoutReplacement, "struct 'Foo'", V2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -110,7 +110,7 @@ type Foo = table {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "bar", V2, "example.fidl:9:8");
+  library.ExpectFail(ErrRemovedWithReplacement, "table member 'bar'", V2, "example.fidl:9:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -143,7 +143,7 @@ type Foo = table {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrReplacedWithoutReplacement, "bar", V2);
+  library.ExpectFail(ErrReplacedWithoutReplacement, "table member 'bar'", V2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -166,7 +166,8 @@ TEST_P(VersioningReplacementTest, BadMethodRemoved) {
   TestLibrary library;
   library.SelectVersion("test", GetParam());
   library.AddFile("bad/fi-0205.test.fidl");
-  library.ExpectFail(ErrRemovedWithReplacement, "Bar", V2, "bad/fi-0205.test.fidl:11:14");
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Bar'", V2,
+                     "bad/fi-0205.test.fidl:11:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -192,11 +193,11 @@ TEST_P(VersioningReplacementTest, BadMethodReplaced) {
   TestLibrary library;
   library.AddFile("bad/fi-0206.test.fidl");
   library.SelectVersion("test", GetParam());
-  library.ExpectFail(ErrReplacedWithoutReplacement, "Bar", V2);
+  library.ExpectFail(ErrReplacedWithoutReplacement, "protocol method 'Bar'", V2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST_P(VersioningReplacementTest, BadMethodRemovedComposeNew) {
+TEST_P(VersioningReplacementTest, BadMethodRemovedNewCompose) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -215,34 +216,12 @@ protocol Base {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "Method", V2, "example.fidl:15:3");
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:15:3");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST_P(VersioningReplacementTest, BadMethodRemovedComposeExisting) {
-  TestLibrary library(R"FIDL(
-@available(added=1)
-library example;
-
-protocol Protocol {
-  @available(removed=2)
-  Method();
-
-  compose Base;
-};
-
-protocol Base {
-  @available(added=2)
-  @selector("example/Protocol.Method")
-  Method();
-};
-)FIDL");
-  library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "Method", V2, "example.fidl:15:3");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST_P(VersioningReplacementTest, GoodMethodReplacedComposeNew) {
+TEST_P(VersioningReplacementTest, GoodMethodReplacedNewCompose) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -262,10 +241,35 @@ protocol Base {
 )FIDL");
   library.SelectVersion("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].is_composed, GetParam() >= V2);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].composed != nullptr,
+            GetParam() >= V2);
 }
 
-TEST_P(VersioningReplacementTest, GoodMethodReplacedComposeExisting) {
+TEST_P(VersioningReplacementTest, BadMethodRemovedExistingCompose) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  Method();
+
+  compose Base;
+};
+
+protocol Base {
+  @available(added=2)
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:15:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodMethodReplacedExistingCompose) {
   TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
@@ -285,7 +289,383 @@ protocol Base {
 )FIDL");
   library.SelectVersion("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].is_composed, GetParam() >= V2);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].composed != nullptr,
+            GetParam() >= V2);
+}
+
+TEST_P(VersioningReplacementTest, BadComposeRemovedNewMethod) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  compose Base;
+
+  @available(added=2)
+  Method();
+};
+
+protocol Base {
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:10:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodComposeReplacedNewMethod) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(replaced=2)
+  compose Base;
+
+  @available(added=2)
+  Method();
+};
+
+protocol Base {
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].composed != nullptr,
+            GetParam() == V1);
+}
+
+TEST_P(VersioningReplacementTest, BadComposeRemovedNewMethodComposeeSimultaneouslyRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  compose Base;
+
+  @available(added=2)
+  Method();
+};
+
+@available(removed=2)
+protocol Base {
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:10:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodComposeReplacedNewMethodComposeeSimultaneouslyRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(replaced=2)
+  compose Base;
+
+  @available(added=2)
+  Method();
+};
+
+@available(removed=2)
+protocol Base {
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].composed != nullptr,
+            GetParam() == V1);
+}
+
+TEST_P(VersioningReplacementTest, BadComposeRemovedNewCompose) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  compose Foo;
+
+  @available(added=2)
+  compose Bar;
+};
+
+protocol Foo {
+  @selector("selector/for.Method")
+  Method();
+};
+
+protocol Bar {
+  @selector("selector/for.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:20:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodComposeReplacedNewCompose) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(replaced=2)
+  compose Foo;
+
+  @available(added=2)
+  compose Bar;
+};
+
+protocol Foo {
+  @selector("selector/for.Method")
+  Method();
+};
+
+protocol Bar {
+  @selector("selector/for.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].owning_protocol->GetName(),
+            GetParam() == V1 ? "Foo" : "Bar");
+}
+
+TEST_P(VersioningReplacementTest, BadComposeRemovedNewComposeComposeeSimultaneouslyRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  compose Foo;
+
+  @available(added=2)
+  compose Bar;
+};
+
+@available(removed=2)
+protocol Foo {
+  @selector("selector/for.Method")
+  Method();
+};
+
+protocol Bar {
+  @selector("selector/for.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:21:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodComposeReplacedNewComposeComposeeSimultaneouslyRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(replaced=2)
+  compose Foo;
+
+  @available(added=2)
+  compose Bar;
+};
+
+@available(removed=2)
+protocol Foo {
+  @selector("selector/for.Method")
+  Method();
+};
+
+protocol Bar {
+  @selector("selector/for.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].owning_protocol->GetName(),
+            GetParam() == V1 ? "Foo" : "Bar");
+}
+
+// No "Good" version because it would have to be replaced in Base (already
+// tested by BadMethodRemoved), causing a name collision with Protocol.Method.
+TEST_P(VersioningReplacementTest, BadComposedMethodRemovedNewMethod) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  compose Base;
+
+  @available(added=2)
+  Method();
+};
+
+protocol Base {
+  @available(removed=2)
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2, "example.fidl:9:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, BadMethodRemovedTransitiveCompose) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  Method();
+
+  compose Intermediate;
+};
+
+protocol Intermediate {
+    @available(added=2)
+    compose Base;
+};
+
+protocol Base {
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'Method'", V2,
+                     "example.fidl:19:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodMethodReplacedTransitiveCompose) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(replaced=2)
+  Method();
+
+  compose Intermediate;
+};
+
+protocol Intermediate {
+    @available(added=2)
+    compose Base;
+};
+
+protocol Base {
+  @selector("example/Protocol.Method")
+  Method();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods[0].owning_protocol->GetName(),
+            GetParam() == V1 ? "Protocol" : "Base");
+}
+
+TEST_P(VersioningReplacementTest, BadMethodAndComposeRemovedHybrid) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(removed=2)
+  compose AB;
+  @available(removed=2)
+  @selector("selector/for.C")
+  C();
+
+  @available(added=2)
+  @selector("selector/for.A")
+  A();
+  @available(added=2)
+  compose BC;
+};
+
+protocol AB {
+  @selector("selector/for.A")
+  A();
+  @selector("selector/for.B")
+  B();
+};
+
+protocol BC {
+  @selector("selector/for.B")
+  B();
+  @selector("selector/for.C")
+  C();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'B'", V2, "example.fidl:28:3");
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'A'", V2, "example.fidl:14:3");
+  library.ExpectFail(ErrRemovedWithReplacement, "protocol method 'C'", V2, "example.fidl:30:3");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningReplacementTest, GoodMethodAndComposeReplacedHybrid) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Protocol {
+  @available(replaced=2)
+  compose AB;
+  @available(replaced=2)
+  @selector("selector/for.C")
+  C();
+
+  @available(added=2)
+  @selector("selector/for.A")
+  A();
+  @available(added=2)
+  compose BC;
+};
+
+protocol AB {
+  @selector("selector/for.A")
+  A();
+  @selector("selector/for.B")
+  B();
+};
+
+protocol BC {
+  @selector("selector/for.B")
+  B();
+  @selector("selector/for.C")
+  C();
+};
+)FIDL");
+  library.SelectVersion("example", GetParam());
+  ASSERT_COMPILED(library);
+  EXPECT_EQ(library.LookupProtocol("Protocol")->all_methods.size(), 3u);
 }
 
 TEST_P(VersioningReplacementTest, GoodReplacedTwice) {
@@ -452,7 +832,7 @@ type Bar = struct {
 };
 )FIDL");
   library.SelectVersion("example", GetParam());
-  library.ExpectFail(ErrRemovedWithReplacement, "Foo", V2, "example.fidl:10:9");
+  library.ExpectFail(ErrRemovedWithReplacement, "struct 'Foo'", V2, "example.fidl:10:9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

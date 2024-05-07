@@ -11,8 +11,6 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
@@ -21,6 +19,7 @@
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -75,6 +74,7 @@
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
@@ -180,7 +180,7 @@ zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, B
 
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<Image> image = fbl::AdoptRef(new (&alloc_checker) Image(
-      controller_, image_metadata, driver_image_id, zx::vmo(), &proxy_->node(), id_));
+      controller_, image_metadata, driver_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
     zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
     return ZX_ERR_NO_MEMORY;

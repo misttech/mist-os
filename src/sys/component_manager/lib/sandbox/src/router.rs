@@ -4,13 +4,13 @@
 
 use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken};
 use async_trait::async_trait;
-use bedrock_error::BedrockError;
 use cm_types::Availability;
 use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::TryStreamExt;
+use router_error::RouterError;
 use std::fmt::Debug;
 use std::{fmt, sync::Arc};
 
@@ -18,7 +18,7 @@ use std::{fmt, sync::Arc};
 /// capabilities from them.
 #[async_trait]
 pub trait Routable: Send + Sync {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError>;
+    async fn route(&self, request: Request) -> Result<Capability, RouterError>;
 }
 
 /// [`Request`] contains metadata around how to obtain a capability.
@@ -29,6 +29,19 @@ pub struct Request {
 
     /// A reference to the requesting component.
     pub target: WeakComponentToken,
+}
+
+impl From<Request> for fsandbox::RouteRequest {
+    fn from(request: Request) -> Self {
+        let availability = from_cm_type(request.availability);
+        let (token, server) = zx::EventPair::create();
+        request.target.register(token.get_koid().unwrap(), server);
+        fsandbox::RouteRequest {
+            availability: Some(availability),
+            requesting: Some(fsandbox::ComponentToken { token }),
+            ..Default::default()
+        }
+    }
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
@@ -60,10 +73,10 @@ impl CapabilityTrait for Router {
 /// that takes a request and returns such future.
 impl<F> Routable for F
 where
-    F: Fn(Request) -> BoxFuture<'static, Result<Capability, BedrockError>> + Send + Sync + 'static,
+    F: Fn(Request) -> BoxFuture<'static, Result<Capability, RouterError>> + Send + Sync + 'static,
 {
     // We use the desugared form of `async_trait` to avoid unnecessary boxing.
-    fn route<'a, 'b>(&'a self, request: Request) -> BoxFuture<'b, Result<Capability, BedrockError>>
+    fn route<'a, 'b>(&'a self, request: Request) -> BoxFuture<'b, Result<Capability, RouterError>>
     where
         'a: 'b,
         Self: 'b,
@@ -74,7 +87,7 @@ where
 
 #[async_trait]
 impl Routable for Router {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         Router::route(self, request).await
     }
 }
@@ -94,13 +107,13 @@ impl Router {
     }
 
     /// Creates a router that will always fail a request with the provided error.
-    pub fn new_error(error: impl Into<BedrockError>) -> Self {
-        let error: BedrockError = error.into();
+    pub fn new_error(error: impl Into<RouterError>) -> Self {
+        let error: RouterError = error.into();
         Router::new(error)
     }
 
     /// Obtain a capability from this router, following the description in `request`.
-    pub async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    pub async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         self.routable.route(request).await
     }
 
@@ -111,21 +124,22 @@ impl Router {
         async fn do_route(
             router: &Router,
             payload: fsandbox::RouteRequest,
-        ) -> Result<fsandbox::Capability, fsandbox::BedrockError> {
+        ) -> Result<fsandbox::Capability, fsandbox::RouterError> {
             let Some(availability) = payload.availability else {
-                return Err(fsandbox::BedrockError::InvalidArgs);
+                return Err(fsandbox::RouterError::InvalidArgs);
             };
             let Some(token) = payload.requesting else {
-                return Err(fsandbox::BedrockError::InvalidArgs);
+                return Err(fsandbox::RouterError::InvalidArgs);
             };
             let capability = crate::registry::get(token.token.as_handle_ref().get_koid().unwrap());
             let component = match capability {
                 Some(crate::Capability::Component(c)) => c,
-                Some(_) => return Err(fsandbox::BedrockError::InvalidArgs),
-                None => return Err(fsandbox::BedrockError::InvalidArgs),
+                Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
+                None => return Err(fsandbox::RouterError::InvalidArgs),
             };
             let request = Request { availability: to_cm_type(availability), target: component };
-            router.route(request).await.map(Into::into).map_err(|_| fsandbox::BedrockError::Routing)
+            let cap = router.route(request).await?;
+            Ok(cap.into())
         }
 
         while let Ok(Some(request)) = stream.try_next().await {
@@ -146,7 +160,7 @@ impl Router {
         let router = self.clone();
 
         // Move this capability into the registry.
-        crate::registry::spawn_task(self.into(), koid, async move {
+        crate::registry::insert(self.into(), koid, async move {
             router.serve_router(stream).await.expect("failed to serve Router");
         });
     }
@@ -163,7 +177,7 @@ impl From<Router> for fsandbox::Capability {
 
 #[async_trait]
 impl Routable for Capability {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         match self.clone() {
             Capability::Router(router) => router.route(request).await,
             capability => Ok(capability),
@@ -173,14 +187,14 @@ impl Routable for Capability {
 
 #[async_trait]
 impl Routable for Dict {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         Capability::Dictionary(self.clone()).route(request).await
     }
 }
 
 #[async_trait]
-impl Routable for BedrockError {
-    async fn route(&self, _: Request) -> Result<Capability, BedrockError> {
+impl Routable for RouterError {
+    async fn route(&self, _: Request) -> Result<Capability, RouterError> {
         Err(self.clone())
     }
 }
@@ -191,6 +205,15 @@ fn to_cm_type(value: fsandbox::Availability) -> cm_types::Availability {
         fsandbox::Availability::Optional => cm_types::Availability::Optional,
         fsandbox::Availability::SameAsTarget => cm_types::Availability::SameAsTarget,
         fsandbox::Availability::Transitional => cm_types::Availability::Transitional,
+    }
+}
+
+fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
+    match value {
+        cm_types::Availability::Required => fsandbox::Availability::Required,
+        cm_types::Availability::Optional => fsandbox::Availability::Optional,
+        cm_types::Availability::SameAsTarget => fsandbox::Availability::SameAsTarget,
+        cm_types::Availability::Transitional => fsandbox::Availability::Transitional,
     }
 }
 
@@ -282,7 +305,7 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+        assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
 
         let component = FakeComponentToken::new();
         let (component_client, server) = zx::EventPair::create();
@@ -298,7 +321,7 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+        assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
     }
 
     #[fuchsia::test]
@@ -320,6 +343,6 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_matches!(capability, Err(fsandbox::BedrockError::InvalidArgs));
+        assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
     }
 }

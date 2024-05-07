@@ -491,6 +491,9 @@ There are a few things to note when implementing a server:
 
 ### Common FIDL server code patterns
 
+Note: For more information on writing async Python code with Fuchsia Controller,
+see this [async Python][async-python] page.
+
 In contrast to the simple `echo` server example above, this section covers
 different types of server interactions.
 
@@ -736,6 +739,9 @@ Out[6]: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core',
 ...
 ```
 
+For more information on writing async Python code with Fuchsia Controller,
+see this [async Python][async-python] page.
+
 <!-- Reference links -->
 
 [fuchsia-controller-header-file]: /src/developer/ffx/lib/fuchsia-controller/cpp/abi/fuchsia_controller.h
@@ -747,3 +753,4 @@ Out[6]: ProviderGetBuildInfoResponse(build_info=BuildInfo(product_config='core',
 [echo-fidl]: /src/developer/ffx/fidl/echo.fidl
 [server-tests]: /src/developer/ffx/lib/fuchsia-controller/tests/server.py
 [test-fidl]: /src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia_controller.test.fidl
+[async-python]: /docs/development/tools/fuchsia-controller/async-python.md

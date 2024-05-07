@@ -6,7 +6,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.spi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.spi.Service": "fuchsia.hardware.spi.Service.ZirconTransport",
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.nordic.platform.BIND_PLATFORM_DEV_DID.THREAD",
                     "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.nordic.platform.BIND_PLATFORM_DEV_VID.NORDIC"
                 }

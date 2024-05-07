@@ -25,7 +25,7 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CoreTimerContext, CounterContext, ResourceCounterContext, SendFrameContext, TimerContext,
+        CoreTimerContext, CounterContext, ResourceCounterContext, SendableFrameMeta, TimerContext,
     },
     device::{
         self,
@@ -213,30 +213,30 @@ impl DeviceSocketSendTypes for LoopbackDevice {
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    SendFrameContext<BC, DeviceSocketMetadata<LoopbackDevice, LoopbackDeviceId<BC>>>
-    for CoreCtx<'_, BC, L>
+    SendableFrameMeta<CoreCtx<'_, BC, L>, BC>
+    for DeviceSocketMetadata<LoopbackDevice, LoopbackDeviceId<BC>>
 {
-    fn send_frame<S>(
-        &mut self,
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CoreCtx<'_, BC, L>,
         bindings_ctx: &mut BC,
-        metadata: DeviceSocketMetadata<LoopbackDevice, LoopbackDeviceId<BC>>,
         body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let DeviceSocketMetadata { device_id, metadata } = metadata;
+        let Self { device_id, metadata } = self;
         match metadata {
             Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
-                self,
+                core_ctx,
                 bindings_ctx,
                 &device_id,
                 body,
                 protocol,
                 dest_addr,
             ),
-            None => send_ethernet_frame(self, bindings_ctx, &device_id, body),
+            None => send_ethernet_frame(core_ctx, bindings_ctx, &device_id, body),
         }
     }
 }

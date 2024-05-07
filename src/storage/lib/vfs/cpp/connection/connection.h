@@ -29,10 +29,6 @@
 
 namespace fs::internal {
 
-// Perform basic flags sanitization.
-// Returns false if the flags combination is invalid.
-bool PrevalidateFlags(fuchsia_io::wire::OpenFlags flags);
-
 // Connection is a base class representing an open connection to a Vnode (the server-side component
 // of a file descriptor). It contains the logic to synchronize connection teardown with the vfs, as
 // well as shared utilities such as connection cloning and enforcement of connection rights.

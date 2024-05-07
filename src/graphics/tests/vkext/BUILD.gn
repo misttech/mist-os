@@ -47,6 +47,7 @@ executable("vkext_bin") {
   deps = [
     ":config",
     ":vulkan_extension_test",
+    "../common:gtest_main",
     "../vkreadback:helper",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/lib/fdio",
@@ -54,7 +55,6 @@ executable("vkext_bin") {
     "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/tests/common",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
     "//src/lib/vulkan",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
@@ -96,6 +96,7 @@ fuchsia_structured_config_values("default_config") {
     support_sysmem_linear_nonrgba = true
     support_sysmem_renderable_linear = true
     support_protected_memory = false
+    disabled_test_pattern = ""
   }
 }
 

@@ -4,7 +4,7 @@
 
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
-    security::fs::selinux_proc_attrs,
+    security,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -276,8 +276,24 @@ fn static_directory_builder_with_common_task_entries<'a>(
         // owned by the effective user and effective group ID of the process."
         dir.entry_creds(task.creds().euid_as_fscred());
         dir.dir_creds(task.creds().euid_as_fscred());
-        // TODO(b/322850635): Add get/set_procattr hooks and move procattr impl here.
-        selinux_proc_attrs(current_task, task, dir);
+
+        let task = WeakRef::from(task);
+        for (attr, name) in [
+            (security::ProcAttr::Current, "current"),
+            (security::ProcAttr::Exec, "exec"),
+            (security::ProcAttr::FsCreate, "fscreate"),
+            (security::ProcAttr::KeyCreate, "keycreate"),
+            (security::ProcAttr::SockCreate, "sockcreate"),
+        ] {
+            dir.entry(current_task, name, AttrNode::new(task.clone(), attr), mode!(IFREG, 0o666));
+        }
+
+        dir.entry(
+            current_task,
+            "prev",
+            AttrNode::new(task.clone(), security::ProcAttr::Previous),
+            mode!(IFREG, 0o444),
+        );
     });
     dir.entry(current_task, "ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
     dir.entry(
@@ -365,6 +381,37 @@ const NS_ENTRIES: &[&str] = &[
     "user",
     "uts",
 ];
+
+/// /proc/<pid>/attr directory entry.
+struct AttrNode {
+    attr: security::ProcAttr,
+    task: WeakRef<Task>,
+}
+
+impl AttrNode {
+    fn new(task: WeakRef<Task>, attr: security::ProcAttr) -> impl FsNodeOps {
+        BytesFile::new_node(AttrNode { task, attr })
+    }
+}
+
+impl BytesFileOps for AttrNode {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let task = Task::from_weak(&self.task)?;
+
+        // If the current task is not the target then writes are not allowed.
+        if current_task.temp_task() != task {
+            return error!(EPERM);
+        }
+
+        security::set_procattr(current_task, self.attr, data.as_slice())
+    }
+
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let task = Task::from_weak(&self.task)?;
+
+        security::get_procattr(current_task, &task, self.attr).map(|s| s.into())
+    }
+}
 
 /// /proc/[pid]/ns directory
 struct NsDirectory {

@@ -545,9 +545,9 @@ macro_rules! lock_keys {
 }
 pub use lock_keys;
 
-/// Mutations can be associated with an object so that when mutations are applied, updates can be
-/// applied to in-memory structures.  For example, we cache object sizes, so when a size change is
-/// applied, we can update the cached object size.
+/// Mutations in a transaction can be associated with an object so that when mutations are applied,
+/// updates can be applied to in-memory structures. For example, we cache object sizes, so when a
+/// size change is applied, we can update the cached object size.
 pub trait AssociatedObject: Send + Sync {
     fn will_apply_mutation(&self, _mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
     }

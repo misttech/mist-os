@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::hooks::{Event, EventType, Hook, HooksRegistration},
     async_trait::async_trait,
     errors::ModelError,
+    hooks::{Event, EventType, Hook, HooksRegistration},
     std::sync::{Arc, Weak},
     tracing::info,
 };

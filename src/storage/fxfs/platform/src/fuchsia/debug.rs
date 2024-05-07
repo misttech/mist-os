@@ -388,6 +388,37 @@ impl Directory for ObjectDirectory {
         });
     }
 
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        mut path: vfs::path::Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        object_request.take().handle(|object_request| {
+            match path.next_with_ref() {
+                (_, Some(name)) => {
+                    // Lookup an object by id and return it.
+                    let name = name.to_owned();
+                    let object_id = name.parse().unwrap_or(INVALID_OBJECT_ID);
+                    vfs::file::serve(
+                        InternalFile::new(object_id, self.store.clone()),
+                        scope,
+                        &protocols,
+                        object_request,
+                    )
+                }
+                (_, None) => object_request.spawn_connection(
+                    scope,
+                    self,
+                    protocols,
+                    vfs::directory::immutable::connection::ImmutableConnection::create,
+                ),
+            }
+        });
+        Ok(())
+    }
+
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.
     // The lifetimes here are because of https://github.com/rust-lang/rust/issues/63033.

@@ -52,6 +52,14 @@
             availability: "transitional",
             type: "bool",
         },
+        {
+            from: "parent",
+            config: "fuchsia.gpu.test.DisabledTestPattern",
+            key: "disabled_test_pattern",
+            availability: "transitional",
+            type: "string",
+            max_size: 1024,
+        },
     ],
     config: {
         gpu_vendor_id: { type: "uint32" },
@@ -59,5 +67,9 @@
         support_sysmem_renderable_linear: { type: "bool" },
         support_sysmem_linear_nonrgba: { type: "bool" },
         support_protected_memory: { type: "bool" },
+        disabled_test_pattern: {
+            type: "string",
+            max_size: 1024,
+        },
     },
 }

@@ -96,6 +96,10 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   static wlansoftmac_buffer_t IntoRustBuffer(std::unique_ptr<Buffer> buffer);
   wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
       .get_buffer = [](size_t min_capacity) -> wlansoftmac_buffer_t {
+        if (min_capacity == 0) {
+          return IntoRustBuffer(std::unique_ptr<Buffer>(nullptr));
+        }
+
         WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_buffer_provider_ops_t.get_buffer");
         // Note: Once Rust MLME supports more than sending WLAN frames this needs
         // to change.

@@ -34,7 +34,7 @@ executable("vkreadback_test") {
 
   deps = [
     ":helper",
-    "//src/lib/fxl/test:gtest_main_no_testonly",
+    "../common:gtest_main",
   ]
 
   if (is_fuchsia) {
@@ -65,6 +65,7 @@ fuchsia_structured_config_values("default_config") {
   cm_label = ":vkreadback-manifest"
   values = {
     gpu_vendor_id = 0
+    disabled_test_pattern = ""
   }
 }
 

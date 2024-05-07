@@ -30,6 +30,8 @@ const (
 type DeviceConfig struct {
 	sshKeyFile               string
 	deviceFinderPath         string
+	ffxPath                  string
+	ffx                      *ffx.FFXTool
 	deviceName               string
 	deviceHostname           string
 	deviceResolverMode       DeviceResolverMode
@@ -49,6 +51,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.deviceName, "device", os.Getenv(constants.NodenameEnvKey), "device name")
 	fs.StringVar(&c.deviceHostname, "device-hostname", os.Getenv(constants.DeviceAddrEnvKey), "device hostname or IPv4/IPv6 address")
 	fs.StringVar(&c.deviceResolverMode, "device-resolver", FfxResolver, "device resolver (default: ffx)")
+	fs.StringVar(&c.ffxPath, "ffx-path", "host-tools/ffx", "ffx tool path")
 	fs.IntVar(&c.deviceSshPort, "device-ssh-port", 22, "device port")
 	fs.StringVar(&c.deviceFinderPath, "device-finder-path", "", "device-finder tool path")
 	fs.StringVar(&c.SerialSocketPath, "device-serial", "", "device serial path")
@@ -68,6 +71,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 func (c *DeviceConfig) Validate() error {
 	for _, s := range []string{
 		c.sshKeyFile,
+		c.ffxPath,
 		c.SerialSocketPath,
 	} {
 		if err := util.ValidatePath(s); err != nil {
@@ -77,9 +81,21 @@ func (c *DeviceConfig) Validate() error {
 	return nil
 }
 
+func (c *DeviceConfig) FFXTool(ffxIsolateDir ffx.IsolateDir) (*ffx.FFXTool, error) {
+	if c.ffx == nil {
+		ffx, err := ffx.NewFFXTool(c.ffxPath, ffxIsolateDir)
+		if err != nil {
+			return nil, err
+		}
+		c.ffx = ffx
+	}
+
+	return c.ffx, nil
+}
+
 func (c *DeviceConfig) deviceResolver(
 	ctx context.Context,
-	ffx *ffx.FFXTool,
+	ffxIsolateDir ffx.IsolateDir,
 ) (device.DeviceResolver, error) {
 	if c.deviceHostname != "" {
 		return device.NewConstantHostResolver(
@@ -92,6 +108,11 @@ func (c *DeviceConfig) deviceResolver(
 
 	switch c.deviceResolverMode {
 	case FfxResolver:
+		ffx, err := c.FFXTool(ffxIsolateDir)
+		if err != nil {
+			return nil, err
+		}
+
 		return device.NewFfxResolver(ctx, ffx, c.deviceName)
 
 	default:
@@ -122,9 +143,9 @@ func (c *DeviceConfig) SSHPrivateKey() (ssh.Signer, error) {
 
 func (c *DeviceConfig) NewDeviceClient(
 	ctx context.Context,
-	ffx *ffx.FFXTool,
+	ffxIsolateDir ffx.IsolateDir,
 ) (*device.Client, error) {
-	deviceResolver, err := c.deviceResolver(ctx, ffx)
+	deviceResolver, err := c.deviceResolver(ctx, ffxIsolateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +173,7 @@ func (c *DeviceConfig) NewDeviceClient(
 		connectBackoff,
 		c.WorkaroundBrokenTimeSkip,
 		serialConn,
+		ffxIsolateDir,
 	)
 	if err != nil {
 		return nil, err

@@ -660,7 +660,7 @@ mod tests {
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
             },
-            InstantContext as _, TimerHandler,
+            InstantContext as _, SendableFrameMeta, TimerHandler,
         },
         device::{
             ethernet::EthernetLinkDevice,
@@ -737,6 +737,23 @@ mod tests {
         FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeArpCtx::new(bindings_ctx))
         })
+    }
+
+    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl>
+        for ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>
+    {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
+        }
     }
 
     impl FakeNetworkContext for crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {

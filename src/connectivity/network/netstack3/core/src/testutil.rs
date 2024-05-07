@@ -38,10 +38,6 @@ use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
 #[cfg(test)]
-use rand::Rng as _;
-use rand::{CryptoRng, RngCore, SeedableRng};
-use rand_xorshift::XorShiftRng;
-#[cfg(test)]
 use tracing::Subscriber;
 #[cfg(test)]
 use tracing_subscriber::{
@@ -103,6 +99,8 @@ use crate::{
     },
     BindingsTypes,
 };
+
+pub use netstack3_base::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
 
 /// NDP test utilities.
 pub mod ndp {
@@ -583,20 +581,16 @@ pub type FakeCtx = Ctx<FakeBindingsCtx>;
 /// Shorthand for [`StackState`] that uses a [`FakeBindingsCtx`].
 pub type FakeCoreCtx = StackState<FakeBindingsCtx>;
 
+type InnerFakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
+    TimerId<FakeBindingsCtx>,
+    DispatchedEvent,
+    FakeBindingsCtxState,
+    DispatchedFrame,
+>;
+
 /// Test-only implementation of [`crate::BindingsContext`].
 #[derive(Default, Clone)]
-pub struct FakeBindingsCtx(
-    Arc<
-        Mutex<
-            crate::context::testutil::FakeBindingsCtx<
-                TimerId<Self>,
-                DispatchedEvent,
-                FakeBindingsCtxState,
-                DispatchedFrame,
-            >,
-        >,
-    >,
-);
+pub struct FakeBindingsCtx(Arc<Mutex<InnerFakeBindingsCtx>>);
 
 /// A wrapper type that makes it easier to implement `Deref` (and optionally
 /// `DerefMut`) for a value that is protected by a lock.
@@ -605,6 +599,8 @@ pub struct FakeBindingsCtx(
 /// probably a lock guard. The second and third fields are functions that, given
 /// the first field, provide shared and mutable access (respectively) to the
 /// inner value.
+// TODO(https://github.com/rust-lang/rust/issues/117108): Replace this with
+// mapped mutex guards once stable.
 struct Wrapper<S, Callback, CallbackMut>(S, Callback, CallbackMut);
 
 impl<T: ?Sized, S: Deref, Callback: for<'a> Fn(&'a <S as Deref>::Target) -> &'a T, CallbackMut>
@@ -634,39 +630,13 @@ impl<
 }
 
 impl FakeBindingsCtx {
-    fn with_inner<
-        F: FnOnce(
-            &crate::context::testutil::FakeBindingsCtx<
-                TimerId<Self>,
-                DispatchedEvent,
-                FakeBindingsCtxState,
-                DispatchedFrame,
-            >,
-        ) -> O,
-        O,
-    >(
-        &self,
-        f: F,
-    ) -> O {
+    fn with_inner<F: FnOnce(&InnerFakeBindingsCtx) -> O, O>(&self, f: F) -> O {
         let Self(this) = self;
         let locked = this.lock();
         f(&*locked)
     }
 
-    fn with_inner_mut<
-        F: FnOnce(
-            &mut crate::context::testutil::FakeBindingsCtx<
-                TimerId<Self>,
-                DispatchedEvent,
-                FakeBindingsCtxState,
-                DispatchedFrame,
-            >,
-        ) -> O,
-        O,
-    >(
-        &self,
-        f: F,
-    ) -> O {
+    fn with_inner_mut<F: FnOnce(&mut InnerFakeBindingsCtx) -> O, O>(&self, f: F) -> O {
         let Self(this) = self;
         let mut locked = this.lock();
         f(&mut *locked)
@@ -674,15 +644,26 @@ impl FakeBindingsCtx {
 
     #[cfg(test)]
     pub(crate) fn timer_ctx(&self) -> impl Deref<Target = FakeTimerCtx<TimerId<Self>>> + '_ {
-        Wrapper(self.0.lock(), crate::context::testutil::FakeBindingsCtx::timer_ctx, ())
+        // NB: Helper function is required to satisfy lifetime requirements of
+        // borrow.
+        fn get_timers<'a>(
+            i: &'a InnerFakeBindingsCtx,
+        ) -> &'a FakeTimerCtx<TimerId<FakeBindingsCtx>> {
+            &i.timers
+        }
+        Wrapper(self.0.lock(), get_timers, ())
     }
 
     pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
-        Wrapper(
-            self.0.lock(),
-            crate::context::testutil::FakeBindingsCtx::state,
-            crate::context::testutil::FakeBindingsCtx::state_mut,
-        )
+        // NB: Helper functions are required to satisfy lifetime requirements of
+        // borrow.
+        fn get_state<'a>(i: &'a InnerFakeBindingsCtx) -> &'a FakeBindingsCtxState {
+            &i.state
+        }
+        fn get_state_mut<'a>(i: &'a mut InnerFakeBindingsCtx) -> &'a mut FakeBindingsCtxState {
+            &mut i.state
+        }
+        Wrapper(self.0.lock(), get_state, get_state_mut)
     }
 
     /// Copy all ethernet frames sent so far.
@@ -695,7 +676,7 @@ impl FakeBindingsCtx {
         &mut self,
     ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| {
-            ctx.frame_ctx_mut()
+            ctx.frames
                 .frames()
                 .into_iter()
                 .map(|(meta, frame)| match meta {
@@ -715,7 +696,7 @@ impl FakeBindingsCtx {
         &mut self,
     ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| {
-            ctx.frame_ctx_mut()
+            ctx.frames
                 .take_frames()
                 .into_iter()
                 .map(|(meta, frame)| match meta {
@@ -733,7 +714,7 @@ impl FakeBindingsCtx {
     /// Panics if the there are non-IP frames stored.
     pub fn take_ip_frames(&mut self) -> Vec<(PureIpDeviceAndIpVersion<FakeBindingsCtx>, Vec<u8>)> {
         self.with_inner_mut(|ctx| {
-            ctx.frame_ctx_mut()
+            ctx.frames
                 .take_frames()
                 .into_iter()
                 .map(|(meta, frame)| match meta {
@@ -869,7 +850,7 @@ impl TimerContext for FakeBindingsCtx {
 }
 
 impl RngContext for FakeBindingsCtx {
-    type Rng<'a> = FakeCryptoRng<XorShiftRng>;
+    type Rng<'a> = FakeCryptoRng;
 
     fn rng(&mut self) -> Self::Rng<'_> {
         let Self(this) = self;
@@ -952,101 +933,6 @@ impl<D: LinkDevice> LinkResolutionNotifier<D> for () {
     }
 
     fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
-}
-
-/// A wrapper which implements `RngCore` and `CryptoRng` for any `RngCore`.
-///
-/// This is used to satisfy [`EventDispatcher`]'s requirement that the
-/// associated `Rng` type implements `CryptoRng`.
-///
-/// # Security
-///
-/// This is obviously insecure. Don't use it except in testing!
-#[derive(Clone, Debug)]
-pub struct FakeCryptoRng<R>(Arc<Mutex<R>>);
-
-impl Default for FakeCryptoRng<XorShiftRng> {
-    fn default() -> FakeCryptoRng<XorShiftRng> {
-        FakeCryptoRng::new_xorshift(12957992561116578403)
-    }
-}
-
-impl FakeCryptoRng<XorShiftRng> {
-    /// Creates a new [`FakeCryptoRng<XorShiftRng>`] from a seed.
-    pub(crate) fn new_xorshift(seed: u128) -> FakeCryptoRng<XorShiftRng> {
-        Self(Arc::new(Mutex::new(new_rng(seed))))
-    }
-
-    #[cfg(test)]
-    pub(crate) fn deep_clone(&self) -> Self {
-        Self(Arc::new(Mutex::new(self.0.lock().clone())))
-    }
-}
-
-impl<R: RngCore> RngCore for FakeCryptoRng<R> {
-    fn next_u32(&mut self) -> u32 {
-        self.0.lock().next_u32()
-    }
-    fn next_u64(&mut self) -> u64 {
-        self.0.lock().next_u64()
-    }
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.lock().fill_bytes(dest)
-    }
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        self.0.lock().try_fill_bytes(dest)
-    }
-}
-
-impl<R: RngCore> CryptoRng for FakeCryptoRng<R> {}
-
-impl<R: SeedableRng> SeedableRng for FakeCryptoRng<R> {
-    type Seed = R::Seed;
-
-    fn from_seed(seed: Self::Seed) -> Self {
-        Self(Arc::new(Mutex::new(R::from_seed(seed))))
-    }
-}
-
-impl<R: RngCore> crate::context::RngContext for FakeCryptoRng<R> {
-    type Rng<'a> = &'a mut Self where Self: 'a;
-
-    fn rng(&mut self) -> Self::Rng<'_> {
-        self
-    }
-}
-
-/// Create a new deterministic RNG from a seed.
-pub(crate) fn new_rng(mut seed: u128) -> XorShiftRng {
-    if seed == 0 {
-        // XorShiftRng can't take 0 seeds
-        seed = 1;
-    }
-    XorShiftRng::from_seed(seed.to_ne_bytes())
-}
-
-/// Creates `iterations` fake RNGs.
-///
-/// `with_fake_rngs` will create `iterations` different [`FakeCryptoRng`]s and
-/// call the function `f` for each one of them.
-///
-/// This function can be used for tests that weed out weirdness that can
-/// happen with certain random number sequences.
-#[cfg(test)]
-pub(crate) fn with_fake_rngs<F: Fn(FakeCryptoRng<XorShiftRng>)>(iterations: u128, f: F) {
-    for seed in 0..iterations {
-        f(FakeCryptoRng::new_xorshift(seed))
-    }
-}
-
-/// Invokes a function multiple times with different RNG seeds.
-#[cfg(test)]
-pub(crate) fn run_with_many_seeds<F: FnMut(u128)>(mut f: F) {
-    // Arbitrary seed.
-    let mut rng = new_rng(0x0fe50fae6c37593d71944697f1245847);
-    for _ in 0..64 {
-        f(rng.gen());
-    }
 }
 
 #[cfg(test)]
@@ -1642,7 +1528,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
-        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, frame.into_inner()));
+        self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, frame.into_inner()));
         Ok(())
     }
 
@@ -1656,7 +1542,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
             device: device.downgrade(),
             version: ip_version,
         });
-        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, packet.into_inner()));
+        self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, packet.into_inner()));
         Ok(())
     }
 }

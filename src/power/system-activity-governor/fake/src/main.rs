@@ -24,10 +24,12 @@ async fn connect_to_suspend_ctrl_and_setup_suspend_device() -> Result<tsc::Devic
     .await
     .unwrap();
 
-    let suspend_device =
-        device_watcher::recursive_wait_and_open::<tsc::DeviceMarker>(&dir_proxy, &entry)
-            .await
-            .unwrap();
+    let suspend_device = device_watcher::recursive_wait_and_open::<tsc::DeviceMarker>(
+        &dir_proxy,
+        format!("{}/device_protocol", &entry).as_str(),
+    )
+    .await
+    .unwrap();
 
     // Set up default state.
     suspend_device

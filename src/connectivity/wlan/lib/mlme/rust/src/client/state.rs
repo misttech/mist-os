@@ -1482,7 +1482,6 @@ mod tests {
         super::*,
         crate::{
             block_ack::{write_addba_req_body, ADDBA_REQ_FRAME_LEN},
-            buffer::FakeCBufferProvider,
             client::{
                 channel_switch::ChannelState, scanner::Scanner, test_utils::drain_timeouts,
                 ParsedConnectRequest, TimedEventClass,
@@ -1511,6 +1510,7 @@ mod tests {
             },
             timer::{self, create_timer},
         },
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
         wlan_frame_writer::write_frame_with_dynamic_buffer,
         wlan_statemachine as statemachine,
     };
@@ -1576,7 +1576,7 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buffer_provider: FakeCBufferProvider::new(),
+                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }

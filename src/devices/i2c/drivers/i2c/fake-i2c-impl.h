@@ -6,6 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_I2C_FAKE_I2C_IMPL_H_
 
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
+#include <lib/async/default.h>
 
 namespace i2c {
 class FakeI2cImpl : public fdf::WireServer<fuchsia_hardware_i2cimpl::Device> {

@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_IMAGE_H_
 
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -67,7 +66,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   using DoublyLinkedList = fbl::DoublyLinkedList<DoublyLinkedListPointer, fbl::DefaultObjectTag,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
-  Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id, zx::vmo vmo,
+  Image(Controller* controller, const ImageMetadata& metadata, DriverImageId driver_id,
         inspect::Node* parent_node, ClientId client_id);
   ~Image();
 
@@ -102,8 +101,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   void ResetFences() __TA_REQUIRES(mtx());
 
   bool IsReady() const { return wait_fence_ == nullptr; }
-
-  const zx::vmo& vmo() { return vmo_; }
 
   void set_latest_controller_config_stamp(ConfigStamp stamp) {
     latest_controller_config_stamp_ = stamp;
@@ -187,8 +184,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   // the next vsync. This is distinct from presenting_ due to multiplexing the display between
   // multiple clients.
   bool retiring_ __TA_GUARDED(mtx()) = false;
-
-  const zx::vmo vmo_;
 
   inspect::Node node_;
   inspect::ValueList properties_;

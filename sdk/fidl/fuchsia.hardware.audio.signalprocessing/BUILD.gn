@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.audio.signalprocessing") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Media"
 
   sources = [

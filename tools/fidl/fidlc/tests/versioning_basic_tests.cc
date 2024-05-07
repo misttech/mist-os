@@ -18,8 +18,8 @@ class VersioningBasicTest : public testing::TestWithParam<Version> {};
 
 const Version V1 = Version::From(1).value();
 const Version V2 = Version::From(2).value();
-const Version HEAD = Version::Head();
-const Version LEGACY = Version::Legacy();
+const Version HEAD = Version::kHead;
+const Version LEGACY = Version::kLegacy;
 
 INSTANTIATE_TEST_SUITE_P(VersioningBasicTests, VersioningBasicTest,
                          testing::Values(V1, V2, HEAD, LEGACY),

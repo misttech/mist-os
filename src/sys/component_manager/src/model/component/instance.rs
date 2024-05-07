@@ -11,7 +11,7 @@ use {
                 resolve::sandbox_construction::{
                     self, build_component_sandbox, extend_dict_with_offers,
                 },
-                shutdown, ActionKey, ActionSet, DiscoverAction, StopAction,
+                shutdown, ActionKey, ActionsManager, DiscoverAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
@@ -20,7 +20,6 @@ use {
             context::ModelContext,
             environment::Environment,
             escrow::{self, EscrowedState},
-            hooks::{CapabilityReceiver, Event, EventPayload},
             namespace::create_namespace,
             routing::{
                 self,
@@ -63,6 +62,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::future::{BoxFuture, FutureExt},
+    hooks::{CapabilityReceiver, EventPayload},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{
         Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
@@ -807,7 +807,7 @@ impl ResolvedInstanceState {
             .clone()
             .lock_actions()
             .await
-            .register_no_wait(&child, DiscoverAction::new(input))
+            .register_no_wait(DiscoverAction::new(input))
             .await
             .boxed();
         Ok((child, discover_fut))
@@ -1031,7 +1031,7 @@ impl ResolvedInstanceState {
             let child_name =
                 Name::new(child_name.name.as_str()).expect("child is static so name is not long");
             let child_input = child_inputs.remove(&child_name).expect("missing child dict");
-            ActionSet::register(child_instance.clone(), DiscoverAction::new(child_input))
+            ActionsManager::register(child_instance.clone(), DiscoverAction::new(child_input))
                 .await
                 .expect("failed to discover child");
         }
@@ -1115,7 +1115,7 @@ impl ProgramRuntime {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
                 let mut actions = component.lock_actions().await;
-                let stop_nf = actions.register_no_wait(&component, StopAction::new(false)).await;
+                let stop_nf = actions.register_no_wait(StopAction::new(false)).await;
                 drop(actions);
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
                     let _ = stop_nf.await.map_err(
@@ -1254,7 +1254,7 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
-    async fn route(&self, request: Request) -> Result<Capability, bedrock_error::BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
         self.source
             .ensure_started(&StartReason::AccessCapability {
                 target: request.target.moniker().clone(),
@@ -1264,14 +1264,11 @@ impl Routable for CapabilityRequestedHook {
         let source = self.source.upgrade().map_err(RoutingError::from)?;
         let target = request.target.upgrade().map_err(RoutingError::from)?;
         let (receiver, sender) = CapabilityReceiver::new();
-        let event = Event::new(
-            &target,
-            EventPayload::CapabilityRequested {
-                source_moniker: source.moniker.clone(),
-                name: self.name.to_string(),
-                receiver: receiver.clone(),
-            },
-        );
+        let event = target.new_event(EventPayload::CapabilityRequested {
+            source_moniker: source.moniker.clone(),
+            name: self.name.to_string(),
+            receiver: receiver.clone(),
+        });
         // TODO(https://fxbug.dev/320698181): Before dispatching events we need to wait for any
         // in-progress resolve actions to end. See https://fxbug.dev/320698181#comment21 for why.
         {

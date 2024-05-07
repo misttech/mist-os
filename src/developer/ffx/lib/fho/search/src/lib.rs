@@ -46,10 +46,6 @@ pub struct ExternalSubToolSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolRunner for ExternalSubTool {
-    fn forces_stdout_log(&self) -> bool {
-        false
-    }
-
     async fn run(self: Box<Self>, _metrics: MetricsSession) -> Result<ExitStatus> {
         // fho v0: Run the exact same command, just with the first argument
         // replaced with the 'real' tool location. We will also exec() it so

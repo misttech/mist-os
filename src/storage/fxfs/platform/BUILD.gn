@@ -54,6 +54,7 @@ rustc_library("platform") {
       "//src/lib/fuchsia-component",
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
+      "//src/storage/fxfs:fxfs_macros",
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs/crypto",
       "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",

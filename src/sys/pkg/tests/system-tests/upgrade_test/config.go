@@ -15,7 +15,6 @@ import (
 )
 
 type config struct {
-	ffxConfig                  *cli.FfxConfig
 	archiveConfig              *cli.ArchiveConfig
 	installerConfig            *cli.InstallerConfig
 	deviceConfig               *cli.DeviceConfig
@@ -36,7 +35,6 @@ type config struct {
 func newConfig(fs *flag.FlagSet) (*config, error) {
 	testDataPath := filepath.Join(filepath.Dir(os.Args[0]), "test_data", "system-tests")
 
-	ffxConfig := cli.NewFfxConfig(fs)
 	installerConfig, err := cli.NewInstallerConfig(fs, testDataPath)
 	if err != nil {
 		return nil, err
@@ -45,7 +43,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
 	c := &config{
-		ffxConfig:          ffxConfig,
 		archiveConfig:      archiveConfig,
 		deviceConfig:       deviceConfig,
 		installerConfig:    installerConfig,
@@ -70,10 +67,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 func (c *config) validate() error {
 	if c.cycleCount < 1 {
 		return fmt.Errorf("-cycle-count must be >= 1")
-	}
-
-	if err := c.ffxConfig.Validate(); err != nil {
-		return err
 	}
 
 	if err := c.deviceConfig.Validate(); err != nil {

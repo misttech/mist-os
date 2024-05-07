@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.mem") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   api = "fuchsia.mem.api"
   sources = [

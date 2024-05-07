@@ -105,6 +105,8 @@ pub enum PackageDestination {
     FromBoard(String),
     /// Any package that came from the product.
     FromProduct(String),
+    /// Any package that come from the developer
+    FromDeveloper(String),
 }
 
 impl std::fmt::Display for PackageDestination {
@@ -113,8 +115,10 @@ impl std::fmt::Display for PackageDestination {
             f,
             "{}",
             match self {
-                Self::FromAIB(s) | Self::FromBoard(s) | Self::FromProduct(s) =>
-                    return write!(f, "{}", s),
+                Self::FromAIB(s)
+                | Self::FromBoard(s)
+                | Self::FromProduct(s)
+                | Self::FromDeveloper(s) => return write!(f, "{}", s),
                 Self::BuildInfo => "build-info",
                 Self::SensorConfig => "sensor-config",
                 Self::Base => "system_image",
@@ -141,6 +145,8 @@ pub enum BootfsPackageDestination {
     FromAIB(String),
     /// Any package that came from a board
     FromBoard(String),
+    /// Any package that came from the developer.
+    FromDeveloper(String),
 }
 
 impl std::fmt::Display for BootfsPackageDestination {
@@ -149,7 +155,8 @@ impl std::fmt::Display for BootfsPackageDestination {
             f,
             "{}",
             match self {
-                Self::FromAIB(s) | Self::FromBoard(s) => return write!(f, "{}", s),
+                Self::FromAIB(s) | Self::FromBoard(s) | Self::FromDeveloper(s) =>
+                    return write!(f, "{}", s),
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
                 Self::ForTest => "for-test",

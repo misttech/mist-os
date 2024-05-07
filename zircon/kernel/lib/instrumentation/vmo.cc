@@ -44,15 +44,10 @@ class SymbolizerFile {
 
   // Move the VMO into a handle and return it.
   Handle* Finish() && {
-    fbl::RefPtr<ContentSizeManager> content_size_manager;
-    zx_status_t status = ContentSizeManager::Create(0, &content_size_manager);
-    ZX_ASSERT(status == ZX_OK);
-
     KernelHandle<VmObjectDispatcher> handle;
     zx_rights_t rights;
-    status = VmObjectDispatcher::Create(ktl::move(vmo_), ktl::move(content_size_manager),
-                                        VmObjectDispatcher::InitialMutability::kMutable, &handle,
-                                        &rights);
+    zx_status_t status = VmObjectDispatcher::Create(
+        ktl::move(vmo_), 0, VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
     ZX_ASSERT(status == ZX_OK);
     status = handle.dispatcher()->set_name(kVmoName.data(), kVmoName.size());
     DEBUG_ASSERT(status == ZX_OK);
@@ -108,12 +103,8 @@ zx_status_t InstrumentationData::GetVmos(Handle* handles[]) {
       fbl::RefPtr<VmObjectPaged> vmo;
       zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, 0, &vmo);
       ZX_ASSERT(status == ZX_OK);
-      fbl::RefPtr<ContentSizeManager> content_size_manager;
-      status = ContentSizeManager::Create(0, &content_size_manager);
-      ZX_ASSERT(status == ZX_OK);
-      status = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
-                                          VmObjectDispatcher::InitialMutability::kMutable, &handle,
-                                          &rights);
+      status = VmObjectDispatcher::Create(
+          ktl::move(vmo), 0, VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
       ZX_ASSERT(status == ZX_OK);
       rights &= ~ZX_RIGHT_WRITE;
     }

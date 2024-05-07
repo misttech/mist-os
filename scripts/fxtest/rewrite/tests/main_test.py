@@ -286,16 +286,23 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(selection_event.selected), 1)
 
     @parameterized.expand(
-        [("--host", HOST_TESTS_IN_INPUT), ("--device", DEVICE_TESTS_IN_INPUT)]
+        [
+            (["--host"], HOST_TESTS_IN_INPUT - E2E_TESTS_IN_INPUT),
+            (["--device"], DEVICE_TESTS_IN_INPUT),
+            (["--only-e2e"], E2E_TESTS_IN_INPUT),
+            # TODO(https://fxbug.dev/338667899): Enable when we determine how to handle opt-in e2e.
+            # ([], TOTAL_NON_E2E_TESTS_IN_INPUT),
+            (["--e2e"], TOTAL_TESTS_IN_INPUT),
+        ]
     )
     async def test_selection_flags(
-        self, flag_name: str, expected_count: int
+        self, extra_flags: list[str], expected_count: int
     ) -> None:
-        """Test that the correct --device or --host tests are selected"""
+        """Test that the correct --device, --host, or --e2e tests are selected"""
 
         recorder = event.EventRecorder()
         ret = await main.async_main_wrapper(
-            args.parse_args(["--simple", "--dry"] + [flag_name]),
+            args.parse_args(["--simple", "--dry"] + extra_flags),
             recorder=recorder,
         )
         self.assertEqual(ret, 0)
@@ -417,8 +424,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 (
                     "fx",
                     "build",
-                    "src/sys:foo_test_package",
-                    "--host",
+                    "--default",
+                    "//src/sys:foo_test_package",
+                    "--toolchain=//build/toolchain/host:x64",
                     "//src/sys:bar_test",
                 ),
                 ("fx", "ffx", "repository", "publish"),
@@ -430,6 +438,47 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         # Make sure we ran the host tests.
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
         self.assertTrue(any(["baz_test" in v[0] for v in call_prefixes]))
+
+    async def test_build_e2e(self) -> None:
+        """Test that we build an updates package for e2e tests"""
+
+        command_mock = self._mock_run_command(0)
+        subprocess_mock = self._mock_subprocess_call(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base([])
+
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--only-e2e"])
+        )
+        self.assertEqual(ret, 0)
+
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
+        call_prefixes.update(
+            self._make_call_args_prefix_set(subprocess_mock.call_args_list)
+        )
+
+        # Make sure we built, published, and ran the device test.
+        self.assertIsSubset(
+            {
+                (
+                    "fx",
+                    "build",
+                    "--toolchain=//build/toolchain/host:x64",
+                    "//src/tests/end_to_end:example_e2e_test",
+                    "--default",
+                    "updates",
+                ),
+                ("fx", "ffx", "repository", "publish"),
+            },
+            call_prefixes,
+        )
+
+        # Make sure we ran the host tests.
+        self.assertTrue(
+            any(["example_e2e_test" in v[0] for v in call_prefixes])
+        )
 
     async def test_no_build(self) -> None:
         """Test that we can run all tests and report success"""

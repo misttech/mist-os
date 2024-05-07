@@ -11,12 +11,11 @@ use {
         framework::controller,
         model::{
             actions::{
-                start, ActionSet, DestroyAction, ResolveAction, ShutdownAction, ShutdownType,
+                start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType,
                 StartAction, UnresolveAction,
             },
             context::ModelContext,
             environment::Environment,
-            hooks::{Event, EventPayload, Hooks},
             routing::{self, RoutingError},
             start::Start,
         },
@@ -32,7 +31,6 @@ use {
         resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage},
     },
     async_trait::async_trait,
-    bedrock_error::{BedrockError, Explain},
     cm_moniker::{IncarnationId, InstancedMoniker},
     cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::{Name, Url},
@@ -51,12 +49,14 @@ use {
         future::{join_all, BoxFuture},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
+    hooks::{Event, EventPayload, Hooks},
     instance::{
         InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
         StopOutcomeWithEscrow,
     },
     manager::ComponentManagerInstance,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    router_error::{Explain, RouterError},
     sandbox::{Capability, Dict, Open, Request, Routable, Router},
     std::{
         clone::Clone,
@@ -252,7 +252,7 @@ pub struct ComponentInstance {
     /// The component's mutable state.
     state: Mutex<InstanceState>,
     /// Actions on the instance that must eventually be completed.
-    actions: Mutex<ActionSet>,
+    actions: Mutex<ActionsManager>,
     /// Tasks owned by this component instance that will be cancelled if the component is
     /// destroyed.
     nonblocking_task_group: TaskGroup,
@@ -300,7 +300,7 @@ impl ComponentInstance {
         persistent_storage: bool,
     ) -> Arc<Self> {
         let moniker = instanced_moniker.without_instance_ids();
-        Arc::new(Self {
+        let self_ = Arc::new(Self {
             environment,
             instanced_moniker,
             moniker,
@@ -311,12 +311,14 @@ impl ComponentInstance {
             context,
             parent,
             state: Mutex::new(InstanceState::New),
-            actions: Mutex::new(ActionSet::new()),
+            actions: Mutex::new(ActionsManager::new()),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
             persistent_storage,
             execution_scope: ExecutionScope::new(),
-        })
+        });
+        self_.lock_actions().await.set_component_reference(WeakComponentInstance::new(&self_));
+        self_
     }
 
     /// Locks and returns the instance's mutable state.
@@ -327,7 +329,7 @@ impl ComponentInstance {
 
     /// Locks and returns the instance's action set.
     // TODO(b/309656051): Remove this method from ComponentInstance's public API
-    pub async fn lock_actions(&self) -> MutexGuard<'_, ActionSet> {
+    pub async fn lock_actions(&self) -> MutexGuard<'_, ActionsManager> {
         self.actions.lock().await
     }
 
@@ -399,14 +401,14 @@ impl ComponentInstance {
     /// `Resolved` event is dispatched if the instance was not previously resolved or an error
     /// occurs.
     pub async fn resolve(self: &Arc<Self>) -> Result<(), ActionError> {
-        ActionSet::register(self.clone(), ResolveAction::new()).await
+        ActionsManager::register(self.clone(), ResolveAction::new()).await
     }
 
     /// Unresolves the component using an UnresolveAction. The component will be shut down, then
     /// reset to the Discovered state without being destroyed. An Unresolved event is dispatched on
     /// success or error.
     pub async fn unresolve(self: &Arc<Self>) -> Result<(), ActionError> {
-        ActionSet::register(self.clone(), UnresolveAction::new()).await
+        ActionsManager::register(self.clone(), UnresolveAction::new()).await
     }
 
     /// Adds the dynamic child defined by `child_decl` to the given `collection_name`.
@@ -577,7 +579,7 @@ impl ComponentInstance {
     /// Stops this component.
     #[cfg(test)]
     pub async fn stop(self: &Arc<Self>) -> Result<(), ActionError> {
-        ActionSet::register(self.clone(), crate::model::actions::StopAction::new(false)).await
+        ActionsManager::register(self.clone(), crate::model::actions::StopAction::new(false)).await
     }
 
     /// Shuts down this component. This means the component and its subrealm are stopped and never
@@ -586,7 +588,7 @@ impl ComponentInstance {
         self: &Arc<Self>,
         shutdown_type: ShutdownType,
     ) -> Result<(), ActionError> {
-        ActionSet::register(self.clone(), ShutdownAction::new(shutdown_type)).await
+        ActionsManager::register(self.clone(), ShutdownAction::new(shutdown_type)).await
     }
 
     /// Performs the stop protocol for this component instance. `shut_down` determines whether the
@@ -686,15 +688,12 @@ impl ComponentInstance {
             }
 
             let stop_time = zx::Time::get_monotonic();
-            let event = Event::new(
-                self,
-                EventPayload::Stopped {
-                    status: outcome.component_exit_status,
-                    stop_time,
-                    execution_duration: stop_time - start_time,
-                    requested_escrow,
-                },
-            );
+            let event = self.new_event(EventPayload::Stopped {
+                status: outcome.component_exit_status,
+                stop_time,
+                execution_duration: stop_time - start_time,
+                requested_escrow,
+            });
             self.hooks.dispatch(&event).await;
         }
 
@@ -923,7 +922,7 @@ impl ComponentInstance {
         }
 
         // Wait for the child component to be destroyed
-        ActionSet::register(child.clone(), DestroyAction::new()).await
+        ActionsManager::register(child.clone(), DestroyAction::new()).await
     }
 
     /// Opens an object referenced by `path` from the outgoing directory of the component.  The
@@ -971,7 +970,7 @@ impl ComponentInstance {
     }
 
     /// Obtains the program output dict.
-    pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, BedrockError> {
+    pub async fn get_program_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
         Ok(self.lock_resolved_state().await?.program_output_dict.clone())
     }
 
@@ -988,7 +987,7 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ProgramOutput {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
                 component.get_program_output_dict().await?.route(request).await
             }
@@ -998,7 +997,7 @@ impl ComponentInstance {
     }
 
     /// Obtains the component output dict.
-    pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, BedrockError> {
+    pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
         Ok(self.lock_resolved_state().await?.component_output_dict.clone())
     }
 
@@ -1011,7 +1010,7 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ComponentOutput {
-            async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
                 component.get_component_output_dict().await?.route(request).await
             }
@@ -1054,7 +1053,7 @@ impl ComponentInstance {
                 return res.map_err(Into::into);
             }
         }
-        ActionSet::register(
+        ActionsManager::register(
             self.clone(),
             StartAction::new(reason.clone(), execution_controller_task, incoming),
         )
@@ -1255,6 +1254,19 @@ impl ComponentInstance {
         component.start(reason, None, IncomingCapabilities::default()).await?;
         Ok(component)
     }
+
+    pub fn new_event(&self, payload: EventPayload) -> Event {
+        self.new_event_with_timestamp(payload, zx::Time::get_monotonic())
+    }
+
+    pub fn new_event_with_timestamp(&self, payload: EventPayload, timestamp: zx::Time) -> Event {
+        Event {
+            target_moniker: self.moniker.clone().into(),
+            component_url: self.component_url.clone(),
+            timestamp,
+            payload,
+        }
+    }
 }
 
 impl DirectoryEntry for ComponentInstance {
@@ -1337,8 +1349,9 @@ impl std::fmt::Debug for ComponentInstance {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::model::{events::stream::EventStream, hooks::EventType};
+    use crate::model::events::stream::EventStream;
     use fuchsia_zircon as zx;
+    use hooks::EventType;
     use moniker::{Moniker, MonikerBase};
 
     pub async fn wait_until_event_get_timestamp(
@@ -1357,7 +1370,6 @@ pub mod tests {
         crate::model::{
             actions::{shutdown, test_utils::is_discovered, StopAction},
             events::registry::EventSubscription,
-            hooks::EventType,
             structured_dict::ComponentInput,
             testing::{
                 mocks::ControllerActionResponse,
@@ -1380,6 +1392,7 @@ pub mod tests {
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, AsHandleRef},
         futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt},
+        hooks::EventType,
         instance::UnresolvedInstanceState,
         routing_test_helpers::component_id_index::make_index_file,
         std::{panic, task::Poll},
@@ -1510,7 +1523,7 @@ pub mod tests {
 
         // Verify that a parent of the exited component can still be stopped
         // properly.
-        ActionSet::register(
+        ActionsManager::register(
             test.look_up(a_moniker.clone()).await,
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -2482,7 +2495,7 @@ pub mod tests {
         let child = test_topology.look_up(vec![TEST_CHILD_NAME].try_into().unwrap()).await;
 
         // Start the child.
-        ActionSet::register(
+        ActionsManager::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
@@ -2560,7 +2573,7 @@ pub mod tests {
 
         // Unresolve component a, this causes it to stop having children and drop component b after
         // shutting it down.
-        ActionSet::register(component_a.clone(), UnresolveAction::new())
+        ActionsManager::register(component_a.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
 
@@ -2688,7 +2701,7 @@ pub mod tests {
 
         // Start to stop the component. This will stall because the framework will be
         // waiting the controller to respond.
-        let stop_fut = ActionSet::register(root.clone(), StopAction::new(false));
+        let stop_fut = ActionsManager::register(root.clone(), StopAction::new(false));
         futures::pin_mut!(stop_fut);
         assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
 

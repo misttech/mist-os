@@ -66,7 +66,7 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   // Sysmem device was created as a child under mock_root by the caller.
   sysmem_device_ = mock_root_->GetLatestChild();
 
-  fidl::ClientEnd<fuchsia_sysmem::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV1();
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV2();
   display_ = std::make_unique<fake_display::FakeDisplay>(device_config, std::move(sysmem_allocator),
                                                          inspect::Inspector{});
   zx_status_t status = display_->Initialize();
@@ -135,7 +135,7 @@ const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack
   return display_provider_client_;
 }
 
-fidl::ClientEnd<fuchsia_sysmem::Allocator> FakeDisplayStack::ConnectToSysmemAllocatorV1() {
+fidl::ClientEnd<fuchsia_sysmem2::Allocator> FakeDisplayStack::ConnectToSysmemAllocatorV2() {
   // The directory exposed by `sysmem_` is its root directory. First we need to
   // open the `/svc` directory where the services are located.
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> sysmem_root_dir_result =
@@ -156,8 +156,8 @@ fidl::ClientEnd<fuchsia_sysmem::Allocator> FakeDisplayStack::ConnectToSysmemAllo
              zx_status_get_string(status));
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> connect_allocator_result =
-      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV1>(
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_allocator_result =
+      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV2>(
           sysmem_svc_dir_client);
   if (connect_allocator_result.is_error()) {
     ZX_PANIC("Failed to connect to sysmem Allocator service: %s",

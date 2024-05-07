@@ -63,6 +63,7 @@ group("tests") {
     "lib/common/cpp:wlan_cpp_bitfield_tests",
     "lib/common/rust:wlan-common-tests",
     "lib/eapol:eapol-tests",
+    "lib/ffi-transport:tests",
     "lib/fidl-ext:wlan-fidl-ext-tests",
     "lib/frame_writer:wlan-frame-writer-tests",
     "lib/ieee80211:ieee80211-tests",

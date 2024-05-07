@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.wlan.phyimpl") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   sources = [ "phyimpl.fidl" ]
   public_deps = [

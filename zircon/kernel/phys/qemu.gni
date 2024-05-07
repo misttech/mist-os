@@ -13,6 +13,11 @@ qemu_short_timeout = 30
 #
 # Type: list(scope)
 #
+#   * disabled
+#     - Optional: If true, the boot tests generated for this boot format will
+#       not be run in automation.  They'll be available for `fx run-boot-test`.
+#     - Type: bool
+#
 #   * environment
 #     - Required: Build environment to instantiate phys_executable() in.
 #     - Type: label_no_toolchain
@@ -27,6 +32,20 @@ qemu_short_timeout = 30
 #   * name
 #     - Required: Name of the format.
 #     - Type: string
+#
+#   * import
+#     - Optional: A .gni file that defines the $target_type template.
+#     - Type: path
+#
+#   * target_second_environment
+#     - Optional: A second build environment in which the phys_executable()
+#       (or $target_type()) target should also be evaluated.
+#     - Type: label_no_toolchain
+#
+#   * target_type
+#     - Optional: The target type (template) to use in $environment.
+#     - Type: string
+#     - Default: "phys_executable"
 #
 #   * timeout
 #     - Optional: Passed along to zbi_test() for qemu_kernel_test() tests.
@@ -59,6 +78,23 @@ if (current_cpu == "x64") {
       environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
       deps = [ "//zircon/kernel/arch/x86/phys:linuxboot" ]
       shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-boot-shim($environment)" ]
+      timeout = qemu_short_timeout
+    },
+    {
+      name = "linuxboot64"
+      disabled = true  # Only for experimentation.
+      environment = phys_toolchain
+      deps = [ "//zircon/kernel/arch/x86/phys:linuxboot64" ]
+      timeout = qemu_short_timeout
+    },
+    {
+      name = "linuxbiboot"
+      disabled = true  # Only for experimentation.
+      environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
+      import = "//zircon/kernel/arch/x86/phys/linuxbiboot_executable.gni"
+      target_type = "linuxbiboot_executable"
+      target_second_environment = phys_toolchain
+      deps = []
       timeout = qemu_short_timeout
     },
   ]

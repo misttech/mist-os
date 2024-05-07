@@ -14,6 +14,10 @@
             matchers: [
                 // TODO(https://fxbug.dev/42051708): Return ENETUNREACH instead of EHOSTUNREACH.
                 "NoNetworkTest.SendToNet*",
+
+                // NS2 returns incorrect error code when the caller tries to set IPV6_MULTICAST_IF
+                // on an IPv4 socket.
+                "*/SocketOptsTest.SetUDPIPv6MulticastIfImrIfindex/IPv4_Datagram",
             ],
         },
     ],

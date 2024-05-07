@@ -10,5 +10,8 @@ group("testing") {
 
 group("tests") {
   testonly = true
-  deps = [ "thermal-test-control:tests" ]
+  deps = [
+    "client:tests",
+    "thermal-test-control:tests",
+  ]
 }

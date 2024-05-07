@@ -30,6 +30,7 @@ sdk_source_set("no_converters") {
   category = "partner"
 
   sdk_name = "media_cpp_no_converters"
+  stable = true
 
   sources = [
     "timeline_function.cc",

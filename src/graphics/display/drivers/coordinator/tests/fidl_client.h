@@ -47,7 +47,7 @@ class TestFidlClient {
     fuchsia_hardware_display_types::wire::ImageMetadata image_metadata_;
   };
 
-  explicit TestFidlClient(const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem)
+  explicit TestFidlClient(const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem)
       : sysmem_(sysmem) {}
 
   ~TestFidlClient();
@@ -110,7 +110,7 @@ class TestFidlClient {
   VsyncAckCookie vsync_ack_cookie_ = kInvalidVsyncAckCookie;
   ImageId next_image_id_ TA_GUARDED(mtx()) = ImageId(1);
   fuchsia_hardware_display_types::wire::ConfigStamp recent_presented_config_stamp_;
-  const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem_;
+  const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem_;
 
   zx::result<ImageId> ImportImageWithSysmemLocked(
       const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_REQ(mtx());

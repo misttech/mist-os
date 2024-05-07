@@ -24,12 +24,14 @@ use templates::markdown::MarkdownTemplate;
 use templates::FidldocTemplate;
 
 static FIDLDOC_CONFIG_PATH: &str = "fidldoc.config.json";
-static ATTR_NAME_DOC: &'static str = "doc";
-static ATTR_NAME_AVAILABLE: &'static str = "available";
-static ATTR_NAME_ADDED: &'static str = "added";
-static ATTR_NAME_NO_DOC: &'static str = "no_doc";
-static HEAD_VERSION: &'static str = "HEAD";
-static HEAD_VERSION_NUMBER: &'static u64 = &(u64::MAX - 1);
+static ATTR_NAME_DOC: &str = "doc";
+static ATTR_NAME_AVAILABLE: &str = "available";
+static ATTR_NAME_ADDED: &str = "added";
+static ATTR_NAME_NO_DOC: &str = "no_doc";
+static NEXT_VERSION: &str = "NEXT";
+static NEXT_VERSION_NUMBER: u32 = 0xFFD00000;
+static HEAD_VERSION: &str = "HEAD";
+static HEAD_VERSION_NUMBER: u32 = 0xFFE00000;
 
 #[derive(Debug)]
 enum TemplateType {
@@ -320,23 +322,21 @@ fn create_toc(fidl_json_map: &HashMap<String, FidlJson>) -> TableOfContents {
 
     // Add all versions as <integer value, string representation> to a
     // BTreeMap so that they are automatically sorted by key.
-    // A string representation such as "HEAD" gets a u64::MAX value.
-    let mut version_map: BTreeMap<u64, String> = BTreeMap::new();
+    // A string representation such as "HEAD" gets a u32::MAX value.
+    let mut version_map: BTreeMap<u32, String> = BTreeMap::new();
+    let mut max_numbered_version: u32 = 0;
     for item in table_of_contents_items.iter() {
         if !item.added.is_empty() {
-            version_map.insert(item.added.parse::<u64>().unwrap_or(u64::MAX), item.added.clone());
+            let number = item.added.parse::<u32>().ok();
+            version_map.insert(number.unwrap_or(u32::MAX), item.added.clone());
+            max_numbered_version = std::cmp::max(max_numbered_version, number.unwrap_or(0));
         }
     }
-
-    // Because the BTreeMap is ordered, the max version is the HEAD, but this
-    // returns the before last version which is the highest version after HEAD.
-    let head = HEAD_VERSION.to_string();
-    let (_, max_version) = version_map.iter().nth_back(1).unwrap_or((&0, &head));
 
     TableOfContents {
         items: table_of_contents_items,
         versions: version_map.values().cloned().collect(),
-        default_version: max_version.to_string(),
+        default_version: max_numbered_version.to_string(),
     }
 }
 
@@ -362,7 +362,9 @@ fn get_library_added(maybe_attributes: &Vec<Value>) -> String {
                     {
                         if let Some(val) = argument["value"].as_object() {
                             let mut vers = val["value"].as_str().unwrap_or("").to_string();
-                            if vers == HEAD_VERSION_NUMBER.to_string() {
+                            if vers == NEXT_VERSION_NUMBER.to_string() {
+                                vers = NEXT_VERSION.to_string();
+                            } else if vers == HEAD_VERSION_NUMBER.to_string() {
                                 vers = HEAD_VERSION.to_string();
                             }
                             return vers;

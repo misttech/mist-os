@@ -35,7 +35,6 @@ use {
         rights::Rights,
         walk_state::WalkState,
     },
-    bedrock_error::Explain,
     cm_rust::{
         Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
         ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
@@ -51,6 +50,7 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
     moniker::{ChildName, Moniker},
+    router_error::Explain,
     std::sync::Arc,
     tracing::warn,
 };

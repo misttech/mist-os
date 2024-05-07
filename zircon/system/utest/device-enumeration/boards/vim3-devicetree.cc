@@ -25,8 +25,8 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
-      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c-0-24",
-      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
 

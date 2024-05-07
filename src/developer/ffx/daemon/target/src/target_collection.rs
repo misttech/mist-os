@@ -983,6 +983,23 @@ impl TargetCollection {
         })
     }
 
+    pub fn query_single_connected_target(
+        &self,
+        query: &TargetInfoQuery,
+    ) -> Result<Option<Rc<Target>>, ()> {
+        self.query_any_single_target(query, |target| {
+            if !target.is_enabled() {
+                tracing::debug!("Skipping inactive target {target:?}");
+                false
+            } else if !target.is_connected() {
+                tracing::debug!("Skipping disconnected target {target:?}");
+                false
+            } else {
+                true
+            }
+        })
+    }
+
     /// Waits to find a single matching target, without filtering out discovered/disabled targets.
     ///
     /// Use `query_enabled_targets` to find a previously used target.

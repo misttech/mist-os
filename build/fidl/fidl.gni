@@ -44,8 +44,7 @@ import("//build/testing/host_test_data.gni")
 #   api (optional)
 #     Path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
-#     explicitly acknowledged. It is mandatory for publication categories of
-#     "partner" or "public".
+#     explicitly acknowledged. It is mandatory for stable = true.
 #     Defaults to "<target name>.api".
 #
 #   excluded_checks (optional)
@@ -133,6 +132,12 @@ import("//build/testing/host_test_data.gni")
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
 #
+#   stable (optional)
+#     Whether this library is stabilized. If false, there will not be
+#     .api file generated, and the atom will be marked as unstable in the final
+#     IDK.
+#     Defaults to false.
+#
 #   applicable_licenses
 #   public_deps
 #   testonly
@@ -199,6 +204,7 @@ template("fidl") {
     "goldens_dir",
     "non_fidl_deps",
     "versioned",
+    "stable",
   ]
   if (is_fidl_toolchain) {
     # Only import the fidl_library template when in the fidl toolchain

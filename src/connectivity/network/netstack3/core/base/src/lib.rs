@@ -15,22 +15,30 @@ extern crate fakealloc as alloc;
 mod context;
 mod counters;
 mod data_structures;
+mod event;
+mod frame;
 mod inspect;
 mod resource_references;
+mod rng;
 mod time;
+mod trace;
 
-pub use context::ContextPair;
-pub use counters::Counter;
+pub use context::{ContextPair, ContextProvider, CtxPair, NonTestCtxMarker};
+pub use counters::{Counter, CounterContext, ResourceCounterContext};
+pub use event::{CoreEventContext, EventContext};
+pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
     RemoveResourceResultWithContext,
 };
+pub use rng::RngContext;
 pub use time::{
     local_timer_heap::LocalTimerHeap, CoreTimerContext, HandleableTimer, Instant,
     InstantBindingsTypes, InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx,
     TimerBindingsTypes, TimerContext, TimerHandler,
 };
+pub use trace::TracingContext;
 
 /// Reference counted hash map data structure.
 pub mod ref_counted_hash_map {
@@ -57,8 +65,14 @@ pub mod sync {
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
+    mod fake_bindings;
+    pub use crate::event::testutil::FakeEventCtx;
+    pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
+    pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
         FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
         WithFakeTimerContext,
     };
+    pub use crate::trace::testutil::FakeTracingCtx;
+    pub use fake_bindings::FakeBindingsCtx;
 }

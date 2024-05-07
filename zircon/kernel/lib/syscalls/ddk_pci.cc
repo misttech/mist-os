@@ -660,17 +660,10 @@ zx_status_t sys_pci_get_bar(zx_handle_t dev_handle, uint32_t bar_num,
              dev->func_id(), bar_num);
     vmo->set_name(name, sizeof(name));
 
-    fbl::RefPtr<ContentSizeManager> content_size_manager;
-    status = ContentSizeManager::Create(info->size, &content_size_manager);
-    if (status != ZX_OK) {
-      return status;
-    }
-
     // Now that the vmo has been created for the bar, create a handle to
     // the appropriate dispatcher for the caller
-    status = VmObjectDispatcher::Create(vmo, ktl::move(content_size_manager),
-                                        VmObjectDispatcher::InitialMutability::kMutable,
-                                        &kernel_handle, &rights);
+    status = VmObjectDispatcher::Create(
+        vmo, info->size, VmObjectDispatcher::InitialMutability::kMutable, &kernel_handle, &rights);
     if (status != ZX_OK) {
       return status;
     }

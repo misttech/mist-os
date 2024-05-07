@@ -17,10 +17,10 @@ use {
         capability::CapabilitySource,
         model::{
             actions::{
-                ActionSet, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+                ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction,
+                StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::router_ext::WeakComponentTokenExt,
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{
@@ -40,7 +40,6 @@ use {
     assert_matches::assert_matches,
     async_trait::async_trait,
     async_utils::PollExt,
-    bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::RelativePath,
@@ -58,8 +57,10 @@ use {
         lock::Mutex,
         StreamExt,
     },
+    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    router_error::{DowncastErrorForTest, RouterError},
     routing::component_instance::ComponentInstanceInterface,
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
@@ -114,7 +115,7 @@ fn namespace_teardown_processes_final_request() {
         let root_component = test.model.root().clone();
         let ehandle = ehandle_rx.recv().unwrap();
         let scope = ExecutionScope::build().executor(ehandle).new();
-        ActionSet::register(
+        ActionsManager::register(
             root_component.clone(),
             StartAction::new_with_scope(
                 StartReason::Debug,
@@ -1710,7 +1711,7 @@ async fn use_runner_from_environment_not_found() {
 
     assert_matches!(
         *err,
-        BedrockError::RoutingError(err)
+        RouterError::NotFound(err)
         if matches!(
             err.downcast_for_test::<RoutingError>(),
             RoutingError::UseFromEnvironmentNotFound {
@@ -1879,10 +1880,10 @@ async fn use_from_destroyed_but_not_removed() {
     // Destroy `b` but keep alive its reference from the parent.
     // TODO: If we had a "pre-destroy" event we could delete the child through normal means and
     // block on the event instead of explicitly registering actions.
-    ActionSet::register(component_b.clone(), ShutdownAction::new(ShutdownType::Instance))
+    ActionsManager::register(component_b.clone(), ShutdownAction::new(ShutdownType::Instance))
         .await
         .expect("shutdown failed");
-    ActionSet::register(component_b, DestroyAction::new()).await.expect("destroy failed");
+    ActionsManager::register(component_b, DestroyAction::new()).await.expect("destroy failed");
     test.check_use(
         vec!["c"].try_into().unwrap(),
         CheckUse::Protocol {
@@ -3406,7 +3407,7 @@ async fn source_component_stopping_when_routing() {
 
     // Start to stop the component. This will stall because the framework will be
     // waiting the controller to respond.
-    let mut stop_fut = pin!(ActionSet::register(root.clone(), StopAction::new(false)));
+    let mut stop_fut = pin!(ActionsManager::register(root.clone(), StopAction::new(false)));
     assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
 
     // Start to request a capability from the component.
@@ -3607,7 +3608,7 @@ impl Hook for BlockingResolvedHook {
         match &event.payload {
             EventPayload::Resolved { component, .. } => {
                 let expected_moniker = self.receiver.lock().await.next().await.unwrap();
-                assert_eq!(component.moniker, expected_moniker);
+                assert_eq!(component.moniker(), expected_moniker);
             }
             _ => (),
         };
@@ -3721,7 +3722,7 @@ fn slow_resolve_races_with_capability_requested() {
     let mut test_body = Box::pin(async move {
         // Add a hook that delays component resolution.
         let (blocking_resolved_hook, resolved_hook_sender) = BlockingResolvedHook::new();
-        test.model.root().hooks.install_front(blocking_resolved_hook.hooks()).await;
+        test.model.root().hooks.install_front_for_test(blocking_resolved_hook.hooks()).await;
 
         // Resolve root.
         resolved_hook_sender.unbounded_send(Moniker::root()).unwrap();

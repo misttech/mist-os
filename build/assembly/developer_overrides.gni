@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/product_assembly_config_file_impl.gni")
+import("//build/group_with_inputs.gni")
 
 # Define developer overrides for product assembly
 #
@@ -31,6 +32,37 @@ import("//build/assembly/product_assembly_config_file_impl.gni")
 #      [list, strings] A list of kernel command-line arguments to add to the
 #      zbi that's created by assembly.
 #
+#  base_packages [optional]
+#    [list, GN labels] A list of GN labels of fuchsia_package targets to
+#    include in the base package set.
+#
+#    Note: These are direct labels for specific targets, not deps to walk for
+#    metadata.  If the target isn't a package target, it will cause an error
+#    like:
+#      "no dependency provides the input <package_name>/package_manifest.json"
+#
+#  cache_packages [optional]
+#    [list, GN labels] A list of GN labels of fuchsia_package targets to
+#    include in the cache package set.
+#
+#  flexible_packages [optional]
+#    [list, GN labels] A list of GN labels of fuchsia_package targets that
+#    assembly may choose to put in base, cache, or elsewhere depending on the
+#    assembly context.
+#
+#  bootfs_packages [optional]
+#    [list, GN labels] A list of GN labels of fuchsia_package targets to
+#    include in the bootfs package set.
+#
+#    Note: These are direct labels for specific targets, not deps to walk for
+#    metadata.  If the target isn't a package target, it will cause an error
+#    like:
+#      "no dependency provides the input <package_name>/package_manifest.json"
+#
+#    Note: These are direct labels for specific targets, not deps to walk for
+#    metadata. If the target isn't a bootfs_files_for_assembly target, it will
+#    cause an error like:
+#      "no dependency provides the input <package_name>/bootfs_files.json"
 template("assembly_developer_overrides") {
   labels = {
     # So it can be reused.
@@ -49,6 +81,39 @@ template("assembly_developer_overrides") {
     assembly_config_file = "$outdir/product_assembly_overrides.json"
   }
 
+  creation_inputs = []
+  creation_deps = []
+
+  # Gather up all the developer-specified packages
+  _packages = []
+
+  foreach(package_set,
+          [
+            "base",
+            "cache",
+            "flexible",
+            "bootfs",
+          ]) {
+    package_set_varname = "${package_set}_packages"
+    if (defined(invoker[package_set_varname])) {
+      foreach(package_target, invoker[package_set_varname]) {
+        _package_out_dir = get_label_info(package_target, "target_out_dir")
+        _package_name = get_label_info(package_target, "name")
+        _manifest_path =
+            "${_package_out_dir}/${_package_name}/package_manifest.json"
+
+        _packages += [
+          {
+            package = rebase_path(_manifest_path, root_build_dir)
+            set = package_set
+          },
+        ]
+        creation_inputs += [ _manifest_path ]
+        creation_deps += [ package_target ]
+      }
+    }
+  }
+
   _assembly_overrides = {
     target_name = get_label_info(":$target_name", "label_no_toolchain")
     forward_variables_from(invoker,
@@ -57,14 +122,15 @@ template("assembly_developer_overrides") {
                              "platform",
                              "kernel",
                            ])
+    packages = _packages
   }
 
   # Generate the overrides configuration file itself.
   #
   # This uses the product_assembly_config_file() template to properly convert
   # any file paths in the 'platform' and 'product' sections that need to be
-  # converted from GN paths into rebased file paths.  See the templat's file for
-  # more information on those paths.
+  # converted from GN paths into rebased file paths.  See the template's file
+  # for more information on those paths.
   #
   product_assembly_config_file(labels.assembly_overrides) {
     forward_variables_from(invoker,
@@ -78,7 +144,7 @@ template("assembly_developer_overrides") {
     product_assembly_config = _assembly_overrides
   }
 
-  group(labels.target_name) {
+  group_with_inputs(labels.target_name) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -88,6 +154,9 @@ template("assembly_developer_overrides") {
       ":${labels.assembly_overrides_inputs}",
       ":${labels.assembly_overrides}",
     ]
+
+    inputs = creation_inputs
+    deps = creation_deps
 
     # Block all metadata walks for packages, distribution entries, etc.  These
     # inputs should not exist in metadata walks, as they are added via the paths

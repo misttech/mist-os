@@ -11,7 +11,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"golang.org/x/crypto/ssh"
 )
@@ -19,14 +18,13 @@ import (
 func FlashDevice(
 	ctx context.Context,
 	d *device.Client,
-	ffx *ffx.FFXTool,
 	build artifacts.Build,
 	publicKey ssh.PublicKey,
 ) error {
 	logger.Infof(ctx, "Starting to flash device")
 	startTime := time.Now()
 
-	if err := d.Flash(ctx, ffx, build, publicKey); err != nil {
+	if err := d.Flash(ctx, build, publicKey); err != nil {
 		return fmt.Errorf("device failed to flash: %w", err)
 	}
 

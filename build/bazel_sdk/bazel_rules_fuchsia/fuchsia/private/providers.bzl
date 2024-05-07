@@ -13,7 +13,7 @@ FuchsiaAssembledArtifactInfo = provider(
 )
 
 FuchsiaConfigDataInfo = provider(
-    "The  config data which is used in assembly.",
+    "The config data which is used in assembly.",
     fields = {
         "source": "Config file on host",
         "destination": "A String indicating the path to find the file in the package on the target",

@@ -224,6 +224,15 @@ __EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* devic
                                           fragment_name);
 }
 
+__EXPORT zx_status_t device_connect_ns_protocol(zx_device_t* device, const char* protocol_name,
+                                                zx_handle_t request) {
+  std::lock_guard guard(libdriver_lock);
+  if (!device) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return device->ConnectToNsProtocol(protocol_name, zx::channel(request));
+}
+
 // Unsupported calls:
 __EXPORT
 zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, const char* role,

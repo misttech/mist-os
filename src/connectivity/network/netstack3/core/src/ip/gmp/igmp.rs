@@ -569,7 +569,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _, SendFrameContext as _,
+            InstantContext as _, SendFrameContext as _, SendableFrameMeta,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -663,6 +663,21 @@ mod tests {
         ) -> O {
             let FakeIgmpCtx { groups, .. } = self.get_ref();
             cb(groups)
+        }
+    }
+
+    impl SendableFrameMeta<FakeCoreCtx, FakeBindingsCtx> for IgmpPacketMetadata<FakeDeviceId> {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtx,
+            bindings_ctx: &mut FakeBindingsCtx,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
         }
     }
 
@@ -1006,7 +1021,7 @@ mod tests {
                 .gmp_state
                 .timers
                 .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
-            let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+            let instant1 = bindings_ctx.timers.timers()[0].0.clone();
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0));
             assert_eq!(core_ctx.frames().len(), 1);
@@ -1030,11 +1045,11 @@ mod tests {
                 .gmp_state
                 .timers
                 .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
-            bindings_ctx.timer_ctx().assert_timers_installed_range([
+            bindings_ctx.timers.assert_timers_installed_range([
                 (GMP_TIMER_ID, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL)),
                 (V1_ROUTER_PRESENT_TIMER_ID, now..=(now + DEFAULT_V1_ROUTER_PRESENT_TIMEOUT)),
             ]);
-            let instant2 = bindings_ctx.timer_ctx().timers()[1].0.clone();
+            let instant2 = bindings_ctx.timers.timers()[1].0.clone();
             assert_eq!(instant1, instant2);
 
             core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
@@ -1084,7 +1099,7 @@ mod tests {
             .gmp_state
             .timers
             .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
-        let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+        let instant1 = bindings_ctx.timers.timers()[0].0.clone();
         let start = bindings_ctx.now();
         let duration = Duration::from_micros(((instant1 - start).as_micros() / 2) as u64);
         assert!(duration.as_millis() > 100);
@@ -1092,7 +1107,7 @@ mod tests {
         assert_eq!(core_ctx.frames().len(), 1);
         let now = bindings_ctx.now();
         core_ctx.state.gmp_state.timers.assert_range([(&GROUP_ADDR, now..=(now + duration))]);
-        let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+        let instant2 = bindings_ctx.timers.timers()[0].0.clone();
         // Because of the message, our timer should be reset to a nearer future.
         assert!(instant2 <= instant1);
         core_ctx.state.gmp_state.timers.assert_top(&GROUP_ADDR, &());
@@ -1157,7 +1172,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             assert_eq!(core_ctx.frames().len(), 0);
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            bindings_ctx.timers.assert_no_timers_installed();
         });
     }
 
@@ -1177,7 +1192,7 @@ mod tests {
                 .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             assert_eq!(core_ctx.frames().len(), 1);
             receive_igmp_report(&mut core_ctx, &mut bindings_ctx);
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            bindings_ctx.timers.assert_no_timers_installed();
             // The report should be discarded because we have received from
             // someone else.
             assert_eq!(core_ctx.frames().len(), 1);
@@ -1244,7 +1259,7 @@ mod tests {
 
             // Assert that no observable effects have taken place.
             let assert_no_effect = |core_ctx: &FakeCoreCtx, bindings_ctx: &FakeBindingsCtx| {
-                bindings_ctx.timer_ctx().assert_no_timers_installed();
+                bindings_ctx.timers.assert_no_timers_installed();
                 assert_empty(core_ctx.frames());
             };
 
@@ -1317,7 +1332,7 @@ mod tests {
                 GroupLeaveResult::Left(())
             );
             assert_eq!(core_ctx.frames().len(), 2);
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            bindings_ctx.timers.assert_no_timers_installed();
             ensure_ttl_ihl_rtr(&core_ctx);
         });
     }

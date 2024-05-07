@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        client::{connection_selection::bss_selection, types},
-        util::pseudo_energy::SignalData,
-    },
+    crate::{client::types, util::pseudo_energy::SignalData},
     fuchsia_async as fasync,
     futures::channel::mpsc,
 };
@@ -44,7 +41,7 @@ impl ConnectionData {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct RoamDecisionData {
     pub(crate) time_prev_roam_scan: fasync::Time,
-    pub roam_reasons_prev_scan: Vec<bss_selection::RoamReason>,
+    pub roam_reasons_prev_scan: Vec<RoamReason>,
     /// This is the EWMA value, hence why it is an f64
     pub rssi_prev_roam_scan: f64,
 }
@@ -74,4 +71,10 @@ impl RoamSearchRequest {
     ) -> Self {
         RoamSearchRequest { connection_data, _roam_req_sender }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RoamReason {
+    RssiBelowThreshold,
+    SnrBelowThreshold,
 }

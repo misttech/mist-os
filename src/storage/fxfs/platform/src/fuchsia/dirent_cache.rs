@@ -221,9 +221,11 @@ mod tests {
     use {
         crate::fuchsia::{directory::FxDirectory, dirent_cache::DirentCache, node::FxNode},
         fxfs::object_store::ObjectDescriptor,
+        fxfs_macros::ToWeakNode,
         std::sync::Arc,
     };
 
+    #[derive(ToWeakNode)]
     struct FakeNode(u64);
     impl FxNode for FakeNode {
         fn object_id(&self) -> u64 {

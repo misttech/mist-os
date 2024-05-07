@@ -7,9 +7,7 @@ use quote::{quote_spanned, ToTokens};
 
 #[derive(Debug)]
 pub enum ParseError {
-    MalformedFfxAttr(Span),
     DuplicateAttr(Span),
-    DuplicateFfxAttr(Span),
     CommandRequired(Span),
     OnlyStructsSupported(Span),
     OnlyNamedFieldStructsSupported(Span),
@@ -22,19 +20,9 @@ pub enum ParseError {
 impl ToTokens for ParseError {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            ParseError::MalformedFfxAttr(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("`#[ffx]` attribute malformed. Must contain a list of property literals. So far only `forces_stdout_logs` is supported.");
-                }
-            ),
             ParseError::DuplicateAttr(span) => tokens.extend(
                 quote_spanned! {*span=>
                     std::compile_error!("Duplicate attribute found. Can only have one attribute kind per field");
-                }
-            ),
-            ParseError::DuplicateFfxAttr(span) => tokens.extend(
-                quote_spanned! {*span=>
-                    std::compile_error!("Duplicate ffx attribute found. Can only have one attribute of each kind");
                 }
             ),
             ParseError::CommandRequired(span) => tokens.extend(

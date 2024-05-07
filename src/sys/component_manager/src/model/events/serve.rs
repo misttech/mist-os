@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        events::{event::Event, registry::ComponentEventRoute, stream::EventStream},
-        hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType},
-    },
+    crate::model::events::{event::Event, registry::ComponentEventRoute, stream::EventStream},
     async_utils::stream::FlattenUnorderedExt,
     cm_rust::{ChildRef, EventScope},
     cm_types::{LongName, Name},
@@ -17,6 +14,7 @@ use {
         self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
     },
     futures::{stream, stream::Peekable, Stream, StreamExt},
+    hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType},
     measure_tape_for_events::Measurable,
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{pin::Pin, sync::Arc, task::Poll},

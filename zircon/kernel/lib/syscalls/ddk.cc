@@ -102,16 +102,10 @@ zx_status_t sys_vmo_create_contiguous(zx_handle_t bti, size_t size, uint32_t ali
     return status;
   }
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(size, &content_size_manager);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   // create a Vm Object dispatcher
   KernelHandle<VmObjectDispatcher> kernel_handle;
   zx_rights_t rights;
-  status = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
+  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
                                       VmObjectDispatcher::InitialMutability::kMutable,
                                       &kernel_handle, &rights);
   if (status != ZX_OK) {
@@ -152,16 +146,10 @@ zx_status_t sys_vmo_create_physical(zx_handle_t hrsrc, zx_paddr_t paddr, size_t 
     return status;
   }
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(size, &content_size_manager);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   // create a Vm Object dispatcher
   KernelHandle<VmObjectDispatcher> kernel_handle;
   zx_rights_t rights;
-  status = VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
+  status = VmObjectDispatcher::Create(ktl::move(vmo), size,
                                       VmObjectDispatcher::InitialMutability::kMutable,
                                       &kernel_handle, &rights);
   if (status != ZX_OK) {

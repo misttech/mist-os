@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.input.virtualkeyboard") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "HCI"
 
   sources = [ "virtual_keyboard.fidl" ]

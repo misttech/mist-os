@@ -249,6 +249,8 @@ class_permission_enum! {
         SigChld("sigchld"),
         /// Permission to trace a process.
         Ptrace("ptrace"),
+        /// Permission to get the session ID.
+        GetSession("getsession"),
     }
 }
 

@@ -69,6 +69,7 @@ config("trace_engine_include") {
 sdk_source_set("trace-engine-headersonly") {
   sdk_name = "trace-engine-headersonly"
   category = "partner"
+  stable = true
 
   sources = [ "include/lib/trace-engine/buffer_internal.h" ]
 

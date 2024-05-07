@@ -37,145 +37,6 @@ pub fn impl_derive_reference_doc(ast: syn::DeriveInput) -> Result<TokenStream2, 
         ast::Data::Enum(_) => {}
     }
 
-    impl ToTokens for ReferenceDocAttributes {
-        fn to_tokens(&self, tokens: &mut TokenStream2) {
-            let mut section_tokens = quote!(
-                let mut s = String::new();
-            );
-
-            let top_level_doc_after_fields = self.top_level_doc_after_fields.unwrap_or_default();
-            let top_level_doc = if let Some(doc) = get_doc_attr(&self.attrs) {
-                format!("{}\n\n", doc)
-            } else {
-                "".to_string()
-            };
-
-            if !top_level_doc_after_fields {
-                section_tokens.append_all(quote!(s.push_str(&#top_level_doc);));
-            }
-
-            match &self.data {
-                ast::Data::Struct(fields) => {
-                    fields.iter().for_each(|field| {
-                        section_tokens.append_all(quote!(
-                            s.push_str(&#field);
-                        ))
-                    });
-                }
-                ast::Data::Enum(_) => {}
-            }
-
-            if top_level_doc_after_fields {
-                section_tokens.append_all(quote!(s.push_str("\n");));
-                section_tokens.append_all(quote!(s.push_str(&#top_level_doc);));
-            }
-
-            tokens.append_all(section_tokens);
-            tokens.append_all(quote!(s));
-        }
-    }
-
-    impl ToTokens for ReferenceDocFieldAttributes {
-        fn to_tokens(&self, tokens: &mut TokenStream2) {
-            if self.skip {
-                tokens.append_all(quote!({ "" }));
-                return;
-            }
-            let name = self.rename.clone().unwrap_or_else(|| get_ident_name(&self.ident));
-            let indent_headers = self.indent_headers.unwrap_or(0);
-            let mut rust_ty_path = expect_typepath(&self.ty);
-            let mut is_optional = false;
-            let mut is_vec = false;
-            if outer_type_ident_eq(&rust_ty_path, "Option") {
-                is_optional = true;
-                rust_ty_path = get_first_inner_type_from_generic(&rust_ty_path).unwrap();
-            }
-            if outer_type_ident_eq(&rust_ty_path, "Vec") {
-                is_vec = true;
-                rust_ty_path = get_first_inner_type_from_generic(&rust_ty_path).unwrap();
-            }
-
-            let rust_ty_string = get_outer_type_without_generics(&rust_ty_path);
-            // Get the json-equivalent value type for this Rust type.
-            let json_type_string = get_json_type_string_from_field_attrs(&self, &rust_ty_string);
-            match &self.fields_as {
-                FieldOutputType::Headings => {
-                    let doc = get_doc_attr(&self.attrs)
-                        .map(|s| indent_all_markdown_headers_by(&s, indent_headers + 1))
-                        .unwrap_or_default();
-                    let trait_output = if self.recurse {
-                        quote!(
-                            #rust_ty_path::get_reference_doc_markdown_with_options(#indent_headers + 1, 0)
-                        )
-                    } else {
-                        quote!("")
-                    };
-
-                    let indented_format_string =
-                        indent_markdown_header_by("# `{name}` {{#{name}}}\n\n", indent_headers);
-                    tokens.append_all(quote!({
-                        let doc = #doc.to_string();
-                        let trait_output = #trait_output.to_string();
-                        let mut output = format!(#indented_format_string, name=#name);
-                        output.push_str("_");
-                        if #is_vec {
-                            output.push_str("array of ");
-                        }
-                        output.push_str("`");
-                        output.push_str(#json_type_string);
-                        output.push_str("`");
-                        if #is_optional {
-                            output.push_str(" (optional)");
-                        }
-                        output.push_str("_\n\n");
-                        if !doc.is_empty() {
-                            output.push_str(&doc);
-                            output.push_str("\n\n");
-                        }
-                        if !trait_output.is_empty() {
-                            output.push_str(&trait_output);
-                            output.push_str("\n\n");
-                        }
-                        output
-                    }));
-                }
-                FieldOutputType::List => {
-                    let doc = get_doc_attr(&self.attrs)
-                        .map(|s| indent_lines_with_spaces(&s, LIST_INDENT_SPACES, 1))
-                        .unwrap_or_default();
-                    let trait_output = if self.recurse {
-                        quote!(
-                            #rust_ty_path::get_reference_doc_markdown_with_options(#indent_headers, #LIST_INDENT_SPACES)
-                        )
-                    } else {
-                        quote!("")
-                    };
-                    // FieldOutputType::List
-                    tokens.append_all(quote!({
-                        let trait_output = #trait_output.to_string();
-                        let mut output = format!("- `{}`: (_", #name);
-                        if #is_optional {
-                            output.push_str("optional ");
-                        }
-                        if #is_vec {
-                            output.push_str("array of ");
-                        }
-                        output.push_str("`");
-                        output.push_str(#json_type_string);
-                        output.push_str("`_) ");
-                        output.push_str(#doc);
-                        if !trait_output.is_empty() {
-                            output.push_str("\n");
-                            output.push_str(&trait_output);
-                        }
-                        output.push_str("\n");
-                        output
-                    }));
-                }
-            }
-        }
-    }
-
     Ok(quote! {
         impl #impl_generics ::reference_doc::MarkdownReferenceDocGenerator
             for #name #ty_generics #where_clause
@@ -212,6 +73,44 @@ struct ReferenceDocAttributes {
     /// after the fields' doc comments.
     #[darling(default)]
     top_level_doc_after_fields: Option<bool>,
+}
+
+impl ToTokens for ReferenceDocAttributes {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let mut section_tokens = quote!(
+            let mut s = String::new();
+        );
+
+        let top_level_doc_after_fields = self.top_level_doc_after_fields.unwrap_or_default();
+        let top_level_doc = if let Some(doc) = get_doc_attr(&self.attrs) {
+            format!("{}\n\n", doc)
+        } else {
+            "".to_string()
+        };
+
+        if !top_level_doc_after_fields {
+            section_tokens.append_all(quote!(s.push_str(&#top_level_doc);));
+        }
+
+        match &self.data {
+            ast::Data::Struct(fields) => {
+                fields.iter().for_each(|field| {
+                    section_tokens.append_all(quote!(
+                        s.push_str(&#field);
+                    ))
+                });
+            }
+            ast::Data::Enum(_) => {}
+        }
+
+        if top_level_doc_after_fields {
+            section_tokens.append_all(quote!(s.push_str("\n");));
+            section_tokens.append_all(quote!(s.push_str(&#top_level_doc);));
+        }
+
+        tokens.append_all(section_tokens);
+        tokens.append_all(quote!(s));
+    }
 }
 
 #[derive(Debug, Clone, FromMeta)]
@@ -271,6 +170,107 @@ struct ReferenceDocFieldAttributes {
     /// Instructs the doc generator to skip this field's doc comments.
     #[darling(default)]
     skip: bool,
+}
+
+impl ToTokens for ReferenceDocFieldAttributes {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        if self.skip {
+            tokens.append_all(quote!({ "" }));
+            return;
+        }
+        let name = self.rename.clone().unwrap_or_else(|| get_ident_name(&self.ident));
+        let indent_headers = self.indent_headers.unwrap_or(0);
+        let mut rust_ty_path = expect_typepath(&self.ty);
+        let mut is_optional = false;
+        let mut is_vec = false;
+        if outer_type_ident_eq(&rust_ty_path, "Option") {
+            is_optional = true;
+            rust_ty_path = get_first_inner_type_from_generic(&rust_ty_path).unwrap();
+        }
+        if outer_type_ident_eq(&rust_ty_path, "Vec") {
+            is_vec = true;
+            rust_ty_path = get_first_inner_type_from_generic(&rust_ty_path).unwrap();
+        }
+
+        let rust_ty_string = get_outer_type_without_generics(&rust_ty_path);
+        // Get the json-equivalent value type for this Rust type.
+        let json_type_string = get_json_type_string_from_field_attrs(&self, &rust_ty_string);
+        match &self.fields_as {
+            FieldOutputType::Headings => {
+                let doc = get_doc_attr(&self.attrs)
+                    .map(|s| indent_all_markdown_headers_by(&s, indent_headers + 1))
+                    .unwrap_or_default();
+                let trait_output = if self.recurse {
+                    quote!(
+                        #rust_ty_path::get_reference_doc_markdown_with_options(#indent_headers + 1, 0)
+                    )
+                } else {
+                    quote!("")
+                };
+
+                let indented_format_string =
+                    indent_markdown_header_by("# `{name}` {{#{name}}}\n\n", indent_headers);
+                tokens.append_all(quote!({
+                    let doc = #doc.to_string();
+                    let trait_output = #trait_output.to_string();
+                    let mut output = format!(#indented_format_string, name=#name);
+                    output.push_str("_");
+                    if #is_vec {
+                        output.push_str("array of ");
+                    }
+                    output.push_str("`");
+                    output.push_str(#json_type_string);
+                    output.push_str("`");
+                    if #is_optional {
+                        output.push_str(" (optional)");
+                    }
+                    output.push_str("_\n\n");
+                    if !doc.is_empty() {
+                        output.push_str(&doc);
+                        output.push_str("\n\n");
+                    }
+                    if !trait_output.is_empty() {
+                        output.push_str(&trait_output);
+                        output.push_str("\n\n");
+                    }
+                    output
+                }));
+            }
+            FieldOutputType::List => {
+                let doc = get_doc_attr(&self.attrs)
+                    .map(|s| indent_lines_with_spaces(&s, LIST_INDENT_SPACES, 1))
+                    .unwrap_or_default();
+                let trait_output = if self.recurse {
+                    quote!(
+                        #rust_ty_path::get_reference_doc_markdown_with_options(#indent_headers, #LIST_INDENT_SPACES)
+                    )
+                } else {
+                    quote!("")
+                };
+                // FieldOutputType::List
+                tokens.append_all(quote!({
+                    let trait_output = #trait_output.to_string();
+                    let mut output = format!("- `{}`: (_", #name);
+                    if #is_optional {
+                        output.push_str("optional ");
+                    }
+                    if #is_vec {
+                        output.push_str("array of ");
+                    }
+                    output.push_str("`");
+                    output.push_str(#json_type_string);
+                    output.push_str("`_) ");
+                    output.push_str(#doc);
+                    if !trait_output.is_empty() {
+                        output.push_str("\n");
+                        output.push_str(&trait_output);
+                    }
+                    output.push_str("\n");
+                    output
+                }));
+            }
+        }
+    }
 }
 
 /// Returns true if the outer type in `p` is equal to `str`. For example, for

@@ -377,7 +377,7 @@ You can fix this issue commenting out your fuchsia target in `.cargo/config`:
 ```
 [build]
 ...
-target = "x86_64-fuchsia"
+target = "x86_64-unknown-fuchsia"
 ```
 
 After commenting, it becomes:
@@ -385,7 +385,7 @@ After commenting, it becomes:
 ```
 [build]
 ...
-# target = "x86_64-fuchsia"
+# target = "x86_64-unknown-fuchsia"
 ```
 
 This issue is being tracked [upstream](https://github.com/rust-lang/cargo/issues/8462){: .external}.

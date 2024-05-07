@@ -30,11 +30,6 @@
  */
 
 /*
- * We use only "bzImage" protocol, which loads the 32-bit code at fixed 1MiB.
- */
-HIDDEN(LINUXBOOT_LOAD_ADDRESS = 0x100000);
-
-/*
  * So we define PHYS_LOAD_ADDRESS to be beneath the real fixed 1MiB load
  * address of the 32-bit code such that the image directly after .boot.header
  * (linuxboot-header.S) corresponds to that fixed address.  That header content
@@ -60,10 +55,7 @@ HIDDEN(PHYS_LOAD_ADDRESS = LINUXBOOT_LOAD_ADDRESS - LINUXBOOT_SETUP_SIZE);
 HIDDEN(LINUXBOOT_SYSSIZE = (PHYS_LOAD_END - LINUXBOOT_LOAD_ADDRESS) / 16);
 
 /*
- * This _start symbol just sets e_entry in ELF headers (as per phys.ld), which
- * don't exist at runtime.  Set it to match the 32-bit protocol's entry point.
- * There is no global symbol for the 16-bit entry point (exactly 512 bytes into
- * the .boot.header region) because the linuxboot-header.S code is not actually
- * part of the same memory image as the rest of the program.
+ * This is needed by linuxboot64-header.S to embed the LINUXBOOT_SYSSIZE
+ * value while using only PC-relative relocations.
  */
-HIDDEN(_start = Phys32Entry);
+HIDDEN(LINUXBOOT_SYSSIZE_RELATIVE = PHYS_LOAD_ADDRESS + LINUXBOOT_SYSSIZE);

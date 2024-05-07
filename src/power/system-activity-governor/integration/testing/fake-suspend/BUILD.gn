@@ -16,19 +16,13 @@ driver_bind_rules("bind") {
 
 fuchsia_driver("driver") {
   output_name = "fake-suspend"
-  sources = [
-    "control_server.cc",
-    "device_server.cc",
-    "fake_suspend.cc",
-  ]
+  sources = [ "fake_suspend.cc" ]
   deps = [
     ":bind",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
-    "//sdk/lib/fit",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/power/system-activity-governor/integration/testing/fidl:test.suspendcontrol_cpp",
+    "//src/power/testing/fake-suspend:cpp",
   ]
 }
 

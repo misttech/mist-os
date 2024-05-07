@@ -13,6 +13,7 @@
     device_set_profile_by_role;
     device_get_protocol;
     device_get_config_vmo;
+    device_get_properties;
     get_iommu_resource;
     get_framebuffer_resource;
     get_ioport_resource;

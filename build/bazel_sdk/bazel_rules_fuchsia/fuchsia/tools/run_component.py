@@ -20,15 +20,20 @@ class FuchsiaTaskRunComponent(FuchsiaTask):
             required=True,
         )
         parser.add_argument(
-            "--moniker",
-            type=str,
-            help="The moniker to add the component to.",
-            required=True,
-        )
-        parser.add_argument(
             "--url",
             type=str,
             help="The full component url.",
+            required=True,
+        )
+        parser.add_argument(
+            "--package-manifest",
+            type=parser.path_arg(),
+            help="A path to the package manifest json file.",
+        )
+        parser.add_argument(
+            "--moniker",
+            type=str,
+            help="The moniker to add the component to.",
             required=True,
         )
         parser.add_argument(
@@ -48,6 +53,16 @@ class FuchsiaTaskRunComponent(FuchsiaTask):
     def run(self, parser: ScopedArgumentParser) -> None:
         args = self.parse_args(parser)
         ffx = [args.ffx] + (["--target", args.target] if args.target else [])
+        url = (
+            args.url.replace(
+                "{{PACKAGE_NAME}}",
+                json.loads(args.package_manifest.read_text())["package"][
+                    "name"
+                ],
+            )
+            if args.package_manifest
+            else args.url
+        )
 
         if args.session:
             subprocess.check_call(
@@ -55,7 +70,7 @@ class FuchsiaTaskRunComponent(FuchsiaTask):
                     *ffx,
                     "session",
                     "add",
-                    args.url,
+                    url,
                 ]
             )
         else:
@@ -65,7 +80,7 @@ class FuchsiaTaskRunComponent(FuchsiaTask):
                     "component",
                     "run",
                     args.moniker,
-                    args.url,
+                    url,
                     "--recreate",
                 ]
             )

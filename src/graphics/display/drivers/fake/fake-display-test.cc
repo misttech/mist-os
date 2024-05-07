@@ -75,8 +75,8 @@ class FakeDisplayTest : public testing::Test {
 
   fake_display::FakeDisplay* display() { return tree_->display(); }
 
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> ConnectToSysmemAllocatorV1() {
-    return fidl::WireSyncClient(tree_->ConnectToSysmemAllocatorV1());
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> ConnectToSysmemAllocatorV2() {
+    return fidl::WireSyncClient(tree_->ConnectToSysmemAllocatorV2());
   }
 
   MockDevice* mock_root() const { return mock_root_.get(); }
@@ -133,16 +133,16 @@ TEST_F(FakeDisplayTest, Inspect) {
 class FakeDisplayRealSysmemTest : public FakeDisplayTest {
  public:
   struct BufferCollectionAndToken {
-    fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection_client;
-    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token;
+    fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> collection_client;
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token;
   };
 
   FakeDisplayRealSysmemTest() = default;
   ~FakeDisplayRealSysmemTest() override = default;
 
   zx::result<BufferCollectionAndToken> CreateBufferCollection() {
-    zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>> token_endpoints =
-        fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+    zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token_endpoints =
+        fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
 
     EXPECT_OK(token_endpoints.status_value());
     if (!token_endpoints.is_ok()) {
@@ -150,7 +150,12 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
     }
 
     auto& [token_client, token_server] = token_endpoints.value();
-    fidl::Status allocate_token_status = sysmem_->AllocateSharedCollection(std::move(token_server));
+    fidl::Arena arena;
+    auto allocate_shared_request =
+        fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena);
+    allocate_shared_request.token_request(std::move(token_server));
+    fidl::Status allocate_token_status =
+        sysmem_->AllocateSharedCollection(allocate_shared_request.Build());
     EXPECT_OK(allocate_token_status.status());
     if (!allocate_token_status.ok()) {
       return zx::error(allocate_token_status.status());
@@ -169,25 +174,29 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
     // Here we duplicate the token to set buffer collection constraints in
     // the test.
     std::vector<zx_rights_t> rights = {ZX_RIGHT_SAME_RIGHTS};
+    auto duplicate_request =
+        fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncRequest::Builder(arena);
+    duplicate_request.rights_attenuation_masks(rights);
     fidl::WireResult duplicate_result =
-        fidl::WireCall(token_client)
-            ->DuplicateSync(fidl::VectorView<zx_rights_t>::FromExternal(rights));
+        fidl::WireCall(token_client)->DuplicateSync(duplicate_request.Build());
     EXPECT_OK(duplicate_result.status());
     if (!duplicate_result.ok()) {
       return zx::error(duplicate_result.status());
     }
 
     auto& duplicate_value = duplicate_result.value();
-    EXPECT_EQ(duplicate_value.tokens.count(), 1u);
-    if (duplicate_value.tokens.count() != 1u) {
+    EXPECT_EQ(duplicate_value.tokens().count(), 1u);
+    if (duplicate_value.tokens().count() != 1u) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
     // Bind duplicated token to BufferCollection client.
     auto [collection_client, collection_server] =
-        fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
-    fidl::Status bind_status = sysmem_->BindSharedCollection(std::move(duplicate_value.tokens[0]),
-                                                             std::move(collection_server));
+        fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+    auto bind_request = fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena);
+    bind_request.token(std::move(duplicate_value.tokens()[0]));
+    bind_request.buffer_collection_request(std::move(collection_server));
+    fidl::Status bind_status = sysmem_->BindSharedCollection(bind_request.Build());
     EXPECT_OK(bind_status.status());
     if (!bind_status.ok()) {
       return zx::error(bind_status.status());
@@ -201,7 +210,7 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
 
   void SetUp() override {
     FakeDisplayTest::SetUp();
-    sysmem_ = ConnectToSysmemAllocatorV1();
+    sysmem_ = ConnectToSysmemAllocatorV2();
     EXPECT_TRUE(sysmem_.is_valid());
   }
 
@@ -210,10 +219,10 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
     FakeDisplayTest::TearDown();
   }
 
-  const fidl::WireSyncClient<fuchsia_sysmem::Allocator>& sysmem() const { return sysmem_; }
+  const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem() const { return sysmem_; }
 
  private:
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 };
 
 // A completion semaphore indicating the display capture is completed.
@@ -257,46 +266,34 @@ class DisplayCaptureCompletion {
 //
 // As we require the image to be both readable and writable, the constraints
 // will work for both simple (scanout) images and capture images.
-fuchsia_sysmem::wire::BufferCollectionConstraints CreateImageConstraints(
-    uint32_t min_size_bytes, fuchsia_sysmem::wire::PixelFormat pixel_format) {
-  return fuchsia_sysmem::wire::BufferCollectionConstraints{
-      .usage =
-          {
-              .cpu = fuchsia_sysmem::wire::kCpuUsageRead | fuchsia_sysmem::wire::kCpuUsageWrite,
-          },
-      .min_buffer_count = 1,
-      .max_buffer_count = 1,
-      .has_buffer_memory_constraints = true,
-      .buffer_memory_constraints =
-          {
-              .min_size_bytes = min_size_bytes,
-              .max_size_bytes = std::numeric_limits<uint32_t>::max(),
-              // The test cases need direct CPU access to the buffers and we
-              // don't enforce cache flushing, so we should narrow down the
-              // allowed sysmem heaps to the heaps supporting CPU domain and
-              // reject all the other heaps.
-              .ram_domain_supported = false,
-              .cpu_domain_supported = true,
-              .inaccessible_domain_supported = false,
-          },
-      // fake-display driver doesn't add extra image format constraints when
-      // SetBufferCollectionConstraints() is called. To make sure we allocate an
-      // image buffer, we add constraints here.
-      .image_format_constraints_count = 1,
-      .image_format_constraints =
-          {
-              fuchsia_sysmem::wire::ImageFormatConstraints{
-                  .pixel_format = pixel_format,
-                  .color_spaces_count = 1,
-                  .color_space =
-                      {
-                          fuchsia_sysmem::wire::ColorSpace{
-                              .type = fuchsia_sysmem::ColorSpaceType::kSrgb,
-                          },
-                      },
-              },
-          },
-  };
+fuchsia_sysmem2::wire::BufferCollectionConstraints CreateImageConstraints(
+    fidl::AnyArena& arena, uint32_t min_size_bytes,
+    fuchsia_images2::wire::PixelFormat pixel_format) {
+  // fake-display driver doesn't add extra image format constraints when
+  // SetBufferCollectionConstraints() is called. To make sure we allocate an
+  // image buffer, we add constraints here.
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints.usage(
+      fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+          .cpu(fuchsia_sysmem2::wire::kCpuUsageRead | fuchsia_sysmem2::wire::kCpuUsageWrite)
+          .Build());
+  constraints.min_buffer_count(1);
+  constraints.max_buffer_count(1);
+  auto bmc = fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena);
+  bmc.min_size_bytes(min_size_bytes);
+  bmc.ram_domain_supported(false);
+  // The test cases need direct CPU access to the buffers and we
+  // don't enforce cache flushing, so we should narrow down the
+  // allowed sysmem heaps to the heaps supporting CPU domain and
+  // reject all the other heaps.
+  bmc.cpu_domain_supported(true);
+  bmc.inaccessible_domain_supported(false);
+  constraints.buffer_memory_constraints(bmc.Build());
+  auto ifc = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
+  ifc.pixel_format(pixel_format);
+  ifc.color_spaces(std::array{fuchsia_images2::ColorSpace::kSrgb});
+  constraints.image_format_constraints(std::array{ifc.Build()});
+  return constraints.Build();
 }
 
 // Creates a primary layer config for an opaque layer that holds the `image`
@@ -333,19 +330,21 @@ layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& 
   };
 }
 
-std::pair<zx::vmo, fuchsia_sysmem::wire::SingleBufferSettings> GetAllocatedBufferAndSettings(
-    const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client) {
-  auto wait_result = client->WaitForBuffersAllocated();
-  ZX_ASSERT_MSG(wait_result.ok(), "WaitForBuffersAllocated() FIDL call failed: %s",
-                wait_result.status_string());
-  ZX_ASSERT_MSG(wait_result.value().status == ZX_OK,
-                "WaitForBuffersAllocated() responds with error: %s",
-                zx_status_get_string(wait_result.value().status));
-  auto& buffer_collection_info = wait_result.value().buffer_collection_info;
-  ZX_ASSERT_MSG(buffer_collection_info.buffer_count == 1u,
-                "Incorrect number of buffers allocated: actual %u, expected 1",
-                buffer_collection_info.buffer_count);
-  return {std::move(buffer_collection_info.buffers[0].vmo), buffer_collection_info.settings};
+std::pair<zx::vmo, fuchsia_sysmem2::wire::SingleBufferSettings> GetAllocatedBufferAndSettings(
+    fidl::AnyArena& arena, const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& client) {
+  auto wait_result = client->WaitForAllBuffersAllocated();
+  ZX_ASSERT_MSG(wait_result.ok(), "WaitForBuffersAllocated() FIDL call failed: %s (%u)",
+                wait_result.status_string(), fidl::ToUnderlying(wait_result->error_value()));
+  auto& buffer_collection_info = wait_result.value()->buffer_collection_info();
+  ZX_ASSERT_MSG(buffer_collection_info.buffers().count() == 1u,
+                "Incorrect number of buffers allocated: actual %zu, expected 1",
+                buffer_collection_info.buffers().count());
+  // wire types don't provide a way to clone into a different arena short of converting to natural
+  // type and back; we could consider returning the natural type instead, or converting this whole
+  // file to natural types, but for now this allows the caller to use wire types everyhwere (not
+  // necessarily a goal; just how the client code currently works)
+  auto settings_clone = fidl::ToWire(arena, fidl::ToNatural(buffer_collection_info.settings()));
+  return {std::move(buffer_collection_info.buffers()[0].vmo()), std::move(settings_clone)};
 }
 
 void FillImageWithColor(cpp20::span<uint8_t> image_buffer, const std::vector<uint8_t>& color_raw,
@@ -390,22 +389,18 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
       &kDisplayUsage, kBanjoValidBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
-  fidl::Status set_constraints_status = collection_client->SetConstraints(
-      /* has_constraints= */ true,
-      CreateImageConstraints(/*min_size_bytes=*/4096,
-                             fuchsia_sysmem::wire::PixelFormat{
-                                 .type = fuchsia_sysmem::PixelFormatType::kR8G8B8A8,
-                                 .has_format_modifier = true,
-                                 .format_modifier =
-                                     {
-                                         .value = fuchsia_sysmem::wire::kFormatModifierLinear,
-                                     },
-                             }));
+  fidl::Arena arena;
+  auto set_constraints_request =
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  set_constraints_request.constraints(CreateImageConstraints(
+      arena, /*min_size_bytes=*/4096, fuchsia_images2::PixelFormat::kR8G8B8A8));
+  fidl::Status set_constraints_status =
+      collection_client->SetConstraints(set_constraints_request.Build());
   EXPECT_TRUE(set_constraints_status.ok());
 
   // Both the test-side client and the driver have  set the constraints.
   // The buffer should be allocated correctly in sysmem.
-  EXPECT_TRUE(collection_client->WaitForBuffersAllocated().ok());
+  EXPECT_TRUE(collection_client->WaitForAllBuffersAllocated().ok());
 
   // Test ReleaseBufferCollection().
   // TODO(https://fxbug.dev/42079040): Consider adding RAII handles to release the
@@ -443,26 +438,26 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
       .height = 768,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  static constexpr fuchsia_sysmem::wire::PixelFormat kPixelFormat = {
-      .type = fuchsia_sysmem::PixelFormatType::kBgra32,
-      .has_format_modifier = true,
-      .format_modifier =
-          {
-              .value = fuchsia_sysmem::wire::kFormatModifierLinear,
-          },
-  };
+
+  const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear);
 
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
-  fidl::Status set_constraints_status = collection_client->SetConstraints(
-      /* has_constraints= */ true, CreateImageConstraints(
-                                       /*min_size_bytes=*/kDisplayImageMetadata.width *
-                                           kDisplayImageMetadata.height * bytes_per_pixel,
-                                       kPixelFormat));
+  fidl::Arena arena;
+  auto set_constraints_request =
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  set_constraints_request.constraints(
+      CreateImageConstraints(arena,
+                             /*min_size_bytes=*/kDisplayImageMetadata.width *
+                                 kDisplayImageMetadata.height * bytes_per_pixel,
+                             kPixelFormat.pixel_format));
+  fidl::Status set_constraints_status =
+      collection_client->SetConstraints(set_constraints_request.Build());
   EXPECT_TRUE(set_constraints_status.ok());
 
   // Both the test-side client and the driver have set the constraints.
   // The buffer should be allocated correctly in sysmem.
-  EXPECT_TRUE(collection_client->WaitForBuffersAllocated().ok());
+  EXPECT_TRUE(collection_client->WaitForAllBuffersAllocated().ok());
 
   // TODO(https://fxbug.dev/42079037): Split all valid / invalid imports into separate
   // test cases.
@@ -520,14 +515,8 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   EXPECT_OK(display()->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                    token.TakeChannel()));
 
-  const auto kPixelFormat = fuchsia_sysmem::wire::PixelFormat{
-      .type = fuchsia_sysmem::PixelFormatType::kBgra32,
-      .has_format_modifier = true,
-      .format_modifier =
-          {
-              .value = fuchsia_sysmem::wire::kFormatModifierLinear,
-          },
-  };
+  const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear);
 
   constexpr uint32_t kDisplayWidth = 1280;
   constexpr uint32_t kDisplayHeight = 800;
@@ -540,13 +529,18 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
   const uint32_t size_bytes = kDisplayWidth * kDisplayHeight * bytes_per_pixel;
   // Set BufferCollection buffer memory constraints.
-  fidl::Status set_constraints_status = collection_client->SetConstraints(
-      /* has_constraints= */ true, CreateImageConstraints(size_bytes, kPixelFormat));
+  fidl::Arena arena;
+  auto set_constraints_request =
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  set_constraints_request.constraints(
+      CreateImageConstraints(arena, size_bytes, kPixelFormat.pixel_format));
+  fidl::Status set_constraints_status =
+      collection_client->SetConstraints(set_constraints_request.Build());
   EXPECT_TRUE(set_constraints_status.ok());
 
   // Both the test-side client and the driver have set the constraints.
   // The buffer should be allocated correctly in sysmem.
-  EXPECT_TRUE(collection_client->WaitForBuffersAllocated().ok());
+  EXPECT_TRUE(collection_client->WaitForAllBuffersAllocated().ok());
 
   uint64_t out_capture_handle = INVALID_ID;
 
@@ -608,14 +602,8 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   EXPECT_OK(display()->DisplayControllerImplImportBufferCollection(
       kBanjoFramebufferBufferCollectionId, framebuffer_token.TakeChannel()));
 
-  const auto kPixelFormat = fuchsia_sysmem::wire::PixelFormat{
-      .type = fuchsia_sysmem::PixelFormatType::kBgra32,
-      .has_format_modifier = true,
-      .format_modifier =
-          {
-              .value = fuchsia_sysmem::wire::kFormatModifierLinear,
-          },
-  };
+  const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear);
 
   // Must match kWidth and kHeight defined in fake-display.cc.
   // TODO(https://fxbug.dev/42078942): Do not hardcode the display width and height.
@@ -638,18 +626,32 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   // Set BufferCollection buffer memory constraints from the test's end.
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
   const uint32_t size_bytes = kDisplayWidth * kDisplayHeight * bytes_per_pixel;
-  fidl::Status set_framebuffer_constraints_status = framebuffer_collection_client->SetConstraints(
-      /* has_constraints= */ true, CreateImageConstraints(size_bytes, kPixelFormat));
+
+  fidl::Arena arena;
+  auto framebuffer_set_constraints_request =
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  framebuffer_set_constraints_request.constraints(
+      CreateImageConstraints(arena, size_bytes, kPixelFormat.pixel_format));
+  fidl::Status set_framebuffer_constraints_status =
+      framebuffer_collection_client->SetConstraints(framebuffer_set_constraints_request.Build());
   EXPECT_TRUE(set_framebuffer_constraints_status.ok());
-  fidl::Status set_capture_constraints_status = capture_collection_client->SetConstraints(
-      /* has_constraints= */ true, CreateImageConstraints(size_bytes, kPixelFormat));
+  arena.Reset();
+
+  auto capture_set_constraints_request =
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  capture_set_constraints_request.constraints(
+      CreateImageConstraints(arena, size_bytes, kPixelFormat.pixel_format));
+  fidl::Status set_capture_constraints_status =
+      capture_collection_client->SetConstraints(capture_set_constraints_request.Build());
   EXPECT_TRUE(set_capture_constraints_status.ok());
+  arena.Reset();
 
   // Both the test-side client and the driver have set the constraints.
   // The buffers should be allocated correctly in sysmem.
   auto [framebuffer_vmo, framebuffer_settings] =
-      GetAllocatedBufferAndSettings(framebuffer_collection_client);
-  auto [capture_vmo, capture_settings] = GetAllocatedBufferAndSettings(capture_collection_client);
+      GetAllocatedBufferAndSettings(arena, framebuffer_collection_client);
+  auto [capture_vmo, capture_settings] =
+      GetAllocatedBufferAndSettings(arena, capture_collection_client);
 
   // Fill the framebuffer.
   fzl::VmoMapper framebuffer_mapper;
@@ -658,7 +660,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
                                          framebuffer_mapper.size());
   const std::vector<uint8_t> kBlueBgra = {0xff, 0, 0, 0xff};
   FillImageWithColor(framebuffer_bytes, kBlueBgra, kDisplayWidth, kDisplayHeight,
-                     framebuffer_settings.image_format_constraints.bytes_per_row_divisor);
+                     framebuffer_settings.image_format_constraints().bytes_per_row_divisor());
   zx_cache_flush(framebuffer_bytes.data(), framebuffer_bytes.size(),
                  ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   framebuffer_mapper.Unmap();
@@ -730,7 +732,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   // Verify the captured image has the same content as the original image.
   constexpr int kCaptureBytesPerPixel = 4;
   uint32_t capture_bytes_per_row_divisor =
-      capture_settings.image_format_constraints.bytes_per_row_divisor;
+      capture_settings.image_format_constraints().bytes_per_row_divisor();
   uint32_t capture_row_stride_bytes =
       fbl::round_up(uint32_t{kDisplayWidth} * kCaptureBytesPerPixel, capture_bytes_per_row_divisor);
 

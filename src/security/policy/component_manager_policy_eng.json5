@@ -41,18 +41,6 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
-                source_name: "fuchsia.boot.RootResource",
-                capability: "protocol",
-                target_monikers: [
-                    "/bootstrap",
-                    "/bootstrap/console-launcher",
-                    "/core/test_manager/system-tests:**",
-                    "/core/testing/vfs-compliance-tests:**",
-                ],
-            },
-            {
-                source_moniker: "<component_manager>",
-                source: "component",
                 source_name: "fuchsia.kernel.CpuResource",
                 capability: "protocol",
                 target_monikers: [

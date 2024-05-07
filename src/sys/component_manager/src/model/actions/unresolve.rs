@@ -7,10 +7,10 @@ use {
         actions::{shutdown::do_shutdown, Action, ActionKey, ShutdownType},
         component::instance::InstanceState,
         component::ComponentInstance,
-        hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
     errors::{ActionError, UnresolveActionError},
+    hooks::EventPayload,
     std::sync::Arc,
 };
 
@@ -83,7 +83,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     component.execution_scope.wait().await;
     component.execution_scope.resurrect();
 
-    let event = Event::new(&component, EventPayload::Unresolved);
+    let event = component.new_event(EventPayload::Unresolved);
     component.hooks.dispatch(&event).await;
     Ok(())
 }
@@ -93,10 +93,9 @@ pub mod tests {
     use {
         crate::model::{
             actions::test_utils::{is_destroyed, is_discovered, is_resolved, is_shutdown},
-            actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
+            actions::{ActionsManager, ShutdownAction, ShutdownType, UnresolveAction},
             component::{ComponentInstance, StartReason},
             events::{registry::EventSubscription, stream::EventStream},
-            hooks::EventType,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
@@ -105,6 +104,7 @@ pub mod tests {
         cm_types::Name,
         errors::{ActionError, UnresolveActionError},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
+        hooks::EventType,
         moniker::{Moniker, MonikerBase},
         std::sync::Arc,
     };
@@ -138,7 +138,7 @@ pub mod tests {
         assert!(is_resolved(&component_c).await);
 
         // Unresolve, recursively.
-        ActionSet::register(component_a.clone(), UnresolveAction::new())
+        ActionsManager::register(component_a.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
         assert!(is_resolved(&component_root).await);
@@ -152,7 +152,7 @@ pub mod tests {
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_matches!(
-            ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
+            ActionsManager::register(component_a.clone(), UnresolveAction::new()).await,
             Ok(())
         );
         // Still Discovered.
@@ -196,7 +196,7 @@ pub mod tests {
         let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
         // Unresolve, recursively.
-        ActionSet::register(component_a.clone(), UnresolveAction::new())
+        ActionsManager::register(component_a.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
 
@@ -259,7 +259,7 @@ pub mod tests {
         // Register the UnresolveAction.
         let nf = {
             let mut actions = component_a.lock_actions().await;
-            actions.register_no_wait(&component_a, UnresolveAction::new()).await
+            actions.register_no_wait(UnresolveAction::new()).await
         };
 
         // Component a is then unresolved.
@@ -272,7 +272,7 @@ pub mod tests {
         // Now attempt to unresolve again with another UnresolveAction.
         let nf2 = {
             let mut actions = component_a.lock_actions().await;
-            actions.register_no_wait(&component_a, UnresolveAction::new()).await
+            actions.register_no_wait(UnresolveAction::new()).await
         };
         // The component is not resolved anymore, so the unresolve will have no effect.
         nf2.await.unwrap();
@@ -335,7 +335,7 @@ pub mod tests {
             start_collection(durability).await;
 
         // Stop the collection.
-        ActionSet::register(
+        ActionsManager::register(
             component_container.clone(),
             ShutdownAction::new(ShutdownType::Instance),
         )
@@ -343,7 +343,7 @@ pub mod tests {
         .expect("shutdown failed");
         assert!(is_destroyed(&component_a).await);
         assert!(is_destroyed(&component_b).await);
-        ActionSet::register(component_container.clone(), UnresolveAction::new())
+        ActionsManager::register(component_container.clone(), UnresolveAction::new())
             .await
             .expect("unresolve failed");
         assert!(is_discovered(&component_container).await);
@@ -351,7 +351,7 @@ pub mod tests {
         // Trying to unresolve a child fails because the children of a collection are destroyed when
         // the collection is stopped. Then it's an error to unresolve a Destroyed component.
         assert_matches!(
-            ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
+            ActionsManager::register(component_a.clone(), UnresolveAction::new()).await,
             Err(ActionError::UnresolveError {
                 err: UnresolveActionError::InstanceDestroyed { .. }
             })

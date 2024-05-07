@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.diagnostics.types") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   sources = [ "component.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

@@ -16,6 +16,7 @@ from honeydew.typing.wlan import (
     ClientStatusConnected,
     ClientStatusConnecting,
     ClientStatusIdle,
+    CountryCode,
     Protection,
     QueryIfaceResponse,
     WlanChannel,
@@ -127,14 +128,14 @@ class WlanSL4FTests(unittest.TestCase):
 
     def test_get_country_success(self) -> None:
         """Test for Wlan.get_country()."""
-        self.sl4f_obj.run.return_value = {"result": "US"}
+        self.sl4f_obj.run.return_value = {"result": [85, 83]}
 
         self.assertEqual(self.wlan_obj.get_country(1), "US")
         self.sl4f_obj.run.assert_called()
 
     def test_get_country_failure_resp_not_str(self) -> None:
         """Test for Wlan.get_country()."""
-        self.sl4f_obj.run.return_value = {"result": [1]}
+        self.sl4f_obj.run.return_value = {"result": "a"}
 
         with self.assertRaises(TypeError):
             self.wlan_obj.get_country(1)
@@ -198,40 +199,42 @@ class WlanSL4FTests(unittest.TestCase):
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {
             "result": {
-                "bss1": {
-                    "bssid": [1, 2, 3],
-                    "bss_type": 2,
-                    "beacon_period": 2,
-                    "capability_info": 3,
-                    "ies": [3, 2, 1],
-                    "channel": {
-                        "primary": 1,
-                        "cbw": "Cbw20",
-                        "secondary80": 3,
+                "bss1": [
+                    {
+                        "bssid": [1, 2, 3],
+                        "bss_type": "Personal",
+                        "beacon_period": 2,
+                        "capability_info": 3,
+                        "ies": [3, 2, 1],
+                        "channel": {
+                            "primary": 1,
+                            "cbw": "Cbw20",
+                            "secondary80": 3,
+                        },
+                        "rssi_dbm": 4,
+                        "snr_db": 5,
                     },
-                    "rssi_dbm": 4,
-                    "snr_db": 5,
-                },
-                "bss2": {
-                    "bssid": [1, 2],
-                    "bss_type": 2,
-                    "beacon_period": 2,
-                    "capability_info": 3,
-                    "ies": [3, 2],
-                    "channel": {
-                        "primary": 1,
-                        "cbw": "Cbw20",
-                        "secondary80": 3,
+                    {
+                        "bssid": [1, 2],
+                        "bss_type": "Personal",
+                        "beacon_period": 2,
+                        "capability_info": 3,
+                        "ies": [3, 2],
+                        "channel": {
+                            "primary": 1,
+                            "cbw": "Cbw20",
+                            "secondary80": 3,
+                        },
+                        "rssi_dbm": 4,
+                        "snr_db": 5,
                     },
-                    "rssi_dbm": 4,
-                    "snr_db": 5,
-                },
+                ],
             }
         }
 
         self.assertEqual(
             self.wlan_obj.scan_for_bss_info(),
-            {"bss1": _TEST_BSS_DESC_1, "bss2": _TEST_BSS_DESC_2},
+            {"bss1": [_TEST_BSS_DESC_1, _TEST_BSS_DESC_2]},
         )
 
         self.sl4f_obj.run.assert_called()
@@ -301,7 +304,7 @@ class WlanSL4FTests(unittest.TestCase):
 
     def test_set_region_success(self) -> None:
         """Test for Wlan.set_region()."""
-        self.wlan_obj.set_region("US")
+        self.wlan_obj.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
         self.sl4f_obj.run.assert_called()
 
     def test_status_idle_success(self) -> None:

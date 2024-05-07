@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.scenic.scheduling") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [ "prediction_info.fidl" ]

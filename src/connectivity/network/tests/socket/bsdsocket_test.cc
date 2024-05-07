@@ -676,19 +676,6 @@ class SocketOptsTest : public SocketKindTest {
     };
   }
 
-  static SockOption GetMcastIfOption() {
-    if (IsIPv6()) {
-      return {
-          .level = IPPROTO_IPV6,
-          .option = IPV6_MULTICAST_IF,
-      };
-    }
-    return {
-        .level = IPPROTO_IP,
-        .option = IP_MULTICAST_IF,
-    };
-  }
-
   static SockOption GetRecvTOSOption() {
     if (IsIPv6()) {
       return {
@@ -988,31 +975,19 @@ TEST_P(SocketOptsTest, SetUDPMulticastIfImrIfindex) {
   fbl::unique_fd s;
   ASSERT_TRUE(s = NewSocket()) << strerror(errno);
 
-  constexpr int kOne = 1;
-  SockOption t = GetMcastIfOption();
-  if (IsIPv6()) {
-    EXPECT_EQ(setsockopt(s.get(), t.level, t.option, &kOne, sizeof(kOne)), 0) << strerror(errno);
+  ip_mreqn param_in = {
+      .imr_ifindex = 1,
+  };
+  ASSERT_EQ(setsockopt(s.get(), IPPROTO_IP, IP_MULTICAST_IF, &param_in, sizeof(param_in)), 0)
+      << strerror(errno);
 
-    int param_out;
-    socklen_t len = sizeof(param_out);
-    ASSERT_EQ(getsockopt(s.get(), t.level, t.option, &param_out, &len), 0) << strerror(errno);
-    ASSERT_EQ(len, sizeof(param_out));
+  in_addr param_out;
+  socklen_t len = sizeof(param_out);
+  ASSERT_EQ(getsockopt(s.get(), IPPROTO_IP, IP_MULTICAST_IF, &param_out, &len), 0)
+      << strerror(errno);
+  ASSERT_EQ(len, sizeof(param_out));
 
-    ASSERT_EQ(param_out, kOne);
-  } else {
-    ip_mreqn param_in = {
-        .imr_ifindex = kOne,
-    };
-    ASSERT_EQ(setsockopt(s.get(), t.level, t.option, &param_in, sizeof(param_in)), 0)
-        << strerror(errno);
-
-    in_addr param_out;
-    socklen_t len = sizeof(param_out);
-    ASSERT_EQ(getsockopt(s.get(), t.level, t.option, &param_out, &len), 0) << strerror(errno);
-    ASSERT_EQ(len, sizeof(param_out));
-
-    ASSERT_EQ(param_out.s_addr, INADDR_ANY);
-  }
+  ASSERT_EQ(param_out.s_addr, INADDR_ANY);
 
   EXPECT_EQ(close(s.release()), 0) << strerror(errno);
 }
@@ -1021,29 +996,58 @@ TEST_P(SocketOptsTest, SetUDPMulticastIfImrAddress) {
   if (IsTCP()) {
     GTEST_SKIP() << "Skip multicast tests on TCP socket";
   }
-  if (IsIPv6()) {
-    GTEST_SKIP() << "V6 sockets don't support setting IP_MULTICAST_IF by addr";
-  }
 
   fbl::unique_fd s;
   ASSERT_TRUE(s = NewSocket()) << strerror(errno);
 
-  SockOption t = GetMcastIfOption();
   ip_mreqn param_in = {
       .imr_address =
           {
               .s_addr = htonl(INADDR_LOOPBACK),
           },
   };
-  ASSERT_EQ(setsockopt(s.get(), t.level, t.option, &param_in, sizeof(param_in)), 0)
+  ASSERT_EQ(setsockopt(s.get(), IPPROTO_IP, IP_MULTICAST_IF, &param_in, sizeof(param_in)), 0)
       << strerror(errno);
 
   in_addr param_out;
   socklen_t len = sizeof(param_out);
-  ASSERT_EQ(getsockopt(s.get(), t.level, t.option, &param_out, &len), 0) << strerror(errno);
+  ASSERT_EQ(getsockopt(s.get(), IPPROTO_IP, IP_MULTICAST_IF, &param_out, &len), 0)
+      << strerror(errno);
   ASSERT_EQ(len, sizeof(param_out));
 
   ASSERT_EQ(param_out.s_addr, param_in.imr_address.s_addr);
+
+  EXPECT_EQ(close(s.release()), 0) << strerror(errno);
+}
+
+TEST_P(SocketOptsTest, SetUDPIPv6MulticastIfImrIfindex) {
+  if (IsTCP()) {
+    GTEST_SKIP() << "Skip multicast tests on TCP socket";
+  }
+
+  fbl::unique_fd s;
+  ASSERT_TRUE(s = NewSocket()) << strerror(errno);
+
+  constexpr int kOne = 1;
+  int result = setsockopt(s.get(), IPPROTO_IPV6, IPV6_MULTICAST_IF, &kOne, sizeof(kOne));
+  if (IsIPv6()) {
+    EXPECT_EQ(result, 0) << strerror(errno);
+  } else {
+    ASSERT_EQ(result, -1) << strerror(errno);
+    EXPECT_EQ(errno, ENOPROTOOPT) << strerror(errno);
+  }
+
+  int param_out;
+  socklen_t len = sizeof(param_out);
+  result = getsockopt(s.get(), IPPROTO_IPV6, IPV6_MULTICAST_IF, &param_out, &len);
+  if (IsIPv6()) {
+    ASSERT_EQ(result, 0) << strerror(errno);
+    ASSERT_EQ(len, sizeof(param_out));
+    ASSERT_EQ(param_out, kOne);
+  } else {
+    ASSERT_EQ(result, -1) << strerror(errno);
+    EXPECT_EQ(errno, EOPNOTSUPP) << strerror(errno);
+  }
 
   EXPECT_EQ(close(s.release()), 0) << strerror(errno);
 }

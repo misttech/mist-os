@@ -225,7 +225,7 @@ mod test {
             status: Status::InDevelopment,
         },
         Version {
-            api_level: ApiLevel::LEGACY,
+            api_level: ApiLevel::PLATFORM,
             abi_revision: AbiRevision::from_u64(0x2db0661e7832b33d),
             status: Status::InDevelopment,
         },

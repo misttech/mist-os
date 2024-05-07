@@ -11,7 +11,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"golang.org/x/crypto/ssh"
 )
@@ -19,7 +18,6 @@ import (
 func PaveDevice(
 	ctx context.Context,
 	d *device.Client,
-	ffx *ffx.FFXTool,
 	build artifacts.Build,
 	sshPublicKey ssh.PublicKey,
 ) error {

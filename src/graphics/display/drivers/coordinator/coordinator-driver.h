@@ -6,64 +6,47 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_COORDINATOR_DRIVER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <lib/ddk/device.h>
+#include <lib/driver/compat/cpp/banjo_client.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
-
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
 namespace display {
 
-class CoordinatorDriver;
-
-using DeviceType = ddk::Device<CoordinatorDriver, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_display::Provider>::Mixin>;
-
-// Interfaces with the Driver Framework v1 and manages the driver lifetime of
+// Interfaces with the Driver Framework v2 and manages the driver lifetime of
 // the display coordinator Controller device.
-class CoordinatorDriver : public DeviceType,
-                          public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
+class CoordinatorDriver : public fdf::DriverBase {
  public:
-  // Factory method for production use.
-  //
-  // `parent` must not be null.
-  static zx::result<> Create(zx_device_t* parent);
+  CoordinatorDriver(fdf::DriverStartArgs start_args,
+                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  // Production code must use the `Create()` factory method.
-  //
-  // `parent` and `controller` must not be null.
-  explicit CoordinatorDriver(zx_device_t* parent, std::unique_ptr<Controller> controller);
+  ~CoordinatorDriver() override;
 
   CoordinatorDriver(const CoordinatorDriver&) = delete;
   CoordinatorDriver(CoordinatorDriver&&) = delete;
   CoordinatorDriver& operator=(const CoordinatorDriver&) = delete;
   CoordinatorDriver& operator=(CoordinatorDriver&&) = delete;
 
-  ~CoordinatorDriver() override;
-
-  // ddk::Unbindable:
-  void DdkUnbind(ddk::UnbindTxn txn);
-
-  // ddk::Device:
-  void DdkRelease();
-
-  // fuchsia_hardware_display::Provider:
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  // fdf::DriverBase:
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  void Stop() override;
 
   Controller* controller() const { return controller_.get(); }
 
  private:
-  // Binds the coordinator driver to the driver manager.
-  zx::result<> Bind();
+  void ConnectProvider(fidl::ServerEnd<fuchsia_hardware_display::Provider> provider_request);
 
   std::unique_ptr<Controller> controller_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_display::Provider> provider_bindings_;
+  driver_devfs::Connector<fuchsia_hardware_display::Provider> devfs_connector_;
 };
 
 }  // namespace display

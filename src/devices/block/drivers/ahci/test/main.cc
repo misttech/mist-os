@@ -476,6 +476,12 @@ class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam
     // Start dut_.
     ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
 
+    Port* port = dut_->port(FakeBus::kTestPortNumber);
+    while (port->SlotBusyLocked(0)) {
+      // Wait until IDENTIFY DEVICE command has been fully processed.
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+
     fake_bus_ = static_cast<FakeBus*>(dut_->bus());
     ASSERT_NOT_NULL(fake_bus_);
 

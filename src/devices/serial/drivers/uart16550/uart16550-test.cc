@@ -4,9 +4,8 @@
 
 #include "uart16550.h"
 
-#include <fuchsia/hardware/serial/c/banjo.h>
-#include <fuchsia/hardware/serialimpl/c/banjo.h>
-#include <lib/zx/event.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 
 #include <zxtest/zxtest.h>
 
@@ -17,7 +16,6 @@ class Uart16550Harness : public zxtest::Test {
   void SetUp() override {
     zx::interrupt interrupt;
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
-    ASSERT_OK(zx::event::create(0, &callback_finished_));
 
     port_mock_
         .ExpectWrite<uint8_t>(0b1000'0000, 3)   // divisor latch enable
@@ -39,22 +37,30 @@ class Uart16550Harness : public zxtest::Test {
     ASSERT_OK(device_->Init(std::move(interrupt), *port_mock_.io()));
     ASSERT_EQ(device_->FifoDepth(), 64);
     ASSERT_FALSE(device_->Enabled());
-    ASSERT_FALSE(device_->NotifyCallbackSet());
 
-    serial_notify_t notify = {
-        .callback = [](void* /*unused*/, serial_state_t /*unused*/) { ASSERT_TRUE(false); },
-        .ctx = nullptr,
-    };
-
-    ASSERT_OK(device_->SerialImplSetNotifyCallback(&notify));
     ASSERT_FALSE(device_->Enabled());
-    ASSERT_TRUE(device_->NotifyCallbackSet());
 
-    ASSERT_OK(device_->SerialImplEnable(true));
+    auto [client, server] = fdf::Endpoints<fuchsia_hardware_serialimpl::Device>::Create();
+    device_->GetHandler()(std::move(server));
+    fdf::WireClient<fuchsia_hardware_serialimpl::Device> driver_client(
+        std::move(client), fdf::Dispatcher::GetCurrent()->get());
+
+    fdf::Arena arena('TEST');
+    driver_client.buffer(arena)->Enable(true).ThenExactlyOnce([this](auto& result) {
+      ASSERT_TRUE(result.ok());
+      EXPECT_TRUE(result->is_ok());
+      runtime_.Quit();
+    });
+    runtime_.Run();
+    runtime_.ResetQuit();
+
     ASSERT_TRUE(device_->Enabled());
-    ASSERT_TRUE(device_->NotifyCallbackSet());
 
     port_mock_.VerifyAndClear();
+
+    auto result = driver_client.UnbindMaybeGetEndpoint();
+    ASSERT_TRUE(result.is_ok());
+    driver_client_end_ = *std::move(result);
   }
 
   void TearDown() override {
@@ -67,40 +73,45 @@ class Uart16550Harness : public zxtest::Test {
     uart16550::Uart16550* device = device_.release();
     device->DdkRelease();
 
+    // Verify and clear after joining with the interrupt thread.
+    port_mock_.VerifyAndClear();
     port_mock_.ExpectNoIo();
-    callback_finished_.reset();
   }
 
   uart16550::Uart16550& Device() { return *device_; }
 
   hwreg::Mock& PortMock() { return port_mock_; }
 
+  fdf_testing::DriverRuntime& Runtime() { return runtime_; }
+
   void InterruptDriver() { ASSERT_OK(Device().InterruptHandle()->trigger(0, zx::time())); }
 
-  void SignalCallbackFinished() {
-    ASSERT_OK(callback_finished_.signal(ZX_EVENT_SIGNAL_MASK, ZX_EVENT_SIGNALED));
-  }
-
-  void WaitCallbackFinished() {
-    ASSERT_OK(callback_finished_.wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), nullptr));
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateDriverClient() {
+    return fdf::WireClient<fuchsia_hardware_serialimpl::Device>(
+        std::move(driver_client_end_), fdf::Dispatcher::GetCurrent()->get());
   }
 
  private:
-  std::unique_ptr<uart16550::Uart16550> device_;
+  fdf_testing::DriverRuntime runtime_;
   hwreg::Mock port_mock_;
-  zx::event callback_finished_;
+  std::unique_ptr<uart16550::Uart16550> device_;
+  fdf::ClientEnd<fuchsia_hardware_serialimpl::Device> driver_client_end_;
 };
 
-TEST_F(Uart16550Harness, SerialImplGetInfo) {
+TEST_F(Uart16550Harness, GetInfo) {
   PortMock().ExpectNoIo();
 
-  serial_port_info_t info;
-  ASSERT_OK(Device().SerialImplGetInfo(&info));
-
-  PortMock().VerifyAndClear();
+  fdf::WireClient client = CreateDriverClient();
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->GetInfo().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    Runtime().Quit();
+  });
+  Runtime().Run();
 }
 
-TEST_F(Uart16550Harness, SerialImplConfig) {
+TEST_F(Uart16550Harness, Config) {
   PortMock()
       .ExpectWrite<uint8_t>(0b0000'0000, 1)   // disable interrupts
       .ExpectRead<uint8_t>(0b0000'0000, 3)    // line control
@@ -115,21 +126,49 @@ TEST_F(Uart16550Harness, SerialImplConfig) {
       .ExpectWrite<uint8_t>(0b0000'1011, 1)   // upper
       .ExpectWrite<uint8_t>(0b0001'1101, 3);  // disable divisor latch
 
-  ASSERT_OK(Device().SerialImplEnable(false));
+  fdf::WireClient client = CreateDriverClient();
+
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
 
   static constexpr uint32_t serial_test_config =
-      SERIAL_DATA_BITS_6 | SERIAL_STOP_BITS_2 | SERIAL_PARITY_EVEN | SERIAL_FLOW_CTRL_CTS_RTS;
-  ASSERT_OK(Device().SerialImplConfig(20, serial_test_config));
-  ASSERT_OK(Device().SerialImplConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
+      fuchsia_hardware_serialimpl::wire::kSerialDataBits6 |
+      fuchsia_hardware_serialimpl::wire::kSerialStopBits2 |
+      fuchsia_hardware_serialimpl::wire::kSerialParityEven |
+      fuchsia_hardware_serialimpl::wire::kSerialFlowCtrlCtsRts;
 
-  ASSERT_NOT_OK(Device().SerialImplConfig(0, serial_test_config));
-  ASSERT_NOT_OK(Device().SerialImplConfig(UINT32_MAX, serial_test_config));
-  ASSERT_NOT_OK(Device().SerialImplConfig(1, serial_test_config));
+  client.buffer(arena)->Config(20, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  client.buffer(arena)
+      ->Config(40, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly)
+      .ThenExactlyOnce([](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+      });
 
-  PortMock().VerifyAndClear();
+  client.buffer(arena)->Config(0, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  });
+  client.buffer(arena)->Config(UINT32_MAX, serial_test_config).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+  });
+  client.buffer(arena)->Config(1, serial_test_config).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_FALSE(result->is_ok());
+    Runtime().Quit();
+  });
+
+  Runtime().Run();
 }
 
-TEST_F(Uart16550Harness, SerialImplEnable) {
+TEST_F(Uart16550Harness, Enable) {
   PortMock()
       .ExpectWrite<uint8_t>(0b0000'0000, 1)   // disable interrupts
       .ExpectWrite<uint8_t>(0b1000'0000, 3)   // divisor latch enable
@@ -137,66 +176,32 @@ TEST_F(Uart16550Harness, SerialImplEnable) {
       .ExpectWrite<uint8_t>(0b0000'0000, 3)   // divisor latch disable
       .ExpectWrite<uint8_t>(0b0000'1101, 1);  // enable interrupts
 
-  ASSERT_OK(Device().SerialImplEnable(false));
-  ASSERT_FALSE(Device().Enabled());
-  ASSERT_TRUE(Device().NotifyCallbackSet());
+  fdf::WireClient client = CreateDriverClient();
 
-  ASSERT_OK(Device().SerialImplEnable(false));
-  ASSERT_FALSE(Device().Enabled());
-  ASSERT_TRUE(Device().NotifyCallbackSet());
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    ASSERT_FALSE(Device().Enabled());
+  });
 
-  ASSERT_OK(Device().SerialImplEnable(true));
-  ASSERT_TRUE(Device().Enabled());
-  ASSERT_TRUE(Device().NotifyCallbackSet());
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    ASSERT_FALSE(Device().Enabled());
+  });
 
-  PortMock().VerifyAndClear();
+  client.buffer(arena)->Enable(true).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    ASSERT_TRUE(Device().Enabled());
+    Runtime().Quit();
+  });
+
+  Runtime().Run();
 }
 
-TEST_F(Uart16550Harness, SerialImplSetNotifyCallback) {
-  PortMock().ExpectWrite<uint8_t>(0b0000'0000, 1);  // disable interrupts
-
-  serial_notify_t notify = {
-      .callback = [](void* /*unused*/, serial_state_t /*unused*/) { ASSERT_TRUE(false); },
-      .ctx = nullptr,
-  };
-
-  ASSERT_NOT_OK(Device().SerialImplSetNotifyCallback(&notify));
-  ASSERT_TRUE(Device().Enabled());
-  ASSERT_TRUE(Device().NotifyCallbackSet());
-
-  ASSERT_OK(Device().SerialImplEnable(false));
-  ASSERT_OK(Device().SerialImplSetNotifyCallback(&notify));
-  ASSERT_TRUE(Device().NotifyCallbackSet());
-
-  ASSERT_OK(Device().SerialImplSetNotifyCallback(nullptr));
-  ASSERT_FALSE(Device().NotifyCallbackSet());
-
-  ASSERT_OK(Device().SerialImplSetNotifyCallback(&notify));
-  ASSERT_TRUE(Device().NotifyCallbackSet());
-
-  notify.callback = nullptr;
-
-  ASSERT_TRUE(Device().NotifyCallbackSet());
-
-  ASSERT_OK(Device().SerialImplSetNotifyCallback(&notify));
-  ASSERT_FALSE(Device().NotifyCallbackSet());
-
-  PortMock().VerifyAndClear();
-}
-
-TEST_F(Uart16550Harness, SerialImplRead) {
-  auto readable = [](void* ctx, serial_state_t state) {
-    auto* harness = static_cast<Uart16550Harness*>(ctx);
-    if (state & SERIAL_STATE_READABLE) {
-      harness->SignalCallbackFinished();
-    }
-  };
-
-  serial_notify_t notify = {
-      .callback = readable,
-      .ctx = this,
-  };
-
+TEST_F(Uart16550Harness, Read) {
   PortMock()
       .ExpectWrite<uint8_t>(0b0000'0000, 1)  // disable interrupts
       .ExpectWrite<uint8_t>(0b1000'0000, 3)  // divisor latch enable
@@ -206,6 +211,115 @@ TEST_F(Uart16550Harness, SerialImplRead) {
       .ExpectRead<uint8_t>(0b0000'0000, 5)   // data not ready
       .ExpectRead<uint8_t>(0b0000'0100, 2)   // rx available interrupt id
       .ExpectRead<uint8_t>(0b0000'0001, 5)   // data ready
+      .ExpectRead<uint8_t>(0x0F, 0)          // buffer[0]
+      .ExpectRead<uint8_t>(0b0000'0001, 5)   // data ready
+      .ExpectRead<uint8_t>(0xF0, 0)          // buffer[1]
+      .ExpectRead<uint8_t>(0b0000'0001, 5)   // data ready
+      .ExpectRead<uint8_t>(0x59, 0)          // buffer[2]
+      .ExpectRead<uint8_t>(0b0000'0000, 5);  // data ready
+
+  fdf::WireClient client = CreateDriverClient();
+
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+
+  client.buffer(arena)->Read().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    EXPECT_EQ(result->error_value(), ZX_ERR_BAD_STATE);
+  });
+
+  client.buffer(arena)->Enable(true).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+
+  const std::vector<uint8_t> expect_buffer{0x0F, 0xF0, 0x59};
+
+  client.buffer(arena)->Read().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+
+    const std::vector actual_buffer(result->value()->data.cbegin(), result->value()->data.cend());
+    EXPECT_EQ(expect_buffer, actual_buffer);
+
+    Runtime().Quit();
+  });
+
+  // Run the dispatcher so that driver processes the read request.
+  Runtime().RunUntilIdle();
+
+  // The RX FIFO was empty, so the driver should have stored the request. Interrupt the driver to
+  // make it read from the FIFO and complete the request.
+  InterruptDriver();
+
+  Runtime().Run();
+}
+
+TEST_F(Uart16550Harness, Write) {
+  PortMock()
+      .ExpectWrite<uint8_t>(0b0000'0000, 1)   // disable interrupts
+      .ExpectWrite<uint8_t>(0b1000'0000, 3)   // divisor latch enable
+      .ExpectWrite<uint8_t>(0b1110'0111, 2)   // fifo control reset
+      .ExpectWrite<uint8_t>(0b0000'0000, 3)   // divisor latch disable
+      .ExpectWrite<uint8_t>(0b0000'1101, 1)   // enable interrupts
+      .ExpectRead<uint8_t>(0b0000'1101, 1)    // read interrupts
+      .ExpectWrite<uint8_t>(0b0000'1111, 1)   // write interrupts
+      .ExpectRead<uint8_t>(0b0100'0000, 5)    // tx empty
+      .ExpectWrite<uint8_t>(0xDE, 0)          // writable_buffer[0]
+      .ExpectWrite<uint8_t>(0xAD, 0)          // writable_buffer[1]
+      .ExpectWrite<uint8_t>(0xBE, 0)          // writable_buffer[2]
+      .ExpectWrite<uint8_t>(0xEF, 0)          // writable_buffer[3]
+      .ExpectRead<uint8_t>(0b0000'0010, 2)    // tx empty interrupt id
+      .ExpectRead<uint8_t>(0b0000'1111, 1)    // read interrupts
+      .ExpectWrite<uint8_t>(0b0000'1101, 1);  // write interrupts
+
+  fdf::WireClient client = CreateDriverClient();
+
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->Enable(false).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+
+  client.buffer(arena)
+      ->Write(fidl::VectorView<uint8_t>(arena, 1))
+      .ThenExactlyOnce([](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_error());
+        EXPECT_EQ(result->error_value(), ZX_ERR_BAD_STATE);
+      });
+
+  client.buffer(arena)->Enable(true).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+
+  uint8_t writable_buffer[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+  client.buffer(arena)
+      ->Write(fidl::VectorView<uint8_t>::FromExternal(writable_buffer, std::size(writable_buffer)))
+      .ThenExactlyOnce([&](auto& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        Runtime().Quit();
+      });
+
+  // Run the dispatcher so that driver processes the write request.
+  Runtime().RunUntilIdle();
+
+  // The driver should have written the data to the TX FIFO by this point. Raise a TX FIFO empty
+  // interrupt to make the driver complete the request.
+  InterruptDriver();
+
+  Runtime().Run();
+}
+
+TEST_F(Uart16550Harness, ReadDataInFifo) {
+  PortMock()
+      .ExpectRead<uint8_t>(0b0000'0001, 5)   // data ready
       .ExpectRead<uint8_t>(0b0000'0001, 5)   // data ready
       .ExpectRead<uint8_t>(0x0F, 0)          // buffer[0]
       .ExpectRead<uint8_t>(0b0000'0001, 5)   // data ready
@@ -214,91 +328,22 @@ TEST_F(Uart16550Harness, SerialImplRead) {
       .ExpectRead<uint8_t>(0x59, 0)          // buffer[2]
       .ExpectRead<uint8_t>(0b0000'0000, 5);  // data ready
 
-  ASSERT_OK(Device().SerialImplEnable(false));
-  ASSERT_OK(Device().SerialImplSetNotifyCallback(&notify));
+  fdf::WireClient client = CreateDriverClient();
 
-  uint8_t unreadable_buffer[1] = {0};
-  size_t actual;
+  const std::vector<uint8_t> expect_buffer{0x0F, 0xF0, 0x59};
 
-  ASSERT_EQ(Device().SerialImplRead(unreadable_buffer, sizeof(unreadable_buffer), &actual),
-            ZX_ERR_BAD_STATE);
-  ASSERT_EQ(actual, 0);
+  fdf::Arena arena('TEST');
+  client.buffer(arena)->Read().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
 
-  ASSERT_OK(Device().SerialImplEnable(true));
+    const std::vector actual_buffer(result->value()->data.cbegin(), result->value()->data.cend());
+    EXPECT_EQ(expect_buffer, actual_buffer);
+  });
 
-  ASSERT_EQ(Device().SerialImplRead(unreadable_buffer, sizeof(unreadable_buffer), &actual),
-            ZX_ERR_SHOULD_WAIT);
-  ASSERT_EQ(actual, 0);
-
-  InterruptDriver();
-  WaitCallbackFinished();
-
-  uint8_t readable_buffer[4] = {0xDE, 0xAD, 0xBE, 0xEF};
-  uint8_t expect_buffer[4] = {0x0F, 0xF0, 0x59, 0xEF};
-
-  ASSERT_OK(Device().SerialImplRead(readable_buffer, sizeof(readable_buffer), &actual));
-  ASSERT_EQ(actual, 3);
-  ASSERT_BYTES_EQ(readable_buffer, expect_buffer, sizeof(readable_buffer));
-
-  PortMock().VerifyAndClear();
-}
-
-TEST_F(Uart16550Harness, SerialImplWrite) {
-  auto writable = [](void* ctx, serial_state_t state) {
-    auto* harness = static_cast<Uart16550Harness*>(ctx);
-    if (state & SERIAL_STATE_WRITABLE) {
-      harness->SignalCallbackFinished();
-    }
-  };
-
-  serial_notify_t notify = {
-      .callback = writable,
-      .ctx = this,
-  };
-
-  PortMock()
-      .ExpectWrite<uint8_t>(0b0000'0000, 1)  // disable interrupts
-      .ExpectWrite<uint8_t>(0b1000'0000, 3)  // divisor latch enable
-      .ExpectWrite<uint8_t>(0b1110'0111, 2)  // fifo control reset
-      .ExpectWrite<uint8_t>(0b0000'0000, 3)  // divisor latch disable
-      .ExpectWrite<uint8_t>(0b0000'1101, 1)  // enable interrupts
-      .ExpectRead<uint8_t>(0b0000'0000, 5)   // tx empty
-      .ExpectRead<uint8_t>(0b0000'1101, 1)   // read interrupts
-      .ExpectWrite<uint8_t>(0b0000'1111, 1)  // write interrupts
-      .ExpectRead<uint8_t>(0b0000'0010, 2)   // tx empty interrupt id
-      .ExpectRead<uint8_t>(0b0000'1111, 1)   // read interrupts
-      .ExpectWrite<uint8_t>(0b0000'1101, 1)  // write interrupts
-      .ExpectRead<uint8_t>(0b0100'0000, 5)   // tx empty
-      .ExpectWrite<uint8_t>(0xDE, 0)         // writable_buffer[0]
-      .ExpectWrite<uint8_t>(0xAD, 0)         // writable_buffer[1]
-      .ExpectWrite<uint8_t>(0xBE, 0)         // writable_buffer[2]
-      .ExpectWrite<uint8_t>(0xEF, 0);        // writable_buffer[3]
-
-  ASSERT_OK(Device().SerialImplEnable(false));
-  ASSERT_OK(Device().SerialImplSetNotifyCallback(&notify));
-
-  uint8_t unwritable_buffer[1] = {0};
-  size_t actual;
-
-  ASSERT_EQ(Device().SerialImplWrite(unwritable_buffer, sizeof(unwritable_buffer), &actual),
-            ZX_ERR_BAD_STATE);
-  ASSERT_EQ(actual, 0);
-
-  ASSERT_OK(Device().SerialImplEnable(true));
-
-  ASSERT_EQ(Device().SerialImplWrite(unwritable_buffer, sizeof(unwritable_buffer), &actual),
-            ZX_ERR_SHOULD_WAIT);
-  ASSERT_EQ(actual, 0);
-
-  InterruptDriver();
-  WaitCallbackFinished();
-
-  uint8_t writable_buffer[4] = {0xDE, 0xAD, 0xBE, 0xEF};
-
-  ASSERT_OK(Device().SerialImplWrite(writable_buffer, sizeof(writable_buffer), &actual));
-  ASSERT_EQ(actual, 4);
-
-  PortMock().VerifyAndClear();
+  // There is already data in the FIFO, so our read request should be completed immediately without
+  // involvement from the interrupt handler.
+  Runtime().RunUntilIdle();
 }
 
 }  // namespace

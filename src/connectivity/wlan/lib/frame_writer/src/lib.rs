@@ -6,6 +6,12 @@ pub use wlan_frame_writer_macro::{
     write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
 };
 
+#[doc(hidden)]
+pub use wlan_ffi_transport::BufferProvider as __BufferProvider;
+
+#[cfg(test)]
+extern crate self as wlan_frame_writer;
+
 #[cfg(test)]
 mod tests {
     use {
@@ -29,6 +35,7 @@ mod tests {
             mac::*,
             organization::Oui,
         },
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
     };
 
     #[derive(Debug, Error, PartialEq, Eq, Ord, PartialOrd, Hash)]
@@ -55,10 +62,9 @@ mod tests {
         }
     }
 
-    struct CBufferProvider;
-    impl CBufferProvider {
-        fn get_buffer(&mut self, min_len: usize) -> Result<Vec<u8>, Error> {
-            Ok(vec![0; min_len])
+    impl From<wlan_ffi_transport::Error> for Error {
+        fn from(_: wlan_ffi_transport::Error) -> Self {
+            Error::FrameWriteError
         }
     }
 
@@ -75,7 +81,7 @@ mod tests {
 
     #[test]
     fn write_emit_offset_buffer_provider() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let mut offset = 0;
         write_frame!(buffer_provider, {
             ies: {
@@ -132,7 +138,7 @@ mod tests {
 
     #[test]
     fn write_ssid() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { ssid: &b"foobar"[..] }
         })
@@ -143,7 +149,7 @@ mod tests {
 
     #[test]
     fn write_ssid_empty() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { ssid: [0u8; 0] }
         })
@@ -154,7 +160,7 @@ mod tests {
 
     #[test]
     fn write_ssid_max() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { ssid: [2u8; (fidl_ieee80211::MAX_SSID_BYTE_LEN as usize)] }
         })
@@ -175,7 +181,7 @@ mod tests {
 
     #[test]
     fn write_ssid_too_large() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let err = write_frame!(buffer_provider, {
             ies: { ssid: [2u8; 33] }
         })
@@ -240,7 +246,7 @@ mod tests {
 
     #[test]
     fn write_rates() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { supported_rates: &[1u8, 2, 3, 4, 5] }
         })
@@ -251,7 +257,7 @@ mod tests {
 
     #[test]
     fn write_rates_too_large() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9] }
         })
@@ -262,7 +268,7 @@ mod tests {
 
     #[test]
     fn write_rates_empty() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let err = write_frame!(buffer_provider, {
             ies: { supported_rates: &[] }
         })
@@ -272,7 +278,7 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_too_few_rates() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let err = write_frame!(buffer_provider, {
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6],
@@ -285,7 +291,7 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_too_many_rates() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let err = write_frame!(buffer_provider, {
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -298,7 +304,7 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_continued() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -312,7 +318,7 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_separate() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
@@ -328,7 +334,7 @@ mod tests {
     fn write_rsne() {
         let rsne = rsne::Rsne::wpa2_rsne();
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { rsne: &rsne, }
         })
@@ -354,7 +360,7 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: { wpa1: &wpa_ie, }
         })
@@ -381,7 +387,7 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 wpa1?: match 2u8 {
@@ -414,9 +420,12 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
+                // Add another field that is present since write_frame!() will
+                // return an error if no bytes are written.
+                supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
                 wpa1?: match 1u8 {
                     1 => None,
                     2 => Some(&wpa_ie),
@@ -425,8 +434,10 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 0);
-        assert!(buffer.is_empty());
+
+        // Only supported rates are written.
+        assert_eq!(written, 10);
+        assert_eq!(&[1, 8, 1, 2, 3, 4, 5, 6, 7, 8][..], &buffer[..]);
     }
 
     #[test]
@@ -442,7 +453,7 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 wpa1: match 1u8 {
@@ -465,7 +476,7 @@ mod tests {
             &buffer[..]
         );
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 wpa1: match 2u8 {
@@ -491,7 +502,7 @@ mod tests {
 
     #[test]
     fn write_ht_caps() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 ht_cap: &ie::HtCapabilities {
@@ -523,7 +534,7 @@ mod tests {
 
     #[test]
     fn write_vht_caps() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 vht_cap: &ie::VhtCapabilities {
@@ -546,7 +557,7 @@ mod tests {
 
     #[test]
     fn write_dsss_param_set() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 dsss_param_set: &ie::DsssParamSet {
@@ -561,7 +572,7 @@ mod tests {
 
     #[test]
     fn write_bss_max_idle_period() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 bss_max_idle_period: &ie::BssMaxIdlePeriod {
@@ -592,7 +603,7 @@ mod tests {
             });
         }
 
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             ies: {
                 ssid: if always_true { &[2u8; 2][..] } else { &[2u8; 33][..] },
@@ -625,7 +636,7 @@ mod tests {
 
     #[test]
     fn write_headers() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             headers: {
                 // Struct expressions:
@@ -669,7 +680,7 @@ mod tests {
 
     #[test]
     fn write_body() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             body: &[9u8; 9],
         })
@@ -680,7 +691,7 @@ mod tests {
 
     #[test]
     fn write_payload() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             payload: &[9u8; 9],
         })
@@ -691,7 +702,7 @@ mod tests {
 
     #[test]
     fn write_complex() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             headers: {
                 MgmtHdr: &MgmtHdr {
@@ -750,7 +761,7 @@ mod tests {
 
     #[test]
     fn write_complex_verify_order() {
-        let buffer_provider = CBufferProvider;
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (buffer, written) = write_frame!(buffer_provider, {
             payload: vec![42u8; 5],
             ies: {
@@ -809,10 +820,7 @@ mod tests {
 
     #[test]
     fn write_nothing() {
-        let buffer_provider = CBufferProvider;
-        let (buffer, written) =
-            write_frame!(buffer_provider, {}).expect("frame construction failed");
-        assert_eq!(written, 0);
-        assert_eq!(buffer.len(), written);
+        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
+        write_frame!(buffer_provider, {}).expect_err("frame construction succeeded");
     }
 }

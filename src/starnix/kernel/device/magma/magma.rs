@@ -5,13 +5,15 @@
 #![allow(non_upper_case_globals)]
 
 use crate::vulkan::{BufferCollectionTokens, Loader};
-use fidl_fuchsia_sysmem as fsysmem;
+use fidl_fuchsia_images2 as fimages2;
+use fidl_fuchsia_sysmem2 as fsysmem2;
 use fidl_fuchsia_ui_composition as fuicomp;
+use fsysmem2::{AllocatorAllocateSharedCollectionRequest, BufferCollectionTokenDuplicateRequest};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_image_format::{
-    constraints_to_format, drm_format_to_sysmem_format, drm_format_to_vulkan_format,
-    drm_modifier_to_sysmem_modifier, get_plane_row_bytes, image_format_plane_byte_offset,
-    sysmem_modifier_to_drm_modifier, DRM_FORMAT_MOD_INVALID,
+    constraints_to_image_format, drm_format_to_images2_format, drm_format_to_vulkan_format,
+    drm_modifier_to_sysmem_modifier_2, get_plane_row_bytes_2, image_format_plane_byte_offset_2,
+    sysmem_modifier_to_drm_modifier_2, DRM_FORMAT_MOD_INVALID,
 };
 use fuchsia_vulkan::{
     BufferCollectionConstraintsInfoFUCHSIA, ImageConstraintsInfoFUCHSIA,
@@ -102,10 +104,10 @@ pub fn create_drm_image(
     let vk_format = drm_format_to_vulkan_format(create_info.drm_format as u32)
         .map_err(|_| MAGMA_STATUS_INVALID_ARGS)?;
 
-    let sysmem_format = drm_format_to_sysmem_format(create_info.drm_format as u32)
+    let sysmem_format = drm_format_to_images2_format(create_info.drm_format as u32)
         .map_err(|_| MAGMA_STATUS_INVALID_ARGS)?;
 
-    let mut sysmem_modifiers = vec![];
+    let mut sysmem_modifiers: Vec<fimages2::PixelFormatModifier> = vec![];
     let mut terminator_found = false;
     for modifier in create_info.drm_format_modifiers {
         if modifier == DRM_FORMAT_MOD_INVALID {
@@ -114,7 +116,7 @@ pub fn create_drm_image(
         }
 
         let modifier =
-            drm_modifier_to_sysmem_modifier(modifier).map_err(|_| MAGMA_STATUS_INVALID_ARGS)?;
+            drm_modifier_to_sysmem_modifier_2(modifier).map_err(|_| MAGMA_STATUS_INVALID_ARGS)?;
 
         sysmem_modifiers.push(modifier);
     }
@@ -152,8 +154,8 @@ pub fn create_drm_image(
         }
     } else {
         // If linear isn't requested, assume we'll get a tiled format modifier.
-        let is_linear_tiling =
-            sysmem_modifiers.len() == 1 && sysmem_modifiers[0] == fsysmem::FORMAT_MODIFIER_LINEAR;
+        let is_linear_tiling = sysmem_modifiers.len() == 1
+            && sysmem_modifiers[0] == fimages2::PixelFormatModifier::Linear;
 
         vk_format_features = loader.get_format_features(vk_format, is_linear_tiling);
 
@@ -215,7 +217,7 @@ pub fn create_drm_image(
     let rgb_color_space = SysmemColorSpaceFUCHSIA {
         sType: STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
         pNext: std::ptr::null(),
-        colorSpace: fsysmem::ColorSpaceType::Srgb as u32,
+        colorSpace: fimages2::ColorSpace::Srgb.into_primitive(),
     };
 
     let format_info = ImageFormatConstraintsInfoFUCHSIA {
@@ -279,32 +281,49 @@ pub fn init_scenic() -> Result<fuicomp::AllocatorSynchronousProxy, Errno> {
 /// duplicate token to use for both Scenic and Vulkan.
 pub fn init_sysmem(
     use_scenic: bool,
-) -> Result<(BufferCollectionTokens, fsysmem::AllocatorSynchronousProxy), Errno> {
+) -> Result<(BufferCollectionTokens, fsysmem2::AllocatorSynchronousProxy), Errno> {
     let sysmem_allocator =
-        connect_to_protocol_sync::<fsysmem::AllocatorMarker>().map_err(|_| errno!(ENOENT))?;
+        connect_to_protocol_sync::<fsysmem2::AllocatorMarker>().map_err(|_| errno!(ENOENT))?;
 
     let (client, remote) =
-        fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
+        fidl::endpoints::create_endpoints::<fsysmem2::BufferCollectionTokenMarker>();
 
-    sysmem_allocator.allocate_shared_collection(remote).map_err(|_| errno!(EINVAL))?;
+    sysmem_allocator
+        .allocate_shared_collection(AllocatorAllocateSharedCollectionRequest {
+            token_request: Some(remote),
+            ..Default::default()
+        })
+        .map_err(|_| errno!(EINVAL))?;
 
     let buffer_token_proxy =
-        fsysmem::BufferCollectionTokenSynchronousProxy::new(client.into_channel());
+        fsysmem2::BufferCollectionTokenSynchronousProxy::new(client.into_channel());
 
     let scenic_token = if use_scenic {
         let (token, remote) =
-            fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
+            fidl::endpoints::create_endpoints::<fsysmem2::BufferCollectionTokenMarker>();
 
-        buffer_token_proxy.duplicate(!0, remote).map_err(|_| errno!(EINVAL))?;
+        buffer_token_proxy
+            .duplicate(BufferCollectionTokenDuplicateRequest {
+                rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+                token_request: Some(remote),
+                ..Default::default()
+            })
+            .map_err(|_| errno!(EINVAL))?;
         Some(token)
     } else {
         None
     };
 
     let (vulkan_token, remote) =
-        fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();
+        fidl::endpoints::create_endpoints::<fsysmem2::BufferCollectionTokenMarker>();
 
-    buffer_token_proxy.duplicate(!0, remote).map_err(|_| errno!(EINVAL))?;
+    buffer_token_proxy
+        .duplicate(BufferCollectionTokenDuplicateRequest {
+            rights_attenuation_mask: Some(fidl::Rights::SAME_RIGHTS),
+            token_request: Some(remote),
+            ..Default::default()
+        })
+        .map_err(|_| errno!(EINVAL))?;
 
     buffer_token_proxy.sync(zx::Time::INFINITE).map_err(|_| errno!(EINVAL))?;
 
@@ -322,39 +341,64 @@ pub fn init_sysmem(
 /// - `width`: The width to use when creating the image format.
 /// - `height`: The height to use when creating the image format.
 pub fn get_image_info(
-    buffer_collection: fsysmem::BufferCollectionSynchronousProxy,
+    buffer_collection: fsysmem2::BufferCollectionSynchronousProxy,
     width: u32,
     height: u32,
 ) -> Result<(zx::Vmo, magma_image_info_t), Errno> {
-    let (_, mut collection_info) =
-        buffer_collection.wait_for_buffers_allocated(zx::Time::INFINITE).map_err(|err| {
-            log_warn!("wait_for_buffers_allocated failed: {}", err);
+    let mut collection_info = buffer_collection
+        .wait_for_all_buffers_allocated(zx::Time::INFINITE)
+        .map_err(|err| {
+            log_warn!("wait_for_all_buffers_allocated failed (fidl layer): {}", err);
             errno!(EINVAL)
-        })?;
-    let _ = buffer_collection.close();
+        })?
+        .map_err(|err| {
+            log_warn!("wait_for_all_buffers_allocated failed (app layer): {:?}", err);
+            errno!(EINVAL)
+        })?
+        .buffer_collection_info
+        .expect("buffer_colllection_info");
+    let _ = buffer_collection.release();
 
-    let image_format =
-        constraints_to_format(&collection_info.settings.image_format_constraints, width, height)
-            .map_err(|_| errno!(EINVAL))?;
+    let image_format = constraints_to_image_format(
+        collection_info.settings.as_ref().unwrap().image_format_constraints.as_ref().unwrap(),
+        width,
+        height,
+    )
+    .map_err(|_| errno!(EINVAL))?;
 
     let mut image_info = magma_image_info_t::default();
     for plane in 0..MAGMA_MAX_IMAGE_PLANES {
         image_info.plane_offsets[plane as usize] =
-            image_format_plane_byte_offset(&image_format, plane).unwrap_or(0);
+            image_format_plane_byte_offset_2(&image_format, plane).unwrap_or(0);
         image_info.plane_strides[plane as usize] =
-            get_plane_row_bytes(&image_format, plane).unwrap_or(0) as u64;
+            get_plane_row_bytes_2(&image_format, plane).unwrap_or(0) as u64;
     }
 
-    image_info.drm_format_modifier =
-        sysmem_modifier_to_drm_modifier(image_format.pixel_format.format_modifier.value)
-            .unwrap_or(0);
-    image_info.coherency_domain = match collection_info.settings.buffer_settings.coherency_domain {
-        fsysmem::CoherencyDomain::Cpu => MAGMA_COHERENCY_DOMAIN_CPU,
-        fsysmem::CoherencyDomain::Ram => MAGMA_COHERENCY_DOMAIN_RAM,
-        fsysmem::CoherencyDomain::Inaccessible => MAGMA_COHERENCY_DOMAIN_INACCESSIBLE,
+    image_info.drm_format_modifier = sysmem_modifier_to_drm_modifier_2(
+        *image_format.pixel_format_modifier.as_ref().expect("format_modifier"),
+    )
+    .unwrap_or(0);
+    image_info.coherency_domain = match collection_info
+        .settings
+        .as_ref()
+        .expect("settings")
+        .buffer_settings
+        .as_ref()
+        .expect("buffer_settings")
+        .coherency_domain
+        .as_ref()
+        .expect("coherency_domain")
+    {
+        fsysmem2::CoherencyDomain::Cpu => MAGMA_COHERENCY_DOMAIN_CPU,
+        fsysmem2::CoherencyDomain::Ram => MAGMA_COHERENCY_DOMAIN_RAM,
+        fsysmem2::CoherencyDomain::Inaccessible => MAGMA_COHERENCY_DOMAIN_INACCESSIBLE,
+        _ => return Err(errno!(EINVAL)),
     };
 
-    let vmo = collection_info.buffers[0].vmo.take().ok_or_else(|| errno!(EINVAL))?;
+    let vmo = collection_info.buffers.as_mut().expect("buffers")[0]
+        .vmo
+        .take()
+        .ok_or_else(|| errno!(EINVAL))?;
     Ok((vmo, image_info))
 }
 

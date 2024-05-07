@@ -334,7 +334,6 @@ async fn main() {
 
                     // Present all pending updates with a trace flow into Scenic based on
                     // present_count.
-                    trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
                     trace::flow_begin!(c"gfx", c"Flatland::PerAppPresent[simplest-app-flatland]", present_count.into());
                     flatland.present(fland::PresentArgs::default()).expect("Present call failed");
                     present_count += 1;

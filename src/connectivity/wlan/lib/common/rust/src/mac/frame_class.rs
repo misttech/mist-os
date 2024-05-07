@@ -14,19 +14,13 @@ pub enum FrameClass {
 /// Converts a MacFrame into a FrameClass.
 impl<B: ByteSlice> From<&mac::MacFrame<B>> for FrameClass {
     fn from(mac_frame: &mac::MacFrame<B>) -> FrameClass {
-        match mac_frame {
-            mac::MacFrame::Data(mac::DataFrame { fixed_fields, .. }) => {
-                frame_class(&{ fixed_fields.frame_ctrl })
-            }
-            mac::MacFrame::Mgmt(mac::MgmtFrame { mgmt_hdr, .. }) => {
-                frame_class(&{ mgmt_hdr.frame_ctrl })
-            }
-            mac::MacFrame::Ctrl { frame_ctrl, .. } => frame_class(&frame_ctrl),
-            mac::MacFrame::Unsupported { frame_ctrl } => frame_class(&frame_ctrl),
-        }
+        frame_class(&mac_frame.frame_ctrl())
     }
 }
 
+// TODO(https://fxbug.dev/332571044): Factor this function into an inherent function of
+//                                    `FrameClass` and provide similar inherent functions for
+//                                    `MacFrame` and its variant types.
 /// IEEE Std 802.11-2016, 11.3.3
 /// Unlike IEEE which only considers Public and Self-Protected Action frames Class 1 frames,
 /// Fuchsia considers all Action frames Class 1 frames when checking a frame's FrameControl.

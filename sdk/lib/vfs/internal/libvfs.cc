@@ -170,7 +170,7 @@ typedef struct vfs_internal_node {
 
 __EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
                                              async_dispatcher_t* dispatcher, zx_handle_t channel,
-                                             uint32_t rights) {
+                                             uint32_t flags) {
   zx::channel chan(channel);
   if (!vnode || !dispatcher) {
     return ZX_ERR_INVALID_ARGS;
@@ -178,10 +178,14 @@ __EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
   if (!chan) {
     return ZX_ERR_BAD_HANDLE;
   }
-  // Ensure `rights` are compatible with the version this library was compiled against.
-  std::optional fidl_rights = fuchsia_io::wire::OpenFlags::TryFrom(rights);
-  if (!fidl_rights) {
+  // Ensure `flags` are compatible with the version this library was compiled against.
+  std::optional fidl_flags = fuchsia_io::wire::OpenFlags::TryFrom(flags);
+  if (!fidl_flags) {
     return ZX_ERR_INVALID_ARGS;
+  }
+  zx::result open_options = intree_vfs::VnodeConnectionOptions::FromOpen1Flags(*fidl_flags);
+  if (open_options.is_error()) {
+    return open_options.error_value();
   }
   std::lock_guard guard(vnode->mutex);
   if (!vnode->vfs) {
@@ -189,8 +193,7 @@ __EXPORT zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode,
   } else if (dispatcher != vnode->vfs->dispatcher()) {
     return ZX_ERR_INVALID_ARGS;
   }
-  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan),
-                           intree_vfs::VnodeConnectionOptions::FromOpen1Flags(*fidl_rights));
+  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan), *open_options);
 }
 
 __EXPORT zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode) {

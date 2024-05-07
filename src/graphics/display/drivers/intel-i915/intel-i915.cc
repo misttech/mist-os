@@ -105,10 +105,6 @@ constexpr zx_protocol_device_t kGpuCoreDeviceProtocol = {
 
 constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
     .version = DEVICE_OPS_VERSION,
-    .get_protocol =
-        [](void* ctx, uint32_t id, void* proto) {
-          return device_get_protocol(reinterpret_cast<zx_device_t*>(ctx), id, proto);
-        },
     .release = [](void* ctx) {},
 };
 
@@ -2296,8 +2292,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
-  zx::result client =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>("sysmem");
+  zx::result client = DdkConnectNsProtocol<fuchsia_sysmem::Allocator>();
   if (client.is_error()) {
     zxlogf(ERROR, "could not get SYSMEM protocol: %s", client.status_string());
     return client.status_value();
@@ -2442,7 +2437,7 @@ zx_status_t Controller::Init() {
     device_add_args_t display_device_add_args = {
         .version = DEVICE_ADD_ARGS_VERSION,
         .name = "intel-display-controller",
-        .ctx = zxdev(),
+        .ctx = this,
         .ops = &kDisplayControllerDeviceProtocol,
         .proto_id = ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
         .proto_ops = &display_controller_impl_protocol_ops_,

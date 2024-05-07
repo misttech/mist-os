@@ -252,7 +252,7 @@ pub fn process_with_buffer_provider(input: TokenStream) -> TokenStream {
     let macro_args = parse_macro_input!(input as MacroArgs);
     let buffer_source = macro_args.buffer_source;
     let buf_tokens = quote!(
-        let mut buffer_provider = #buffer_source;
+        let mut buffer_provider: &::wlan_frame_writer::__BufferProvider = &#buffer_source;
         let mut buffer = buffer_provider.get_buffer(frame_len)?;
         let mut w = BufferWriter::new(&mut buffer[..]);
     );

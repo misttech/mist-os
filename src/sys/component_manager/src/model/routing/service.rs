@@ -7,13 +7,11 @@ use {
         capability::CapabilityProvider,
         model::{
             component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
             routing::{CapabilityOpenRequest, CapabilitySource, RouteSource},
         },
     },
     async_trait::async_trait,
-    bedrock_error::Explain,
     cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon},
     cm_types::{IterablePath, Name, RelativePath},
     cm_util::TaskGroup,
@@ -28,7 +26,9 @@ use {
         lock::Mutex,
         stream::TryStreamExt,
     },
+    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
+    router_error::Explain,
     routing::capability_source::{
         AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
         FilteredAggregateCapabilityProvider,

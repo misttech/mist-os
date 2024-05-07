@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.device.fs") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   api = "fuchsia.device.fs.api"
 

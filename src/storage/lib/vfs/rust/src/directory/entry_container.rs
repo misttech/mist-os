@@ -108,9 +108,7 @@ pub trait Directory: Node {
         _path: Path,
         _protocols: fio::ConnectionProtocols,
         _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
+    ) -> Result<(), Status>;
 
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.

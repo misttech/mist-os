@@ -26,6 +26,7 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/fidl/cpp/wire/connect_service.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
@@ -237,26 +238,16 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
     parent_ = MockDevice::FakeRootParent();
 
-    zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
-        fuchsia_hardware_sysmem::Service::InstanceHandler(
-            {.allocator_v1 = sysmem_.bind_handler(dispatcher())}));
-    ASSERT_EQ(service_result.status_value(), ZX_OK);
+    parent_->AddNsProtocol<fuchsia_sysmem::Allocator>(sysmem_.bind_handler(dispatcher()));
 
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
-
-    parent_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
-                            "sysmem");
-
-    service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+    zx::result service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
         fuchsia_hardware_pci::Service::InstanceHandler(
             {.device = pci_.bind_handler(pci_loop_.dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
 
-    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
 
     parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
                             "pci");

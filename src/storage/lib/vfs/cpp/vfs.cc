@@ -20,24 +20,61 @@ namespace fio = fuchsia_io;
 namespace fs {
 namespace {
 
-zx_status_t LookupNode(fbl::RefPtr<Vnode> vn, std::string_view name, fbl::RefPtr<Vnode>* out) {
-  if (name == "..") {
+// Traverse the directory tree starting at |vndir| until the last component in |path|, or until a
+// remote mount point is encountered. Both |path| and |vndir| are updated in-place.
+//
+// On success, |path| will be the canonical name for the entry to lookup within |vndir|. Note that
+// on Fuchsia, the dot path (".") is used as the canonical form for a reference to |vndir| itself.
+//
+// See https://fxbug.dev/42103076 for a discussion on this mapping.
+zx_status_t Traverse(fbl::RefPtr<Vnode>& vndir, std::string_view& path) {
+  if (path.empty() || path.length() >= fio::kMaxPathLength) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (name == ".") {
-    *out = std::move(vn);
+
+  // Handle "." and "/", ensuring we map the latter to the canonical form used by the VFS.
+  if (path == "." || path == "/") {
+    path = ".";
     return ZX_OK;
   }
-  return vn->Lookup(name, out);
-}
 
-// Validate open flags as much as they can be validated independently of the target node.
-zx_status_t PrevalidateOptions(VnodeConnectionOptions options) {
-  if ((options.flags & fuchsia_io::OpenFlags::kTruncate) &&
-      !(options.rights & fuchsia_io::Rights::kWriteBytes)) {
-    return ZX_ERR_INVALID_ARGS;
+  // Allow a single leading '/'.
+  if (path[0] == '/') {
+    path = path.substr(1);
   }
-  return ZX_OK;
+  // Allow trailing '/', but only if preceded by something.
+  if (path.length() > 1 && path.back() == '/') {
+    path = path.substr(0, path.length() - 1);
+  }
+
+  while (!path.empty()) {
+    // If we hit a remote mount point, the caller must forward the remainder of |path| there.
+    if (vndir->IsRemote()) {
+      return ZX_OK;
+    }
+    // Look for the next '/' separated path component.
+    size_t slash = path.find('/');
+    std::string_view component = path.substr(0, slash);
+    if (component.length() > fio::kMaxNameLength) {
+      return ZX_ERR_BAD_PATH;  // Maps to ENAMETOOLONG
+    }
+    if (component.empty() || component == "." || component == "..") {
+      // Clients are required to transform paths into their canonical form.
+      return ZX_ERR_INVALID_ARGS;
+    }
+    // Stop traversal if this is the last component (e.g. there are no remaining '/' separators).
+    if (slash == std::string_view::npos) {
+      return ZX_OK;
+    }
+    // Traverse to the next component, updating |vndir| and |path| in-place.
+    fbl::RefPtr<fs::Vnode> next_vn;
+    if (zx_status_t status = vndir->Lookup(component, &next_vn); status != ZX_OK) {
+      return status;
+    }
+    vndir = std::move(next_vn);
+    path = path.substr(slash + 1);
+  }
+  return ZX_ERR_INVALID_ARGS;
 }
 
 }  // namespace
@@ -45,56 +82,35 @@ zx_status_t PrevalidateOptions(VnodeConnectionOptions options) {
 Vfs::Vfs() = default;
 
 Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                          VnodeConnectionOptions options, fuchsia_io::Rights parent_rights) {
+                          VnodeConnectionOptions options, fuchsia_io::Rights connection_rights) {
   FS_PRETTY_TRACE_DEBUG("Vfs::Open: path='", path, "' options=", options,
-                        ", parent_rights=", parent_rights);
-
+                        ", connection_rights=", connection_rights);
   std::lock_guard lock(vfs_lock_);
-  if (zx_status_t status = PrevalidateOptions(options); status != ZX_OK) {
+  // Traverse directory tree until last component, updating |vndir| and |path| in-place.
+  if (zx_status_t status = Traverse(vndir, path); status != ZX_OK) {
     return status;
   }
-  if (zx_status_t status = Vfs::Walk(vndir, path, &vndir, &path); status != ZX_OK) {
-    return status;
-  }
-
   if (vndir->IsRemote()) {
     // remote filesystem, return handle and path to caller
     return OpenResult::Remote{.vnode = std::move(vndir), .path = path};
   }
+  // |Traverse()| should guarantee |path| is only a single and valid component.
+  ZX_DEBUG_ASSERT(!path.empty() && path.find('/') == std::string_view::npos && path != "..");
 
-  {
-    zx::result result = TrimName(path);
-    if (result.is_error()) {
-      return result.status_value();
-    }
-    if (path == "..") {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    if (result.value()) {
-      options.flags |= fuchsia_io::OpenFlags::kDirectory;
-    }
-  }
   fbl::RefPtr<Vnode> vn;
-  bool just_created;
-  if (options.flags & fuchsia_io::OpenFlags::kCreate) {
-    bool allow_existing = !(options.flags & fio::OpenFlags::kCreateIfAbsent);
-
-    if (options.flags & fio::OpenFlags::kDirectory &&
-        options.flags & fio::OpenFlags::kNotDirectory) {
-      return ZX_ERR_INVALID_ARGS;
+  bool vn_is_open;
+  {
+    CreationMode mode = internal::CreationModeFromFidl(options.flags);
+    std::optional<CreationType> type = std::nullopt;
+    if (mode != CreationMode::kNever) {
+      type = options.flags & fio::OpenFlags::kDirectory ? CreationType::kDirectory
+                                                        : CreationType::kFile;
     }
-    CreationType type =
-        options.flags & fio::OpenFlags::kDirectory ? CreationType::kDirectory : CreationType::kFile;
-    zx::result created = EnsureExists(vndir, path, type, allow_existing, parent_rights, &vn);
-    if (created.is_error()) {
-      return created.status_value();
+    zx::result result = CreateOrLookup(std::move(vndir), path, mode, type, connection_rights);
+    if (result.is_error()) {
+      return result.error_value();
     }
-    just_created = created.value();
-  } else {
-    if (zx_status_t status = LookupNode(std::move(vndir), path, &vn); status != ZX_OK) {
-      return status;
-    }
-    just_created = false;
+    std::tie(vn, vn_is_open) = *std::move(result);
   }
 
   if (vn->IsRemote()) {
@@ -121,7 +137,7 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
     if (options.flags & fuchsia_io::OpenFlags::kPosixExecutable) {
       inheritable_rights |= fuchsia_io::kXStarDir;
     }
-    options.rights |= parent_rights & inheritable_rights;
+    options.rights |= connection_rights & inheritable_rights;
   }
   if (zx::result validated = vn->ValidateOptions(options); validated.is_error()) {
     return validated.error_value();
@@ -129,7 +145,7 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
 
   // |node_reference| requests that we don't actually open the underlying Vnode, but use the
   // connection as a reference to the Vnode.
-  if (!(options.flags & fuchsia_io::OpenFlags::kNodeReference) && !just_created) {
+  if (!(options.flags & fuchsia_io::OpenFlags::kNodeReference) && !vn_is_open) {
     if (zx_status_t status = OpenVnode(&vn); status != ZX_OK) {
       return status;
     }
@@ -163,36 +179,67 @@ zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool mu
   return ZX_OK;
 }
 
-zx::result<bool> Vfs::EnsureExists(const fbl::RefPtr<Vnode>& vndir, std::string_view path,
-                                   CreationType type, bool allow_existing,
-                                   fuchsia_io::Rights parent_rights, fbl::RefPtr<Vnode>* out_vn) {
-  if (ReadonlyLocked()) {
+zx::result<std::tuple<fbl::RefPtr<Vnode>, /*vnode_is_open*/ bool>> Vfs::CreateOrLookup(
+    fbl::RefPtr<fs::Vnode> vndir, std::string_view name, CreationMode mode,
+    std::optional<CreationType> type, fio::Rights connection_rights) {
+  // If the request requires we create an object, ensure the VFS isn't in read-only mode, and
+  // that the connection has the correct rights.
+  if (mode != CreationMode::kNever &&
+      (ReadonlyLocked() || !(connection_rights & fuchsia_io::Rights::kModifyDirectory))) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
-  if (!(parent_rights & fuchsia_io::Rights::kModifyDirectory)) {
-    return zx::error(ZX_ERR_ACCESS_DENIED);
-  }
-
-  if (path == ".") {
-    if (allow_existing) {
-      *out_vn = std::move(vndir);
-      return zx::ok(false);
+  // If |name| points to this directory, just return |vndir|.
+  if (name == ".") {
+    if (mode == CreationMode::kAlways) {
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
+    return zx::ok(std::tuple{std::move(vndir), false});
+  }
+  // Try to create a new object if the request requires it.
+  switch (mode) {
+    case CreationMode::kAllowExisting:
+    case CreationMode::kAlways: {
+      ZX_DEBUG_ASSERT(type.has_value());
+      // Try to create a new object and notify any watchers if one was added. Note that
+      // |Vnode::Create()| ensures the returned object has already been opened on success.
+      zx::result created = vndir->Create(name, *type);
+      if (created.is_ok()) {
+        vndir->Notify(name, fio::WatchEvent::kAdded);
+        return zx::ok(std::tuple{*std::move(created), true});
+      }
+      // If |name| already exists in this directory, look it up if the request allows it.
+      if (created.error_value() == ZX_ERR_ALREADY_EXISTS && mode == CreationMode::kAllowExisting) {
+        break;
+      }
+      // If the filesystem doesn't support creating objects, we must still try to find an entry
+      // matching |name| so we can return ZX_ERR_ALREADY_EXISTS. This is required for |open()| and
+      // |mkdir()| to return EEXIST if an entry matching |name| already exists.
+      //
+      // *NOTE*: The POSIX specification states that |open()| and |mkdir()| should return EROFS if
+      // the filesystem doesn't support creating new objects, and an existing one was not found.
+      // Unfortunately there is no equivalent Zircon status that maps to that error code, nor can we
+      // return ZX_ERR_NOT_SUPPORTED (ENOTSUP is not a valid error for these syscalls).
+      //
+      // For now, if we fail to find an existing object, we will return ZX_ERR_NOT_FOUND (ENOENT)
+      // below. This doesn't cause an for most callers, as most only check for the EEXIST case,
+      // which is common when specifying O_CREAT | O_EXCL.
+      if (created.error_value() == ZX_ERR_NOT_SUPPORTED) {
+        break;
+      }
+      return created.take_error();
+    }
+    case fs::CreationMode::kNever:
+      break;
+  }
+  // We didn't create a new object, try to lookup an existing entry matching |name|.
+  fbl::RefPtr<Vnode> vn;
+  if (zx_status_t status = vndir->Lookup(name, &vn); status != ZX_OK) {
+    return zx::error(status);
+  }
+  if (mode == CreationMode::kAlways) {
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
-
-  zx::result new_vn = vndir->Create(path, type);
-  if (new_vn.is_ok()) {
-    *out_vn = *new_vn;
-    return zx::ok(true);
-  }
-
-  if ((new_vn.error_value() == ZX_ERR_ALREADY_EXISTS && allow_existing) ||
-      new_vn.error_value() == ZX_ERR_NOT_SUPPORTED) {
-    return zx::make_result(LookupNode(std::move(vndir), path, out_vn), false);
-  }
-
-  return new_vn.take_error();
+  return zx::ok(std::tuple{std::move(vn), false});
 }
 
 zx::result<bool> Vfs::TrimName(std::string_view& name) {
@@ -227,63 +274,6 @@ zx_status_t Vfs::Readdir(Vnode* vn, VdirCookie* cookie, void* dirents, size_t le
 void Vfs::SetReadonly(bool value) {
   std::lock_guard lock(vfs_lock_);
   readonly_ = value;
-}
-
-zx_status_t Vfs::Walk(fbl::RefPtr<Vnode> vn, std::string_view path, fbl::RefPtr<Vnode>* out_vn,
-                      std::string_view* out_path) {
-  if (path.empty()) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // Handle "." and "/".
-  if (path == "." || path == "/") {
-    *out_vn = std::move(vn);
-    *out_path = ".";
-    return ZX_OK;
-  }
-
-  // Allow leading '/'.
-  if (path[0] == '/') {
-    path = path.substr(1);
-  }
-
-  // Allow trailing '/', but only if preceded by something.
-  if (path.length() > 1 && path.back() == '/') {
-    path = path.substr(0, path.length() - 1);
-  }
-
-  for (;;) {
-    if (vn->IsRemote()) {
-      // Remote filesystem mount, caller must resolve.
-      *out_vn = std::move(vn);
-      *out_path = path;
-      return ZX_OK;
-    }
-
-    // Look for the next '/' separated path component.
-    size_t slash = path.find('/');
-    std::string_view component = path.substr(0, slash);
-    if (component.length() > NAME_MAX) {
-      return ZX_ERR_BAD_PATH;
-    }
-    if (component.empty() || component == "." || component == "..") {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    if (slash == std::string_view::npos) {
-      // Final path segment.
-      *out_vn = std::move(vn);
-      *out_path = path;
-      return ZX_OK;
-    }
-
-    if (zx_status_t status = LookupNode(std::move(vn), component, &vn); status != ZX_OK) {
-      return status;
-    }
-
-    // Traverse to the next segment.
-    path = path.substr(slash + 1);
-  }
 }
 
 }  // namespace fs

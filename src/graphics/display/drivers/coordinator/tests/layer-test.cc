@@ -44,8 +44,8 @@ class LayerTest : public TestBase {
         .height = kDisplayHeight,
         .tiling_type = kImageTilingTypeLinear,
     });
-    fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
-        controller(), image_metadata, import_result.value(), zx::vmo(0), nullptr, ClientId(1)));
+    fbl::RefPtr<Image> image = fbl::AdoptRef(
+        new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     image->Acquire();
     return image;

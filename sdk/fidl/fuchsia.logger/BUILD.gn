@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.logger") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Diagnostics"
   api = "fuchsia.logger.api"
   sources = [ "logger.fidl" ]

@@ -20,10 +20,9 @@ use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6,
+        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
     },
-    MulticastAddr, MulticastAddress, SpecifiedAddr, Witness, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
@@ -47,7 +46,7 @@ use crate::{
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
         base::TransparentLocalDelivery,
-        socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SendOptions},
+        socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
         TransportReceiveError,
     },
@@ -60,13 +59,13 @@ use crate::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
-            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
-            DatagramStateContext, DualStackConnState, DualStackDatagramBoundStateContext,
-            DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, FoundSockets,
-            InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
-            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
-            SetMulticastMembershipError, SocketHopLimits, SocketInfo,
-            SocketState as DatagramSocketState, WrapOtherStackIpOptions,
+            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet,
+            DatagramSocketSpec, DatagramStateContext, DualStackConnState,
+            DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
+            ExpectedUnboundError, FoundSockets, InUseError, IpExt, IpOptions,
+            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
+            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
+            SocketInfo, SocketState as DatagramSocketState, WrapOtherStackIpOptions,
             WrapOtherStackIpOptionsMut,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
@@ -545,28 +544,9 @@ pub struct DualStackSocketState<D: device::WeakId> {
     /// Match Linux's behavior by enabling dualstack operations by default.
     #[derivative(Default(value = "true"))]
     dual_stack_enabled: bool,
-    /// The IPv4 hop limits (e.g. TTL) to be used when sending packets in the
-    /// IPv4 stack.
-    hop_limits: SocketHopLimits<Ipv4>,
 
-    /// The multicast interface which can be set for IPv4 independently from
-    /// the interface selected for IPv6.
-    multicast_interface: Option<D>,
-}
-
-impl<D: device::WeakId> SendOptions<Ipv4, D> for DualStackSocketState<D> {
-    fn hop_limit(&self, destination: &SpecifiedAddr<Ipv4Addr>) -> Option<NonZeroU8> {
-        let Self { hop_limits: SocketHopLimits { unicast, multicast, version: _ }, .. } = self;
-        if destination.is_multicast() {
-            *multicast
-        } else {
-            *unicast
-        }
-    }
-
-    fn multicast_interface(&self) -> Option<&D> {
-        self.multicast_interface.as_ref()
-    }
+    /// Send options used when sending on the IPv4 stack.
+    socket_options: DatagramSocketOptions<Ipv4, D>,
 }
 
 /// Serialization errors for Udp Packets.
@@ -1923,7 +1903,11 @@ where
                 |(IpInvariant(_unicast_hop_limit), _v4)| Err(NotDualStackCapableError),
                 |(IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
                     let DualStackSocketState {
-                        hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                        socket_options:
+                            DatagramSocketOptions {
+                                hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                                ..
+                            },
                         ..
                     } = other_stack;
                     *unicast = unicast_hop_limit;
@@ -1962,7 +1946,11 @@ where
                 |(IpInvariant(_multicast_hop_limit), _v4)| Err(NotDualStackCapableError),
                 |(IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
                     let DualStackSocketState {
-                        hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                        socket_options:
+                            DatagramSocketOptions {
+                                hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                                ..
+                            },
                         ..
                     } = other_stack;
                     *multicast = multicast_hop_limit;
@@ -2004,7 +1992,12 @@ where
                         IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
                     )| {
                         let DualStackSocketState {
-                            hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
+                            socket_options:
+                                DatagramSocketOptions {
+                                    hop_limits:
+                                        SocketHopLimits { unicast, multicast: _, version: _ },
+                                    ..
+                                },
                             ..
                         } = other_stack;
                         Ok(IpInvariant(unicast.unwrap_or(default_unicast)))
@@ -2047,7 +2040,12 @@ where
                         IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
                     )| {
                         let DualStackSocketState {
-                            hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
+                            socket_options:
+                                DatagramSocketOptions {
+                                    hop_limits:
+                                        SocketHopLimits { unicast: _, multicast, version: _ },
+                                    ..
+                                },
                             ..
                         } = other_stack;
                         Ok(IpInvariant(multicast.unwrap_or(default_multicast)))
@@ -2056,6 +2054,57 @@ where
             },
         )?
         .map(|IpInvariant(multicast)| multicast)
+    }
+
+    pub fn get_multicast_interface(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        ip_version: IpVersion,
+    ) -> Result<
+        Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        NotDualStackCapableError,
+    > {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        if ip_version == I::VERSION {
+            return Ok(crate::socket::datagram::get_multicast_interface(core_ctx, id));
+        };
+
+        datagram::with_other_stack_ip_options(core_ctx, bindings_ctx, id, |other_stack| {
+            I::map_ip::<_, Result<IpInvariant<Option<_>>, _>>(
+                WrapOtherStackIpOptions(other_stack),
+                |_v4| Err(NotDualStackCapableError),
+                |WrapOtherStackIpOptions(other_stack)| {
+                    Ok(IpInvariant(other_stack.socket_options.multicast_interface.clone()))
+                },
+            )
+        })
+        .map(|IpInvariant(result)| result)
+    }
+
+    pub fn set_multicast_interface(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        interface: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+
+        if ip_version == I::VERSION {
+            crate::socket::datagram::set_multicast_interface(core_ctx, id, interface);
+            return Ok(());
+        };
+
+        datagram::with_other_stack_ip_options_mut(core_ctx, bindings_ctx, id, |other_stack| {
+            I::map_ip(
+                (IpInvariant(interface), WrapOtherStackIpOptionsMut(other_stack)),
+                |(IpInvariant(_interface), _v4)| Err(NotDualStackCapableError),
+                |(IpInvariant(interface), WrapOtherStackIpOptionsMut(other_stack))| {
+                    other_stack.socket_options.multicast_interface =
+                        interface.map(|device| device.downgrade());
+                    Ok(())
+                },
+            )
+        })
     }
 
     /// Gets the transparent option.
@@ -2442,13 +2491,11 @@ impl<
         *dual_stack_enabled
     }
 
-    type OtherSendOptions = DualStackSocketState<CC::WeakDeviceId>;
-
-    fn to_other_send_options<'a>(
+    fn to_other_socket_options<'a>(
         &self,
         state: &'a IpOptions<Ipv6, Self::WeakDeviceId, Udp<BC>>,
-    ) -> &'a Self::OtherSendOptions {
-        state.other_stack()
+    ) -> &'a DatagramSocketOptions<Ipv4, Self::WeakDeviceId> {
+        &state.other_stack().socket_options
     }
 
     type Converter = ();
@@ -2538,7 +2585,7 @@ mod tests {
     use net_declare::net_ip_v4 as ip_v4;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{IpAddr, Ipv4, Ipv6, Ipv6Addr, Ipv6SourceAddr},
+        ip::{IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
     use packet::Buf;
@@ -2753,7 +2800,7 @@ mod tests {
             (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
             body: &B,
         ) {
-            self.state_mut().received_mut::<I>().entry(id.downgrade()).or_default().packets.push(
+            self.state.received_mut::<I>().entry(id.downgrade()).or_default().packets.push(
                 ReceivedPacket {
                     addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
                     body: body.as_ref().to_owned(),
@@ -3284,7 +3331,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().received::<I>(),
+            bindings_ctx.state.received::<I>(),
             &HashMap::from([(
                 socket.downgrade(),
                 SocketReceived {
@@ -3370,7 +3417,7 @@ mod tests {
             LOCAL_PORT,
             &body[..],
         );
-        assert_eq!(&bindings_ctx.state().socket_data::<I>(), &HashMap::new());
+        assert_eq!(&bindings_ctx.state.socket_data::<I>(), &HashMap::new());
     }
 
     /// Tests that UDP connections can be created and data can be transmitted
@@ -3406,7 +3453,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&body[..]])])
         );
 
@@ -3928,7 +3975,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
         api.shutdown(&socket, which).expect("is connected");
@@ -3944,7 +3991,7 @@ mod tests {
             &packet[..],
         );
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
 
@@ -3962,7 +4009,7 @@ mod tests {
             &packet[..],
         );
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
         );
     }
@@ -4031,7 +4078,7 @@ mod tests {
                 src_port: Some(REMOTE_PORT),
             },
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_conn2 = [2, 2, 2, 2];
         receive_udp_packet(
@@ -4052,7 +4099,7 @@ mod tests {
             },
             body: body_conn2.into(),
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_list1 = [3, 3, 3, 3];
         receive_udp_packet(
@@ -4073,7 +4120,7 @@ mod tests {
             },
             body: body_list1.into(),
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_list2 = [4, 4, 4, 4];
         receive_udp_packet(
@@ -4094,7 +4141,7 @@ mod tests {
                 src_port: Some(REMOTE_PORT),
             },
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
 
         let body_wildcard_list = [5, 5, 5, 5];
         receive_udp_packet(
@@ -4115,7 +4162,7 @@ mod tests {
             },
             body: body_wildcard_list.into(),
         });
-        assert_eq!(bindings_ctx.state().received(), &expectations);
+        assert_eq!(bindings_ctx.state.received(), &expectations);
     }
 
     /// Tests UDP wildcard listeners for different IP versions.
@@ -4157,7 +4204,7 @@ mod tests {
 
         // Check that we received both packets for the listener.
         assert_eq!(
-            bindings_ctx.state().received::<I>(),
+            bindings_ctx.state.received::<I>(),
             &HashMap::from([(
                 listener.downgrade(),
                 SocketReceived {
@@ -4209,7 +4256,7 @@ mod tests {
         );
         // Check that we received both packets for the listener.
         assert_eq!(
-            bindings_ctx.state().received(),
+            bindings_ctx.state.received(),
             &HashMap::from([(
                 listener.downgrade(),
                 SocketReceived {
@@ -4244,7 +4291,7 @@ mod tests {
         );
         // Check that we received the packet on the listener.
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([(listener.downgrade(), vec![&body[..]])])
         );
     }
@@ -4340,7 +4387,7 @@ mod tests {
         receive_packet(3, multicast_addr_other);
 
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([
                 (specific_listeners[0].downgrade(), vec![[1].as_slice(), &[2]]),
                 (specific_listeners[1].downgrade(), vec![&[1], &[2]]),
@@ -4360,11 +4407,18 @@ mod tests {
                 MultipleDevicesId::all().into_iter().enumerate().map(|(i, device)| {
                     FakeDeviceConfig {
                         device,
-                        local_ips: vec![I::get_other_ip_address((i + 1).try_into().unwrap())],
+                        local_ips: vec![Self::local_ip(i)],
                         remote_ips: remote_ips.clone(),
                     }
                 }),
             ))
+        }
+
+        fn local_ip<A: IpAddress>(index: usize) -> SpecifiedAddr<A>
+        where
+            A::Version: TestIpExt,
+        {
+            A::Version::get_other_ip_address((index + 1).try_into().unwrap())
         }
     }
 
@@ -4425,7 +4479,7 @@ mod tests {
             &body[..],
         );
         assert_eq!(
-            bindings_ctx.state().socket_data(),
+            bindings_ctx.state.socket_data(),
             HashMap::from([
                 (bound_first_device.downgrade(), vec![&body[..]]),
                 (bound_second_device.downgrade(), vec![&body[..]])
@@ -4522,14 +4576,14 @@ mod tests {
         // Since it is bound, it does not receive a packet from another device.
         let (core_ctx, bindings_ctx) = api.contexts();
         receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B);
-        let received = &bindings_ctx.state().socket_data::<I>();
+        let received = &bindings_ctx.state.socket_data::<I>();
         assert_eq!(received, &HashMap::new());
 
         // When unbound, the socket can receive packets on the other device.
         api.set_device(&socket, None).expect("clearing bound device failed");
         let (core_ctx, bindings_ctx) = api.contexts();
         receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B);
-        let received = bindings_ctx.state().received::<I>().iter().collect::<Vec<_>>();
+        let received = bindings_ctx.state.received::<I>().iter().collect::<Vec<_>>();
         let (rx_socket, socket_received) =
             assert_matches!(received[..], [(rx_socket, packets)] => (rx_socket, packets));
         assert_eq!(rx_socket, &socket);
@@ -4660,7 +4714,7 @@ mod tests {
             receive_packet(remote_ip, device);
         }
 
-        let per_socket_data = bindings_ctx.state().socket_data();
+        let per_socket_data = bindings_ctx.state.socket_data();
         for (device, listener) in bound_on_devices {
             assert_eq!(per_socket_data[&listener.downgrade()], vec![&[index_for_device(device)]]);
         }
@@ -4688,6 +4742,90 @@ mod tests {
                 remote_identifier: REMOTE_PORT.into(),
             })
         );
+    }
+
+    #[ip_test]
+    fn test_multicast_sendto<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+
+        let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
+            UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
+        );
+
+        // Add multicsat route for every device.
+        for device in MultipleDevicesId::all().iter() {
+            let (core_ctx, _bindings_ctx) = ctx.contexts();
+            core_ctx.inner.inner.get_mut().add_subnet_route(*device, I::MULTICAST_SUBNET);
+        }
+
+        let mut api = UdpApi::<I, _>::new(ctx.as_mut());
+        let socket = api.create();
+
+        for (i, target_device) in MultipleDevicesId::all().iter().enumerate() {
+            api.set_multicast_interface(&socket, Some(&target_device), I::VERSION)
+                .expect("bind should succeed");
+
+            let multicast_ip = I::get_multicast_addr(i.try_into().unwrap());
+            api.send_to(
+                &socket,
+                Some(ZonedAddr::Unzoned(multicast_ip.into())),
+                REMOTE_PORT.into(),
+                Buf::new(b"packet".to_vec(), ..),
+            )
+            .expect("send should succeed");
+
+            let packets = api.core_ctx().inner.inner.take_frames();
+            assert_eq!(packets.len(), 1usize);
+            for (meta, _body) in packets {
+                let meta = meta.try_as::<I>().unwrap();
+                assert_eq!(meta.device, *target_device);
+                assert_eq!(meta.proto, IpProto::Udp.into());
+                assert_eq!(meta.src_ip, UdpMultipleDevicesCoreCtx::local_ip(i));
+                assert_eq!(meta.dst_ip, multicast_ip.into());
+                assert_eq!(meta.next_hop, multicast_ip.into());
+            }
+        }
+    }
+
+    #[ip_test]
+    fn test_multicast_send<I: Ip + TestIpExt>() {
+        set_logger_for_test();
+
+        let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
+            UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
+        );
+
+        // Add multicsat route for every device.
+        for device in MultipleDevicesId::all().iter() {
+            let (core_ctx, _bindings_ctx) = ctx.contexts();
+            core_ctx.inner.inner.get_mut().add_subnet_route(*device, I::MULTICAST_SUBNET);
+        }
+
+        let mut api = UdpApi::<I, _>::new(ctx.as_mut());
+        let multicast_ip = I::get_multicast_addr(42);
+
+        for (i, target_device) in MultipleDevicesId::all().iter().enumerate() {
+            let socket = api.create();
+
+            api.set_multicast_interface(&socket, Some(&target_device), I::VERSION)
+                .expect("set_multicast_interface should succeed");
+
+            api.connect(&socket, Some(ZonedAddr::Unzoned(multicast_ip.into())), REMOTE_PORT.into())
+                .expect("send should succeed");
+
+            api.send(&socket, Buf::new(b"packet".to_vec(), ..)).expect("send should succeed");
+
+            let packets = api.core_ctx().inner.inner.take_frames();
+            assert_eq!(packets.len(), 1usize);
+            for (meta, _body) in packets {
+                let meta = meta.try_as::<I>().unwrap();
+                assert_eq!(meta.device, *target_device);
+                assert_eq!(meta.proto, IpProto::Udp.into());
+                assert_eq!(meta.src_ip, UdpMultipleDevicesCoreCtx::local_ip(i));
+                assert_eq!(meta.dst_ip, multicast_ip.into());
+                assert_eq!(meta.next_hop, multicast_ip.into());
+            }
+        }
     }
 
     /// Tests local port allocation for [`connect`].
@@ -6084,7 +6222,7 @@ mod tests {
         );
 
         assert_eq!(
-            bindings_ctx.state().received::<Ipv6>(),
+            bindings_ctx.state.received::<Ipv6>(),
             &HashMap::from([(
                 listener.downgrade(),
                 SocketReceived {

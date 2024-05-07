@@ -12,7 +12,7 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    transport = "sl4f"
+    transport = "fuchsia-controller-preferred"
     environments = [ sherlock_env ]
   }
 
@@ -22,7 +22,7 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    transport = "sl4f"
+    transport = "fuchsia-controller-preferred"
     environments = [ sherlock_env ]
   }
 

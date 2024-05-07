@@ -10,10 +10,8 @@ use {
     fuchsia_async::LocalExecutor,
     fuchsia_zircon as zx,
     std::{ffi::c_void, sync::Once},
-    wlan_mlme::{
-        buffer::CBufferProvider,
-        device::{CFrameSender, Device},
-    },
+    wlan_ffi_transport::{BufferProvider, FfiBufferProvider},
+    wlan_mlme::device::{Device, FfiFrameSender},
 };
 
 static LOGGER_ONCE: Once = Once::new();
@@ -59,8 +57,8 @@ static LOGGER_ONCE: Once = Once::new();
 pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     init_completer: *mut c_void,
     run_init_completer: unsafe extern "C" fn(init_completer: *mut c_void, status: zx::zx_status_t),
-    frame_sender: CFrameSender,
-    buffer_provider: CBufferProvider,
+    frame_sender: FfiFrameSender,
+    buffer_provider: FfiBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
     let mut executor = LocalExecutor::new();
@@ -107,7 +105,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
             }
         },
         device,
-        buffer_provider,
+        BufferProvider::new(buffer_provider),
     ));
     zx::Status::from(result).into_raw()
 }

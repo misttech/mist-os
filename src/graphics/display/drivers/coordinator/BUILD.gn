@@ -18,9 +18,14 @@ fuchsia_driver("coordinator-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
+  sources = [
+    "coordinator-driver.cc",
+    "coordinator-driver.h",
+  ]
   deps = [
     ":shared",
-    "//src/devices/lib/driver",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 }
 
@@ -54,8 +59,6 @@ source_set("shared") {
     "client.h",
     "controller.cc",
     "controller.h",
-    "coordinator-driver.cc",
-    "coordinator-driver.h",
     "display-info.cc",
     "display-info.h",
     "eld.cc",
@@ -83,6 +86,9 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",
@@ -91,8 +97,6 @@ source_set("shared") {
     "//src/graphics/display/lib/api-types-cpp",
     "//src/graphics/display/lib/edid",
     "//src/lib/async-watchdog",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/eld",
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//zircon/system/ulib/async:async-cpp",

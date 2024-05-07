@@ -13,10 +13,11 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
+namespace fs {
 namespace {
 
 namespace fio = fuchsia_io;
-class DummyVnode : public fs::Vnode {
+class DummyVnode : public Vnode {
  public:
   DummyVnode() = default;
 };
@@ -29,49 +30,45 @@ class DummyVnode : public fs::Vnode {
 TEST(VnodeConnectionOptions, ValidateOptionsForDirectory) {
   class TestDirectory : public DummyVnode {
    public:
-    fuchsia_io::NodeProtocolKinds GetProtocols() const final {
-      return fuchsia_io::NodeProtocolKinds::kDirectory;
-    }
+    fio::NodeProtocolKinds GetProtocols() const final { return fio::NodeProtocolKinds::kDirectory; }
   };
 
   TestDirectory vnode;
-  EXPECT_RESULT_OK(vnode.ValidateOptions(
-      fs::VnodeConnectionOptions::FromOpen1Flags(fio::wire::OpenFlags::kDirectory)));
+  EXPECT_RESULT_OK(
+      vnode.ValidateOptions(*VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags::kDirectory)));
   EXPECT_RESULT_ERROR(ZX_ERR_NOT_FILE,
-                      vnode.ValidateOptions(fs::VnodeConnectionOptions::FromOpen1Flags(
-                          fio::wire::OpenFlags::kNotDirectory)));
+                      vnode.ValidateOptions(
+                          *VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags::kNotDirectory)));
 }
 
 TEST(VnodeConnectionOptions, ValidateOptionsForService) {
   class TestConnector : public DummyVnode {
    public:
-    fuchsia_io::NodeProtocolKinds GetProtocols() const final {
-      return fuchsia_io::NodeProtocolKinds::kConnector;
-    }
+    fio::NodeProtocolKinds GetProtocols() const final { return fio::NodeProtocolKinds::kConnector; }
   };
 
   TestConnector vnode;
-  EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR,
-                      vnode.ValidateOptions(fs::VnodeConnectionOptions::FromOpen1Flags(
-                          fio::wire::OpenFlags::kDirectory)));
+  EXPECT_RESULT_ERROR(
+      ZX_ERR_NOT_DIR,
+      vnode.ValidateOptions(*VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags::kDirectory)));
   EXPECT_RESULT_OK(vnode.ValidateOptions(
-      fs::VnodeConnectionOptions::FromOpen1Flags(fio::wire::OpenFlags::kNotDirectory)));
+      *VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags::kNotDirectory)));
 }
 
 TEST(VnodeConnectionOptions, ValidateOptionsForFile) {
   class TestFile : public DummyVnode {
    public:
-    fuchsia_io::NodeProtocolKinds GetProtocols() const final {
-      return fuchsia_io::NodeProtocolKinds::kFile;
-    }
+    fio::NodeProtocolKinds GetProtocols() const final { return fio::NodeProtocolKinds::kFile; }
   };
 
   TestFile vnode;
-  EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR,
-                      vnode.ValidateOptions(fs::VnodeConnectionOptions::FromOpen1Flags(
-                          fio::wire::OpenFlags::kDirectory)));
+  EXPECT_RESULT_ERROR(
+      ZX_ERR_NOT_DIR,
+      vnode.ValidateOptions(*VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags::kDirectory)));
   EXPECT_RESULT_OK(vnode.ValidateOptions(
-      fs::VnodeConnectionOptions::FromOpen1Flags(fio::wire::OpenFlags::kNotDirectory)));
+      *VnodeConnectionOptions::FromOpen1Flags(fio::OpenFlags::kNotDirectory)));
 }
 
 }  // namespace
+
+}  // namespace fs

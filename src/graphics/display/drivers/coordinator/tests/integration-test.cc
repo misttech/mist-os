@@ -34,7 +34,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace sysmem = fuchsia_sysmem;
+namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display {
 
@@ -103,14 +103,14 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
-    auto sysmem = fidl::SyncClient(ConnectToSysmemAllocatorV1());
+    auto sysmem = fidl::SyncClient(ConnectToSysmemAllocatorV2());
     EXPECT_TRUE(sysmem.is_valid());
-    fuchsia_sysmem::AllocatorSetDebugClientInfoRequest request;
+    fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
     request.name() = fsl::GetCurrentProcessName();
     request.id() = fsl::GetCurrentProcessKoid();
     auto set_debug_result = sysmem->SetDebugClientInfo(std::move(request));
     EXPECT_TRUE(set_debug_result.is_ok());
-    sysmem_ = fidl::WireSyncClient<fuchsia_sysmem::Allocator>(sysmem.TakeClientEnd());
+    sysmem_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem.TakeClientEnd());
   }
 
   // |TestBase|
@@ -126,7 +126,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     TestBase::TearDown();
   }
 
-  fidl::WireSyncClient<sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<sysmem2::Allocator> sysmem_;
 };
 
 TEST_F(IntegrationTest, DISABLED_ClientsCanBail) {

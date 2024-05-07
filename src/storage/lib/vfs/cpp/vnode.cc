@@ -52,8 +52,6 @@ zx_status_t Vnode::WatchDir(FuchsiaVfs* vfs, fio::wire::WatchMask mask, uint32_t
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void Vnode::Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {}
-
 zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
   return ZX_ERR_NOT_SUPPORTED;
 }

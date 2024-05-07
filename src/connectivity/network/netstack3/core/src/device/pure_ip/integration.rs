@@ -15,7 +15,7 @@ use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::{
-    context::{RecvFrameContext, ResourceCounterContext, SendFrameContext},
+    context::{ReceivableFrameMeta, RecvFrameContext, ResourceCounterContext, SendableFrameMeta},
     device::{
         config::DeviceConfigurationContext,
         pure_ip::{
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<CC, BC> RecvFrameContext<BC, PureIpDeviceReceiveFrameMetadata<CC::DeviceId>> for CC
+impl<CC, BC> ReceivableFrameMeta<CC, BC> for PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
 where
     CC: DeviceIdContext<PureIpDevice>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
@@ -96,19 +96,19 @@ where
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
         + DeviceSocketHandler<PureIpDevice, BC>,
 {
-    fn receive_frame<B: BufferMut + Debug>(
-        &mut self,
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CC,
         bindings_ctx: &mut BC,
-        metadata: PureIpDeviceReceiveFrameMetadata<CC::DeviceId>,
         buffer: B,
     ) {
-        let PureIpDeviceReceiveFrameMetadata { device_id, ip_version } = metadata;
-        self.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
+        let Self { device_id, ip_version } = self;
+        core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
 
         // NB: For conformance with Linux, don't verify that the contents of
         // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
         // allowed to receive malformed packets.
-        self.handle_frame(
+        core_ctx.handle_frame(
             bindings_ctx,
             &device_id,
             Frame::Received(ReceivedFrame::Ip(IpFrame { ip_version, body: buffer.as_ref() })),
@@ -116,12 +116,12 @@ where
         );
 
         match ip_version {
-            IpVersion::V4 => self.receive_frame(
+            IpVersion::V4 => core_ctx.receive_frame(
                 bindings_ctx,
                 RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
                 buffer,
             ),
-            IpVersion::V6 => self.receive_frame(
+            IpVersion::V6 => core_ctx.receive_frame(
                 bindings_ctx,
                 RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
                 buffer,
@@ -131,32 +131,32 @@ where
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
-    RecvFrameContext<BC, RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>> for CoreCtx<'_, BC, L>
+    ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>
 {
-    fn receive_frame<B: BufferMut>(
-        &mut self,
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CoreCtx<'_, BC, L>,
         bindings_ctx: &mut BC,
-        metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>,
         frame: B,
     ) {
-        let RecvIpFrameMeta { device, frame_dst, _marker: _ } = metadata;
-        self.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv4_delivered);
-        crate::ip::receive_ipv4_packet(self, bindings_ctx, &device.into(), frame_dst, frame);
+        let Self { device, frame_dst, _marker: _ } = self;
+        core_ctx.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv4_delivered);
+        crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
-    RecvFrameContext<BC, RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>> for CoreCtx<'_, BC, L>
+    ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>
 {
-    fn receive_frame<B: BufferMut>(
-        &mut self,
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CoreCtx<'_, BC, L>,
         bindings_ctx: &mut BC,
-        metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>,
         frame: B,
     ) {
-        let RecvIpFrameMeta { device, frame_dst, _marker: _ } = metadata;
-        self.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv6_delivered);
-        crate::ip::receive_ipv6_packet(self, bindings_ctx, &device.into(), frame_dst, frame);
+        let Self { device, frame_dst, _marker: _ } = self;
+        core_ctx.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv6_delivered);
+        crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 
@@ -168,26 +168,25 @@ impl<
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::AllDeviceSockets>
             + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
-    > SendFrameContext<BC, DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>>
-    for CoreCtx<'_, BC, L>
+    > SendableFrameMeta<CoreCtx<'_, BC, L>, BC>
+    for DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>
 {
-    fn send_frame<S>(
-        &mut self,
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CoreCtx<'_, BC, L>,
         bindings_ctx: &mut BC,
-        metadata: DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>,
         body: S,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let DeviceSocketMetadata { device_id, metadata: PureIpHeaderParams { ip_version } } =
-            metadata;
+        let Self { device_id, metadata: PureIpHeaderParams { ip_version } } = self;
         net_types::for_any_ip_version!(
             ip_version,
             I,
             crate::device::pure_ip::send_ip_frame::<_, _, I, _>(
-                self,
+                core_ctx,
                 bindings_ctx,
                 &device_id,
                 body

@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.pci") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Drivers"
   sources = [ "pci.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

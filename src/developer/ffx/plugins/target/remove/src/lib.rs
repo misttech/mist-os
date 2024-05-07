@@ -4,8 +4,12 @@
 
 use async_trait::async_trait;
 use ffx_target_remove_args::RemoveCommand;
-use fho::{bug, daemon_protocol, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
-use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
+use fho::{
+    bug, daemon_protocol, return_bug, return_user_error, FfxMain, FfxTool, Result, ToolIO,
+    VerifiedMachineWriter,
+};
+use fidl_fuchsia_developer_ffx as ffx;
+use manual_targets::{Config, ManualTargets};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -24,7 +28,7 @@ pub struct RemoveTool {
     #[command]
     cmd: RemoveCommand,
     #[with(daemon_protocol())]
-    target_collection_proxy: TargetCollectionProxy,
+    target_collection_proxy: ffx::TargetCollectionProxy,
 }
 
 fho::embedded_plugin!(RemoveTool);
@@ -33,7 +37,7 @@ fho::embedded_plugin!(RemoveTool);
 impl FfxMain for RemoveTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        match remove_impl(self.target_collection_proxy, self.cmd).await {
+        match Self::remove_impl(self.target_collection_proxy, self.cmd, &mut writer).await {
             Ok(message) => {
                 if writer.is_machine() {
                     writer.machine(&CommandStatus::Ok { message: Some(message) })?;
@@ -55,19 +59,64 @@ impl FfxMain for RemoveTool {
     }
 }
 
-async fn remove_impl(
-    target_collection: TargetCollectionProxy,
-    cmd: RemoveCommand,
-) -> Result<String> {
-    let RemoveCommand { name_or_addr, .. } = cmd;
-    if target_collection
-        .remove_target(&name_or_addr)
-        .await
-        .map_err(|e| bug!("Cannot remove target: {e}"))?
-    {
-        Ok("Removed.".to_string())
-    } else {
-        Ok("No matching target found.".to_string())
+impl RemoveTool {
+    async fn remove_impl(
+        target_collection: ffx::TargetCollectionProxy,
+        cmd: RemoveCommand,
+        writer: &mut <Self as FfxMain>::Writer,
+    ) -> Result<String> {
+        if cmd.all {
+            let cfg = Config();
+            Self::remove_all_targets(writer, &target_collection, &cfg).await
+        } else if let Some(name_or_addr) = cmd.name_or_addr {
+            if target_collection
+                .remove_target(&name_or_addr)
+                .await
+                .map_err(|e| bug!("Cannot remove target: {e}"))?
+            {
+                Ok("Removed.".to_string())
+            } else {
+                Ok("No matching target found.".to_string())
+            }
+        } else {
+            return_user_error!("need to specify a target name or address or use the --all option")
+        }
+    }
+
+    async fn remove_all_targets(
+        writer: &mut <Self as FfxMain>::Writer,
+        target_collection: &ffx::TargetCollectionProxy,
+        cfg: &Config,
+    ) -> Result<String> {
+        let list = match cfg.storage_get().await {
+            Ok(v) => v,
+            Err(e) => {
+                if format!("{e:?}").contains("no value") {
+                    return Ok("No manual targets found.".into());
+                } else {
+                    return_bug!(e)
+                }
+            }
+        };
+
+        if let Some(arr) = list.as_object() {
+            for (k, _) in arr {
+                if target_collection
+                    .remove_target(&k)
+                    .await
+                    .map_err(|e| bug!("Cannot remove target: {e}"))?
+                {
+                    writeln!(writer.stderr(), "Removed {k}").map_err(|e| bug!(e))?;
+                } else {
+                    // This most likely happens when the daemon is restarted when running
+                    // this command and the manual target collection has not been loaded yet.
+                    // It will work the second time.
+                    writeln!(writer.stderr(),"No matching target for {k} found. {}",
+                     "This is most likely because the daemon just started. Please run this command again.").map_err(|e| bug!(e))?;
+                }
+            }
+        }
+        Ok(String::from(""))
     }
 }
 
@@ -77,12 +126,13 @@ async fn remove_impl(
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
-    use fidl_fuchsia_developer_ffx as ffx;
+    use serde_json::json;
 
     fn setup_fake_target_collection_proxy<T: 'static + Fn(String) -> bool + Send>(
         test: T,
-    ) -> TargetCollectionProxy {
+    ) -> ffx::TargetCollectionProxy {
         fho::testing::fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::RemoveTarget { target_id, responder } => {
                 let result = test(target_id);
@@ -99,7 +149,10 @@ mod test {
             true
         });
         let tool = RemoveTool {
-            cmd: RemoveCommand { name_or_addr: "correct-horse-battery-staple".to_owned() },
+            cmd: RemoveCommand {
+                all: false,
+                name_or_addr: Some("correct-horse-battery-staple".to_owned()),
+            },
             target_collection_proxy: server,
         };
         let test_buffers = TestBuffers::default();
@@ -112,7 +165,10 @@ mod test {
     async fn test_remove_nonexisting_target() {
         let server = setup_fake_target_collection_proxy(|_| false);
         let tool = RemoveTool {
-            cmd: RemoveCommand { name_or_addr: "incorrect-donkey-battery-jazz".to_owned() },
+            cmd: RemoveCommand {
+                all: false,
+                name_or_addr: Some("incorrect-donkey-battery-jazz".to_owned()),
+            },
             target_collection_proxy: server,
         };
         let test_buffers = TestBuffers::default();
@@ -126,7 +182,10 @@ mod test {
     async fn test_remove_machine_nonexisting_target() {
         let server = setup_fake_target_collection_proxy(|_| false);
         let tool = RemoveTool {
-            cmd: RemoveCommand { name_or_addr: "incorrect-donkey-battery-jazz".to_owned() },
+            cmd: RemoveCommand {
+                all: false,
+                name_or_addr: Some("incorrect-donkey-battery-jazz".to_owned()),
+            },
             target_collection_proxy: server,
         };
         let test_buffers = TestBuffers::default();
@@ -137,5 +196,49 @@ mod test {
         let (actual_stdout, actual_stderr) = test_buffers.into_strings();
         assert_eq!(actual_stderr, "");
         assert_eq!(actual_stdout, "{\"Ok\":{\"message\":\"No matching target found.\"}}\n");
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_all_targets_some() {
+        let env = ffx_config::test_init().await.unwrap();
+        const MANUAL_TARGETS: &'static str = "targets.manual";
+        env.context
+            .query(MANUAL_TARGETS)
+            .level(Some(ConfigLevel::User))
+            .set(json!({"127.0.0.1:8022": 0, "127.0.0.1:8023": 12345}))
+            .await
+            .unwrap();
+        let server = setup_fake_target_collection_proxy(|_| true);
+        let tool = RemoveTool {
+            cmd: RemoveCommand { all: true, name_or_addr: None },
+            target_collection_proxy: server,
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            VerifiedMachineWriter::<CommandStatus>::new_test(Some(Format::Json), &test_buffers);
+
+        tool.main(writer).await.expect("run main");
+        let (actual_stdout, actual_stderr) = test_buffers.into_strings();
+        assert_eq!(actual_stderr, "Removed 127.0.0.1:8022\nRemoved 127.0.0.1:8023\n");
+        assert_eq!(actual_stdout, "{\"Ok\":{\"message\":\"\"}}\n");
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_all_targets_none() {
+        let _env = ffx_config::test_init().await.unwrap();
+
+        let server = setup_fake_target_collection_proxy(|_| panic!("should not be called"));
+        let tool = RemoveTool {
+            cmd: RemoveCommand { all: true, name_or_addr: None },
+            target_collection_proxy: server,
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            VerifiedMachineWriter::<CommandStatus>::new_test(Some(Format::Json), &test_buffers);
+
+        tool.main(writer).await.expect("run main");
+        let (actual_stdout, actual_stderr) = test_buffers.into_strings();
+        assert_eq!(actual_stderr, "");
+        assert_eq!(actual_stdout, "{\"Ok\":{\"message\":\"No manual targets found.\"}}\n");
     }
 }

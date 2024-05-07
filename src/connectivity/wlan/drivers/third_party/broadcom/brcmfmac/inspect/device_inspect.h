@@ -74,6 +74,10 @@ class DeviceInspect {
   DeviceConnMetrics conn_metrics_;
   inspect::UintProperty tx_qfull_;
   WindowedUintProperty tx_qfull_24hrs_;
+
+  // Lapis copies |fw_recovered_| and |fw_recovered_24hrs_| inspect nodes to the Cobalt metrics.
+  // Cobalt metric definition:
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/connectivity_wlan/metrics.yaml;l=475
   inspect::UintProperty fw_recovered_;
   WindowedUintProperty fw_recovered_24hrs_;
   inspect::UintProperty rx_freeze_;

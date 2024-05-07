@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import atexit
+from collections import defaultdict
 from dataclasses import dataclass
 from dataclasses import field
 import functools
@@ -141,7 +142,13 @@ def do_process_previous(flags: args.Flags) -> int:
     assert_no_selection(flags, f"-pr {flags.previous}")
     if flags.previous is args.PrevOption.LOG:
         return do_print_logs(flags)
-    if flags.previous is args.PrevOption.HELP:
+    elif flags.previous is args.PrevOption.PATH:
+        env = environment.ExecutionEnvironment.initialize_from_args(
+            flags, create_log_file=False
+        )
+        print(env.get_most_recent_log())
+        return 0
+    elif flags.previous is args.PrevOption.HELP:
         print("--previous options:")
         for arg in args.PrevOption:
             prefix = f"{arg:>8}: "
@@ -258,25 +265,6 @@ async def async_main(
         else:
             output_file = gzip.open(exec_env.log_file, "wt")
         tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
-        # TODO(https://fxbug.dev/326214131): Remove log path printing when we support `-pr logpath`.
-        recorder.emit_instruction_message(
-            f"Logging all output to: {exec_env.log_file}"
-        )
-        recorder.emit_instruction_message(
-            "Use the `--logpath` argument to specify a log location or `--no-log` to disable"
-        )
-
-        # For convenience, display the log output path when the program exits.
-        # Since the async loop may already be exited at that point, directly
-        # print to the console.
-        if not exec_env.log_to_stdout():
-            atexit.register(
-                print,
-                statusinfo.dim(
-                    f"Output was logged to: {os.path.relpath(exec_env.log_file, os.getcwd())}",
-                    style=flags.style,
-                ),
-            )
 
     if flags.has_debugger():
         recorder.emit_warning_message(
@@ -487,6 +475,8 @@ async def generate_test_list(
                 f"Could not generate a new test-list.json{suffix}"
             )
 
+        exec_env.test_list_file = out_path
+
         # Load the generated test-list.json file.
         try:
             parse_id = recorder.emit_start_file_parsing(
@@ -625,31 +615,46 @@ async def do_build(
     # Labels start with // and end with a toolchain, starting with
     # '('. Both toolchain and '//' need to be omitted for building
     # device tests through fx build.
-    label_to_rule = re.compile(r"//([^()]+)\(")
-    build_command_line = []
+    label_to_rule = re.compile(r"//([^()]+)\((.+)\)")
+    build_targets_by_toolchain: defaultdict[str, list[str]] = defaultdict(list)
     for selection in tests.selected:
         label = selection.build.test.package_label or selection.build.test.label
-        path = selection.build.test.path
-        if path is not None:
-            # Host tests are built by output name.
-            match = label_to_rule.match(label)
-            if match:
-                # NOTE: Prepend // for host labels, since that seems to be required.
-                build_command_line.extend(["--host", "//" + match.group(1)])
-        elif label:
-            # Other tests are built by label content, without toolchain.
-            match = label_to_rule.match(label)
-            if match:
-                build_command_line.append(match.group(1))
+        match = label_to_rule.match(label)
+
+        if match:
+            target = match.group(1)
+            toolchain = match.group(2)
+            assert isinstance(toolchain, str)
+
+            build_targets_by_toolchain[toolchain].append(f"//{target}")
         else:
             recorder.emit_warning_message(f"Unknown entry {selection}")
             return False
 
+    build_command_line = []
+    for key, vals in sorted(list(build_targets_by_toolchain.items())):
+        if "fuchsia:" in key:
+            # Use --default instead of fuchsia toolchains, otherwise some
+            # ZBI tests fail to build.
+            build_command_line.append("--default")
+        else:
+            build_command_line.append(f"--toolchain={key}")
+        build_command_line.extend(vals)
+
+    if tests.has_e2e_test():
+        build_command_line.extend(["--default", "updates"])
+
     build_id = recorder.emit_build_start(targets=build_command_line)
+    if tests.has_e2e_test():
+        recorder.emit_instruction_message(
+            "E2E test selected, building updates package"
+        )
     recorder.emit_instruction_message("Use --no-build to skip building")
 
     status_suffix = " Status output suspended." if termout.is_init() else ""
     recorder.emit_info_message(f"\nExecuting build.{status_suffix}")
+
+    await asyncio.sleep(0.1)
 
     return_code = await run_build_with_suspended_output(
         build_command_line, show_output=not exec_env.log_to_stdout()
@@ -662,43 +667,47 @@ async def do_build(
         recorder.emit_end(error, id=build_id)
         return False
 
-    amber_directory = os.path.join(exec_env.out_dir, "amber-files")
-    delivery_blob_type = read_delivery_blob_type(exec_env, recorder)
-    publish_args = (
-        [
-            "fx",
-            "ffx",
-            "repository",
-            "publish",
-            "--trusted-root",
-            os.path.join(amber_directory, "repository/root.json"),
-            "--ignore-missing-packages",
-            "--time-versioning",
-        ]
-        + (
-            ["--delivery-blob-type", str(delivery_blob_type)]
-            if delivery_blob_type is not None
-            else []
+    if tests.has_device_test():
+        amber_directory = os.path.join(exec_env.out_dir, "amber-files")
+        delivery_blob_type = read_delivery_blob_type(exec_env, recorder)
+        publish_args = (
+            [
+                "fx",
+                "ffx",
+                "repository",
+                "publish",
+                "--trusted-root",
+                os.path.join(amber_directory, "repository/root.json"),
+                "--ignore-missing-packages",
+                "--time-versioning",
+            ]
+            + (
+                ["--delivery-blob-type", str(delivery_blob_type)]
+                if delivery_blob_type is not None
+                else []
+            )
+            + [
+                "--package-list",
+                os.path.join(exec_env.out_dir, "all_package_manifests.list"),
+                amber_directory,
+            ]
         )
-        + [
-            "--package-list",
-            os.path.join(exec_env.out_dir, "all_package_manifests.list"),
-            amber_directory,
-        ]
-    )
 
-    output = await execution.run_command(
-        *publish_args,
-        recorder=recorder,
-        parent=build_id,
-        print_verbatim=True,
-        env={"CWD": exec_env.out_dir},
-    )
-    if not output:
-        error = "Failure publishing packages."
-    elif output.return_code != 0:
-        error = f"Publish returned non-zero exit code {output.return_code}"
-    elif not await post_build_checklist(tests, recorder, exec_env, build_id):
+        output = await execution.run_command(
+            *publish_args,
+            recorder=recorder,
+            parent=build_id,
+            print_verbatim=True,
+            env={"CWD": exec_env.out_dir},
+        )
+        if not output:
+            error = "Failure publishing packages."
+        elif output.return_code != 0:
+            error = f"Publish returned non-zero exit code {output.return_code}"
+
+    if not error and not await post_build_checklist(
+        tests, recorder, exec_env, build_id
+    ):
         error = "Post build checklist failed"
 
     recorder.emit_end(error, id=build_id)

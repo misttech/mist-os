@@ -18,7 +18,7 @@ if (is_host) {
 
     deps = [ "//src/tests/end_to_end/connectivity/bluetooth:bluetooth_utils" ]
     params_source = "params.yaml"
-    transport = "sl4f"
+    transport = "fuchsia-controller-preferred"
     environments = lacewing_bluetooth_envs
   }
 }

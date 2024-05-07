@@ -1303,7 +1303,7 @@ mod tests {
         let key = test_key::<I>(fragment_id.into());
 
         // Make sure no timers in the dispatcher yet.
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.get_ref().cache.size, 0);
 
         // Test that we properly reset fragment cache on timer.
@@ -1367,7 +1367,7 @@ mod tests {
         );
 
         // Make sure no other times exist..
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.get_ref().cache.size, 0);
 
         // Attempt to reassemble the packet but get an error since the fragment
@@ -1861,7 +1861,7 @@ mod tests {
         );
 
         // Make sure no other times exist.
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         // Process fragment #2 for packet #1 Should get a need more return value
         // since even though we technically received all the fragments, the last
@@ -1940,7 +1940,7 @@ mod tests {
                 M_FLAG,
                 ExpectedResult::Invalid,
             );
-            assert_eq!(bindings_ctx.timer_ctx().timers(), [],);
+            assert_eq!(bindings_ctx.timers.timers(), [],);
         }
     }
 }

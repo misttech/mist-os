@@ -8,7 +8,6 @@ use {
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
         model::{
             component::{ComponentInstance, StartReason},
-            hooks::HooksRegistration,
             model::Model,
             testing::{
                 echo_service::{EchoProtocol, ECHO_CAPABILITY},
@@ -42,6 +41,7 @@ use {
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::{channel::oneshot, prelude::*},
+    hooks::HooksRegistration,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},

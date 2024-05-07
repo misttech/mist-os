@@ -5,15 +5,17 @@
 #ifndef SRC_LIB_ZXDUMP_TEST_TOOL_PROCESS_H_
 #define SRC_LIB_ZXDUMP_TEST_TOOL_PROCESS_H_
 
-#include <list>
-#include <string>
-#include <string_view>
-#include <thread>
 #ifdef __Fuchsia__
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/resource.h>
 #endif
+
+#include <list>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <vector>
 
 #include <fbl/unique_fd.h>
 

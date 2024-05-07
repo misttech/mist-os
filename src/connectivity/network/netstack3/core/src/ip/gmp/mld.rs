@@ -436,7 +436,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _, SendFrameContext,
+            InstantContext as _, SendFrameContext, SendableFrameMeta,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -531,6 +531,21 @@ mod tests {
         (),
         (),
     >;
+
+    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for MldFrameMetadata<FakeDeviceId> {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
+        }
+    }
 
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
@@ -936,7 +951,7 @@ mod tests {
             (),
             FakeInstant::from(Duration::from_micros(590_354)),
         )]);
-        let instant1 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+        let instant1 = bindings_ctx.timers.timers()[0].0.clone();
         let start = bindings_ctx.now();
         let duration = instant1 - start;
 
@@ -947,7 +962,7 @@ mod tests {
             (),
             FakeInstant::from(Duration::from_micros(34_751)),
         )]);
-        let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
+        let instant2 = bindings_ctx.timers.timers()[0].0.clone();
         // This new timer should be sooner.
         assert!(instant2 <= instant1);
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
@@ -1023,7 +1038,7 @@ mod tests {
                 .assert_range([(&GROUP_ADDR, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL))]);
             assert_eq!(core_ctx.frames().len(), 1);
             receive_mld_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            bindings_ctx.timers.assert_no_timers_installed();
             // The report should be discarded because we have received from someone
             // else.
             assert_eq!(core_ctx.frames().len(), 1);
@@ -1072,7 +1087,7 @@ mod tests {
                 // Assert that no observable effects have taken place.
                 let assert_no_effect =
                     |core_ctx: &FakeCoreCtxImpl, bindings_ctx: &FakeBindingsCtxImpl| {
-                        bindings_ctx.timer_ctx().assert_no_timers_installed();
+                        bindings_ctx.timers.assert_no_timers_installed();
                         assert_empty(core_ctx.frames());
                     };
 
@@ -1175,7 +1190,7 @@ mod tests {
                 GroupLeaveResult::Left(())
             );
             assert_eq!(core_ctx.frames().len(), 2);
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+            bindings_ctx.timers.assert_no_timers_installed();
             let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 132, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);

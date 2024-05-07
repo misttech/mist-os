@@ -21,7 +21,7 @@ class CompileStep : public Compiler::Step {
   friend class TypeResolver;
 
   // Compiles an attribute early, before the main CompileStep has started. The
-  // attribute must support this (see AttributeSchema::CanCompileEarly).
+  // attribute must support this (see AttributeSchema::IsCompileEarly).
   static void CompileAttributeEarly(Compiler* compiler, Attribute* attribute);
 
  private:

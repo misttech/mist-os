@@ -13,13 +13,6 @@ if (use_bazel_images_only) {
   group("verifications") {
   }
 } else {
-  _excluded_images = [
-    # Fxfs does not guarantee binary determinism in image generation.
-    # The package manifests produced by assembly ensure that the contents are logically identical.
-    "fxfs.blk",
-    "fxfs.sparse.blk",
-  ]
-
   if (use_bringup_assembly) {
     # Until bringup assembly is enabled by default,
     # add this target with
@@ -31,26 +24,15 @@ if (use_bazel_images_only) {
       bazel_assembled_system_target =
           "//build/bazel/assembly:bringup($default_toolchain)"
 
-      exclude_images = _excluded_images + [
-                         "bringup.vbmeta",
-                         "bringup.zbi",
-                       ]
-    }
-  } else {
-    verify_images_manifest("verify_fuchsia") {
-      testonly = true
-      gn_assembled_system_target =
-          "//build/images/fuchsia:fuchsia($default_toolchain)"
-      bazel_assembled_system_target =
-          "${bazel_product_bundle_target}_create_system"
-      exclude_images = _excluded_images
-    }
-    verify_images_manifest("verify_recovery") {
-      testonly = true
-      gn_assembled_system_target = recovery_label
-      bazel_assembled_system_target =
-          "${bazel_product_bundle_target}_create_recovery_system"
-      exclude_images = _excluded_images
+      exclude_images = [
+        # Fxfs does not guarantee binary determinism in image generation.
+        # The package manifests produced by assembly ensure that the contents
+        # are logically identical.
+        "fxfs.blk",
+        "fxfs.sparse.blk",
+        "bringup.vbmeta",
+        "bringup.zbi",
+      ]
     }
   }
 
@@ -59,11 +41,6 @@ if (use_bazel_images_only) {
     deps = []
     if (use_bringup_assembly) {
       deps += [ ":verify_bringup" ]
-    } else if (build_info_product == "minimal") {
-      deps += [
-        ":verify_fuchsia",
-        ":verify_recovery",
-      ]
     }
   }
 }

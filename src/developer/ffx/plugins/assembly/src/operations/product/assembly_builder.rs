@@ -113,12 +113,20 @@ impl ImageAssemblyConfigBuilder {
         &mut self,
         developer_only_options: DeveloperOnlyOptions,
         kernel_options: KernelOptions,
+        packages: Vec<PackageDetails>,
     ) -> Result<()> {
         // Set the developer-only options for the buidler to use.
         self.developer_only_options = Some(developer_only_options);
 
         // Add the kernel command line args from the developer
         self.kernel_args.extend(kernel_options.command_line_args.into_iter());
+
+        // Add packages specified by the developer
+        for package_details in packages {
+            let set = self.map_package_set(&package_details.set);
+            self.add_package_from_path(package_details.package, PackageOrigin::Developer, &set)
+                .context("Adding developer-specified package")?;
+        }
 
         Ok(())
     }
@@ -375,6 +383,36 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    /// Remap the package sets based on the build type (for the flexible set)
+    /// and the developer_only_overrides (for the 'all_packages_in_base' flag)
+    fn map_package_set(&self, set: &PackageSet) -> PackageSet {
+        match (set, &self.build_type, &self.developer_only_options) {
+            // BootFS packages are always in BootFS.
+            (&PackageSet::Bootfs, _, _) => PackageSet::Bootfs,
+            // System packages are always system packages
+            (&PackageSet::System, _, _) => PackageSet::System,
+
+            // When the all_packages_in_base developer override option is
+            // enabled, that takes precedence over all the rest on eng and userdebug
+            // build-types.
+            (_, BuildType::Eng, Some(DeveloperOnlyOptions { all_packages_in_base: true }))
+            | (
+                _,
+                BuildType::UserDebug,
+                Some(DeveloperOnlyOptions { all_packages_in_base: true }),
+            ) => PackageSet::Base,
+
+            // The Flexible package set is in Cache for eng builds, and base
+            // for user/userdebug.
+            (&PackageSet::Flexible, BuildType::Eng, _) => PackageSet::Cache,
+            (&PackageSet::Flexible, _, _) => PackageSet::Base,
+
+            // In all other cases, packages are just in their original
+            // package set.
+            (ps, _, _) => ps.clone(),
+        }
+    }
+
     /// Add a set of packages from a bundle, resolving each path to a package
     /// manifest from the bundle's path to locate it.
     fn add_bundle_packages(
@@ -385,31 +423,7 @@ impl ImageAssemblyConfigBuilder {
         for entry in packages {
             let manifest_path: Utf8PathBuf =
                 entry.package.clone().resolve_from_dir(&bundle_path)?.into();
-            let set = match (&entry.set, &self.build_type, &self.developer_only_options) {
-                // BootFS packages are always in BootFS.
-                (&PackageSet::Bootfs, _, _) => PackageSet::Bootfs,
-                // System packages are always system packages
-                (&PackageSet::System, _, _) => PackageSet::System,
-
-                // When the all_packages_in_base developer override option is
-                // enabled, that takes precedence over all the rest on eng and userdebug
-                // build-types.
-                (_, BuildType::Eng, Some(DeveloperOnlyOptions { all_packages_in_base: true }))
-                | (
-                    _,
-                    BuildType::UserDebug,
-                    Some(DeveloperOnlyOptions { all_packages_in_base: true }),
-                ) => PackageSet::Base,
-
-                // The Flexible package set is in Cache for eng builds, and base
-                // for user/userdebug.
-                (&PackageSet::Flexible, BuildType::Eng, _) => PackageSet::Cache,
-                (&PackageSet::Flexible, _, _) => PackageSet::Base,
-
-                // In all other cases, packages are just in their original
-                // package set.
-                (ps, _, _) => ps.clone(),
-            };
+            let set = self.map_package_set(&entry.set);
             self.add_package_from_path(manifest_path, PackageOrigin::AIB, &set)?;
         }
 
@@ -933,10 +947,12 @@ impl PackageEntry {
                 PackageOrigin::AIB => PackageDestination::FromAIB(name),
                 PackageOrigin::Board => PackageDestination::FromBoard(name),
                 PackageOrigin::Product => PackageDestination::FromProduct(name),
+                PackageOrigin::Developer => PackageDestination::FromDeveloper(name),
             }),
             PackageSet::Bootfs => PackageSetDestination::Boot(match &origin {
                 PackageOrigin::AIB => BootfsPackageDestination::FromAIB(name),
                 PackageOrigin::Board => BootfsPackageDestination::FromBoard(name),
+                PackageOrigin::Developer => BootfsPackageDestination::FromDeveloper(name),
                 PackageOrigin::Product => bail!("Products cannot add packages to bootfs  ({path})"),
             }),
         };
@@ -957,6 +973,9 @@ enum PackageOrigin {
 
     /// The package is from the product
     Product,
+
+    /// The package is from the developer
+    Developer,
 }
 
 impl std::fmt::Display for PackageOrigin {
@@ -965,6 +984,7 @@ impl std::fmt::Display for PackageOrigin {
             PackageOrigin::AIB => "platform",
             PackageOrigin::Board => "board",
             PackageOrigin::Product => "product",
+            PackageOrigin::Developer => "developer",
         })
     }
 }

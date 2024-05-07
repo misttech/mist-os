@@ -386,7 +386,7 @@ int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& exp
     auto& expected = expected_platform.value();
     if (actual != expected) {
       std::stringstream hint;
-      auto version = expected_version_added.value_or(fidlc::Version::Head()).ToString();
+      auto version = expected_version_added.value_or(fidlc::Version::kHead).name();
       if (expected.is_unversioned()) {
         hint << "try removing @available attributes";
       } else if (actual.is_unversioned()) {

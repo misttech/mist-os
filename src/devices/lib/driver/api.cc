@@ -38,6 +38,10 @@ __EXPORT zx_status_t device_get_config_vmo(zx_device_t* device, zx_handle_t* con
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+__EXPORT zx_status_t device_get_properties(zx_device_t* device, device_props_args_t* out_args) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
                                                      const char* protocol_name,
                                                      fdf_handle_t request) {

@@ -20,17 +20,16 @@ std::optional<Platform> Platform::Parse(std::string str) {
   return std::nullopt;
 }
 
-std::optional<Version> Version::From(uint64_t ordinal) {
-  if (ordinal == Head().ordinal()) {
-    return Head();
+const uint32_t kMaxNormalVersion = (1ul << 31) - 1;
+
+std::optional<Version> Version::From(uint32_t number) {
+  for (auto& version : kSpecialVersions) {
+    if (number == version.value_)
+      return version;
   }
-  if (ordinal == Legacy().ordinal()) {
-    return Legacy();
-  }
-  if (ordinal == 0 || ordinal >= (1ul << 63)) {
+  if (number == 0 || number > kMaxNormalVersion)
     return std::nullopt;
-  }
-  return Version(ordinal);
+  return Version(number);
 }
 
 std::optional<Version> Version::Parse(std::string_view str) {
@@ -38,46 +37,54 @@ std::optional<Version> Version::Parse(std::string_view str) {
   if (str.empty()) {
     return std::nullopt;
   }
-  if (str == "HEAD") {
-    return Head();
+  for (auto& version : kSpecialVersions) {
+    if (str == version.name())
+      return version;
   }
-  if (str == "LEGACY") {
-    return Legacy();
-  }
-  uint64_t value;
+  uint32_t value;
   if (ParseNumeric(str, &value) != ParseNumericResult::kSuccess) {
     return std::nullopt;
   }
   return From(value);
 }
 
-uint64_t Version::ordinal() const {
+std::string_view Version::name() const {
   switch (value_) {
-    case NegInf().value_:
-    case PosInf().value_:
-      ZX_PANIC("infinite versions do not have an ordinal");
-    case Head().value_:
-      return std::numeric_limits<uint64_t>::max() - 1;
-    case Legacy().value_:
-      return std::numeric_limits<uint64_t>::max();
+    case Version::kNext.value_:
+      return "NEXT";
+    case Version::kHead.value_:
+      return "HEAD";
+    case Version::kLegacy.value_:
+      return "LEGACY";
     default:
-      return value_;
+      ZX_PANIC("expected a special version");
   }
 }
 
 std::string Version::ToString() const {
   switch (value_) {
-    case Version::NegInf().value_:
+    case Version::kNegInf.value_:
       return "-inf";
-    case Version::PosInf().value_:
+    case Version::kPosInf.value_:
       return "+inf";
-    case Version::Head().value_:
-      return "HEAD";
-    case Version::Legacy().value_:
-      return "LEGACY";
+    case Version::kNext.value_:
+    case Version::kHead.value_:
+    case Version::kLegacy.value_:
+      return std::string(name());
     default:
       return std::to_string(value_);
   }
+}
+
+Version Version::Predecessor() const {
+  ZX_ASSERT(*this != kNegInf && *this != kPosInf);
+  if (*this == kSpecialVersions[0])
+    return Version(kMaxNormalVersion);
+  for (size_t i = 1; i < std::size(kSpecialVersions); ++i) {
+    if (*this == kSpecialVersions[i])
+      return kSpecialVersions[i - 1];
+  }
+  return Version(value_ - 1);
 }
 
 bool VersionRange::Contains(Version version) const {
@@ -145,7 +152,7 @@ VersionSet Availability::set() const {
     case Legacy::kNo:
       return VersionSet(range);
     case Legacy::kYes:
-      return VersionSet(range, VersionRange(Version::Legacy(), Version::PosInf()));
+      return VersionSet(range, VersionRange(Version::kLegacy, Version::kPosInf));
   }
 }
 
@@ -156,8 +163,8 @@ std::set<Version> Availability::points() const {
     result.insert(deprecated_.value());
   }
   if (legacy_.value() == Legacy::kYes) {
-    ZX_ASSERT(result.insert(Version::Legacy()).second);
-    ZX_ASSERT(result.insert(Version::PosInf()).second);
+    ZX_ASSERT(result.insert(Version::kLegacy).second);
+    ZX_ASSERT(result.insert(Version::kPosInf).second);
   }
   return result;
 }
@@ -182,9 +189,9 @@ bool Availability::Init(InitArgs args) {
   ZX_ASSERT_MSG(args.legacy != Legacy::kNotApplicable, "legacy cannot be kNotApplicable");
   ZX_ASSERT_MSG(args.removed || !args.replaced, "cannot set replaced without removed");
   for (auto version : {args.added, args.deprecated, args.removed}) {
-    ZX_ASSERT(version != Version::NegInf());
-    ZX_ASSERT(version != Version::PosInf());
-    ZX_ASSERT(version != Version::Legacy());
+    ZX_ASSERT(version != Version::kNegInf);
+    ZX_ASSERT(version != Version::kPosInf);
+    ZX_ASSERT(version != Version::kLegacy);
   }
   added_ = args.added;
   deprecated_ = args.deprecated;
@@ -199,9 +206,9 @@ bool Availability::Init(InitArgs args) {
 }
 
 bool Availability::ValidOrder() const {
-  auto a = added_.value_or(Version::NegInf());
+  auto a = added_.value_or(Version::kNegInf);
   auto d = deprecated_.value_or(a);
-  auto r = removed_.value_or(Version::PosInf());
+  auto r = removed_.value_or(Version::kPosInf);
   return a <= d && d < r;
 }
 
@@ -280,12 +287,12 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
       legacy_ = parent.legacy_.value();
     } else {
       ZX_ASSERT_MSG(
-          removed_.value() != Version::PosInf(),
+          removed_.value() != Version::kPosInf,
           "impossible for child to be removed at +inf if parent is not also removed at +inf");
       // By default, removed elements are not added back at LEGACY.
       legacy_ = Legacy::kNo;
     }
-  } else if (removed_.value() == Version::PosInf()) {
+  } else if (removed_.value() == Version::kPosInf) {
     // Legacy is not applicable if the element is never removed. Note that we
     // cannot check this earlier (e.g. in Init) because we don't know if the
     // element is removed or not until performing inheritance.
@@ -297,7 +304,7 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
 
   if (result.Ok()) {
     ZX_ASSERT(added_ && removed_ && ending_ && legacy_);
-    ZX_ASSERT(added_.value() != Version::NegInf());
+    ZX_ASSERT(added_.value() != Version::kNegInf);
     ZX_ASSERT(ValidOrder());
     state_ = State::kInherited;
   } else {
@@ -309,13 +316,13 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
 void Availability::Narrow(VersionRange range) {
   ZX_ASSERT_MSG(state_ == State::kInherited, "called Narrow in the wrong order");
   auto [a, b] = range.pair();
-  if (a == Version::Legacy()) {
-    ZX_ASSERT_MSG(b == Version::PosInf(), "legacy range must be [LEGACY, +inf)");
+  if (a == Version::kLegacy) {
+    ZX_ASSERT_MSG(b == Version::kPosInf, "legacy range must be [LEGACY, +inf)");
     ZX_ASSERT_MSG(legacy_.value() != Legacy::kNo, "must be present at LEGACY");
   } else {
     ZX_ASSERT_MSG(a >= added_ && b <= removed_, "must narrow to a subrange");
   }
-  if (b == Version::PosInf()) {
+  if (b == Version::kPosInf) {
     ending_ = Ending::kNone;
   } else if (removed_ != b) {
     ending_ = Ending::kSplit;
@@ -327,7 +334,7 @@ void Availability::Narrow(VersionRange range) {
   } else {
     deprecated_ = std::nullopt;
   }
-  if (a <= Version::Legacy() && b > Version::Legacy()) {
+  if (a <= Version::kLegacy && b > Version::kLegacy) {
     legacy_ = Legacy::kNotApplicable;
   } else {
     legacy_ = Legacy::kNo;
@@ -373,7 +380,7 @@ bool VersionSelection::Contains(const Platform& platform) const {
 
 Version VersionSelection::Lookup(const Platform& platform) const {
   if (platform.is_unversioned()) {
-    return Version::Head();
+    return Version::kHead;
   }
   const auto iter = map_.find(platform);
   ZX_ASSERT_MSG(iter != map_.end(), "no version was inserted for platform '%s'",

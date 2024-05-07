@@ -18,6 +18,7 @@ if (toolchain_environment == "kernel.phys" ||
     sources = [ "address-space.cc" ]
     deps = [
       "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/phys:address-space.header",
     ]
   }

@@ -53,6 +53,49 @@ pub trait AsBytesExt: AsBytes + NoCell + Sized {
 
 impl<T> AsBytesExt for T where T: AsBytes + NoCell + Sized {}
 
+pub struct CtrlFrame<B> {
+    // Control Header: frame control
+    pub frame_ctrl: FrameControl,
+    // Body
+    pub body: B,
+}
+
+impl<B> CtrlFrame<B>
+where
+    B: ByteSlice,
+{
+    pub fn parse(reader: impl IntoBufferReader<B>) -> Option<Self> {
+        let reader = reader.into_buffer_reader();
+        let fc = FrameControl(reader.peek_value()?);
+        matches!(fc.frame_type(), FrameType::CTRL)
+            .then(|| CtrlFrame::parse_frame_type_unchecked(reader))
+            .flatten()
+    }
+
+    fn parse_frame_type_unchecked(reader: impl IntoBufferReader<B>) -> Option<Self> {
+        let mut reader = reader.into_buffer_reader();
+        let fc = reader.read_value()?;
+
+        Some(CtrlFrame { frame_ctrl: fc, body: reader.into_remaining() })
+    }
+
+    pub fn try_into_ctrl_body(self) -> Option<CtrlBody<B>> {
+        CtrlBody::parse(self.ctrl_subtype(), self.body)
+    }
+
+    pub fn ctrl_body(&self) -> Option<CtrlBody<&'_ B::Target>> {
+        CtrlBody::parse(self.ctrl_subtype(), self.body.deref())
+    }
+
+    pub fn frame_ctrl(&self) -> FrameControl {
+        self.frame_ctrl
+    }
+
+    pub fn ctrl_subtype(&self) -> CtrlSubtype {
+        self.frame_ctrl().ctrl_subtype()
+    }
+}
+
 pub struct DataFrame<B> {
     // Data Header: fixed fields
     pub fixed_fields: Ref<B, FixedDataHdrFields>,
@@ -191,38 +234,42 @@ where
 pub enum MacFrame<B> {
     Mgmt(MgmtFrame<B>),
     Data(DataFrame<B>),
-    // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
-    Ctrl {
-        // Control Header: frame control
-        frame_ctrl: FrameControl,
-        // Body
-        body: B,
-    },
-    // TODO(https://fxbug.dev/42079361): Implement a dedicated type for control frames.
-    Unsupported {
-        frame_ctrl: FrameControl,
-    },
+    Ctrl(CtrlFrame<B>),
+    Unsupported { frame_ctrl: FrameControl },
 }
 
 impl<B: ByteSlice> MacFrame<B> {
-    /// If `body_aligned` is |true| the frame's body is expected to be 4 byte aligned.
-    pub fn parse(bytes: B, body_aligned: bool) -> Option<MacFrame<B>> {
-        let mut reader = BufferReader::new(bytes);
-        let fc = FrameControl(reader.peek_value()?);
-        match fc.frame_type() {
+    /// Parses a MAC frame from bytes.
+    ///
+    /// If `is_body_aligned` is `true`, then the frame body **must** be aligned to four bytes.
+    pub fn parse(bytes: B, is_body_aligned: bool) -> Option<MacFrame<B>> {
+        let reader = BufferReader::new(bytes);
+        let frame_ctrl = FrameControl(reader.peek_value()?);
+        match frame_ctrl.frame_type() {
             FrameType::MGMT => {
-                MgmtFrame::parse_frame_type_unchecked(reader, body_aligned).map(From::from)
+                MgmtFrame::parse_frame_type_unchecked(reader, is_body_aligned).map(From::from)
             }
             FrameType::DATA => {
-                DataFrame::parse_frame_type_unchecked(reader, body_aligned).map(From::from)
+                DataFrame::parse_frame_type_unchecked(reader, is_body_aligned).map(From::from)
             }
-            FrameType::CTRL => {
-                // Parse frame control.
-                let frame_ctrl = reader.read_value()?;
-                Some(MacFrame::Ctrl { frame_ctrl, body: reader.into_remaining() })
-            }
-            _type => Some(MacFrame::Unsupported { frame_ctrl: fc }),
+            FrameType::CTRL => CtrlFrame::parse_frame_type_unchecked(reader).map(From::from),
+            _frame_type => Some(MacFrame::Unsupported { frame_ctrl }),
         }
+    }
+
+    pub fn frame_ctrl(&self) -> FrameControl {
+        match self {
+            MacFrame::Ctrl(ctrl_frame) => ctrl_frame.frame_ctrl(),
+            MacFrame::Data(data_frame) => data_frame.frame_ctrl(),
+            MacFrame::Mgmt(mgmt_frame) => mgmt_frame.frame_ctrl(),
+            MacFrame::Unsupported { frame_ctrl } => *frame_ctrl,
+        }
+    }
+}
+
+impl<B> From<CtrlFrame<B>> for MacFrame<B> {
+    fn from(ctrl: CtrlFrame<B>) -> Self {
+        MacFrame::Ctrl(ctrl)
     }
 }
 
@@ -326,7 +373,7 @@ mod tests {
                 2, 2, 2, 2, 2, 2, // addr1
                 4, 4, 4, 4, 4, 4, // addr2
             ][..], false),
-            Some(MacFrame::Ctrl { frame_ctrl, body }) => {
+            Some(MacFrame::Ctrl(CtrlFrame { frame_ctrl, body })) => {
                 assert_eq!(0b00000000_10100100, frame_ctrl.0);
                 assert_eq!(&body[..], &[
                     0b00000001, 0b11000000, // Masked AID

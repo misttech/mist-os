@@ -7,7 +7,7 @@ use {
     fidl::endpoints::ControlHandle,
     fidl_fuchsia_logger::LogSinkMarker,
     fidl_fuchsia_scheduler::RoleManagerMarker,
-    fidl_fuchsia_sysmem::AllocatorMarker,
+    fidl_fuchsia_sysmem as fsysmem, fidl_fuchsia_sysmem2 as fsysmem2,
     fidl_fuchsia_tracing_provider::RegistryMarker,
     fidl_fuchsia_ui_composition::FlatlandMarker,
     fidl_fuchsia_ui_display_singleton::InfoMarker,
@@ -130,7 +130,8 @@ async fn assemble_puppet_realm(
             Route::new()
                 .capability(Capability::protocol::<LogSinkMarker>())
                 .capability(Capability::protocol::<RoleManagerMarker>())
-                .capability(Capability::protocol::<AllocatorMarker>())
+                .capability(Capability::protocol::<fsysmem::AllocatorMarker>())
+                .capability(Capability::protocol::<fsysmem2::AllocatorMarker>())
                 .capability(Capability::protocol::<LoaderMarker>())
                 .capability(Capability::protocol::<RegistryMarker>())
                 .from(Ref::parent())

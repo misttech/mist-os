@@ -6,7 +6,6 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -30,6 +29,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display {

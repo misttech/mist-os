@@ -195,17 +195,16 @@ pub fn add_stream_controller_capability<SC: StreamController + Clone + Send + 's
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        anyhow::format_err,
-        fidl::client::QueryResponseFut,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream},
-        fidl_fuchsia_bluetooth_internal_a2dp::{
-            ControllerMarker, ControllerProxy, StreamSuspenderEvent, StreamSuspenderMarker,
-            StreamSuspenderProxy,
-        },
-        fuchsia_sync::Mutex,
-        futures::channel::mpsc,
+
+    use anyhow::format_err;
+    use fidl::client::QueryResponseFut;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fidl_fuchsia_bluetooth_internal_a2dp::{
+        ControllerMarker, ControllerProxy, StreamSuspenderEvent, StreamSuspenderMarker,
+        StreamSuspenderProxy,
     };
+    use fuchsia_sync::Mutex;
+    use futures::channel::mpsc;
 
     #[derive(Debug, PartialEq)]
     enum Event {

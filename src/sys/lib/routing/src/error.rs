@@ -4,12 +4,12 @@
 
 use {
     crate::{policy::PolicyError, rights::Rights},
-    bedrock_error::{BedrockError, Explain},
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
     moniker::{ChildName, Moniker, MonikerError},
+    router_error::{Explain, RouterError},
     std::sync::Arc,
     thiserror::Error,
 };
@@ -293,6 +293,9 @@ pub enum RoutingError {
     #[error("Item {name} is not present in dictionary")]
     BedrockNotPresentInDictionary { name: String },
 
+    #[error("Routed capability was the wrong type. Was: {actual}, expected: {expected}")]
+    BedrockWrongCapabilityType { actual: String, expected: String },
+
     #[error("There was an error remoting a capability")]
     BedrockRemoteCapability,
 
@@ -369,6 +372,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockNotPresentInDictionary { .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
+            | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
@@ -382,9 +386,9 @@ impl Explain for RoutingError {
     }
 }
 
-impl From<RoutingError> for BedrockError {
+impl From<RoutingError> for RouterError {
     fn from(value: RoutingError) -> Self {
-        BedrockError::RoutingError(Arc::new(value))
+        Self::NotFound(Arc::new(value))
     }
 }
 

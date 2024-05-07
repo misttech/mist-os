@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_IMAGE_INFO_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_IMAGE_INFO_H_
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/zx/vmo.h>
 
 #include <cstddef>
@@ -20,8 +20,8 @@
 namespace fake_display {
 
 struct ImageMetadata {
-  fuchsia_sysmem::wire::PixelFormatType pixel_format;
-  fuchsia_sysmem::wire::CoherencyDomain coherency_domain;
+  fuchsia_images2::PixelFormat pixel_format;
+  fuchsia_sysmem2::CoherencyDomain coherency_domain;
 };
 
 class DisplayImageInfo : public fbl::SinglyLinkedListable<std::unique_ptr<DisplayImageInfo>> {

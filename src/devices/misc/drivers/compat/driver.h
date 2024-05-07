@@ -62,6 +62,9 @@ class Driver : public fdf::DriverBase {
 
   zx::vmo& GetConfigVmo();
 
+  zx_status_t GetProperties(device_props_args_t* out_args,
+                            const std::string& parent_node_name = "default");
+
   // # Threading notes
   //
   // If this method is not called from a task running on |dispatcher|,

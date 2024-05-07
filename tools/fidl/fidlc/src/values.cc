@@ -6,9 +6,12 @@
 
 #include <zircon/assert.h>
 
-#include "tools/fidl/fidlc/src/utils.h"
-
 namespace fidlc {
+
+std::string_view ConstantValue::AsString() const {
+  ZX_ASSERT(kind == Kind::kString);
+  return static_cast<const StringConstantValue*>(this)->value;
+}
 
 // TODO(https://fxbug.dev/42064981): Use std::cmp_* functions when we're on C++20.
 // https://en.cppreference.com/w/cpp/utility/intcmp#Possible_implementation

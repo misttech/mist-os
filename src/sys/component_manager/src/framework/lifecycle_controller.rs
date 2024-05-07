@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
-            actions::{ActionSet, StopAction},
+            actions::{ActionsManager, StopAction},
             component::{IncomingCapabilities, StartReason, WeakComponentInstance},
             model::Model,
         },
@@ -86,10 +86,12 @@ impl LifecycleController {
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StopError::BadMoniker)?;
         let instance =
             model.root().find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
-        ActionSet::register(instance.clone(), StopAction::new(false)).await.map_err(|error| {
-            warn!(%moniker, %error, "failed to stop instance");
-            error
-        })?;
+        ActionsManager::register(instance.clone(), StopAction::new(false)).await.map_err(
+            |error| {
+                warn!(%moniker, %error, "failed to stop instance");
+                error
+            },
+        )?;
         Ok(())
     }
 

@@ -10,10 +10,10 @@ use crate::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
         fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, CheckAccessReason, DirEntry,
-        DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode,
-        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
+        DirEntryOps, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
+        DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
         SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
     },
 };
@@ -49,6 +49,7 @@ use std::{
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
+const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
 const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
 
 #[derive(Debug)]
@@ -149,11 +150,11 @@ pub fn new_fuse_fs(
         FuseFs { connection: connection.clone(), default_permissions },
         options,
     );
-    let fuse_node = FuseNode::new(connection.clone(), uapi::FUSE_ROOT_ID as u64);
+    let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64);
     fuse_node.state.lock().nlookup += 1;
 
     let mut root_node = FsNode::new_root(fuse_node.clone());
-    root_node.node_id = uapi::FUSE_ROOT_ID as u64;
+    root_node.node_id = FUSE_ROOT_ID_U64;
     fs.set_root_node(root_node);
     {
         let mut state = connection.lock();
@@ -195,8 +196,13 @@ struct FuseFs {
 }
 
 impl FuseFs {
-    fn from_fs(fs: &FileSystem) -> Result<&FuseFs, Errno> {
-        fs.downcast_ops::<FuseFs>().ok_or_else(|| errno!(ENOENT))
+    /// Downcasts this `fs` to a [`FuseFs`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `fs` is not a `FuseFs`.
+    fn from_fs(fs: &FileSystem) -> &FuseFs {
+        fs.downcast_ops::<FuseFs>().expect("FUSE should only handle `FuseFs`s")
     }
 }
 
@@ -220,12 +226,7 @@ impl FileSystemOps for FuseFs {
     }
 
     fn statfs(&self, fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        let node = if let Ok(node) = FuseNode::from_node(&fs.root().node) {
-            node
-        } else {
-            log_error!("Unexpected file type");
-            return error!(EINVAL);
-        };
+        let node = FuseNode::from_node(&fs.root().node);
         let response =
             self.connection.lock().execute_operation(current_task, node, FuseOperation::Statfs)?;
         let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
@@ -467,8 +468,13 @@ impl FuseNode {
         })
     }
 
-    fn from_node(node: &FsNode) -> Result<&Arc<FuseNode>, Errno> {
-        node.downcast_ops::<Arc<FuseNode>>().ok_or_else(|| errno!(ENOENT))
+    /// Downcasts this `node` to a [`FuseNode`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `node` is not a `FuseNode`.
+    fn from_node(node: &FsNode) -> &Arc<FuseNode> {
+        node.downcast_ops::<Arc<FuseNode>>().expect("FUSE should only handle `FuseNode`s")
     }
 
     fn default_check_access_with_valid_node_attributes(
@@ -599,7 +605,7 @@ impl FuseNode {
         })?;
         // . and .. do not get their lookup count increased.
         if !DirEntry::is_reserved_name(name) {
-            let fuse_node = FuseNode::from_node(&node)?;
+            let fuse_node = FuseNode::from_node(&node);
             fuse_node.state.lock().nlookup += 1;
         }
         Ok(node)
@@ -614,19 +620,14 @@ struct FuseFileObject {
 
 impl FuseFileObject {
     /// Returns the `FuseNode` associated with the opened file.
-    fn get_fuse_node<'a>(&self, file: &'a FileObject) -> Result<&'a Arc<FuseNode>, Errno> {
+    fn get_fuse_node(file: &FileObject) -> &Arc<FuseNode> {
         FuseNode::from_node(file.node())
     }
 }
 
 impl FileOps for FuseFileObject {
     fn close(&self, file: &FileObject, current_task: &CurrentTask) {
-        let node = if let Ok(node) = self.get_fuse_node(file) {
-            node
-        } else {
-            log_error!("Unexpected file type");
-            return;
-        };
+        let node = Self::get_fuse_node(file);
         let mode = file.node().info().mode;
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
@@ -638,12 +639,7 @@ impl FileOps for FuseFileObject {
     }
 
     fn flush(&self, file: &FileObject, current_task: &CurrentTask) {
-        let node = if let Ok(node) = self.get_fuse_node(file) {
-            node
-        } else {
-            log_error!("Unexpected file type");
-            return;
-        };
+        let node = Self::get_fuse_node(file);
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
             node,
@@ -665,7 +661,7 @@ impl FileOps for FuseFileObject {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
             node,
@@ -695,7 +691,7 @@ impl FileOps for FuseFileObject {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let content = data.peek_all()?;
         let response = self.connection.lock().execute_operation(
             current_task,
@@ -734,7 +730,7 @@ impl FileOps for FuseFileObject {
     ) -> Result<off_t, Errno> {
         // Only delegate SEEK_DATA and SEEK_HOLE to the userspace process.
         if matches!(target, SeekTarget::Data(_) | SeekTarget::Hole(_)) {
-            let node = self.get_fuse_node(file)?;
+            let node = Self::get_fuse_node(file);
             let response = self.connection.lock().execute_operation(
                 current_task,
                 node,
@@ -783,7 +779,7 @@ impl FileOps for FuseFileObject {
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
             node,
@@ -834,7 +830,7 @@ impl FileOps for FuseFileObject {
         } else {
             *PAGE_SIZE as usize
         };
-        let node = self.get_fuse_node(file)?;
+        let node = Self::get_fuse_node(file);
         let response = state.execute_operation(
             current_task,
             node,
@@ -910,6 +906,81 @@ impl FileOps for FuseFileObject {
     }
 }
 
+struct FuseDirEntry {
+    valid_until: AtomicTime,
+}
+
+impl Default for FuseDirEntry {
+    fn default() -> Self {
+        Self { valid_until: zx::Time::INFINITE_PAST.into() }
+    }
+}
+
+impl DirEntryOps for FuseDirEntry {
+    fn revalidate(&self, current_task: &CurrentTask, dir_entry: &DirEntry) -> Result<bool, Errno> {
+        // Relaxed because the attributes valid until atomic is not used to synchronize
+        // anything.
+        const VALID_UNTIL_ORDERING: Ordering = Ordering::Relaxed;
+
+        let now = zx::Time::get_monotonic();
+        if self.valid_until.load(VALID_UNTIL_ORDERING) >= now {
+            return Ok(true);
+        }
+
+        let node = FuseNode::from_node(&dir_entry.node);
+        if node.nodeid == FUSE_ROOT_ID_U64 {
+            // The root node entry is always valid.
+            return Ok(true);
+        }
+
+        // Perform a lookup on this entry's parent FUSE node to revalidate this
+        // entry.
+        let parent = dir_entry.parent().expect("non-root nodes always has a parent");
+        let parent = FuseNode::from_node(&parent.node);
+        let name = dir_entry.local_name();
+        let response = parent.connection.lock().execute_operation(
+            current_task,
+            parent,
+            FuseOperation::Lookup { name },
+        )?;
+        let FuseResponse::Entry(uapi::fuse_entry_out {
+            nodeid,
+            entry_valid,
+            entry_valid_nsec,
+            attr,
+            attr_valid,
+            attr_valid_nsec,
+            ..
+        }) = response
+        else {
+            return error!(EINVAL);
+        };
+
+        if nodeid != node.nodeid {
+            // A new entry exists with the name. This `DirEntry` is no longer
+            // valid. The caller should attempt to restart the path walk at this
+            // node.
+            return Ok(false);
+        }
+
+        dir_entry.node.update_info(|info| {
+            FuseNode::set_node_info(
+                info,
+                attr,
+                attr_valid_to_duration(attr_valid, attr_valid_nsec)?,
+                &node.attributes_valid_until,
+            )?;
+
+            self.valid_until.store(
+                zx::Time::after(attr_valid_to_duration(entry_valid, entry_valid_nsec)?),
+                VALID_UNTIL_ORDERING,
+            );
+
+            Ok(true)
+        })
+    }
+}
+
 // `FuseFs.default_permissions` is not used to synchronize anything.
 const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
 
@@ -924,9 +995,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<(), Errno> {
         // Perform access checks regardless of the reason when userspace configured
         // the kernel to perform its default access checks on behalf of the FUSE fs.
-        if FuseFs::from_fs(&node.fs())?
-            .default_permissions
-            .load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
+        if FuseFs::from_fs(&node.fs()).default_permissions.load(DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
         {
             return self.default_check_access_with_valid_node_attributes(
                 node,
@@ -974,6 +1043,10 @@ impl FsNodeOps for Arc<FuseNode> {
                 );
             }
         }
+    }
+
+    fn create_dir_entry_ops(&self) -> Box<dyn DirEntryOps> {
+        Box::new(FuseDirEntry::default())
     }
 
     fn create_file_ops(
@@ -1101,7 +1174,7 @@ impl FsNodeOps for Arc<FuseNode> {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let child_node = FuseNode::from_node(child)?;
+        let child_node = FuseNode::from_node(child);
         self.connection
             .lock()
             .execute_operation(
@@ -1673,7 +1746,6 @@ impl FuseMutableState {
                     // `default_permissions` mount option.
                     if let Some(fs) = fs.upgrade() {
                         FuseFs::from_fs(&fs)
-                            .expect("should only perform FUSE ops with FUSE fs")
                             .default_permissions
                             .store(true, DEFAULT_PERMISSIONS_ATOMIC_ORDERING)
                     } else {

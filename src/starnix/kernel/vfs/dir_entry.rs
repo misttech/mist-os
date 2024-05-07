@@ -73,6 +73,32 @@ struct DirEntryState {
     mount_count: u32,
 }
 
+pub trait DirEntryOps: Send + Sync + 'static {
+    /// Revalidate the [`DirEntry`], if needed.
+    ///
+    /// Most filesystems don't need to do any revalidations because they are "local"
+    /// and all changes to nodes go through the kernel. However some filesystems
+    /// allow changes to happen through other means (e.g. NFS, FUSE) and these
+    /// filesystems need a way to let the kernel know it may need to refresh its
+    /// cached metadata. This method provides that hook for such filesystems.
+    ///
+    /// For more details, see:
+    ///  - https://www.halolinux.us/kernel-reference/the-dentry-cache.html
+    ///  - https://www.kernel.org/doc/html/latest/filesystems/path-lookup.html#revalidation-and-automounts
+    ///  - https://lwn.net/Articles/649115/
+    ///  - https://www.infradead.org/~mchehab/kernel_docs/filesystems/path-walking.html
+    ///
+    /// Returns `Ok(valid)` where `valid` indicates if the `DirEntry` is still valid,
+    /// or an error.
+    fn revalidate(&self, _: &CurrentTask, _: &DirEntry) -> Result<bool, Errno> {
+        Ok(true)
+    }
+}
+
+pub struct DefaultDirEntryOps;
+
+impl DirEntryOps for DefaultDirEntryOps {}
+
 /// An entry in a directory.
 ///
 /// This structure assigns a name to an FsNode in a given file system. An
@@ -90,6 +116,12 @@ pub struct DirEntry {
     /// A given FsNode can be referenced by multiple DirEntry objects, for
     /// example if there are multiple hard links to a given FsNode.
     pub node: FsNodeHandle,
+
+    /// The [`DirEntryOps`] for this `DirEntry`.
+    ///
+    /// The `DirEntryOps` are implemented by the individual file systems to provide
+    /// specific behaviours for this `DirEntry`.
+    ops: Box<dyn DirEntryOps>,
 
     /// The mutable state for this DirEntry.
     ///
@@ -119,8 +151,10 @@ impl DirEntry {
         parent: Option<DirEntryHandle>,
         local_name: FsString,
     ) -> DirEntryHandle {
+        let ops = node.create_dir_entry_ops();
         let result = Arc::new(DirEntry {
             node,
+            ops,
             state: RwLock::new(DirEntryState {
                 parent,
                 local_name,
@@ -435,8 +469,14 @@ impl DirEntry {
     ///
     /// Notice that this method takes `self` by value to destroy this reference.
     fn destroy(self: DirEntryHandle) {
+        {
+            let mut state = self.state.write();
+            if state.is_dead {
+                return;
+            }
+            state.is_dead = true;
+        }
         self.node.fs().will_destroy_dir_entry(&self);
-        self.state.write().is_dead = true;
         self.notify_deletion();
     }
 
@@ -735,14 +775,38 @@ impl DirEntry {
 
         // Check if the child is already in children. In that case, we can
         // simply return the child and we do not need to call init_fn.
-        if let Some(child) = self.children.read().get(name).and_then(Weak::upgrade) {
+        let child = self.children.read().get(name).and_then(Weak::upgrade);
+        let (child, create_result) = if let Some(child) = child {
             child.node.fs().did_access_dir_entry(&child);
-            return Ok((child, true));
-        }
+            (child, CreationResult::Existed { create_fn })
+        } else {
+            let (child, create_result) =
+                self.lock_children().get_or_create_child(current_task, mount, name, create_fn)?;
+            child.node.fs().purge_old_entries();
+            (child, create_result)
+        };
 
-        let (child, exists) =
-            self.lock_children().get_or_create_child(current_task, mount, name, create_fn)?;
-        child.node.fs().purge_old_entries();
+        let (child, exists) = match create_result {
+            CreationResult::Created => (child, false),
+            CreationResult::Existed { create_fn } => {
+                if child.ops.revalidate(current_task, &child)? {
+                    (child, true)
+                } else {
+                    self.internal_remove_child(&child);
+                    child.destroy();
+
+                    let (child, create_result) = self.lock_children().get_or_create_child(
+                        current_task,
+                        mount,
+                        name,
+                        create_fn,
+                    )?;
+                    child.node.fs().purge_old_entries();
+                    (child, matches!(create_result, CreationResult::Existed { .. }))
+                }
+            }
+        };
+
         Ok((child, exists))
     }
 
@@ -762,7 +826,7 @@ impl DirEntry {
             .collect()
     }
 
-    fn internal_remove_child(&self, child: &mut DirEntry) {
+    fn internal_remove_child(&self, child: &DirEntry) {
         let local_name = child.local_name();
         let mut children = self.children.write();
         if let Some(weak_child) = children.get(&local_name) {
@@ -821,6 +885,11 @@ struct DirEntryLockedChildren<'a> {
     children: RwLockWriteGuard<'a, DirEntryChildren>,
 }
 
+enum CreationResult<F> {
+    Created,
+    Existed { create_fn: F },
+}
+
 impl<'a> DirEntryLockedChildren<'a> {
     fn component_lookup(
         &mut self,
@@ -834,18 +903,22 @@ impl<'a> DirEntryLockedChildren<'a> {
         Ok(node)
     }
 
-    fn get_or_create_child(
+    fn get_or_create_child<
+        F: FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
+    >(
         &mut self,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-        create_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
-    ) -> Result<(DirEntryHandle, bool), Errno> {
-        let create_child = || {
+        create_fn: F,
+    ) -> Result<(DirEntryHandle, CreationResult<F>), Errno> {
+        let create_child = |create_fn: F| {
             // Before creating the child, check for existence.
-            let (node, exists) = match self.entry.node.lookup(current_task, mount, name) {
-                Ok(node) => (node, true),
-                Err(e) if e == ENOENT => (create_fn(&self.entry.node, mount, name)?, false),
+            let (node, create_result) = match self.entry.node.lookup(current_task, mount, name) {
+                Ok(node) => (node, CreationResult::Existed { create_fn }),
+                Err(e) if e == ENOENT => {
+                    (create_fn(&self.entry.node, mount, name)?, CreationResult::Created)
+                }
                 Err(e) => return Err(e),
             };
 
@@ -861,14 +934,14 @@ impl<'a> DirEntryLockedChildren<'a> {
                 // ordering will trigger the tracing-mutex at the right call site.
                 let _l1 = entry.state.read();
             }
-            Ok((entry, exists))
+            Ok((entry, create_result))
         };
 
-        let (child, exists) = match self.children.entry(name.to_owned()) {
+        let (child, create_result) = match self.children.entry(name.to_owned()) {
             Entry::Vacant(entry) => {
-                let (child, exists) = create_child()?;
+                let (child, create_result) = create_child(create_fn)?;
                 entry.insert(Arc::downgrade(&child));
-                (child, exists)
+                (child, create_result)
             }
             Entry::Occupied(mut entry) => {
                 // It's possible that the upgrade will succeed this time around because we dropped
@@ -876,15 +949,15 @@ impl<'a> DirEntryLockedChildren<'a> {
                 // populated this entry while we were not holding any locks.
                 if let Some(child) = Weak::upgrade(entry.get()) {
                     child.node.fs().did_access_dir_entry(&child);
-                    return Ok((child, true));
+                    return Ok((child, CreationResult::Existed { create_fn }));
                 }
-                let (child, exists) = create_child()?;
+                let (child, create_result) = create_child(create_fn)?;
                 entry.insert(Arc::downgrade(&child));
-                (child, exists)
+                (child, create_result)
             }
         };
         child.node.fs().did_create_dir_entry(&child);
-        Ok((child, exists))
+        Ok((child, create_result))
     }
 }
 

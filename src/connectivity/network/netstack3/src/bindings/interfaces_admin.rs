@@ -1256,7 +1256,8 @@ async fn run_address_state_provider(
     let (address, subnet) = addr_subnet_either.addr_subnet();
     struct StateInCore {
         address: bool,
-        subnet_route: Option<routes::admin::UserRouteSet>,
+        subnet_route:
+            Option<(routes::admin::UserRouteSet<Ipv4>, routes::admin::UserRouteSet<Ipv6>)>,
     }
 
     // Add the address to Core. Note that even though we verified the address
@@ -1292,7 +1293,8 @@ async fn run_address_state_provider(
                     .expect("missing device info for interface")
                     .downgrade();
 
-                let route_set = routes::admin::UserRouteSet::new(ctx.clone());
+                let route_set_v4 = routes::admin::UserRouteSet::new(ctx.clone());
+                let route_set_v6 = routes::admin::UserRouteSet::new(ctx.clone());
 
                 let add_route_result = match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => {
@@ -1302,7 +1304,7 @@ async fn run_address_state_provider(
                             metric: netstack3_core::routes::AddableMetric::MetricTracksInterface,
                             gateway: None,
                         };
-                        route_set.apply_route_op(routes::RouteOp::Add(entry)).await
+                        route_set_v4.apply_route_op(routes::RouteOp::Add(entry)).await
                     }
                     net_types::ip::SubnetEither::V6(subnet) => {
                         let entry = netstack3_core::routes::AddableEntry {
@@ -1311,14 +1313,15 @@ async fn run_address_state_provider(
                             metric: netstack3_core::routes::AddableMetric::MetricTracksInterface,
                             gateway: None,
                         };
-                        route_set.apply_route_op(routes::RouteOp::Add(entry)).await
+                        route_set_v6.apply_route_op(routes::RouteOp::Add(entry)).await
                     }
                 };
 
                 match add_route_result {
                     Err(e) => {
                         tracing::warn!("failed to add subnet route {:?}: {:?}", subnet, e);
-                        route_set.close().await;
+                        route_set_v4.close().await;
+                        route_set_v6.close().await;
                         StateInCore { address: true, subnet_route: None }
                     }
                     Ok(outcome) => {
@@ -1330,7 +1333,10 @@ async fn run_address_state_provider(
                             for this"
                         );
 
-                        StateInCore { address: true, subnet_route: Some(route_set) }
+                        StateInCore {
+                            address: true,
+                            subnet_route: Some((route_set_v4, route_set_v6)),
+                        }
                     }
                 }
             } else {
@@ -1402,8 +1408,9 @@ async fn run_address_state_provider(
     // The presence of this `route_set` indicates that we added a subnet route
     // previously due to the `add_subnet_route` AddressParameters option.
     // Closing `route_set` will correctly remove this route.
-    if let Some(route_set) = subnet_route {
-        route_set.close().await;
+    if let Some((route_set_v4, route_set_v6)) = subnet_route {
+        route_set_v4.close().await;
+        route_set_v6.close().await;
     }
 
     if remove_address {

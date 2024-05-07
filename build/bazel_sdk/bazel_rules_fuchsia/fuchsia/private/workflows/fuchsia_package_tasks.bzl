@@ -9,6 +9,7 @@ load(":fuchsia_task_publish.bzl", "fuchsia_task_publish")
 load(":fuchsia_task_register_debug_symbols.bzl", "fuchsia_task_register_debug_symbols")
 load(":fuchsia_task_run_component.bzl", "fuchsia_task_run_component")
 load(":fuchsia_task_run_driver_tool.bzl", "fuchsia_task_run_driver_tool")
+load(":fuchsia_task_test_enumerated_components.bzl", "fuchsia_task_test_enumerated_components")
 load(":fuchsia_task_verbs.bzl", "make_help_executable", "verbs")
 load(":fuchsia_workflow.bzl", "fuchsia_workflow", "fuchsia_workflow_rule")
 load(":providers.bzl", "FuchsiaDebugSymbolInfo", "FuchsiaPackageInfo", "FuchsiaWorkflowInfo")
@@ -21,6 +22,8 @@ def _fuchsia_package_help_impl(ctx, make_shell_task):
     components = ctx.attr.package[FuchsiaPackageInfo].packaged_components
     help = make_help_executable(ctx, dict((
         [(verbs.noverb, "Run all test components within this test package.")] if ctx.attr.is_test and len(components) > 0 else []
+    ) + (
+        [(verbs.test_enumerated, "Enumerates and tests all components within this test package.")] if ctx.attr.enumerated_testing_workflow else []
     ) + [
         (verbs.help, "Print this help message."),
         (verbs.debug_symbols, "Register this package's debug symbols."),
@@ -43,13 +46,17 @@ def _fuchsia_package_help_impl(ctx, make_shell_task):
     implementation = _fuchsia_package_help_impl,
     doc = "Prints valid runnable sub-targets in a package.",
     attrs = {
+        "package": attr.label(
+            doc = "The package.",
+            providers = [FuchsiaPackageInfo],
+            mandatory = True,
+        ),
         "is_test": attr.bool(
             doc = "Whether the package is a test package.",
             mandatory = True,
         ),
-        "package": attr.label(
-            doc = "The package.",
-            providers = [FuchsiaPackageInfo],
+        "enumerated_testing_workflow": attr.bool(
+            doc = "Whether the :pkg.test_enumerated target is generated.",
             mandatory = True,
         ),
         "tools": attr.string_list(
@@ -157,6 +164,7 @@ def fuchsia_package_tasks(
         package_repository_name = None,
         disable_repository_name = None,
         test_realm = None,
+        enumerate_test_components = False,
         tags = [],
         **kwargs):
     # Disable Bazel sandboxing when running tests to allow ffx run without
@@ -170,6 +178,10 @@ def fuchsia_package_tasks(
     #    running within an isolate dir.
     if is_test:
         tags = tags + ["no-sandbox", "no-cache"]
+    elif enumerate_test_components:
+        fail("enumerate_test_components is only allowed when is_test = True.")
+    elif test_realm:
+        fail("test_realm is only allowed when is_test = True.")
 
     # Every target beside the default target should be marked as manual,
     # as they are irrelevant to `bazel build //...` and incompatible with
@@ -229,20 +241,6 @@ def fuchsia_package_tasks(
         **kwargs
     )
 
-    # For `bazel run :pkg.help`.
-    help_task = verbs.help(name)
-    _fuchsia_package_help(
-        name = help_task,
-        package = package,
-        tools = tools,
-        debug_symbols_task = debug_symbols_task,
-        publish_task = publish_task,
-        top_level_name = name,
-        is_test = is_test,
-        tags = intermediate_target_tags,
-        **kwargs
-    )
-
     # For `bazel run :pkg.component`.
     component_run_tasks = []
     for run_tag in component_run_tags:
@@ -273,6 +271,51 @@ def fuchsia_package_tasks(
             **kwargs
         )
 
+    # For `bazel test :pkg.test_enumerated`.
+    if enumerate_test_components:
+        enumerated_testing_task = verbs.test_enumerated(name)
+        enumerated_testing_subtask = "%s.run_only" % enumerated_testing_task
+        fuchsia_task_test_enumerated_components(
+            name = enumerated_testing_subtask,
+            default_argument_scope = "global",
+            repository = package_repository_name or anonymous_repo_name,
+            package = package,
+            tags = intermediate_target_tags,
+            test_realm = test_realm,
+            **kwargs
+        )
+
+        fuchsia_workflow(
+            name = enumerated_testing_task,
+            sequence = [
+                debug_symbols_task,
+                anonymous_publish_task,
+                enumerated_testing_subtask,
+            ] + ([] if package_repository_name else [
+                verbs.delete_repo(anonymous_publish_task),
+            ]),
+            tags = intermediate_target_tags,
+            **kwargs
+        )
+
+        # Ensure the following for test packages:
+        # 1. `fuchsia_[unit]test_package` (non-prebuilt) packages never offer
+        #    the "test enumerated components" workflow. This is because we have
+        #    perfect knowledge of the test components that exist in the test
+        #    package during analysis phase when it is created within the build
+        #    system.
+        # 2. `fuchsia_prebuilt_test_package` should always offer the "test
+        #    enumarted components" workflow. This is because we cannot know all
+        #    of the test components during analysis phase in a non error-prone
+        #    manner so it's useful to offer this as an option.
+        #    The default `bazel test :pkg` workflow should:
+        #    a. Operate exactly like `fuchsia_[unit]test_package`, if users
+        #       specify `test_components`.
+        #    b. Fallback to `bazel test :pkg.test_enumerated` behavior, if
+        #       `test_components` is omitted.
+        if not component_run_tasks:
+            component_run_tasks = [enumerated_testing_subtask]
+
     # For `bazel run :pkg.tool`.
     for label, tool in tools.items():
         tool_run_task = _to_verb(label)(name)
@@ -298,6 +341,21 @@ def fuchsia_package_tasks(
             tags = intermediate_target_tags,
             **kwargs
         )
+
+    # For `bazel run :pkg.help`.
+    help_task = verbs.help(name)
+    _fuchsia_package_help(
+        name = help_task,
+        package = package,
+        tools = tools,
+        debug_symbols_task = debug_symbols_task,
+        publish_task = publish_task,
+        top_level_name = name,
+        is_test = is_test,
+        enumerated_testing_workflow = enumerate_test_components,
+        tags = intermediate_target_tags,
+        **kwargs
+    )
 
     # For `bazel run :pkg`.
     _fuchsia_package_default_task(

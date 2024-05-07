@@ -198,8 +198,14 @@ async def select_tests(
                 else:
                     # In exact mode, don't match names against
                     # anything but the name field itself.
+                    #
+                    # For host tests, still allow exact matches against last
+                    # segment of the name for more succinct selections.
                     tasks = [
                         name.distances(n, recorder, id, exact=True)
+                        for n in group.names
+                    ] + [
+                        trailing_path.distances(n, recorder, id, exact=True)
                         for n in group.names
                     ]
                 results: list[list[_TestDistance]] = await asyncio.gather(

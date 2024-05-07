@@ -218,7 +218,10 @@ if (current_toolchain == default_toolchain) {
     # environment makes it a Linux x86 (bzImage) compatible kernel image.
     source_set("linuxboot") {
       sources = [ "linuxboot-header.S" ]
-      libs = [ "./linuxboot.ld" ]
+      libs = [
+        "./linuxboot.ld",
+        "./linuxboot32.ld",
+      ]
       deps = [
         ":linuxboot-asm",
         ":linuxboot-init",
@@ -255,6 +258,33 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
+  # Just putting this in deps of a phys_executable() in the kernel.phys
+  # environment makes it a Linux/x86 (bzImage) compatible kernel image that
+  # requires a boot loader that prefers the 64-bit boot protocol.
+  source_set("linuxboot64") {
+    sources = [ "linuxboot64-header.S" ]
+    configs += [ ":ikconfig.config" ]
+    libs = [ "./linuxboot.ld" ]
+    deps = [
+      ":linuxboot-asm",
+      ":linuxboot-init",
+    ]
+  }
+
+  # Just putting this in deps of a phys_executable() in the kernel.phys
+  # environment makes it into a raw image that expects to be entered at the
+  # start of the image in memory, but with the Linux/x86 64-bit boot protocol.
+  # This won't be started by a Linux-compatible boot loader, which would enter
+  # at 0x200 past the start of the image.  Instead, it will be embedded by
+  # linuxbiboot.S into the outer phys32 image of a linuxbiboot_executable().
+  source_set("linuxbiboot64") {
+    public_configs = [ "//zircon/kernel/phys:load-pic" ]
+    deps = [
+      ":linuxboot-init",
+      "//zircon/kernel/phys:raw-header",
+    ]
+  }
+
   source_set("linuxboot.h") {
     public = [ "linuxboot.h" ]
     public_deps = [
@@ -264,7 +294,10 @@ if (current_toolchain == default_toolchain) {
   }
 
   config("ikconfig.config") {
-    visibility = [ ":linuxboot" ]
+    visibility = [
+      ":linuxboot",
+      ":linuxboot64",
+    ]
 
     # This input is a gzipped linux in-kernel config.
     # To update this file, edit ikconfig.txt in this directory and run:
@@ -284,6 +317,7 @@ if (current_toolchain == default_toolchain) {
     deps = [
       ":linuxboot.h",
       "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:address-space",
       "//zircon/kernel/phys:allocation",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:symbolize",
@@ -376,7 +410,6 @@ hwreg_asm_header("phys32.h") {
 }
 
 hwreg_asm_header("linuxboot-asm") {
-  visibility = [ ":linuxboot" ]
   output_name = "linuxboot-asm.h"
   sources = [ "linuxboot-asm-gen.cc" ]
   deps = [ ":linuxboot.h" ]

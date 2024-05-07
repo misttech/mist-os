@@ -19,6 +19,11 @@ def main():
     parser.add_argument(
         "--specs", help="Path to spec files of dependencies", nargs="*"
     )
+    parser.add_argument(
+        "--stable",
+        help="Whether this library is stabilized",
+        action="store_true",
+    )
     parser.add_argument("--sources", help="List of library sources", nargs="+")
     args = parser.parse_args()
 
@@ -27,6 +32,7 @@ def main():
         "name": args.name,
         "root": args.root,
         "sources": args.sources,
+        "stable": args.stable,
     }
 
     deps = []

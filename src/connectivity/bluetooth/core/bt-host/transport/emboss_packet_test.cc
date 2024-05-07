@@ -11,7 +11,7 @@
 
 #include <pw_bluetooth/hci_commands.emb.h>
 #include <pw_bluetooth/hci_test.emb.h>
-#include <pw_bluetooth/hci_vendor.emb.h>
+#include <pw_bluetooth/hci_android.emb.h>
 
 namespace bt::hci {
 namespace {

@@ -15,7 +15,6 @@ use {
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
-    bedrock_error::Explain,
     cm_rust::NativeIntoFidl,
     cm_types::{Name, Url},
     errors::OpenExposedDirError,
@@ -30,6 +29,7 @@ use {
     lazy_static::lazy_static,
     measure_tape_for_instance::Measurable,
     moniker::{Moniker, MonikerBase},
+    router_error::Explain,
     routing::{
         component_instance::{ComponentInstanceInterface, ResolvedInstanceInterface},
         resolving::ComponentAddress,

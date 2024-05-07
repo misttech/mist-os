@@ -3,13 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        ap::TimedEvent,
-        buffer::{Buffer, CBufferProvider},
-        device::DeviceOps,
-        disconnect::LocallyInitiated,
-        error::Error,
-    },
+    crate::{ap::TimedEvent, device::DeviceOps, disconnect::LocallyInitiated, error::Error},
     anyhow::format_err,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
@@ -24,6 +18,7 @@ use {
         timer::{EventId, Timer},
         wmm, TimeUnit,
     },
+    wlan_ffi_transport::{Buffer, BufferProvider},
     wlan_frame_writer::{write_frame, write_frame_with_fixed_buffer},
 };
 
@@ -35,7 +30,7 @@ pub struct BeaconOffloadParams {
 
 pub struct Context<D> {
     pub device: D,
-    pub buffer_provider: CBufferProvider,
+    pub buffer_provider: BufferProvider,
     pub timer: Timer<TimedEvent>,
     pub seq_mgr: SequenceManager,
     pub bssid: Bssid,
@@ -44,7 +39,7 @@ pub struct Context<D> {
 impl<D> Context<D> {
     pub fn new(
         device: D,
-        buffer_provider: CBufferProvider,
+        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
@@ -63,7 +58,7 @@ impl<D> Context<D> {
         auth_txn_seq_num: u16,
         status_code: StatusCode,
     ) -> Result<(Buffer, usize), Error> {
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -87,7 +82,7 @@ impl<D> Context<D> {
         rates: &[u8],
         max_idle_period: Option<u16>,
     ) -> Result<(Buffer, usize), Error> {
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -131,7 +126,7 @@ impl<D> Context<D> {
         capabilities: mac::CapabilityInfo,
         status_code: StatusCode,
     ) -> Result<(Buffer, usize), Error> {
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -156,7 +151,7 @@ impl<D> Context<D> {
         addr: MacAddr,
         reason_code: mac::ReasonCode,
     ) -> Result<(Buffer, usize), Error> {
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -177,7 +172,7 @@ impl<D> Context<D> {
         addr: MacAddr,
         reason_code: mac::ReasonCode,
     ) -> Result<(Buffer, usize), Error> {
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -204,7 +199,7 @@ impl<D> Context<D> {
         channel: u8,
         rsne: &[u8],
     ) -> Result<(Buffer, usize), Error> {
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -250,7 +245,7 @@ impl<D> Context<D> {
         rsne: &[u8],
     ) -> Result<(Buffer, usize, BeaconOffloadParams), Error> {
         let mut tim_ele_offset = 0;
-        let (buffer, written) = write_frame!(&self.buffer_provider, {
+        let (buffer, written) = write_frame!(self.buffer_provider, {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -311,7 +306,7 @@ impl<D> Context<D> {
             None
         };
 
-        write_frame!(&self.buffer_provider, {
+        write_frame!(self.buffer_provider, {
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -522,12 +517,13 @@ impl<D: DeviceOps> Context<D> {
 mod test {
     use {
         super::*,
-        crate::{ap::ClientEvent, buffer::FakeCBufferProvider, device::FakeDevice},
+        crate::{ap::ClientEvent, device::FakeDevice},
         lazy_static::lazy_static,
         wlan_common::{
             assert_variant,
             timer::{self, create_timer},
         },
+        wlan_ffi_transport::FakeFfiBufferProvider,
     };
 
     lazy_static! {
@@ -540,7 +536,15 @@ mod test {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID), time_stream)
+        (
+            Context::new(
+                fake_device,
+                BufferProvider::new(FakeFfiBufferProvider::new()),
+                timer,
+                *BSSID,
+            ),
+            time_stream,
+        )
     }
 
     #[fuchsia::test(allow_stalls = false)]

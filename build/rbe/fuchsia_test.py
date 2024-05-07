@@ -114,7 +114,7 @@ class RustcTargetToSysrootTripleTests(unittest.TestCase):
             "x86_64-linux-gnu",
             "aarch64-linux-gnu",
             "riscv64gc-fuchsia",
-            "x86_64-fuchsia",
+            "x86_64-unknown-fuchsia",
         ):
             fuchsia.rustc_target_to_sysroot_triple(t)
 

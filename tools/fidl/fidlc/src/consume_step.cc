@@ -535,9 +535,7 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
   if (arg == nullptr || !arg->value->IsResolved()) {
     return;
   }
-  const ConstantValue& value = arg->value->Value();
-  ZX_ASSERT(value.kind == ConstantValue::Kind::kString);
-  auto str = static_cast<const StringConstantValue&>(value).value;
+  auto str = arg->value->Value().AsString();
   if (IsValidIdentifierComponent(str)) {
     context->set_name_override(std::string(str));
   } else {

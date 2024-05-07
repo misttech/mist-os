@@ -14,7 +14,10 @@ use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
 use tracing::debug;
 
 use crate::{
-    context::{CoreTimerContext, EventContext, HandleableTimer, TimerBindingsTypes, TimerContext},
+    context::{
+        CoreEventContext, CoreTimerContext, EventContext, HandleableTimer, TimerBindingsTypes,
+        TimerContext,
+    },
     device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
     ip::device::{
         state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext,
@@ -87,6 +90,7 @@ pub(super) trait DadContext<BC: DadBindingsTypes>:
     IpDeviceAddressIdContext<Ipv6>
     + DeviceIdContext<AnyDevice>
     + CoreTimerContext<DadTimerId<Self::WeakDeviceId, Self::WeakAddressId>, BC>
+    + CoreEventContext<DadEvent<Self::DeviceId>>
 {
     type DadAddressCtx<'a>: DadAddressContext<
         BC,
@@ -132,14 +136,11 @@ pub trait DadBindingsTypes: TimerBindingsTypes {}
 impl<BT> DadBindingsTypes for BT where BT: TimerBindingsTypes {}
 
 /// The bindings execution context for DAD.
-pub trait DadBindingsContext<DeviceId>:
-    DadBindingsTypes + TimerContext + EventContext<DadEvent<DeviceId>>
-{
-}
-impl<DeviceId, BC> DadBindingsContext<DeviceId> for BC where
-    BC: DadBindingsTypes + TimerContext + EventContext<DadEvent<DeviceId>>
-{
-}
+///
+/// The type parameter `E` is tied by [`DadContext`] so that [`DadEvent`] can be
+/// transformed into an event that is more meaningful to bindings.
+pub trait DadBindingsContext<E>: DadBindingsTypes + TimerContext + EventContext<E> {}
+impl<E, BC> DadBindingsContext<E> for BC where BC: DadBindingsTypes + TimerContext + EventContext<E> {}
 
 /// An implementation for Duplicate Address Detection.
 pub trait DadHandler<I: IpDeviceIpExt, BC>:
@@ -177,7 +178,7 @@ enum DoDadVariation {
     Continue,
 }
 
-fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>>(
+fn do_duplicate_address_detection<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -234,10 +235,13 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                 None => {
                     *dad_state = Ipv6DadState::Assigned;
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
-                    bindings_ctx.on_event(DadEvent::AddressAssigned {
-                        device: device_id.clone(),
-                        addr: addr.addr_sub().addr().get(),
-                    });
+                    CC::on_event(
+                        bindings_ctx,
+                        DadEvent::AddressAssigned {
+                            device: device_id.clone(),
+                            addr: addr.addr_sub().addr().get(),
+                        },
+                    );
                     false
                 }
                 Some(non_zero_remaining) => {
@@ -327,7 +331,7 @@ where
     }
 }
 
-impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, BC> for CC {
+impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> DadHandler<Ipv6, BC> for CC {
     const INITIAL_ADDRESS_STATE: IpAddressState = IpAddressState::Tentative;
 
     fn start_duplicate_address_detection(
@@ -381,7 +385,7 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, 
     }
 }
 
-impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> HandleableTimer<CC, BC>
+impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> HandleableTimer<CC, BC>
     for DadTimerId<CC::WeakDeviceId, CC::WeakAddressId>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
@@ -412,14 +416,14 @@ mod tests {
         ip::{AddrSubnet, IpAddress as _},
         Witness as _,
     };
-    use packet::EmptyBuf;
+    use packet::{BufferMut, EmptyBuf, Serializer};
     use packet_formats::icmp::ndp::Options;
 
     use super::*;
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _, TimerHandler,
+            InstantContext as _, SendFrameContext as _, SendableFrameMeta, TimerHandler,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::{
@@ -535,6 +539,28 @@ mod tests {
     impl CoreTimerContext<TestDadTimerId, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn convert_timer(dispatch_id: TestDadTimerId) -> TestDadTimerId {
             dispatch_id
+        }
+    }
+
+    impl CoreEventContext<DadEvent<FakeDeviceId>> for FakeCoreCtxImpl {
+        type OuterEvent = DadEvent<FakeDeviceId>;
+        fn convert_event(event: DadEvent<FakeDeviceId>) -> DadEvent<FakeDeviceId> {
+            event
+        }
+    }
+
+    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for DadMessageMeta {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
         }
     }
 
@@ -675,7 +701,7 @@ mod tests {
         let options = Options::parse(&frame[..]).expect("parse NDP options");
         assert_eq!(options.iter().count(), 0);
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_timers_installed([(dad_timer_id(), bindings_ctx.now() + retrans_timer.get())]);
     }
 
@@ -775,7 +801,7 @@ mod tests {
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
             core_ctx.get_ref();
         assert_matches!(*state, Ipv6DadState::Uninitialized);

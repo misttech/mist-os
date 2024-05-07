@@ -42,14 +42,21 @@ fuchsia_product_assembly_config_label = "//products/minimal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
-extra_bazel_assembly_targets =
-    [ "//build/bazel/assembly/assembly_outputs:verifications" ]
 
 # Packages to be published to universe that do not go through assembly.
 discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 
-# List all artifacts to upload to CIPD.
-cipd_assembly_artifact_targets = [
-  "//build/images:main_assembly",
+# These targets used to flow through GN assembly. Now add them explicitly to
+# Bazel assebmly to make sure they can be built for CIPD uploads.
+extra_bazel_assembly_targets = [
+  "//build/images/fuchsia:assembly_inputs",
   "//products/minimal:board_assembly_artifacts",
 ]
+
+# List all artifacts to upload to CIPD.
+cipd_assembly_artifact_targets = [
+  "//build/images/fuchsia:assembly_inputs",
+  "//products/minimal:board_assembly_artifacts",
+]
+
+use_bazel_images_only = true

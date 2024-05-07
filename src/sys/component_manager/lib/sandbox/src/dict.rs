@@ -234,7 +234,7 @@ impl Dict {
         let mut dict = self.clone();
 
         // Move this capability into the registry.
-        registry::spawn_task(self.into(), koid, async move {
+        registry::insert(self.into(), koid, async move {
             dict.serve_dict(stream).await.expect("failed to serve Dict");
         });
     }

@@ -242,12 +242,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     _ => {}
                 }
 
-                // This is a temporary change to include wlanphy driver through
-                // wlanphy platform AIB. It will be removed after we move the driver
-                // into bootstrap AIB.
-                if context.board_info.provides_feature("fuchsia::platform_driver_migration") {
-                    builder.platform_bundle("wlanphy_driver");
-                }
+                builder.platform_bundle("wlanphy_driver");
 
                 // Some products require legacy security types to be supported.
                 // Otherwise, they are disabled by default.

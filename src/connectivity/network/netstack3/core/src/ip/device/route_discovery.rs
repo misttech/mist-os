@@ -428,7 +428,7 @@ mod tests {
             ROUTE1,
             None,
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     fn discover_new_route(
@@ -474,7 +474,7 @@ mod tests {
     ) {
         let route_table = &core_ctx.get_ref().route_table.route_table;
         assert!(!route_table.contains(&route), "route_table={route_table:?}");
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     fn assert_single_invalidation_timer(
@@ -506,7 +506,7 @@ mod tests {
 
         // There should not be any add-route events dispatched.
         assert_eq!(bindings_ctx.take_events(), []);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[test]
@@ -528,7 +528,7 @@ mod tests {
         let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[test]
@@ -536,7 +536,7 @@ mod tests {
         let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         RouteDiscoveryHandler::update_route(
             &mut core_ctx,
@@ -566,7 +566,7 @@ mod tests {
         let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         update_to_invalidate_check_invalidation(&mut core_ctx, &mut bindings_ctx, ROUTE1);
     }
@@ -601,7 +601,7 @@ mod tests {
             ROUTE1,
             Some(NonZeroNdpLifetime::Infinite),
         );
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[test]
@@ -660,7 +660,7 @@ mod tests {
         );
 
         RouteDiscoveryHandler::invalidate_routes(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         let route_table = &core_ctx.get_ref().route_table.route_table;
         assert!(route_table.is_empty(), "route_table={route_table:?}");
     }

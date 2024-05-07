@@ -243,6 +243,7 @@ mod tests {
 
     use net_declare::net_ip_v6;
     use netstack3_base::IntoCoreTimerCtx;
+    use packet::BufferMut;
     use packet_formats::icmp::ndp::{options::NdpOption, Options};
     use test_case::test_case;
 
@@ -250,7 +251,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _,
+            InstantContext as _, SendFrameContext as _, SendableFrameMeta,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::testutil::FakeIpDeviceIdCtx,
@@ -278,6 +279,21 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
     type FakeBindingsCtxImpl =
         FakeBindingsCtx<RsTimerId<FakeWeakDeviceId<FakeDeviceId>>, (), (), ()>;
+
+    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for RsMessageMeta {
+        fn send_meta<S>(
+            self,
+            core_ctx: &mut FakeCoreCtxImpl,
+            bindings_ctx: &mut FakeBindingsCtxImpl,
+            frame: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
+        }
+    }
 
     impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;
@@ -336,11 +352,11 @@ mod tests {
 
         let now = bindings_ctx.now();
         bindings_ctx
-            .timer_ctx()
+            .timers
             .assert_timers_installed_range([(RS_TIMER_ID, now..=now + MAX_RTR_SOLICITATION_DELAY)]);
 
         RsHandler::stop_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
 
         assert_eq!(core_ctx.frames(), &[][..]);
     }
@@ -409,7 +425,7 @@ mod tests {
             );
             let now = bindings_ctx.now();
             bindings_ctx
-                .timer_ctx()
+                .timers
                 .assert_timers_installed_range([(RS_TIMER_ID, now..=now + duration)]);
 
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(RS_TIMER_ID));
@@ -428,7 +444,7 @@ mod tests {
             duration = RTR_SOLICITATION_INTERVAL;
         }
 
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.get_ref().rs_state.remaining, None);
         let frames = core_ctx.frames();
         assert_eq!(frames.len(), usize::from(max_router_solicitations), "frames = {:?}", frames);

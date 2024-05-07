@@ -126,7 +126,7 @@ void AddressSpace::ArchInstall() const {
 }
 
 void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
-  if (gBootOptions && !gBootOptions->phys_mmu) {
+  if (gBootOptions && !gBootOptions->arm64_phys_mmu) {
     return;
   }
   auto mair = arch::ArmMemoryAttrIndirectionRegister::Get()

@@ -16,7 +16,8 @@ pub struct GetArtifactsCommand {
     #[argh(positional)]
     pub product_bundle: Utf8PathBuf,
 
-    /// select what group of artifacts to list
+    /// select what group of artifacts to list.
+    /// One of flash, emu, update, bootloader
     #[argh(option, short = 'g')]
     pub artifacts_group: Type,
 

@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
+#include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/pinned-vmo.h>
@@ -333,57 +334,43 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    zx::event active_power_dep_token;
-    zx::event passive_power_dep_token;
-    zx::event::create(0, &active_power_dep_token);
-    zx::event::create(0, &passive_power_dep_token);
-
-    auto [current_level_client_end, current_level_server_end] =
-        fidl::Endpoints<fuchsia_power_broker::CurrentLevel>::Create();
-    auto [required_level_client_end, required_level_server_end] =
-        fidl::Endpoints<fuchsia_power_broker::RequiredLevel>::Create();
-    auto [lessor_client_end, lessor_server_end] =
-        fidl::Endpoints<fuchsia_power_broker::Lessor>::Create();
-
-    auto result = fdf_power::AddElement(
-        power_broker.value(), config, std::move(tokens.value()),
-        zx::unowned_event(active_power_dep_token), zx::unowned_event(passive_power_dep_token),
-        std::make_pair(std::move(current_level_server_end), std::move(required_level_server_end)),
-        std::move(lessor_server_end));
+    fdf_power::ElementDesc description =
+        fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+    auto result = fdf_power::AddElement(power_broker.value(), description);
     if (result.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to add power element: %u",
                static_cast<uint8_t>(result.error_value()));
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    active_power_dep_tokens_.push_back(std::move(active_power_dep_token));
-    passive_power_dep_tokens_.push_back(std::move(passive_power_dep_token));
+    active_power_dep_tokens_.push_back(std::move(description.active_token_));
+    passive_power_dep_tokens_.push_back(std::move(description.passive_token_));
 
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =
           std::move(result.value().element_control_channel());
-      hardware_power_lessor_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::Lessor>(std::move(lessor_client_end));
+      hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
+          std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(current_level_client_end));
+              std::move(description.current_level_client_.value()));
       // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
       // RequiredLevel.
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(required_level_client_end), dispatcher());
+          std::move(description.required_level_client_.value()), dispatcher());
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_end_ =
           std::move(result.value().element_control_channel());
-      wake_on_request_lessor_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::Lessor>(std::move(lessor_client_end));
+      wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
+          std::move(description.lessor_client_.value()));
       wake_on_request_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(current_level_client_end));
+              std::move(description.current_level_client_.value()));
       // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
       // RequiredLevel.
       wake_on_request_required_level_client_ =
           fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-              std::move(required_level_client_end), dispatcher());
+              std::move(description.required_level_client_.value()), dispatcher());
     } else {
       FDF_LOGL(ERROR, logger(), "Unexpected power element: %s",
                std::string(config.element().name().get()).c_str());

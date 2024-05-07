@@ -28,6 +28,7 @@ sdk_source_set("fidl_base") {
   category = "partner"
   api = "//sdk/lib/fidl_base/fidl_base.api"
   sdk_name = "fidl_base"
+  stable = true
 
   # TODO(https://fxbug.dev/42172264): We should represent the library as a
   # `sdk_static_library` when supported.

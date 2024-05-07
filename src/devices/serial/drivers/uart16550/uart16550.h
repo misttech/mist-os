@@ -5,12 +5,12 @@
 #ifndef SRC_DEVICES_SERIAL_DRIVERS_UART16550_UART16550_H_
 #define SRC_DEVICES_SERIAL_DRIVERS_UART16550_UART16550_H_
 
-#include <fuchsia/hardware/serialimpl/cpp/banjo.h>
-#include <lib/fit/function.h>
-#include <lib/zx/fifo.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>
 
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -19,6 +19,7 @@
 #include <hwreg/bitfields.h>
 #include <hwreg/pio.h>
 
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 #include "src/devices/lib/acpi/client.h"
 
 #if UART16550_TESTING
@@ -30,7 +31,7 @@ namespace uart16550 {
 class Uart16550;
 using DeviceType = ddk::Device<Uart16550>;
 
-class Uart16550 : public DeviceType, public ddk::SerialImplProtocol<Uart16550, ddk::base_protocol> {
+class Uart16550 : public DeviceType, public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   Uart16550();
 
@@ -39,8 +40,6 @@ class Uart16550 : public DeviceType, public ddk::SerialImplProtocol<Uart16550, d
   size_t FifoDepth() const;
 
   bool Enabled();
-
-  bool NotifyCallbackSet();
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -54,45 +53,73 @@ class Uart16550 : public DeviceType, public ddk::SerialImplProtocol<Uart16550, d
   // test-use only
   zx::unowned_interrupt InterruptHandle();
 
-  // ddk::SerialImplProtocol
-  zx_status_t SerialImplGetInfo(serial_port_info_t* info);
-
-  // ddk::SerialImplProtocol
-  zx_status_t SerialImplConfig(uint32_t baud_rate, uint32_t flags);
-
-  // ddk::SerialImplProtocol
-  zx_status_t SerialImplEnable(bool enable);
-
-  // ddk::SerialImplProtocol
-  zx_status_t SerialImplRead(uint8_t* buf, size_t size, size_t* actual);
-
-  // ddk::SerialImplProtocol
-  zx_status_t SerialImplWrite(const uint8_t* buf, size_t size, size_t* actual);
-
-  // ddk::SerialImplProtocol
-  zx_status_t SerialImplSetNotifyCallback(const serial_notify_t* cb);
-
   // ddk::Releasable
   void DdkRelease();
 
+  fidl::ProtocolHandler<fuchsia_hardware_serialimpl::Device> GetHandler();
+
  private:
+  struct WriteContext {
+    WriteContext(WriteCompleter::Async completer, cpp20::span<const uint8_t> data)
+        : completer(std::move(completer)), data(data) {}
+
+    WriteCompleter::Async completer;
+    cpp20::span<const uint8_t> data;
+  };
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override;
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override;
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override;
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override;
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request, fdf::Arena& arena,
+             WriteCompleter::Sync& completer) override;
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override;
+
+  // fdf::WireServer<fuchsia_hardware_serialimpl::Device>
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
   bool SupportsAutomaticFlowControl() const;
+
+  zx_status_t Config(uint32_t baud_rate, uint32_t flags);
+
+  zx_status_t Enable(bool enable);
+
+  void CancelAll();
 
   void ResetFifosLocked() __TA_REQUIRES(device_mutex_);
 
   void InitFifosLocked() __TA_REQUIRES(device_mutex_);
 
-  void NotifyLocked() __TA_REQUIRES(device_mutex_);
-
   void HandleInterrupts();
+
+  // Returns the number of bytes read from the RX FIFO.
+  size_t DrainRxFifo(cpp20::span<uint8_t> buffer) __TA_REQUIRES(device_mutex_);
+
+  // Fills the TX FIFO with as many bytes as possible, and returns a subspan pointing to the
+  // remaining data that did not fit.
+  cpp20::span<const uint8_t> FillTxFifo(cpp20::span<const uint8_t> data)
+      __TA_REQUIRES(device_mutex_);
 
   acpi::Client acpi_fidl_;
   std::mutex device_mutex_;
 
   std::thread interrupt_thread_;
   zx::interrupt interrupt_;
-
-  serial_notify_t notify_cb_ __TA_GUARDED(device_mutex_) = {};
 
 #if UART16550_TESTING
   // This should never be used before Init, but must be default-constructible.
@@ -106,7 +133,14 @@ class Uart16550 : public DeviceType, public ddk::SerialImplProtocol<Uart16550, d
   size_t uart_fifo_len_ = 1;
 
   bool enabled_ __TA_GUARDED(device_mutex_) = false;
-  serial_state_t state_ __TA_GUARDED(device_mutex_) = 0;
+
+  std::optional<ReadCompleter::Async> read_completer_ __TA_GUARDED(device_mutex_);
+
+  std::vector<uint8_t> write_buffer_ __TA_GUARDED(device_mutex_);
+  std::optional<WriteContext> write_context_ __TA_GUARDED(device_mutex_);
+
+  fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> bindings_;
+  fdf::OutgoingDirectory outgoing_;
 };  // namespace uart16550
 
 }  // namespace uart16550

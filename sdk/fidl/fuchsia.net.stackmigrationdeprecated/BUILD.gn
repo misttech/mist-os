@@ -8,5 +8,6 @@ fidl("fuchsia.net.stackmigrationdeprecated") {
   sources = [ "stackmigrationdeprecated.fidl" ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 }

@@ -15,7 +15,16 @@ lazy_static! {
 }
 
 /// Registers a capability with a task.
-pub(crate) fn spawn_task(
+///
+/// After this call, the registry will retain `capability` and recognize `koid`.
+/// One may use [`get`] to get another clone of the capability given the `koid`.
+///
+/// When `fut` completes:
+///
+/// - The `capability` will be dropped.
+/// - The `koid` will no longer be recognized by the registry.
+///
+pub(crate) fn insert(
     capability: Capability,
     koid: zx::Koid,
     fut: impl Future<Output = ()> + Send + 'static,
@@ -119,7 +128,7 @@ mod tests {
         let koid = zx::Koid::from_raw(123);
         let unit = Unit::default();
 
-        spawn_task(unit.into(), koid, task);
+        insert(unit.into(), koid, task);
 
         // Drop the sender so `task` completes and `remove_when_done_task` removes the entry.
         drop(sender);

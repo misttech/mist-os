@@ -429,16 +429,16 @@ bool CompileStep::ResolveLiteralConstant(LiteralConstant* literal_constant,
           uint64_t raw_value;
           switch (value.kind) {
             case ConstantValue::Kind::kUint8:
-              raw_value = static_cast<const NumericConstantValue<uint8_t>&>(value).value;
+              raw_value = value.AsNumeric<uint8_t>();
               break;
             case ConstantValue::Kind::kUint16:
-              raw_value = static_cast<const NumericConstantValue<uint16_t>&>(value).value;
+              raw_value = value.AsNumeric<uint16_t>();
               break;
             case ConstantValue::Kind::kUint32:
-              raw_value = static_cast<const NumericConstantValue<uint32_t>&>(value).value;
+              raw_value = value.AsNumeric<uint32_t>();
               break;
             case ConstantValue::Kind::kUint64:
-              raw_value = static_cast<const NumericConstantValue<uint64_t>&>(value).value;
+              raw_value = value.AsNumeric<uint64_t>();
               break;
             default:
               return false;
@@ -599,7 +599,7 @@ void CompileStep::CompileAttribute(Attribute* attribute, bool early) {
 
   const AttributeSchema& schema = all_libraries()->RetrieveAttributeSchema(attribute);
   if (early) {
-    ZX_ASSERT_MSG(schema.CanCompileEarly(), "attribute is not allowed to be compiled early");
+    ZX_ASSERT_MSG(schema.IsCompileEarly(), "attribute is not allowed to be compiled early");
   }
   schema.ResolveArgs(this, attribute);
   attribute->compiled = true;
@@ -945,20 +945,17 @@ static void SetResultUnionFields(Protocol::Method* method) {
 // Populates protocol->all_methods by recursively visiting composed protocols.
 class PopulateAllMethods {
  public:
-  PopulateAllMethods(Protocol* protocol, Reporter* reporter)
-      : original_protocol_(protocol), reporter_(reporter) {}
+  PopulateAllMethods(std::vector<Protocol::MethodWithInfo>* all_methods, Reporter* reporter)
+      : all_methods_(all_methods), reporter_(reporter) {}
 
-  void Run() { Visit(original_protocol_); }
-
- private:
-  void Visit(Protocol* protocol) {
+  void Visit(Protocol* protocol, const Protocol::ComposedProtocol* composed = nullptr) {
     for (const auto& member : protocol->composed_protocols) {
       auto target = member.reference.resolved().element();
       if (target->kind != Element::Kind::kProtocol)
         continue;
-      auto composed = static_cast<Protocol*>(target);
-      if (auto [it, inserted] = seen_.insert(composed); inserted)
-        Visit(composed);
+      auto target_protocol = static_cast<Protocol*>(target);
+      if (auto [it, inserted] = seen_.insert(target_protocol); inserted)
+        Visit(target_protocol, composed ? composed : &member);
     }
     for (auto& method : protocol->methods) {
       auto original_name = method.name.data();
@@ -979,12 +976,13 @@ class PopulateAllMethods {
           reporter_->Fail(ErrDuplicateMethodOrdinal, method.name, result.previous_occurrence());
         }
       }
-      original_protocol_->all_methods.push_back(
-          {.method = &method, .is_composed = protocol != original_protocol_});
+      all_methods_->push_back(
+          {.method = &method, .owning_protocol = protocol, .composed = composed});
     }
   }
 
-  Protocol* original_protocol_;
+ private:
+  std::vector<Protocol::MethodWithInfo>* all_methods_;
   Reporter* reporter_;
   Scope<std::string> canonical_names_;
   Ordinal64Scope ordinals_;
@@ -1037,7 +1035,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     }
   }
 
-  PopulateAllMethods(protocol_declaration, reporter()).Run();
+  PopulateAllMethods(&protocol_declaration->all_methods, reporter()).Visit(protocol_declaration);
 }
 
 void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
@@ -1047,7 +1045,7 @@ void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
   if (auto attr = method->attributes->Get("selector")) {
     if (auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName)) {
       if (auto& constant = arg->value; constant && constant->IsResolved()) {
-        auto value = static_cast<const StringConstantValue&>(constant->Value()).value;
+        auto value = constant->Value().AsString();
         if (IsValidFullyQualifiedMethodIdentifier(value)) {
           selector = value;
         } else if (IsValidIdentifierComponent(value)) {
@@ -1394,8 +1392,7 @@ bool CompileStep::ValidateMembers(DeclType* decl, MemberValidator<MemberType> va
       continue;
     }
 
-    MemberType value =
-        static_cast<const NumericConstantValue<MemberType>&>(member.value->Value()).value;
+    MemberType value = member.value->Value().template AsNumeric<MemberType>();
     const auto value_result = value_scope.Insert(value, member.name);
     if (!value_result.ok()) {
       const auto previous_span = value_result.previous_occurrence();
@@ -1462,8 +1459,7 @@ bool CompileStep::ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl,
       if (explicit_unknown_value.has_value()) {
         return reporter()->Fail(ErrUnknownAttributeOnMultipleEnumMembers, member.name);
       }
-      explicit_unknown_value =
-          static_cast<const NumericConstantValue<MemberType>&>(member.value->Value()).value;
+      explicit_unknown_value = member.value->Value().AsNumeric<MemberType>();
     }
   }
 

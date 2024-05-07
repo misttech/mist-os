@@ -364,7 +364,9 @@ fn pv(version_list: &Value) -> String {
     // If any value is 2^64-2, render it as HEAD
     // TODO(https://fxbug.dev/42069447) Update to have links for release notes
     for version in version_list.as_array().expect("get array of versions") {
-        version_val = if version["value"]["value"] == (crate::HEAD_VERSION_NUMBER).to_string() {
+        version_val = if version["value"]["value"] == (crate::NEXT_VERSION_NUMBER).to_string() {
+            crate::NEXT_VERSION.to_string()
+        } else if version["value"]["value"] == (crate::HEAD_VERSION_NUMBER).to_string() {
             crate::HEAD_VERSION.to_string()
         } else {
             version["value"]["value"].to_string().trim_matches('"').to_string()

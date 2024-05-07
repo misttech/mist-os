@@ -35,7 +35,6 @@
                 "*selinux_stat*",
                 "*selinux_sysctl*",
                 "*selinux_task_setnice*",
-                "*selinux_task_getsid*",
                 "*selinux_file*",
                 "*selinux_ioctl*",
                 "*selinux_capable_file*",

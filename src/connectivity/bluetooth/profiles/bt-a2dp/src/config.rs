@@ -9,7 +9,7 @@ use fuchsia_zircon as zx;
 use std::collections::HashSet;
 use thiserror::Error;
 
-use crate::sources::AudioSourceType;
+use crate::media::sources::AudioSourceType;
 
 pub(crate) const DEFAULT_DOMAIN: &str = "Bluetooth";
 pub(crate) const DEFAULT_INITIATOR_DELAY: zx::Duration = zx::Duration::from_millis(500);

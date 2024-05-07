@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::errors::TestRunError;
-use crate::opts::EnvironmentArgs;
+use crate::opts::TestPilotArgs;
 use crate::test_config::{TestConfigV1, TestConfiguration};
 use std::io::{self, Write};
 use std::process::{ExitStatus, Stdio};
@@ -21,7 +21,7 @@ const ENV_CUSTOM_TEST_ARGS: &str = "custom_test_args";
 const ENV_TAGS: &str = "TAGS";
 const BUFFER_SIZE: usize = 2048;
 
-fn create_test_launch_command_v1(args: &EnvironmentArgs, config: &TestConfigV1) -> Command {
+fn create_test_launch_command_v1(args: &TestPilotArgs, config: &TestConfigV1) -> Command {
     let mut cmd = Command::new(&args.test_bin_path);
     cmd.env_clear();
     cmd.env(ENV_PATH, DEFAULT_PATH);
@@ -59,8 +59,10 @@ fn create_test_launch_command_v1(args: &EnvironmentArgs, config: &TestConfigV1) 
         cmd.env(ENV_TAGS, tags_str);
     }
 
-    for (key, value) in &args.extra_env_vars {
-        cmd.env(key, value);
+    if !args.strict_mode {
+        for (key, value) in &args.extra_env_vars {
+            cmd.env(key, value);
+        }
     }
 
     cmd
@@ -137,7 +139,7 @@ async fn run_test_and_stream_output_v1<W1: Write + Send, W2: Write + Send>(
 }
 
 pub async fn run_test(
-    args: &EnvironmentArgs,
+    args: &TestPilotArgs,
     config: &TestConfiguration,
 ) -> Result<ExitStatus, TestRunError> {
     match config {
@@ -156,16 +158,18 @@ mod tests {
     use rand::{distributions::Alphanumeric, Rng};
     use std::{collections::HashMap, ffi::OsStr, io::Cursor};
 
-    fn default_args() -> EnvironmentArgs {
-        EnvironmentArgs {
+    fn default_args() -> TestPilotArgs {
+        TestPilotArgs {
             test_bin_path: "/path/to/test_bin".into(),
             sdk_tools_path: None,
             targets: Vec::new(),
             resource_path: None,
+            out_dir: None,
             test_filter: None,
             custom_test_args: None,
             test_config: "/path/to/test_config".into(),
             timeout_seconds: None,
+            strict_mode: true,
             extra_env_vars: vec![],
         }
     }
@@ -203,6 +207,35 @@ mod tests {
 
         // make sure there are no inherited env variables
         assert_eq!(env.len(), 1);
+    }
+
+    #[test]
+    fn test_strict_mode() {
+        let mut args = default_args();
+        let config = default_config_v1();
+
+        args.extra_env_vars = vec![("key1".into(), "val1".into()), ("key2".into(), "val2".into())];
+
+        let cmd = create_test_launch_command_v1(&args, &config);
+
+        assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
+        assert_eq!(cmd.as_std().get_args().len(), 0);
+        let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
+        assert_eq!(env.get(OsStr::new("key1")), None);
+        assert_eq!(env.get(OsStr::new("key2")), None);
+
+        // make sure there are no inherited env variables
+        assert_eq!(env.len(), 1);
+
+        args.strict_mode = false;
+        let cmd = create_test_launch_command_v1(&args, &config);
+        assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
+        assert_eq!(cmd.as_std().get_args().len(), 0);
+        let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
+
+        // make sure we inherit extra env variables.
+        assert_eq!(env.get(OsStr::new("key1")).unwrap().unwrap(), "val1");
+        assert_eq!(env.get(OsStr::new("key2")).unwrap().unwrap(), "val2");
     }
 
     #[test]
@@ -257,6 +290,7 @@ mod tests {
         args.resource_path = Some("/path/to/resource_path".into());
         args.test_filter = Some("test*filter".into());
         args.custom_test_args = Some("--arg1 --arg2".into());
+        args.strict_mode = false;
         args.extra_env_vars = vec![("key1".into(), "val1".into()), ("key2".into(), "val2".into())];
 
         let cmd = create_test_launch_command_v1(&args, &config);

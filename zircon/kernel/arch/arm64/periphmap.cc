@@ -333,6 +333,11 @@ zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
       return status;
     }
 
+    // Mapping already covered.
+    if (range.base_phys <= base_phys && range.length >= base_phys - range.base_phys + length) {
+      return ZX_OK;
+    }
+
     base_virt = range.base_virt;
   }
   return ZX_ERR_OUT_OF_RANGE;

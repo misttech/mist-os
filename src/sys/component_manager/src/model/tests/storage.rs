@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        actions::{ActionSet, DestroyAction, ShutdownType},
+        actions::{ActionsManager, DestroyAction, ShutdownType},
         component::StartReason,
         routing::route_and_open_capability,
         start::Start,
@@ -15,7 +15,6 @@ use {
     },
     assert_matches::assert_matches,
     async_utils::PollExt,
-    bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
@@ -27,6 +26,7 @@ use {
     fuchsia_sync as fsync, fuchsia_zircon as zx,
     futures::{channel::mpsc, pin_mut, StreamExt},
     moniker::{Moniker, MonikerBase},
+    router_error::{DowncastErrorForTest, RouterError},
     routing::{error::RoutingError, RouteRequest},
     std::path::Path,
     vfs::{
@@ -655,7 +655,7 @@ async fn use_restricted_storage_open_failure() {
     .await;
     assert_matches!(
         result,
-        Err(BedrockError::RoutingError(err))
+        Err(RouterError::NotFound(err))
         if matches!(
             err.downcast_for_test::<RoutingError>(),
             RoutingError::ComponentNotInIdIndex { .. }
@@ -1684,7 +1684,7 @@ fn storage_does_not_block_shutdown_when_backing_dir_hangs() {
             .await
             .expect("Storage connection should finish");
 
-        ActionSet::register(root.clone(), DestroyAction::new()).await.expect("destroy failed");
+        ActionsManager::register(root.clone(), DestroyAction::new()).await.expect("destroy failed");
     });
     executor.run_until_stalled(&mut test_body).unwrap();
 }

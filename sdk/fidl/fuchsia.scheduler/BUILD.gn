@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.scheduler") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Kernel"
 
   sources = [ "role.fidl" ]

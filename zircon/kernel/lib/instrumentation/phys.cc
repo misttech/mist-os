@@ -35,14 +35,10 @@ Handle* MakePhysVmo(const PhysVmo& phys_vmo) {
   status = vmo->Write(contents.data(), 0, contents.size_bytes());
   ZX_ASSERT(status == ZX_OK);
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  status = ContentSizeManager::Create(contents.size_bytes(), &content_size_manager);
-  ZX_ASSERT(status == ZX_OK);
-
   zx_rights_t rights;
   KernelHandle<VmObjectDispatcher> handle;
   status =
-      VmObjectDispatcher::Create(ktl::move(vmo), ktl::move(content_size_manager),
+      VmObjectDispatcher::Create(ktl::move(vmo), contents.size_bytes(),
                                  VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
   ZX_ASSERT(status == ZX_OK);
   status = handle.dispatcher()->set_name(phys_vmo.name.data(), phys_vmo.name.size());

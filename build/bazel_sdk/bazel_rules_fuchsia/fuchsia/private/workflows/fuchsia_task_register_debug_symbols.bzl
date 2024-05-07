@@ -13,7 +13,7 @@ def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
         (build_id_dir, build_dir)
         for build_dir, build_id_dirs in collect_debug_symbols(ctx.attr.deps).build_id_dirs.items()
         for build_id_dir in build_id_dirs.to_list()
-    ])
+    ]) or ([], [])
 
     return make_shell_task(
         command = [

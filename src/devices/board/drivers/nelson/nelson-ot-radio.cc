@@ -14,9 +14,9 @@
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/spi/cpp/bind.h>
 #include <bind/fuchsia/nordic/platform/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <bind/fuchsia/spi/cpp/bind.h>
 
 #include "nelson-gpios.h"
 #include "nelson.h"
@@ -40,7 +40,8 @@ static const std::vector<fpbus::Metadata> kNrf52811RadioMetadata{
 };
 
 const std::vector<fdf::BindRule> kSpiRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spi::SERVICE,
+                            bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                             bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -51,7 +52,8 @@ const std::vector<fdf::BindRule> kSpiRules = std::vector{
 };
 
 const std::vector<fdf::NodeProperty> kSpiProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_spi::SERVICE,
+                      bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                       bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
     fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,

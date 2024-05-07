@@ -1,0 +1,28 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("test.suspendcontrol") {
+  sources = [ "fidl/suspendcontrol.test.fidl" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.suspend",
+    "//zircon/vdso/zx",
+  ]
+}
+
+source_set("cpp") {
+  sources = [
+    "control_server.cc",
+    "control_server.h",
+    "device_server.cc",
+    "device_server.h",
+    "interfaces.h",
+  ]
+  public_deps = [
+    ":test.suspendcontrol_cpp",
+    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/lib/fit",
+  ]
+}

@@ -39,6 +39,7 @@ use {
         },
         serialized_types::BlobMetadata,
     },
+    fxfs_macros::ToWeakNode,
     std::{str::FromStr, sync::Arc},
     vfs::{
         directory::{
@@ -50,7 +51,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
-        ToObjectRequest,
+        ObjectRequestRef, ToObjectRequest,
     },
 };
 
@@ -58,6 +59,7 @@ use {
 /// It is not possible to create sub-directories.
 /// It is not possible to write to an existing blob.
 /// It is not possible to open or read a blob until it is written and verified.
+#[derive(ToWeakNode)]
 pub struct BlobDirectory {
     directory: Arc<FxDirectory>,
 }
@@ -482,6 +484,31 @@ impl VfsDirectory for BlobDirectory {
                 Err(Status::NOT_SUPPORTED)
             }
         });
+    }
+
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        object_request.take().handle(|object_request| {
+            if path.is_empty() {
+                object_request.spawn_connection(
+                    scope,
+                    OpenedNode::new(self).take(),
+                    protocols,
+                    MutableConnection::create,
+                )
+            } else {
+                tracing::error!(
+                    "Tried to open a blob via open(). Use the BlobCreator or BlobReader instead."
+                );
+                return Err(Status::NOT_SUPPORTED);
+            }
+        });
+        Ok(())
     }
 
     async fn read_dirents<'a>(

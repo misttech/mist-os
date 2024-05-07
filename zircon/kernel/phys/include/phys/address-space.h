@@ -10,6 +10,7 @@
 #include <zircon/assert.h>
 
 #include <hwreg/array.h>
+#include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/functional.h>
 #include <ktl/integer_sequence.h>
@@ -24,6 +25,19 @@
 namespace memalloc {
 class Pool;
 }  // namespace memalloc
+
+// Ordered list from highest supported page size shift to lowest.
+// When aligning ranges in memory, specially peripheral ranges, we attempt to
+// align those ranges to these boundaries, in order, such that the generated
+// mappings require a smaller set of pages.
+constexpr ktl::array kAddressSpacePageSizeShifts = ktl::to_array<size_t>({
+    // 1 GB
+    12 + (9 * 2),
+    // 2 MB
+    12 + (9 * 1),
+    // 4 KB
+    12 + (9 * 0),
+});
 
 // Defined below.
 class AddressSpace;

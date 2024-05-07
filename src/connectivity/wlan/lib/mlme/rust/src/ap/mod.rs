@@ -9,7 +9,6 @@ mod remote_client;
 
 use {
     crate::{
-        buffer::{Buffer, CBufferProvider},
         ddk_converter,
         device::{self, DeviceOps},
         error::Error,
@@ -25,6 +24,7 @@ use {
         timer::{EventId, Timer},
         TimeUnit,
     },
+    wlan_ffi_transport::{Buffer, BufferProvider},
     wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
@@ -135,7 +135,7 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     async fn new(
         config: Self::Config,
         device: D,
-        buffer_provider: CBufferProvider,
+        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error>
     where
@@ -180,7 +180,7 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
 impl<D> Ap<D> {
     pub fn new(
         device: D,
-        buffer_provider: CBufferProvider,
+        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
         bssid: Bssid,
     ) -> Self {
@@ -458,9 +458,7 @@ impl<D: DeviceOps> Ap<D> {
         if let Err(e) = match mac_frame {
             mac::MacFrame::Mgmt(mgmt) => bss.handle_mgmt_frame(&mut self.ctx, mgmt).await,
             mac::MacFrame::Data(data_frame) => bss.handle_data_frame(&mut self.ctx, data_frame),
-            mac::MacFrame::Ctrl { frame_ctrl, body } => {
-                bss.handle_ctrl_frame(&mut self.ctx, frame_ctrl, body)
-            }
+            mac::MacFrame::Ctrl(ctrl_frame) => bss.handle_ctrl_frame(&mut self.ctx, ctrl_frame),
             mac::MacFrame::Unsupported { frame_ctrl } => {
                 error!("received unsupported MAC frame: frame_ctrl = {:?}", frame_ctrl);
                 wtrace::async_end_wlansoftmac_rx(async_id, "received unsupported frame");
@@ -480,7 +478,6 @@ mod tests {
     use {
         super::*,
         crate::{
-            buffer::FakeCBufferProvider,
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::MockWlanRxInfo,
         },
@@ -494,6 +491,7 @@ mod tests {
             assert_variant, big_endian::BigEndianU16, test_utils::fake_frames::fake_wpa2_rsne,
             timer,
         },
+        wlan_ffi_transport::FakeFfiBufferProvider,
         wlan_frame_writer::write_frame_with_dynamic_buffer,
         wlan_sme::responder::Responder,
     };
@@ -538,7 +536,7 @@ mod tests {
         )
         .await;
         (
-            Ap::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID),
+            Ap::new(fake_device, BufferProvider::new(FakeFfiBufferProvider::new()), timer, *BSSID),
             fake_device_state,
             time_stream,
         )

@@ -72,6 +72,7 @@ sdk_source_set("cpp_sync") {
   category = "partner"
 
   sdk_name = "fidl_cpp_sync"
+  stable = true
 
   sources = [
     "internal/logging.cc",
@@ -101,6 +102,7 @@ sdk_source_set("cpp_base") {
   category = "partner"
 
   sdk_name = "fidl_cpp_base"
+  stable = true
 
   sources = [
     "clone.cc",

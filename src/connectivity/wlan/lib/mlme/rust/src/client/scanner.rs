@@ -544,7 +544,6 @@ mod tests {
     use {
         super::*,
         crate::{
-            buffer::FakeCBufferProvider,
             client::TimedEvent,
             device::{FakeDevice, FakeDeviceState},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
@@ -560,6 +559,7 @@ mod tests {
             sequence::SequenceManager,
             timer::{self, create_timer, Timer},
         },
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
     };
 
     lazy_static! {
@@ -1202,7 +1202,7 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buffer_provider: FakeCBufferProvider::new(),
+                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }

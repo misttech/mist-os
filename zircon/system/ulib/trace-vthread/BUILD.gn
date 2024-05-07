@@ -12,6 +12,7 @@ config("trace_vthread_include") {
 sdk_source_set("trace-vthread-headersonly") {
   sdk_name = "trace-vthread-headersonly"
   category = "partner"
+  stable = true
   public = [
     "include/trace-vthread/event_vthread.h",
     "include/trace-vthread/internal/event_vthread.h",

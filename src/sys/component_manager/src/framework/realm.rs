@@ -335,7 +335,6 @@ mod tests {
             model::{
                 component::StartReason,
                 events::{source::EventSource, stream::EventStream},
-                hooks::EventType,
                 testing::{mocks::*, out_dir::OutDir, test_helpers::*, test_hook::*},
             },
         },
@@ -347,6 +346,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client,
         futures::lock::Mutex,
+        hooks::EventType,
         moniker::MonikerBase,
         routing_test_helpers::component_decl_with_exposed_binder,
         std::collections::HashSet,

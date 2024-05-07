@@ -13,6 +13,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
 use fuchsia_zircon as zx;
 use realm_client::InstalledNamespace;
+use utils::{Event, EventVerifier};
 
 mod test_topology;
 mod utils;
@@ -44,83 +45,64 @@ async fn event_count_sampler_test() {
     ))
     .unwrap();
 
-    test_app_controller.increment_int(1).await.unwrap();
-    let events = utils::gather_sample_group(
-        utils::LogQuerierConfig { project_id: 5, expected_batch_size: 3 },
-        &logger_querier,
-    )
-    .await;
+    let mut project_5_events = EventVerifier::new(&logger_querier, 5);
 
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 101, value: 1 }
-    ));
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 102, value: 10 }
-    ));
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 103, value: 20 }
-    ));
+    test_app_controller.increment_int(1).await.unwrap();
+
+    project_5_events
+        .validate_with_count(
+            vec![
+                Event { id: 101, value: 1, codes: vec![0, 0] },
+                Event { id: 102, value: 10, codes: vec![0, 0] },
+                Event { id: 103, value: 20, codes: vec![0, 0] },
+            ],
+            "initial in event_count",
+        )
+        .await;
 
     // We want to guarantee a sample takes place before we increment the value again.
     // This is to verify that despite two samples taking place, the count type isn't uploaded with no diff
     // and the metric that is upload_once isn't sampled again.
     test_app_controller.wait_for_sample().await.unwrap().unwrap();
 
-    let events = utils::gather_sample_group(
-        utils::LogQuerierConfig { project_id: 5, expected_batch_size: 1 },
-        &logger_querier,
-    )
-    .await;
+    project_5_events
+        .validate_with_count(
+            vec![Event { id: 102, value: 10, codes: vec![0, 0] }],
+            "second in event_count",
+        )
+        .await;
 
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 102, value: 10 }
-    ));
     test_app_controller.increment_int(1).await.unwrap();
 
     test_app_controller.wait_for_sample().await.unwrap().unwrap();
 
-    let events = utils::gather_sample_group(
-        utils::LogQuerierConfig { project_id: 5, expected_batch_size: 2 },
-        &logger_querier,
-    )
-    .await;
-
-    // Even though we incremented metric-1 its value stays at 1 since it's being cached.
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 101, value: 1 }
-    ));
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 102, value: 10 }
-    ));
+    project_5_events
+        .validate_with_count(
+            vec![
+                // Even though we incremented metric-1 its value stays at 1 since it's being cached.
+                Event { id: 101, value: 1, codes: vec![0, 0] },
+                Event { id: 102, value: 10, codes: vec![0, 0] },
+            ],
+            "before reboot in event_count",
+        )
+        .await;
 
     // trigger_reboot calls the on_reboot callback that drives sampler shutdown. this
     // should await until sampler has finished its cleanup, which means we should have some events
     // present when we're done, and the sampler task should be finished.
     reboot_controller.trigger_reboot().await.unwrap().unwrap();
 
-    let events = utils::gather_sample_group(
-        utils::LogQuerierConfig { project_id: 5, expected_batch_size: 2 },
-        &logger_querier,
-    )
-    .await;
-
-    // The metric configured to run every 3000 seconds gets polled, and gets an undiffed
-    // report of its values.
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 104, value: 2 }
-    ));
-    // The integer metric which is always getting undiffed sampling is sampled one last time.
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 102, value: 10 }
-    ));
+    project_5_events
+        .validate_with_count(
+            vec![
+                // The metric configured to run every 3000 seconds gets polled, and gets an undiffed
+                // report of its values.
+                Event { id: 104, value: 2, codes: vec![0, 0] },
+                Event { id: 102, value: 10, codes: vec![0, 0] },
+            ],
+            "after reboot in event_count",
+        )
+        .await;
 }
 
 /// Runs the Sampler and a test component that can have its inspect properties
@@ -138,51 +120,40 @@ async fn reboot_server_crashed_test() {
         ns.prefix()
     ))
     .unwrap();
+    let mut project_5_events = EventVerifier::new(&logger_querier, 5);
 
     // Crash the reboot server to verify that sampler continues to sample.
     reboot_controller.crash_reboot_channel().await.unwrap().unwrap();
 
     test_app_controller.increment_int(1).await.unwrap();
 
-    let events = utils::gather_sample_group(
-        utils::LogQuerierConfig { project_id: 5, expected_batch_size: 3 },
-        &logger_querier,
-    )
-    .await;
-
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 101, value: 1 }
-    ));
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 102, value: 10 }
-    ));
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 103, value: 20 }
-    ));
+    project_5_events
+        .validate_with_count(
+            vec![
+                Event { id: 101, value: 1, codes: vec![0, 0] },
+                Event { id: 102, value: 10, codes: vec![0, 0] },
+                Event { id: 103, value: 20, codes: vec![0, 0] },
+            ],
+            "initial in crashed",
+        )
+        .await;
 
     // We want to guarantee a sample takes place before we increment the value again.
     // This is to verify that despite two samples taking place, the count type isn't uploaded with
     // no diff and the metric that is upload_once isn't sampled again.
     test_app_controller.wait_for_sample().await.unwrap().unwrap();
 
-    let events = utils::gather_sample_group(
-        utils::LogQuerierConfig { project_id: 5, expected_batch_size: 1 },
-        &logger_querier,
-    )
-    .await;
-
-    assert!(utils::verify_event_present_once(
-        &events,
-        utils::ExpectedEvent { metric_id: 102, value: 10 }
-    ));
+    project_5_events
+        .validate_with_count(
+            vec![Event { id: 102, value: 10, codes: vec![0, 0] }],
+            "second in crashed",
+        )
+        .await;
 }
 
 /// Runs the Sampler and a test component that can have its inspect properties
-/// manipulated by the test via fidl, and uses mock services to determine that when
-/// the reboot server goes down, sampler continues to run as expected.
+/// manipulated by the test via fidl. Verifies that Sampler publishes its own
+/// status correctly in its own Inspect data.
 #[fuchsia::test]
 async fn sampler_inspect_test() {
     let ns = test_topology::create_realm().await.expect("initialized topology");

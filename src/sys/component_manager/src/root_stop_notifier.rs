@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::hooks::{Event, EventType, Hook, HooksRegistration},
     async_trait::async_trait,
     errors::ModelError,
     futures::{channel::*, lock::Mutex},
+    hooks::{Event, EventType, Hook, HooksRegistration},
     moniker::MonikerBase,
     std::sync::{Arc, Weak},
 };

@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::{
-    events::synthesizer::ComponentManagerEventSynthesisProvider,
-    hooks::{CapabilityReceiver, Event, EventPayload},
-};
+use crate::model::events::synthesizer::ComponentManagerEventSynthesisProvider;
 use async_trait::async_trait;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fuchsia_async::TaskGroup;
 use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
+use hooks::{CapabilityReceiver, Event, EventPayload};
 use inspect_runtime::{publish, PublishOptions};
 use moniker::Moniker;
 use routing::event::EventFilter;

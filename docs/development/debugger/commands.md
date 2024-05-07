@@ -1,8 +1,6 @@
-# Zxdb console commands and interaction model
+# Commands and interaction model
 
-##
-
-Zxdb has a built-in help system:
+The Fuchsia debugger (`zxdb`) has a built-in help system:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] help

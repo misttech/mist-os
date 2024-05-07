@@ -15,9 +15,14 @@ ffx_plugin("ffx_target_remove") {
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/manual_targets:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
   ]
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/developer/ffx/config:lib",
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:serde_json",
+  ]
 }

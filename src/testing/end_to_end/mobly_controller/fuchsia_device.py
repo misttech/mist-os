@@ -8,7 +8,6 @@ import logging
 from typing import Any, Dict, List
 
 import honeydew
-from honeydew import transports
 from honeydew.typing import custom_types
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
@@ -200,7 +199,7 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     #       nodename: botanist-target-qemu
     #       serial_socket: ''
     #       ssh_key: private_key
-    #       transport: sl4f
+    #       transport: fuchsia-controller
     #       device_ip_port: [::1]:8022
     if "name" not in config:
         raise RuntimeError("Missing fuchsia device name in the config")

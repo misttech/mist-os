@@ -9,6 +9,7 @@ fidl("fuchsia.sysmem") {
   excluded_checks = [ "invalid-case-for-constant" ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   api = "fuchsia.sysmem.api"
   sources = [

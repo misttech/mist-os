@@ -15,7 +15,7 @@ go_library("botanist_lib") {
   ]
   deps = [
     ":constants",
-    "//src/sys/pkg/bin/pm/pmhttp",
+    ":repo",
     "//third_party/golibs:cloud.google.com/go/storage",
     "//tools/build",
     "//tools/lib/gcsutil",
@@ -26,6 +26,20 @@ go_library("botanist_lib") {
     "//tools/lib/subprocess",
     "//tools/net/netboot",
     "//tools/net/tftp",
+  ]
+}
+
+go_library("repo") {
+  source_dir = "repo"
+  sources = [
+    "config.go",
+    "config_test.go",
+    "repo.go",
+    "repo_test.go",
+  ]
+  deps = [
+    "//src/sys/pkg/lib/repo",
+    "//third_party/golibs:github.com/theupdateframework/go-tuf",
   ]
 }
 
@@ -100,6 +114,10 @@ go_test("botanist_lib_tests") {
   library = ":botanist_lib"
 }
 
+go_test("botanist_repo_tests") {
+  library = ":repo"
+}
+
 go_test("botanist_targets_tests") {
   library = ":targets"
   deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
@@ -115,6 +133,7 @@ group("tests") {
 
   deps = [
     ":botanist_lib_tests",
+    ":botanist_repo_tests",
     ":botanist_targets_tests",
   ]
 }

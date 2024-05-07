@@ -4,5 +4,6 @@ ffx product lookup
 ffx target add
 ffx target list
 ffx target remove
+ffx target snapshot
 ffx target screenshot
 ffx target show

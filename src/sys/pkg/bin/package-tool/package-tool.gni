@@ -236,7 +236,7 @@ template("package_tool_package_build") {
       "--repository",
       repository,
       "--api-level",
-      "${fidl_fuchsia_api_level}",
+      "${override_target_api_level}",
     ]
 
     if (defined(meta_subpackages_file)) {

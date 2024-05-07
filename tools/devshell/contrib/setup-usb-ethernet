@@ -27,6 +27,8 @@ LABEL="zircon_add_net_google"
 ATTRS{idProduct}=="a020", GOTO="zircon_net_name"
 # CDC Ethernet & USB Test Function composite configuration
 ATTRS{idProduct}=="a023", GOTO="zircon_net_name"
+# CDC Ethernet & ADB
+ATTRS{idProduct}=="a026", GOTO="zircon_net_name"
 GOTO="zircon_end"
 
 # Set the interface name based on the MAC

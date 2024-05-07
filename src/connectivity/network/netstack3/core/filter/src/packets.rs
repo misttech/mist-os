@@ -786,7 +786,7 @@ pub mod testutil {
         type TransportPacket = Never;
 
         fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-            None
+            unimplemented!()
         }
     }
 
@@ -794,7 +794,7 @@ pub mod testutil {
         type TransportPacket = Never;
 
         fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-            None
+            unimplemented!()
         }
     }
 
@@ -802,7 +802,7 @@ pub mod testutil {
         type TransportPacket = Never;
 
         fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-            None
+            unimplemented!()
         }
     }
 

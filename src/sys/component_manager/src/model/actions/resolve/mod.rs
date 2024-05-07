@@ -10,13 +10,14 @@ use {
         component::instance::{InstanceState, ResolvedInstanceState},
         component::ComponentInstance,
         component::{Component, WeakComponentInstance},
-        hooks::{Event, EventPayload},
         resolver::Resolver,
+        routing::router_ext::WeakComponentTokenExt,
     },
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::{AbortError, AbortHandle, AbortableScope},
     errors::{ActionError, ResolveActionError},
+    hooks::EventPayload,
     std::{ops::DerefMut, sync::Arc},
 };
 
@@ -167,13 +168,9 @@ async fn do_resolve(
         return Ok(());
     }
 
-    let event = Event::new(
-        component,
-        EventPayload::Resolved {
-            component: WeakComponentInstance::from(component),
-            decl: component_info.decl.clone(),
-        },
-    );
+    let weak = sandbox::WeakComponentToken::new(WeakComponentInstance::new(component));
+    let event = component
+        .new_event(EventPayload::Resolved { component: weak, decl: component_info.decl.clone() });
     component.hooks.dispatch(&event).await;
     Ok(())
 }
@@ -184,8 +181,8 @@ pub mod tests {
         crate::model::{
             actions::test_utils::{is_resolved, is_stopped},
             actions::{
-                Action, ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction,
-                StopAction,
+                Action, ActionKey, ActionsManager, ResolveAction, ShutdownAction, ShutdownType,
+                StartAction, StopAction,
             },
             component::{IncomingCapabilities, StartReason},
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -212,28 +209,28 @@ pub mod tests {
         assert!(is_resolved(&component_a).await);
 
         // Stop, then it's ok to resolve again.
-        ActionSet::register(component_a.clone(), StopAction::new(false)).await.unwrap();
+        ActionsManager::register(component_a.clone(), StopAction::new(false)).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
 
-        ActionSet::register(component_a.clone(), ResolveAction::new()).await.unwrap();
+        ActionsManager::register(component_a.clone(), ResolveAction::new()).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
 
         // Start it again then shut it down.
-        ActionSet::register(
+        ActionsManager::register(
             component_a.clone(),
             StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .unwrap();
-        ActionSet::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
+        ActionsManager::register(component_a.clone(), ShutdownAction::new(ShutdownType::Instance))
             .await
             .unwrap();
 
         // Error to resolve a shut-down component.
         assert_matches!(
-            ActionSet::register(component_a.clone(), ResolveAction::new()).await,
+            ActionsManager::register(component_a.clone(), ResolveAction::new()).await,
             Err(ActionError::ResolveError { err: ResolveActionError::InstanceShutDown { .. } })
         );
         assert!(!is_resolved(&component_a).await);
@@ -258,10 +255,9 @@ pub mod tests {
         let component_a = component_root.find(&vec!["a"].try_into().unwrap()).await.unwrap();
         let resolve_action = ResolveAction::new();
         let resolve_abort_handle = resolve_action.abort_handle().unwrap();
-        let resolve_fut =
-            component_a.lock_actions().await.register_no_wait(&component_a, resolve_action).await;
+        let resolve_fut = component_a.lock_actions().await.register_no_wait(resolve_action).await;
         let resolve_fut_2 =
-            component_a.lock_actions().await.wait(ResolveAction::new()).await.unwrap();
+            component_a.lock_actions().await.wait(ActionKey::Resolve).await.unwrap();
 
         // Wait until routing reaches resolution.
         let _ = resolved_rx.await.unwrap();

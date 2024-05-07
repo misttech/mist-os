@@ -1114,6 +1114,7 @@ mod tests {
             filesystem::{FxFilesystemBuilder, OpenFxFilesystem},
             object_store::{volume::root_volume, Directory},
         },
+        fxfs_macros::ToWeakNode,
         std::{
             collections::HashSet,
             sync::{
@@ -2179,6 +2180,7 @@ mod tests {
 
     #[fuchsia::test(threads = 8)]
     async fn test_race() {
+        #[derive(ToWeakNode)]
         struct File {
             notifications: UnboundedSender<Op>,
             handle: PagedObjectHandle,

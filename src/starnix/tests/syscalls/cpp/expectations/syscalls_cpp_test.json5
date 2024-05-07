@@ -63,7 +63,7 @@
                 "VmspliceTest/VmspliceUnmapBufferAfterVmsplicingRemappedBufferTest.UnmapBufferAfterVmsplicingRemappedBuffer/*",
 
                 // TODO(https://fxbug.dev/331965426)
-                "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/*",
+                "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/1",
             ],
         },
     ],

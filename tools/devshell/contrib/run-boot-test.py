@@ -234,7 +234,7 @@ def main():
         metavar="RUNNER-ARG",
         action="append",
         default=[],
-        help="Pass RUNNER-ARG to bootserver/fx qemu",
+        help="Pass RUNNER-ARG to bootserver / fx qemu / crosvm run",
     )
     parser.add_argument(
         "--cmdline",
@@ -243,6 +243,22 @@ def main():
         action="append",
         default=[],
         help="Add kernel command-line arguments.",
+    )
+    modes.add_argument("--crosvm", action="store_true", help="Run via crosvm")
+    parser.add_argument(
+        "--crosvm-args",
+        metavar="ARG",
+        action="append",
+        default=[],
+        help="Pass ARG to crosvm before `run` subcommand (--args go after)",
+    )
+    parser.add_argument(
+        "--crosvm-path",
+        metavar="PATH",
+        type=str,
+        # TODO(https://fxbug.dev/335547883): Point at a prebuilt in checkout.
+        default="crosvm",
+        help="Use crosvm binary at PATH",
     )
     parser.add_argument(
         "name",
@@ -265,8 +281,8 @@ def main():
         print("FUCHSIA_ARCH not set")
         return 1
 
-    # Construct a map of product bundles by name. Boot test metadata points to a
-    # product bundle in this way.
+    # Construct a map of product bundles by name. Boot test metadata points to
+    # a product bundle in this way.
     with open(os.path.join(build_dir, "product_bundles.json")) as file:
         product_bundles = {}
         for bundle in json.load(file):
@@ -323,7 +339,17 @@ def main():
             return 1
         assert test.zbi
         bootserver = find_bootserver(build_dir)
-        cmd = [bootserver, "--boot"] + test.zbi + args.args
+        cmd = [bootserver, "--boot", test.zbi] + args.args
+    elif args.crosvm:
+        if not test.qemu_kernel:
+            print(
+                error("cannot use --crosvm with no-kernel test %s" % test.name)
+            )
+            return 1
+        cmd = [args.crosvm_path] + args.crosvm_args + ["run"] + args.args
+        if test.zbi:
+            cmd += ["--initrd", test.zbi]
+        cmd.append(test.qemu_kernel)
     else:
         cmd = ["fx", "qemu", "--arch", args.arch] + args.args
 
@@ -337,9 +363,9 @@ def main():
             cmd += ["-D", test.efi_disk]
 
     for arg in args.cmdline:
-        cmd += ["-c", arg]
+        cmd += ["-p" if args.crosvm else "-c", arg]
 
-    if not args.boot:
+    if not args.boot and not args.crosvm:
         # Prevents QEMU from boot-looping, as most boot tests do not have a
         # means of gracefully shutting down.
         cmd += ["--", "-no-reboot"]

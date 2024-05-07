@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bedrock_error::Explain;
 use cm_types::Availability;
 use fuchsia_zircon_status as zx;
+use router_error::Explain;
 use thiserror::Error;
 
 /// Ensure that availability cannot decrease from target to source.

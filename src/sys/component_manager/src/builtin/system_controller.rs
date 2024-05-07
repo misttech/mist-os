@@ -106,15 +106,15 @@ async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String
 mod tests {
     use {
         super::*,
-        crate::model::{
-            hooks::{Event, EventType, Hook, HooksRegistration},
-            testing::test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
+        crate::model::testing::test_helpers::{
+            component_decl_with_test_runner, ActionsTest, ComponentInfo,
         },
         async_trait::async_trait,
         cm_rust_testing::*,
         errors::ModelError,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+        hooks::{Event, EventType, Hook, HooksRegistration},
         moniker::{Moniker, MonikerBase},
     };
 

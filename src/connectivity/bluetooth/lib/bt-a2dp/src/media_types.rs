@@ -201,7 +201,7 @@ impl SbcCodecInfo {
         self.0.maxbitpoolval()
     }
 
-    /// Returns the sampling frequeency selected, in hz.
+    /// Returns the sampling frequency selected, in hz.
     /// Returns Error::OutOfRange if multiple frequencies are selected.
     pub fn sampling_frequency(&self) -> avdtp::Result<u32> {
         let hz = match SbcSamplingFrequency::from_bits_truncate(self.0.sampling_frequency()) {
@@ -535,7 +535,10 @@ impl AacCodecInfo {
         };
         let vbr = a.variable_bit_rate() && b.variable_bit_rate();
         // If either bitrate is unspecified, take the other one, otherwise, the minimum.
+        // If both are unspecified, choose a reasonable one.
         let bitrate = match (a.bitrate(), b.bitrate()) {
+            // Pick a reasonable quality bitrate to use by default. 64k average per channel.
+            (0, 0) => 128000,
             (0, b) => b,
             (a, 0) => a,
             (a, b) => std::cmp::min(a, b),

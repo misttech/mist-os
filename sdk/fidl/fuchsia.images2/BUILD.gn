@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.images2") {
   sdk_category = "partner"
+  stable = true
 
   # Also Graphics
   sdk_area = "Media"

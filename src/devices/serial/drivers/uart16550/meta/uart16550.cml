@@ -14,7 +14,16 @@
         compat: "driver/uart16550.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.serialimpl.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.serialimpl.Service",
+            from: "self",
+        },
     ],
 }

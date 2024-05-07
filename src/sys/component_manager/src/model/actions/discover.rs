@@ -7,11 +7,11 @@ use {
         actions::{Action, ActionKey},
         component::instance::{InstanceState, UnresolvedInstanceState},
         component::ComponentInstance,
-        hooks::{Event, EventPayload},
         structured_dict::ComponentInput,
     },
     async_trait::async_trait,
     errors::{ActionError, DiscoverActionError},
+    hooks::EventPayload,
     std::sync::Arc,
 };
 
@@ -60,7 +60,7 @@ async fn do_discover(
     if is_discovered {
         return Ok(());
     }
-    let event = Event::new(&component, EventPayload::Discovered);
+    let event = component.new_event(EventPayload::Discovered);
     component.hooks.dispatch(&event).await;
     {
         let mut state = component.lock_state().await;

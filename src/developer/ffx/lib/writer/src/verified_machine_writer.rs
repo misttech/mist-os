@@ -73,13 +73,19 @@ where
     /// for the writer type.
     pub fn verify_schema(&self, data: &Value) -> Result<()> {
         let s = schemars::schema_for!(T);
-        let mut schema: Vec<u8> = vec![];
-        format_output(Format::JsonPretty, &mut schema, &s)?;
-        let schema_val = serde_json::from_slice(&schema)?;
+        let mut raw_schema: Vec<u8> = vec![];
+        format_output(Format::JsonPretty, &mut raw_schema, &s)
+            .map_err(|e| crate::Error::SchemaFailure(format!("err: {e:?} for {s:?}")))?;
+        let schema_val: Value = serde_json::from_slice(&raw_schema).map_err(|e| {
+            crate::Error::SchemaFailure(format!(
+                "err: {e:?} for {:?}",
+                String::from_utf8(raw_schema)
+            ))
+        })?;
 
         let mut scope = valico::json_schema::Scope::new();
         let schema = scope
-            .compile_and_return(serde_json::to_value(&schema_val)?, false)
+            .compile_and_return(schema_val, false)
             .map_err(|e| crate::Error::SchemaFailure(format!("Error compiling schema: {e:?}")))?;
         let state = schema.validate(data);
 

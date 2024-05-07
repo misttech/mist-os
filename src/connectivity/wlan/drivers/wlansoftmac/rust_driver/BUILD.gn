@@ -15,6 +15,7 @@ rustc_library("wlansoftmac-rust") {
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_rust",
+    "//src/connectivity/wlan/lib/ffi-transport:wlan-ffi-transport",
     "//src/connectivity/wlan/lib/fidl-ext:wlan-fidl-ext",
     "//src/connectivity/wlan/lib/ieee80211",
     "//src/connectivity/wlan/lib/mlme/rust:wlan-mlme",

@@ -11,6 +11,7 @@ fidl("fuchsia.bluetooth.gatt2") {
   excluded_checks = [ "protocol-name-includes-service" ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [

@@ -23,7 +23,7 @@ use fidl::endpoints::RequestStream as _;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
-    ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
+    ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6},
     MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
@@ -125,6 +125,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type DisconnectError: IntoErrno;
     type SetSocketDeviceError: IntoErrno;
     type SetMulticastMembershipError: IntoErrno;
+    type MulticastInterfaceError: IntoErrno;
     type SetReusePortError: IntoErrno;
     type ShutdownError: IntoErrno;
     type SetIpTransparentError: IntoErrno;
@@ -237,6 +238,19 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 
     fn get_ip_transparent(ctx: &mut Ctx, id: &Self::SocketId) -> bool;
 
+    fn set_multicast_interface(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        interface: Option<&DeviceId<BindingsCtx>>,
+        ip_version: IpVersion,
+    ) -> Result<(), Self::MulticastInterfaceError>;
+
+    fn get_multicast_interface(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
+    ) -> Result<Option<WeakDeviceId<BindingsCtx>>, Self::MulticastInterfaceError>;
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -294,6 +308,7 @@ where
     type ShutdownError = ExpectedConnError;
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = SetMulticastMembershipError;
+    type MulticastInterfaceError = NotDualStackCapableError;
     type SetReusePortError = ExpectedUnboundError;
     type SetIpTransparentError = Never;
     type LocalIdentifier = NonZeroU16;
@@ -461,6 +476,23 @@ where
         ctx.api().udp().get_transparent(id)
     }
 
+    fn set_multicast_interface(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        interface: Option<&DeviceId<BindingsCtx>>,
+        ip_version: IpVersion,
+    ) -> Result<(), Self::MulticastInterfaceError> {
+        ctx.api().udp().set_multicast_interface(id, interface, ip_version)
+    }
+
+    fn get_multicast_interface(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
+    ) -> Result<Option<WeakDeviceId<BindingsCtx>>, Self::MulticastInterfaceError> {
+        ctx.api().udp().get_multicast_interface(id, ip_version)
+    }
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -545,6 +577,7 @@ where
     type ShutdownError = ExpectedConnError;
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = NotSupportedError;
+    type MulticastInterfaceError = NotSupportedError;
     type SetReusePortError = NotSupportedError;
     type SetIpTransparentError = NotSupportedError;
     type LocalIdentifier = NonZeroU16;
@@ -739,6 +772,23 @@ where
         Ok(ctx.api().icmp_echo().get_multicast_hop_limit(id))
     }
 
+    fn set_multicast_interface(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _interface: Option<&DeviceId<BindingsCtx>>,
+        _ip_version: IpVersion,
+    ) -> Result<(), NotSupportedError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_multicast_interface(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _ip_version: IpVersion,
+    ) -> Result<Option<WeakDeviceId<BindingsCtx>>, Self::MulticastInterfaceError> {
+        Err(NotSupportedError)
+    }
+
     fn set_ip_transparent(
         _ctx: &mut Ctx,
         _id: &Self::SocketId,
@@ -897,6 +947,8 @@ struct BindingData<I: BindingsDataIpExt, T: Transport<I>> {
     ip_receive_original_destination_address: bool,
     /// SO_TIMESTAMP, SO_TIMESTAMPNS state.
     timestamp_option: fposix_socket::TimestampOption,
+    /// `IP_MULTICAST_IF` option. It can be set separately from `IPV6_MULTICAST_IF`.
+    ipv4_multicast_if_addr: Option<SpecifiedAddr<Ipv4Addr>>,
 }
 
 impl<I, T> BindingData<I, T>
@@ -928,6 +980,7 @@ where
             version_specific_data: I::VersionSpecificData::default(),
             ip_receive_original_destination_address: false,
             timestamp_option: fposix_socket::TimestampOption::Disabled,
+            ipv4_multicast_if_addr: None,
         }
     }
 }
@@ -1308,14 +1361,17 @@ where
             Request::GetIpv6TrafficClass { responder } => {
                 respond_not_supported!("syncudp::GetIpv6TrafficClass", responder)
             }
-            Request::SetIpv6MulticastInterface { value: _, responder } => {
-                warn!(
-                    "TODO(https://fxbug.dev/42059016): implement IPV6_MULTICAST_IF socket option"
-                );
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            Request::SetIpv6MulticastInterface { value, responder } => {
+                let result = self.set_multicast_interface_ipv6(NonZeroU64::new(value));
+                maybe_log_error!("set_ipv6_multicast_interface", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::GetIpv6MulticastInterface { responder } => {
-                respond_not_supported!("syncudp::GetIpv6MulticastInterface", responder)
+                let result = self
+                    .get_multicast_interface_ipv6()
+                    .map(|v| v.map(NonZeroU64::get).unwrap_or(0));
+                maybe_log_error!("get_ipv6_multicast_interface", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::SetIpv6UnicastHops { value, responder } => {
                 let result = self.set_unicast_hop_limit(Ipv6::VERSION, value);
@@ -1367,12 +1423,17 @@ where
                 maybe_log_error!("get_ip_multicast_ttl", &result);
                 responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
-            Request::SetIpMulticastInterface { iface: _, address: _, responder } => {
-                warn!("TODO(https://fxbug.dev/42059016): implement IP_MULTICAST_IF socket option");
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            Request::SetIpMulticastInterface { iface, address, responder } => {
+                let result = self.set_multicast_interface_ipv4(NonZeroU64::new(iface), address);
+                maybe_log_error!("set_multicast_interface", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::GetIpMulticastInterface { responder } => {
-                respond_not_supported!("syncudp::GetIpMulticastInterface", responder)
+                let result = self.get_multicast_interface_ipv4();
+                maybe_log_error!("get_ip_multicast_interface", &result);
+                responder
+                    .send(result.as_ref().map_err(|e| e.clone()))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             Request::SetIpMulticastLoopback { value, responder } => {
                 // TODO(https://fxbug.dev/42058186): add support for
@@ -1945,6 +2006,95 @@ where
 
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_multicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
+    }
+
+    fn set_multicast_interface_ipv4(
+        self,
+        interface: Option<NonZeroU64>,
+        addr: fnet::Ipv4Address,
+    ) -> Result<(), fposix::Errno> {
+        // Multicast interface for IPv4 multicast packets can be selected by
+        // the IP address. Linux also uses the specified address as the source
+        // address for outgoing multicast packets. Our implementation of
+        // IP_MULTICAST_IF diverges from Linux: the address is used only to
+        // select the interface and is saved to return from `getsockopts()`.
+
+        let Self {
+            ctx,
+            data: BindingData { info: SocketControlInfo { id, .. }, ipv4_multicast_if_addr, .. },
+        } = self;
+
+        let addr: Option<SpecifiedAddr<Ipv4Addr>> = SpecifiedAddr::new(addr.into_core());
+        let device_id = match (interface, addr) {
+            // If both the interface index and the address are specified then
+            // we use the index to select the interface. The address still
+            // saved to return it in the future.
+            (Some(index), _) => Some(
+                // `setsockopt(IP_MULTICAST_IF)` is supposed to fail with
+                // `EADDRNOTAVAIL` when the IP or the interface index is invalid. This is
+                // different from `IPV6_MULTICAST_IF`.
+                TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), index)
+                    .map_err(|_| fposix::Errno::Eaddrnotavail)?,
+            ),
+            (None, Some(addr)) => {
+                let device = ctx
+                    .bindings_ctx()
+                    .devices
+                    .with_devices(|devices| devices.cloned().collect::<Vec<_>>())
+                    .into_iter()
+                    .find(|device| {
+                        let mut ip_found = false;
+                        ctx.api().device_ip::<Ipv4>().for_each_assigned_ip_addr_subnet(
+                            device,
+                            |ip_subnet| {
+                                if ip_subnet.addr() == addr {
+                                    ip_found = true;
+                                }
+                            },
+                        );
+                        ip_found
+                    })
+                    .ok_or(fposix::Errno::Eaddrnotavail)?;
+                Some(device)
+            }
+            (None, None) => None,
+        };
+
+        T::set_multicast_interface(ctx, id, device_id.as_ref(), Ipv4::VERSION)
+            .map_err(IntoErrno::into_errno)
+            .inspect(|_| *ipv4_multicast_if_addr = addr)
+    }
+
+    fn get_multicast_interface_ipv4(self) -> Result<fnet::Ipv4Address, fposix::Errno> {
+        let Self { data: BindingData { ipv4_multicast_if_addr, .. }, .. } = self;
+        Ok(ipv4_multicast_if_addr.map(Into::into).unwrap_or(Ipv4::UNSPECIFIED_ADDRESS).into_fidl())
+    }
+
+    fn set_multicast_interface_ipv6(
+        self,
+        interface: Option<NonZeroU64>,
+    ) -> Result<(), fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        let interface = interface
+            .map(|index| TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), index))
+            .transpose()
+            .map_err(IntoErrno::into_errno)?;
+        T::set_multicast_interface(ctx, id, interface.as_ref(), Ipv6::VERSION)
+            .map_err(IntoErrno::into_errno)
+    }
+
+    fn get_multicast_interface_ipv6(self) -> Result<Option<NonZeroU64>, fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_multicast_interface(ctx, id, Ipv6::VERSION)
+            .map_err(IntoErrno::into_errno)
+            .map_err(|e| match e {
+                // `getsockopt()` should fail with `EOPNOTSUPP` instead of `ENOPROTOOPT`.
+                fposix::Errno::Enoprotoopt => fposix::Errno::Eopnotsupp,
+                e => e,
+            })?
+            .map(|id| id.try_into_fidl_with_ctx(ctx.bindings_ctx()))
+            .transpose()
+            .map_err(IntoErrno::into_errno)
     }
 
     fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {

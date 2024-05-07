@@ -6,12 +6,12 @@ composite ot_radio;
 
 using fuchsia.gpio;
 using fuchsia.hardware.gpio;
+using fuchsia.hardware.spi;
 using fuchsia.nordic.platform;
 using fuchsia.platform;
-using fuchsia.spi;
 
 primary node "spi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.spi.BIND_PROTOCOL.DEVICE;
+  fuchsia.hardware.spi.Service == fuchsia.hardware.spi.Service.ZirconTransport;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.nordic.platform.BIND_PLATFORM_DEV_VID.NORDIC;
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.nordic.platform.BIND_PLATFORM_DEV_DID.THREAD;
 }

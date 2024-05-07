@@ -127,6 +127,19 @@ if (current_cpu == "arm64") {
       ]
     }
   }
+
+  bazel_product_bundle("product_bundle.emac") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.emac"
+    bazel_product_image_target = ":image.emac"
+    bazel_elf_sizes_target = ":elf_sizes.emac"
+    bazel_inputs_from_gn = [
+      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+      "//build/images/zedboot:zedboot.bazel_legacy_aib",
+      "//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
+    ]
+  }
 }
 
 if (current_cpu == "riscv64") {

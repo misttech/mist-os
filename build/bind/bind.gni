@@ -266,13 +266,11 @@ template("bind_test") {
     deps = [ ":${test_target}($host_toolchain)" ]
   }
 
-  original_target_name = target_name
   bind_host_test(test_target) {
     if (defined(invoker.target)) {
       target = invoker.target
     } else {
-      target =
-          get_label_info(":${original_target_name}", "label_with_toolchain")
+      target = get_label_info(":${test_target}", "label_with_toolchain")
     }
     rules = invoker.rules
     tests = invoker.tests

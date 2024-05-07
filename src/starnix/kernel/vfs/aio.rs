@@ -10,21 +10,18 @@ use std::{
     },
 };
 
-use smallvec::smallvec;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::{
-    errno, error, errors::Errno, io_event, ownership::OwnedRef, user_address::UserAddress,
-    user_buffer::UserBuffer,
+    errno, error, errors::Errno, io_event, ownership::OwnedRef, ownership::WeakRef,
+    user_address::UserAddress, user_buffer::UserBuffer,
 };
 use std::sync::mpsc::Sender;
 use zerocopy::IntoBytes;
 
 use crate::{
-    mm::MemoryManager,
-    task::CurrentTask,
-    vfs::{
-        FileHandle, UserBuffersInputBuffer, UserBuffersOutputBuffer, VecInputBuffer, WeakFileHandle,
-    },
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    task::{CurrentTask, Task},
+    vfs::{FileHandle, VecInputBuffer, VecOutputBuffer, WeakFileHandle},
 };
 
 /// Kernel state-machine-based implementation of asynchronous I/O.
@@ -127,7 +124,7 @@ fn spawn_background_thread<F>(
     F: Fn(
             &mut Locked<'_, Unlocked>,
             &CurrentTask,
-            Arc<MemoryManager>,
+            WeakRef<Task>,
             FileHandle,
             UserBuffer,
             usize,
@@ -138,21 +135,7 @@ fn spawn_background_thread<F>(
     let weak_task = OwnedRef::downgrade(&current_task.task);
 
     current_task.kernel().kthreads.spawn(move |inner_locked, current_task| {
-        // Move weak_task into the background thread.
-        let weak_task = weak_task;
-
         while let Ok(op) = receiver.recv() {
-            let memory_manager = {
-                // Upgraded TempRef<Task> is only used to clone its MemoryManager, and dropped before
-                // the blocking operation below.
-                let Some(task) = weak_task.upgrade() else {
-                    // The calling task can terminate while async IO operations are ongoing.
-                    // Terminate the thread when this happens.
-                    return;
-                };
-                task.mm().clone()
-            };
-
             let Some(ctx) = weak_ctx.upgrade() else {
                 // The AioContext can be destroyed while async IO operations are ongoing.
                 // Terminate the thread when this happens.
@@ -168,7 +151,7 @@ fn spawn_background_thread<F>(
             let res = match operation_fn(
                 inner_locked,
                 current_task,
-                memory_manager,
+                weak_task.clone(),
                 file,
                 op.buffer,
                 op.offset,
@@ -200,30 +183,41 @@ fn spawn_background_thread<F>(
 fn do_read_operation(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    mm: Arc<MemoryManager>,
+    weak_task: WeakRef<Task>,
     file: FileHandle,
     buffer: UserBuffer,
     offset: usize,
 ) -> Result<usize, Errno> {
-    let mut output_buffer =
-        UserBuffersOutputBuffer::<MemoryManager>::vmo_new(mm.as_ref(), smallvec![buffer])?;
+    let mut output_buffer = VecOutputBuffer::new(buffer.length);
+
     if offset != 0 {
-        file.read_at(locked, current_task, offset, &mut output_buffer)
+        file.read_at(locked, current_task, offset, &mut output_buffer)?;
     } else {
-        file.read(locked, current_task, &mut output_buffer)
+        file.read(locked, current_task, &mut output_buffer)?;
     }
+
+    let Some(task) = weak_task.upgrade() else {
+        return error!(EINVAL);
+    };
+    task.write_memory(buffer.address, &output_buffer.data())
 }
 
 fn do_write_operation(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    mm: Arc<MemoryManager>,
+    weak_task: WeakRef<Task>,
     file: FileHandle,
     buffer: UserBuffer,
     offset: usize,
 ) -> Result<usize, Errno> {
-    let mut input_buffer =
-        UserBuffersInputBuffer::<MemoryManager>::vmo_new(mm.as_ref(), smallvec![buffer])?;
+    let mut input_buffer = {
+        let Some(task) = weak_task.upgrade() else {
+            return error!(EINVAL);
+        };
+        let input_vec = task.read_memory_to_vec(buffer.address, buffer.length)?;
+        VecInputBuffer::new(&input_vec)
+    };
+
     if offset != 0 {
         file.write_at(locked, current_task, offset, &mut input_buffer)
     } else {

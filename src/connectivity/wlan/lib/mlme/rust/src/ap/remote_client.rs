@@ -5,7 +5,6 @@
 use {
     crate::{
         ap::{frame_writer, BufferedFrame, Context, TimedEvent},
-        buffer::Buffer,
         device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
@@ -24,6 +23,7 @@ use {
         timer::EventId,
         TimeUnit,
     },
+    wlan_ffi_transport::Buffer,
     wlan_statemachine::StateMachine,
     wlan_trace as wtrace,
     zerocopy::ByteSlice,
@@ -1136,7 +1136,7 @@ impl RemoteClient {
 mod tests {
     use {
         super::*,
-        crate::{buffer::FakeCBufferProvider, device::FakeDevice},
+        crate::device::FakeDevice,
         ieee80211::Bssid,
         lazy_static::lazy_static,
         test_case::test_case,
@@ -1146,6 +1146,7 @@ mod tests {
             test_utils::fake_frames::*,
             timer::{self, create_timer},
         },
+        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
         zerocopy::Unalign,
     };
 
@@ -1162,7 +1163,15 @@ mod tests {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeCBufferProvider::new(), timer, *AP_ADDR), time_stream)
+        (
+            Context::new(
+                fake_device,
+                BufferProvider::new(FakeFfiBufferProvider::new()),
+                timer,
+                *AP_ADDR,
+            ),
+            time_stream,
+        )
     }
 
     #[fuchsia::test(allow_stalls = false)]

@@ -4,9 +4,7 @@
 
 #include "uart16550.h"
 
-#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <fuchsia/hardware/serial/c/banjo.h>
-#include <fuchsia/hardware/serialimpl/c/banjo.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -24,11 +22,12 @@ namespace uart16550 {
 static constexpr int64_t kPioIndex = 0;
 static constexpr int64_t kIrqIndex = 0;
 
-static constexpr uint8_t kDefaultConfig =
-    SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
+static constexpr uint32_t kDefaultConfig = fuchsia_hardware_serialimpl::wire::kSerialDataBits8 |
+                                           fuchsia_hardware_serialimpl::wire::kSerialStopBits1 |
+                                           fuchsia_hardware_serialimpl::wire::kSerialParityNone;
 
-static constexpr serial_port_info_t kInfo = {
-    .serial_class = fidl::ToUnderlying(fuchsia_hardware_serial::Class::kGeneric),
+static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kInfo = {
+    .serial_class = fuchsia_hardware_serial::Class::kGeneric,
     .serial_vid = 0,
     .serial_pid = 0,
 };
@@ -53,7 +52,30 @@ zx_status_t Uart16550::Create(void* /*ctx*/, zx_device_t* parent) {
     return status;
   }
 
-  dev->DdkAdd("uart16550");
+  {
+    fuchsia_hardware_serialimpl::Service::InstanceHandler handler({.device = dev->GetHandler()});
+    auto result =
+        dev->outgoing_.AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
+    if (result.is_error()) {
+      zxlogf(ERROR, "AddService failed: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+  {
+    auto result = dev->outgoing_.Serve(std::move(directory_server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to serve the outgoing directory: %s", result.status_string());
+      return result.error_value();
+    }
+  }
+
+  std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_serialimpl::Service::Name};
+  dev->DdkAdd(ddk::DeviceAddArgs("uart16550")
+                  .set_outgoing_dir(directory_client.TakeChannel())
+                  .set_runtime_service_offers(fidl_service_offers));
 
   // Release because devmgr is now in charge of the device.
   static_cast<void>(dev.release());
@@ -65,11 +87,6 @@ size_t Uart16550::FifoDepth() const { return uart_fifo_len_; }
 bool Uart16550::Enabled() {
   std::lock_guard<std::mutex> lock(device_mutex_);
   return enabled_;
-}
-
-bool Uart16550::NotifyCallbackSet() {
-  std::lock_guard<std::mutex> lock(device_mutex_);
-  return notify_cb_.callback != nullptr;
 }
 
 // Create RX and TX FIFOs, obtain interrupt and port handles from the ACPI
@@ -133,7 +150,7 @@ zx_status_t Uart16550::Init() {
     InitFifosLocked();
   }
 
-  status = SerialImplConfig(kMaxBaudRate, kDefaultConfig);
+  status = Config(kMaxBaudRate, kDefaultConfig);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SerialImplConfig failed", __func__);
     return status;
@@ -153,7 +170,7 @@ zx_status_t Uart16550::Init(zx::interrupt interrupt, hwreg::Mock::RegisterIo por
     InitFifosLocked();
   }
 
-  auto status = SerialImplConfig(kMaxBaudRate, kDefaultConfig);
+  auto status = Config(kMaxBaudRate, kDefaultConfig);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SerialImplConfig failed", __func__);
     return status;
@@ -167,12 +184,16 @@ zx_status_t Uart16550::Init(zx::interrupt interrupt, hwreg::Mock::RegisterIo por
 
 zx::unowned_interrupt Uart16550::InterruptHandle() { return zx::unowned_interrupt(interrupt_); }
 
-zx_status_t Uart16550::SerialImplGetInfo(serial_port_info_t* info) {
-  *info = kInfo;
-  return ZX_OK;
+void Uart16550::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  completer.buffer(arena).ReplySuccess(kInfo);
 }
 
-zx_status_t Uart16550::SerialImplConfig(uint32_t baud_rate, uint32_t flags) {
+void Uart16550::Config(fuchsia_hardware_serialimpl::wire::DeviceConfigRequest* request,
+                       fdf::Arena& arena, ConfigCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(zx::make_result(Config(request->baud_rate, request->flags)));
+}
+
+zx_status_t Uart16550::Config(uint32_t baud_rate, uint32_t flags) {
   if (Enabled()) {
     zxlogf(ERROR, "%s: attempted to configure when enabled", __func__);
     return ZX_ERR_BAD_STATE;
@@ -187,7 +208,9 @@ zx_status_t Uart16550::SerialImplConfig(uint32_t baud_rate, uint32_t flags) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if ((flags & SERIAL_FLOW_CTRL_MASK) != SERIAL_FLOW_CTRL_NONE && !SupportsAutomaticFlowControl()) {
+  if ((flags & fuchsia_hardware_serialimpl::wire::kSerialFlowCtrlMask) !=
+          fuchsia_hardware_serialimpl::wire::kSerialFlowCtrlNone &&
+      !SupportsAutomaticFlowControl()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -205,45 +228,45 @@ zx_status_t Uart16550::SerialImplConfig(uint32_t baud_rate, uint32_t flags) {
 
   lcr.set_divisor_latch_access(false);
 
-  if (flags & SERIAL_SET_BAUD_RATE_ONLY) {
+  if (flags & fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly) {
     lcr.WriteTo(&port_io_);
     return ZX_OK;
   }
 
-  switch (flags & SERIAL_DATA_BITS_MASK) {
-    case SERIAL_DATA_BITS_5:
+  switch (flags & fuchsia_hardware_serialimpl::wire::kSerialDataBitsMask) {
+    case fuchsia_hardware_serialimpl::wire::kSerialDataBits5:
       lcr.set_word_length(LineControlRegister::kWordLength5);
       break;
-    case SERIAL_DATA_BITS_6:
+    case fuchsia_hardware_serialimpl::wire::kSerialDataBits6:
       lcr.set_word_length(LineControlRegister::kWordLength6);
       break;
-    case SERIAL_DATA_BITS_7:
+    case fuchsia_hardware_serialimpl::wire::kSerialDataBits7:
       lcr.set_word_length(LineControlRegister::kWordLength7);
       break;
-    case SERIAL_DATA_BITS_8:
+    case fuchsia_hardware_serialimpl::wire::kSerialDataBits8:
       lcr.set_word_length(LineControlRegister::kWordLength8);
       break;
   }
 
-  switch (flags & SERIAL_STOP_BITS_MASK) {
-    case SERIAL_STOP_BITS_1:
+  switch (flags & fuchsia_hardware_serialimpl::wire::kSerialStopBitsMask) {
+    case fuchsia_hardware_serialimpl::wire::kSerialStopBits1:
       lcr.set_stop_bits(LineControlRegister::kStopBits1);
       break;
-    case SERIAL_STOP_BITS_2:
+    case fuchsia_hardware_serialimpl::wire::kSerialStopBits2:
       lcr.set_stop_bits(LineControlRegister::kStopBits2);
       break;
   }
 
-  switch (flags & SERIAL_PARITY_MASK) {
-    case SERIAL_PARITY_NONE:
+  switch (flags & fuchsia_hardware_serialimpl::wire::kSerialParityMask) {
+    case fuchsia_hardware_serialimpl::wire::kSerialParityNone:
       lcr.set_parity_enable(false);
       lcr.set_even_parity(false);
       break;
-    case SERIAL_PARITY_ODD:
+    case fuchsia_hardware_serialimpl::wire::kSerialParityOdd:
       lcr.set_parity_enable(true);
       lcr.set_even_parity(false);
       break;
-    case SERIAL_PARITY_EVEN:
+    case fuchsia_hardware_serialimpl::wire::kSerialParityEven:
       lcr.set_parity_enable(true);
       lcr.set_even_parity(true);
       break;
@@ -256,13 +279,13 @@ zx_status_t Uart16550::SerialImplConfig(uint32_t baud_rate, uint32_t flags) {
   // The below is necessary for interrupts on some devices.
   mcr.set_auxiliary_out_2(true);
 
-  switch (flags & SERIAL_FLOW_CTRL_MASK) {
-    case SERIAL_FLOW_CTRL_NONE:
+  switch (flags & fuchsia_hardware_serialimpl::wire::kSerialFlowCtrlMask) {
+    case fuchsia_hardware_serialimpl::wire::kSerialFlowCtrlNone:
       mcr.set_automatic_flow_control_enable(false);
       mcr.set_data_terminal_ready(true);
       mcr.set_request_to_send(true);
       break;
-    case SERIAL_FLOW_CTRL_CTS_RTS:
+    case fuchsia_hardware_serialimpl::wire::kSerialFlowCtrlCtsRts:
       mcr.set_automatic_flow_control_enable(true);
       mcr.set_data_terminal_ready(false);
       mcr.set_request_to_send(false);
@@ -274,10 +297,20 @@ zx_status_t Uart16550::SerialImplConfig(uint32_t baud_rate, uint32_t flags) {
   return ZX_OK;
 }
 
-zx_status_t Uart16550::SerialImplEnable(bool enable) {
+void Uart16550::Enable(fuchsia_hardware_serialimpl::wire::DeviceEnableRequest* request,
+                       fdf::Arena& arena, EnableCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(zx::make_result(Enable(request->enable)));
+}
+
+zx_status_t Uart16550::Enable(bool enable) {
   std::lock_guard<std::mutex> lock(device_mutex_);
   if (enabled_) {
     if (!enable) {
+      if (read_completer_ || write_context_) {
+        zxlogf(ERROR, "Attempted to disable with a pending read or write request");
+        return ZX_ERR_BAD_STATE;
+      }
+
       // The device is enabled, and will be disabled.
       InterruptEnableRegister::Get()
           .FromValue(0)
@@ -304,116 +337,125 @@ zx_status_t Uart16550::SerialImplEnable(bool enable) {
   return ZX_OK;
 }
 
-zx_status_t Uart16550::SerialImplRead(uint8_t* buf, size_t size, size_t* actual) {
+size_t Uart16550::DrainRxFifo(cpp20::span<uint8_t> buffer) {
+  size_t actual = 0;
+  auto lcr = LineStatusRegister::Get().ReadFrom(&port_io_);
+  auto rbr = RxBufferRegister::Get();
+  for (; lcr.data_ready() && actual < buffer.size(); lcr.ReadFrom(&port_io_), actual++) {
+    buffer[actual] = rbr.ReadFrom(&port_io_).data();
+  }
+
+  return actual;
+}
+
+void Uart16550::Read(fdf::Arena& arena, ReadCompleter::Sync& completer) {
   std::lock_guard<std::mutex> lock(device_mutex_);
-  *actual = 0;
 
   if (!enabled_) {
     zxlogf(ERROR, "%s: attempted to read when disabled", __func__);
-    return ZX_ERR_BAD_STATE;
+    return completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+  }
+  if (read_completer_) {
+    // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUND should be returned if the client makes a
+    // read request when one was already in progress.
+    return completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_BOUND);
   }
 
-  auto p = buf;
-
-  auto lcr = LineStatusRegister::Get();
-
-  auto data_ready_and_notify = [&]() __TA_REQUIRES(device_mutex_) {
-    auto ready = lcr.ReadFrom(&port_io_).data_ready();
-    auto state = state_;
-    if (!ready) {
-      state &= ~SERIAL_STATE_READABLE;
-    } else {
-      state |= SERIAL_STATE_READABLE;
-    }
-    if (state_ != state) {
-      state_ = state;
-      NotifyLocked();
-    }
-    return ready;
-  };
-
-  if (!data_ready_and_notify()) {
-    return ZX_ERR_SHOULD_WAIT;
+  auto lcr = LineStatusRegister::Get().ReadFrom(&port_io_);
+  if (!lcr.data_ready()) {
+    // The RX FIFO is empty, store the completer until we get some bytes to return.
+    read_completer_.emplace(completer.ToAsync());
+    return;
   }
 
-  auto rbr = RxBufferRegister::Get();
-
-  while (data_ready_and_notify() && size != 0) {
-    *p++ = rbr.ReadFrom(&port_io_).data();
-    *actual += 1;
-    --size;
-  }
-
-  return ZX_OK;
+  // This was the maximum size for reads from the serial core driver at the time of our conversion
+  // from Banjo to FIDL.
+  uint8_t buf[fuchsia_io::wire::kMaxBuf];
+  size_t actual = DrainRxFifo({buf, std::size(buf)});
+  completer.buffer(arena).ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(buf, actual));
 }
 
-zx_status_t Uart16550::SerialImplWrite(const uint8_t* buf, size_t size, size_t* actual) {
-  std::lock_guard<std::mutex> lock(device_mutex_);
-  *actual = 0;
+cpp20::span<const uint8_t> Uart16550::FillTxFifo(cpp20::span<const uint8_t> data) {
+  auto tbr = TxBufferRegister::Get();
+  const size_t writable = std::min(data.size(), uart_fifo_len_);
+  for (size_t i = 0; i < writable; i++) {
+    tbr.FromValue(0).set_data(data[i]).WriteTo(&port_io_);
+  }
 
+  return data.subspan(writable);
+}
+
+void Uart16550::Write(fuchsia_hardware_serialimpl::wire::DeviceWriteRequest* request,
+                      fdf::Arena& arena, WriteCompleter::Sync& completer) {
+  std::lock_guard<std::mutex> lock(device_mutex_);
   if (!enabled_) {
     zxlogf(ERROR, "%s: attempted to write when disabled", __func__);
-    return ZX_ERR_BAD_STATE;
+    return completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+  }
+  if (write_context_) {
+    // Per the serialimpl protocol, ZX_ERR_ALREADY_BOUND should be returned if the client makes a
+    // write request when one was already in progress.
+    return completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_BOUND);
   }
 
-  auto p = buf;
-  size_t writable = std::min(size, uart_fifo_len_);
-
-  auto lsr = LineStatusRegister::Get();
-  auto ier = InterruptEnableRegister::Get();
-
-  if (!lsr.ReadFrom(&port_io_).tx_empty()) {
-    ier.ReadFrom(&port_io_).set_tx_empty(true).WriteTo(&port_io_);
-    return ZX_ERR_SHOULD_WAIT;
+  cpp20::span<const uint8_t> remaining = request->data.get();
+  if (remaining.empty()) {
+    return completer.buffer(arena).ReplySuccess();
   }
 
-  auto tbr = TxBufferRegister::Get();
+  InterruptEnableRegister::Get().ReadFrom(&port_io_).set_tx_empty(true).WriteTo(&port_io_);
 
-  while (writable != 0) {
-    tbr.FromValue(0).set_data(*p++).WriteTo(&port_io_);
-    *actual += 1;
-    --writable;
+  if (LineStatusRegister::Get().ReadFrom(&port_io_).tx_empty()) {
+    remaining = FillTxFifo(remaining);
   }
 
-  if (*actual != size) {
-    ier.ReadFrom(&port_io_).set_tx_empty(true).WriteTo(&port_io_);
-  }
+  // Copy the remaining write data to the vector, resizing if necessary.
+  write_buffer_.clear();
+  write_buffer_.insert(write_buffer_.begin(), remaining.begin(), remaining.end());
 
-  if (*actual != 0) {
-    auto state = state_;
-    state &= ~SERIAL_STATE_WRITABLE;
-    if (state_ != state) {
-      state_ = state;
-      NotifyLocked();
-    }
-  }
-
-  return ZX_OK;
+  write_context_.emplace(completer.ToAsync(), write_buffer_);
 }
 
-zx_status_t Uart16550::SerialImplSetNotifyCallback(const serial_notify_t* cb) {
+void Uart16550::CancelAll() {
   std::lock_guard<std::mutex> lock(device_mutex_);
-  if (enabled_) {
-    zxlogf(ERROR, "%s: attempted to set notify callback when enabled", __func__);
-    return ZX_ERR_BAD_STATE;
+
+  fdf::Arena arena('UART');
+
+  if (read_completer_) {
+    read_completer_->buffer(arena).ReplyError(ZX_ERR_CANCELED);
+    read_completer_.reset();
   }
 
-  if (!cb) {
-    notify_cb_.callback = nullptr;
-    notify_cb_.ctx = nullptr;
-  } else {
-    notify_cb_ = *cb;
+  if (write_context_) {
+    write_context_->completer.buffer(arena).ReplyError(ZX_ERR_CANCELED);
+    write_context_.reset();
+    InterruptEnableRegister::Get().ReadFrom(&port_io_).set_tx_empty(false).WriteTo(&port_io_);
   }
+}
 
-  return ZX_OK;
+void Uart16550::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
+  CancelAll();
+  completer.buffer(arena).Reply();
+}
+
+void Uart16550::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method ordinal %lu", metadata.method_ordinal);
 }
 
 void Uart16550::DdkRelease() {
-  SerialImplEnable(false);
+  CancelAll();
+  Enable(false);
   // End the interrupt loop by canceling waits.
   interrupt_.destroy();
   interrupt_thread_.join();
   delete this;
+}
+
+fidl::ProtocolHandler<fuchsia_hardware_serialimpl::Device> Uart16550::GetHandler() {
+  return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                 fidl::kIgnoreBindingClosure);
 }
 
 bool Uart16550::SupportsAutomaticFlowControl() const { return uart_fifo_len_ == kFifoDepth16750; }
@@ -447,12 +489,6 @@ void Uart16550::InitFifosLocked() {
   }
 }
 
-void Uart16550::NotifyLocked() {
-  if (notify_cb_.callback && enabled_) {
-    notify_cb_.callback(notify_cb_.ctx, state_);
-  }
-}
-
 // Loop and wait on the interrupt handle. When an interrupt is detected, read the interrupt
 // identifier. If there is data available in the hardware RX FIFO, notify readable. If the
 // hardware TX FIFO is empty, notify writable. If there is a line status error, log it. If
@@ -466,6 +502,8 @@ void Uart16550::HandleInterrupts() {
       // Interrupts should be disabled now and we shouldn't respond to them.
       continue;
     }
+
+    fdf::Arena arena('UART');
 
     const auto identifier = InterruptIdentRegister::Get().ReadFrom(&port_io_).interrupt_id();
 
@@ -493,23 +531,30 @@ void Uart16550::HandleInterrupts() {
         break;
       }
       case InterruptType::kRxDataAvailable:  // In both cases, there is data ready in the rx fifo.
-      case InterruptType::kCharTimeout: {
-        auto state = state_;
-        state |= SERIAL_STATE_READABLE;
-        if (state_ != state) {
-          state_ = state;
-          NotifyLocked();
+      case InterruptType::kCharTimeout:
+        if (read_completer_) {
+          uint8_t buf[fuchsia_io::wire::kMaxBuf];
+          size_t actual = DrainRxFifo({buf, std::size(buf)});
+          read_completer_->buffer(arena).ReplySuccess(
+              fidl::VectorView<uint8_t>::FromExternal(buf, actual));
+          read_completer_.reset();
         }
         break;
-      }
       case InterruptType::kTxEmpty: {
-        InterruptEnableRegister::Get().ReadFrom(&port_io_).set_tx_empty(false).WriteTo(&port_io_);
-        auto state = state_;
-        state |= SERIAL_STATE_WRITABLE;
-        if (state_ != state) {
-          state_ = state;
-          NotifyLocked();
+        if (write_context_) {
+          if (write_context_->data.empty()) {
+            // No more data to write, complete the request and disable the TX empty interrupt.
+            write_context_->completer.buffer(arena).ReplySuccess();
+            write_context_.reset();
+          } else {
+            write_context_->data = FillTxFifo(write_context_->data);
+            // There is still data that needs to be written -- break early to keep the TX empty
+            // interrupt enabled.
+            break;
+          }
         }
+
+        InterruptEnableRegister::Get().ReadFrom(&port_io_).set_tx_empty(false).WriteTo(&port_io_);
         break;
       }
       case InterruptType::kModemStatus: {

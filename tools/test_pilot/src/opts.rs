@@ -8,31 +8,54 @@ use std::env::VarError;
 use std::fs;
 use std::num::ParseIntError;
 use std::path::PathBuf;
+use structopt::StructOpt;
 use thiserror::Error as ThisError;
 
-const ENV_TEST_CONFIG: &str = "FUCHSIA_TEST_CONFIG";
-const ENV_TEST_BIN_PATH: &str = "FUCHSIA_TEST_BIN_PATH";
 const ENV_TARGETS: &str = "FUCHSIA_TARGETS";
 const ENV_TIMEOUT_SECONDS: &str = "FUCHSIA_TIMEOUT_SECONDS";
 const ENV_SDK_TOOLS_PATH: &str = "FUCHSIA_SDK_TOOLS_PATH";
 const ENV_RESOURCE_PATH: &str = "FUCHSIA_RESOURCE_PATH";
 const ENV_CUSTOM_TEST_ARGS: &str = "FUCHSIA_CUSTOM_TEST_ARGS";
 const ENV_TEST_FILTER: &str = "FUCHSIA_TEST_FILTER";
+const ENV_OUT_DIR: &str = "FUCHSIA_TEST_OUTDIR";
+const ENV_STRICT_MODE: &str = "FUCHSIA_TEST_PILOT_STRICT_MODE";
 
 const ALL_ENV_VARS: [&str; 8] = [
-    ENV_TEST_CONFIG,
-    ENV_TEST_BIN_PATH,
     ENV_TARGETS,
     ENV_TIMEOUT_SECONDS,
     ENV_SDK_TOOLS_PATH,
     ENV_RESOURCE_PATH,
+    ENV_OUT_DIR,
     ENV_CUSTOM_TEST_ARGS,
     ENV_TEST_FILTER,
+    ENV_STRICT_MODE,
 ];
+
+#[derive(Debug, StructOpt, Clone)]
+#[structopt(name = "Test Pilot", about = "Assist Test Execution.")]
+struct CommandLineArgs {
+    /// Path to the host test binary to execute.
+    #[structopt(
+        long,
+        value_name = "FILEPATH",
+        required = true,
+        parse(try_from_str = "file_parse_path")
+    )]
+    fuchsia_test_bin_path: PathBuf,
+
+    /// Path to test configuration.
+    #[structopt(
+        long,
+        value_name = "FILEPATH",
+        required = true,
+        parse(try_from_str = "file_parse_path")
+    )]
+    fuchsia_test_configuration: PathBuf,
+}
 
 /// Error encountered running test manager
 #[derive(Debug, PartialEq, Eq)]
-pub struct EnvironmentArgs {
+pub struct TestPilotArgs {
     /// Path to test configuration.
     pub test_config: PathBuf,
 
@@ -54,8 +77,14 @@ pub struct EnvironmentArgs {
     /// Comma-separated glob pattern for test cases to run.
     pub test_filter: Option<String>,
 
+    /// Output directory.
+    pub out_dir: Option<PathBuf>,
+
     ///  Extra arguments to pass to the host test binary as is.
     pub custom_test_args: Option<String>,
+
+    /// Pass along extra_env_vars if strict mode is disabled.
+    pub strict_mode: bool,
 
     /// Extra environment variables passed as it is to the test binary.
     pub extra_env_vars: Vec<(String, String)>,
@@ -92,13 +121,13 @@ impl Environment for StandardEnvironment {
     }
 }
 
-/// Error encountered parsing environment variables
+/// Error encountered parsing Test Pilot arguments
 #[derive(Debug, ThisError)]
-pub enum EnvironmentArgsError {
+pub enum TestPilotArgsError {
     #[error("Error with environment variable '{1}': {0:?}")]
     Var(VarError, &'static str),
 
-    #[error("Error serving test manager protocol: {0:?}")]
+    #[error("Error validating environment variable: '{1}': {0:?}")]
     Validation(anyhow::Error, &'static str),
 }
 
@@ -109,24 +138,16 @@ pub enum ConfigError {
     Required(&'static str),
 }
 
-macro_rules! parse_req_var {
-    ($env:expr, $key:expr, $parser:expr) => {
-        $env.var($key)
-            .map_err(|err| EnvironmentArgsError::Var(err, $key))
-            .and_then(|v| $parser(&v).map_err(|e| EnvironmentArgsError::Validation(e, $key)))
-    };
-}
-
 macro_rules! parse_optional_var {
     ($env:expr, $key:expr, $parser:expr) => {
         $env.var($key)
             .ok()
-            .map(|v| $parser(&v).map_err(|e| EnvironmentArgsError::Validation(e.into(), $key)))
+            .map(|v| $parser(&v).map_err(|e| TestPilotArgsError::Validation(e.into(), $key)))
             .transpose()
     };
 }
 
-impl EnvironmentArgs {
+impl TestPilotArgs {
     pub fn validate_config(
         &self,
         config: &test_config::TestConfiguration,
@@ -145,18 +166,23 @@ impl EnvironmentArgs {
         Ok(())
     }
 
-    pub fn from_env() -> Result<Self, EnvironmentArgsError> {
+    pub fn from_env_and_cmd() -> Result<Self, TestPilotArgsError> {
         let mut env = StandardEnvironment;
-        Self::from_env_internal(&mut env)
+        let cmd = CommandLineArgs::from_args();
+        Self::from_internal(&mut env, cmd)
     }
 
-    fn from_env_internal<E: Environment>(env: &mut E) -> Result<Self, EnvironmentArgsError> {
+    fn from_internal<E: Environment>(
+        env: &mut E,
+        cmd: CommandLineArgs,
+    ) -> Result<Self, TestPilotArgsError> {
         let mut s = Self {
-            test_config: parse_req_var!(env, ENV_TEST_CONFIG, file_parse_path)?,
-            test_bin_path: parse_req_var!(env, ENV_TEST_BIN_PATH, file_parse_path)?,
+            test_config: cmd.fuchsia_test_configuration,
+            test_bin_path: cmd.fuchsia_test_bin_path,
             timeout_seconds: parse_optional_var!(env, ENV_TIMEOUT_SECONDS, parse_u32)?,
             sdk_tools_path: parse_optional_var!(env, ENV_SDK_TOOLS_PATH, dir_parse_path)?,
             resource_path: parse_optional_var!(env, ENV_RESOURCE_PATH, dir_parse_path)?,
+            out_dir: parse_optional_var!(env, ENV_OUT_DIR, dir_parse_path)?,
             targets: env
                 .var(ENV_TARGETS)
                 .ok()
@@ -164,6 +190,7 @@ impl EnvironmentArgs {
                 .unwrap_or_default(),
             test_filter: env.var(ENV_TEST_FILTER).ok(),
             custom_test_args: env.var(ENV_CUSTOM_TEST_ARGS).ok(),
+            strict_mode: env.var(ENV_STRICT_MODE).ok().map_or(true, |m| !m.eq("0")),
             extra_env_vars: vec![],
         };
 
@@ -203,6 +230,7 @@ fn dir_parse_path(path: &str) -> Result<PathBuf, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use structopt::clap::ErrorKind::MissingRequiredArgument;
     use tempfile::tempdir;
     use tempfile::NamedTempFile;
     use test_config::*;
@@ -311,17 +339,21 @@ mod tests {
 
         let mut env = MockEnvironment::new();
 
-        env.set_var(ENV_TEST_CONFIG, temp_config_file_path.to_str().unwrap());
-        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
+        let cmd = CommandLineArgs {
+            fuchsia_test_bin_path: temp_file_path.to_path_buf(),
+            fuchsia_test_configuration: temp_config_file_path.to_path_buf(),
+        };
+
         env.set_var(ENV_TARGETS, "target1, target2");
         env.set_var(ENV_TIMEOUT_SECONDS, "10");
         env.set_var(ENV_SDK_TOOLS_PATH, temp_dir_path.to_str().unwrap());
         env.set_var(ENV_RESOURCE_PATH, temp_dir_path.to_str().unwrap());
+        env.set_var(ENV_OUT_DIR, temp_dir_path.to_str().unwrap());
         env.set_var(ENV_TEST_FILTER, "test_filter");
         env.set_var(ENV_CUSTOM_TEST_ARGS, "custom_args");
 
         let parsed_args =
-            EnvironmentArgs::from_env_internal(&mut env).expect("env args should not fail");
+            TestPilotArgs::from_internal(&mut env, cmd).expect("env args should not fail");
 
         // Check the individual arguments
         assert_eq!(parsed_args.targets, vec!["target1".to_string(), "target2".to_string()]);
@@ -331,6 +363,8 @@ mod tests {
         assert_eq!(parsed_args.test_bin_path, temp_file_path.to_path_buf());
         assert_eq!(parsed_args.test_config, temp_config_file_path.to_path_buf());
         assert_eq!(parsed_args.test_filter, Some("test_filter".to_string()));
+        assert_eq!(parsed_args.out_dir, Some(temp_dir_path.to_path_buf()));
+        assert!(parsed_args.strict_mode);
         assert_eq!(parsed_args.custom_test_args, Some("custom_args".to_string()));
         assert_eq!(parsed_args.extra_env_vars, vec![]);
         validate_env_cleared!(env);
@@ -340,52 +374,61 @@ mod tests {
     }
 
     #[test]
-    fn test_args_missing_required_param() {
-        // Simulate arguments without ENV_TEST_BIN_PATH
+    fn test_cmd_args() {
+        let temp_file = NamedTempFile::new().expect("Failed to create temporary file in the test");
+        let temp_file_path = temp_file.path();
         let temp_config_file =
             NamedTempFile::new().expect("Failed to create temporary file in the test");
         let temp_config_file_path = temp_config_file.path();
 
-        let mut env = MockEnvironment::new();
+        let args = vec![
+            "test_pilot",
+            "--fuchsia_test_configuration",
+            temp_config_file_path.to_str().unwrap(),
+            "--fuchsia_test_bin_path",
+            temp_file_path.to_str().unwrap(),
+        ];
 
-        env.set_var(ENV_TEST_CONFIG, temp_config_file_path.to_str().unwrap());
-        env.set_var(ENV_TARGETS, "target1");
-        env.set_var(ENV_TIMEOUT_SECONDS, "10");
-        env.set_var(ENV_SDK_TOOLS_PATH, "/path/to/sdk_tools");
-        env.set_var(ENV_RESOURCE_PATH, "/path/to/resources");
-        env.set_var(ENV_TEST_FILTER, "test_filter");
-        env.set_var(ENV_CUSTOM_TEST_ARGS, "custom_args");
+        // Convert the arguments to OsString and pass them to the arg parser.
+        let args_os: Vec<std::ffi::OsString> =
+            args.iter().map(|arg| std::ffi::OsString::from(*arg)).collect();
+        let args_os_slice: &[std::ffi::OsString] = &args_os;
 
-        let parsed_args = EnvironmentArgs::from_env_internal(&mut env);
+        // Parse command-line arguments
+        let parsed_args = CommandLineArgs::from_iter_safe(args_os_slice)
+            .expect("command line args should not fail");
 
-        match parsed_args.unwrap_err() {
-            EnvironmentArgsError::Var(_e, var) => {
-                assert_eq!(var, ENV_TEST_BIN_PATH);
-            }
-            err => panic!("unexpected error: {}", err),
-        }
+        // Check the individual arguments
+        assert_eq!(parsed_args.fuchsia_test_bin_path, temp_file_path.to_path_buf());
+        assert_eq!(parsed_args.fuchsia_test_configuration, temp_config_file_path.to_path_buf());
 
-        for var in ALL_ENV_VARS {
-            env.remove_var(var);
-        }
+        // Clean up temporary resources after the test
+        temp_file.close().expect("Failed to close temporary file");
+        temp_config_file.close().expect("Failed to close temporary file");
+    }
 
-        // Simulate arguments without ENV_TEST_CONFIG
-        env.set_var(ENV_TEST_BIN_PATH, temp_config_file_path.to_str().unwrap());
-        env.set_var(ENV_TARGETS, "target1");
-        env.set_var(ENV_TIMEOUT_SECONDS, "10");
-        env.set_var(ENV_SDK_TOOLS_PATH, "/path/to/sdk_tools");
-        env.set_var(ENV_RESOURCE_PATH, "/path/to/resources");
-        env.set_var(ENV_TEST_FILTER, "test_filter");
-        env.set_var(ENV_CUSTOM_TEST_ARGS, "custom_args");
+    #[test]
+    fn test_cmd_args_missing_required_param() {
+        // Simulate command-line arguments without '--test_bin_path'
+        let args = vec!["test_pilot"];
 
-        let parsed_args = EnvironmentArgs::from_env_internal(&mut env);
+        // Convert the arguments to OsString and pass them to the arg parser.
+        let args_os: Vec<std::ffi::OsString> =
+            args.iter().map(|arg| std::ffi::OsString::from(*arg)).collect();
+        let args_os_slice: &[std::ffi::OsString] = &args_os;
 
-        match parsed_args.unwrap_err() {
-            EnvironmentArgsError::Var(_e, var) => {
-                assert_eq!(var, ENV_TEST_CONFIG);
-            }
-            err => panic!("unexpected error: {}", err),
-        }
+        // Parse command-line arguments
+        let parsed_args = CommandLineArgs::from_iter_safe(args_os_slice);
+
+        let err = parsed_args.unwrap_err();
+        assert_eq!(err.kind, MissingRequiredArgument);
+        assert!(
+            err.message.contains(
+                "The following required arguments were not provided:\n    --fuchsia_test_bin_path <FILEPATH>\n    --fuchsia_test_configuration <FILEPATH>"
+            ),
+            "{:?}",
+            err
+        );
     }
 
     #[test]
@@ -394,11 +437,12 @@ mod tests {
         let temp_file_path = temp_file.path();
 
         let mut env = MockEnvironment::new();
+        let cmd = CommandLineArgs {
+            fuchsia_test_bin_path: temp_file_path.to_path_buf(),
+            fuchsia_test_configuration: temp_file_path.to_path_buf(),
+        };
 
-        env.set_var(ENV_TEST_CONFIG, temp_file_path.to_str().unwrap());
-        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
-
-        let parsed_args = EnvironmentArgs::from_env_internal(&mut env).unwrap();
+        let parsed_args = TestPilotArgs::from_internal(&mut env, cmd).unwrap();
 
         // Check the individual arguments
         assert_eq!(parsed_args.targets, Vec::<String>::new());
@@ -406,6 +450,7 @@ mod tests {
         assert_eq!(parsed_args.sdk_tools_path, None);
         assert_eq!(parsed_args.resource_path, None);
         assert_eq!(parsed_args.test_filter, None);
+        assert_eq!(parsed_args.out_dir, None);
         assert_eq!(parsed_args.custom_test_args, None);
         assert_eq!(parsed_args.test_bin_path, temp_file_path.to_path_buf());
         assert_eq!(parsed_args.test_config, temp_file_path.to_path_buf());
@@ -421,13 +466,15 @@ mod tests {
         let temp_file_path = temp_file.path();
 
         let mut env = MockEnvironment::new();
+        let cmd = CommandLineArgs {
+            fuchsia_test_bin_path: temp_file_path.to_path_buf(),
+            fuchsia_test_configuration: temp_file_path.to_path_buf(),
+        };
 
-        env.set_var(ENV_TEST_CONFIG, temp_file_path.to_str().unwrap());
-        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
         env.set_var("EXTRA_VAR1", "some_str1");
         env.set_var("EXTRA_VAR2", "some_str2");
 
-        let mut parsed_args = EnvironmentArgs::from_env_internal(&mut env).unwrap();
+        let mut parsed_args = TestPilotArgs::from_internal(&mut env, cmd).unwrap();
 
         validate_env_cleared!(env);
         parsed_args.extra_env_vars.sort();
@@ -445,19 +492,40 @@ mod tests {
         let temp_file_path = temp_file.path();
 
         let mut env = MockEnvironment::new();
-
-        env.set_var(ENV_TEST_CONFIG, temp_file_path.to_str().unwrap());
-        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
+        let cmd = CommandLineArgs {
+            fuchsia_test_bin_path: temp_file_path.to_path_buf(),
+            fuchsia_test_configuration: temp_file_path.to_path_buf(),
+        };
         env.set_var(ENV_TIMEOUT_SECONDS, "abc");
 
-        let parsed_args = EnvironmentArgs::from_env_internal(&mut env);
+        let parsed_args = TestPilotArgs::from_internal(&mut env, cmd);
 
         match parsed_args.unwrap_err() {
-            EnvironmentArgsError::Validation(_e, var) => {
+            TestPilotArgsError::Validation(_e, var) => {
                 assert_eq!(var, ENV_TIMEOUT_SECONDS);
             }
             err => panic!("unexpected error: {}", err),
         }
+    }
+
+    #[test]
+    fn test_args_parse_strict_mode() {
+        let temp_file = NamedTempFile::new().expect("Failed to create temporary file in the test");
+        let temp_file_path = temp_file.path();
+
+        let mut env = MockEnvironment::new();
+        let cmd = CommandLineArgs {
+            fuchsia_test_bin_path: temp_file_path.to_path_buf(),
+            fuchsia_test_configuration: temp_file_path.to_path_buf(),
+        };
+        env.set_var(ENV_STRICT_MODE, "0");
+
+        let parsed_args = TestPilotArgs::from_internal(&mut env, cmd.clone()).unwrap();
+        assert_eq!(parsed_args.strict_mode, false);
+
+        env.set_var(ENV_STRICT_MODE, "1");
+        let parsed_args = TestPilotArgs::from_internal(&mut env, cmd.clone()).unwrap();
+        assert_eq!(parsed_args.strict_mode, true);
     }
 
     // Helper function to create a simple TestConfiguration for testing
@@ -475,7 +543,7 @@ mod tests {
 
     #[test]
     fn test_validate_success() {
-        let args = EnvironmentArgs {
+        let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: vec!["target1".to_string()],
@@ -483,7 +551,9 @@ mod tests {
             sdk_tools_path: Some(PathBuf::from("sdk_tools")),
             resource_path: Some(PathBuf::from("resources")),
             test_filter: Some("test_filter".to_string()),
+            out_dir: Some(PathBuf::from("out_dir")),
             custom_test_args: Some("extra_args".to_string()),
+            strict_mode: true,
             extra_env_vars: vec![],
         };
 
@@ -494,15 +564,17 @@ mod tests {
         let result = args.validate_config(&test_config);
         assert!(result.is_ok());
 
-        let args = EnvironmentArgs {
+        let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: vec![],
             timeout_seconds: Some(30),
             sdk_tools_path: None,
             resource_path: None,
+            out_dir: None,
             test_filter: Some("test_filter".to_string()),
             custom_test_args: Some("extra_args".to_string()),
+            strict_mode: true,
             extra_env_vars: vec![],
         };
 
@@ -513,15 +585,17 @@ mod tests {
 
     #[test]
     fn test_validate_missing_sdk_tools_path() {
-        let args = EnvironmentArgs {
+        let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: vec!["target1".to_string()],
             timeout_seconds: Some(30),
             sdk_tools_path: None, // Missing sdk_tools_path
             resource_path: Some(PathBuf::from("resources")),
+            out_dir: None,
             test_filter: Some("test_filter".to_string()),
             custom_test_args: Some("extra_args".to_string()),
+            strict_mode: true,
             extra_env_vars: vec![],
         };
 
@@ -534,7 +608,7 @@ mod tests {
 
     #[test]
     fn test_validate_missing_targets() {
-        let args = EnvironmentArgs {
+        let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: Vec::new(), // Missing targets
@@ -542,7 +616,9 @@ mod tests {
             sdk_tools_path: Some(PathBuf::from("sdk_tools")),
             resource_path: Some(PathBuf::from("resources")),
             test_filter: Some("test_filter".to_string()),
+            out_dir: None,
             custom_test_args: Some("extra_args".to_string()),
+            strict_mode: true,
             extra_env_vars: vec![],
         };
 

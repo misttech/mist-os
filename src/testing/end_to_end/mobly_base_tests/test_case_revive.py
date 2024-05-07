@@ -28,15 +28,17 @@ _DMC_CLASS: str = "PowerSwitchDmc"
 class FuchsiaDeviceOperation(enum.StrEnum):
     """Operation that need to be performed on Fuchsia Device."""
 
-    NONE = "None"
+    NONE = "none"
 
-    SOFT_REBOOT = "Soft-Reboot"
+    SOFT_REBOOT = "soft-reboot"
 
-    HARD_REBOOT = "Hard-Reboot"
+    HARD_REBOOT = "hard-reboot"
 
-    POWER_CYCLE = "Power-Cycle"
+    POWER_CYCLE = "power-cycle"
 
-    IDLE_SUSPEND_AUTO_RESUME = "Idle-Suspend-Auto-Resume"
+    IDLE_SUSPEND_AUTO_RESUME = "idle-suspend-auto-resume"
+
+    IDLE_SUSPEND_TIMER_RESUME = "idle-suspend-timer-resume"
 
 
 class TestMethodExecutionFrequency(enum.StrEnum):
@@ -144,6 +146,13 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
                 == FuchsiaDeviceOperation.IDLE_SUSPEND_AUTO_RESUME
             ):
                 fuchsia_device.system_power_state_controller.idle_suspend_auto_resume()
+            elif (
+                fuchsia_device_operation
+                == FuchsiaDeviceOperation.IDLE_SUSPEND_TIMER_RESUME
+            ):
+                fuchsia_device.system_power_state_controller.idle_suspend_timer_based_resume(
+                    duration=self.user_params["resume_timer_duration_sec"]
+                )
             elif fuchsia_device_operation == FuchsiaDeviceOperation.SOFT_REBOOT:
                 fuchsia_device.reboot()
             elif fuchsia_device_operation in [
@@ -243,13 +252,25 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
         )
         try:
             self._fuchsia_device_operation_obj: FuchsiaDeviceOperation = (
-                FuchsiaDeviceOperation(self._fuchsia_device_operation)
+                FuchsiaDeviceOperation(self._fuchsia_device_operation.lower())
             )
         except ValueError as err:
             raise ValueError(
                 f"'{self._fuchsia_device_operation}' operation is not "
                 f"supported by 'TestCaseRevive'"
             ) from err
+        if (
+            self._fuchsia_device_operation_obj
+            == FuchsiaDeviceOperation.IDLE_SUSPEND_TIMER_RESUME
+            and not isinstance(
+                self.user_params.get("resume_timer_duration_sec"), int
+            )
+        ):
+            raise ValueError(
+                f"FuchsiaDeviceOperation: '{self._fuchsia_device_operation}' "
+                f"requires user to also pass 'resume_timer_duration_sec' key "
+                f"with int value in test prams"
+            )
 
         self._test_method_execution_frequency: str = self.user_params.get(
             "test_method_execution_frequency",

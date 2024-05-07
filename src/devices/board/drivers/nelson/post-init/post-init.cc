@@ -13,6 +13,7 @@
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/spi/cpp/bind.h>
 #include <bind/fuchsia/infineon/platform/cpp/bind.h>
 #include <bind/fuchsia/spi/cpp/bind.h>
 
@@ -257,7 +258,8 @@ zx::result<> PostInit::AddSelinaCompositeNode() {
   }
 
   const std::vector<fuchsia_driver_framework::BindRule> spi_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_spi::SERVICE,
+                              bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_VID_INFINEON),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -267,7 +269,10 @@ zx::result<> PostInit::AddSelinaCompositeNode() {
   };
 
   const std::vector<fuchsia_driver_framework::NodeProperty> spi_properties{
+      // TODO(fxbug.dev/333883536): Remove this after Selina has been switched to the rule below.
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_spi::SERVICE,
+                        bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                         bind_fuchsia_infineon_platform::BIND_PLATFORM_DEV_VID_INFINEON),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,

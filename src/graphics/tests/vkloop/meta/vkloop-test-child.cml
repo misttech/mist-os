@@ -39,10 +39,23 @@
             type: "string",
             max_size: 1024,
         },
+        {
+            // A Gtest negative pattern (colon-separated list of globs) that identifies a set of tests to disable.
+            from: "parent",
+            config: "fuchsia.gpu.test.DisabledTestPattern",
+            key: "disabled_test_pattern",
+            availability: "transitional",
+            type: "string",
+            max_size: 1024,
+        },
     ],
     config: {
         gpu_vendor_id: { type: "uint32" },
         gpu_driver_url: {
+            type: "string",
+            max_size: 1024,
+        },
+        disabled_test_pattern: {
             type: "string",
             max_size: 1024,
         },

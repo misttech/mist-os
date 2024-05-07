@@ -7,12 +7,12 @@ use crate::model::component::ComponentInstance;
 use crate::model::component::WeakComponentInstance;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
-use bedrock_error::{BedrockError, Explain};
 use cm_types::Availability;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use router_error::{Explain, RouterError};
 use routing::error::ComponentInstanceError;
 use sandbox::Capability;
 use sandbox::Dict;
@@ -68,7 +68,7 @@ pub trait RouterExt: Send + Sync {
         errors_fn: F,
     ) -> Arc<dyn DirectoryEntry>
     where
-        for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static;
+        for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static;
 }
 
 impl RouterExt for Router {
@@ -144,7 +144,7 @@ impl RouterExt for Router {
         errors_fn: F,
     ) -> Arc<dyn DirectoryEntry>
     where
-        for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+        for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
     {
         struct RouterEntry<F> {
             router: Router,
@@ -156,7 +156,7 @@ impl RouterExt for Router {
 
         impl<F> DirectoryEntry for RouterEntry<F>
         where
-            for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
             fn entry_info(&self) -> EntryInfo {
                 EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
@@ -174,7 +174,7 @@ impl RouterExt for Router {
 
         impl<F> DirectoryEntryAsync for RouterEntry<F>
         where
-            for<'a> F: Fn(&'a BedrockError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
             async fn open_entry_async(
                 self: Arc<Self>,
@@ -236,7 +236,7 @@ impl PolicyCheckRouter {
 
 #[async_trait]
 impl Routable for PolicyCheckRouter {
-    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         match self
             .policy_checker
             .can_route_capability(&self.capability_source, &request.target.moniker())
@@ -274,7 +274,7 @@ pub trait WeakComponentTokenExt {
 // We need this extra struct because WeakComponentInstance isn't defined in this
 // crate so we can't implement WeakComponentTokenAny for it.
 #[derive(Debug)]
-struct WeakComponentInstanceExt {
+pub struct WeakComponentInstanceExt {
     inner: WeakComponentInstance,
 }
 impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {
@@ -312,7 +312,7 @@ impl WeakComponentTokenExt for WeakComponentToken {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use bedrock_error::DowncastErrorForTest;
+    use router_error::DowncastErrorForTest;
     use sandbox::Data;
 
     #[derive(Debug)]
@@ -364,7 +364,7 @@ mod tests {
         use ::routing::error::AvailabilityRoutingError;
         assert_matches!(
             error,
-            BedrockError::RoutingError(err)
+            RouterError::NotFound(err)
             if matches!(
                 err.downcast_for_test::<RoutingError>(),
                 RoutingError::AvailabilityRoutingError(

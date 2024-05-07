@@ -14,7 +14,6 @@ import (
 )
 
 type config struct {
-	ffxConfig        *cli.FfxConfig
 	archiveConfig    *cli.ArchiveConfig
 	deviceConfig     *cli.DeviceConfig
 	installerConfig  *cli.InstallerConfig
@@ -36,12 +35,10 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 		return nil, err
 	}
 
-	ffxConfig := cli.NewFfxConfig(fs)
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
 
 	c := &config{
-		ffxConfig:       ffxConfig,
 		archiveConfig:   archiveConfig,
 		deviceConfig:    deviceConfig,
 		installerConfig: installerConfig,
@@ -59,10 +56,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 }
 
 func (c *config) validate() error {
-	if err := c.ffxConfig.Validate(); err != nil {
-		return err
-	}
-
 	if err := c.buildConfig.Validate(); err != nil {
 		return err
 	}

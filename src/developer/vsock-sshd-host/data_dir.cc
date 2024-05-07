@@ -91,8 +91,8 @@ zx::result<> BuildDataDir(async::Loop& loop, memfs::Memfs* memfs,
     loop.Quit();
   });
   loop.Run();
-  loop.ResetQuit();
   t.join();
+  loop.ResetQuit();
 
   return zx::ok();
 }

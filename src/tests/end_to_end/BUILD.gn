@@ -46,100 +46,98 @@ template("group_with_no_dir_target_deps") {
 
 ############################# Test groups - Start ##############################
 
-if (is_host) {
-  # workbench.emulator
-  # Note - workbench does not support SL4F
-  group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
-    testonly = true
-    public_deps = [
-      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
-      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
-    ]
-  }
+# workbench.emulator
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
+  testonly = true
+  public_deps = [
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
+    "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
+  ]
+}
 
-  group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
-    testonly = true
-    public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
-  }
+group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
+  testonly = true
+  public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
+}
 
-  group("workbench_emulator_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":workbench_emulator_stable_tests",
-      ":workbench_emulator_unstable_tests",
-    ]
-  }
+group("workbench_emulator_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_emulator_stable_tests",
+    ":workbench_emulator_unstable_tests",
+  ]
+}
 
-  # workbench.vim3
-  # Note - workbench does not support SL4F
-  group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
-    testonly = true
-    public_deps = [
-      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
-      "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
-      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
-    ]
-  }
+# workbench.vim3
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
+  testonly = true
+  public_deps = [
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
+    "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
+    "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
+  ]
+}
 
-  group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
-      "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
-    ]
-  }
+group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
+    "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
+  ]
+}
 
-  group("workbench_vim3_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":workbench_vim3_stable_tests",
-      ":workbench_vim3_unstable_tests",
-    ]
-  }
+group("workbench_vim3_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_vim3_stable_tests",
+    ":workbench_vim3_unstable_tests",
+  ]
+}
 
-  # workbench.nuc
-  # Note - workbench does not support SL4F
-  group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
-    testonly = true
-    public_deps = [
-      "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
-      "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
-    ]
-  }
+# workbench.nuc
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
+  testonly = true
+  public_deps = [
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests",
+    "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
+  ]
+}
 
-  group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
-    testonly = true
-    public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
-  }
+group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
+  testonly = true
+  public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
+}
 
-  group("workbench_nuc_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":workbench_nuc_stable_tests",
-      ":workbench_nuc_unstable_tests",
-    ]
-  }
+group("workbench_nuc_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_nuc_stable_tests",
+    ":workbench_nuc_unstable_tests",
+  ]
+}
 
-  # minimal.vim3
-  # Note - minimal does not support SL4F
-  group_with_no_dir_target_deps("minimal_vim3_stable_tests") {
-    testonly = true
-    public_deps = []
-  }
+# minimal.vim3
+# Note - minimal does not support SL4F
+group_with_no_dir_target_deps("minimal_vim3_stable_tests") {
+  testonly = true
+  public_deps = []
+}
 
-  group_with_no_dir_target_deps("minimal_vim3_unstable_tests") {
-    testonly = true
-    public_deps =
-        [ "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)" ]
-  }
+group_with_no_dir_target_deps("minimal_vim3_unstable_tests") {
+  testonly = true
+  public_deps =
+      [ "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)" ]
+}
 
-  group("minimal_vim3_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":minimal_vim3_stable_tests",
-      ":minimal_vim3_unstable_tests",
-    ]
-  }
+group("minimal_vim3_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":minimal_vim3_stable_tests",
+    ":minimal_vim3_unstable_tests",
+  ]
 }
 
 ############################## Test groups - End ###############################

@@ -15,6 +15,9 @@ use selinux::SecurityId;
 /// SELinux implementations called by the LSM hooks.
 mod selinux_hooks;
 
+/// Expose the constructor for the "selinuxfs" filesystem, for Starnix to mount.
+pub use selinux_hooks::fs::selinux_fs;
+
 /// Linux Security Modules hooks for use within the Starnix kernel.
 mod hooks;
 pub use hooks::*;
@@ -26,7 +29,3 @@ pub struct ThreadGroupState(selinux_hooks::ThreadGroupState);
 /// Opaque structure holding security state associated with a `ResolvedElf` instance.
 #[derive(Debug, PartialEq)]
 pub struct ResolvedElfState(SecurityId);
-
-// TODO(b/322850635): Create a clean separation between the procattr filesystem, and LSM hooks.
-// TODO(b/335397745): Move the SELinux filesystem bits under the selinux directory.
-pub mod fs;

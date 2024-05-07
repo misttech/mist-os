@@ -30,17 +30,14 @@ class ImageTest : public TestBase, public FenceCallback {
   void OnRefForFenceDead(Fence* fence) override { fence->OnRefDead(); }
 
   fbl::RefPtr<Image> ImportImage(zx::vmo vmo, const ImageMetadata& image_metadata) {
-    zx::vmo dup_vmo;
-    EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo));
     zx::result<DriverImageId> import_result =
         display()->ImportVmoImageForTesting(std::move(vmo), /*offset=*/0);
     if (!import_result.is_ok()) {
       return nullptr;
     }
 
-    fbl::RefPtr<Image> image =
-        fbl::AdoptRef(new Image(controller(), image_metadata, import_result.value(),
-                                std::move(dup_vmo), nullptr, ClientId(1)));
+    fbl::RefPtr<Image> image = fbl::AdoptRef(
+        new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     return image;
   }

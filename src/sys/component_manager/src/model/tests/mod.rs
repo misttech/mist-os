@@ -4,6 +4,7 @@
 
 mod availability;
 mod config;
+mod diagnostics;
 mod dictionary;
 mod directory;
 mod lifecycle;

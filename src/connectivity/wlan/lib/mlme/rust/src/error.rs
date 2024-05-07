@@ -14,8 +14,6 @@ use {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("out of buffers; requested {} bytes", _0)]
-    NoResources(usize),
     #[error("provided buffer to small")]
     BufferTooSmall,
     #[error("error parsing frame: {}", _0)]
@@ -28,6 +26,8 @@ pub enum Error {
     Internal(anyhow::Error),
     #[error("{}", _0)]
     Fidl(fidl::Error),
+    #[error("{}", _0)]
+    Allocator(wlan_ffi_transport::Error),
     #[error("{}; {}", _0, _1)]
     Status(String, zx::Status),
 }
@@ -35,7 +35,6 @@ pub enum Error {
 impl From<Error> for zx::Status {
     fn from(e: Error) -> Self {
         match e {
-            Error::NoResources(_) => zx::Status::NO_RESOURCES,
             Error::BufferTooSmall => zx::Status::BUFFER_TOO_SMALL,
             Error::Internal(_) => zx::Status::INTERNAL,
             Error::ParsingFrame(_) => zx::Status::IO_INVALID,
@@ -47,6 +46,10 @@ impl From<Error> for zx::Status {
                 | fidl::Error::ServerResponseWrite(status)
                 | fidl::Error::ServerRequestRead(status) => status,
                 _ => zx::Status::IO,
+            },
+            Error::Allocator(e) => match e {
+                wlan_ffi_transport::Error::NoResources { .. } => zx::Status::NO_RESOURCES,
+                wlan_ffi_transport::Error::InvalidFfiBuffer(..) => zx::Status::INTERNAL,
             },
             Error::Status(_, status) => status,
         }
@@ -107,6 +110,12 @@ impl From<fidl::Error> for Error {
     }
 }
 
+impl From<wlan_ffi_transport::Error> for Error {
+    fn from(e: wlan_ffi_transport::Error) -> Self {
+        Error::Allocator(e)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, anyhow::format_err};
@@ -128,8 +137,16 @@ mod tests {
         let status = zx::Status::from(Error::BufferTooSmall);
         assert_eq!(status, zx::Status::BUFFER_TOO_SMALL);
 
-        let status = zx::Status::from(Error::NoResources(42));
+        let status = zx::Status::from(Error::Allocator(wlan_ffi_transport::Error::NoResources {
+            requested_capacity: 42,
+        }));
         assert_eq!(status, zx::Status::NO_RESOURCES);
+
+        let status =
+            zx::Status::from(Error::Allocator(wlan_ffi_transport::Error::InvalidFfiBuffer(
+                wlan_ffi_transport::InvalidFfiBuffer::NullCtx,
+            )));
+        assert_eq!(status, zx::Status::INTERNAL);
 
         let status =
             zx::Status::from(Error::Fidl(fidl::Error::ClientWrite(zx::Status::NOT_SUPPORTED)));

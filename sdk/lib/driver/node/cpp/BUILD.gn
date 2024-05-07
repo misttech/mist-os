@@ -8,6 +8,7 @@ import("//build/cpp/sdk_source_set.gni")
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_node_cpp"
+  stable = true
 
   include_base = "//sdk"
   public_configs = [ "//sdk/config" ]

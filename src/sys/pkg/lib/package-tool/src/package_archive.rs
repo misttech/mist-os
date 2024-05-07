@@ -147,8 +147,10 @@ pub async fn cmd_package_archive_add(cmd: PackageArchiveAddCommand) -> Result<()
         .path_of_file_in_archive
         .to_str()
         .ok_or_else(|| anyhow!("couldn't create str from archive file path"))?;
+    let file_to_add = std::fs::canonicalize(&cmd.file_to_add)
+        .with_context(|| format!("canonicalizing {}", cmd.file_to_add.display()))?;
     let file_to_add =
-        cmd.file_to_add.to_str().ok_or_else(|| anyhow!("couldn't create str from file path"))?;
+        file_to_add.to_str().ok_or_else(|| anyhow!("couldn't create str from file path"))?;
 
     if cmd.path_of_file_in_archive.starts_with("meta/") {
         pkg_builder.add_file_to_far(path_of_file_in_archive, file_to_add)?;

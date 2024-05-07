@@ -155,7 +155,7 @@ pub(crate) fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: RngCore
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutil::{with_fake_rngs, FakeCryptoRng};
+    use crate::testutil::FakeCryptoRng;
 
     /// A fake flow identifier.
     #[derive(Hash)]
@@ -200,7 +200,7 @@ mod tests {
     /// Helper fn to test that if only a single port is available, we will
     /// eventually get that
     fn test_allow_single(single: u16) {
-        with_fake_rngs(RNG_ROUNDS, |mut rng| {
+        FakeCryptoRng::with_fake_rngs(RNG_ROUNDS, |mut rng| {
             let fake = FakeImpl { available: FakeAvailable::AllowSingle(single) };
             let port = simple_randomized_port_alloc(&mut rng, &FakeId(0), &fake, &());
             assert_eq!(port.unwrap(), single);
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_allow_none() {
         // Test that if no ports are available, try_alloc must return none.
-        with_fake_rngs(RNG_ROUNDS, |mut rng| {
+        FakeCryptoRng::with_fake_rngs(RNG_ROUNDS, |mut rng| {
             let fake = FakeImpl { available: FakeAvailable::DenyAll };
             let port = simple_randomized_port_alloc(&mut rng, &FakeId(0), &fake, &());
             assert_eq!(port, None);
@@ -239,7 +239,7 @@ mod tests {
     fn test_allow_evens() {
         // Test that if we only allow even ports, we will always get ports in
         // the specified range, and they'll always be even.
-        with_fake_rngs(RNG_ROUNDS, |mut rng| {
+        FakeCryptoRng::with_fake_rngs(RNG_ROUNDS, |mut rng| {
             let fake = FakeImpl { available: FakeAvailable::AllowEvens };
             let port = simple_randomized_port_alloc(&mut rng, &FakeId(0), &fake, &()).unwrap();
             assert!(FakeImpl::EPHEMERAL_RANGE.contains(&port));

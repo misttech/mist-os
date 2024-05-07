@@ -22,6 +22,9 @@ pub struct Part {
     pub meta: String,
     #[serde(rename = "type")]
     pub kind: ElementType,
+
+    #[serde(default)]
+    pub stable: bool,
 }
 
 impl fmt::Display for Part {

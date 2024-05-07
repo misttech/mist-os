@@ -170,7 +170,13 @@ class SystemPowerStateController(
             errors.SystemPowerStateControllerError: In case of failure
             errors.NotSupportedError: If any of the suspend_state or resume_type
                 is not yet supported
+            ValueError: If any of the input args are not valid
         """
+        self._validate_suspend_resume_method_args(
+            suspend_state=suspend_state,
+            resume_mode=resume_mode,
+        )
+
         logs_start_time: float = time.time()
         log_message: str = (
             f"Performing '{suspend_state}' followed by '{resume_mode}' "
@@ -241,6 +247,7 @@ class SystemPowerStateController(
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
+            ValueError: If any of the input args are not valid
         """
         self.suspend_resume(
             suspend_state=system_power_state_controller_interface.IdleSuspend(),
@@ -251,6 +258,54 @@ class SystemPowerStateController(
         )
 
     # List all the private methods
+    def _validate_suspend_resume_method_args(
+        self,
+        suspend_state: system_power_state_controller_interface.SuspendState,
+        resume_mode: system_power_state_controller_interface.ResumeMode,
+    ) -> None:
+        """Validate the input args of suspend_resume() method.
+
+        Args:
+            suspend_state: Which state to suspend the Fuchsia device into.
+            resume_mode: Information about how to resume the device.
+
+        Raises:
+            errors.NotSupportedError: If any of the suspend_state or resume_type
+                is not yet supported
+            ValueError: If any of the input args are not valid
+        """
+        if not isinstance(
+            suspend_state,
+            (system_power_state_controller_interface.IdleSuspend,),
+        ):
+            raise errors.NotSupportedError(
+                f"Suspending the device to '{suspend_state}' state is not yet "
+                f"supported."
+            )
+
+        if not isinstance(
+            resume_mode,
+            (
+                system_power_state_controller_interface.AutomaticResume,
+                system_power_state_controller_interface.TimerResume,
+            ),
+        ):
+            raise errors.NotSupportedError(
+                f"Resuming the device using '{resume_mode}' is not yet supported."
+            )
+
+        if (
+            isinstance(
+                resume_mode, system_power_state_controller_interface.TimerResume
+            )
+            and resume_mode.duration
+            >= system_power_state_controller_interface.AutomaticResume.duration
+        ):
+            raise ValueError(
+                f"Resuming the device using '{resume_mode}' is not valid. "
+                f"Set the timer value less than '{system_power_state_controller_interface.AutomaticResume.duration}sec'"
+            )
+
     def _suspend(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
@@ -265,8 +320,6 @@ class SystemPowerStateController(
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
-            errors.NotSupportedError: If any of the suspend_state or resume_type
-                is not yet supported
         """
         _LOGGER.info(
             "Putting '%s' into '%s'",
@@ -278,11 +331,6 @@ class SystemPowerStateController(
             suspend_state, system_power_state_controller_interface.IdleSuspend
         ):
             self._perform_idle_suspend()
-        else:
-            raise errors.NotSupportedError(
-                f"Suspending the device to '{suspend_state}' state is not yet "
-                f"supported."
-            )
 
         _LOGGER.info(
             "'%s' has been resumed from '%s'",
@@ -323,8 +371,6 @@ class SystemPowerStateController(
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
-            errors.NotSupportedError: If any of the suspend_state or resume_type
-                is not yet supported
             errors.HoneydewTimeoutError: If timer has not been started in 2 sec
         """
         _LOGGER.info(
@@ -343,10 +389,6 @@ class SystemPowerStateController(
         ):
             proc: subprocess.Popen[str] = self._set_timer(resume_mode.duration)
             self._wait_for_timer_start(proc=proc)
-        else:
-            raise errors.NotSupportedError(
-                f"Resuming the device using '{resume_mode}' is not yet supported."
-            )
 
         yield
 
@@ -359,10 +401,6 @@ class SystemPowerStateController(
             resume_mode, system_power_state_controller_interface.TimerResume
         ):
             self._wait_for_timer_end(proc=proc, resume_mode=resume_mode)
-        else:
-            raise errors.NotSupportedError(
-                f"Resuming the device using '{resume_mode}' is not yet supported."
-            )
 
     def _set_timer(self, duration: int) -> subprocess.Popen[str]:
         """Sets the timer.

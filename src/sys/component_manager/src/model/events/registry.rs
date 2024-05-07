@@ -13,7 +13,6 @@ use {
                 stream::EventStream,
                 synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer},
             },
-            hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
             model::Model,
             routing::RouteSource,
         },
@@ -30,6 +29,7 @@ use {
     cm_types::Name,
     errors::{EventsError, ModelError},
     futures::lock::Mutex,
+    hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
@@ -411,14 +411,12 @@ impl Hook for EventRegistry {
 mod tests {
     use {
         super::*,
-        crate::model::{
-            hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
-            testing::test_helpers::*,
-        },
+        crate::model::testing::test_helpers::*,
         assert_matches::assert_matches,
         cm_rust::{Availability, UseSource},
         fuchsia_zircon as zx,
         futures::StreamExt,
+        hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
         sandbox::Message,
         std::str::FromStr,
     };
@@ -426,25 +424,27 @@ mod tests {
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
         let (_, capability_server_end) = zx::Channel::create();
         let (receiver, sender) = CapabilityReceiver::new();
-        let event = ComponentEvent::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::CapabilityRequested {
+        let event = ComponentEvent {
+            target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
+            component_url: "fuchsia-pkg://root".parse().unwrap(),
+            payload: EventPayload::CapabilityRequested {
                 source_moniker: Moniker::root(),
                 name: "foo".to_string(),
                 receiver,
             },
-        );
+            timestamp: zx::Time::get_monotonic(),
+        };
         sender.send(Message { channel: capability_server_end }).unwrap();
         registry.dispatch(&event).await;
     }
 
     async fn dispatch_fake_event(registry: &EventRegistry) {
-        let event = ComponentEvent::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root",
-            EventPayload::Discovered,
-        );
+        let event = ComponentEvent {
+            target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
+            component_url: "fuchsia-pkg://root".parse().unwrap(),
+            payload: EventPayload::Discovered,
+            timestamp: zx::Time::get_monotonic(),
+        };
         registry.dispatch(&event).await;
     }
 

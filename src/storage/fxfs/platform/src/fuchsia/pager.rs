@@ -818,8 +818,9 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::channel::mpsc, futures::StreamExt};
+    use {super::*, futures::channel::mpsc, futures::StreamExt, fxfs_macros::ToWeakNode};
 
+    #[derive(ToWeakNode)]
     struct MockFile {
         vmo: zx::Vmo,
         pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
@@ -899,6 +900,7 @@ mod tests {
         }
     }
 
+    #[derive(ToWeakNode)]
     struct OnZeroChildrenFile {
         pager: Arc<Pager>,
         vmo: zx::Vmo,
@@ -1036,6 +1038,7 @@ mod tests {
 
     #[fuchsia::test(threads = 2)]
     async fn test_status_code_mapping() {
+        #[derive(ToWeakNode)]
         struct StatusCodeFile {
             vmo: zx::Vmo,
             pager: Arc<Pager>,
@@ -1260,6 +1263,7 @@ mod tests {
         pager_range.expand(0..page_size()).consume();
     }
 
+    #[derive(ToWeakNode)]
     struct PagerRangeTestFile {
         vmo: zx::Vmo,
         pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,

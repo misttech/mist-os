@@ -12,6 +12,7 @@ fidl("fuchsia.audio.effects") {
   ]
 
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
 
   public_deps = [

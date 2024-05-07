@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.recovery.ui") {
   sdk_category = "partner"
+  stable = true
   sdk_area = "Unknown"
   name = "fuchsia.recovery.ui"
   sources = [
