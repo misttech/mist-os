@@ -27,6 +27,7 @@ use {
         object_store::{DataObjectHandle, ObjectDescriptor},
         round::{round_down, round_up},
     },
+    fxfs_macros::ToWeakNode,
     std::{
         ops::Range,
         sync::{
@@ -47,6 +48,7 @@ pub const READ_AHEAD_SIZE: u64 = 131_072;
 const PURGED: usize = 1 << (usize::BITS - 1);
 
 /// Represents an immutable blob stored on Fxfs with associated an merkle tree.
+#[derive(ToWeakNode)]
 pub struct FxBlob {
     handle: DataObjectHandle<FxVolume>,
     vmo: zx::Vmo,

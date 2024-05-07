@@ -39,6 +39,7 @@ use {
         },
         serialized_types::BlobMetadata,
     },
+    fxfs_macros::ToWeakNode,
     std::{str::FromStr, sync::Arc},
     vfs::{
         directory::{
@@ -58,6 +59,7 @@ use {
 /// It is not possible to create sub-directories.
 /// It is not possible to write to an existing blob.
 /// It is not possible to open or read a blob until it is written and verified.
+#[derive(ToWeakNode)]
 pub struct BlobDirectory {
     directory: Arc<FxDirectory>,
 }

@@ -291,3 +291,44 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
 
     out.into()
 }
+
+#[proc_macro_derive(ToWeakNode)]
+pub fn derive_to_weak_node(input: TokenStream) -> TokenStream {
+    let input: syn::DeriveInput = parse_macro_input!(input);
+    let node = input.ident;
+    quote! {
+        impl crate::node::ToWeakNode for #node {
+            fn to_weak_node(self: Arc<Self>) -> crate::node::WeakNode {
+                use {
+                    crate::node::{FxNode, ToWeakNode, WeakNode, WeakNodeVTable},
+                    std::{
+                        any::TypeId,
+                        mem::ManuallyDrop,
+                        sync::{Arc, Weak},
+                    },
+                };
+
+                unsafe fn drop(ptr: *const ()) {
+                    Weak::from_raw(ptr as *const #node);
+                }
+
+                unsafe fn type_id() -> TypeId {
+                    TypeId::of::<#node>()
+                }
+
+                unsafe fn upgrade(ptr: *const ()) -> Option<Arc<dyn FxNode>> {
+                    ManuallyDrop::new(Weak::from_raw(ptr as *const #node))
+                        .upgrade()
+                        .map(|a| a as Arc<dyn FxNode>)
+                }
+
+                static VTABLE: WeakNodeVTable = WeakNodeVTable::new(drop, type_id, upgrade);
+
+                // SAFETY: We've implemented `drop`, `type_id` and `upgrade` correctly.  The code in
+                // `node.rs` requires us to use `Weak::into_raw` here.
+                unsafe { WeakNode::new(&VTABLE, Arc::downgrade(&self).into_raw() as *const ()) }
+            }
+        }
+    }
+    .into()
+}

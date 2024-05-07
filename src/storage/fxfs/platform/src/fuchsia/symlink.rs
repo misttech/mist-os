@@ -21,6 +21,7 @@ use {
             StoreObjectHandle,
         },
     },
+    fxfs_macros::ToWeakNode,
     std::sync::Arc,
     vfs::{
         attributes, common::rights_to_posix_mode_bits,
@@ -28,6 +29,7 @@ use {
     },
 };
 
+#[derive(ToWeakNode)]
 pub struct FxSymlink {
     handle: StoreObjectHandle<FxVolume>,
 }

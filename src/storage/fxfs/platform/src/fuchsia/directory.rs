@@ -28,6 +28,7 @@ use {
             Directory, ObjectDescriptor, ObjectStore, Timestamp,
         },
     },
+    fxfs_macros::ToWeakNode,
     std::{
         any::Any,
         sync::{Arc, Mutex},
@@ -49,6 +50,7 @@ use {
     },
 };
 
+#[derive(ToWeakNode)]
 pub struct FxDirectory {
     // The root directory is the only directory which has no parent, and its parent can never
     // change, hence the Option can go on the outside.
