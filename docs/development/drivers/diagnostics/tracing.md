@@ -57,24 +57,6 @@ fuchsia_driver("my_driver") {
 }
 ```
 
-## Build with tracing {:#build-with-tracing}
-
-To be able to trace drivers that are loaded during boot,
-set your Fuchsia build configuration with the additional
-`--with-base=//bundles/packages/prod:tracing` option, for example:
-
-```sh {:.devsite-disable-click-to-copy}
-$ fx set workstation_eng.x64 --with-base=//bundles/packages/prod:tracing
-$ fx build
-```
-
-Without this option, `TraceManager` is not present when the driver starts.
-Thus the driver is not be able to participate in tracing when `TraceManager`
-is started later.
-
-For more information on `fx set`, see [fx workflows][fx-workflows]
-(or run `fx help set`).
-
 ## Boot with tracing {:#boot-with-tracing}
 
 Caution: The information in this section is only specific to the legacy
