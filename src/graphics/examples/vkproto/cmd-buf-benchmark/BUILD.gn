@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/packaged_shared_library.gni")
+import("//build/packages/sdk_fuchsia_package.gni")
 import("//src/graphics/examples/vkproto/common/common.gni")
 import("//src/lib/vulkan/layers.gni")
 import("//src/lib/vulkan/vulkan.gni")
@@ -26,7 +27,6 @@ fuchsia_component_manifest("cmd-buf-benchmark-child-manifest") {
 }
 
 fuchsia_component("cmd-buf-benchmark-test-child-component") {
-  testonly = true
   component_name = "cmd-buf-benchmark-test-child"
   cm_label = ":cmd-buf-benchmark-child-manifest"
   deps = [
@@ -47,11 +47,18 @@ fuchsia_structured_config_values("default_config") {
 
 fuchsia_package("cmd-buf-benchmark-test-child") {
   package_name = "cmd-buf-benchmark-test"
-  testonly = true
   deps = [
     ":cmd-buf-benchmark-test-child-component",
     ":default_config",
   ]
+}
+
+sdk_fuchsia_package("cmd-buf-benchmark-test-sdk") {
+  distribution_name = "cmd-buf-benchmark-test"
+  category = "partner"
+  package_label = ":cmd-buf-benchmark-test-child"
+  api_level_added = 19
+  expected_files_exact = [ "meta/cmd-buf-benchmark-test-child.cm" ]
 }
 
 config("vulkan_sdk_linux_config") {
@@ -64,7 +71,6 @@ config("vulkan_sdk_linux_config") {
 }
 
 executable("bin") {
-  testonly = true
   output_name = "cmd-buf-benchmark"
   sources = [ "main.cc" ]
 

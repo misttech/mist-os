@@ -3,10 +3,10 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/packages/sdk_fuchsia_package.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 source_set("vulkan_extension_test") {
-  testonly = true
   sources = [
     "vulkan_extension_test.cc",
     "vulkan_extension_test.h",
@@ -19,7 +19,7 @@ source_set("vulkan_extension_test") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//src/graphics/tests/common",
     "//src/lib/vulkan",
-    "//third_party/googletest:gtest",
+    "//third_party/googletest:gtest_no_testonly",
   ]
 }
 
@@ -33,7 +33,6 @@ fuchsia_structured_config_cpp_elf_lib("config") {
 }
 
 executable("vkext_bin") {
-  testonly = true
   output_name = "vkext"
 
   sources = [
@@ -56,7 +55,7 @@ executable("vkext_bin") {
     "//src/graphics/tests/common",
     "//src/lib/fsl",
     "//src/lib/vulkan",
-    "//third_party/googletest:gtest",
+    "//third_party/googletest:gtest_no_testonly",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
   ]
@@ -85,7 +84,6 @@ fuchsia_component("vkext_cmp") {
     "//src/lib/vulkan/validation_layers",
   ]
   cm_label = ":child-manifest"
-  testonly = true
 }
 
 fuchsia_structured_config_values("default_config") {
@@ -102,11 +100,18 @@ fuchsia_structured_config_values("default_config") {
 
 fuchsia_package("vkext-child-package") {
   package_name = "vkext-test"
-  testonly = true
   deps = [
     ":default_config",
     ":vkext_cmp",
   ]
+}
+
+sdk_fuchsia_package("vkext-test-sdk") {
+  distribution_name = "vkext-test"
+  category = "partner"
+  package_label = ":vkext-child-package"
+  api_level_added = 19
+  expected_files_exact = [ "meta/vkext-test-child.cm" ]
 }
 
 protected_libvulkan_envs = []

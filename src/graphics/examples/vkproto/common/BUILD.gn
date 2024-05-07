@@ -13,7 +13,6 @@ source_set("srcs") {
 if (is_fuchsia) {
   # This target can set the gpu vendor ID from a config exactly matching the one in meta/config.shard.cml.
   source_set("config_query") {
-    testonly = true
     sources = [ "config_query.cc" ]
     deps = [
       ":config",

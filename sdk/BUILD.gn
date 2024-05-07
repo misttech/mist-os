@@ -565,11 +565,17 @@ sdk_molecule("core_bindlib") {
 sdk_molecule("core_packages") {
   category = "partner"
   deps = [
-    "//src/performance/memory/heapdump/collector:collector_sdk",
+    "//src/graphics/examples/vkproto/cmd-buf-benchmark:cmd-buf-benchmark-test-sdk",
+    "//src/graphics/examples/vkproto/driver-tests:vkproto-driver-test-sdk",
+
     # TODO(https://fxbug.dev/326231777): Uncomment this once
     # realm_builder_server can build targeting API levels.
     #
     # "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk"
+    "//src/graphics/tests/benchmark:vkcopy-test-sdk",
+    "//src/graphics/tests/vkext:vkext-test-sdk",
+    "//src/graphics/tests/vkloop:vkloop-test-sdk",
+    "//src/performance/memory/heapdump/collector:collector_sdk",
   ]
 }
 

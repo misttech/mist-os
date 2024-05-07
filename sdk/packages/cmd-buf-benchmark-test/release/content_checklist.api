@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "content": {
+    "files": {
+      "meta/cmd-buf-benchmark-test-child.cm": {
+        "hash": "c2a13dd68688a7bf531fcac0e3438a148f817d677cfc30a73eac4b2ead002f83"
+      }
+    }
+  }
+}

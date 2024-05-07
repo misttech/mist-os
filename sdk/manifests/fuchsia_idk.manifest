@@ -411,8 +411,13 @@ host_tool://tools/x64/trace2json
 host_tool://tools/x64/zbi
 host_tool://tools/x64/zxdb
 loadable_module://pkg/vulkan_layers
+package://packages/cmd-buf-benchmark-test
 package://packages/heapdump-collector
 package://packages/magma_conformance_tests
+package://packages/vkcopy-test
+package://packages/vkext-test
+package://packages/vkloop-test
+package://packages/vkproto-driver-test
 package://packages/vkreadback_test
 sysroot://pkg/sysroot
 version_history://version_history.json

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/packages/sdk_fuchsia_package.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 fuchsia_component_manifest("config-manifest") {
@@ -15,7 +16,6 @@ fuchsia_structured_config_cpp_elf_lib("config") {
 }
 
 executable("vkloop_bin") {
-  testonly = true
   output_name = "vkloop"
 
   sources = [ "vkloop.cc" ]
@@ -31,7 +31,7 @@ executable("vkloop_bin") {
   ]
   public_deps = [
     "//src/lib/fxl/test:test_settings",
-    "//third_party/googletest:gtest",
+    "//third_party/googletest:gtest_no_testonly",
   ]
 
   public_deps += [ "//src/lib/vulkan" ]
@@ -54,7 +54,6 @@ fuchsia_structured_config_values("default_config") {
 fuchsia_component("vkloop_cmp") {
   cm_label = ":config-manifest"
   component_name = "vkloop-test-child"
-  testonly = true
   deps = [
     ":shaders",
     ":vkloop_bin",
@@ -68,7 +67,14 @@ fuchsia_package("vkloop-child-package") {
     ":default_config",
     ":vkloop_cmp",
   ]
-  testonly = true
+}
+
+sdk_fuchsia_package("vkloop-test-sdk") {
+  distribution_name = "vkloop-test"
+  category = "partner"
+  package_label = ":vkloop-child-package"
+  api_level_added = 19
+  expected_files_exact = [ "meta/vkloop-test-child.cm" ]
 }
 
 fuchsia_test_component("vkloop-test-cmp") {
