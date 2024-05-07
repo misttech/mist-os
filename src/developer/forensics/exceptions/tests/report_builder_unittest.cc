@@ -16,7 +16,7 @@ namespace exceptions {
 namespace handler {
 namespace {
 
-using testing::Contains;
+using ::testing::Contains;
 
 class CrashReportBuilderTest : public testing::Test {
  protected:

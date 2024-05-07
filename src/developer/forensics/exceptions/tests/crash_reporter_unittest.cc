@@ -14,7 +14,7 @@
 #include <zircon/types.h>
 
 #include <memory>
-#include <type_traits>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -36,10 +36,7 @@ inline void ToString(const fuchsia::exception::ExceptionType& value, std::ostrea
 
 namespace {
 
-using fuchsia::exception::ExceptionInfo;
-using fuchsia::exception::ExceptionType;
-using fuchsia::exception::ProcessException;
-using testing::UnorderedElementsAreArray;
+using ::testing::UnorderedElementsAreArray;
 
 constexpr zx::duration kDefaultTimeout{zx::duration::infinite()};
 
@@ -96,7 +93,7 @@ class StubCrashIntrospect : public fuchsia::sys2::CrashIntrospect {
   }
 
   void AddThreadKoidToComponentInfo(uint64_t thread_koid, ComponentInfo component_info) {
-    tids_to_component_infos_[thread_koid] = component_info;
+    tids_to_component_infos_[thread_koid] = std::move(component_info);
   }
 
  private:
@@ -109,7 +106,7 @@ class HandlerTest : public UnitTestFixture {
  public:
   void HandleException(
       zx::exception exception, zx::duration component_lookup_timeout,
-      CrashReporter::SendCallback callback = [](::fidl::StringPtr moniker) {}) {
+      CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
     handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout);
 
     zx::process process;
@@ -125,7 +122,7 @@ class HandlerTest : public UnitTestFixture {
 
   void HandleException(
       zx::process process, zx::thread thread, zx::duration component_lookup_timeout,
-      CrashReporter::SendCallback callback = [](::fidl::StringPtr moniker) {}) {
+      CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
     handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout);
 
     handler_->Send(zx::exception{}, std::move(process), std::move(thread), std::move(callback));
@@ -209,7 +206,7 @@ TEST_F(HandlerTest, NoIntrospectConnection) {
   bool called = false;
   std::optional<std::string> out_moniker{std::nullopt};
   HandleException(std::move(exception.exception), kDefaultTimeout,
-                  [&called, &out_moniker](const ::fidl::StringPtr moniker) {
+                  [&called, &out_moniker](const ::fidl::StringPtr& moniker) {
                     called = true;
                     if (moniker.has_value()) {
                       out_moniker = moniker.value();
@@ -247,7 +244,7 @@ TEST_F(HandlerTest, NoCrashReporterConnection) {
   bool called = false;
   std::optional<std::string> out_moniker{std::nullopt};
   HandleException(std::move(exception.exception), kDefaultTimeout,
-                  [&called, &out_moniker](const ::fidl::StringPtr moniker) {
+                  [&called, &out_moniker](const ::fidl::StringPtr& moniker) {
                     called = true;
                     if (moniker.has_value()) {
                       out_moniker = moniker.value();
@@ -296,7 +293,7 @@ TEST_F(HandlerTest, NoException) {
   bool called = false;
   std::optional<std::string> out_moniker{std::nullopt};
   HandleException(std::move(process), std::move(thread), zx::duration::infinite(),
-                  [&called, &out_moniker](const ::fidl::StringPtr moniker) {
+                  [&called, &out_moniker](const ::fidl::StringPtr& moniker) {
                     called = true;
                     if (moniker.has_value()) {
                       out_moniker = moniker.value();

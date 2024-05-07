@@ -3,6 +3,7 @@
 
 #include "src/developer/forensics/exceptions/process_limbo_manager.h"
 
+#include <fuchsia/exception/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -11,7 +12,6 @@
 
 #include <gtest/gtest.h>
 
-#include "fuchsia/exception/cpp/fidl.h"
 #include "src/developer/forensics/exceptions/exception_broker.h"
 #include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
 #include "src/lib/fsl/handles/object_info.h"

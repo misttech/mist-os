@@ -52,8 +52,8 @@ class ProcessLimboManager {
   // Corresponds to the return value of |WatchProcessesWaitingOnException|.
   std::vector<fuchsia::exception::ProcessExceptionMetadata> ListProcessesInLimbo();
 
-  // TODO(https://fxbug.dev/42122544): This is an extremely naive approach. There are several policies to make
-  // this more robust:
+  // TODO(https://fxbug.dev/42122544): This is an extremely naive approach. There are several
+  // policies to make this more robust:
   //                - Put a ceiling on the amount of exceptions to be held.
   //                - Define an eviction policy (FIFO probably).
   //                - Set a timeout for exceptions (configurable).
@@ -83,10 +83,10 @@ class ProcessLimboHandler : public fuchsia::exception::ProcessLimbo {
 
   fxl::WeakPtr<ProcessLimboHandler> GetWeakPtr();
 
-  void ActiveStateChanged(bool state);
+  void ActiveStateChanged(bool active);
 
   // Called when a process goes in or out of limbo (ProcessLimboManager::AddToLimbo).
-  void LimboChanged(std::vector<fuchsia::exception::ProcessExceptionMetadata> processes);
+  void LimboChanged(std::vector<fuchsia::exception::ProcessExceptionMetadata> limbo_list);
 
   // fuchsia.exception.ProcessLimbo implementation.
   void SetActive(bool active, SetActiveCallback) override;

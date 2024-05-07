@@ -18,7 +18,7 @@ using inspect::testing::NameMatches;
 using inspect::testing::NodeMatches;
 using inspect::testing::PropertyList;
 using inspect::testing::UintIs;
-using testing::UnorderedElementsAreArray;
+using ::testing::UnorderedElementsAreArray;
 
 using CrashCounterTest = UnitTestFixture;
 

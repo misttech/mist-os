@@ -18,7 +18,7 @@ namespace handler {
 namespace {
 
 ::fpromise::promise<ComponentInfo> GetInfo(async_dispatcher_t* dispatcher,
-                                           std::shared_ptr<sys::ServiceDirectory> services,
+                                           const std::shared_ptr<sys::ServiceDirectory>& services,
                                            zx::duration timeout, zx_koid_t thread_koid) {
   namespace sys = fuchsia::sys2;
   return OneShotCall<sys::CrashIntrospect, &sys::CrashIntrospect::FindComponentByThreadKoid>(
