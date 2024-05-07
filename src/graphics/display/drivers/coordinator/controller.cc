@@ -149,74 +149,85 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 }
 
 void Controller::DisplayControllerInterfaceOnDisplaysChanged(
-    const added_display_args_t* displays_added, size_t added_count,
-    const uint64_t* displays_removed, size_t removed_count) {
+    const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
+    const uint64_t* removed_banjo_display_id_list, size_t removed_banjo_display_id_count) {
+  cpp20::span<const added_display_args_t> added_banjo_displays(added_banjo_display_list,
+                                                               added_banjo_display_count);
   fbl::Vector<fbl::RefPtr<DisplayInfo>> added_display_infos;
-  fbl::Vector<DisplayId> removed_display_ids;
-  std::unique_ptr<async::Task> task;
-
   fbl::AllocChecker alloc_checker;
-  if (added_count) {
-    added_display_infos.reserve(added_count, &alloc_checker);
+  if (!added_banjo_displays.empty()) {
+    added_display_infos.reserve(added_banjo_displays.size(), &alloc_checker);
     if (!alloc_checker.check()) {
       zxlogf(ERROR, "No memory when processing hotplug");
       return;
     }
   }
-  if (removed_count) {
-    removed_display_ids.reserve(removed_count, &alloc_checker);
+
+  cpp20::span<const uint64_t> removed_banjo_display_ids(removed_banjo_display_id_list,
+                                                        removed_banjo_display_id_count);
+  fbl::Vector<DisplayId> removed_display_ids;
+  if (!removed_banjo_display_ids.empty()) {
+    removed_display_ids.reserve(removed_banjo_display_ids.size(), &alloc_checker);
     if (!alloc_checker.check()) {
       zxlogf(ERROR, "No memory when processing hotplug");
       return;
     }
-    for (size_t i = 0; i < removed_count; ++i) {
-      removed_display_ids.push_back(ToDisplayId(displays_removed[i]));
-    }
   }
-  task = fbl::make_unique_checked<async::Task>(&alloc_checker);
+  for (uint64_t removed_banjo_display_id : removed_banjo_display_ids) {
+    ZX_DEBUG_ASSERT(removed_display_ids.size() < removed_banjo_display_ids.size());
+    removed_display_ids.push_back(ToDisplayId(removed_banjo_display_id), &alloc_checker);
+    ZX_DEBUG_ASSERT_MSG(alloc_checker.check(), "push_back() failed after earlier reserve()");
+  }
+
+  auto task = fbl::make_unique_checked<async::Task>(&alloc_checker);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "No memory when processing hotplug");
     return;
   }
 
-  fbl::AutoLock lock(mtx());
+  for (DisplayId removed_display_id : removed_display_ids) {
+    fbl::AutoLock lock(mtx());
+    fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(removed_display_id);
+    if (!removed_display) {
+      zxlogf(WARNING, "Unknown display %" PRIu64 " removed", removed_display_id.value());
+      continue;
+    }
 
-  for (unsigned i = 0; i < removed_count; i++) {
-    DisplayId removed_display_id(displays_removed[i]);
-
-    auto target = displays_.erase(removed_display_id);
-    if (target) {
-      while (fbl::RefPtr<Image> image = target->images.pop_front()) {
-        AssertMtxAliasHeld(image->mtx());
-        image->StartRetire();
-        image->OnRetire();
-      }
-    } else {
-      zxlogf(DEBUG, "Unknown display %" PRIu64 " removed", removed_display_id.value());
+    while (fbl::RefPtr<Image> image = removed_display->images.pop_front()) {
+      AssertMtxAliasHeld(image->mtx());
+      image->StartRetire();
+      image->OnRetire();
     }
   }
 
-  for (unsigned i = 0; i < added_count; i++) {
-    zx::result<fbl::RefPtr<DisplayInfo>> info_result = DisplayInfo::Create(displays_added[i]);
-    if (info_result.is_error()) {
-      zxlogf(INFO, "failed to add display %ld: %s", displays_added[i].display_id,
-             info_result.status_string());
+  for (const added_display_args_t& added_banjo_display : added_banjo_displays) {
+    zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+        DisplayInfo::Create(added_banjo_display);
+    if (display_info_result.is_error()) {
+      zxlogf(WARNING, "Failed to add display %" PRIu64 ": %s", added_banjo_display.display_id,
+             display_info_result.status_string());
       continue;
     }
-    fbl::RefPtr<DisplayInfo> info = std::move(info_result).value();
-    if (info->edid.has_value()) {
-      fbl::Array<uint8_t> eld = ComputeEld(info->edid->base);
+
+    fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
+    DisplayId display_id = display_info->id;
+    if (display_info->edid.has_value()) {
+      fbl::Array<uint8_t> eld = ComputeEld(display_info->edid->base);
 
       // The array is empty if memory allocation failed. We prefer using an
       // empty ELD to dropping the display altogether.
-      engine_driver_client_->SetEld(info->id, eld);
+      engine_driver_client_->SetEld(display_id, eld);
     }
 
-    if (displays_.insert_or_find(info)) {
-      added_display_infos.push_back(std::move(info));
-    } else {
-      zxlogf(INFO, "Ignoring duplicate display");
+    fbl::AutoLock lock(mtx());
+    auto display_it = displays_.find(display_id);
+    if (display_it != displays_.end()) {
+      zxlogf(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
+             display_id.value());
+      continue;
     }
+    displays_.insert(display_info);
+    added_display_infos.push_back(std::move(display_info));
   }
 
   task->set_handler([this, added_display_infos = std::move(added_display_infos),

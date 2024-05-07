@@ -89,10 +89,10 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void PrepareStop();
   void Stop();
 
-  void DisplayControllerInterfaceOnDisplaysChanged(const added_display_args_t* displays_added,
-                                                   size_t added_count,
-                                                   const uint64_t* displays_removed,
-                                                   size_t removed_count);
+  void DisplayControllerInterfaceOnDisplaysChanged(
+      const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
+      const uint64_t* removed_banjo_display_id_list, size_t removed_banjo_display_id_count);
+
   void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
 
