@@ -302,7 +302,7 @@ pub fn new_remote_file(
             if mode.is_dir() {
                 Box::new(RemoteDirectoryObject::new(zxio))
             } else {
-                Box::new(RemoteFileObject::new(zxio))
+                Box::new(RemoteFileObject::new(Arc::new(zxio)))
             }
         }
         zx::ObjectType::SOCKET => Box::new(RemotePipeObject::new(Arc::new(zxio))),
@@ -381,16 +381,21 @@ impl FsNodeOps for RemoteNode {
         _current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let zxio = (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?;
         if node.is_dir() {
-            return Ok(Box::new(RemoteDirectoryObject::new(zxio)));
+            // For directories we need to clone the connection because we rely on the seek offset.
+            return Ok(Box::new(RemoteDirectoryObject::new(
+                (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?,
+            )));
         }
 
         // fsverity files cannot be opened in write mode, including while building.
         if flags.can_write() {
             node.fsverity.lock().check_writable()?;
         }
-        Ok(Box::new(RemoteFileObject::new(zxio)))
+
+        // For files we can clone the `Arc<Zxio>` because we don't rely on any per-connection state
+        // (i.e. the file offset).
+        Ok(Box::new(RemoteFileObject::new(self.zxio.clone())))
     }
 
     fn mknod(
@@ -1375,7 +1380,8 @@ impl FileOps for RemoteDirectoryObject {
 }
 
 pub struct RemoteFileObject {
-    /// The underlying Zircon I/O object.
+    /// The underlying Zircon I/O object.  This is shared, so we must take care not to use any
+    /// stateful methods on the underlying object (reading and writing is fine).
     zxio: Arc<Zxio>,
 
     /// Cached read-only VMO handle.
@@ -1386,9 +1392,9 @@ pub struct RemoteFileObject {
 }
 
 impl RemoteFileObject {
-    pub fn new(zxio: Zxio) -> RemoteFileObject {
+    fn new(zxio: Arc<Zxio>) -> RemoteFileObject {
         RemoteFileObject {
-            zxio: Arc::new(zxio),
+            zxio,
             read_only_vmo: Default::default(),
             read_exec_vmo: Default::default(),
         }
