@@ -54,237 +54,232 @@ template("group_with_no_dir_target_deps") {
 
 ############################# Test groups - Start ##############################
 
-if (is_host) {
-  # core.emulator
-  group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_emulator_stable_sl4f_tests" ]
-  }
+# core.emulator
+group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:core_emulator_stable_sl4f_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_emulator_stable_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_emulator_stable_tests" ]
-  }
+group_with_no_dir_target_deps("core_emulator_stable_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:core_emulator_stable_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_emulator_unstable_sl4f_tests" ]
-  }
+group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:core_emulator_unstable_sl4f_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_emulator_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:core_emulator_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("core_emulator_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:core_emulator_unstable_tests",
+  ]
+}
 
-  group("core_emulator_staging_sl4f_tests") {
-    testonly = true
-    public_deps = [
-      ":core_emulator_stable_sl4f_tests",
-      ":core_emulator_unstable_sl4f_tests",
-    ]
-  }
+group("core_emulator_staging_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":core_emulator_stable_sl4f_tests",
+    ":core_emulator_unstable_sl4f_tests",
+  ]
+}
 
-  group("core_emulator_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":core_emulator_stable_tests",
-      ":core_emulator_unstable_tests",
-    ]
-  }
+group("core_emulator_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":core_emulator_stable_tests",
+    ":core_emulator_unstable_tests",
+  ]
+}
 
-  # workbench.emulator
-  # Note - workbench does not support SL4F
-  group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:workbench_emulator_stable_tests" ]
-  }
+# workbench.emulator
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:workbench_emulator_stable_tests" ]
+}
 
-  group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:workbench_emulator_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_emulator_unstable_tests",
+  ]
+}
 
-  group("workbench_emulator_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":workbench_emulator_stable_tests",
-      ":workbench_emulator_unstable_tests",
-    ]
-  }
+group("workbench_emulator_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_emulator_stable_tests",
+    ":workbench_emulator_unstable_tests",
+  ]
+}
 
-  # core.vim3
-  group_with_no_dir_target_deps("core_vim3_stable_sl4f_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_vim3_stable_sl4f_tests" ]
-  }
+# core.vim3
+group_with_no_dir_target_deps("core_vim3_stable_sl4f_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:core_vim3_stable_sl4f_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_vim3_stable_tests") {
-    testonly = true
-    public_deps = [ "honeydew/tests/functional_tests:core_vim3_stable_tests" ]
-  }
+group_with_no_dir_target_deps("core_vim3_stable_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:core_vim3_stable_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_vim3_unstable_sl4f_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_vim3_unstable_sl4f_tests" ]
-  }
+group_with_no_dir_target_deps("core_vim3_unstable_sl4f_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:core_vim3_unstable_sl4f_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_vim3_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:core_vim3_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("core_vim3_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:core_vim3_unstable_tests",
+  ]
+}
 
-  group("core_vim3_staging_sl4f_tests") {
-    testonly = true
-    public_deps = [
-      ":core_vim3_stable_sl4f_tests",
-      ":core_vim3_unstable_sl4f_tests",
-    ]
-  }
+group("core_vim3_staging_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":core_vim3_stable_sl4f_tests",
+    ":core_vim3_unstable_sl4f_tests",
+  ]
+}
 
-  group("core_vim3_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":core_vim3_stable_tests",
-      ":core_vim3_unstable_tests",
-    ]
-  }
+group("core_vim3_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":core_vim3_stable_tests",
+    ":core_vim3_unstable_tests",
+  ]
+}
 
-  # workbench.vim3
-  # Note - workbench does not support SL4F
-  group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:workbench_vim3_stable_tests" ]
-  }
+# workbench.vim3
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:workbench_vim3_stable_tests" ]
+}
 
-  group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-      "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-      "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:workbench_vim3_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_vim3_unstable_tests",
+  ]
+}
 
-  group("workbench_vim3_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":workbench_vim3_stable_tests",
-      ":workbench_vim3_unstable_tests",
-    ]
-  }
+group("workbench_vim3_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_vim3_stable_tests",
+    ":workbench_vim3_unstable_tests",
+  ]
+}
 
-  # core.nuc
-  group_with_no_dir_target_deps("core_nuc_stable_sl4f_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_nuc_stable_sl4f_tests" ]
-  }
+# core.nuc
+group_with_no_dir_target_deps("core_nuc_stable_sl4f_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:core_nuc_stable_sl4f_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_nuc_stable_tests") {
-    testonly = true
-    public_deps = [ "honeydew/tests/functional_tests:core_nuc_stable_tests" ]
-  }
+group_with_no_dir_target_deps("core_nuc_stable_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:core_nuc_stable_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_nuc_unstable_sl4f_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:core_nuc_unstable_sl4f_tests" ]
-  }
+group_with_no_dir_target_deps("core_nuc_unstable_sl4f_tests") {
+  testonly = true
+  public_deps =
+      [ "honeydew/tests/functional_tests:core_nuc_unstable_sl4f_tests" ]
+}
 
-  group_with_no_dir_target_deps("core_nuc_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:core_nuc_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("core_nuc_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:core_nuc_unstable_tests",
+  ]
+}
 
-  group("core_nuc_staging_sl4f_tests") {
-    testonly = true
-    public_deps = [
-      ":core_nuc_stable_sl4f_tests",
-      ":core_nuc_unstable_sl4f_tests",
-    ]
-  }
+group("core_nuc_staging_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":core_nuc_stable_sl4f_tests",
+    ":core_nuc_unstable_sl4f_tests",
+  ]
+}
 
-  group("core_nuc_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":core_nuc_stable_tests",
-      ":core_nuc_unstable_tests",
-    ]
-  }
+group("core_nuc_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":core_nuc_stable_tests",
+    ":core_nuc_unstable_tests",
+  ]
+}
 
-  # workbench.nuc
-  # Note - workbench does not support SL4F
-  group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
-    testonly = true
-    public_deps =
-        [ "honeydew/tests/functional_tests:workbench_nuc_stable_tests" ]
-  }
+# workbench.nuc
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:workbench_nuc_stable_tests" ]
+}
 
-  group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:workbench_nuc_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_nuc_unstable_tests",
+  ]
+}
 
-  group("workbench_nuc_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":workbench_nuc_stable_tests",
-      ":workbench_nuc_unstable_tests",
-    ]
-  }
+group("workbench_nuc_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_nuc_stable_tests",
+    ":workbench_nuc_unstable_tests",
+  ]
+}
 
-  # starnix.vim3
-  # Note: This will be run on internal builder, hence using `starnix` here
-  # instead of internal `<PRODUCT>` name.
-  group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_case_revive_example:test_case_revive_with_idle_suspend_auto_resume_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:starnix_vim3_stable_tests",
-    ]
-  }
+# starnix.vim3
+# Note: This will be run on internal builder, hence using `starnix` here
+# instead of internal `<PRODUCT>` name.
+group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_auto_resume_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:starnix_vim3_stable_tests",
+  ]
+}
 
-  group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
-    testonly = true
-    public_deps = [
-      "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_fc($host_toolchain)",
-      "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
-    ]
-  }
+group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
+  ]
+}
 
-  group("starnix_vim3_staging_tests") {
-    testonly = true
-    public_deps = [
-      ":starnix_vim3_stable_tests",
-      ":starnix_vim3_unstable_tests",
-    ]
-  }
+group("starnix_vim3_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":starnix_vim3_stable_tests",
+    ":starnix_vim3_unstable_tests",
+  ]
 }
 
 ############################## Test groups - End ###############################
