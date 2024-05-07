@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/zx/result.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -28,6 +29,9 @@ class EngineDriverClient {
   // Factory method for production use.
   // `parent` must be valid.
   static zx::result<std::unique_ptr<EngineDriverClient>> Create(zx_device_t* parent);
+
+  static zx::result<std::unique_ptr<EngineDriverClient>> Create(
+      std::shared_ptr<fdf::Namespace> incoming);
 
   // Production code must use the Create() factory method.
   // `dc` must be valid.

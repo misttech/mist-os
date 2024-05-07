@@ -3,19 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/display-coordinator.so",
         bind: "meta/bind/display-coordinator.bindbc",
         colocate: "true",
-        compat: "driver/display-coordinator.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
+        { service: "fuchsia.driver.compat.Service" },
         {
             service: [ "fuchsia.hardware.display.engine.Service" ],
             availability: "optional",

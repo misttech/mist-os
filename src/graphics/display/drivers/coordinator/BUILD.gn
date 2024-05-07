@@ -24,10 +24,8 @@ fuchsia_driver("coordinator-driver") {
   ]
   deps = [
     ":shared",
-    "//src/devices/lib/driver",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 }
 
@@ -88,6 +86,9 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",
