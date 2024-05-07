@@ -13,6 +13,7 @@
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
@@ -86,6 +87,7 @@ void InstallTestGraphicalPresenter(component_testing::Realm& realm) {
                               Protocol{fuchsia::logger::LogSink::Name_},
                               Protocol{fuchsia::scheduler::RoleManager::Name_},
                               Protocol{fuchsia::sysmem::Allocator::Name_},
+                              Protocol{fuchsia::sysmem2::Allocator::Name_},
                               Protocol{fuchsia::tracing::provider::Registry::Name_},
                               Protocol{fuchsia::vulkan::loader::Loader::Name_},
                               Protocol{fuchsia::ui::composition::Flatland::Name_},
@@ -261,6 +263,7 @@ void EnclosedGuest::InstallInRealm(component_testing::Realm& realm,
                               Protocol{fuchsia::logger::LogSink::Name_},
                               Protocol{fuchsia::scheduler::RoleManager::Name_},
                               Protocol{fuchsia::sysmem::Allocator::Name_},
+                              Protocol{fuchsia::sysmem2::Allocator::Name_},
                               Protocol{fuchsia::tracing::provider::Registry::Name_},
                               Protocol{fuchsia::vulkan::loader::Loader::Name_},
                               Protocol{fuchsia::ui::composition::Flatland::Name_},

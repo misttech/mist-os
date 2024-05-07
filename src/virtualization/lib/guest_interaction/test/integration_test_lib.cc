@@ -11,6 +11,7 @@
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
 #include <fuchsia/virtualization/guest/interaction/cpp/fidl.h>
@@ -74,6 +75,7 @@ void GuestInteractionTest::SetUp() {
                               Protocol{fuchsia::kernel::VmexResource::Name_},
                               Protocol{fuchsia::sysinfo::SysInfo::Name_},
                               Protocol{fuchsia::sysmem::Allocator::Name_},
+                              Protocol{fuchsia::sysmem2::Allocator::Name_},
                               Protocol{fuchsia::tracing::provider::Registry::Name_},
                               Protocol{fuchsia::scheduler::RoleManager::Name_},
                           },
