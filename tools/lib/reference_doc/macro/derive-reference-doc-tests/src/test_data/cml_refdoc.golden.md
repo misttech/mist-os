@@ -644,6 +644,9 @@ This supports the following additional fields:
       max_size: 100,
     }
     ```
+- `default`: (_optional `any`_) (`configuration` only) The default value of this configuration.
+    Default values are used if the capability is optional and routed from `void`.
+    This is only supported if `availability` is not `required``.
 
 Example:
 

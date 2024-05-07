@@ -44,6 +44,7 @@ impl GenerateValueManifest {
                     target_name,
                     availability: _,
                     type_: _,
+                    default: _,
                 } = config;
                 if target_name == &bounded_name {
                     return Some(config.clone());

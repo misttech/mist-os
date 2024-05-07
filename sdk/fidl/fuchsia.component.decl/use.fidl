@@ -303,4 +303,8 @@ type UseConfiguration = table {
     /// (Required) The type of this config value. If `target_name` matches a
     /// key in the `config` schema, then this type must match that type.
     5: type ConfigType;
+
+    /// (Optional): If this is set, this is the value that will be provided via routing
+    /// if the capability is successfully routed from void.
+    6: default ConfigValue;
 };

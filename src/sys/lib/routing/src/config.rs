@@ -22,14 +22,16 @@ pub fn get_use_config_from_key<'a>(
 }
 
 fn source_to_value<C>(
+    default: &Option<cm_rust::ConfigValue>,
     source: CapabilitySource<C>,
 ) -> Result<Option<cm_rust::ConfigValue>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
     let cap = match source {
-        CapabilitySource::Void { .. } => return Ok(None),
-
+        CapabilitySource::Void { .. } => {
+            return Ok(default.clone());
+        }
         CapabilitySource::Capability { source_capability, .. } => source_capability,
         CapabilitySource::Component { capability, .. } => capability,
         o => {
@@ -67,7 +69,7 @@ where
         &mut crate::mapper::NoopRouteMapper,
     )
     .await?;
-    source_to_value(source.source)
+    source_to_value(&use_config.default, source.source)
 }
 
 #[cfg(test)]
@@ -84,7 +86,7 @@ mod tests {
             ),
             component: WeakComponentInstanceInterface::<TestComponent>::invalid(),
         };
-        assert_eq!(Ok(None), source_to_value(void_source));
+        assert_eq!(Ok(None), source_to_value(&None, void_source));
     }
 
     #[test]
@@ -99,7 +101,7 @@ mod tests {
             ),
             component: WeakComponentInstanceInterface::<TestComponent>::invalid(),
         };
-        assert_eq!(Ok(Some(test_value)), source_to_value(void_source));
+        assert_eq!(Ok(Some(test_value)), source_to_value(&None, void_source));
     }
 
     #[test]
@@ -114,6 +116,6 @@ mod tests {
             ),
             component: WeakComponentInstanceInterface::<TestComponent>::invalid(),
         };
-        assert_eq!(Ok(Some(test_value)), source_to_value(void_source));
+        assert_eq!(Ok(Some(test_value)), source_to_value(&None, void_source));
     }
 }

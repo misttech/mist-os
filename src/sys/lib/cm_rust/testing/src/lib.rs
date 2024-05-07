@@ -823,6 +823,7 @@ impl UseBuilder {
                 target_name: self.target_name.expect("target name not set"),
                 availability: self.availability,
                 type_: self.config_type.expect("config_type not set"),
+                default: None,
             }),
             CapabilityTypeName::Resolver | CapabilityTypeName::Dictionary => unreachable!(),
         }

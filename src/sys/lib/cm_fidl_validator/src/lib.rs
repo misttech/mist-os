@@ -427,7 +427,7 @@ impl<'a> ValidationContext<'a> {
         config: Option<&fdecl::ConfigSchema>,
         uses: Option<&Vec<fdecl::Use>>,
     ) {
-        // Get all of the `use` configs that are optional.
+        // Get all of the `use` configs that are optional without a default.
         let optional_use_keys: BTreeMap<String, fdecl::ConfigType> =
             uses.map_or(BTreeMap::new(), |u| {
                 u.iter()
@@ -438,6 +438,9 @@ impl<'a> ValidationContext<'a> {
                         if config.availability == Some(fdecl::Availability::Required)
                             || config.availability == None
                         {
+                            return None;
+                        }
+                        if let Some(_) = config.default.as_ref() {
                             return None;
                         }
                         let Some(key) = config.target_name.clone() else {
@@ -451,6 +454,18 @@ impl<'a> ValidationContext<'a> {
                     .flatten()
                     .collect()
             });
+
+        // Validate default values in use configs.
+        for u in uses.iter().flat_map(|x| x.iter()) {
+            let fdecl::Use::Config(config) = u else { continue };
+            let Some(default) = config.default.as_ref() else { continue };
+            validate_value_spec(&fdecl::ConfigValueSpec {
+                value: Some(default.clone()),
+                ..Default::default()
+            })
+            .map_err(|mut e| self.errors.append(&mut e.errs))
+            .ok();
+        }
 
         let Some(config) = config else {
             if !optional_use_keys.is_empty() {

@@ -2347,6 +2347,31 @@ impl ConfigValueType {
     }
 }
 
+impl From<ConfigValueType> for cm_rust::ConfigValueType {
+    fn from(value: ConfigValueType) -> Self {
+        match value {
+            ConfigValueType::Bool { .. } => cm_rust::ConfigValueType::Bool,
+            ConfigValueType::Uint8 { .. } => cm_rust::ConfigValueType::Uint8,
+            ConfigValueType::Uint16 { .. } => cm_rust::ConfigValueType::Uint16,
+            ConfigValueType::Uint32 { .. } => cm_rust::ConfigValueType::Uint32,
+            ConfigValueType::Uint64 { .. } => cm_rust::ConfigValueType::Uint64,
+            ConfigValueType::Int8 { .. } => cm_rust::ConfigValueType::Int8,
+            ConfigValueType::Int16 { .. } => cm_rust::ConfigValueType::Int16,
+            ConfigValueType::Int32 { .. } => cm_rust::ConfigValueType::Int32,
+            ConfigValueType::Int64 { .. } => cm_rust::ConfigValueType::Int64,
+            ConfigValueType::String { max_size, .. } => {
+                cm_rust::ConfigValueType::String { max_size: max_size.into() }
+            }
+            ConfigValueType::Vector { max_count, element, .. } => {
+                cm_rust::ConfigValueType::Vector {
+                    max_count: max_count.into(),
+                    nested_type: element.into(),
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", deny_unknown_fields, rename_all = "lowercase")]
 pub enum ConfigNestedValueType {
@@ -2381,6 +2406,25 @@ impl ConfigNestedValueType {
             }
         };
         hasher.update([val])
+    }
+}
+
+impl From<ConfigNestedValueType> for cm_rust::ConfigNestedValueType {
+    fn from(value: ConfigNestedValueType) -> Self {
+        match value {
+            ConfigNestedValueType::Bool {} => cm_rust::ConfigNestedValueType::Bool,
+            ConfigNestedValueType::Uint8 {} => cm_rust::ConfigNestedValueType::Uint8,
+            ConfigNestedValueType::Uint16 {} => cm_rust::ConfigNestedValueType::Uint16,
+            ConfigNestedValueType::Uint32 {} => cm_rust::ConfigNestedValueType::Uint32,
+            ConfigNestedValueType::Uint64 {} => cm_rust::ConfigNestedValueType::Uint64,
+            ConfigNestedValueType::Int8 {} => cm_rust::ConfigNestedValueType::Int8,
+            ConfigNestedValueType::Int16 {} => cm_rust::ConfigNestedValueType::Int16,
+            ConfigNestedValueType::Int32 {} => cm_rust::ConfigNestedValueType::Int32,
+            ConfigNestedValueType::Int64 {} => cm_rust::ConfigNestedValueType::Int64,
+            ConfigNestedValueType::String { max_size } => {
+                cm_rust::ConfigNestedValueType::String { max_size: max_size.into() }
+            }
+        }
     }
 }
 
@@ -2913,6 +2957,13 @@ pub struct Use {
     #[serde(rename = "element", skip_serializing_if = "Option::is_none")]
     #[reference_doc(rename = "element", json_type = "object")]
     pub config_element_type: Option<ConfigNestedValueType>,
+
+    /// (`configuration` only) The default value of this configuration.
+    /// Default values are used if the capability is optional and routed from `void`.
+    /// This is only supported if `availability` is not `required``.
+    #[serde(rename = "default", skip_serializing_if = "Option::is_none")]
+    #[reference_doc(rename = "default")]
+    pub config_default: Option<serde_json::Value>,
 }
 
 /// Example:
@@ -4660,6 +4711,7 @@ mod tests {
             config_max_count: None,
             config_max_size: None,
             config_type: None,
+            config_default: None,
         }
     }
 
