@@ -10,11 +10,11 @@ use core::{convert::Infallible as Never, fmt::Debug};
 use crate::{
     sync::DynDebugReferences,
     testutil::{
-        FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstantCtx, FakeTimerCtx,
-        WithFakeTimerContext,
+        FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeTimerCtx, WithFakeTimerContext,
     },
-    ContextProvider, DeferredResourceRemovalContext, EventContext, ReferenceNotifiers, RngContext,
-    TimerBindingsTypes, TimerContext, TracingContext,
+    ContextProvider, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+    InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
+    TracingContext,
 };
 
 /// A test helper used to provide an implementation of a bindings context.
@@ -76,27 +76,17 @@ impl<TimerId, Event: Debug, State, FrameMeta> RngContext
     }
 }
 
-impl<Id, Event: Debug, State, FrameMeta> AsRef<FakeInstantCtx>
-    for FakeBindingsCtx<Id, Event, State, FrameMeta>
+impl<TimerId, Event: Debug, State, FrameMeta> InstantBindingsTypes
+    for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
-    fn as_ref(&self) -> &FakeInstantCtx {
-        self.timers.as_ref()
-    }
+    type Instant = FakeInstant;
 }
 
-impl<Id, Event: Debug, State, FrameMeta> AsRef<FakeTimerCtx<Id>>
-    for FakeBindingsCtx<Id, Event, State, FrameMeta>
+impl<TimerId, Event: Debug, State, FrameMeta> InstantContext
+    for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
-    fn as_ref(&self) -> &FakeTimerCtx<Id> {
-        &self.timers
-    }
-}
-
-impl<Id, Event: Debug, State, FrameMeta> AsMut<FakeTimerCtx<Id>>
-    for FakeBindingsCtx<Id, Event, State, FrameMeta>
-{
-    fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
-        &mut self.timers
+    fn now(&self) -> Self::Instant {
+        self.timers.now()
     }
 }
 

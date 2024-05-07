@@ -129,16 +129,6 @@ impl InstantContext for FakeInstantCtx {
     }
 }
 
-impl<T: AsRef<FakeInstantCtx>> InstantBindingsTypes for T {
-    type Instant = FakeInstant;
-}
-
-impl<T: AsRef<FakeInstantCtx>> InstantContext for T {
-    fn now(&self) -> FakeInstant {
-        self.as_ref().now()
-    }
-}
-
 /// Arbitrary data of type `D` attached to a `FakeInstant`.
 ///
 /// `InstantAndData` implements `Ord` and `Eq` to be used in a `BinaryHeap`
@@ -365,9 +355,13 @@ impl<Id: PartialEq> FakeTimerCtx<Id> {
     }
 }
 
-impl<Id> AsRef<FakeInstantCtx> for FakeTimerCtx<Id> {
-    fn as_ref(&self) -> &FakeInstantCtx {
-        &self.instant
+impl<Id> InstantBindingsTypes for FakeTimerCtx<Id> {
+    type Instant = FakeInstant;
+}
+
+impl<Id> InstantContext for FakeTimerCtx<Id> {
+    fn now(&self) -> FakeInstant {
+        self.instant.now()
     }
 }
 

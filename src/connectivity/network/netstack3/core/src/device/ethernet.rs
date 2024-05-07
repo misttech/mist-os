@@ -1523,7 +1523,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{FakeFrameCtx, FakeInstant},
+        context::testutil::FakeInstant,
         device::{
             arp::ArpCounters,
             socket::Frame,
@@ -1599,7 +1599,7 @@ mod tests {
 
     impl CounterContext<DeviceCounters> for FakeCoreCtx {
         fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.as_ref().state.counters)
+            cb(&self.inner.state.counters)
         }
     }
 
@@ -1615,7 +1615,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.as_ref().state.per_device_counters)
+            cb(&self.inner.state.per_device_counters)
         }
     }
 
@@ -1631,7 +1631,7 @@ mod tests {
 
     impl CounterContext<EthernetDeviceCounters> for FakeCoreCtx {
         fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.as_ref().state.ethernet_counters)
+            cb(&self.inner.state.ethernet_counters)
         }
     }
 
@@ -1924,8 +1924,7 @@ mod tests {
             (): Self::Meta,
             buf: Self::Buffer,
         ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-            let frame_ctx: &mut FakeFrameCtx<_> = self.as_mut();
-            frame_ctx.push(device_id.clone(), buf.as_ref().to_vec());
+            self.frames.push(device_id.clone(), buf.as_ref().to_vec());
             Ok(())
         }
     }

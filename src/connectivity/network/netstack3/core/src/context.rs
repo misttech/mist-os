@@ -178,13 +178,6 @@ mod locked {
 }
 
 /// Fake implementations of context traits.
-///
-/// Each trait `Xxx` has a fake called `FakeXxx`. `FakeXxx` implements `Xxx`,
-/// and `impl<T> FakeXxx for T` where either `T: AsRef<FakeXxx>` or `T:
-/// AsMut<FakeXxx>` or both (depending on the trait). This allows fake
-/// implementations to be composed easily - any container type need only provide
-/// the appropriate `AsRef` and/or `AsMut` implementations, and the blanket impl
-/// will take care of the rest.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::sync::Arc;
@@ -268,7 +261,7 @@ pub(crate) mod testutil {
         for FakeCtxWithCoreCtx<CC, Id, Event, BindingsCtxState>
     {
         fn as_ref(&self) -> &FakeInstantCtx {
-            self.bindings_ctx.timers.as_ref()
+            &self.bindings_ctx.timers.instant
         }
     }
 

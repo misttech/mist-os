@@ -34,18 +34,6 @@ impl<S, Meta, DeviceId> ContextProvider for FakeCoreCtx<S, Meta, DeviceId> {
     }
 }
 
-impl<S, Meta, DeviceId> AsRef<FakeCoreCtx<S, Meta, DeviceId>> for FakeCoreCtx<S, Meta, DeviceId> {
-    fn as_ref(&self) -> &FakeCoreCtx<S, Meta, DeviceId> {
-        self
-    }
-}
-
-impl<S, Meta, DeviceId> AsMut<FakeCoreCtx<S, Meta, DeviceId>> for FakeCoreCtx<S, Meta, DeviceId> {
-    fn as_mut(&mut self) -> &mut FakeCoreCtx<S, Meta, DeviceId> {
-        self
-    }
-}
-
 impl<BC, S, Meta, DeviceId> CounterContext<BC> for FakeCoreCtx<S, Meta, DeviceId>
 where
     S: CounterContext<BC>,
@@ -90,12 +78,6 @@ impl<S, Meta, DeviceId> FakeCoreCtx<S, Meta, DeviceId> {
     /// Consumes the `FakeCoreCtx` and returns the inner state.
     pub fn into_state(self) -> S {
         self.state
-    }
-}
-
-impl<S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>> for FakeCoreCtx<S, Meta, DeviceId> {
-    fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
-        &mut self.frames
     }
 }
 

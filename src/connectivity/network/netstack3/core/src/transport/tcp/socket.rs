@@ -5024,11 +5024,11 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeFrameCtx, FakeInstantCtx, FakeLinkResolutionNotifier, FakeNetwork,
+                FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
                 WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
-            ContextProvider, InstantContext as _, ReferenceNotifiers,
+            ContextProvider, InstantContext, ReferenceNotifiers,
         },
         device::{
             link::LinkDevice,
@@ -5198,7 +5198,7 @@ mod tests {
             &mut self,
             f: F,
         ) -> O {
-            f(&mut self.core_ctx.inner.as_mut())
+            f(&mut self.core_ctx.inner.frames)
         }
     }
 
@@ -5297,6 +5297,18 @@ mod tests {
     }
 
     /// Delegate implementation to internal thing.
+    impl<D: FakeStrongDeviceId> InstantBindingsTypes for TcpBindingsCtx<D> {
+        type Instant = FakeInstant;
+    }
+
+    /// Delegate implementation to internal thing.
+    impl<D: FakeStrongDeviceId> InstantContext for TcpBindingsCtx<D> {
+        fn now(&self) -> FakeInstant {
+            self.timers.now()
+        }
+    }
+
+    /// Delegate implementation to internal thing.
     impl<D: FakeStrongDeviceId> TimerContext for TcpBindingsCtx<D> {
         fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
             self.timers.new_timer(id)
@@ -5316,18 +5328,6 @@ mod tests {
 
         fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             self.timers.scheduled_instant(timer)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> AsRef<FakeInstantCtx> for TcpBindingsCtx<D> {
-        fn as_ref(&self) -> &FakeInstantCtx {
-            &self.timers.instant
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> AsRef<FakeCryptoRng> for TcpBindingsCtx<D> {
-        fn as_ref(&self) -> &FakeCryptoRng {
-            &self.rng
         }
     }
 

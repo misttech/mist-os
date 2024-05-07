@@ -2600,8 +2600,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeFrameCtx, Wrapped,
-            WrappedFakeCoreCtx,
+            FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, Wrapped, WrappedFakeCoreCtx,
         },
         device::{
             loopback::{LoopbackCreationProperties, LoopbackDevice},
@@ -3866,8 +3865,7 @@ mod tests {
             .expect("connect failed");
 
         // Instruct the fake frame context to throw errors.
-        let frames: &mut FakeFrameCtx<_> = api.core_ctx().as_mut();
-        frames.set_should_error_for_frame(|_frame_meta| true);
+        api.core_ctx().inner.inner.frames.set_should_error_for_frame(|_frame_meta| true);
 
         // Now try to send something over this new connection:
         let send_err = api.send(&socket, Buf::new(Vec::new(), ..)).unwrap_err();
