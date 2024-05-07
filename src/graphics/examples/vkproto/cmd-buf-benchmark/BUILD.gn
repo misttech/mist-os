@@ -41,6 +41,7 @@ fuchsia_structured_config_values("default_config") {
   cm_label = ":cmd-buf-benchmark-child-manifest"
   values = {
     gpu_vendor_id = 0
+    disabled_test_pattern = ""
   }
 }
 

@@ -36,6 +36,8 @@ std::optional<uint32_t> GetGpuVendorId() {
   return {};
 }
 
+std::string DisabledTestPattern() { return GetConfig().disabled_test_pattern(); }
+
 namespace {
 
 class VkLoopTest {

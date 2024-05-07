@@ -18,10 +18,7 @@ executable("vkloop_bin") {
   testonly = true
   output_name = "vkloop"
 
-  sources = [
-    "main.cc",
-    "vkloop.cc",
-  ]
+  sources = [ "vkloop.cc" ]
 
   deps = [
     ":config",
@@ -30,6 +27,7 @@ executable("vkloop_bin") {
     "//src/graphics/lib/magma/src/libmagma",
     "//src/graphics/magma/lib/magma_client/test_util:test_device_helper",
     "//src/graphics/tests/common",
+    "//src/graphics/tests/common:gtest_main",
   ]
   public_deps = [
     "//src/lib/fxl/test:test_settings",
@@ -49,6 +47,7 @@ fuchsia_structured_config_values("default_config") {
   values = {
     gpu_vendor_id = 0
     gpu_driver_url = ""
+    disabled_test_pattern = ""
   }
 }
 
