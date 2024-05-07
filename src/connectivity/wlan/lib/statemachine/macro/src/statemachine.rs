@@ -226,10 +226,6 @@ fn merge_generic_args(state_list: &[&StateArgs]) -> TokenStream2 {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/330168076)
-#[derive(Eq, PartialEq, Hash)]
-struct StateTransition(Ident, Ident);
-
 // TODO: Transitions can be specified multiple times
 pub fn process(input: TokenStream) -> TokenStream {
     // Parse macro input.
