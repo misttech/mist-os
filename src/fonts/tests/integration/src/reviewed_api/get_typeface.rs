@@ -9,14 +9,21 @@ use {
     fidl_fuchsia_intl::LocaleId,
 };
 
-// Add new tests here so we don't overload component manager with requests (58150)
-#[fasync::run_singlethreaded(test)]
+// Add new tests here so we don't overload component manager with requests (b/42136076).
+#[fuchsia::test]
 async fn test_get_typeface() -> Result<(), Error> {
     let factory = ProviderFactory::new();
     test_basic(&factory).await?;
     test_aliases(&factory).await?;
     test_aliases_with_language_overrides(&factory).await?;
     test_aliases_with_style_overrides(&factory).await?;
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_get_typeface_2() -> Result<(), Error> {
+    let factory = ProviderFactory::new();
     test_font_collections(&factory).await?;
     test_fallback(&factory).await?;
     test_fallback_group(&factory).await?;

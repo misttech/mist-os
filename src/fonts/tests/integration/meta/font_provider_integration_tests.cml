@@ -29,7 +29,10 @@
             subdir: "data",
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.tracing.provider.Registry",
+            ],
             from: "parent",
             to: [
                 "#driver",

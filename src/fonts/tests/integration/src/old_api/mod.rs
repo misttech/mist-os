@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use tracing::info;
 use {
     crate::util::ProviderFactory,
     crate::{FONTS_MEDIUM_CM, FONTS_SMALL_CM},
     anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_fonts as fonts, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_fonts as fonts, fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
 };
 
@@ -74,16 +75,24 @@ async fn get_provider(
     factory: &ProviderFactory,
     fonts_cm: &'static str,
 ) -> Result<fonts::ProviderProxy, Error> {
+    info!("getting provider for: {:?}", fonts_cm);
     factory.get_provider::<fonts::ProviderMarker>(fonts_cm).await
 }
 
-// Add new tests here so we don't overload component manager with requests (58150)
-#[fasync::run_singlethreaded(test)]
-async fn test_old_api() {
+// Add new tests here so we don't overload component manager with requests (b/42136076).
+// Update: unclear whether this still applies in the CFv2 world.
+// Limit the number of tests in a single test function.
+#[fuchsia::test]
+async fn test_old_api_1() {
     let factory = ProviderFactory::new();
     test_basic(&factory).await.unwrap();
     test_aliases(&factory).await.unwrap();
     test_font_collections(&factory).await.unwrap();
+}
+
+#[fuchsia::test]
+async fn test_old_api_2() {
+    let factory = ProviderFactory::new();
     test_fallback(&factory).await.unwrap();
     test_fallback_group(&factory).await.unwrap();
     test_get_family_info(&factory).await.unwrap();

@@ -4,6 +4,5 @@
 
 #[macro_use]
 mod util;
-mod ephemeral;
 mod get_font_family_info;
 mod get_typeface;
