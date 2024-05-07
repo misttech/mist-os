@@ -67,6 +67,7 @@ if (toolchain_environment == "user.basic") {
     deps = [
       ":syscall-asm",
       "//src/zircon/lib/zircon:headers",
+      "//zircon/kernel/lib/arch:headers",
       "//zircon/kernel/lib/userabi:headers",
       "//zircon/system/ulib/affine",
       "//zircon/vdso:private",
