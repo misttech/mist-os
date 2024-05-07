@@ -76,7 +76,7 @@ def _generate_command_string(
             output += "%s%s=%s \\\n" % (margin, key, shlex.quote(value))
 
     for a in args:
-        output += "%s%s\n" % (margin, shlex.quote(str(a)))
+        output += "%s%s \\\n" % (margin, shlex.quote(str(a)))
 
     if wrap_command:
         output += ")\n"
@@ -919,7 +919,10 @@ def main():
         )
         if ret.returncode != 0:
             print(
-                "command: " + _generate_command_string(cquery_args),
+                "command: "
+                + _generate_command_string(
+                    cquery_args, env=cquery_env, cwd=workspace_dir
+                ),
                 file=sys.stderr,
             )
             print("ERROR: " + ret.stderr, file=sys.stderr)
@@ -958,7 +961,10 @@ def main():
     # noise in the failure output.
     if ret.returncode != 0:
         print(
-            "command: " + _generate_command_string(test_command),
+            "command: "
+            + _generate_command_string(
+                test_command, env=bazel_env, cwd=workspace_dir
+            ),
             file=sys.stderr,
         )
         print(f"from working dir: {workspace_dir}")
