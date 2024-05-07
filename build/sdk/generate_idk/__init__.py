@@ -21,6 +21,9 @@ from typing import TypedDict
 VERSION_HISTORY_PATH = pathlib.Path("version_history.json")
 
 
+STABLE_SUPPORTED_TYPES = ["cc_source_library", "fidl_library"]
+
+
 class BuildManifestJson(TypedDict):
     """A type description of a subset of the fields in a build manifest.
 
@@ -261,8 +264,7 @@ class MergedIDK:
             else:
                 type = atom["type"]
 
-            # Right now we only support unstable artifact for cc_source_library
-            if type in ["cc_source_library"]:
+            if type in STABLE_SUPPORTED_TYPES:
                 index.append(
                     dict(
                         meta=str(meta_path),

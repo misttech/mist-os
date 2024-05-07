@@ -214,7 +214,7 @@ fidl_library://fidl/fuchsia.component.config
 fidl_library://fidl/fuchsia.component.decl
 fidl_library://fidl/fuchsia.component.resolution
 fidl_library://fidl/fuchsia.component.runner
-fidl_library://fidl/fuchsia.component.sandbox
+fidl_library://fidl/fuchsia.component.sandbox (unstable)
 fidl_library://fidl/fuchsia.component.test
 fidl_library://fidl/fuchsia.component.types
 fidl_library://fidl/fuchsia.data
@@ -243,7 +243,7 @@ fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.network
 fidl_library://fidl/fuchsia.hardware.pci
 fidl_library://fidl/fuchsia.hardware.platform.device
-fidl_library://fidl/fuchsia.hardware.power
+fidl_library://fidl/fuchsia.hardware.power (unstable)
 fidl_library://fidl/fuchsia.hardware.power.sensor
 fidl_library://fidl/fuchsia.hardware.power.statecontrol
 fidl_library://fidl/fuchsia.hardware.radar
