@@ -14,6 +14,7 @@
 #include <lib/arch/arm64/system.h>
 #include <lib/arch/intrin.h>
 #include <lib/arch/sysreg.h>
+#include <lib/boot-options/arm64.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/console.h>
 #include <platform.h>
@@ -46,6 +47,12 @@
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
+
+namespace {
+
+Arm64AlternateVbar gAlternateVbar;
+
+}  // namespace
 
 // Counter-timer Kernel Control Register, EL1.
 static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
@@ -205,7 +212,7 @@ static VbarFunction* arm64_select_vbar() {
   // In auto mode, the physboot detection code has "selected" a firmware option
   // if it's available generally.  The logic here then chooses whether this
   // particular CPU needs to use that firmware option by asking the firmware.
-  switch (gPhysHandoff->arch_handoff.alternate_vbar) {
+  switch (gAlternateVbar) {
     case Arm64AlternateVbar::kArchWorkaround3:
       return arm64_select_vbar_via_smccc11(arch::ArmSmcccFunction::kSmcccArchWorkaround3);
     case Arm64AlternateVbar::kArchWorkaround1:
@@ -245,6 +252,11 @@ static void arm64_install_vbar(VbarFunction* table) {
 }
 
 static void arm64_cpu_early_init() {
+  // Collect the setting that physboot determined.  arch_late_init_percpu()
+  // will call arm64_select_vbar to use it later, when gPhysHandoff may no
+  // longer be available.
+  gAlternateVbar = gPhysHandoff->arch_handoff.alternate_vbar;
+
   // Make sure the per cpu pointer is set up.
   arm64_init_percpu_early();
 
