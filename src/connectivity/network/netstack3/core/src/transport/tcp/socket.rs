@@ -5434,11 +5434,11 @@ mod tests {
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(self.inner.get_mut(), addr)
+            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(&mut self.inner.state, addr)
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(self.inner.get_mut(), device)
+            TransportIpContext::<I, BC>::get_default_hop_limits(&mut self.inner.state, device)
         }
 
         fn confirm_reachable_with_destination(
@@ -5448,7 +5448,7 @@ mod tests {
             device: Option<&Self::DeviceId>,
         ) {
             TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                self.inner.get_mut(),
+                &mut self.inner.state,
                 bindings_ctx,
                 dst,
                 device,

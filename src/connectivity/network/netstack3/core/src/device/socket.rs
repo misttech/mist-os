@@ -1126,7 +1126,7 @@ mod tests {
             FakeAllSockets<D>,
             HashMap<D, DeviceSockets<FakeStrongId>>,
         > {
-            let FakeSockets { any_device_sockets, device_sockets, all_sockets } = self.get_mut();
+            let FakeSockets { any_device_sockets, device_sockets, all_sockets } = &mut self.state;
             FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets)
         }
     }
@@ -1386,8 +1386,7 @@ mod tests {
             SocketInfo { device: device.with_weak_id(), protocol: None }
         );
 
-        let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            api.core_ctx().get_ref();
+        let device_sockets = &api.core_ctx().state.device_sockets;
         if let TargetDevice::SpecificDevice(d) = device {
             let DeviceSockets(socket_ids) = device_sockets.get(&d).expect("device state exists");
             assert_eq!(socket_ids, &HashSet::from([bound]));
@@ -1415,8 +1414,7 @@ mod tests {
             }
         );
 
-        let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            api.core_ctx().get_ref();
+        let device_sockets = &api.core_ctx().state.device_sockets;
         let device_socket_lists = device_sockets
             .iter()
             .map(|(d, DeviceSockets(indexes))| (d, indexes.iter().collect()))
@@ -1492,8 +1490,7 @@ mod tests {
             }
         );
 
-        let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            api.core_ctx().get_ref();
+        let device_sockets = &api.core_ctx().state.device_sockets;
         let DeviceSockets(weak_sockets) =
             device_sockets.get(&device_to_maintain).expect("device state exists");
         assert_eq!(weak_sockets, &HashSet::from([bound]));

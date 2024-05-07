@@ -30,7 +30,7 @@ macro_rules! assert_gmp_state {
         assert_gmp_state!(@inner $ctx, $group, MemberState::Delaying(_));
     };
     (@inner $ctx:expr, $group:expr, $pattern:pat) => {
-        assert!(matches!($ctx.get_ref().groups.get($group).unwrap().0.inner.as_ref().unwrap(), $pattern))
+        assert!(matches!($ctx.state.groups.get($group).unwrap().0.inner.as_ref().unwrap(), $pattern))
     };
 }
 

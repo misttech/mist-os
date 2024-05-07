@@ -2611,7 +2611,7 @@ mod tests {
                 FakeNetworkContext as _, FakeNetworkLinks, FakeTimerCtxExt as _,
                 WithFakeFrameContext, WrappedFakeCoreCtx,
             },
-            CtxPair, InstantContext, SendFrameContext as _, SendableFrameMeta,
+            CtxPair, InstantContext, SendFrameContext as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -2713,23 +2713,6 @@ mod tests {
         type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
     }
 
-    impl<I: Ip> SendableFrameMeta<FakeInnerCtxImpl<I>, FakeBindingsCtxImpl<I>>
-        for FakeNudMessageMeta<I>
-    {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeInnerCtxImpl<I>,
-            bindings_ctx: &mut FakeBindingsCtxImpl<I>,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
-        }
-    }
-
     impl<I: Ip> NudContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>> for FakeCoreCtxImpl<I> {
         type ConfigCtx<'a> = FakeConfigContext;
 
@@ -2761,7 +2744,7 @@ mod tests {
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.nud, self.inner.get_mut())
+            cb(&mut self.outer.nud, &mut self.inner.state)
         }
 
         fn with_nud_state<
@@ -2843,11 +2826,11 @@ mod tests {
 
     impl<I: Ip> NudConfigContext<I> for FakeInnerCtxImpl<I> {
         fn retransmit_timeout(&mut self) -> NonZeroDuration {
-            <FakeConfigContext as NudConfigContext<I>>::retransmit_timeout(self.get_mut())
+            <FakeConfigContext as NudConfigContext<I>>::retransmit_timeout(&mut self.state)
         }
 
         fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
-            <FakeConfigContext as NudConfigContext<I>>::with_nud_user_config(self.get_mut(), cb)
+            <FakeConfigContext as NudConfigContext<I>>::with_nud_user_config(&mut self.state, cb)
         }
     }
 
@@ -2903,7 +2886,7 @@ mod tests {
                     [(
                         lookup_addr,
                         NudEvent::RetransmitUnicastProbe,
-                        core_ctx.inner.get_ref().retrans_timer.get(),
+                        core_ctx.inner.state.retrans_timer.get(),
                     )],
                 );
             }
@@ -2915,7 +2898,7 @@ mod tests {
                     UnreachableMode::WaitingForPacketSend => None,
                     mode @ UnreachableMode::Backoff { .. } => {
                         let duration =
-                            mode.next_backoff_retransmit_timeout::<I, _>(core_ctx.inner.get_mut());
+                            mode.next_backoff_retransmit_timeout::<I, _>(&mut core_ctx.inner.state);
                         Some(bindings_ctx.now() + duration.get())
                     }
                 };
@@ -3907,7 +3890,7 @@ mod tests {
                 (DELAY_FIRST_PROBE_TIME, NonZeroU16::new(max_unicast_solicit - 1))
             }
             InitialState::Probe => {
-                (core_ctx.inner.get_ref().retrans_timer, NonZeroU16::new(max_unicast_solicit - 2))
+                (core_ctx.inner.state.retrans_timer, NonZeroU16::new(max_unicast_solicit - 2))
             }
             other => unreachable!("test only covers DELAY and PROBE, got {:?}", other),
         };
@@ -3930,7 +3913,7 @@ mod tests {
             [(
                 I::LOOKUP_ADDR1,
                 NudEvent::RetransmitUnicastProbe,
-                core_ctx.inner.get_ref().retrans_timer.get(),
+                core_ctx.inner.state.retrans_timer.get(),
             )],
         );
         assert_neighbor_probe_sent(&mut core_ctx, Some(LINK_ADDR1));
@@ -3980,7 +3963,7 @@ mod tests {
                 probes_sent: NonZeroU32::new(probes_sent).unwrap(),
                 packet_sent: /* unused */ false,
             }
-            .next_backoff_retransmit_timeout::<I, _>(core_ctx.inner.get_mut())
+            .next_backoff_retransmit_timeout::<I, _>(&mut core_ctx.inner.state)
             .get()
         };
 

@@ -473,7 +473,7 @@ mod testutil_testonly {
         }
 
         fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
-            !self.get_ref().disabled_devices.contains(device_id)
+            !self.state.disabled_devices.contains(device_id)
         }
     }
 }
@@ -1243,7 +1243,7 @@ mod tests {
 
     #[ip_test]
     #[test_case(|core_ctx, device, device_unusable| {
-        let disabled_devices = core_ctx.get_mut().disabled_devices_mut();
+        let disabled_devices = core_ctx.state.disabled_devices_mut();
         if device_unusable {
             let _: bool = disabled_devices.insert(device);
         } else {

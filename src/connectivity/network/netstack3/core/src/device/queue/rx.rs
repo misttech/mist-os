@@ -203,7 +203,7 @@ mod tests {
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().queue)
+            cb(&mut self.state.queue)
         }
     }
 
@@ -215,7 +215,7 @@ mod tests {
             (): (),
             buf: Buf<Vec<u8>>,
         ) {
-            self.get_mut().handled_frames.push(buf)
+            self.state.handled_frames.push(buf)
         }
     }
 
@@ -291,7 +291,7 @@ mod tests {
                     WorkQueueReport::Pending
                 );
                 assert_eq!(
-                    core::mem::take(&mut ctx.core_ctx.get_mut().handled_frames),
+                    core::mem::take(&mut ctx.core_ctx.state.handled_frames),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
@@ -304,7 +304,7 @@ mod tests {
             );
             let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
-                core::mem::take(&mut core_ctx.get_mut().handled_frames),
+                core::mem::take(&mut core_ctx.state.handled_frames),
                 (MAX_BATCH_SIZE * (MAX_RX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_RX_QUEUED_LEN)
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()

@@ -1059,7 +1059,7 @@ pub(crate) mod testutil {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.get_mut().as_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.state.as_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
         }
 
         fn send_ip_packet<S, O>(
@@ -1121,14 +1121,12 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<
-            I: IpLayerIpExt,
-            BC: InstantContext + TracingContext + FilterBindingsTypes,
-            D: FakeStrongDeviceId,
-            State: TransportIpContext<I, BC, DeviceId = D>,
-            Meta,
-        > TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
+    impl<I, BC, D, State, Meta> TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
+        I: IpLayerIpExt,
+        BC: InstantContext + TracingContext + FilterBindingsTypes,
+        D: FakeStrongDeviceId,
+        State: TransportIpContext<I, BC, DeviceId = D>,
         Self: IpSocketHandler<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
         type DevicesWithAddrIter<'a> = State::DevicesWithAddrIter<'a>
@@ -1138,11 +1136,11 @@ pub(crate) mod testutil {
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(self.get_mut(), addr)
+            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(&mut self.state, addr)
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(self.get_mut(), device)
+            TransportIpContext::<I, BC>::get_default_hop_limits(&mut self.state, device)
         }
 
         fn confirm_reachable_with_destination(
@@ -1152,7 +1150,7 @@ pub(crate) mod testutil {
             device: Option<&Self::DeviceId>,
         ) {
             TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                self.get_mut(),
+                &mut self.state,
                 bindings_ctx,
                 dst,
                 device,
@@ -1329,7 +1327,7 @@ pub(crate) mod testutil {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.get_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.state.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
         }
 
         fn send_ip_packet<S, O>(

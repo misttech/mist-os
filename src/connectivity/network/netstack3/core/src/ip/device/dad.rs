@@ -416,14 +416,14 @@ mod tests {
         ip::{AddrSubnet, IpAddress as _},
         Witness as _,
     };
-    use packet::{BufferMut, EmptyBuf, Serializer};
+    use packet::EmptyBuf;
     use packet_formats::icmp::ndp::Options;
 
     use super::*;
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _, SendableFrameMeta, TimerHandler,
+            InstantContext as _, SendFrameContext as _, TimerHandler,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::{
@@ -459,8 +459,7 @@ mod tests {
             request_addr: &Self::AddressId,
             cb: F,
         ) -> O {
-            let FakeDadAddressContext { addr, assigned, groups: _, ip_device_id_ctx: _ } =
-                self.get_mut();
+            let FakeDadAddressContext { addr, assigned, .. } = &mut self.state;
             assert_eq!(*request_addr.addr(), *addr);
             cb(assigned)
         }
@@ -471,9 +470,7 @@ mod tests {
             &FakeDeviceId: &Self::DeviceId,
             multicast_addr: MulticastAddr<Ipv6Addr>,
         ) {
-            let FakeDadAddressContext { addr: _, assigned: _, groups, ip_device_id_ctx: _ } =
-                self.get_mut();
-            *groups.entry(multicast_addr).or_default() += 1;
+            *self.state.groups.entry(multicast_addr).or_default() += 1;
         }
 
         fn leave_multicast_group(
@@ -482,9 +479,7 @@ mod tests {
             &FakeDeviceId: &Self::DeviceId,
             multicast_addr: MulticastAddr<Ipv6Addr>,
         ) {
-            let FakeDadAddressContext { addr: _, assigned: _, groups, ip_device_id_ctx: _ } =
-                self.get_mut();
-            match groups.entry(multicast_addr) {
+            match self.state.groups.entry(multicast_addr) {
                 Entry::Vacant(_) => {}
                 Entry::Occupied(mut e) => {
                     let v = e.get_mut();
@@ -514,7 +509,7 @@ mod tests {
 
     impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadContext {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            self.address_ctx.get_ref().as_ref()
+            &self.address_ctx.state.ip_device_id_ctx
         }
     }
 
@@ -549,21 +544,6 @@ mod tests {
         }
     }
 
-    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for DadMessageMeta {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeCoreCtxImpl,
-            bindings_ctx: &mut FakeBindingsCtxImpl,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
-        }
-    }
-
     impl DadContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type DadAddressCtx<'a> = FakeAddressCtxImpl;
 
@@ -577,8 +557,8 @@ mod tests {
             cb: F,
         ) -> O {
             let FakeDadContext { state, retrans_timer, max_dad_transmits, address_ctx } =
-                self.get_mut();
-            let ctx_addr = address_ctx.get_ref().addr;
+                &mut self.state;
+            let ctx_addr = address_ctx.state.addr;
             let requested_addr = request_addr.addr().get();
             assert!(
                 ctx_addr == requested_addr,
@@ -651,11 +631,9 @@ mod tests {
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
-        let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            core_ctx.get_ref();
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, Ipv6DadState::Assigned);
-        let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
-            address_ctx.get_ref();
+        let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         assert_eq!(groups, &HashMap::from([(DAD_ADDRESS.to_solicited_node_address(), 1)]));
         assert_eq!(
@@ -678,16 +656,14 @@ mod tests {
         dad_transmits_remaining: Option<NonZeroU16>,
         retrans_timer: NonZeroDuration,
     ) {
-        let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            core_ctx.get_ref();
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, Ipv6DadState::Tentative {
             dad_transmits_remaining: got,
             timer: _
         } => {
             assert_eq!(got, dad_transmits_remaining);
         });
-        let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
-            address_ctx.get_ref();
+        let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(!*assigned);
         assert_eq!(groups, &HashMap::from([(DAD_ADDRESS.to_solicited_node_address(), 1)]));
         let frames = core_ctx.frames();
@@ -745,11 +721,9 @@ mod tests {
             );
             assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
         }
-        let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            core_ctx.get_ref();
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, Ipv6DadState::Assigned);
-        let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
-            address_ctx.get_ref();
+        let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         assert_eq!(groups, &HashMap::from([(DAD_ADDRESS.to_solicited_node_address(), 1)]));
         assert_eq!(
@@ -802,11 +776,9 @@ mod tests {
             &get_address_id(DAD_ADDRESS.get()),
         );
         bindings_ctx.timers.assert_no_timers_installed();
-        let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
-            core_ctx.get_ref();
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
         assert_matches!(*state, Ipv6DadState::Uninitialized);
-        let FakeDadAddressContext { addr: _, assigned, groups, ip_device_id_ctx: _ } =
-            address_ctx.get_ref();
+        let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(!*assigned);
         assert_eq!(groups, &HashMap::new());
     }

@@ -382,8 +382,7 @@ mod tests {
             &FakeDeviceId: &Self::DeviceId,
             cb: F,
         ) -> O {
-            let FakeIpv6RouteDiscoveryContext { state, route_table, ip_device_id_ctx: _ } =
-                self.get_mut();
+            let FakeIpv6RouteDiscoveryContext { state, route_table, .. } = &mut self.state;
             cb(state, route_table)
         }
     }
@@ -445,7 +444,7 @@ mod tests {
             Some(duration),
         );
 
-        let route_table = &core_ctx.get_ref().route_table.route_table;
+        let route_table = &core_ctx.state.route_table.route_table;
         assert!(route_table.contains(&route), "route_table={route_table:?}");
 
         let expect = match duration {
@@ -472,7 +471,7 @@ mod tests {
         bindings_ctx: &mut FakeBindingsCtxImpl,
         route: Ipv6DiscoveredRoute,
     ) {
-        let route_table = &core_ctx.get_ref().route_table.route_table;
+        let route_table = &core_ctx.state.route_table.route_table;
         assert!(!route_table.contains(&route), "route_table={route_table:?}");
         bindings_ctx.timers.assert_no_timers_installed();
     }
@@ -491,7 +490,7 @@ mod tests {
         let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Fake the route already being present in the routing table.
-        assert!(core_ctx.get_mut().route_table.route_table.insert(ROUTE1));
+        assert!(core_ctx.state.route_table.route_table.insert(ROUTE1));
 
         // Clear events so we can assert on route-added events later.
         let _: Vec<crate::testutil::DispatchedEvent> = bindings_ctx.take_events();
@@ -517,7 +516,7 @@ mod tests {
 
         // Fake the route already being removed from underneath the route
         // discovery table.
-        assert!(core_ctx.get_mut().route_table.route_table.remove(&ROUTE1));
+        assert!(core_ctx.state.route_table.route_table.remove(&ROUTE1));
         // Invalidating the route should ignore the fact that the route is not
         // in the route table.
         update_to_invalidate_check_invalidation(&mut core_ctx, &mut bindings_ctx, ROUTE1);
@@ -661,7 +660,7 @@ mod tests {
 
         RouteDiscoveryHandler::invalidate_routes(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
         bindings_ctx.timers.assert_no_timers_installed();
-        let route_table = &core_ctx.get_ref().route_table.route_table;
+        let route_table = &core_ctx.state.route_table.route_table;
         assert!(route_table.is_empty(), "route_table={route_table:?}");
     }
 

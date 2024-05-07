@@ -3652,7 +3652,7 @@ mod tests {
         // connected socket.
         assert!(api.get_posix_reuse_port(&socket));
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::from([(
                 (FakeDeviceId, multicast_addr),
                 const_unwrap_option(NonZeroUsize::new(1))
@@ -3701,7 +3701,7 @@ mod tests {
         // Check that the listener was unchanged by the failed connection.
         assert!(api.get_posix_reuse_port(&socket));
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::from([(
                 (FakeDeviceId, multicast_addr),
                 const_unwrap_option(NonZeroUsize::new(1))
@@ -4761,7 +4761,7 @@ mod tests {
         // Add multicsat route for every device.
         for device in MultipleDevicesId::all().iter() {
             let (core_ctx, _bindings_ctx) = ctx.contexts();
-            core_ctx.inner.inner.get_mut().add_subnet_route(*device, I::MULTICAST_SUBNET);
+            core_ctx.inner.inner.state.add_subnet_route(*device, I::MULTICAST_SUBNET);
         }
 
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -4804,7 +4804,7 @@ mod tests {
         // Add multicsat route for every device.
         for device in MultipleDevicesId::all().iter() {
             let (core_ctx, _bindings_ctx) = ctx.contexts();
-            core_ctx.inner.inner.get_mut().add_subnet_route(*device, I::MULTICAST_SUBNET);
+            core_ctx.inner.inner.state.add_subnet_route(*device, I::MULTICAST_SUBNET);
         }
 
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -5071,14 +5071,13 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let result = api.set_multicast_membership(&socket, mcast_addr, interface, true);
 
-        let memberships_snapshot =
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>();
+        let memberships_snapshot = api.core_ctx().inner.inner.state.multicast_memberships::<I>();
         if let Ok(()) = result {
             api.set_multicast_membership(&socket, mcast_addr, interface, false)
                 .expect("leaving group failed");
         }
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::default()
         );
 
@@ -5170,9 +5169,7 @@ mod tests {
                 MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute => {
                     let (core_ctx, _bindings_ctx) = ctx.contexts();
                     let Wrapped { inner: Wrapped { inner, outer: _ }, outer: _ } = core_ctx;
-                    inner
-                        .get_mut()
-                        .add_route(MultipleDevicesId::A, mcast_addr.into_specified().into());
+                    inner.state.add_route(MultipleDevicesId::A, mcast_addr.into_specified().into());
                 }
             }
         };
@@ -5292,7 +5289,7 @@ mod tests {
         // state still exists in the fake IP socket context so we can inspect
         // it here.
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::default(),
         );
     }
@@ -5315,7 +5312,7 @@ mod tests {
         .expect("join group failed");
 
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::from([(
                 (MultipleDevicesId::A, group),
                 const_unwrap_option(NonZeroUsize::new(1))
@@ -5324,7 +5321,7 @@ mod tests {
 
         api.close(unbound).into_removed();
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::default()
         );
     }
@@ -5359,7 +5356,7 @@ mod tests {
         .expect("join group failed");
 
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::from([
                 ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
                 ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
@@ -5368,7 +5365,7 @@ mod tests {
 
         api.close(socket).into_removed();
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::default()
         );
     }
@@ -5408,7 +5405,7 @@ mod tests {
         .expect("join group failed");
 
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::from([
                 ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
                 ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
@@ -5417,7 +5414,7 @@ mod tests {
 
         api.close(socket).into_removed();
         assert_eq!(
-            api.core_ctx().inner.inner.get_ref().multicast_memberships::<I>(),
+            api.core_ctx().inner.inner.state.multicast_memberships::<I>(),
             HashMap::default()
         );
     }

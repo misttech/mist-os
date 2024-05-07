@@ -22,6 +22,7 @@ rustc_library_with_features("netstack3-base") {
     "src/resource_references.rs",
     "src/rng.rs",
     "src/testutil/fake_bindings.rs",
+    "src/testutil/fake_core.rs",
     "src/testutil/fake_network.rs",
     "src/time.rs",
     "src/time/local_timer_heap.rs",
@@ -38,6 +39,7 @@ rustc_library_with_features("netstack3-base") {
 
   _testutils_deps = [
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:rand_xorshift",
   ]
 

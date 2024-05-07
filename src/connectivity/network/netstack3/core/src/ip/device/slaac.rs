@@ -1877,9 +1877,9 @@ mod tests {
                 retrans_timer,
                 iid,
                 slaac_addrs,
-                ip_device_id_ctx: _,
                 slaac_state,
-            } = self.get_mut();
+                ..
+            } = &mut self.state;
             let mut slaac_addrs = slaac_addrs;
             cb(
                 SlaacAddrsMutAndConfig {
@@ -1967,7 +1967,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(preferred_lifetime_secs),
             NonZeroNdpLifetime::from_u32_with_infinite(valid_lifetime_secs),
         );
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2010,7 +2010,7 @@ mod tests {
             config: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
             deprecated: address_created_deprecated,
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry],);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry],);
         let deprecate_timer_id = InnerSlaacTimerId::DeprecateSlaacAddress { addr: addr_sub.addr() };
         let invalidate_timer_id =
             InnerSlaacTimerId::InvalidateSlaacAddress { addr: addr_sub.addr() };
@@ -2023,13 +2023,13 @@ mod tests {
             // Trigger the deprecation timer.
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()));
             let entry = SlaacAddressEntry { deprecated: true, ..entry };
-            assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+            assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         }
         core_ctx.state.slaac_state.timers.assert_timers([(invalidate_timer_id, (), valid_until)]);
 
         // Trigger the invalidation timer.
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()));
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2061,7 +2061,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(LIFETIME_SECS),
             NonZeroNdpLifetime::from_u32_with_infinite(LIFETIME_SECS),
         );
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2095,7 +2095,7 @@ mod tests {
             config: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
             deprecated: false,
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
 
         let deprecate_timer_id = InnerSlaacTimerId::DeprecateSlaacAddress { addr: addr_sub.addr() };
         let invalidate_timer_id =
@@ -2108,7 +2108,7 @@ mod tests {
         // Remove the address and let SLAAC know the address was removed
         let config = {
             let SlaacAddressEntry { addr_sub: got_addr_sub, config, deprecated } =
-                core_ctx.get_mut().slaac_addrs.slaac_addrs.remove(0);
+                core_ctx.state.slaac_addrs.slaac_addrs.remove(0);
             assert_eq!(addr_sub, got_addr_sub);
             assert!(!deprecated);
             config
@@ -2284,7 +2284,7 @@ mod tests {
             config: SlaacConfig::Static { valid_until },
             deprecated: address_created_deprecated,
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
 
         // Refresh timers.
@@ -2319,7 +2319,7 @@ mod tests {
             deprecated: ndp_pl.is_none(),
             ..entry
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
     }
 
@@ -2468,7 +2468,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(preferred_lifetime_secs),
             NonZeroNdpLifetime::from_u32_with_infinite(valid_lifetime_secs),
         );
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2667,7 +2667,7 @@ mod tests {
             invalidate_timer_id: first_invalidate_timer_id,
             regenerate_timer_id: first_regenerate_timer_id,
         } = addr_props(&mut dup_rng, bindings_ctx.now(), Duration::ZERO);
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [first_entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [first_entry]);
         core_ctx.state.slaac_state.timers.assert_timers([
             (first_deprecate_timer_id, (), first_preferred_until),
             (first_invalidate_timer_id, (), first_valid_until),
@@ -2687,7 +2687,7 @@ mod tests {
             regenerate_timer_id: second_regenerate_timer_id,
         } = addr_props(&mut dup_rng, bindings_ctx.now(), first_desync_factor);
         assert_eq!(
-            core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
+            core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [first_entry, second_entry]
         );
         let second_regen_at = second_preferred_until - regen_advance.get();
@@ -2703,7 +2703,7 @@ mod tests {
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()),);
         let first_entry = SlaacAddressEntry { deprecated: true, ..first_entry };
         assert_eq!(
-            core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
+            core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [first_entry, second_entry]
         );
         core_ctx.state.slaac_state.timers.assert_timers([
@@ -2749,7 +2749,7 @@ mod tests {
         } = addr_props(&mut dup_rng, third_created_at, first_desync_factor + second_desync_factor);
         let second_entry = SlaacAddressEntry { deprecated: true, ..second_entry };
         assert_eq!(
-            core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
+            core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [second_entry, third_entry]
         );
         core_ctx.state.slaac_state.timers.assert_timers([

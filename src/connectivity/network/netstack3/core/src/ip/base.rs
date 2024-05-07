@@ -3670,7 +3670,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            self.get_mut().join_multicast_group(bindings_ctx, device, addr)
+            self.state.join_multicast_group(bindings_ctx, device, addr)
         }
 
         fn leave_multicast_group(
@@ -3679,14 +3679,14 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            self.get_mut().leave_multicast_group(bindings_ctx, device, addr)
+            self.state.leave_multicast_group(bindings_ctx, device, addr)
         }
 
         fn select_device_for_multicast_group(
             &mut self,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) -> Result<Self::DeviceId, ResolveRouteError> {
-            self.get_mut().select_device_for_multicast_group(addr)
+            self.state.select_device_for_multicast_group(addr)
         }
     }
 }

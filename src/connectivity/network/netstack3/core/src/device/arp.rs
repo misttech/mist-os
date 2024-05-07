@@ -660,7 +660,7 @@ mod tests {
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
             },
-            InstantContext as _, SendableFrameMeta, TimerHandler,
+            InstantContext as _, TimerHandler,
         },
         device::{
             ethernet::EthernetLinkDevice,
@@ -739,23 +739,6 @@ mod tests {
         })
     }
 
-    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl>
-        for ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>
-    {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeCoreCtxImpl,
-            bindings_ctx: &mut FakeBindingsCtxImpl,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
-        }
-    }
-
     impl FakeNetworkContext for crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
         type TimerId = ArpTimerId<EthernetLinkDevice, FakeWeakDeviceId<FakeLinkDeviceId>>;
         type SendMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
@@ -810,8 +793,8 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let state = self.get_mut();
-            cb(&mut state.arp_state, &mut state.inner)
+            let FakeArpCtx { arp_state, inner, .. } = &mut self.state;
+            cb(arp_state, inner)
         }
 
         fn with_arp_state<O, F: FnOnce(&ArpState<EthernetLinkDevice, FakeBindingsCtxImpl>) -> O>(
@@ -819,8 +802,7 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let state = self.get_ref();
-            cb(&state.arp_state)
+            cb(&self.state.arp_state)
         }
 
         fn get_protocol_addr(
@@ -828,7 +810,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> Option<Ipv4Addr> {
-            self.get_ref().proto_addr
+            self.state.proto_addr
         }
 
         fn get_hardware_addr(
@@ -836,7 +818,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> UnicastAddr<Mac> {
-            self.get_ref().hw_addr
+            self.state.hw_addr
         }
 
         fn with_arp_state_mut<
@@ -850,15 +832,7 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let FakeArpCtx {
-                arp_state,
-                config,
-                proto_addr: _,
-                hw_addr: _,
-                inner: _,
-                counters: _,
-                nud_counters: _,
-            } = self.get_mut();
+            let FakeArpCtx { arp_state, config, .. } = &mut self.state;
             cb(arp_state, config)
         }
     }
@@ -899,15 +873,15 @@ mod tests {
         }
     }
 
-    impl CounterContext<ArpCounters> for FakeCoreCtxImpl {
+    impl CounterContext<ArpCounters> for FakeArpCtx {
         fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.get_ref().counters)
+            cb(&self.counters)
         }
     }
 
-    impl CounterContext<NudCounters<Ipv4>> for FakeCoreCtxImpl {
+    impl CounterContext<NudCounters<Ipv4>> for FakeArpCtx {
         fn with_counters<O, F: FnOnce(&NudCounters<Ipv4>) -> O>(&self, cb: F) -> O {
-            cb(&self.get_ref().nud_counters)
+            cb(&self.nud_counters)
         }
     }
 
@@ -1166,8 +1140,8 @@ mod tests {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
                     let mut ctx = new_context();
                     let FakeCtx { core_ctx, bindings_ctx: _ } = &mut ctx;
-                    core_ctx.get_mut().hw_addr = UnicastAddr::new(*hw_addr).unwrap();
-                    core_ctx.get_mut().proto_addr = Some(*proto_addr);
+                    core_ctx.state.hw_addr = UnicastAddr::new(*hw_addr).unwrap();
+                    core_ctx.state.proto_addr = Some(*proto_addr);
                     (*name, ctx)
                 })
             },

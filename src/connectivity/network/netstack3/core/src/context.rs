@@ -68,6 +68,10 @@ impl<BC: BindingsContext, L> crate::transport::udp::UseUdpIpTransportContextBlan
     for CoreCtx<'_, BC, L>
 {
 }
+impl<BC: BindingsContext, L> crate::device::ethernet::UseArpFrameMetadataBlanket
+    for CoreCtx<'_, BC, L>
+{
+}
 
 /// Provides access to core context implementations.
 ///
@@ -184,18 +188,11 @@ mod locked {
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::sync::Arc;
-    #[cfg(test)]
-    use alloc::vec::Vec;
     use core::fmt::Debug;
-    #[cfg(test)]
-    use core::marker::PhantomData;
-
-    #[cfg(test)]
-    use derivative::Derivative;
 
     #[cfg(test)]
     use crate::{
-        context::{ContextProvider, CounterContext},
+        context::ContextProvider,
         filter::{FilterBindingsTypes, FilterHandlerProvider},
     };
     use crate::{
@@ -205,10 +202,10 @@ pub(crate) mod testutil {
     };
 
     pub use netstack3_base::testutil::{
-        FakeBindingsCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeInstantCtx,
-        FakeNetwork, FakeNetworkContext, FakeNetworkLinks, FakeTimerCtx, FakeTimerCtxExt,
-        FakeTracingCtx, InstantAndData, PendingFrame, PendingFrameData, StepResult,
-        WithFakeFrameContext, WithFakeTimerContext,
+        FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
+        FakeInstantCtx, FakeNetwork, FakeNetworkContext, FakeNetworkLinks, FakeTimerCtx,
+        FakeTimerCtxExt, FakeTracingCtx, InstantAndData, PendingFrame, PendingFrameData,
+        StepResult, WithFakeFrameContext, WithFakeTimerContext,
     };
 
     impl<D: LinkDevice, Id, Event: Debug, State, FrameMeta> LinkResolutionContext<D>
@@ -354,39 +351,6 @@ pub(crate) mod testutil {
         }
     }
 
-    /// A test helper used to provide an implementation of a core context.
-    #[cfg(test)]
-    #[derive(Derivative)]
-    #[derivative(Default(bound = "S: Default"))]
-    pub(crate) struct FakeCoreCtx<S, Meta, DeviceId> {
-        pub(crate) state: S,
-        pub(crate) frames: FakeFrameCtx<Meta>,
-        _devices_marker: PhantomData<DeviceId>,
-    }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> ContextProvider for FakeCoreCtx<S, Meta, DeviceId> {
-        type Context = Self;
-
-        fn context(&mut self) -> &mut Self::Context {
-            self
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> AsRef<FakeCoreCtx<S, Meta, DeviceId>> for FakeCoreCtx<S, Meta, DeviceId> {
-        fn as_ref(&self) -> &FakeCoreCtx<S, Meta, DeviceId> {
-            self
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> AsMut<FakeCoreCtx<S, Meta, DeviceId>> for FakeCoreCtx<S, Meta, DeviceId> {
-        fn as_mut(&mut self) -> &mut FakeCoreCtx<S, Meta, DeviceId> {
-            self
-        }
-    }
-
     #[cfg(test)]
     impl<I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>
         FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
@@ -406,75 +370,6 @@ pub(crate) mod testutil {
 
         fn filter_handler(&mut self) -> Self::Handler<'_> {
             crate::filter::NoopImpl
-        }
-    }
-
-    #[cfg(test)]
-    impl<BC, S, Meta, DeviceId> CounterContext<BC> for FakeCoreCtx<S, Meta, DeviceId>
-    where
-        S: CounterContext<BC>,
-    {
-        fn with_counters<O, F: FnOnce(&BC) -> O>(&self, cb: F) -> O {
-            CounterContext::<BC>::with_counters(&self.state, cb)
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> FakeCoreCtx<S, Meta, DeviceId> {
-        /// Constructs a `FakeCoreCtx` with the given state and default
-        /// `FakeTimerCtx`, and `FakeFrameCtx`.
-        pub(crate) fn with_state(state: S) -> Self {
-            FakeCoreCtx { state, frames: FakeFrameCtx::default(), _devices_marker: PhantomData }
-        }
-
-        /// Get an immutable reference to the inner state.
-        ///
-        /// This method is provided instead of an [`AsRef`] impl to avoid
-        /// conflicting with user-provided implementations of `AsRef<T> for
-        /// FakeCtx<S, Id, Meta, Event>` for other types, `T`. It is named
-        /// `get_ref` instead of `as_ref` so that programmer doesn't need to
-        /// specify which `as_ref` method is intended.
-        pub(crate) fn get_ref(&self) -> &S {
-            &self.state
-        }
-
-        /// Get a mutable reference to the inner state.
-        ///
-        /// `get_mut` is like `get_ref`, but it returns a mutable reference.
-        pub(crate) fn get_mut(&mut self) -> &mut S {
-            &mut self.state
-        }
-
-        /// Get the list of frames sent so far.
-        pub(crate) fn frames(&self) -> &[(Meta, Vec<u8>)] {
-            self.frames.frames()
-        }
-
-        /// Take the list of frames sent so far.
-        pub(crate) fn take_frames(&mut self) -> Vec<(Meta, Vec<u8>)> {
-            self.frames.take_frames()
-        }
-
-        /// Consumes the `FakeCoreCtx` and returns the inner state.
-        pub(crate) fn into_state(self) -> S {
-            self.state
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> AsMut<FakeFrameCtx<Meta>> for FakeCoreCtx<S, Meta, DeviceId> {
-        fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
-            &mut self.frames
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> WithFakeFrameContext<Meta> for FakeCoreCtx<S, Meta, DeviceId> {
-        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O {
-            f(&mut self.frames)
         }
     }
 

@@ -1195,11 +1195,19 @@ pub(super) fn get_mtu<
     })
 }
 
+/// Enables a blanket implementation of [`SendableFrameData`] for
+/// [`ArpFrameMetadata`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `SendableFrameData` given the other requirements are met.
+pub trait UseArpFrameMetadataBlanket {}
+
 impl<
         BC: EthernetIpLinkDeviceBindingsContext + DeviceSocketBindingsContext<CC::DeviceId>,
         CC: EthernetIpLinkDeviceDynamicStateContext<BC>
             + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
-            + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+            + ResourceCounterContext<CC::DeviceId, DeviceCounters>
+            + UseArpFrameMetadataBlanket,
     > SendableFrameMeta<CC, BC> for ArpFrameMetadata<EthernetLinkDevice, CC::DeviceId>
 {
     fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
@@ -1661,7 +1669,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.get_ref().static_state)
+            cb(&self.state.static_state)
         }
     }
 
@@ -1698,8 +1706,8 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let state = self.get_ref();
-            cb(&state.static_state, &state.dynamic_state)
+            let FakeEthernetCtx { static_state, dynamic_state, .. } = &self.state;
+            cb(static_state, dynamic_state)
         }
 
         fn with_ethernet_state_mut<
@@ -1710,8 +1718,8 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let state = self.get_mut();
-            cb(&state.static_state, &mut state.dynamic_state)
+            let FakeEthernetCtx { static_state, dynamic_state, .. } = &mut self.state;
+            cb(static_state, dynamic_state)
         }
     }
 
@@ -1748,6 +1756,8 @@ mod tests {
         }
     }
 
+    impl UseArpFrameMetadataBlanket for FakeCoreCtx {}
+
     impl ArpContext<EthernetLinkDevice, FakeBindingsCtx> for FakeCoreCtx {
         type ConfigCtx<'a> = CoreCtxWithDeviceId<'a, FakeInnerCtx>;
 
@@ -1781,7 +1791,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtx,
             _device_id: &Self::DeviceId,
         ) -> UnicastAddr<Mac> {
-            self.inner.get_ref().static_state.mac
+            self.inner.state.static_state.mac
         }
 
         fn with_arp_state_mut<
@@ -1904,7 +1914,7 @@ mod tests {
             _device_id: &Self::DeviceId,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().tx_queue)
+            cb(&mut self.state.tx_queue)
         }
 
         fn send_frame(
@@ -1932,7 +1942,7 @@ mod tests {
 
     impl CounterContext<ArpCounters> for FakeCoreCtx {
         fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.as_ref().get_ref().arp_counters)
+            cb(&self.inner.state.arp_counters)
         }
     }
 

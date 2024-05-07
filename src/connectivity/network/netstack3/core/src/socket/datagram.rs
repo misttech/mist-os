@@ -5792,8 +5792,7 @@ mod test {
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
         {
-            let ip_socket_ctx = core_ctx.inner.inner.get_mut();
-            let device_state = ip_socket_ctx.get_device_state_mut::<I>(&device);
+            let device_state = core_ctx.inner.inner.state.get_device_state_mut::<I>(&device);
             assert_ne!(device_state.default_hop_limit, unicast);
             device_state.default_hop_limit = unicast;
         }

@@ -436,7 +436,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _, SendFrameContext, SendableFrameMeta,
+            InstantContext as _, SendFrameContext,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -532,21 +532,6 @@ mod tests {
         (),
     >;
 
-    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for MldFrameMetadata<FakeDeviceId> {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeCoreCtxImpl,
-            bindings_ctx: &mut FakeBindingsCtxImpl,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
-        }
-    }
-
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
@@ -556,8 +541,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeMldCtx { groups, .. } = self.get_ref();
-            cb(groups)
+            cb(&self.state.groups)
         }
     }
 
@@ -570,7 +554,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeMldCtx { groups, mld_enabled, gmp_state, .. } = self.get_mut();
+            let FakeMldCtx { groups, mld_enabled, gmp_state, .. } = &mut self.state;
             cb(GmpStateRef { enabled: *mld_enabled, groups, gmp: gmp_state })
         }
 
@@ -578,7 +562,7 @@ mod tests {
             &mut self,
             _device: &FakeDeviceId,
         ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
-            self.get_ref().ipv6_link_local
+            self.state.ipv6_link_local
         }
     }
 
@@ -881,7 +865,7 @@ mod tests {
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let MldGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let MldGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
@@ -918,7 +902,7 @@ mod tests {
 
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
-            let MldGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let MldGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Idle(_) => {}
                 _ => panic!("Wrong State!"),
@@ -1062,7 +1046,7 @@ mod tests {
             let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
             bindings_ctx.seed_rng(seed);
 
-            core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
+            core_ctx.state.ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1082,7 +1066,7 @@ mod tests {
             // Test that we do not perform MLD for addresses that we're supposed
             // to skip or when MLD is disabled.
             let test = |FakeCtxImpl { mut core_ctx, mut bindings_ctx }, group| {
-                core_ctx.get_mut().ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
+                core_ctx.state.ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
 
                 // Assert that no observable effects have taken place.
                 let assert_no_effect =
@@ -1115,7 +1099,7 @@ mod tests {
                     GroupLeaveResult::Left(())
                 );
                 // We should have left the group but not executed any `Actions`.
-                assert!(core_ctx.get_ref().groups.get(&group).is_none());
+                assert!(core_ctx.state.groups.get(&group).is_none());
                 assert_no_effect(&core_ctx, &bindings_ctx);
             };
 
@@ -1141,7 +1125,7 @@ mod tests {
             // Test that we skip executing `Actions` when MLD is disabled on the
             // device.
             let mut ctx = new_ctx();
-            ctx.core_ctx.get_mut().mld_enabled = false;
+            ctx.core_ctx.state.mld_enabled = false;
             test(ctx, GROUP_ADDR);
         });
     }

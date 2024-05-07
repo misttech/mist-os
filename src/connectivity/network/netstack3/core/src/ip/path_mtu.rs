@@ -440,7 +440,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().cache)
+            cb(&mut self.state.cache)
         }
     }
 
@@ -489,7 +489,7 @@ mod tests {
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<Mtu> {
-        core_ctx.get_ref().cache.get_pmtu(src_ip, dst_ip)
+        core_ctx.state.cache.get_pmtu(src_ip, dst_ip)
     }
 
     fn get_last_updated<I: Ip>(
@@ -497,7 +497,7 @@ mod tests {
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<FakeInstant> {
-        core_ctx.get_ref().cache.get_last_updated(src_ip, dst_ip)
+        core_ctx.state.cache.get_last_updated(src_ip, dst_ip)
     }
 
     #[ip_test]

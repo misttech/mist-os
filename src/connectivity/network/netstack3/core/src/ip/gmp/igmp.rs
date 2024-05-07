@@ -569,7 +569,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _, SendFrameContext as _, SendableFrameMeta,
+            InstantContext as _, SendFrameContext as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -661,23 +661,7 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeIgmpCtx { groups, .. } = self.get_ref();
-            cb(groups)
-        }
-    }
-
-    impl SendableFrameMeta<FakeCoreCtx, FakeBindingsCtx> for IgmpPacketMetadata<FakeDeviceId> {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeCoreCtx,
-            bindings_ctx: &mut FakeBindingsCtx,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
+            cb(&self.state.groups)
         }
     }
 
@@ -693,12 +677,12 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeIgmpCtx { groups, igmp_enabled, gmp_state, igmp_state, .. } = self.get_mut();
+            let FakeIgmpCtx { groups, igmp_enabled, gmp_state, igmp_state, .. } = &mut self.state;
             cb(GmpStateRef { enabled: *igmp_enabled, groups, gmp: gmp_state }, igmp_state)
         }
 
         fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
-            self.get_ref().addr_subnet
+            self.state.addr_subnet
         }
     }
 
@@ -912,7 +896,7 @@ mod tests {
             })
         });
         ctx.bindings_ctx.seed_rng(seed);
-        ctx.core_ctx.get_mut().addr_subnet = a;
+        ctx.core_ctx.state.addr_subnet = a;
         ctx
     }
 
@@ -993,7 +977,7 @@ mod tests {
 
             // We have received a query, hence we are falling back to Delay
             // Member state.
-            let IgmpGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let IgmpGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Delaying(_) => {}
                 _ => panic!("Wrong State!"),
@@ -1028,7 +1012,7 @@ mod tests {
 
             // Since we have heard from the v1 router, we should have set our
             // flag.
-            let IgmpGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let IgmpGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Delaying(state) => {
                     assert!(state.get_protocol_specific().v1_router_present)
@@ -1067,7 +1051,7 @@ mod tests {
                 Some(V1_ROUTER_PRESENT_TIMER_ID)
             );
             // After the second timer, we should reset our flag for v1 routers.
-            let IgmpGroupState(group_state) = core_ctx.get_ref().groups.get(&GROUP_ADDR).unwrap();
+            let IgmpGroupState(group_state) = core_ctx.state.groups.get(&GROUP_ADDR).unwrap();
             match group_state.get_inner() {
                 MemberState::Idle(state) => {
                     assert!(!state.get_protocol_specific().v1_router_present)
@@ -1255,7 +1239,7 @@ mod tests {
 
             let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
             bindings_ctx.seed_rng(seed);
-            core_ctx.get_mut().igmp_enabled = false;
+            core_ctx.state.igmp_enabled = false;
 
             // Assert that no observable effects have taken place.
             let assert_no_effect = |core_ctx: &FakeCoreCtx, bindings_ctx: &FakeBindingsCtx| {
@@ -1287,7 +1271,7 @@ mod tests {
                 GroupLeaveResult::Left(())
             );
             // We should have left the group but not executed any `Actions`.
-            assert!(core_ctx.get_ref().groups.get(&GROUP_ADDR).is_none());
+            assert!(core_ctx.state.groups.get(&GROUP_ADDR).is_none());
             assert_no_effect(&core_ctx, &bindings_ctx);
         });
     }

@@ -856,7 +856,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().cache)
+            cb(&mut self.state.cache)
         }
     }
 
@@ -1304,7 +1304,7 @@ mod tests {
 
         // Make sure no timers in the dispatcher yet.
         bindings_ctx.timers.assert_no_timers_installed();
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
+        assert_eq!(core_ctx.state.cache.size, 0);
 
         // Test that we properly reset fragment cache on timer.
 
@@ -1324,7 +1324,7 @@ mod tests {
             (),
             FakeInstant::from(REASSEMBLY_TIMEOUT),
         )]);
-        validate_size(&core_ctx.get_ref().cache);
+        validate_size(&core_ctx.state.cache);
 
         // Process fragment #1
         process_ip_fragment(
@@ -1341,7 +1341,7 @@ mod tests {
             (),
             FakeInstant::from(REASSEMBLY_TIMEOUT),
         )]);
-        validate_size(&core_ctx.get_ref().cache);
+        validate_size(&core_ctx.state.cache);
 
         // Process fragment #2
         process_ip_fragment(
@@ -1358,7 +1358,7 @@ mod tests {
             (),
             FakeInstant::from(REASSEMBLY_TIMEOUT),
         )]);
-        validate_size(&core_ctx.get_ref().cache);
+        validate_size(&core_ctx.state.cache);
 
         // Trigger the timer (simulate a timer for the fragmented packet).
         assert_eq!(
@@ -1368,7 +1368,7 @@ mod tests {
 
         // Make sure no other times exist..
         bindings_ctx.timers.assert_no_timers_installed();
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
+        assert_eq!(core_ctx.state.cache.size, 0);
 
         // Attempt to reassemble the packet but get an error since the fragment
         // data would have been reset/cleared.
@@ -1393,13 +1393,13 @@ mod tests {
         let mut fragment_id = 0;
         const THRESHOLD: usize = 8196usize;
 
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
-        core_ctx.get_mut().cache.threshold = THRESHOLD;
+        assert_eq!(core_ctx.state.cache.size, 0);
+        core_ctx.state.cache.threshold = THRESHOLD;
 
         // Test that when cache size exceeds the threshold, process_fragment
         // returns OOM.
 
-        while core_ctx.get_ref().cache.size < THRESHOLD {
+        while core_ctx.state.cache.size < THRESHOLD {
             process_ip_fragment(
                 &mut core_ctx,
                 &mut bindings_ctx,
@@ -1408,7 +1408,7 @@ mod tests {
                 true,
                 ExpectedResult::NeedMore,
             );
-            validate_size(&core_ctx.get_ref().cache);
+            validate_size(&core_ctx.state.cache);
             fragment_id += 1;
         }
 
@@ -1421,15 +1421,15 @@ mod tests {
             true,
             ExpectedResult::OutOfMemory,
         );
-        validate_size(&core_ctx.get_ref().cache);
+        validate_size(&core_ctx.state.cache);
 
         // Trigger the timers, which will clear the cache.
         let timers = bindings_ctx
             .trigger_timers_for(REASSEMBLY_TIMEOUT + Duration::from_secs(1), &mut core_ctx)
             .len();
         assert!(timers == 171 || timers == 293, "timers is {timers}"); // ipv4 || ipv6
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
-        validate_size(&core_ctx.get_ref().cache);
+        assert_eq!(core_ctx.state.cache.size, 0);
+        validate_size(&core_ctx.state.cache);
 
         // Can process fragments again.
         process_ip_fragment(
@@ -1513,7 +1513,7 @@ mod tests {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv4>();
         let fragment_id = 0;
 
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
+        assert_eq!(core_ctx.state.cache.size, 0);
         // Test that fragment bodies must be a multiple of
         // `FRAGMENT_BLOCK_SIZE`, except for the last fragment.
 
@@ -1564,7 +1564,7 @@ mod tests {
             fragment_id,
             35
         );
-        validate_size(&core_ctx.get_ref().cache);
+        validate_size(&core_ctx.state.cache);
         let mut buffer: Vec<u8> = vec![0; packet_len];
         let mut buffer = &mut buffer[..];
         let packet =
@@ -1573,7 +1573,7 @@ mod tests {
         let mut expected_body: Vec<u8> = Vec::new();
         expected_body.extend(0..15);
         assert_eq!(packet.body(), &expected_body[..]);
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
+        assert_eq!(core_ctx.state.cache.size, 0);
     }
 
     #[test]
@@ -1581,7 +1581,7 @@ mod tests {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<Ipv6>();
         let fragment_id = 0;
 
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
+        assert_eq!(core_ctx.state.cache.size, 0);
         // Test that fragment bodies must be a multiple of
         // `FRAGMENT_BLOCK_SIZE`, except for the last fragment.
 
@@ -1642,7 +1642,7 @@ mod tests {
             fragment_id,
             55
         );
-        validate_size(&core_ctx.get_ref().cache);
+        validate_size(&core_ctx.state.cache);
         let mut buffer: Vec<u8> = vec![0; packet_len];
         let mut buffer = &mut buffer[..];
         let packet =
@@ -1651,7 +1651,7 @@ mod tests {
         let mut expected_body: Vec<u8> = Vec::new();
         expected_body.extend(0..15);
         assert_eq!(packet.body(), &expected_body[..]);
-        assert_eq!(core_ctx.get_ref().cache.size, 0);
+        assert_eq!(core_ctx.state.cache.size, 0);
     }
 
     #[ip_test]

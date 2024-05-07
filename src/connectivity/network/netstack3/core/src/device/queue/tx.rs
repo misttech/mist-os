@@ -319,9 +319,7 @@ mod tests {
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let FakeTxQueueState { queue, transmitted_packets: _, device_not_ready: _ } =
-                self.get_mut();
-            cb(queue)
+            cb(&mut self.state.queue)
         }
 
         fn send_frame(
@@ -332,7 +330,7 @@ mod tests {
             buf: Buf<Vec<u8>>,
         ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
             let FakeTxQueueState { queue: _, transmitted_packets, device_not_ready } =
-                self.get_mut();
+                &mut self.state;
             if *device_not_ready {
                 Err(DeviceSendFrameError::DeviceNotReady((meta, buf)))
             } else {
@@ -395,7 +393,7 @@ mod tests {
             delivered_to_sockets,
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
-        assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
+        assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), [body]);
 
         // Should not have any frames waiting to be transmitted since we have no
         // queue.
@@ -406,7 +404,7 @@ mod tests {
 
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
-        assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), []);
+        assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), []);
     }
 
     #[test]
@@ -462,7 +460,7 @@ mod tests {
                     Ok(WorkQueueReport::Pending),
                 );
                 assert_eq!(
-                    core::mem::take(&mut ctx.core_ctx.get_mut().transmitted_packets),
+                    core::mem::take(&mut ctx.core_ctx.state.transmitted_packets),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
@@ -476,7 +474,7 @@ mod tests {
 
             let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
-                core::mem::take(&mut core_ctx.get_mut().transmitted_packets),
+                core::mem::take(&mut core_ctx.state.transmitted_packets),
                 (MAX_BATCH_SIZE * (MAX_TX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_TX_QUEUED_LEN)
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()
@@ -518,15 +516,15 @@ mod tests {
             Ok(())
         );
         assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_tx_tasks), [FakeLinkDeviceId]);
-        assert_eq!(core_ctx.get_mut().transmitted_packets, []);
+        assert_eq!(core_ctx.state.transmitted_packets, []);
 
-        core_ctx.get_mut().device_not_ready = true;
+        core_ctx.state.device_not_ready = true;
         assert_eq!(
             ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
             Err(DeviceSendFrameError::DeviceNotReady(())),
         );
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(core_ctx.get_mut().transmitted_packets, []);
+        assert_eq!(core_ctx.state.transmitted_packets, []);
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             &bindings_ctx.state;
         assert_eq!(woken_tx_tasks, &[]);
@@ -537,14 +535,14 @@ mod tests {
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
 
-        core_ctx.get_mut().device_not_ready = false;
+        core_ctx.state.device_not_ready = false;
         assert_eq!(
             ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
             Ok(WorkQueueReport::AllDone),
         );
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
-        assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
+        assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), [body]);
     }
 
     #[test_case(true; "device not ready")]
@@ -568,9 +566,9 @@ mod tests {
             Ok(())
         );
         assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_tx_tasks), [FakeLinkDeviceId]);
-        assert_eq!(core_ctx.get_mut().transmitted_packets, []);
+        assert_eq!(core_ctx.state.transmitted_packets, []);
 
-        core_ctx.get_mut().device_not_ready = device_not_ready;
+        core_ctx.state.device_not_ready = device_not_ready;
         ctx.transmit_queue_api()
             .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::None);
 
@@ -583,9 +581,9 @@ mod tests {
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
         if device_not_ready {
-            assert_eq!(core_ctx.get_mut().transmitted_packets, []);
+            assert_eq!(core_ctx.state.transmitted_packets, []);
         } else {
-            assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
+            assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), [body]);
         }
     }
 }

@@ -243,7 +243,6 @@ mod tests {
 
     use net_declare::net_ip_v6;
     use netstack3_base::IntoCoreTimerCtx;
-    use packet::BufferMut;
     use packet_formats::icmp::ndp::{options::NdpOption, Options};
     use test_case::test_case;
 
@@ -251,7 +250,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _, SendableFrameMeta,
+            InstantContext as _, SendFrameContext as _,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::testutil::FakeIpDeviceIdCtx,
@@ -280,21 +279,6 @@ mod tests {
     type FakeBindingsCtxImpl =
         FakeBindingsCtx<RsTimerId<FakeWeakDeviceId<FakeDeviceId>>, (), (), ()>;
 
-    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl> for RsMessageMeta {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeCoreCtxImpl,
-            bindings_ctx: &mut FakeBindingsCtxImpl,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
-        }
-    }
-
     impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;
 
@@ -306,12 +290,12 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            let FakeRsContext { max_router_solicitations, rs_state, .. } = self.get_mut();
+            let FakeRsContext { max_router_solicitations, rs_state, .. } = &mut self.state;
             cb(rs_state, *max_router_solicitations)
         }
 
         fn get_link_layer_addr_bytes(&mut self, &FakeDeviceId: &FakeDeviceId) -> Option<Vec<u8>> {
-            let FakeRsContext { link_layer_bytes, .. } = self.get_ref();
+            let FakeRsContext { link_layer_bytes, .. } = &self.state;
             link_layer_bytes.clone()
         }
 
@@ -325,7 +309,7 @@ mod tests {
             message: RouterSolicitation,
             body: F,
         ) -> Result<(), S> {
-            let FakeRsContext { source_address, .. } = self.get_ref();
+            let FakeRsContext { source_address, .. } = &self.state;
             self.send_frame(bindings_ctx, RsMessageMeta { message }, body(*source_address))
         }
     }
@@ -420,7 +404,7 @@ mod tests {
         let mut duration = MAX_RTR_SOLICITATION_DELAY;
         for i in 0..max_router_solicitations {
             assert_eq!(
-                core_ctx.get_ref().rs_state.remaining,
+                core_ctx.state.rs_state.remaining,
                 NonZeroU8::new(max_router_solicitations - i)
             );
             let now = bindings_ctx.now();
@@ -445,7 +429,7 @@ mod tests {
         }
 
         bindings_ctx.timers.assert_no_timers_installed();
-        assert_eq!(core_ctx.get_ref().rs_state.remaining, None);
+        assert_eq!(core_ctx.state.rs_state.remaining, None);
         let frames = core_ctx.frames();
         assert_eq!(frames.len(), usize::from(max_router_solicitations), "frames = {:?}", frames);
     }
