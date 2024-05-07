@@ -16,6 +16,15 @@
 HIDDEN(LINUXBOOT_LOAD_ADDRESS = 0x100000);
 
 /*
+ * Size of the kernel in memory, including the bss after the image so that the
+ * boot loader is sure to place the kernel where it has enough headroom after
+ * the storage image is loaded.  This symbol is used by the linuxboot-header.S
+ * assembly code to embed this value, which cannot be calculated directly by a
+ * single relocation record.
+ */
+HIDDEN(LINUXBOOT_INIT_SIZE = _end - LINUXBOOT_LOAD_ADDRESS);
+
+/*
  * This _start symbol just sets e_entry in ELF headers (as per phys.ld), which
  * don't exist at runtime.  Set it to match the 32-bit protocol's entry point.
  * There is no global symbol for the 16-bit entry point (exactly 512 bytes into

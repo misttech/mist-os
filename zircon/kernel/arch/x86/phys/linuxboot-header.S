@@ -110,29 +110,41 @@
   .org BOOT_PARAMS_HDR + SETUP_HEADER_HEADER
   .ascii "HdrS"
 
-   // This tells the boot loader which precise version of the protocol for
-   // encoding bits in these headers this kernel image is compatible with.
-   // Version 2.06 is not the newest, but none of the Zircon shim code needs
-   // to take advantange of any of the newer features.
+  // This tells the boot loader which precise version of the protocol for
+  // encoding bits in these headers this kernel image is compatible with.
+  // Version 2.12 is not the newest, but none of the Zircon shim code needs
+  // to take advantange of any of the newer features.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_VERSION
-  .short 0x0206
+  .short 0x020c
 
-   // This indicates "bzImage" format: load the 32-bit code at 1MiB.
+  // This indicates "bzImage" format: load the 32-bit code at 1MiB.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_LOADFLAGS
   .byte LOADFLAGS_LOADED_HIGH
 
-   // This gives the boot loader license to place the initrd RAMDISK image
-   // anywhere in the 4G address space.
+  // This gives the boot loader license to place the initrd RAMDISK image
+  // anywhere in the 4G address space.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_INITRD_ADDR_MAX
   .int 0xffffffff
 
-   // Load addresses must be aligned to 4KiB.
+  // Preferred alignment for the load address is just 4KiB.  Without
+  // relocatable_kernel set, this shouldn't matter either way for the 32-bit
+  // (or 16-bit) boot path--the load address is fixed.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_KERNEL_ALIGNMENT
   .int 0x1000
+
+  // Load addresses must be aligned to 4KiB (1 << 12).
+  .org BOOT_PARAMS_HDR + SETUP_HEADER_MIN_ALIGNMENT
+  .byte 12
 
    // This constrains the maximum size of kernel command line data passed.
   .org BOOT_PARAMS_HDR + SETUP_HEADER_CMDLINE_SIZE
   .int 0xffffffff
+
+  // This tells the boot loader how much space to leave from the start of the
+  // kernel's load image.  This ensures it leaves space for the .bss and not
+  // just the image it copies in.
+  .org BOOT_PARAMS_HDR + SETUP_HEADER_INIT_SIZE
+  .int LINUXBOOT_INIT_SIZE
 
    // The rest of setup_header contains fields a boot loader might examine
    // or modify though they're not meaningful to the version of the protocol
@@ -303,8 +315,15 @@
 .balign 512, 0
 .label LINUXBOOT_SETUP_SIZE, global, notype, . - zero_page
 
-// This is the entrypoint for bootloaders using the 32-bit linux boot
-// protocol.
+// This matches the fixed LINUXBOOT_LOAD_ADDRESS, but the assembler doesn't
+// know what absolute addresses will be, so it needs to refer to it only as a
+// label defined in this file.
+.label LinuxBase
+
+// This is the entrypoint for bootloaders using the 32-bit Linux boot protocol.
+// The data earlier in the image is not actually part of what's loaded into
+// memory.  Instead, the kernel's memory image starts here.  For the 32-bit
+// non-relocatable protocol, that's exactly at 1MiB.
 .function Linux32Entry, nosection=nosection
   // Jump to the start32.S entry point at its fixed address.
   mov $Phys32Entry, %eax
