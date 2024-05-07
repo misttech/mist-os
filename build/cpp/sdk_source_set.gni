@@ -26,7 +26,7 @@ import("//build/sdk/sdk_atom.gni")
 #   api (optional)
 #     Path to the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
-#     explicitly acknowledged. It is mandatory for stable = true.
+#     explicitly acknowledged. It is mandatory for stable == true.
 #     Defaults to "<SDK name>.api".
 #
 #   sdk_name (required)
@@ -100,8 +100,10 @@ template("sdk_source_set") {
 
   sdk_id = "sdk://${sdk_root_path}"
 
-  # Only partner and public categories have API validation
-  if (invoker.category == "partner" || invoker.category == "public") {
+  stable = defined(invoker.stable) && invoker.stable
+
+  # Only stable library has API validation
+  if (stable) {
     api_reference = "${sdk_name}.api"
     if (defined(invoker.api)) {
       api_reference = invoker.api
@@ -154,11 +156,10 @@ template("sdk_source_set") {
       deps += invoker.non_sdk_local_deps
     }
 
-    # Ensure that 'sdk_source_set()' targets in the 'partner' or 'public' category that are not
-    # testonly are included in the SDK source_sets allowlist. The allowlist target's `visibility`
+    # Ensure that stable 'sdk_source_set()' targets are included in the SDK
+    # source_sets allowlist. The allowlist target's `visibility`
     # list ensures that the target using this template is in the allowlist.
-    if ((!defined(invoker.testonly) || !invoker.testonly) &&
-        (invoker.category == "partner" || invoker.category == "public")) {
+    if (stable) {
       deps += [ "//build/sdk:sdk_source_sets_allowlist" ]
     }
 

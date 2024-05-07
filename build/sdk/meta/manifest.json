@@ -42,6 +42,10 @@
                     "type": {
                         "$ref": "common.json#/definitions/kind",
                         "description": "The type of the element"
+                    },
+                    "stable": {
+                        "description": "If true, the atom is subject to API compatibility policy. If false, it is under development and may change without warning.",
+                        "type": "boolean"
                     }
                 },
                 "required": [

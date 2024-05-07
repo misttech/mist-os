@@ -13,6 +13,7 @@ config("include") {
 sdk_source_set("driver_runtime") {
   category = "partner"
   sdk_name = "driver_runtime"
+  stable = true
   sources = [
     "include/lib/fdf/arena.h",
     "include/lib/fdf/channel.h",
@@ -36,6 +37,7 @@ sdk_source_set("driver_runtime") {
 sdk_source_set("driver_runtime_cpp") {
   category = "partner"
   sdk_name = "driver_runtime_cpp"
+  stable = true
   public = [
     "include/lib/fdf/cpp/arena.h",
     "include/lib/fdf/cpp/channel.h",
@@ -62,6 +64,7 @@ sdk_source_set("driver_runtime_cpp") {
 sdk_source_set("driver_runtime_env") {
   category = "partner"
   sdk_name = "driver_runtime_env"
+  stable = true
   sources = [ "include/lib/fdf/env.h" ]
   visibility = [
     "//build/sdk:deprecated_sdk_source_sets_to_build_at_all_supported_api_levels",
@@ -89,6 +92,7 @@ sdk_source_set("driver_runtime_env") {
 sdk_source_set("driver_runtime_env_cpp") {
   category = "partner"
   sdk_name = "driver_runtime_env_cpp"
+  stable = true
   public = [ "include/lib/fdf/cpp/env.h" ]
   public_configs = [ ":include" ]
   public_deps = [
@@ -103,6 +107,7 @@ sdk_source_set("driver_runtime_env_cpp") {
 sdk_source_set("driver_runtime_testing") {
   category = "partner"
   sdk_name = "driver_runtime_testing"
+  stable = true
 
   sources = [ "include/lib/fdf/testing.h" ]
   visibility = [

@@ -90,6 +90,8 @@ struct Atom {
     meta: String,
     #[serde(rename = "type")]
     kind: ElementType,
+    #[serde(default)]
+    stable: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -384,7 +386,11 @@ impl Sdk {
                     anyhow!("Atom did not specify source for its metadata: {atom:?}")
                 })?;
 
-                metas.push(Part { meta: meta.clone(), kind: atom.kind.clone() });
+                metas.push(Part {
+                    meta: meta.clone(),
+                    kind: atom.kind.clone(),
+                    stable: atom.stable,
+                });
             } else {
                 tracing::debug!("Atom did not contain a meta file, skipping it: {atom:?}");
             }

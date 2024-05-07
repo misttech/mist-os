@@ -18,6 +18,7 @@ sdk_source_set("fidl") {
   # TODO(https://fxbug.dev/42172264): We should represent the library as a
   # `sdk_static_library` when supported.
   build_as_static = true
+  stable = true
 
   public = [ "include/lib/fidl/epitaph.h" ]
 

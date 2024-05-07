@@ -9,6 +9,7 @@ sdk_source_set("cpp") {
   category = "partner"
 
   sdk_name = "sys_service_cpp"
+  stable = true
 
   include_base = "//sdk"
   sources = [

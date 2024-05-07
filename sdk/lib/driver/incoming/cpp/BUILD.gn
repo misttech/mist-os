@@ -8,6 +8,7 @@ sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_incoming_cpp"
   include_base = "//sdk"
+  stable = true
 
   sources = [
     "namespace.cc",

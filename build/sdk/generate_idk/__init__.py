@@ -51,6 +51,7 @@ class CCPrebuiltLibraryMeta(TypedDict):
     type: Literal["cc_prebuilt_library"]
     binaries: dict[str, Any]
     variants: list[Any]
+    stable: bool
 
 
 class SysrootMeta(TypedDict):
@@ -58,18 +59,21 @@ class SysrootMeta(TypedDict):
     type: Literal["sysroot"]
     versions: dict[str, Any]
     variants: list[Any]
+    stable: bool
 
 
 class PackageMeta(TypedDict):
     name: str
     type: Literal["package"]
     variants: list[Any]
+    stable: bool
 
 
 class LoadableModuleMeta(TypedDict):
     name: str
     type: Literal["loadable_module"]
     binaries: dict[str, Any]
+    stable: bool
 
 
 class UnmergableMeta(TypedDict):
@@ -87,6 +91,7 @@ class UnmergableMeta(TypedDict):
         | Literal["version_history"]
         | Literal["experimental_python_e2e_test"]
     )
+    stable: bool
 
 
 AtomMeta = (
@@ -255,7 +260,18 @@ class MergedIDK:
                 type = "data"
             else:
                 type = atom["type"]
-            index.append(dict(meta=str(meta_path), type=type))
+
+            # Right now we only support unstable artifact for cc_source_library
+            if type in ["cc_source_library"]:
+                index.append(
+                    dict(
+                        meta=str(meta_path),
+                        type=type,
+                        stable=atom.get("stable", False),
+                    )
+                )
+            else:
+                index.append(dict(meta=str(meta_path), type=type, stable=True))
 
         index.sort(key=lambda a: (a["meta"], a["type"]))
 

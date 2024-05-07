@@ -201,33 +201,17 @@ template("zx_library") {
           name = invoker.sdk_name
         }
         target_type = "sdk_source_set"
-        if (sdk_category == "public" || sdk_category == "partner") {
-          # API version checks are only relevant for public or partner APIs.
-          # Here, and in the similar code below.
-          extra_target_args = {
-            api = "//sdk/lib/$target_name/$target_name.api"
-            build_as_static = true
-            category = sdk_category
-            sdk_name = name
-            forward_variables_from(invoker,
-                                   [
-                                     "sdk_headers_for_internal_use",
-                                     "sdk_area",
-                                     "stable",
-                                   ])
-          }
-        } else {
-          extra_target_args = {
-            category = sdk_category
-            sdk_name = name
-            build_as_static = true
-            forward_variables_from(invoker,
-                                   [
-                                     "sdk_headers_for_internal_use",
-                                     "sdk_area",
-                                     "stable",
-                                   ])
-          }
+        extra_target_args = {
+          api = "//sdk/lib/$target_name/$target_name.api"
+          build_as_static = true
+          category = sdk_category
+          sdk_name = name
+          forward_variables_from(invoker,
+                                 [
+                                   "sdk_headers_for_internal_use",
+                                   "sdk_area",
+                                   "stable",
+                                 ])
         }
       } else {
         target_type = "static_library"

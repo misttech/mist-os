@@ -54,7 +54,7 @@ $FFX \
 
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    ffx_tool = fuchsia_toolchain.ffx
+    ffx_tool = fuchsia_toolchain.ffx_assembly
     legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
     platform_artifacts = ctx.attr.platform_artifacts[FuchsiaProductAssemblyBundleInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")

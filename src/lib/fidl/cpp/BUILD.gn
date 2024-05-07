@@ -13,6 +13,7 @@ sdk_source_set("cpp_base") {
   # TODO(https://fxbug.dev/42055960): Rename SDK element to "fidl_cpp_base".
   api = "fidl_cpp_base_v2.api"
   sdk_name = "fidl_cpp_base_v2"
+  stable = true
 
   # TODO(https://fxbug.dev/42172264): We should represent the library as a
   # `sdk_static_library` when supported.

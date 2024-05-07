@@ -56,6 +56,7 @@ config("trace_include") {
 sdk_source_set("trace-headersonly") {
   category = "partner"
   sdk_name = "trace-headersonly"
+  stable = true
 
   public = [
     "include/lib/trace/event.h",
