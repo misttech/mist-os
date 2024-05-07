@@ -206,11 +206,6 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
         fc_preferred_fuchsia_device.FuchsiaDevice, "health_check", autospec=True
     )
     @mock.patch.object(
-        fuchsia_controller_transport.FuchsiaController,
-        "create_context",
-        autospec=True,
-    )
-    @mock.patch.object(
         sl4f_transport.SL4F,
         "start_server",
         autospec=True,
@@ -218,16 +213,12 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
     def test_on_device_boot(
         self,
         mock_sl4f_start_server: mock.Mock,
-        mock_fc_create_context: mock.Mock,
         mock_fc_preferred_health_check: mock.Mock,
     ) -> None:
         """Testcase for FuchsiaDevice.on_device_boot()"""
         self.fd_obj.on_device_boot()
 
         mock_sl4f_start_server.assert_called_once_with(self.fd_obj.sl4f)
-        mock_fc_create_context.assert_called_once_with(
-            self.fd_obj.fuchsia_controller
-        )
         mock_fc_preferred_health_check.assert_called_once_with(self.fd_obj)
 
 

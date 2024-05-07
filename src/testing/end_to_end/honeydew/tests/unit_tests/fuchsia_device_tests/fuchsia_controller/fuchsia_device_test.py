@@ -602,15 +602,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     @mock.patch.object(
         fc_fuchsia_device.FuchsiaDevice, "health_check", autospec=True
     )
-    @mock.patch.object(
-        fuchsia_controller_transport.FuchsiaController,
-        "create_context",
-        autospec=True,
-    )
     def test_on_device_boot(
         self,
         parameterized_dict: dict[str, Any],
-        mock_fc_create_context: mock.Mock,
         mock_health_check: mock.Mock,
     ) -> None:
         """Testcase for BaseFuchsiaDevice.on_device_boot()"""
@@ -630,7 +624,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # Reset the `_on_device_boot_fns` variable at the end of the test
         self.fd_obj._on_device_boot_fns = []
 
-        mock_fc_create_context.assert_called_once()
         mock_health_check.assert_called_once()
 
     @mock.patch.object(
@@ -801,22 +794,22 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_disconnection.assert_called()
 
     @mock.patch.object(
-        ffx_transport.FFX,
-        "wait_for_rcs_connection",
+        fuchsia_controller_transport.FuchsiaController,
+        "check_connection",
         autospec=True,
     )
     def test_wait_for_online_success(
-        self, mock_ffx_wait_for_rcs_connection: mock.Mock
+        self, mock_fc_check_connection: mock.Mock
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_online() success case"""
         self.fd_obj.wait_for_online()
 
-        mock_ffx_wait_for_rcs_connection.assert_called()
+        mock_fc_check_connection.assert_called()
 
     @mock.patch.object(
-        ffx_transport.FFX,
-        "wait_for_rcs_connection",
-        side_effect=errors.FuchsiaDeviceError("some error"),
+        fuchsia_controller_transport.FuchsiaController,
+        "check_connection",
+        side_effect=errors.FuchsiaControllerConnectionError("some error"),
         autospec=True,
     )
     def test_wait_for_online_fail(
