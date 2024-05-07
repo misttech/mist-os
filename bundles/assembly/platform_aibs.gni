@@ -164,6 +164,7 @@ user_platform_aib_names =
 
       # Diagnostics
       "diagnostics_triage_detect_mali",
+      "detect_user",
 
       # Fonts
       "fonts",

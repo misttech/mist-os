@@ -222,6 +222,8 @@ pub enum BootfsCompiledPackageDestination {
     Fshost,
     /// The compiled bootstrap realm package.
     Bootstrap,
+    /// The compiled root realm package.
+    Root,
 }
 
 /// Test variants.

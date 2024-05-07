@@ -154,7 +154,7 @@
             from: "parent",
             to: "#archivist",
             dependency: "weak",
-            availability: "same_as_target",
+            availability: "optional",
         },
 
         // -- End Archivist offers --

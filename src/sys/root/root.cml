@@ -16,12 +16,6 @@
             environment: "#elf-env",
         },
         {
-            name: "core",
-            url: "fuchsia-pkg://fuchsia.com/core#meta/core.cm",
-            environment: "#core-env",
-            on_terminate: "reboot",
-        },
-        {
             name: "elf_runner",
             url: "fuchsia-builtin://#elf_runner.cm",
         },
@@ -60,27 +54,6 @@
             ],
         },
         {
-            from: "#config",
-            to: "#core",
-            config: [
-                "fuchsia.fonts.FontManifest",
-                "fuchsia.fonts.VerboseLogging",
-                "fuchsia.http-client.StopOnIdleTimeoutMillis",
-                "fuchsia.memory.CaptureOnPressureChange",
-                "fuchsia.memory.CriticalCaptureDelay",
-                "fuchsia.memory.ImminentOomCaptureDelay",
-                "fuchsia.memory.NormalCaptureDelay",
-                "fuchsia.memory.WarningCaptureDelay",
-                "fuchsia.power.SuspendEnabled",
-                "fuchsia.session.AutoLaunch",
-                "fuchsia.session.SessionUrl",
-                "fuchsia.wlan.RecoveryEnabled",
-                "fuchsia.wlan.RecoveryProfile",
-                "fuchsia.wlan.RoamingProfile",
-            ],
-            availability: "same_as_target",
-        },
-        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: "#elf_runner",
@@ -90,6 +63,7 @@
             from: "#core",
             as: "fuchsia.component.CoreBinder",
             to: "#startup",
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -130,10 +104,7 @@
         {
             directory: "boot",
             from: "parent",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
         {
             protocol: [
@@ -168,10 +139,7 @@
                 "fuchsia.sys2.CrashIntrospect",
             ],
             from: "parent",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
         {
             event_stream: [
@@ -183,10 +151,7 @@
                 "stopped",
             ],
             from: "parent",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
         {
             protocol: [
@@ -196,16 +161,7 @@
             from: "#core",
             to: "#bootstrap",
             dependency: "weak",
-        },
-        {
-            protocol: [ "fuchsia.time.Maintenance" ],
-            from: "parent",
-            to: "#core",
-        },
-        {
-            protocol: [ "fuchsia.memory.attribution.Provider" ],
-            from: "#elf_runner",
-            to: "#core",
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -214,89 +170,6 @@
             ],
             from: "parent",
             to: "#bootstrap",
-        },
-
-        // ...and the rest of these are capabilities provided by components for each other
-        {
-            directory: [
-                "bin",
-                "blob",
-                "build-info",
-                "config-data",
-                "data",
-                "dev-builtin",
-                "dev-class",
-                "dev-topological",
-                "factory",
-                "pkgfs",
-                "root-ssl-certificates",
-                "system",
-                "tmp",
-            ],
-            from: "#bootstrap",
-            to: "#core",
-        },
-
-        // Non-zircon services for bootstrap
-        {
-            protocol: [
-                "fuchsia.device.NameProvider",
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.diagnostics.FeedbackArchiveAccessor",
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-                "fuchsia.diagnostics.LogSettings",
-                "fuchsia.diagnostics.LoWPANArchiveAccessor",
-                "fuchsia.driver.development.Manager",
-                "fuchsia.driver.registrar.DriverRegistrar",
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
-                "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
-                "fuchsia.paver.Paver",
-                "fuchsia.pkg.PackageCache",
-                "fuchsia.pkg.PackageResolver-base",
-                "fuchsia.pkg.RetainedPackages",
-                "fuchsia.power.button.Monitor",
-                "fuchsia.power.clientlevel.Connector",
-                "fuchsia.power.profile.Watcher",
-                "fuchsia.power.systemmode.ClientConfigurator",
-                "fuchsia.power.systemmode.Requester",
-                "fuchsia.scheduler.deprecated.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
-                "fuchsia.space.Manager",
-                "fuchsia.sysinfo.SysInfo",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-                "fuchsia.thermal.ClientStateConnector",
-                "fuchsia.update.verify.BlobfsVerifier",
-            ],
-            from: "#bootstrap",
-            to: "#core",
-        },
-        {
-            protocol: [
-                "fuchsia.tpm.cr50.Cr50",
-                "fuchsia.virtualconsole.SessionManager",
-            ],
-            from: "#bootstrap",
-            to: "#core",
-            availability: "optional",
-        },
-        {
-            protocol: [
-                "fuchsia.hardware.pty.Device",
-                "fuchsia.kernel.Counter",
-                "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
-            from: "#bootstrap",
-            to: "#core",
-            availability: "same_as_target",
         },
 
         // Non-zircon services for archivist, pwrbtn-monitor, and console.
@@ -319,13 +192,7 @@
             from: "#core",
             to: "#bootstrap",
             dependency: "weak",
-        },
-        {
-            protocol: [ "fuchsia.component.DetectBinder" ],
-            from: "#core",
-            to: "#bootstrap",
-            dependency: "weak",
-            availability: "same_as_target",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.memorypressure.Provider" ],
@@ -333,6 +200,7 @@
             to: "#bootstrap",
             dependency: "weak",
             availability: "optional",
+            source_availability: "unknown",
         },
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
@@ -342,6 +210,7 @@
             to: "#bootstrap",
             dependency: "weak",
             availability: "optional",
+            source_availability: "unknown",
         },
 
         // Trace manager may be excluded from builds where tracing is not
@@ -356,6 +225,7 @@
             to: "#bootstrap",
             dependency: "weak",
             availability: "optional",
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -368,6 +238,7 @@
             to: "#bootstrap",
             dependency: "weak",
             availability: "optional",
+            source_availability: "unknown",
         },
 
         // The source of this protocol, debug-dash-launcher,
@@ -379,48 +250,37 @@
             to: "#bootstrap",
             dependency: "weak",
             availability: "optional",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.sys2.RealmExplorer",
             from: "framework",
             as: "fuchsia.sys2.RealmExplorer.root",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
         {
             protocol: "fuchsia.sys2.RealmQuery",
             from: "framework",
             as: "fuchsia.sys2.RealmQuery.root",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
         {
             protocol: "fuchsia.component.Introspector",
             from: "framework",
             as: "fuchsia.component.Introspector.root",
-            to: "#core",
+            to: "#bootstrap",
         },
         {
             protocol: "fuchsia.sys2.LifecycleController",
             from: "framework",
             as: "fuchsia.sys2.LifecycleController.root",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
         {
             protocol: "fuchsia.sys2.RouteValidator",
             from: "framework",
             as: "fuchsia.sys2.RouteValidator.root",
-            to: [
-                "#bootstrap",
-                "#core",
-            ],
+            to: "#bootstrap",
         },
 
         // Offer boot resolver to `bootstrap` for driver usage.
@@ -428,21 +288,6 @@
             resolver: "boot_resolver",
             from: "parent",
             to: "#bootstrap",
-        },
-        {
-            service: "fuchsia.hardware.rtc.Service",
-            from: "#bootstrap",
-            to: "#core",
-        },
-        {
-            protocol: [
-                "fuchsia.power.broker.Topology",
-                "fuchsia.power.suspend.Stats",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
-            from: "#bootstrap",
-            to: "#core",
-            availability: "optional",
         },
     ],
     expose: [
@@ -453,23 +298,6 @@
         },
     ],
     environments: [
-        {
-            name: "core-env",
-            extends: "realm",
-            runners: [
-                {
-                    runner: "elf",
-                    from: "#elf_runner",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "base_resolver",
-                    from: "#bootstrap",
-                    scheme: "fuchsia-pkg",
-                },
-            ],
-        },
         {
             name: "elf-env",
             extends: "realm",

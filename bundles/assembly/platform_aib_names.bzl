@@ -93,6 +93,7 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "core_realm",
     "core_realm_networking",
     "core_realm_user_and_userdebug",
+    "detect_user",
     "diagnostics_triage_detect_mali",
     "element_manager",
     "factory_data",

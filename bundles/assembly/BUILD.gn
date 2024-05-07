@@ -106,11 +106,20 @@ assembly_input_bundle("embeddable") {
     "//src/bringup/bin/critical-services:package",
     "//src/diagnostics/archivist:package",
     "//src/power/shutdown-shim:package",
-    "//src/sys/root:package",
     "//src/sys/startup:package",
   ]
 
   compiled_packages = [
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = rebase_path("//src/sys/root/root.cml", root_build_dir)
+        },
+      ]
+    },
     {
       bootfs_package = true
       name = "bootstrap"
@@ -752,6 +761,16 @@ assembly_input_bundle("core_realm") {
   ]
 
   compiled_packages = [
+    {
+      name = "root"
+      component_shards = [
+        {
+          component_name = "root"
+          shards = rebase_path([ "//src/sys/core/meta/core.root_shard.cml" ],
+                               root_build_dir)
+        },
+      ]
+    },
     {
       name = "bootstrap"
       component_shards = [
@@ -1973,6 +1992,33 @@ assembly_input_bundle("standard_userdebug_and_eng") {
                     "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
                     "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
                   ],
+                  root_build_dir)
+        },
+      ]
+    },
+    {
+      name = "root"
+      component_shards = [
+        {
+          component_name = "root"
+          shards = rebase_path(
+                  [ "//src/diagnostics/detect/meta/detect_userdebug.root_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("detect_user") {
+  compiled_packages = [
+    {
+      name = "root"
+      component_shards = [
+        {
+          component_name = "root"
+          shards = rebase_path(
+                  [ "//src/diagnostics/detect/meta/detect_user.root_shard.cml" ],
                   root_build_dir)
         },
       ]

@@ -40,6 +40,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             }
             BuildType::User => {
                 builder.platform_bundle("console_user");
+                builder.platform_bundle("detect_user");
             }
         }
 

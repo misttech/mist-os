@@ -36,6 +36,7 @@ BOOTFS_COMPILED_PACKAGE_ALLOWLIST = [
     "bootstrap",
     "fshost",
     "for-test2",
+    "root",
 ]  # test package
 
 
