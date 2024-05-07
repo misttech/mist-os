@@ -20,19 +20,26 @@ pub struct Attribute {
     pub arguments: Vec<AttributeArgument>,
 }
 
-pub fn get_attribute<S: AsRef<str>>(
+impl Attribute {
+    pub fn get_argument(&self, name: impl AsRef<str>) -> Option<Constant> {
+        let name = name.as_ref();
+        if let Some(arg) = self.arguments.iter().filter(|a| a.name == name).next() {
+            Some(arg.value.clone())
+        } else {
+            None
+        }
+    }
+}
+
+pub fn get_attribute(
     attributes: &Option<Vec<Attribute>>,
-    name: S,
-) -> Option<Vec<String>> {
+    name: impl AsRef<str>,
+) -> Option<Attribute> {
     let name = name.as_ref();
-    match attributes {
-        Some(attrs) => match attrs.iter().filter(|a| a.name == name).next() {
-            Some(attr) => {
-                Some(attr.arguments.iter().map(|arg| arg.value.value().to_owned()).collect())
-            }
-            None => None,
-        },
-        None => None,
+    if let Some(attrs) = attributes {
+        attrs.iter().filter(|a| a.name == name).next().cloned()
+    } else {
+        None
     }
 }
 
@@ -44,7 +51,7 @@ pub enum Constant {
 }
 
 impl Constant {
-    pub fn value<'a>(&'a self) -> &'a str {
+    pub fn value(&self) -> &str {
         match self {
             Constant::Literal { value } => value,
             Constant::Identifier { value } => value,
@@ -74,7 +81,6 @@ pub enum Type {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct BitsMember {
-    pub name: String,
     pub value: Constant,
 }
 
@@ -88,7 +94,6 @@ pub struct BitsDeclaration {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct EnumMember {
-    pub name: String,
     pub value: Constant,
 }
 
@@ -149,7 +154,6 @@ pub struct TableMember {
 pub struct TableDeclaration {
     pub name: String,
     pub members: Vec<TableMember>,
-    pub resource: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -162,7 +166,6 @@ pub struct StructMember {
 pub struct StructDeclaration {
     pub name: String,
     pub members: Vec<StructMember>,
-    pub resource: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -176,7 +179,6 @@ pub struct UnionMember {
 pub struct UnionDeclaration {
     pub name: String,
     pub members: Vec<UnionMember>,
-    pub resource: bool,
     pub strict: bool,
 }
 
@@ -197,6 +199,7 @@ pub enum DeclarationKind {
     Union,
 }
 
+#[derive(Debug)]
 pub enum Declaration {
     Bits(BitsDeclaration),
     Enum(EnumDeclaration),
@@ -219,7 +222,7 @@ pub struct IR {
 }
 
 impl IR {
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Rc<Self>> {
+    pub fn load(path: impl AsRef<Path>) -> Result<Rc<Self>> {
         let file = fs::File::open(path)?;
         let reader = BufReader::new(file);
         Ok(Rc::new(serde_json::from_reader(reader)?))

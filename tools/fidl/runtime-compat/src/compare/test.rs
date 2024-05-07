@@ -2,42 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::CompatibilityProblems;
+use super::problems::CompatibilityProblems;
 use anyhow::Result;
-use itertools::Itertools;
 
-#[cfg(test)]
-pub(super) fn compare_fidl_library(
-    a1: &str,
-    a2: &str,
-    source: &str,
-    library_name: &str,
-) -> Result<CompatibilityProblems> {
-    use anyhow::Context;
-
-    use crate::{compare::compatible, convert::convert_platform, ir::IR};
-
-    let ir1 = IR::from_source(a1, source, library_name)
-        .context(format!("Loading at fuchsia:{}:\n{}", a1, source))?;
-    let ir2 = IR::from_source(a2, source, library_name)
-        .context(format!("Loading at fuchsia:{}:\n{}", a2, source))?;
-
-    let p1 = convert_platform(ir1).context("Converting platform")?;
-    let p2 = convert_platform(ir2).context("Converting platform")?;
-
-    println!("p1 discoverable: {:?}", p1.discoverable.iter().collect_vec());
-    println!("p2 discoverable: {:?}", p2.discoverable.iter().collect_vec());
-
-    compatible(&p1, &p2)
-}
-
-#[cfg(test)]
 pub(super) fn compare_fidl_type(name: &str, source_fragment: &str) -> CompatibilityProblems {
     use anyhow::Context as _;
     use flyweights::FlyStr;
 
     use crate::{
-        compare::{compare_types, CompatibilityProblems, Type},
+        compare::{compare_types, Type},
         convert::{Context, ConvertType},
         ir::IR,
     };

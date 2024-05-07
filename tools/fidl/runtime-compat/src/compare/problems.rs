@@ -1,7 +1,7 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use std::{collections::BTreeSet, fmt::Display};
+use std::fmt::Display;
 
 use super::Path;
 
@@ -19,7 +19,6 @@ enum ProblemScopeType {
     Type,
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CompatibilityScope {
     Platform { external: Path, platform: Path },
@@ -31,9 +30,9 @@ impl CompatibilityScope {
     fn scope_type(&self) -> ProblemScopeType {
         use ProblemScopeType::*;
         match self {
-            CompatibilityScope::Platform { external, platform } => Platform,
-            CompatibilityScope::Protocol { client, server } => Protocol,
-            CompatibilityScope::Type { sender, receiver } => Type,
+            CompatibilityScope::Platform { external: _, platform: _ } => Platform,
+            CompatibilityScope::Protocol { client: _, server: _ } => Protocol,
+            CompatibilityScope::Type { sender: _, receiver: _ } => Type,
         }
     }
     fn paths(&self) -> (&Path, &Path) {
@@ -53,8 +52,12 @@ impl CompatibilityScope {
                 b
             } else if b.is_empty() {
                 a
+            } else if a.starts_with(&b) {
+                a
+            } else if b.starts_with(&a) {
+                b
             } else {
-                todo!("Work out how to report different paths");
+                todo!("Work out how to report different paths where neither is a prefix");
             }
         }
     }
@@ -94,18 +97,11 @@ impl Ord for CompatibilityScope {
     }
 }
 
-#[allow(unused)]
 #[derive(Clone, PartialEq, Eq)]
 pub struct CompatibilityProblem {
     scope: CompatibilityScope,
     warning: bool,
     message: String,
-}
-
-impl CompatibilityProblem {
-    pub fn is_warning(&self) -> bool {
-        self.warning
-    }
 }
 
 impl Display for CompatibilityProblem {
@@ -148,11 +144,11 @@ impl std::fmt::Debug for CompatibilityProblem {
 
 impl PartialOrd for CompatibilityProblem {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.scope.partial_cmp(&other.scope) {
+        match self.warning.partial_cmp(&other.warning) {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        match self.warning.partial_cmp(&other.warning) {
+        match self.scope.partial_cmp(&other.scope) {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
@@ -187,142 +183,11 @@ fn test_compatibility_problem_comparison() {
     assert!(error < warning);
 }
 
-impl CompatibilityProblem {
-    fn matches(&self, pattern: &ProblemPattern<'_>) -> bool {
-        if let Some(warning) = pattern.warning {
-            if warning != self.warning {
-                return false;
-            }
-        }
-        if let Some(message) = &pattern.message {
-            if !message.matches(&self.message) {
-                return false;
-            }
-        }
-        if let Some(scope) = &pattern.scope {
-            if scope != &self.scope.scope_type() {
-                return false;
-            }
-        }
-        if let Some(path) = &pattern.path {
-            if !path.matches(self.scope.path()) {
-                return false;
-            }
-        }
-        if let Some(levels) = pattern.levels {
-            if levels != self.scope.levels() {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-#[derive(Default)]
-pub struct ProblemPattern<'a> {
-    warning: Option<bool>,
-    message: Option<StringPattern<'a>>,
-    scope: Option<ProblemScopeType>,
-    path: Option<StringPattern<'a>>,
-    levels: Option<(&'a str, &'a str)>,
-}
-
-impl<'a> ProblemPattern<'a> {
-    pub fn platform() -> Self {
-        Self { warning: Some(false), scope: Some(ProblemScopeType::Platform), ..Default::default() }
-    }
-    pub fn protocol(client: &'a str, server: &'a str) -> Self {
-        Self {
-            warning: Some(false),
-            scope: Some(ProblemScopeType::Protocol),
-            levels: Some((client, server)),
-            ..Default::default()
-        }
-    }
-
-    pub fn type_error(sender: &'a str, receiver: &'a str) -> Self {
-        Self {
-            warning: Some(false),
-            scope: Some(ProblemScopeType::Type),
-            levels: Some((sender, receiver)),
-            ..Default::default()
-        }
-    }
-
-    pub fn type_warning(sender: &'a str, receiver: &'a str) -> Self {
-        Self {
-            warning: Some(true),
-            scope: Some(ProblemScopeType::Type),
-            levels: Some((sender, receiver)),
-            ..Default::default()
-        }
-    }
-
-    pub fn message<P: Into<StringPattern<'a>>>(self, message: P) -> Self {
-        Self { message: Some(message.into()), ..self }
-    }
-
-    pub fn path(self, path: StringPattern<'a>) -> Self {
-        Self { path: Some(path), ..self }
-    }
-}
-
-impl<'a> std::fmt::Debug for ProblemPattern<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut d = f.debug_struct("ProblemPattern");
-
-        if let Some(warning) = self.warning {
-            d.field("warning", &warning);
-        };
-        if let Some(message) = &self.message {
-            d.field("message", message);
-        }
-        if let Some(scope) = &self.scope {
-            d.field("scope", scope);
-        }
-        if let Some(path) = &self.path {
-            d.field("path", path);
-        }
-        if let Some(levels) = self.levels {
-            d.field("levels", &levels);
-        }
-
-        d.finish()
-    }
-}
-
-#[derive(Debug)]
-pub enum StringPattern<'a> {
-    Equals(&'a str),
-    Begins(&'a str),
-    Ends(&'a str),
-    Contains(&'a str),
-}
-
-impl<'a> StringPattern<'a> {
-    pub fn matches<A: AsRef<str>>(&self, string: A) -> bool {
-        let string = string.as_ref();
-        match self {
-            StringPattern::Equals(pattern) => &string == pattern,
-            StringPattern::Begins(pattern) => string.starts_with(pattern),
-            StringPattern::Ends(pattern) => string.ends_with(pattern),
-            StringPattern::Contains(pattern) => string.contains(pattern),
-        }
-    }
-}
-
-impl<'a> Into<StringPattern<'a>> for &'a str {
-    fn into(self) -> StringPattern<'a> {
-        StringPattern::Equals(self)
-    }
-}
-
 #[derive(Default, Debug)]
 pub struct CompatibilityProblems(Vec<CompatibilityProblem>);
 
-#[allow(unused)]
 impl CompatibilityProblems {
-    pub fn platform<S: AsRef<str>>(&mut self, external: &Path, platform: &Path, message: S) {
+    pub fn platform(&mut self, external: &Path, platform: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
             scope: CompatibilityScope::Platform {
                 external: external.clone(),
@@ -332,21 +197,21 @@ impl CompatibilityProblems {
             message: message.as_ref().to_owned(),
         });
     }
-    pub fn protocol<S: AsRef<str>>(&mut self, client: &Path, server: &Path, message: S) {
+    pub fn protocol(&mut self, client: &Path, server: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
             scope: CompatibilityScope::Protocol { client: client.clone(), server: server.clone() },
             warning: false,
             message: message.as_ref().to_owned(),
         });
     }
-    pub fn type_error<S: AsRef<str>>(&mut self, sender: &Path, receiver: &Path, message: S) {
+    pub fn type_error(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
             scope: CompatibilityScope::Type { sender: sender.clone(), receiver: receiver.clone() },
             warning: false,
             message: message.as_ref().to_owned(),
         });
     }
-    pub fn type_warning<S: AsRef<str>>(&mut self, sender: &Path, receiver: &Path, message: S) {
+    pub fn type_warning(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
             scope: CompatibilityScope::Type { sender: sender.clone(), receiver: receiver.clone() },
             warning: true,
@@ -370,34 +235,12 @@ impl CompatibilityProblems {
         self.compatibility_degree() == CompatibilityDegree::Incompatible
     }
 
+    #[cfg(test)]
     pub fn is_compatible(&self) -> bool {
-        #[cfg(test)]
-        if !self.0.is_empty() {
-            for problem in &self.0 {
-                println!("Unexpected problem: {:?}", problem);
-            }
-        }
-
         self.0.is_empty()
     }
 
-    fn has_errors(&self) -> bool {
-        self.0.iter().filter(|p| !p.is_warning()).next().is_some()
-    }
-
-    fn has_warnings(&self) -> bool {
-        self.0.iter().filter(|p| p.is_warning()).next().is_some()
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns true if there's at least one problem matching the `pattern`.
-    pub fn has_problem(&self, pattern: ProblemPattern<'_>) -> bool {
-        self.0.iter().filter(|p| p.matches(&pattern)).next().is_some()
-    }
-
+    #[cfg(test)]
     /// Returns true if for every problem there's a exactly one pattern that matches and vice versa.
     pub fn has_problems(&self, patterns: Vec<ProblemPattern<'_>>) -> bool {
         let matching_problems: Vec<Vec<usize>> = patterns
@@ -408,7 +251,7 @@ impl CompatibilityProblems {
                     .enumerate()
                     .filter_map(
                         |(i, problem)| {
-                            if problem.matches(pattern) {
+                            if pattern.matches(problem) {
                                 Some(i)
                             } else {
                                 None
@@ -418,7 +261,7 @@ impl CompatibilityProblems {
                     .collect()
             })
             .collect();
-        let matched_problems: BTreeSet<usize> =
+        let matched_problems: std::collections::BTreeSet<usize> =
             matching_problems.iter().flat_map(|ps| ps.iter().cloned()).collect();
 
         let mut ok = true;
@@ -461,5 +304,139 @@ impl IntoIterator for CompatibilityProblems {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+pub enum StringPattern<'a> {
+    Equals(&'a str),
+    Begins(&'a str),
+    Ends(&'a str),
+    Contains(&'a str),
+}
+
+#[cfg(test)]
+impl StringPattern<'_> {
+    pub fn matches(&self, string: impl AsRef<str>) -> bool {
+        let string = string.as_ref();
+        match self {
+            StringPattern::Equals(pattern) => &string == pattern,
+            StringPattern::Begins(pattern) => string.starts_with(pattern),
+            StringPattern::Ends(pattern) => string.ends_with(pattern),
+            StringPattern::Contains(pattern) => string.contains(pattern),
+        }
+    }
+}
+
+#[cfg(test)]
+impl<'a> Into<StringPattern<'a>> for &'a str {
+    fn into(self) -> StringPattern<'a> {
+        StringPattern::Equals(self)
+    }
+}
+
+#[cfg(test)]
+#[derive(Default)]
+pub struct ProblemPattern<'a> {
+    warning: Option<bool>,
+    message: Option<StringPattern<'a>>,
+    scope: Option<ProblemScopeType>,
+    path: Option<StringPattern<'a>>,
+    levels: Option<(&'a str, &'a str)>,
+}
+
+#[cfg(test)]
+#[allow(unused)]
+impl<'a> ProblemPattern<'a> {
+    pub fn matches(&self, problem: &CompatibilityProblem) -> bool {
+        if let Some(warning) = self.warning {
+            if warning != problem.warning {
+                return false;
+            }
+        }
+        if let Some(message) = &self.message {
+            if !message.matches(&problem.message) {
+                return false;
+            }
+        }
+        if let Some(scope) = &self.scope {
+            if scope != &problem.scope.scope_type() {
+                return false;
+            }
+        }
+        if let Some(path) = &self.path {
+            if !path.matches(problem.scope.path()) {
+                return false;
+            }
+        }
+        if let Some(levels) = self.levels {
+            if levels != problem.scope.levels() {
+                return false;
+            }
+        }
+        true
+    }
+    pub fn platform() -> Self {
+        Self { warning: Some(false), scope: Some(ProblemScopeType::Platform), ..Default::default() }
+    }
+    pub fn protocol(client: &'a str, server: &'a str) -> Self {
+        Self {
+            warning: Some(false),
+            scope: Some(ProblemScopeType::Protocol),
+            levels: Some((client, server)),
+            ..Default::default()
+        }
+    }
+
+    pub fn type_error(sender: &'a str, receiver: &'a str) -> Self {
+        Self {
+            warning: Some(false),
+            scope: Some(ProblemScopeType::Type),
+            levels: Some((sender, receiver)),
+            ..Default::default()
+        }
+    }
+
+    pub fn type_warning(sender: &'a str, receiver: &'a str) -> Self {
+        Self {
+            warning: Some(true),
+            scope: Some(ProblemScopeType::Type),
+            levels: Some((sender, receiver)),
+            ..Default::default()
+        }
+    }
+
+    pub fn message(self, message: impl Into<StringPattern<'a>>) -> Self {
+        Self { message: Some(message.into()), ..self }
+    }
+
+    pub fn path(self, path: StringPattern<'a>) -> Self {
+        Self { path: Some(path), ..self }
+    }
+}
+
+#[cfg(test)]
+impl std::fmt::Debug for ProblemPattern<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("ProblemPattern");
+
+        if let Some(warning) = self.warning {
+            d.field("warning", &warning);
+        };
+        if let Some(message) = &self.message {
+            d.field("message", message);
+        }
+        if let Some(scope) = &self.scope {
+            d.field("scope", scope);
+        }
+        if let Some(path) = &self.path {
+            d.field("path", path);
+        }
+        if let Some(levels) = self.levels {
+            d.field("levels", &levels);
+        }
+
+        d.finish()
     }
 }

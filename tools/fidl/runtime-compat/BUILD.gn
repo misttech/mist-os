@@ -26,7 +26,7 @@ if (is_host) {
     "src/compare/path.rs",
     "src/compare/primitive.rs",
     "src/compare/problems.rs",
-    "src/compare/test.rs",
+    "src/compare/types.rs",
     "src/convert.rs",
     "src/ir.rs",
     "src/main.rs",
@@ -46,7 +46,10 @@ if (is_host) {
   rustc_test("runtime_compat_test") {
     edition = "2021"
     deps = runtime_compat_deps + [ "//third_party/rust_crates:tempfile" ]
-    sources = runtime_compat_sources
+    sources = runtime_compat_sources + [
+                "src/compare/test.rs",
+                "src/compare/types_tests.rs",
+              ]
     source_root = "src/main.rs"
     data_deps = [ ":runtime_compat_test_data" ]
   }
