@@ -139,6 +139,7 @@ impl Repository {
 
 #[derive(Clone, Debug, Copy, Hash, PartialEq, Eq)]
 pub enum Type {
+    None,
     Flash,
     Emu,
     Update,
@@ -153,10 +154,8 @@ impl FromStr for Type {
             "emu" => Ok(Type::Emu),
             "update" => Ok(Type::Update),
             "bootloader" => Ok(Type::Bootloader),
-            _ => Err(anyhow!(
-                "Invalid Type: {}. Expect one of : flash, emu, update, bootloader",
-                value
-            )),
+            // Return None for others, to allow for infallible parsing.
+            _ => Ok(Type::None),
         }
     }
 }
@@ -214,8 +213,8 @@ impl Canonicalizer for DiskCanonicalizer {
         let product_bundle_path = self.product_bundle_dir.join(path.as_ref());
         match product_bundle_path.canonicalize_utf8() {
             Ok(p) => p,
-            Err(_) => {
-                tracing::debug!("Cannot canonicalize {}", &path.as_ref());
+            Err(e) => {
+                tracing::debug!("Cannot canonicalize {}: {e}", &path.as_ref());
                 for image_type in &image_types {
                     let mut ns = self.not_supported.borrow_mut();
                     ns.insert(image_type.clone());
@@ -339,15 +338,20 @@ impl ProductBundleV2 {
 
         // Relativize the partitions.
         for part in &mut self.partitions.bootstrap_partitions {
-            part.image =
-                diff_utf8_paths(&part.image, &product_bundle_dir).context("rebasing file path")?;
+            part.image = diff_utf8_paths(&part.image, &product_bundle_dir).context(format!(
+                "rebasing file path: {:?} to {:?}",
+                &part.image, &product_bundle_dir
+            ))?;
         }
         for part in &mut self.partitions.bootloader_partitions {
-            part.image =
-                diff_utf8_paths(&part.image, &product_bundle_dir).context("rebasing file path")?;
+            part.image = diff_utf8_paths(&part.image, &product_bundle_dir).context(format!(
+                "rebasing file path: {:?} to {:?}",
+                &part.image, &product_bundle_dir
+            ))?;
         }
         for cred in &mut self.partitions.unlock_credentials {
-            *cred = diff_utf8_paths(&cred, &product_bundle_dir).context("rebasing file path")?;
+            *cred = diff_utf8_paths(&cred, &product_bundle_dir)
+                .context(format!("rebasing file path: {:?} to {:?}", &cred, &product_bundle_dir))?;
         }
 
         // Relativize the systems.

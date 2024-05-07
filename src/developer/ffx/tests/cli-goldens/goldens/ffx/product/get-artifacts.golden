@@ -20,7 +20,7 @@
       "optionality": "required",
       "long": "--artifacts-group",
       "short": "g",
-      "description": "select what group of artifacts to list",
+      "description": "select what group of artifacts to list. One of flash, emu, update, bootloader",
       "hidden": false
     },
     {

@@ -18,19 +18,22 @@ ffx_plugin("ffx_product_get_artifacts") {
   ]
   deps = [
     "//build/sdk/meta:rust",
-    "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/assembly/assembly_manifest",
     "//src/lib/utf8_path",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
 
   inputs = [ "//build/sdk/meta/test_data/single_vd_manifest.json" ]
 
   test_deps = [
+    "//src/developer/ffx/config:lib",
     "//src/lib/assembly/partitions_config",
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
   ]
 }
