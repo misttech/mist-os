@@ -158,12 +158,15 @@ func (impl *routesAdminMainRouteTable) Remove(ctx_ fidl.Context) (routesAdmin.Ba
 	return routesAdmin.BaseRouteTableRemoveResultWithErr(routesAdmin.BaseRouteTableRemoveErrorInvalidOpOnMainTable), nil
 }
 
-func (impl *routesAdminMainRouteTable) GetAuthorizationForRouteTable(ctx_ fidl.Context) (uint32, zx.Event, error) {
+func (impl *routesAdminMainRouteTable) GetAuthorizationForRouteTable(ctx_ fidl.Context) (routesAdmin.GrantForRouteTableAuthorization, error) {
 	token, err := impl.token.Duplicate(zx.RightTransfer | zx.RightDuplicate)
 	if err != nil {
-		return 0, token, err
+		return routesAdmin.GrantForRouteTableAuthorization{}, err
 	}
-	return impl.tableId, token, nil
+	return routesAdmin.GrantForRouteTableAuthorization{
+		TableId: impl.tableId,
+		Token:   token,
+	}, nil
 }
 
 var _ routesAdmin.BaseRouteTableWithCtx = (*routesAdminMainRouteTable)(nil)

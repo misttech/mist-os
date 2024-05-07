@@ -292,7 +292,7 @@ pub async fn get_table_id<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
 /// or `RouteTableV6` proxy.
 pub async fn get_authorization_for_route_table<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
-) -> Result<(u32, fidl::Event), fidl::Error> {
+) -> Result<fnet_routes_admin::GrantForRouteTableAuthorization, fidl::Error> {
     let IpInvariant(result_fut) = net_types::map_ip_twice!(
         I,
         RouteTableProxy { route_table },

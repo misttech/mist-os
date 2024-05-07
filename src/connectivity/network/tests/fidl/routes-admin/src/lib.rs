@@ -1540,9 +1540,11 @@ async fn main_table_authorization<
         .expect("connect to routes-admin RouteTable");
     let table_id =
         fnet_routes_ext::admin::get_table_id::<I>(&route_table).await.expect("fidl should succeed");
-    let (authorized_table_id, _token) =
-        fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
-            .await
-            .expect("fidl should succeed");
+    let fnet_routes_admin::GrantForRouteTableAuthorization {
+        table_id: authorized_table_id,
+        token: _,
+    } = fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
+        .await
+        .expect("fidl should succeed");
     assert_eq!(table_id, authorized_table_id);
 }

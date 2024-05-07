@@ -117,7 +117,10 @@ pub(crate) async fn serve_route_table_v4(
                 let token = token
                     .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
                     .expect("failed to duplicate");
-                responder.send(V4_MAIN_TABLE_ID.into(), token)?;
+                responder.send(fnet_routes_admin::GrantForRouteTableAuthorization {
+                    table_id: V4_MAIN_TABLE_ID.into(),
+                    token,
+                })?;
             }
         };
     }
@@ -158,7 +161,10 @@ pub(crate) async fn serve_route_table_v6(
                 let token = token
                     .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
                     .expect("failed to duplicate");
-                responder.send(V6_MAIN_TABLE_ID.into(), token)?;
+                responder.send(fnet_routes_admin::GrantForRouteTableAuthorization {
+                    table_id: V6_MAIN_TABLE_ID.into(),
+                    token,
+                })?;
             }
         };
     }
