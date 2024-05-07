@@ -2697,7 +2697,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:94
+From //zircon/kernel/params.gni:91
 
 ### discoverable_package_labels
 
@@ -2842,7 +2842,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:155
+From //zircon/kernel/params.gni:152
 
 ### enable_mdns_trace
 
@@ -3098,7 +3098,7 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:118
+From //zircon/kernel/params.gni:115
 
 ### escher_test_for_glsl_spirv_mismatch
 
@@ -3149,7 +3149,7 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:147
+From //zircon/kernel/params.gni:144
 
 ### exported_package_labels
 
@@ -3417,14 +3417,6 @@ TODO(johngro): document
 **Current value (from the default):** `false`
 
 From //zircon/kernel/params.gni:73
-
-### futex_tracing_enabled
-
-Enables kernel tracing of futex interactions
-
-**Current value (from the default):** `false`
-
-From //zircon/kernel/params.gni:76
 
 ### fvm_partition
 
@@ -4033,7 +4025,7 @@ By default, log verbose font messages in tests.
 
 **Current value (from the default):** `true`
 
-From //src/fonts/tests/integration/BUILD.gn:21
+From //src/fonts/tests/integration/BUILD.gn:20
 
 ### is_analysis
 
@@ -4098,25 +4090,25 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:135
+From //zircon/kernel/params.gni:132
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:136
+From //zircon/kernel/params.gni:133
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:137
+From //zircon/kernel/params.gni:134
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:138
+From //zircon/kernel/params.gni:135
 
 ### kernel_base
 
@@ -4135,7 +4127,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:106
+From //zircon/kernel/params.gni:103
 
 ### kernel_debug_print_level
 
@@ -4147,7 +4139,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:113
+From //zircon/kernel/params.gni:110
 
 ### kernel_extra_defines
 
@@ -4156,7 +4148,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:98
+From //zircon/kernel/params.gni:95
 
 ### kernel_extra_deps
 
@@ -4175,7 +4167,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:141
+From //zircon/kernel/params.gni:138
 
 ### kernel_version_string
 
@@ -5445,7 +5437,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:125
+From //zircon/kernel/params.gni:122
 
 ### pgo_profile_path
 
@@ -8225,7 +8217,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:144
+From //zircon/kernel/params.gni:141
 
 ### use_gigaboot
 
@@ -8518,7 +8510,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:90
+From //zircon/kernel/params.gni:87
 
 ### vulkan_host_runtime_dir
 
@@ -8546,7 +8538,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:81
+From //zircon/kernel/params.gni:78
 
 ### warn_on_sdk_changes
 
