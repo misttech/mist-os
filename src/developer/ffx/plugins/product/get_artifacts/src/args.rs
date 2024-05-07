@@ -12,9 +12,10 @@ use sdk_metadata::Type;
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "get-artifacts")]
 pub struct GetArtifactsCommand {
-    /// path to product bundle directory.
+    /// path to product bundle directory. Defaults to the configured
+    /// path in `product.path`.
     #[argh(positional)]
-    pub product_bundle: Utf8PathBuf,
+    pub product_bundle: Option<Utf8PathBuf>,
 
     /// select what group of artifacts to list.
     /// One of flash, emu, update, bootloader

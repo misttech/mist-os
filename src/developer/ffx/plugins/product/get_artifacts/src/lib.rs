@@ -6,11 +6,13 @@
 use assembly_manifest::Image;
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
+use ffx_config::EnvironmentContext;
 use ffx_product_get_artifacts_args::GetArtifactsCommand;
 use fho::{bug, return_user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
 use schemars::JsonSchema;
 use sdk_metadata::{ProductBundle, Type, VirtualDeviceManifest};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use utf8_path::path_relative_from;
 
 /// CommandStatus is returned to indicate exit status of
@@ -29,6 +31,7 @@ pub enum CommandStatus {
 pub struct PbGetArtifactsTool {
     #[command]
     pub cmd: GetArtifactsCommand,
+    env: EnvironmentContext,
 }
 
 fho::embedded_plugin!(PbGetArtifactsTool);
@@ -37,7 +40,28 @@ fho::embedded_plugin!(PbGetArtifactsTool);
 impl FfxMain for PbGetArtifactsTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
 
-    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+    async fn main(mut self, mut writer: Self::Writer) -> fho::Result<()> {
+        // Set the product bundle path from config if it was not passed in.
+        if self.cmd.product_bundle.is_none() {
+            if let Some(default_path) = self
+                .env
+                .query("product.path")
+                .get()
+                .await
+                .map(|p: PathBuf| p.into())
+                .map_err(|e| bug!(e))?
+            {
+                let pb_path: Utf8PathBuf =
+                    Utf8PathBuf::try_from(default_path).map_err(|e| bug!(e))?;
+                self.cmd.product_bundle = Some(pb_path);
+            } else {
+                let message = String::from("no product bundle specified nor configured.");
+                writer
+                    .machine(&CommandStatus::UserError { message: message.clone() })
+                    .map_err(Into::<Error>::into)?;
+                return_user_error!(message);
+            }
+        }
         match self.pb_get_artifacts().await {
             Ok(artifacts) => writer
                 .machine_or(&CommandStatus::Ok { paths: artifacts.clone() }, artifacts.join("\n"))
@@ -64,8 +88,10 @@ impl PbGetArtifactsTool {
     /// emulator or updating the device depends on the
     /// artifact_group parameter passed in.
     pub async fn pb_get_artifacts(&self) -> Result<Vec<String>> {
-        let product_bundle = ProductBundle::try_load_from(&self.cmd.product_bundle)
-            .map_err(Into::<fho::Error>::into)?;
+        // It is expected that self.cmd.product_bundle has been validated to be some() by this point.
+        let product_bundle =
+            ProductBundle::try_load_from(&self.cmd.product_bundle.as_ref().unwrap())
+                .map_err(Into::<fho::Error>::into)?;
 
         let artifacts = match self.cmd.artifacts_group {
             Type::Flash => self.extract_flashing_artifacts(product_bundle)?,
@@ -82,7 +108,8 @@ impl PbGetArtifactsTool {
 
     fn compute_path(&self, artifact_path: &Utf8Path) -> Result<Utf8PathBuf> {
         if self.cmd.relative_path {
-            path_relative_from(artifact_path, &self.cmd.product_bundle).map_err(Into::into)
+            path_relative_from(artifact_path, &self.cmd.product_bundle.as_ref().unwrap())
+                .map_err(Into::into)
         } else {
             Ok(artifact_path.into())
         }
@@ -210,6 +237,7 @@ mod tests {
     use super::*;
 
     use assembly_partitions_config::PartitionsConfig;
+    use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
     use sdk_metadata::ProductBundleV2;
     use std::{
@@ -221,8 +249,9 @@ mod tests {
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/single_vd_manifest.json");
 
-    #[test]
-    fn test_get_flashing_artifacts() {
+    #[fuchsia::test]
+    async fn test_get_flashing_artifacts() {
+        let env = ffx_config::test_init().await.expect("test env");
         let json = r#"
             {
                 bootloader_partitions: [
@@ -286,10 +315,11 @@ mod tests {
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
-                product_bundle: Utf8PathBuf::new(),
+                product_bundle: None,
                 relative_path: false,
                 artifacts_group: Type::Flash,
             },
+            env: env.context.clone(),
         };
         let artifacts = tool.extract_flashing_artifacts(pb.clone()).unwrap();
         let expected_artifacts = vec![
@@ -303,8 +333,9 @@ mod tests {
         assert_eq!(expected_artifacts, artifacts);
     }
 
-    #[test]
-    fn test_get_emu_artifacts() {
+    #[fuchsia::test]
+    async fn test_get_emu_artifacts() {
+        let env = ffx_config::test_init().await.expect("test env");
         let json = r#"
             {
                 bootloader_partitions: [
@@ -375,10 +406,11 @@ mod tests {
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
-                product_bundle: Utf8PathBuf::new(),
+                product_bundle: None,
                 relative_path: false,
                 artifacts_group: Type::Emu,
             },
+            env: env.context.clone(),
         };
         let artifacts = tool.extract_emu_artifacts(pb.clone()).unwrap();
         let expected_artifacts = vec![
@@ -393,8 +425,9 @@ mod tests {
         assert_eq!(expected_artifacts, artifacts);
     }
 
-    #[test]
-    fn test_get_bootloaders() {
+    #[fuchsia::test]
+    async fn test_get_bootloaders() {
+        let env = ffx_config::test_init().await.expect("test env");
         let json = r#"
             {
                 bootloader_partitions: [
@@ -433,10 +466,11 @@ mod tests {
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
-                product_bundle: Utf8PathBuf::new(),
+                product_bundle: None,
                 relative_path: false,
                 artifacts_group: Type::Bootloader,
             },
+            env: env.context.clone(),
         };
         let artifacts = tool.extract_bootloaders(pb.clone()).unwrap();
         let expected_artifacts = vec![
@@ -505,10 +539,11 @@ mod tests {
 
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
-                product_bundle: Utf8Path::from_path(&pb_path).expect("utf8 path").into(),
+                product_bundle: Some(Utf8Path::from_path(&pb_path).expect("utf8 path").into()),
                 relative_path: false,
                 artifacts_group: Type::Emu,
             },
+            env: env.context.clone(),
         };
 
         let test_buffers = TestBuffers::default();
@@ -553,5 +588,108 @@ mod tests {
                 assert_eq!("", format!("Error verifying schema: {e:?}\n{data:?}"));
             }
         };
+    }
+
+    #[fuchsia::test]
+    async fn test_get_use_default_bundle() {
+        let env = ffx_config::test_init().await.expect("test env");
+        let pb_path = env.isolate_root.path().join("test_bundle");
+        fs::create_dir_all(&pb_path).expect("create test bundle dir");
+
+        env.context
+            .query("product.path")
+            .level(Some(ConfigLevel::User))
+            .set(pb_path.to_string_lossy().into())
+            .await
+            .expect("set pb path");
+
+        let virtual_device = pb_path.join("manifest.json");
+        let mut vd_file1 = File::create(&virtual_device).expect("virtual_device manifest");
+        vd_file1
+            .write_all(VIRTUAL_DEVICE_VALID.as_bytes())
+            .expect("virtual device contents written");
+
+        // write out some files so that canonicalizing does not error out.
+        let zbi_path = pb_path.join("fuchsia.zbi");
+        fs::write(&zbi_path, vec![0x20, 0x10]).expect("zbi write");
+        let fvm_path = pb_path.join("fvm.blk");
+        fs::write(&fvm_path, vec![0x20, 0x10]).expect("zbi write");
+        let fvm_fast_path = pb_path.join("fastboot_fvm.blk");
+        fs::write(&fvm_fast_path, vec![0x20, 0x10]).expect("zbi write");
+        let qemu_path = pb_path.join("qemu-boot.bin");
+        fs::write(&qemu_path, vec![0x20, 0x10]).expect("zbi write");
+        let fxfs_path = pb_path.join("fxfs.blk");
+        fs::write(&fxfs_path, vec![0x20, 0x10]).expect("zbi write");
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: Some(vec![
+                Image::ZBI {
+                    path: Utf8PathBuf::from_path_buf(zbi_path.clone()).expect("utf8 path"),
+                    signed: false,
+                },
+                Image::FVM(Utf8PathBuf::from_path_buf(fvm_path.clone()).expect("utf8 path")),
+                Image::FVMFastboot(
+                    Utf8PathBuf::from_path_buf(fvm_fast_path.clone()).expect("utf8 path"),
+                ),
+                Image::QemuKernel(
+                    Utf8PathBuf::from_path_buf(qemu_path.clone()).expect("utf8 path"),
+                ),
+                Image::Fxfs {
+                    path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
+                    contents: Default::default(),
+                },
+            ]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: Some(
+                Utf8Path::from_path(&virtual_device).expect("utf8 path").into(),
+            ),
+        });
+        pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
+            .expect("temp test product bundle");
+
+        let tool = PbGetArtifactsTool {
+            cmd: GetArtifactsCommand {
+                product_bundle: None,
+                relative_path: false,
+                artifacts_group: Type::Emu,
+            },
+            env: env.context.clone(),
+        };
+
+        let test_buffers = TestBuffers::default();
+        let writer: <PbGetArtifactsTool as FfxMain>::Writer =
+            <PbGetArtifactsTool as FfxMain>::Writer::new_test(
+                Some(Format::JsonPretty),
+                &test_buffers,
+            );
+
+        let result = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(result.is_ok(), "Expect result to be ok: {stdout} {stderr}");
+
+        let got: CommandStatus = match serde_json::from_str(&stdout) {
+            Ok(c) => c,
+            Err(e) => panic!("Error parsing result: {e} {stdout}"),
+        };
+        let want = CommandStatus::Ok {
+            paths: vec![
+                "product_bundle.json".into(),
+                zbi_path.to_string_lossy().into(),
+                fvm_path.to_string_lossy().into(),
+                qemu_path.to_string_lossy().into(),
+                fxfs_path.to_string_lossy().into(),
+                virtual_device.to_string_lossy().into(),
+                pb_path.join("device.json").to_string_lossy().into(),
+            ],
+        };
+
+        assert_eq!(got, want);
     }
 }
