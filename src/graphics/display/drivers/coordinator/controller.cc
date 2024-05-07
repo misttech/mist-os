@@ -798,8 +798,8 @@ zx_status_t Controller::CreateClient(
   }
   HandleClientOwnershipChanges();
 
-  task->set_handler([this, client_ptr](async_dispatcher_t* dispatcher, async::Task* task_ptr,
-                                       zx_status_t status) {
+  task->set_handler([this, client_id](async_dispatcher_t* dispatcher, async::Task* task_ptr,
+                                      zx_status_t status) {
     // Ensures that `task` gets deleted when the handler completes.
     std::unique_ptr<async::Task> task(task_ptr);
 
@@ -811,30 +811,38 @@ zx_status_t Controller::CreateClient(
     if (unbinding_) {
       return;
     }
-    if (client_ptr == virtcon_client_ || client_ptr == primary_client_) {
-      // Add all existing displays to the client
-      if (displays_.size() > 0) {
-        DisplayId current_displays[displays_.size()];
-        int initialized_display_count = 0;
-        for (const DisplayInfo& display : displays_) {
-          if (display.init_done) {
-            current_displays[initialized_display_count] = display.id;
-            ++initialized_display_count;
-          }
-        }
-        cpp20::span<DisplayId> removed_display_ids = {};
-        client_ptr->OnDisplaysChanged(
-            cpp20::span<DisplayId>(current_displays, initialized_display_count),
-            removed_display_ids);
-      }
 
-      if (virtcon_client_ == client_ptr) {
-        ZX_DEBUG_ASSERT(!virtcon_client_ready_);
-        virtcon_client_ready_ = true;
-      } else {
-        ZX_DEBUG_ASSERT(!primary_client_ready_);
-        primary_client_ready_ = true;
+    ClientProxy* client_proxy;
+    if (virtcon_client_ != nullptr && virtcon_client_->client_id() == client_id) {
+      client_proxy = virtcon_client_;
+    } else if (primary_client_ != nullptr && primary_client_->client_id() == client_id) {
+      client_proxy = primary_client_;
+    } else {
+      return;
+    }
+
+    // Add all existing displays to the client
+    if (displays_.size() > 0) {
+      DisplayId current_displays[displays_.size()];
+      int initialized_display_count = 0;
+      for (const DisplayInfo& display : displays_) {
+        if (display.init_done) {
+          current_displays[initialized_display_count] = display.id;
+          ++initialized_display_count;
+        }
       }
+      cpp20::span<DisplayId> removed_display_ids = {};
+      client_proxy->OnDisplaysChanged(
+          cpp20::span<DisplayId>(current_displays, initialized_display_count), removed_display_ids);
+    }
+
+    if (virtcon_client_ == client_proxy) {
+      ZX_DEBUG_ASSERT(!virtcon_client_ready_);
+      virtcon_client_ready_ = true;
+    } else {
+      ZX_DEBUG_ASSERT(primary_client_ == client_proxy);
+      ZX_DEBUG_ASSERT(!primary_client_ready_);
+      primary_client_ready_ = true;
     }
   });
 
