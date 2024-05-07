@@ -306,7 +306,7 @@ def rustc_target_to_clang_target(target: str) -> str:
     # These mappings were determined by examining the options available
     # in the clang lib dir, and verifying against traces of libraries accessed
     # by local builds.
-    if target == "aarch64-fuchsia" or (
+    if target == "aarch64-unknown-fuchsia" or (
         target.startswith("aarch64-") and target.endswith("-fuchsia")
     ):
         return "aarch64-unknown-fuchsia"
@@ -322,7 +322,7 @@ def rustc_target_to_clang_target(target: str) -> str:
         target.startswith("riscv64gc-") and target.endswith("-linux-gnu")
     ):
         return "riscv64-unknown-linux-gnu"
-    if target == "x86_64-fuchsia" or (
+    if target == "x86_64-unknown-fuchsia" or (
         target.startswith("x86_64-") and target.endswith("-fuchsia")
     ):
         return "x86_64-unknown-fuchsia"

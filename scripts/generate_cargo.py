@@ -264,7 +264,7 @@ def write_toml_file(
 
     default_target = ""
     if classify_toolchain(extract_toolchain(target)) == ToolchainType.TARGET:
-        default_target = 'default-target = "x86_64-fuchsia"'
+        default_target = 'default-target = "x86_64-unknown-fuchsia"'
 
     fout.write(
         CARGO_PACKAGE_CONTENTS

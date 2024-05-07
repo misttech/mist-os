@@ -56,7 +56,6 @@ cat <<END >$rust_prefix/lib/runtime.json
     "runtime": [],
     "rustflags": [],
     "target": [
-      "aarch64-fuchsia",
       "aarch64-unknown-fuchsia"
     ]
   },
@@ -64,7 +63,6 @@ cat <<END >$rust_prefix/lib/runtime.json
     "runtime": [],
     "rustflags": [],
     "target": [
-      "x86_64-fuchsia",
       "x86_64-unknown-fuchsia"
     ]
   },
@@ -75,7 +73,6 @@ cat <<END >$rust_prefix/lib/runtime.json
       "-Cprefer-dynamic"
     ],
     "target": [
-      "aarch64-fuchsia",
       "aarch64-unknown-fuchsia"
     ]
   },
@@ -86,7 +83,6 @@ cat <<END >$rust_prefix/lib/runtime.json
       "-Cprefer-dynamic"
     ],
     "target": [
-      "x86_64-fuchsia",
       "x86_64-unknown-fuchsia"
     ]
   }

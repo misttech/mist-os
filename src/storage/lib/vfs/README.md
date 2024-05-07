@@ -11,10 +11,10 @@ be generated with command like
 
 ```
 fx gen-cargo //src/storage/lib/vfs/rust:vfs
-cargo +nightly doc --manifest-path src/storage/lib/vfs/rust/Cargo.toml --target x86_64-fuchsia --no-deps
+cargo +nightly doc --manifest-path src/storage/lib/vfs/rust/Cargo.toml --target x86_64-unknown-fuchsia --no-deps
 ```
 
 The generated docs can be found in
-`src/storage/lib/vfs/rust/target/x86_64-fuchsia/doc`.
+`src/storage/lib/vfs/rust/target/x86_64-unknown-fuchsia/doc`.
 
 See also: `cargo doc --help`.

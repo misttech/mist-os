@@ -55,7 +55,7 @@ toolchain(
 
 rust_stdlib_filegroup(
     name = "rust_std_fuchsia_x64",
-    srcs = glob(["lib/rustlib/x86_64-fuchsia/lib/*"]),
+    srcs = glob(["lib/rustlib/x86_64-unknown-fuchsia/lib/*"]),
 )
 
 rust_toolchain(
@@ -69,7 +69,7 @@ rust_toolchain(
     dylib_ext = ".so",
     stdlib_linkflags = [],
     exec_triple = "x86_64-unknown-fuchsia",
-    target_triple = "x86_64-fuchsia",
+    target_triple = "x86_64-unknown-fuchsia",
 )
 
 toolchain(
@@ -90,7 +90,7 @@ toolchain(
 
 rust_stdlib_filegroup(
     name = "rust_std_fuchsia_arm64",
-    srcs = glob(["lib/rustlib/aarch64-fuchsia/lib/*"]),
+    srcs = glob(["lib/rustlib/aarch64-unknown-fuchsia/lib/*"]),
 )
 
 rust_toolchain(
@@ -104,7 +104,7 @@ rust_toolchain(
     dylib_ext = ".so",
     stdlib_linkflags = [],
     exec_triple = "aarch64-unknown-fuchsia",
-    target_triple = "aarch64-fuchsia",
+    target_triple = "aarch64-unknown-fuchsia",
 )
 
 toolchain(

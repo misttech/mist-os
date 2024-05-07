@@ -13,9 +13,9 @@ config("arm64") {
   asmflags = cflags
 
   # For supported target features see:
-  # rustc --target=aarch64-fuchsia --print target-features
+  # rustc --target=aarch64-unknown-fuchsia --print target-features
   # `armv8a` and `simd` features are assumed by the target triple
-  # `aarch64-fuchsia`.
+  # `aarch64-unknown-fuchsia`.
   rustflags = [ "-Ctarget-feature=+crc,+aes,+sha2" ]
 }
 

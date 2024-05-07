@@ -22,7 +22,7 @@ export GO_HOME=${HOME}/go/bin/
 export PPROF_BINARY_PATH=\
 ${FUCHSIA_DIR}/out/x64/exe.unstripped:\
 ${FUCHSIA_DIR}/out/x64/x64-shared/lib.unstripped:\
-${FUCHSIA_DIR}/prebuilt/third_party/clang/mac-x64/lib/clang/8.0.0/x86_64-fuchsia/lib:\
+${FUCHSIA_DIR}/prebuilt/third_party/clang/mac-x64/lib/clang/8.0.0/x86_64-unknown-fuchsia/lib:\
 ${FUCHSIA_DIR}/out/x64/sdk/exported/zircon_sysroot/arch/x64/sysroot/debug
 
 # Where is the tool chain? (macos version, need to adjust for Linux)
