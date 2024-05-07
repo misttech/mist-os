@@ -126,6 +126,9 @@ def fuchsia_package(
         component_run_tags = [label_name(c) for c in components],
         tools = {tool: tool for tool in tools},
         disable_repository_name = disable_repository_name,
+        # TODO(b/339099331) fuchsia_packages that are testonly shouldn't have the
+        # full set of tasks.
+        is_test = kwargs.pop("testonly", False),
         **kwargs
     )
 

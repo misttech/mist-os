@@ -56,6 +56,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     # with duplicate entries in cc_binary which will cause a failure.
     visibility = kwargs.pop("visibility", None)
     tags = kwargs.pop("tags", None)
+    testonly = kwargs.pop("testonly", None)
 
     # Ensure we are packaging the lib/libdriver_runtime.so
     deps.append(
@@ -76,6 +77,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
             "static_cpp_standard_library",
         ],
         visibility = ["//visibility:private"],
+        testonly = testonly,
         **kwargs
     )
 
@@ -89,5 +91,6 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         # We do not want libc++ and libunwind packaged since they get statically linked.
         package_clang_dist_files = False,
         visibility = visibility,
+        testonly = testonly,
         tags = tags,
     )
