@@ -2609,7 +2609,7 @@ mod tests {
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, FakeNetwork,
                 FakeNetworkContext as _, FakeNetworkLinks, FakeTimerCtxExt as _,
-                WithFakeFrameContext, WrappedFakeCoreCtx,
+                WithFakeFrameContext,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
@@ -2638,7 +2638,7 @@ mod tests {
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
-        nud: NudState<I, D, FakeBindingsCtxImpl<I>>,
+        state: NudState<I, D, FakeBindingsCtxImpl<I>>,
         counters: NudCounters<I>,
     }
 
@@ -2647,12 +2647,10 @@ mod tests {
         nud_config: NudUserConfig,
     }
 
-    type FakeCoreCtxImpl<I> = WrappedFakeCoreCtx<
-        FakeNudContext<I, FakeLinkDevice>,
-        FakeConfigContext,
-        FakeNudMessageMeta<I>,
-        FakeLinkDeviceId,
-    >;
+    struct FakeCoreCtxImpl<I: Ip> {
+        nud: FakeNudContext<I, FakeLinkDevice>,
+        inner: FakeInnerCtxImpl<I>,
+    }
 
     type FakeInnerCtxImpl<I> =
         FakeCoreCtx<FakeConfigContext, FakeNudMessageMeta<I>, FakeLinkDeviceId>;
@@ -2678,8 +2676,17 @@ mod tests {
 
     impl<I: Ip> FakeCoreCtxImpl<I> {
         fn new(bindings_ctx: &mut FakeBindingsCtxImpl<I>) -> Self {
-            Self::with_inner_and_outer_state(
-                FakeConfigContext {
+            Self {
+                nud: {
+                    FakeNudContext {
+                        state: NudState::new::<_, IntoCoreTimerCtx>(
+                            bindings_ctx,
+                            FakeWeakDeviceId(FakeLinkDeviceId),
+                        ),
+                        counters: Default::default(),
+                    }
+                },
+                inner: FakeInnerCtxImpl::with_state(FakeConfigContext {
                     retrans_timer: ONE_SECOND,
                     // Use different values from the defaults in tests so we get
                     // coverage that the config is used everywhere and not the
@@ -2689,15 +2696,8 @@ mod tests {
                         max_multicast_solicitations: NonZeroU16::new(5).unwrap(),
                         base_reachable_time: NonZeroDuration::from_secs(23).unwrap(),
                     },
-                },
-                FakeNudContext {
-                    nud: NudState::new::<_, IntoCoreTimerCtx>(
-                        bindings_ctx,
-                        FakeWeakDeviceId(FakeLinkDeviceId),
-                    ),
-                    counters: Default::default(),
-                },
-            )
+                }),
+            }
         }
     }
 
@@ -2729,8 +2729,7 @@ mod tests {
             _device_id: &Self::DeviceId,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(&mut outer.nud, inner)
+            cb(&mut self.nud.state, &mut self.inner)
         }
 
         fn with_nud_state_mut<
@@ -2744,7 +2743,7 @@ mod tests {
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.nud, &mut self.inner.state)
+            cb(&mut self.nud.state, &mut self.inner.state)
         }
 
         fn with_nud_state<
@@ -2755,7 +2754,7 @@ mod tests {
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.outer.nud)
+            cb(&self.nud.state)
         }
 
         fn send_neighbor_solicitation(
@@ -2795,7 +2794,7 @@ mod tests {
 
     impl<I: Ip> CounterContext<NudCounters<I>> for FakeCoreCtxImpl<I> {
         fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.outer.counters)
+            cb(&self.nud.counters)
         }
     }
 
@@ -2845,7 +2844,7 @@ mod tests {
         expected_link_addr: FakeLinkAddress,
     ) {
         let entry = assert_matches!(
-            core_ctx.outer.nud.neighbors.get(&lookup_addr),
+            core_ctx.nud.state.neighbors.get(&lookup_addr),
             Some(entry @ (
                 NeighborState::Dynamic(
                     DynamicNeighborState::Reachable (Reachable { link_address, last_confirmed_at: _ })
@@ -2865,7 +2864,7 @@ mod tests {
                 unreachable!("entry must be static, REACHABLE, or STALE")
             }
             NeighborState::Dynamic(DynamicNeighborState::Reachable { .. }) => {
-                core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+                core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
                     bindings_ctx,
                     [(
                         lookup_addr,
@@ -2875,13 +2874,13 @@ mod tests {
                 );
             }
             NeighborState::Dynamic(DynamicNeighborState::Delay { .. }) => {
-                core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+                core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
                     bindings_ctx,
                     [(lookup_addr, NudEvent::DelayFirstProbe, DELAY_FIRST_PROBE_TIME.get())],
                 );
             }
             NeighborState::Dynamic(DynamicNeighborState::Probe { .. }) => {
-                core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+                core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
                     bindings_ctx,
                     [(
                         lookup_addr,
@@ -2903,7 +2902,7 @@ mod tests {
                     }
                 };
                 if let Some(instant) = instant {
-                    core_ctx.outer.nud.timer_heap.neighbor.assert_timers([(
+                    core_ctx.nud.state.timer_heap.neighbor.assert_timers([(
                         lookup_addr,
                         NudEvent::RetransmitUnicastProbe,
                         instant,
@@ -3000,7 +2999,7 @@ mod tests {
             expect_event.then_some(ExpectedEvent::Added),
         );
 
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             bindings_ctx,
             [(neighbor, NudEvent::RetransmitMulticastProbe, ONE_SECOND.get())],
         );
@@ -3153,7 +3152,7 @@ mod tests {
     ) {
         init_delay_neighbor_with_ip(core_ctx, bindings_ctx, ip_address, link_address);
         let max_unicast_solicit = core_ctx.inner.max_unicast_solicit().get();
-        core_ctx.outer.nud.timer_heap.neighbor.assert_top(&ip_address, &NudEvent::DelayFirstProbe);
+        core_ctx.nud.state.timer_heap.neighbor.assert_top(&ip_address, &NudEvent::DelayFirstProbe);
         assert_eq!(
             bindings_ctx.trigger_timers_for(DELAY_FIRST_PROBE_TIME.into(), core_ctx),
             [NudTimerId::neighbor()]
@@ -3260,7 +3259,7 @@ mod tests {
                 init_unreachable_neighbor(core_ctx, bindings_ctx, LINK_ADDR1);
             }
         }
-        assert_matches!(core_ctx.outer.nud.neighbors.get(&I::LOOKUP_ADDR1),
+        assert_matches!(core_ctx.nud.state.neighbors.get(&I::LOOKUP_ADDR1),
             Some(NeighborState::Dynamic(state)) => state.clone()
         )
     }
@@ -3362,8 +3361,10 @@ mod tests {
             );
         }
 
-        let FakeNudContext { nud, counters: _ } = &core_ctx.outer;
-        assert_eq!(nud.neighbors.get(&neighbor), Some(&NeighborState::Dynamic(state)));
+        assert_eq!(
+            core_ctx.nud.state.neighbors.get(&neighbor),
+            Some(&NeighborState::Dynamic(state))
+        );
     }
 
     #[track_caller]
@@ -3851,7 +3852,7 @@ mod tests {
             DynamicNeighborState::Delay(Delay { link_address: LINK_ADDR1 }),
             Some(ExpectedEvent::Changed),
         );
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(I::LOOKUP_ADDR1, NudEvent::DelayFirstProbe, DELAY_FIRST_PROBE_TIME.get())],
         );
@@ -3894,7 +3895,7 @@ mod tests {
             }
             other => unreachable!("test only covers DELAY and PROBE, got {:?}", other),
         };
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(I::LOOKUP_ADDR1, expected_initial_event, time.get())],
         );
@@ -3908,7 +3909,7 @@ mod tests {
             DynamicNeighborState::Probe(Probe { link_address: LINK_ADDR1, transmit_counter }),
             (initial_state != InitialState::Probe).then_some(ExpectedEvent::Changed),
         );
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(
                 I::LOOKUP_ADDR1,
@@ -4062,7 +4063,7 @@ mod tests {
                 override_flag: false,
             }),
         );
-        assert_eq!(core_ctx.outer.nud.neighbors, HashMap::new());
+        assert_eq!(core_ctx.nud.state.neighbors, HashMap::new());
     }
 
     #[ip_test]
@@ -4143,7 +4144,7 @@ mod tests {
                     override_flag: false,
                 }),
             );
-            core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+            core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
                 &mut bindings_ctx,
                 [(
                     I::LOOKUP_ADDR1,
@@ -4204,7 +4205,7 @@ mod tests {
 
         delete_neighbor(&mut core_ctx, &mut bindings_ctx);
 
-        let FakeNudContext { nud: NudState { neighbors, .. }, .. } = &core_ctx.outer;
+        let neighbors = &core_ctx.nud.state.neighbors;
         assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
     }
 
@@ -4417,9 +4418,8 @@ mod tests {
         );
 
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
-        let FakeNudContext { nud, counters: _ } = &core_ctx.outer;
         assert_eq!(
-            nud.neighbors,
+            core_ctx.nud.state.neighbors,
             HashMap::from([
                 (I::LOOKUP_ADDR1, NeighborState::Static(LINK_ADDR1)),
                 (
@@ -4439,15 +4439,15 @@ mod tests {
                 ),
             ]),
         );
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(I::LOOKUP_ADDR3, NudEvent::RetransmitMulticastProbe, ONE_SECOND.get())],
         );
 
         // Flushing the table should clear all entries (dynamic and static) and timers.
         NudHandler::flush(&mut core_ctx, &mut bindings_ctx, &FakeLinkDeviceId);
-        let FakeNudContext { nud, counters: _ } = &core_ctx.outer;
-        assert!(nud.neighbors.is_empty(), "neighbor table should be empty: {:?}", nud.neighbors);
+        let neighbors = &core_ctx.nud.state.neighbors;
+        assert!(neighbors.is_empty(), "neighbor table should be empty: {:?}", neighbors);
         assert_eq!(
             bindings_ctx.take_events().into_iter().collect::<HashSet<_>>(),
             [I::LOOKUP_ADDR1, I::LOOKUP_ADDR2, I::LOOKUP_ADDR3]
@@ -4470,7 +4470,7 @@ mod tests {
         delete_neighbor(&mut core_ctx, &mut bindings_ctx);
 
         // Entry should be removed and timer cancelled.
-        let FakeNudContext { nud: NudState { neighbors, .. }, .. } = &core_ctx.outer;
+        let neighbors = &core_ctx.nud.state.neighbors;
         assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
         bindings_ctx.timers.assert_no_timers_installed();
     }
@@ -4597,7 +4597,7 @@ mod tests {
             ResolutionSuccess::StaticEntryAdded => {
                 init_static_neighbor(core_ctx, bindings_ctx, LINK_ADDR1, ExpectedEvent::Changed);
                 assert_eq!(
-                    core_ctx.outer.nud.neighbors.get(&I::LOOKUP_ADDR1),
+                    core_ctx.nud.state.neighbors.get(&I::LOOKUP_ADDR1),
                     Some(&NeighborState::Static(LINK_ADDR1))
                 );
             }
@@ -4712,7 +4712,7 @@ mod tests {
             }),
             (initial_state != InitialState::Reachable).then_some(ExpectedEvent::Changed),
         );
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, base_reachable_time)],
         );
@@ -4732,7 +4732,7 @@ mod tests {
             }),
             None,
         );
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, base_reachable_time / 2)],
         );
@@ -4754,7 +4754,7 @@ mod tests {
             None,
         );
 
-        core_ctx.outer.nud.timer_heap.neighbor.assert_timers_after(
+        core_ctx.nud.state.timer_heap.neighbor.assert_timers_after(
             &mut bindings_ctx,
             [(I::LOOKUP_ADDR1, NudEvent::ReachableTime, base_reachable_time / 2)],
         );
@@ -4815,7 +4815,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!(core_ctx.outer.nud.neighbors.len(), MAX_ENTRIES * 2);
+        assert_eq!(core_ctx.nud.state.neighbors.len(), MAX_ENTRIES * 2);
 
         // Perform GC, and ensure that only the dynamic entries are discarded.
         collect_garbage(&mut core_ctx, &mut bindings_ctx, FakeLinkDeviceId);
@@ -4831,8 +4831,8 @@ mod tests {
                 assert_eq!(at, bindings_ctx.now());
             });
         }
-        assert_eq!(core_ctx.outer.nud.neighbors.len(), MAX_ENTRIES);
-        for (_, neighbor) in core_ctx.outer.nud.neighbors {
+        assert_eq!(core_ctx.nud.state.neighbors.len(), MAX_ENTRIES);
+        for (_, neighbor) in core_ctx.nud.state.neighbors {
             assert_matches!(neighbor, NeighborState::Static(_));
         }
     }
@@ -4882,7 +4882,7 @@ mod tests {
     fn garbage_collection_triggered_on_new_stale_entry<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
-        core_ctx.outer.nud.last_gc = Some(bindings_ctx.now());
+        core_ctx.nud.state.last_gc = Some(bindings_ctx.now());
 
         // Fill the neighbor table to maximum capacity with static entries.
         for i in 0..MAX_ENTRIES {
@@ -4927,7 +4927,7 @@ mod tests {
     fn garbage_collection_triggered_on_transition_to_unreachable<I: Ip + TestIpExt>() {
         let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
-        core_ctx.outer.nud.last_gc = Some(bindings_ctx.now());
+        core_ctx.nud.state.last_gc = Some(bindings_ctx.now());
 
         // Fill the neighbor table to maximum capacity.
         for i in 0..MAX_ENTRIES {
@@ -4939,7 +4939,7 @@ mod tests {
                 ExpectedEvent::Added,
             );
         }
-        assert_eq!(core_ctx.outer.nud.neighbors.len(), MAX_ENTRIES);
+        assert_eq!(core_ctx.nud.state.neighbors.len(), MAX_ENTRIES);
 
         // Add a dynamic neighbor entry to the table and transition it to the
         // UNREACHABLE state. This should trigger a GC run.
@@ -4950,7 +4950,7 @@ mod tests {
             LINK_ADDR1,
         );
         let expected_gc_time =
-            core_ctx.outer.nud.last_gc.unwrap() + MIN_GARBAGE_COLLECTION_INTERVAL.get();
+            core_ctx.nud.state.last_gc.unwrap() + MIN_GARBAGE_COLLECTION_INTERVAL.get();
         bindings_ctx
             .timers
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
@@ -4982,7 +4982,7 @@ mod tests {
                 ExpectedEvent::Added,
             );
         }
-        assert_eq!(core_ctx.outer.nud.neighbors.len(), MAX_ENTRIES);
+        assert_eq!(core_ctx.nud.state.neighbors.len(), MAX_ENTRIES);
 
         let _: VecDeque<Buf<Vec<u8>>> = init_incomplete_neighbor_with_ip(
             &mut core_ctx,
@@ -4991,7 +4991,7 @@ mod tests {
             true,
         );
         assert_eq!(
-            bindings_ctx.timers.scheduled_instant(&mut core_ctx.outer.nud.timer_heap.gc),
+            bindings_ctx.timers.scheduled_instant(&mut core_ctx.nud.state.timer_heap.gc),
             None
         );
     }
