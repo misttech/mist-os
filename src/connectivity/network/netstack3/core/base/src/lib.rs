@@ -23,7 +23,7 @@ mod rng;
 mod time;
 mod trace;
 
-pub use context::{ContextPair, ContextProvider, CtxPair, NonTestCtxMarker};
+pub use context::{ContextPair, ContextProvider, CtxPair};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};

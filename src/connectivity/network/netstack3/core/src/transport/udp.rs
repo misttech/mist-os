@@ -35,8 +35,7 @@ use tracing::{debug, trace};
 use crate::{
     algorithm::{self, PortAllocImpl, ProtocolFlowId},
     context::{
-        ContextPair, CounterContext, InstantContext, NonTestCtxMarker, ReferenceNotifiers,
-        RngContext, TracingContext,
+        ContextPair, CounterContext, InstantContext, ReferenceNotifiers, RngContext, TracingContext,
     },
     convert::BidirectionalConverter,
     counters::Counter,
@@ -1539,12 +1538,19 @@ fn try_dual_stack_deliver<
     }
 }
 
+/// Enables a blanket implementation of [`IpTransportContext`] for
+/// [`UdpIpTransportContext`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `IpTransportContext` given the other requirements are met.
+pub trait UseUdpIpTransportContextBlanket {}
+
 impl<
         I: IpExt,
         BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
         CC: StateContext<I, BC>
             + StateContext<I::OtherVersion, BC>
-            + NonTestCtxMarker
+            + UseUdpIpTransportContextBlanket
             + CounterContext<UdpCounters<I>>,
     > IpTransportContext<I, BC, CC> for UdpIpTransportContext
 {

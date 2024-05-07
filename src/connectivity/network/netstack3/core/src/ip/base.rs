@@ -42,7 +42,7 @@ use tracing::{debug, error, trace};
 use crate::{
     context::{
         CoreTimerContext, CounterContext, EventContext, HandleableTimer, InstantContext,
-        NestedIntoCoreTimerCtx, NonTestCtxMarker, TimerContext, TimerHandler, TracingContext,
+        NestedIntoCoreTimerCtx, TimerContext, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -386,11 +386,20 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevic
 // it. For the time being, however, we only support protocol numbers that we
 // actually use (TCP and UDP).
 
+/// Enables a blanket implementation of [`TransportIpContext`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `TransportIpContext` given the other requirements are met.
+pub trait UseTransportIpContextBlanket {}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
         I: IpExt,
         BC,
-        CC: IpDeviceContext<I, BC> + IpSocketHandler<I, BC> + IpStateContext<I, BC> + NonTestCtxMarker,
+        CC: IpDeviceContext<I, BC>
+            + IpSocketHandler<I, BC>
+            + IpStateContext<I, BC>
+            + UseTransportIpContextBlanket,
     > TransportIpContext<I, BC> for CC
 {
     type DevicesWithAddrIter<'s> = <Vec<CC::DeviceId> as IntoIterator>::IntoIter where CC: 's;
@@ -949,6 +958,12 @@ pub(crate) fn resolve_route_to_destination<
     }
 }
 
+/// Enables a blanket implementation of [`IpSocketContext`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `IpSocketContext` given the other requirements are met.
+pub trait UseIpSocketContextBlanket {}
+
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
         BC: IpDeviceBindingsContext<I, CC::DeviceId>
@@ -957,7 +972,7 @@ impl<
         CC: IpLayerContext<I, BC>
             + IpLayerEgressContext<I, BC>
             + device::IpDeviceConfigurationContext<I, BC>
-            + NonTestCtxMarker,
+            + UseIpSocketContextBlanket,
     > IpSocketContext<I, BC> for CC
 {
     fn lookup_route(

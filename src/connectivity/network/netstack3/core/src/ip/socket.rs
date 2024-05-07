@@ -16,7 +16,7 @@ use packet::{BufferMut, SerializeError};
 use thiserror::Error;
 
 use crate::{
-    context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
+    context::{CounterContext, InstantContext, TracingContext},
     device::{self, AnyDevice, DeviceIdContext, WeakId as _},
     filter::{
         FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
@@ -381,11 +381,17 @@ where
         S::Buffer: BufferMut;
 }
 
+/// Enables a blanket implementation of [`IpSocketHandler`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `IpSocketHandler` given the other requirements are met.
+pub trait UseIpSocketHandlerBlanket {}
+
 impl<I, BC, CC> IpSocketHandler<I, BC> for CC
 where
     I: IpLayerIpExt + IpDeviceStateIpExt,
     BC: IpSocketBindingsContext,
-    CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>> + NonTestCtxMarker,
+    CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>> + UseIpSocketHandlerBlanket,
     CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
     fn new_ip_socket(
@@ -561,11 +567,17 @@ where
     .map_err(|s| (s, IpSockSendError::Mtu))
 }
 
-impl<
-        I: IpLayerIpExt + IpDeviceStateIpExt,
-        BC: IpSocketBindingsContext,
-        CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + NonTestCtxMarker,
-    > DeviceIpSocketHandler<I, BC> for CC
+/// Enables a blanket implementation of [`DeviceIpSocketHandler`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `DeviceIpSocketHandler` given the other requirements are met.
+pub trait UseDeviceIpSocketHandlerBlanket {}
+
+impl<I, BC, CC> DeviceIpSocketHandler<I, BC> for CC
+where
+    I: IpLayerIpExt + IpDeviceStateIpExt,
+    BC: IpSocketBindingsContext,
+    CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
 {
     fn get_mms(
         &mut self,

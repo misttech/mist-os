@@ -45,12 +45,29 @@ use crate::{
 pub use netstack3_base::{
     ContextPair, ContextProvider, CoreEventContext, CoreTimerContext, CounterContext, CtxPair,
     DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
-    InstantContext, NestedIntoCoreTimerCtx, NonTestCtxMarker, ReceivableFrameMeta,
-    RecvFrameContext, ReferenceNotifiers, ResourceCounterContext, RngContext, SendFrameContext,
-    SendableFrameMeta, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    InstantContext, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext,
+    ReferenceNotifiers, ResourceCounterContext, RngContext, SendFrameContext, SendableFrameMeta,
+    TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
 };
 
-impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
+// Enable all blanket implementations on CoreCtx.
+//
+// Some blanket implementations are enabled individually to sidestep coherence
+// issues with the fake context implementations in tests. We treat each of them
+// individually so it's easier to split things into separate crates and avoids
+// playing whack-a-mole with single markers that work for some traits/crates but
+// not others.
+impl<BC: BindingsContext, L> crate::ip::base::UseTransportIpContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> crate::ip::base::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> crate::ip::socket::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> crate::ip::socket::UseDeviceIpSocketHandlerBlanket
+    for CoreCtx<'_, BC, L>
+{
+}
+impl<BC: BindingsContext, L> crate::transport::udp::UseUdpIpTransportContextBlanket
+    for CoreCtx<'_, BC, L>
+{
+}
 
 /// Provides access to core context implementations.
 ///
