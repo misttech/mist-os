@@ -1575,15 +1575,26 @@ mod tests {
         (),
     >;
 
-    type FakeCoreCtx = crate::context::testutil::WrappedFakeCoreCtx<
-        ArpState<EthernetLinkDevice, FakeBindingsCtx>,
-        FakeEthernetCtx,
-        FakeDeviceId,
-        FakeDeviceId,
-    >;
-
     type FakeInnerCtx =
         crate::context::testutil::FakeCoreCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
+
+    struct FakeCoreCtx {
+        arp_state: ArpState<EthernetLinkDevice, FakeBindingsCtx>,
+        inner: FakeInnerCtx,
+    }
+
+    fn new_context() -> crate::testutil::ContextPair<FakeCoreCtx, FakeBindingsCtx> {
+        crate::testutil::ContextPair::with_default_bindings_ctx(|bindings_ctx| FakeCoreCtx {
+            arp_state: ArpState::new::<_, IntoCoreTimerCtx>(
+                bindings_ctx,
+                FakeWeakDeviceId(FakeDeviceId),
+            ),
+            inner: FakeInnerCtx::with_state(FakeEthernetCtx::new(
+                FAKE_CONFIG_V4.local_mac,
+                IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            )),
+        })
+    }
 
     impl DeviceSocketHandler<EthernetLinkDevice, FakeBindingsCtx> for FakeCoreCtx {
         fn handle_frame(
@@ -1774,8 +1785,8 @@ mod tests {
             device_id: &Self::DeviceId,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(outer, &mut CoreCtxWithDeviceId { core_ctx: inner, device_id })
+            let Self { arp_state, inner } = self;
+            cb(arp_state, &mut CoreCtxWithDeviceId { core_ctx: inner, device_id })
         }
 
         fn get_protocol_addr(
@@ -1805,8 +1816,8 @@ mod tests {
             device_id: &Self::DeviceId,
             cb: F,
         ) -> O {
-            let Self { outer, inner } = self;
-            cb(outer, &mut CoreCtxWithDeviceId { core_ctx: inner, device_id })
+            let Self { arp_state, inner } = self;
+            cb(arp_state, &mut CoreCtxWithDeviceId { core_ctx: inner, device_id })
         }
 
         fn with_arp_state<O, F: FnOnce(&ArpState<EthernetLinkDevice, FakeBindingsCtx>) -> O>(
@@ -1814,8 +1825,7 @@ mod tests {
             FakeDeviceId: &Self::DeviceId,
             cb: F,
         ) -> O {
-            let Self { outer, inner: _ } = self;
-            cb(outer)
+            cb(&mut self.arp_state)
         }
     }
 
@@ -1974,20 +1984,7 @@ mod tests {
         // and that we don't send an Ethernet frame whose size is greater than
         // the MTU.
         fn test(size: usize, expect_frames_sent: bool) {
-            let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_default_bindings_ctx(
-                |bindings_ctx| {
-                    FakeCoreCtx::with_inner_and_outer_state(
-                        FakeEthernetCtx::new(
-                            FAKE_CONFIG_V4.local_mac,
-                            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                        ),
-                        ArpState::new::<_, IntoCoreTimerCtx>(
-                            bindings_ctx,
-                            FakeWeakDeviceId(FakeDeviceId),
-                        ),
-                    )
-                },
-            );
+            let mut ctx = new_context();
             NeighborApi::<Ipv4, EthernetLinkDevice, _>::new(ctx.as_mut())
                 .insert_static_entry(
                     &FakeDeviceId,
@@ -2021,17 +2018,7 @@ mod tests {
 
     #[test]
     fn broadcast() {
-        let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_default_bindings_ctx(
-            |bindings_ctx| {
-                FakeCoreCtx::with_inner_and_outer_state(
-                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
-                    ArpState::new::<_, IntoCoreTimerCtx>(
-                        bindings_ctx,
-                        FakeWeakDeviceId(FakeDeviceId),
-                    ),
-                )
-            },
-        );
+        let mut ctx = new_context();
         let crate::testutil::ContextPair { core_ctx, bindings_ctx } = &mut ctx;
         send_ip_frame(
             core_ctx,
