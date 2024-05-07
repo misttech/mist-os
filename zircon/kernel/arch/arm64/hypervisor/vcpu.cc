@@ -211,23 +211,27 @@ zx::result<ktl::unique_ptr<Vcpu>> Vcpu::Create(Guest& guest, zx_vaddr_t entry) {
 Vcpu::Vcpu(Guest& guest, uint16_t vpid, Thread* thread)
     : guest_(guest), vpid_(vpid), last_cpu_(thread->LastCpu()), thread_(thread) {
   thread->set_vcpu(true);
-  // We have to disable thread safety analysis because it's not smart enough to
-  // realize that SetMigrateFn will always be called with the ThreadLock.
-  thread->SetMigrateFn([this](Thread* thread, auto stage)
-                           TA_NO_THREAD_SAFETY_ANALYSIS { MigrateCpu(thread, stage); });
+  thread->SetMigrateFn([this](Thread* thread, auto stage) {
+    ChainLockTransaction::AssertActive();
+    thread->get_lock().AssertHeld();
+    Migrate(thread, stage);
+  });
 }
 
 Vcpu::~Vcpu() {
   {
-    // Taking the ThreadLock guarantees that thread_ isn't going to be freed
-    // while we access it.
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    Thread* thread = thread_.load();
-    if (thread != nullptr) {
-      thread->set_vcpu(false);
+    // Taking the Thread list lock guarantees that our thread cannot be in the
+    // Exiting stage of our migration function as Thread::Exit holds the list
+    // lock during the migration callback.  `thread_` is only ever mutated
+    // during this callback as the thread exits, so we are guaranteed to see
+    // either our thread, or nullptr if the thread has already exited.
+    Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
+    if (thread_ != nullptr) {
+      UnconditionalChainLockGuard thread_guard{thread_->get_lock()};
+      thread_->set_vcpu(false);
       // Clear the migration function, so that |thread_| does not reference
       // |this| after destruction of the VCPU.
-      thread->SetMigrateFnLocked(nullptr);
+      thread_->SetMigrateFnLocked(nullptr);
     }
   }
 
@@ -235,7 +239,14 @@ Vcpu::~Vcpu() {
   ZX_ASSERT(result.is_ok());
 }
 
-void Vcpu::MigrateCpu(Thread* thread, Thread::MigrateStage stage) {
+void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
+  // The thread being passed to us must be _our_ thread, and its lock must
+  // currently be held (a requirement for calling a Migration function).  Assert
+  // this to make the lock analysis happy.
+  DEBUG_ASSERT(ThreadIsOurThread(thread));
+  [this]() TA_NO_THREAD_SAFETY_ANALYSIS TA_RET_CAP(
+      thread_->get_lock()) -> auto& { return thread_->get_lock(); }().AssertHeld();
+
   switch (stage) {
     case Thread::MigrateStage::Before:
       last_cpu_ = INVALID_CPU;
@@ -247,14 +258,35 @@ void Vcpu::MigrateCpu(Thread* thread, Thread::MigrateStage stage) {
       break;
     case Thread::MigrateStage::Exiting:
       // The |thread_| is exiting and so we must clear our reference to it.
-      thread_.store(nullptr);
+      Thread::get_list_lock().lock().AssertHeld();
+      ktl::atomic_ref{thread_}.store(nullptr, ktl::memory_order_relaxed);
       break;
+  }
+}
+
+void Vcpu::InterruptCpu() {
+  // Enter the global thread list lock, allowing us to see if our thread still exists.
+  Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
+  if (thread_ != nullptr) {
+    // If our thread is still around, grab its lock to prevent our last_cpu_
+    // bookkeeping from changing.
+    //
+    // TODO(johngro): Do we need any of this?  Can we just use the Thread's
+    // last_cpu member instead?
+    SingletonChainLockGuardNoIrqSave thread_guard{thread_->get_lock(),
+                                                  CLT_TAG("Vcpu::InterruptCpu")};
+
+    // If the VCPU thread is still running, and we have a valid last_cpu_, send
+    // the thread's CPU an IPI.
+    if (thread_->state() == THREAD_RUNNING && last_cpu_ != INVALID_CPU) {
+      mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(last_cpu_));
+    }
   }
 }
 
 zx::result<> Vcpu::Enter(zx_port_packet_t& packet) {
   Thread* current_thread = Thread::Current::Get();
-  if (current_thread != thread_) {
+  if (!ThreadIsOurThread(current_thread)) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -319,34 +351,18 @@ void Vcpu::Kick() {
   kicked_.store(true);
   // Cancel any pending or upcoming wait-for-interrupts.
   gich_state_.Cancel();
-  // Check if the VCPU is running and whether to send an IPI. We hold the thread
-  // lock to guard against thread migration between CPUs during the check.
-  //
-  // NOTE: `last_cpu_` may be currently set to `INVALID_CPU` due to thread
-  // migration between CPUs.
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  auto t = thread_.load();
-  if (t != nullptr && t->state() == THREAD_RUNNING && last_cpu_ != INVALID_CPU) {
-    mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(last_cpu_));
-  }
+  // Send an IPI to our thread's CPU, if it is currently running.
+  InterruptCpu();
 }
 
 void Vcpu::Interrupt(uint32_t vector) {
   gich_state_.Interrupt(vector);
-  // Check if the VCPU is running and whether to send an IPI. We hold the thread
-  // lock to guard against thread migration between CPUs during the check.
-  //
-  // NOTE: `last_cpu_` may be currently set to `INVALID_CPU` due to thread
-  // migration between CPUs.
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  auto t = thread_.load();
-  if (t != nullptr && t->state() == THREAD_RUNNING && last_cpu_ != INVALID_CPU) {
-    mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(last_cpu_));
-  }
+  // Send an IPI to our thread's CPU, if it is currently running.
+  InterruptCpu();
 }
 
 zx::result<> Vcpu::ReadState(zx_vcpu_state_t& state) const {
-  if (Thread::Current::Get() != thread_) {
+  if (!ThreadIsOurThread(Thread::Current::Get())) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -358,7 +374,7 @@ zx::result<> Vcpu::ReadState(zx_vcpu_state_t& state) const {
 }
 
 zx::result<> Vcpu::WriteState(const zx_vcpu_state_t& state) {
-  if (Thread::Current::Get() != thread_) {
+  if (!ThreadIsOurThread(Thread::Current::Get())) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 

@@ -53,15 +53,20 @@ class TA_CAP("mutex") Mutex
   static constexpr zx_duration_t DEFAULT_TIMESLICE_EXTENSION = SPIN_MAX_DURATION;
 
   // Acquire the mutex.
-  inline void Acquire(zx_duration_t spin_max_duration = SPIN_MAX_DURATION) TA_ACQ()
-      TA_EXCL(thread_lock);
+  inline void Acquire(zx_duration_t spin_max_duration = SPIN_MAX_DURATION) TA_ACQ();
 
   // Release the mutex. Must be held by the current thread.
-  void Release() TA_REL() TA_EXCL(thread_lock);
-
-  // Special version of Release which operates with the thread lock held. Must
-  // be called with preemption disabled.
-  void ReleaseThreadLocked() TA_REL() TA_REQ(thread_lock);
+  //
+  // Note: that this simply thunks directly to ReleaseInternal, which does not
+  // have any annotations. Methods of capability objects (see TA_CAP, above)
+  // which are annotated with TA_ACQ/TA_REL effectively have static thread
+  // analysis disabled for them.  It is assumed that they will "do whatever it
+  // takes" to either acquire or release the capability.  By thunking to a
+  // non-annotated method, we can guarantee that the implementation of the
+  // release operation *is* subject to static analysis, helping to guarantee
+  // that we are holding (or not holding) all of the proper capabilities when
+  // interacting with things like threads, wait queues, and the scheduler.
+  void Release() TA_REL() { ReleaseInternal(); }
 
   // does the current thread hold the mutex?
   bool IsHeld() const { return (holder() == Thread::Current::Get()); }
@@ -71,6 +76,9 @@ class TA_CAP("mutex") Mutex
   // Can be used when thread safety analysis can't prove you are holding
   // a lock. The asserts may be optimized away in release builds.
   void AssertHeld() const TA_ASSERT() { DEBUG_ASSERT(IsHeld()); }
+
+  // <jedi_mindtrick>This is not the method you are looking for.</jedi_mindtrick>
+  void MarkReleased() const TA_REL() {}
 
   // Is the mutex contested i.e. is at least one thread blocked waiting on it?
   //
@@ -91,10 +99,13 @@ class TA_CAP("mutex") Mutex
   // set.  Otherwise, return false.
   template <bool TimesliceExtensionEnabled>
   bool AcquireCommon(zx_duration_t spin_max_duration,
-                     TimesliceExtension<TimesliceExtensionEnabled> timeslice_extension) TA_ACQ()
-      TA_EXCL(thread_lock);
+                     TimesliceExtension<TimesliceExtensionEnabled> timeslice_extension);
 
  private:
+  // The actual implementation of the Release operation.  See above for why this
+  // is separate from |Release()|.
+  void ReleaseInternal();
+
   // Attempts to release the mutex. Returns STATE_FREE if the mutex was
   // uncontested and released, otherwise returns the contested state of the
   // mutex.
@@ -114,7 +125,7 @@ class TA_CAP("mutex") Mutex
   template <bool TimesliceExtensionEnabled>
   bool AcquireContendedMutex(zx_duration_t spin_max_duration, Thread* current_thread,
                              TimesliceExtension<TimesliceExtensionEnabled> timeslic_extension)
-      TA_ACQ() TA_EXCL(thread_lock);
+      TA_EXCL(chainlock_transaction_token);
 
   // Release a lock contended by another thread.
   //
@@ -124,7 +135,7 @@ class TA_CAP("mutex") Mutex
   // This function is deliberately moved out of line from |Release| to keep the
   // stack set up, tear down in the |Release| fastpath small.
   void ReleaseContendedMutex(Thread* current_thread, uintptr_t old_mutex_state)
-      TA_REQ(thread_lock, preempt_disabled_token);
+      TA_EXCL(chainlock_transaction_token);
 
   void RecordInitialAssignedCpu() {
     maybe_acquired_on_cpu_.store(arch_curr_cpu_num(), ktl::memory_order_relaxed);
@@ -155,6 +166,31 @@ class TA_CAP("mutex") Mutex
   ktl::atomic<cpu_num_t> maybe_acquired_on_cpu_{INVALID_CPU};
   ktl::atomic<uintptr_t> val_{STATE_FREE};
   OwnedWaitQueue wait_;
+
+  // Mutations of the contested flag require holding the contested flag lock
+  // (previously protected by the thread lock).
+  //
+  // TODO(johngro): Look into eliminating this lock.  We should be able to use
+  // the OWQ's lock to serve the same purpose, but to use it effectively, we
+  // would need to make the OWQ locking helpers a bit more flexible.
+  // Specifically, we would want to be able to:
+  //
+  // AcquireContested
+  // 1) Lock OWQ itself
+  // 2) Check the contested flag to see if the lock has been released
+  // 3) Grab the lock and bail early if it has been.
+  // 4) Proceed to acquire the rest of the locks needed to block in the queue,
+  //    restarting the operation if needed.
+  //
+  // ReleaseContested
+  // 1) Obtain all of the locks needed to wake and assign owner, but don't
+  //    actually perform the operation yet.
+  // 2) Now that we know who the owner is going to be, and whether or not there
+  //    are going to be any waiters in the queue when we are finished, update the
+  //    state flag.
+  // 3) Wake the thread, finishing the operation and dropping the locks in the
+  //    process.
+  DECLARE_SPINLOCK(Mutex) contested_flag_lock_;
 };
 
 // TimeslicExtension specializations for Mutex::Acquire and
@@ -169,7 +205,7 @@ struct Mutex::TimesliceExtension<true> {
   zx_duration_t value;
 };
 
-inline void Mutex::Acquire(zx_duration_t spin_max_duration) TA_ACQ() TA_EXCL(thread_lock) {
+inline void Mutex::Acquire(zx_duration_t spin_max_duration) TA_ACQ() {
   AcquireCommon(spin_max_duration, TimesliceExtension<false>{});
 }
 
@@ -211,8 +247,7 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
   CriticalMutex& operator=(CriticalMutex&&) = delete;
 
   // Acquire the mutex.
-  void Acquire(zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION) TA_ACQ()
-      TA_EXCL(thread_lock) {
+  void Acquire(zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION) TA_ACQ() {
     // TODO(maniscalco): What's the right duration here?  Is it a function of
     // spin_max_duration?
     const TimesliceExtension<true> timeslice_extension{spin_max_duration};
@@ -220,27 +255,13 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
   }
 
   // Release the mutex. Must be held by the current thread.
-  void Release() TA_REL() TA_EXCL(thread_lock) {
+  void Release() TA_REL() {
     // Make a copy because once we have released the mutex we can no longer
     // access should_clear_.
     const bool should_clear_copy = should_clear_;
     should_clear_ = false;
 
     Mutex::Release();
-
-    if (should_clear_copy) {
-      Thread::Current::preemption_state().ClearTimesliceExtension();
-    }
-  }
-
-  // See |Mutex::ReleaseThreadLocked|.
-  void ReleaseThreadLocked() TA_REL() TA_REQ(thread_lock) {
-    // Make a copy because once we have released the mutex we can no longer
-    // access should_clear_.
-    const bool should_clear_copy = should_clear_;
-    should_clear_ = false;
-
-    Mutex::ReleaseThreadLocked();
 
     if (should_clear_copy) {
       Thread::Current::preemption_state().ClearTimesliceExtension();
@@ -284,13 +305,13 @@ struct MutexPolicy {
 
   // Basic acquire and release operations.
   template <typename LockType>
-  static bool Acquire(LockType* lock, State* state) TA_ACQ(lock) TA_EXCL(thread_lock) {
+  static bool Acquire(LockType* lock, State* state) TA_ACQ(lock) {
     lock->Acquire(state->spin_max_duration);
     return true;
   }
 
   template <typename LockType>
-  static void Release(LockType* lock, State*) TA_REL(lock) TA_EXCL(thread_lock) {
+  static void Release(LockType* lock, State*) TA_REL(lock) {
     lock->Release();
   }
 
@@ -298,21 +319,6 @@ struct MutexPolicy {
   template <typename LockType>
   static void AssertHeld(const LockType& lock) TA_ASSERT(lock) {
     lock.AssertHeld();
-  }
-
-  // A enum tag that can be passed to Guard<Mutex>::Release(...) to
-  // select the special-case release method below.
-  enum SelectThreadLockHeld { ThreadLockHeld };
-
-  // Releases the lock using the special mutex release operation. This
-  // is selected by calling:
-  //
-  //  Guard<TrivialMutex|Mutex|Mutex>::Release(ThreadLockHeld)
-  //
-  template <typename LockType>
-  static void Release(LockType* lock, State*, SelectThreadLockHeld) TA_REL(lock)
-      TA_REQ(thread_lock) {
-    lock->ReleaseThreadLocked();
   }
 };
 

@@ -299,7 +299,6 @@ if (is_kernel) {
       "LK_DEBUGLEVEL=$kernel_debug_level",
       "DEBUG_PRINT_LEVEL=$kernel_debug_print_level",
       "VM_TRACING_LEVEL=$vm_tracing_level",
-      "FUTEX_TRACING_ENABLED=$futex_tracing_enabled",
       "FUTEX_BLOCK_TRACING_ENABLED=$futex_block_tracing_enabled",
       "LOCK_TRACING_ENABLED=$lock_tracing_enabled",
       "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",

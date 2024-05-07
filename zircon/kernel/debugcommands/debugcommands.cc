@@ -24,7 +24,6 @@
 #include <arch/ops.h>
 #include <kernel/lockdep.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <ktl/array.h>
 #include <ktl/unique_ptr.h>
 #include <platform/debug.h>
@@ -50,7 +49,6 @@ static int cmd_crash_user_read(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_user_execute(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_pmm_use_after_free(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_assert(int argc, const cmd_args* argv, uint32_t flags);
-static int cmd_crash_thread_lock(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t flags);
@@ -79,8 +77,6 @@ STATIC_COMMAND("crash_user_execute", "intentionally execute user memory", &cmd_c
 STATIC_COMMAND("crash_pmm_use_after_free", "intentionally corrupt the pmm free list",
                &cmd_crash_pmm_use_after_free)
 STATIC_COMMAND("crash_assert", "intentionally crash by failing an assert", &cmd_crash_assert)
-STATIC_COMMAND("crash_thread_lock", "intentionally crash while holding the thread lock",
-               &cmd_crash_thread_lock)
 STATIC_COMMAND("crash_stack_guard", "attempt to crash by overwriting the stack guard",
                &cmd_crash_stack_guard)
 STATIC_COMMAND("crash_illegal_instruction", "attempt to crash by running an illegal instruction",
@@ -577,14 +573,6 @@ static int cmd_crash_pmm_use_after_free(int argc, const cmd_args* argv, uint32_t
 static int cmd_crash_assert(int argc, const cmd_args* argv, uint32_t flags) {
   constexpr int kValue = 42;
   ASSERT_MSG(kValue == 0, "value %d\n", kValue);
-  return -1;
-}
-
-static int cmd_crash_thread_lock(int argc, const cmd_args* argv, uint32_t flags) {
-  {
-    Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-    panic("intentionally panicking while holding thread lock\n");
-  }
   return -1;
 }
 

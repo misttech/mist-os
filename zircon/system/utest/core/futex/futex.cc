@@ -36,6 +36,7 @@ constexpr zx::duration kDefaultTimeout = zx::sec(30);
 constexpr zx::duration kDefaultPollInterval = zx::usec(100);
 
 constexpr uint32_t kThreadWakeAllCount = std::numeric_limits<uint32_t>::max();
+constexpr uint32_t kThreadRequeueAllCount = std::numeric_limits<uint32_t>::max();
 constexpr char kThreadName[] = "wakeup-test-thread";
 
 // Poll until the user provided Callable |should_stop| tells us to stop by
@@ -655,6 +656,40 @@ TEST(FutexTest, WaitExitRace) {
     zx_futex_wait(v, 0, new_futex_owner, deadline);
     t2.join();
   }
+}
+
+// A helper for WakeWithWakeCountZero and RequeueWithWakeCountZero tests.
+//
+// Block a thread on a futex to ensure there's an active futex for the requeue
+// to interact with.  Cleans up in its destructor.
+struct WakeCountZeroHelper {
+  zx_futex_t futex{};
+  zx_futex_t other_futex{};
+  std::thread waiter;
+
+  WakeCountZeroHelper() {
+    waiter = std::thread([&]() { zx_futex_wait(&futex, 0, ZX_HANDLE_INVALID, ZX_TIME_INFINITE); });
+    ASSERT_NO_FATAL_FAILURE(WaitUntilThreadBlockedOnFutex(waiter.native_handle()));
+  }
+  ~WakeCountZeroHelper() {
+    zx_futex_wake(&futex, kThreadWakeAllCount);
+    zx_futex_wake(&other_futex, kThreadWakeAllCount);
+    waiter.join();
+  }
+};
+
+// See that it's valid to requeue an active futex with a wake count of zero.
+TEST(FutexTest, WakeWithWakeCountZero) {
+  WakeCountZeroHelper helper;
+  // Now that we've got an active futex, wake zero and see that we don't crash.
+  ASSERT_OK(zx_futex_wake(&helper.futex, 0));
+}
+
+TEST(FutexTest, RequeueWithWakeCountZero) {
+  WakeCountZeroHelper helper;
+  // Now that we've got an active futex, wake zero and see that we don't crash.
+  ASSERT_OK(zx_futex_requeue(&helper.futex, 0, 0, &helper.other_futex, kThreadRequeueAllCount,
+                             ZX_HANDLE_INVALID));
 }
 
 }  // namespace

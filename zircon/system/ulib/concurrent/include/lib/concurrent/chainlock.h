@@ -101,16 +101,9 @@ class __TA_CAPABILITY("mutex") ChainLock {
 
   constexpr ChainLock() = default;
   ~ChainLock() {
-    // TODO(https://fxbug.dev/323004014): Once the public versions of the
-    // ZX_DEBUG_ASSERT macros support local variable declarations inside of `if`
-    // statements, move the declaration of the `lock_token`'s atomic load inside
-    // of the ASSERT.  This will allow us to remove the top level preprocessor
-    // `#if`, and still skip the atomic load of the variable in a release build.
-#if ZX_DEBUG_ASSERT_IMPLEMENTED
-    const Token lock_token = state_.load(std::memory_order_relaxed);
-    ZX_DEBUG_ASSERT_MSG(lock_token == kUnlockedToken,
+    ZX_DEBUG_ASSERT_MSG(const Token lock_token = state_.load(std::memory_order_relaxed);
+                        lock_token == kUnlockedToken,
                         "Destroying locked ChainLock (lock token 0x%lx).", lock_token.value());
-#endif
   }
 
   // No copy, no move
@@ -129,7 +122,7 @@ class __TA_CAPABILITY("mutex") ChainLock {
     // The token the user is passing cannot be invalid.
     ZX_DEBUG_ASSERT_MSG(token.is_valid(), "Attempting to Acquire using an invalid token.");
     // Run any OS/environment specific checks before acquiring.
-    return AcquireInternal(token);
+    return AcquireInternal(token).result;
   }
 
   // Unconditionally acquire the lock.  Do not stop trying, even in the presence
@@ -142,7 +135,7 @@ class __TA_CAPABILITY("mutex") ChainLock {
                         "Attempting to AcquireUnconditionally using an invalid token.");
 
     while (true) {
-      if (const LockResult result = AcquireInternal(token); result == LockResult::kOk) {
+      if (const LockResult result = AcquireInternal(token).result; result == LockResult::kOk) {
         return;
       } else {
         ZX_DEBUG_ASSERT_MSG(result != LockResult::kCycleDetected,
@@ -222,17 +215,10 @@ class __TA_CAPABILITY("mutex") ChainLock {
   // }
   // ```
   void AssertHeld(const Token token) const __TA_ASSERT() {
-    // TODO(https://fxbug.dev/323004014): Once the public versions of the
-    // ZX_DEBUG_ASSERT macros support local variable declarations inside of `if`
-    // statements, move the declaration of the `lock_token`'s atomic load inside
-    // of the ASSERT.  This will allow us to remove the top level preprocessor
-    // `#if`, and still skip the atomic load of the variable in a release build.
-#if ZX_DEBUG_ASSERT_IMPLEMENTED
-    Token lock_token = state_.load(std::memory_order_relaxed);
-    ZX_DEBUG_ASSERT_MSG(lock_token == token,
+    ZX_DEBUG_ASSERT_MSG(Token lock_token = state_.load(std::memory_order_relaxed);
+                        lock_token == token,
                         "Failed to assert ChainLock is held (lock token 0x%lx, our token 0x%lx).",
                         lock_token.value(), token.value());
-#endif
   }
   void AssertAcquired(const Token token) const __TA_ACQUIRE() { AssertHeld(token); }
 
@@ -299,6 +285,13 @@ class __TA_CAPABILITY("mutex") ChainLock {
   // when releasing locks in a partially acquired chain.
   bool is_held(const Token token) const { return state_.load(std::memory_order_relaxed) == token; }
 
+  // Test to see if the lock is in the unlocked state.  Provides acquire
+  // semantics, allowing this method to be used (by thread A) in a polling
+  // fashion to test to see if another thread (B) has finally released the lock,
+  // guaranteeing that A will have seen all of the writes performed by B before
+  // releasing the lock.
+  bool is_unlocked() const { return state_.load(std::memory_order_acquire) == kUnlockedToken; }
+
   // Similar to the difference between AssertHeld and AssertAcquired, is_held
   // and MarkNeedsReleaseIfHeld are related, but MarkNeedsReleaseIfHeld carries
   // an extra TRY annotation so that if a user discovers that the lock is
@@ -318,6 +311,12 @@ class __TA_CAPABILITY("mutex") ChainLock {
   Token get_token() const __TA_REQUIRES(*this) { return state_.load(std::memory_order_relaxed); }
 
  protected:
+  struct AcquireInternalResult {
+    AcquireInternalResult(LockResult r, Token ot) : result(r), observed_token(ot) {}
+    LockResult result;
+    Token observed_token;
+  };
+
   static Token CreateToken(uint32_t val) { return Token{val}; }
   static void ReplaceToken(ChainLock::Token& old_token, ChainLock::Token new_token) {
     old_token.token_ = new_token.token_;
@@ -325,10 +324,10 @@ class __TA_CAPABILITY("mutex") ChainLock {
 
   // Attempt to acquire the lock, automatically retrying if we detect that the
   // lock is held by someone with a lower priority token.
-  inline LockResult AcquireInternal(const Token token) {
+  inline AcquireInternalResult AcquireInternal(const Token token) {
     while (true) {
-      const ChainLock::LockResult result = AcquireInternalSingleAttempt(token);
-      if (result != LockResult::kRetry) {
+      const AcquireInternalResult result = AcquireInternalSingleAttempt(token);
+      if (result.result != LockResult::kRetry) {
         return result;
       }
 
@@ -343,32 +342,32 @@ class __TA_CAPABILITY("mutex") ChainLock {
   // Attempt to acquire the lock, but make only a single attempt.  Do not
   // attempt to automatically retry, even if the lock is currently held by
   // someone with a lower priority than ours.
-  inline LockResult AcquireInternalSingleAttempt(const Token token) {
+  inline AcquireInternalResult AcquireInternalSingleAttempt(const Token token) {
     // Try to CMPX Unlocked for our token.  If this succeeds, great!  We have
     // the lock and can get out.  Otherwise, what we do next will depend on the
     // token id we observed during the failed CMPX.
     Token expected{kUnlockedToken};
     if (state_.compare_exchange_strong(expected, token, std::memory_order_acquire,
-                                       std::memory_order_relaxed)) {
-      return LockResult::kOk;
+                                       std::memory_order_acquire)) {
+      return AcquireInternalResult{LockResult::kOk, expected};
     }
 
     // If the lock's token is strictly greater then our token, then the individual
     // holding the lock came after us and we should retry the attempt to acquire the lock.
     if (expected > token) {
-      return LockResult::kRetry;
+      return AcquireInternalResult{LockResult::kRetry, expected};
     }
 
     // If the lock's token is strictly less then our token, then the individual
     // holding the lock came before us.  We need to back off and give them a
     // chance to complete.
     if (expected < token) {
-      return LockResult::kBackoff;
+      return AcquireInternalResult{LockResult::kBackoff, expected};
     }
 
     // The lock's token must be equal to ours.  We are attempting to obtain a lock
     // we already hold.  Report this as a detected cycle.
-    return LockResult::kCycleDetected;
+    return AcquireInternalResult{LockResult::kCycleDetected, expected};
   }
 
   static constexpr Token kUnlockedToken{Token::kUnlockedTokenValue};

@@ -21,6 +21,8 @@ namespace kconcurrent {
 
 // fwd decls
 class ChainLockTransaction;
+struct SchedulerUtils;
+
 class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
  private:
   using Base = ::concurrent::ChainLock;
@@ -28,6 +30,33 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
  public:
   using Base::LockResult;
   using Base::Token;
+
+  // When we obtain a chain lock, we need an active ChainLockTransaction.  CLTs
+  // have a concept of being "finalized" used by debugging and tracing code.
+  //
+  // Users can mark a transaction as "finalized" once they have obtained all of
+  // the locks they will need to perform their task. This allows optional trace
+  // code to mark where contention for the lock set ended (if there was any in
+  // the first place).  Additionally, debug code can also ASSERT if someone
+  // attempts to acquire new locks after the transaction was already finalize.
+  //
+  // In at least one rare instance, however, we want to be able to make an
+  // attempt to acquire a chain lock, even though our transaction has already
+  // been finalized.  The optional scheduler queue validation code needs to make
+  // an attempt to acquire the lock's of the threads in its queue, but the code
+  // is called from places where there is an active, finalized transaction.  It
+  // is technically safe to do this, since a TryAcquire is used, and the code is
+  // not going to keep trying if the attempt fails (it just skips the extra
+  // checks on that thread if it cannot acquire the lock)
+  //
+  // |FinalizedTransactionAllowed| is a strongly typed, bool equivalent which can
+  // be used to control the behavior of TryAcquire in situations like this.  By
+  // default, TryAcquire will assert at runtime if it detects someone trying to
+  // acquire a lock after the active transaction has been finalized.  Special
+  // debug code may select the FinalizedTransactionAllowed::Yes version
+  // TryAcquire if they want to suppress this behavior.
+  //
+  enum class FinalizedTransactionAllowed { No, Yes };
 
   constexpr ChainLock() = default;
   ~ChainLock() = default;
@@ -71,8 +100,10 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   void AcquireUnconditionally() TA_REQ(chainlock_transaction_token) TA_ACQ() {
     AcquireUnconditionallyInternal();
   }
+
+  template <FinalizedTransactionAllowed FTAllowed = FinalizedTransactionAllowed::No>
   bool TryAcquire() TA_REQ(chainlock_transaction_token) TA_TRY_ACQ(true) {
-    return TryAcquireInternal();
+    return TryAcquireInternal<FTAllowed>();
   }
   void Release() TA_REQ(chainlock_transaction_token) TA_REL() { ReleaseInternal(); }
   void AssertAcquired() const TA_REQ(chainlock_transaction_token) TA_ACQ() {
@@ -111,6 +142,9 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   LockResult Acquire() TA_REQ(chainlock_transaction_token);
   void AssertHeld() const TA_REQ(chainlock_transaction_token) TA_ASSERT();
   bool is_held() const TA_REQ(chainlock_transaction_token);
+
+  // Promote is_unlocked to public
+  using Base::is_unlocked;
 
   // "Mark" routines, used to work around situations where the static analyzer
   // has trouble following what is going on.
@@ -187,13 +221,36 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   }
 
  private:
+  friend struct SchedulerUtils;
   friend class ChainLockTransaction;
 
   void AcquireUnconditionallyInternal() TA_REQ(chainlock_transaction_token)
       TA_ACQ(static_cast<Base*>(this));
+  template <FinalizedTransactionAllowed FTAllowed>
   bool TryAcquireInternal() TA_REQ(chainlock_transaction_token)
       TA_TRY_ACQ(true, static_cast<Base*>(this));
   void ReleaseInternal() TA_REQ(chainlock_transaction_token) TA_REL(static_cast<Base*>(this));
+
+  // Record in the state of this ChainLock that this CPU encountered a conflict
+  // and needed to back-off as the owner of the lock had a higher priority
+  // (lower token number) than this thread.
+  //
+  // Parameters:
+  // observed_token
+  //       : The observed value of this lock's token at the time that
+  //         the conflict was detected.  If, while we attempt to record the backoff
+  //         attempt, lock has changed state (IOW - its state is no longer
+  //         observed_token), we will return false to indicate that the called should
+  //         immediately retry their attempt to Acquire.
+  //
+  // Return values:
+  // true  : The contention was successfully recorded, the thread should continue
+  //         to back off to the start of the transaction and Relax.
+  // false : The state of the lock has changed, and the thread should
+  //         immediately attempt to acquire the lock again.
+  //
+  bool RecordBackoff(Token observed_token) TA_REQ(chainlock_transaction_token);
+
   void AssertAcquiredInternal() const TA_REQ(chainlock_transaction_token)
       TA_ACQ(static_cast<const Base*>(this));
   bool MarkNeedsReleaseIfHeldInternal() const TA_REQ(chainlock_transaction_token)
@@ -225,6 +282,26 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   void ReplaceLockToken(const ChainLock::Token token) TA_REQ(*this) {
     state_.store(token, ktl::memory_order_release);
   }
+
+  // The lock's contention mask stores the bitmask of CPUs which currently might
+  // have a thread waiting for this chain lock to be released before restarting
+  // their transaction.  When a lock is dropped, its contention mask is swapped
+  // for 0, and any CPU whose bit is set in the mask then has its per-cpu
+  // "conflict ID" incremented, thereby releasing any thread who was waiting for
+  // this lock to become available.
+  //
+  // Note:  Someday, we will need to support more than 32 (or even more than 64)
+  // CPUs.  When this day comes, the mechanism here can be easily extended.
+  // Instead of an atomic mask of CPUs which need poking, this value simply
+  // becomes a 64 bit mask.  Threads waiting for the lock to be dropped simply
+  // set the bit (1 << (thread.current_cpu % 64)) to indicate contention.  Later
+  // on, when releasing a contented lock, for each bit "B" which is set in the
+  // contention mask, all CPUs for which `(cpu.id % 64) == C` holds need to have
+  // their conflict ID incremented, instead of just the first one (which is
+  // always the case when the total number of CPUs in the system <= 64).
+  ktl::atomic<cpu_mask_t> contention_mask_{0};
+  static_assert(ktl::atomic<cpu_mask_t>::is_always_lock_free,
+                "cpu_mask_t must be a lock free atomic data type");
 };
 
 }  // namespace kconcurrent

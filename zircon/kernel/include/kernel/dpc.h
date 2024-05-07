@@ -6,13 +6,13 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_DPC_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_DPC_H_
 
+#include <lib/kconcurrent/chainlock.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <fbl/intrusive_double_list.h>
 #include <kernel/event.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 
 // Deferred Procedure Calls - queue callback to invoke on the current cpu in thread context.
 // Dpcs are executed with interrupts enabled, and do not ever migrate cpus while executing.
@@ -34,22 +34,17 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
   //
   // |Queue| will not block, but it may wait briefly for a spinlock.
   //
-  // |Queue| may return before or after the Dpc has executed.  It is the caller's responsibilty to
-  // ensure that a queued Dpc object is not destroyed prior to its execution.
+  // |Queue| may return before or after the Dpc has executed.  It is the
+  // caller's responsibility to ensure that a queued Dpc object is not destroyed
+  // prior to its execution.
+  //
+  // Note: it is important that the thread calling Queue() not be holding its
+  // own lock when calling queue if there is _any_ possibility that the DPC
+  // thread could be involved in a PI interaction with the thread who is
+  // performing the queue operation.
   //
   // Returns ZX_ERR_ALREADY_EXISTS if |this| is already queued.
-  zx_status_t Queue();
-
-  // Queue this object and signal the worker thread to execute it.
-  //
-  // This method is similar to |Queue| with |reschedule| equal to false, except that it must be
-  // called while holding the ThreadLock.
-  //
-  // |QueueThreadLocked| may return before or after the Dpc has executed.  It is the caller's
-  // responsibilty to ensure that a queued Dpc object is not destroyed prior to its execution.
-  //
-  // Returns ZX_ERR_ALREADY_EXISTS if |this| is already queued.
-  zx_status_t QueueThreadLocked() TA_REQ(thread_lock);
+  zx_status_t Queue() TA_EXCL(chainlock_transaction_token);
 
  private:
   friend class DpcQueue;
@@ -101,10 +96,9 @@ class DpcQueue {
   // This must only be called on the current cpu.
   void TransitionOffCpu(DpcQueue& source);
 
-  // These are called by Dpc::Queue and Dpc::QueueThreadLocked.
+  // These are called by Dpc::Queue.
   void Enqueue(Dpc* dpc);
-  void Signal() TA_EXCL(thread_lock);
-  void SignalLocked() TA_REQ(thread_lock);
+  void Signal();
 
  private:
   static int WorkerThread(void* unused);

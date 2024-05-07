@@ -216,7 +216,6 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     hdr.tid = 0;
   }
 
-  bool holding_thread_lock;
   {
     Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
 
@@ -255,28 +254,9 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     }
     head_ += wiresize;
     sequence_count_++;
-
-    // Need to check this before re-releasing the log lock, since we may
-    // re-enable interrupts while doing that.  If interrupts are enabled when we
-    // make this check, we could see the following sequence of events between
-    // two CPUs and incorrectly conclude we are holding the thread lock:
-    // C2: Acquire thread_lock
-    // C1: Running this thread, evaluate thread_lock.HolderCpu() -> C2
-    // C1: Context switch away
-    // C2: Release thread_lock
-    // C2: Context switch to this thread
-    // C2: Running this thread, evaluate arch_curr_cpu_num() -> C2
-    holding_thread_lock = thread_lock.HolderCpu() == arch_curr_cpu_num();
   }
 
-  // If we happen to be called from within the global thread lock, use a special
-  // version of event signal.
-  if (holding_thread_lock) {
-    thread_lock.AssertHeld();
-    notifier_state_.event.SignalLocked();
-  } else {
-    notifier_state_.event.Signal();
-  }
+  notifier_state_.event.Signal();
 
   return ZX_OK;
 }

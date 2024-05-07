@@ -90,6 +90,7 @@ if (toolchain_environment == "kernel") {
       "mmu_tests.cc",
       "mp_hotplug_tests.cc",
       "mutex_spin_time_tests.cc",
+      "owned_wait_queue_topology.cc",
       "pi_tests.cc",
       "pow2_tests.cc",
       "preempt_disable_tests.cc",

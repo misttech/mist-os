@@ -103,7 +103,8 @@ void arch_enter_uspace(iframe_t* iframe) {
   __UNREACHABLE;
 }
 
-void arch_context_switch(Thread* oldthread, Thread* newthread) {
+void arch_context_switch(Thread* oldthread, Thread* newthread)
+    TA_REQ(oldthread->get_lock(), newthread->get_lock()) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   LTRACEF("old %p (%s), new %p (%s)\n", oldthread, oldthread->name(), newthread, newthread->name());

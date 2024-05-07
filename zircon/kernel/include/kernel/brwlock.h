@@ -19,7 +19,6 @@
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <kernel/wait.h>
 #include <ktl/atomic.h>
 
@@ -69,6 +68,18 @@ struct BrwLockState<BrwLockEnablePi::No> {
   uint64_t state_;
 };
 
+template <BrwLockEnablePi enable_pi>
+struct BlockOpLockDetails;
+
+template <>
+struct BlockOpLockDetails<BrwLockEnablePi::Yes> : public OwnedWaitQueue::BAAOLockingDetails {
+  explicit BlockOpLockDetails(const OwnedWaitQueue::BAAOLockingDetails& owq_details)
+      : OwnedWaitQueue::BAAOLockingDetails{owq_details} {}
+};
+
+template <>
+struct BlockOpLockDetails<BrwLockEnablePi::No> {};
+
 static_assert(sizeof(BrwLockState<BrwLockEnablePi::No>) == 8,
               "Non PI BrwLockState expected to be exactly 8 bytes");
 
@@ -86,7 +97,7 @@ class TA_CAP("mutex") BrwLock {
   BrwLock() = default;
   ~BrwLock();
 
-  void ReadAcquire() TA_ACQ_SHARED(this) TA_NO_THREAD_SAFETY_ANALYSIS {
+  void ReadAcquire() TA_ACQ_SHARED() {
     DEBUG_ASSERT(!arch_blocking_disallowed());
     canary_.Assert();
     if constexpr (PI == BrwLockEnablePi::Yes) {
@@ -104,7 +115,7 @@ class TA_CAP("mutex") BrwLock {
     }
   }
 
-  void WriteAcquire() TA_ACQ(this) {
+  void WriteAcquire() TA_ACQ() {
     DEBUG_ASSERT(!arch_blocking_disallowed());
     canary_.Assert();
     // When acquiring the write lock we require there be no-one else using
@@ -112,9 +123,9 @@ class TA_CAP("mutex") BrwLock {
     CommonWriteAcquire(kBrwLockUnlocked, [this] { ContendedWriteAcquire(); });
   }
 
-  void WriteRelease() TA_REL(this) TA_NO_THREAD_SAFETY_ANALYSIS;
+  void WriteRelease() TA_REL();
 
-  void ReadRelease() TA_REL_SHARED(this) TA_NO_THREAD_SAFETY_ANALYSIS {
+  void ReadRelease() TA_REL_SHARED() {
     canary_.Assert();
     uint64_t prev =
         ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockReader, ktl::memory_order_release);
@@ -128,7 +139,7 @@ class TA_CAP("mutex") BrwLock {
     }
   }
 
-  void ReadUpgrade() TA_REL_SHARED(this) TA_ACQ(this) TA_NO_THREAD_SAFETY_ANALYSIS {
+  void ReadUpgrade() TA_REL_SHARED() TA_ACQ() {
     canary_.Assert();
     DEBUG_ASSERT(!arch_blocking_disallowed());
     // To upgrade we require that we as a current reader be the only current
@@ -197,12 +208,22 @@ class TA_CAP("mutex") BrwLock {
     return static_cast<uint32_t>(state & kBrwLockReaderMask);
   }
 
-  void ContendedReadAcquire();
-  void ContendedWriteAcquire();
-  void ContendedReadUpgrade();
-  void ReleaseWakeup();
-  void Block(bool write) TA_REQ(thread_lock, preempt_disabled_token);
-  ResourceOwnership Wake() TA_REQ(thread_lock, preempt_disabled_token);
+  void ContendedReadAcquire() TA_EXCL(chainlock_transaction_token);
+  void ContendedWriteAcquire() TA_EXCL(chainlock_transaction_token);
+  void ContendedReadUpgrade() TA_EXCL(chainlock_transaction_token);
+  void ReleaseWakeup() TA_EXCL(chainlock_transaction_token);
+
+  ktl::optional<BlockOpLockDetails<PI>> LockForBlock()
+      TA_REQ(chainlock_transaction_token, wait_.get_lock());
+
+  void Block(Thread* const current_thread, const BlockOpLockDetails<PI>& lock_details, bool write)
+      TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock(), current_thread->get_lock());
+
+  // TryWake requires that there be an active ChainLockTransaction in progress,
+  // and will finalize that transaction if (and only if) the wake operation
+  // succeeds.
+  ktl::optional<ResourceOwnership> TryWake()
+      TA_REQ(chainlock_transaction_token, wait_.get_lock(), preempt_disabled_token);
 
   struct AcquireResult {
     const bool success;

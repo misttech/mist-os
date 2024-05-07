@@ -16,7 +16,6 @@
 #include <kernel/mutex.h>
 #include <kernel/percpu.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <ktl/atomic.h>
 #include <lk/init.h>
 #include <lockdep/lock_class_state.h>

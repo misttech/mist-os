@@ -66,71 +66,54 @@ struct WaitQueueOrderingTests {
     // nullptr.
     ASSERT_NULL(wqc->Peek(now.raw_value()));
 
-    {
-      // Hold the thread lock while we mutate the wait queue collection.
-      // Operations done during maintenance of the augmented invariant are going
-      // to demand that the lock is held in order to evaluate parts of the
-      // thread's effective profile.
-      //
-      // In reality, this is not actually needed.  These "threads" are not real
-      // threads, nor is the wait queue collection a completely real WQC.  The
-      // threads have only been initilaized just enough to exist in the WQC, and
-      // the collection itself actually exists independently of any actual wait
-      // queue.  As such, none of these objects actually exist in a situation
-      // where they could actually interact with scheduling and would need the
-      // thread lock to be held.
-      //
-      Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    // Add a fair thread to the collection.  As the only thread in the
+    // collection, it should be chosen no matter what.
+    ResetFair(t0, kDefaultWeight, now);
+    wqc->Insert(&t0);
+    ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
 
-      // Add a fair thread to the collection.  As the only thread in the
-      // collection, it should be chosen no matter what.
-      ResetFair(t0, kDefaultWeight, now);
-      wqc->Insert(&t0);
-      ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
+    // Add a higher weight thread with the same start time to the collection.
+    // It should be chosen instead of the normal weight thread.
+    ResetFair(t1, kHighWeight, now);
+    wqc->Insert(&t1);
+    ASSERT_EQ(&t1, wqc->Peek(now.raw_value()));
 
-      // Add a higher weight thread with the same start time to the collection.
-      // It should be chosen instead of the normal weight thread.
-      ResetFair(t1, kHighWeight, now);
-      wqc->Insert(&t1);
-      ASSERT_EQ(&t1, wqc->Peek(now.raw_value()));
+    // Reduce the weight of the thread we just added and try again.  This time,
+    // the initial default weight thread should be chosen.
+    wqc->Remove(&t1);
+    ResetFair(t1, kLowWeight, now);
+    wqc->Insert(&t1);
+    ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
 
-      // Reduce the weight of the thread we just added and try again.  This time,
-      // the initial default weight thread should be chosen.
-      wqc->Remove(&t1);
-      ResetFair(t1, kLowWeight, now);
-      wqc->Insert(&t1);
-      ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
+    // Add a deadline thread whose absolute deadline is in the future.
+    ResetDeadline(t2, kLongDeadline, now);
+    wqc->Insert(&t2);
+    ASSERT_EQ(&t2, wqc->Peek(now.raw_value()));
 
-      // Add a deadline thread whose absolute deadline is in the future.
-      ResetDeadline(t2, kLongDeadline, now);
-      wqc->Insert(&t2);
-      ASSERT_EQ(&t2, wqc->Peek(now.raw_value()));
+    // Add another deadline thread, with a shorter relative deadline, but an
+    // absolute deadline also in the future.  This should become the new choice.
+    ResetDeadline(t3, kShortDeadline, now);
+    wqc->Insert(&t3);
+    ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
 
-      // Add another deadline thread, with a shorter relative deadline, but an
-      // absolute deadline also in the future.  This should become the new choice.
-      ResetDeadline(t3, kShortDeadline, now);
-      wqc->Insert(&t3);
-      ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
+    // Advance time so that we have passed t3's deadline, but not t2's.  t3's
+    // absolute deadline is in the past, and t2's is not, so t2 should be chosen
+    // over t3.
+    now += kShortDeadline + SchedNs(1);
+    ASSERT_EQ(&t2, wqc->Peek(now.raw_value()));
 
-      // Advance time so that we have passed t3's deadline, but not t2's.  t3's
-      // absolute deadline is not in the past and t2's is not, so t2 should be
-      // chosen over t3.
-      now += kShortDeadline + SchedNs(1);
-      ASSERT_EQ(&t2, wqc->Peek(now.raw_value()));
+    // Now, move past both of the absolute deadlines.  t3 should go back to
+    // becoming the proper choice as it has the shorter relative deadline.
+    now += kLongDeadline;
+    ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
 
-      // Now, move past both of the absolute deadlines.  t3 should go back to
-      // becoming the proper choice as it has the shorter relative deadline.
-      now += kLongDeadline;
-      ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
-
-      // Finally, unwind by "unblocking" all of the threads from the queue and
-      // making sure that the come out in the order we expect.  Right now, that
-      // should be t3 first, then t2, t0, and finally t1.
-      ktl::array expected_order{&t3, &t2, &t0, &t1};
-      for (Thread* t : expected_order) {
-        ASSERT_EQ(t, wqc->Peek(now.raw_value()));
-        wqc->Remove(t);
-      }
+    // Finally, unwind by "unblocking" all of the threads from the queue and
+    // making sure that the come out in the order we expect.  Right now, that
+    // should be t3 first, then t2, t0, and finally t1.
+    ktl::array expected_order{&t3, &t2, &t0, &t1};
+    for (Thread* t : expected_order) {
+      ASSERT_EQ(t, wqc->Peek(now.raw_value()));
+      wqc->Remove(t);
     }
 
     // And the queue should finally be empty now.

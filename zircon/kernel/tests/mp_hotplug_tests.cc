@@ -114,7 +114,7 @@ static void wait_for_cpu_active(cpu_num_t i) {
     wait_for_cpu_active(i);
     // Create a thread, affine it to the core just hotplugged
     // and make sure the thread does get scheduled there.
-    cpu_num_t running_core;
+    cpu_num_t running_core{INVALID_CPU};
     Thread* nt = Thread::Create("resume-test-thread", resume_cpu_test_thread, &running_core,
                                 DEFAULT_PRIORITY);
     ASSERT_NE(nullptr, nt, "Thread create failed");

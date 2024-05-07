@@ -9,6 +9,7 @@
 #include <lib/arch/x86/speculation.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 #include <zircon/syscalls/hypervisor.h>
 
@@ -513,17 +514,6 @@ zx_status_t local_apic_maybe_interrupt(AutoVmcs* vmcs, LocalApicState* local_api
   return ZX_OK;
 }
 
-void interrupt_cpu(Thread* thread, cpu_num_t last_cpu) TA_REQ(ThreadLock::Get()) {
-  // Check if the VCPU is running and whether to send an IPI. We hold the thread
-  // lock to guard against thread migration between CPUs during the check.
-  //
-  // NOTE: `last_cpu` may be currently set to `INVALID_CPU` due to thread
-  // migration between CPUs.
-  if (thread != nullptr && thread->state() == THREAD_RUNNING && last_cpu != INVALID_CPU) {
-    mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(last_cpu));
-  }
-}
-
 }  // namespace
 
 AutoVmcs::AutoVmcs(paddr_t vmcs_address, bool clear) : vmcs_address_(vmcs_address) {
@@ -706,14 +696,16 @@ zx::result<ktl::unique_ptr<V>> Vcpu::Create(G& guest, uint16_t vpid, zx_vaddr_t 
   }
 
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    Guard<SpinLock, IrqSave> list_guard{&Thread::get_list_lock()};
+    SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("Vcpu::Create")};
+
     // Only set the thread migrate function after we have initialised the VMCS.
     // Otherwise, the migrate function may interact with an uninitialised VMCS.
-    //
-    // We have to disable thread safety analysis because it's not smart enough to
-    // realize that SetMigrateFn will always be called with the ThreadLock.
-    thread->SetMigrateFnLocked([vcpu = vcpu.get()](Thread* thread, auto stage)
-                                   TA_NO_THREAD_SAFETY_ANALYSIS { vcpu->Migrate(thread, stage); });
+    thread->SetMigrateFnLocked([vcpu = vcpu.get()](Thread* thread, auto stage) {
+      ChainLockTransaction::AssertActive();
+      thread->get_lock().AssertHeld();
+      vcpu->Migrate(thread, stage);
+    });
     thread->SetContextSwitchFnLocked([vcpu = vcpu.get()]() {
       if (vcpu->entered_.load()) {
         // `arch_context_switch()` saves and restores GS, so we can skip it.
@@ -736,21 +728,30 @@ Vcpu::Vcpu(Guest& guest, uint16_t vpid, Thread* thread)
 }
 
 Vcpu::~Vcpu() {
-  cpu_num_t cpu;
-  {
-    // Taking the ThreadLock guarantees that thread_ isn't going to be freed
-    // while we access it.
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    Thread* thread = thread_.load();
-    if (thread != nullptr) {
-      thread->set_vcpu(false);
+  const cpu_num_t cpu = [this]() -> cpu_num_t {
+    // Taking the Thread list lock guarantees that our thread cannot be in the
+    // Exiting stage of our migration function as Thread::Exit holds the list
+    // lock during the migration callback.  `thread_` is only ever mutated
+    // during this callback as the thread exits, so we are guaranteed to see
+    // either our thread, or nullptr if the thread has already exited.
+    Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
+    if (thread_ != nullptr) {
+      SingletonChainLockGuardNoIrqSave thread_guard{thread_->get_lock(), CLT_TAG("Vcpu::~Vcpu")};
+      thread_->set_vcpu(false);
       // Clear the migration function, so that |thread_| does not reference
       // |this| after destruction of the VCPU.
-      thread->SetMigrateFnLocked(nullptr);
-      thread->SetContextSwitchFnLocked(nullptr);
+      thread_->SetMigrateFnLocked(nullptr);
+      thread_->SetContextSwitchFnLocked(nullptr);
+
+      return last_cpu_;
     }
-    cpu = last_cpu_;
-  }
+
+    // TODO(johngro): Is this correct?  If the thread has exited, should it have
+    // cleaned up its own vmcs_page as it exited?  By returning INVALID_CPU
+    // here, we are going to ensure that we are not going to clean anything up
+    // after the thread has exited.
+    return INVALID_CPU;
+  }();
 
   if (vmcs_page_.IsAllocated() && cpu != INVALID_CPU) {
     // Clear VMCS state from the CPU.
@@ -766,6 +767,13 @@ Vcpu::~Vcpu() {
 }
 
 void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
+  // The thread being passed to us must be _our_ thread, and its lock must
+  // currently be held (a requirement for calling a Migration function).  Assert
+  // this to make the lock analysis happy.
+  DEBUG_ASSERT(ThreadIsOurThread(thread));
+  [this]() TA_NO_THREAD_SAFETY_ANALYSIS TA_RET_CAP(
+      thread_->get_lock()) -> auto& { return thread_->get_lock(); }().AssertHeld();
+
   // Volume 3, Section 31.8.2: An MP-aware VMM is free to assign any logical
   // processor to a VM. But for performance considerations, moving a guest VMCS
   // to another logical processor is slower than resuming that guest VMCS on the
@@ -825,7 +833,8 @@ void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
     }
     case Thread::MigrateStage::Exiting: {
       // The `thread_` is exiting and so we must clear our reference to it.
-      thread_.store(nullptr);
+      Thread::get_list_lock().lock().AssertHeld();
+      ktl::atomic_ref{thread_}.store(nullptr, ktl::memory_order_relaxed);
       break;
     }
   }
@@ -889,8 +898,8 @@ zx::result<> vmx_enter(VmxState* vmx_state) {
 template <typename PreEnterFn, typename PostExitFn>
 zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
                                  zx_port_packet_t& packet) {
-  Thread* current_thread = Thread::Current::Get();
-  if (current_thread != thread_) {
+  Thread* const current_thread = Thread::Current::Get();
+  if (!ThreadIsOurThread(current_thread)) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -983,8 +992,28 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
   return result.status_value() == ZX_ERR_NEXT ? zx::ok() : result;
 }
 
+void Vcpu::InterruptCpu() {
+  // Enter the global thread list lock, allowing us to see if our thread still exists.
+  Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
+  if (thread_ != nullptr) {
+    // If our thread is still around, grab its lock to prevent our last_cpu_
+    // bookkeeping from changing.
+    //
+    // TODO(johngro): Do we need any of this?  Can we just use the Thread's
+    // last_cpu member instead?
+    SingletonChainLockGuardNoIrqSave thread_guard{thread_->get_lock(),
+                                                  CLT_TAG("Vcpu::InterruptCpu")};
+
+    // If the VCPU thread is still running, and we have a valid last_cpu_, send
+    // the thread's CPU an IPI.
+    if (thread_->state() == THREAD_RUNNING && last_cpu_ != INVALID_CPU) {
+      mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(last_cpu_));
+    }
+  }
+}
+
 zx::result<> Vcpu::ReadState(zx_vcpu_state_t& vcpu_state) {
-  if (Thread::Current::Get() != thread_) {
+  if (!ThreadIsOurThread(Thread::Current::Get())) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
   register_copy(vcpu_state, vmx_state_.guest_state);
@@ -995,7 +1024,7 @@ zx::result<> Vcpu::ReadState(zx_vcpu_state_t& vcpu_state) {
 }
 
 zx::result<> Vcpu::WriteState(const zx_vcpu_state_t& vcpu_state) {
-  if (Thread::Current::Get() != thread_) {
+  if (!ThreadIsOurThread(Thread::Current::Get())) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
   register_copy(vmx_state_.guest_state, vcpu_state);
@@ -1121,20 +1150,16 @@ void NormalVcpu::Kick() {
   kicked_.store(true);
   // Cancel any pending or upcoming wait-for-interrupts.
   local_apic_state_.interrupt_tracker.Cancel();
-
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  interrupt_cpu(thread_.load(), last_cpu_);
+  InterruptCpu();
 }
 
 void NormalVcpu::Interrupt(uint32_t vector) {
   local_apic_state_.interrupt_tracker.Interrupt(vector);
-
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  interrupt_cpu(thread_.load(), last_cpu_);
+  InterruptCpu();
 }
 
 zx::result<> NormalVcpu::WriteState(const zx_vcpu_io_t& io_state) {
-  if (Thread::Current::Get() != thread_) {
+  if (!ThreadIsOurThread(Thread::Current::Get())) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
   if ((io_state.access_size != 1) && (io_state.access_size != 2) && (io_state.access_size != 4)) {

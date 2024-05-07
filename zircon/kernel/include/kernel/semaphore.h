@@ -7,12 +7,13 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_SEMAPHORE_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_SEMAPHORE_H_
 
+#include <lib/kconcurrent/chainlock.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <kernel/wait.h>
 #include <ktl/atomic.h>
 
@@ -43,7 +44,7 @@ class Semaphore {
   // may return without blocking.
   //
   // |Post| has release memory order semantics and synchronizes with |Wait|.
-  void Post();
+  void Post() TA_EXCL(chainlock_transaction_token);
 
   // If the count is positive, decrement the count and return ZX_OK.  Otherwise,
   // decrement the count and wait until some other thread wakes us via |Post|,
@@ -53,7 +54,7 @@ class Semaphore {
   // of ZX_ERR_INTERNAL_INTR errors if the thread had a signal delivered.
   //
   // |Wait| has acquire memory order semantics and synchronizes with |Post|.
-  zx_status_t Wait(const Deadline& deadline);
+  zx_status_t Wait(const Deadline& deadline) TA_EXCL(chainlock_transaction_token);
 
   // Observe the current internal count of the semaphore.
   //
@@ -63,8 +64,8 @@ class Semaphore {
   // Observe the current internal count of waiters.
   //
   // This should only be used for testing/diagnostic purposes.
-  uint64_t num_waiters() const TA_EXCL(thread_lock) {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  uint64_t num_waiters() const TA_EXCL(chainlock_transaction_token, waitq_.get_lock()) {
+    SingletonChainLockGuardIrqSave guard{waitq_.get_lock(), CLT_TAG("Semaphore:num_waiters")};
     return waitq_.Count();
   }
 
@@ -83,10 +84,10 @@ class Semaphore {
   // thread kill or thread suspend).  The next call to |Post| after an
   // interrupted |Wait| will update the |count_|.
   //
-  // Most methods on |waitq_| require the caller to be holding the ThreadLock.
-  // In order to reduce lock contention and improve scalability, the |Post| and
-  // |Wait| operations are designed to only acquire the lock when necessary.  In
-  // particular:
+  // Many methods on |waitq_| require the caller to be holding the WaitQueue's
+  // lock. In order to reduce lock contention and improve scalability, the
+  // |Post| and |Wait| operations are designed to only acquire the lock when
+  // necessary.  In particular:
   //
   // 1. |Post| does not need to access |waitq_| if it knows that no threads are
   // blocked (i.e. when |count_| is non-negative).
@@ -97,7 +98,7 @@ class Semaphore {
   // It's critical that the lock protecting |waitq_| be held when transitioning
   // |count_| from negative to non-negative or from non-negative to negative.
   ktl::atomic<int64_t> count_;
-  WaitQueue waitq_ TA_GUARDED(thread_lock);
+  WaitQueue waitq_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SEMAPHORE_H_

@@ -124,11 +124,26 @@ class Vcpu {
   void GetInfo(zx_info_vcpu_t* info);
 
  private:
+  Vcpu(Guest& guest, uint16_t vpid, Thread* thread);
+
+  void Migrate(Thread* thread, Thread::MigrateStage stage)
+      TA_REQ(chainlock_transaction_token, thread->get_lock());
+
+  // See the comment in arch/x86/include/arch/hypervisor.h:Vcpu for why it is OK
+  // to disable static analysis here.
+  bool ThreadIsOurThread(Thread* thread) const TA_NO_THREAD_SAFETY_ANALYSIS {
+    return thread == ktl::atomic_ref{thread_}.load(ktl::memory_order_relaxed);
+  }
+
+  void InterruptCpu();
+
   Guest& guest_;
   const uint16_t vpid_;
-  cpu_num_t last_cpu_ TA_GUARDED(ThreadLock::Get());
-  // |thread_| will be set to nullptr when the thread exits.
-  ktl::atomic<Thread*> thread_;
+  cpu_num_t last_cpu_ TA_GUARDED(thread_->get_lock());
+
+  // |thread_| will be set to nullptr when the thread exits during the Exiting
+  // stage of our migration function callback.
+  Thread* thread_ TA_GUARDED(Thread::get_list_lock());
   ktl::atomic<bool> kicked_ = false;
   // We allocate El2State in its own page as it is passed between EL1 and EL2,
   // which have different address space mappings. This ensures that El2State
@@ -136,10 +151,6 @@ class Vcpu {
   hypervisor::PagePtr<El2State> el2_state_;
   GichState gich_state_;
   uint64_t hcr_;
-
-  Vcpu(Guest& guest, uint16_t vpid, Thread* thread);
-
-  void MigrateCpu(Thread* thread, Thread::MigrateStage stage) TA_REQ(ThreadLock::Get());
 };
 
 using NormalVcpu = Vcpu;

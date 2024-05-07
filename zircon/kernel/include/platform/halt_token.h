@@ -10,7 +10,6 @@
 #include <zircon/errors.h>
 
 #include <kernel/event.h>
-#include <kernel/thread_lock.h>
 #include <ktl/atomic.h>
 
 // This object is used to coordinate concurrent halt/reboot operations.
@@ -49,7 +48,7 @@ class HaltToken {
   //
   // If the halt token has not yet been claimed, this function will return an
   // error and leave the ack_event_ in the unsignaled state.
-  zx_status_t AckPendingHalt() TA_EXCL(thread_lock) {
+  zx_status_t AckPendingHalt() {
     if (!halt_token_claimed_.load()) {
       return ZX_ERR_BAD_STATE;
     }

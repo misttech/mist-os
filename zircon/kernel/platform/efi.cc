@@ -32,19 +32,6 @@ ktl::optional<uint64_t> gEfiSystemTable;
 // Address space with EFI services mapped in 1:1.
 fbl::RefPtr<VmAspace> efi_aspace;
 
-// Switch into the given address space in a panic-handler friendly manner.
-//
-// In some contexts (such as panicking) the thread lock may already be
-// held, in which case we avoid grabbing the lock again.
-void PanicFriendlySwitchAspace(VmAspace* aspace) {
-  InterruptDisableGuard interrupt_guard;
-  if (thread_lock.IsHeld()) {
-    vmm_set_active_aspace_locked(aspace);
-  } else {
-    vmm_set_active_aspace(aspace);
-  }
-}
-
 void EfiInitHook(uint level) {
   // Attempt to initialize EFI.
   if (gPhysHandoff->efi_system_table) {
@@ -248,8 +235,8 @@ EfiServicesActivation TryActivateEfiServices() {
   ZX_DEBUG_ASSERT(gEfiSystemTable);
 
   // Switch into the address space where EFI services have been mapped.
-  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
-  PanicFriendlySwitchAspace(efi_aspace.get());
+  VmAspace* old_aspace = Thread::Current::active_aspace();
+  vmm_set_active_aspace(efi_aspace.get());
 
   // Return the services.
   efi_system_table* sys = reinterpret_cast<efi_system_table*>(*gEfiSystemTable);
@@ -262,6 +249,6 @@ void EfiServicesActivation::reset() {
   }
 
   // Restore the previous address space.
-  PanicFriendlySwitchAspace(previous_aspace_);
+  vmm_set_active_aspace(previous_aspace_);
   previous_aspace_ = nullptr;
 }

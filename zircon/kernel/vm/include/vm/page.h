@@ -15,7 +15,6 @@
 #include <zircon/listnode.h>
 
 #include <kernel/percpu.h>
-#include <kernel/thread_lock.h>
 #include <ktl/atomic.h>
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
@@ -136,7 +135,7 @@ struct vm_page {
         // between different VmCowPages, so in a sense it still stack owned.
         //
         // For longer stack ownership intervals (those not entirely under a single VmCowPages
-        // hieararchy lock hold interval), the object won't be set on entry to this method, and we
+        // hierarchy lock hold interval), the object won't be set on entry to this method, and we
         // can verify that a StackOwnedLoanedPagesInterval was set on the page, and is still the
         // current active interval.
 #if DEBUG_ASSERT_IMPLEMENTED
@@ -216,22 +215,23 @@ struct vm_page {
           // thread or the other thread shouldn't have cleared).  If this thread had already done a
           // previous clear, the assert near the top would have fired instead.
           DEBUG_ASSERT(old_value & kObjectOrStackOwnerIsStackOwnerFlag);
-          // We don't want to be acquiring thread_lock here every time we free a loaned page, so we
-          // only acquire the thread_lock if the page's StackOwnedLoanedPagesInterval has a waiter,
-          // which is much more rare.  In that case we must acquire the thread_lock to avoid letting
+          // We don't want to be acquiring SOLIP::lock here every time we free a loaned page, so we
+          // only acquire the lock if the page's StackOwnedLoanedPagesInterval has a waiter,
+          // which is much more rare.  In that case we must acquire the SOLPI::lock to avoid letting
           // this thread continue and signal and delete the StackOwnedLoanedPagesInterval until
-          // after the waiter has finished blocking on the OwnedWaitQueue, so that the waiter can be
-          // woken and removed from the OwnedWaitQueue before the OwnedWaitQueue is deleted.
-          ktl::optional<Guard<MonitoredSpinLock, IrqSave>> maybe_thread_lock_guard;
+          // after the waiter has committed to blocking on the OwnedWaitQueue, so that the waiter
+          // can be woken and removed from the OwnedWaitQueue before the OwnedWaitQueue is deleted.
+          ktl::optional<Guard<SpinLock, IrqSave>> maybe_sollock_guard;
           if (old_value & kObjectOrStackOwnerHasWaiter) {
-            // Acquire thread_lock.
-            maybe_thread_lock_guard.emplace(ThreadLock::Get(), SOURCE_TAG);
+            // Go ahead and actually acquire the lock.
+            maybe_sollock_guard.emplace(&StackOwnedLoanedPagesInterval::get_lock());
           }
-          if (object_or_stack_owner.get().compare_exchange_weak(
+
+          if (object_or_stack_owner.get().compare_exchange_strong(
                   old_value, reinterpret_cast<uintptr_t>(new_obj), ktl::memory_order_relaxed)) {
             break;
           }
-          // ~maybe_thread_lock_guard will release thread_lock if it was acquired
+          // ~maybe_sollock_guard will release the lock if it was acquired
         }
       }
 
@@ -247,12 +247,13 @@ struct vm_page {
         bool first_setter;
         // The stack_owner may own the page.  The stack_owner can be waited on safely now that the
         // waiter bit is set.  The wait on stack_owner must occur while still the calling thread is
-        // still holding the thread_lock.
+        // still holding the SOLPI::lock.
         StackOwnedLoanedPagesInterval* stack_owner;
       };
       // ktl::is_ok() iff the page has a stack_owner and the waiter bit is set.
       // !ktl::is_ok() iff the page no longer has a stack_owner.
-      ktl::optional<TrySetHasWaiterResult> try_set_has_waiter() TA_REQ(thread_lock);
+      ktl::optional<TrySetHasWaiterResult> try_set_has_waiter()
+          TA_REQ(StackOwnedLoanedPagesInterval::get_lock());
 
       // offset 0x20
 

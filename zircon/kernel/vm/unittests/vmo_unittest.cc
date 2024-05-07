@@ -889,7 +889,7 @@ static bool vmo_demand_paged_map_test() {
   fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test aspace");
   ASSERT_NONNULL(aspace, "VmAspace::Create pointer");
 
-  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
+  VmAspace* old_aspace = Thread::Current::active_aspace();
   auto cleanup_aspace = fit::defer([&]() {
     vmm_set_active_aspace(old_aspace);
     ASSERT(aspace->Destroy() == ZX_OK);
@@ -2978,7 +2978,7 @@ static bool vmo_discard_failure_test() {
   fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test aspace");
   ASSERT_NONNULL(aspace);
 
-  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
+  VmAspace* old_aspace = Thread::Current::active_aspace();
   auto cleanup_aspace = fit::defer([&]() {
     vmm_set_active_aspace(old_aspace);
     ASSERT(aspace->Destroy() == ZX_OK);
@@ -3312,11 +3312,14 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
     DEBUG_ASSERT(&StackOwnedLoanedPagesInterval::current() == &raii_interval);
   }  // ~raii_interval
 
-  // Test page stack owned but never waited on.  Hold thread_lock for this to get a failure if the
-  // thread_lock is ever acquired for this scenario.  Normally the thread_lock would not be held
-  // for these steps.
+  // Test page stack owned but never waited on.  Hold SOLPI lock for this to get
+  // a failure if the SOLPI lock is ever acquired for this scenario.  Normally
+  // the lock would not be held for these steps, and we should DEBUG_ASSERT if
+  // anything in the flow below attempts to obtain the lock while we perform the
+  // sequence.
+  //
   {  // scope thread_lock_guard, raii_interval
-    Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+    Guard<SpinLock, IrqSave> sollock_guard{&StackOwnedLoanedPagesInterval::get_lock()};
     StackOwnedLoanedPagesInterval raii_interval;
     DEBUG_ASSERT(&StackOwnedLoanedPagesInterval::current() == &raii_interval);
     ot->pages[0].object.set_stack_owner(&StackOwnedLoanedPagesInterval::current());
@@ -3377,7 +3380,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   // base profile.
   ot->ownership_acquired.Wait();
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    SingletonChainLockGuardIrqSave guard{ot->thread->get_lock(),
+                                         CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (1)")};
     const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
     ASSERT_TRUE(ep.IsFair());
     ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());
@@ -3406,7 +3410,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   for (auto& wt : *waiting_threads) {
     while (true) {
       {
-        Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        SingletonChainLockGuardIrqSave guard{
+            wt.thread->get_lock(), CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (2)")};
         if (wt.thread->state() == THREAD_BLOCKED) {
           break;
         }
@@ -3419,7 +3424,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   // should see the weight of the owning thread increased to the total of its
   // base weight, and weights of all of the threads blocked behind it.
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    SingletonChainLockGuardIrqSave guard{ot->thread->get_lock(),
+                                         CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (3)")};
     const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
     constexpr SchedWeight kExpectedWeight =
         kOwnerThreadBaseWeight + (kWaitingThreadCount * kBlockedThreadBaseWeight);
@@ -3430,8 +3436,9 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   // Wait a bit, the threads should still be blocked.
   Thread::Current::SleepRelative(ZX_MSEC(100));
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
     for (auto& wt : *waiting_threads) {
+      SingletonChainLockGuardIrqSave guard{
+          wt.thread->get_lock(), CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (4)")};
       ASSERT_EQ(THREAD_BLOCKED, wt.thread->state());
     }
   }
@@ -3442,18 +3449,22 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   // its base priority.
   ot->release_stack_ownership.Signal();
   for (auto& wt : *waiting_threads) {
-    {
-      Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-      if (wt.thread->state() != THREAD_BLOCKED) {
-        break;
+    while (true) {
+      {
+        SingletonChainLockGuardIrqSave guard{
+            wt.thread->get_lock(), CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (5)")};
+        if (wt.thread->state() != THREAD_BLOCKED) {
+          break;
+        }
       }
+      Thread::Current::SleepRelative(ZX_MSEC(1));
     }
-    Thread::Current::SleepRelative(ZX_MSEC(1));
   }
 
   // Verify that the profile of the owner thread has relaxed.
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    SingletonChainLockGuardIrqSave guard{ot->thread->get_lock(),
+                                         CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (6)")};
     const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
     ASSERT_TRUE(ep.IsFair());
     ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());

@@ -8,15 +8,21 @@
 #include <assert.h>
 #include <lib/fxt/interned_string.h>
 #include <lib/kconcurrent/chainlock.h>
+#include <lib/ktrace.h>
 #include <stdint.h>
 
 #include <arch/arch_interrupt.h>
 #include <kernel/percpu.h>
+#include <kernel/spin_tracing_config.h>
 #include <ktl/type_traits.h>
 
 namespace kconcurrent {
 
-static inline constexpr bool kCltTraceAccountingEnabled = false;
+// Produce trace records documenting the CLT contention overhead if we have lock
+// contention tracing enabled.
+static inline constexpr bool kCltTraceAccountingEnabled = kSchedulerLockSpinTracingEnabled;
+
+struct SchedulerUtils;
 
 namespace internal {
 struct TrampolineTransactionTag {};
@@ -128,7 +134,7 @@ class CltTraceAccounting;
 template <>
 class CltTraceAccounting<false> {
  public:
-  constexpr explicit CltTraceAccounting(const fxt::InternedString& func, int line) {}
+  constexpr CltTraceAccounting(const fxt::InternedString& func, int line) {}
   constexpr const char* func() const { return "<disabled>"; }
   constexpr int line() const { return 0; }
   void Finalize() {}
@@ -150,7 +156,7 @@ class CltTraceAccounting<false> {
 template <>
 class CltTraceAccounting<true> {
  public:
-  explicit CltTraceAccounting(const fxt::InternedString& func, int line)
+  CltTraceAccounting(const fxt::InternedString& func, int line)
       : func_{func.string}, encoded_id_{EncodeId(func.GetId(), line)} {}
 
   const char* func() const { return func_; }
@@ -158,7 +164,11 @@ class CltTraceAccounting<true> {
 
   void Finalize() {
     if (has_active_conflict()) {
-      // TODO(johngro): If we have an active conflict, produce our trace record here.
+      FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
+                       "lock_spin"_intern, conflict_start_time_, ktrace_timestamp(),
+                       TraceContext::Thread, ("lock_id", lock_id()),
+                       ("lock_class", fxt::StringRef<fxt::RefType::kId>{lock_class()}),
+                       ("lock_type", "ChainLockTransaction"_intern));
     }
   }
 
@@ -177,11 +187,13 @@ class CltTraceAccounting<true> {
   }
 
  private:
+  static inline constexpr zx_ticks_t kInvalidConflictStartTime = 0;
   static inline constexpr uint64_t EncodeId(uint16_t func_id, int line_id) {
     return (static_cast<uint64_t>(func_id) << 32) | static_cast<uint64_t>(line_id);
   }
 
-  static inline constexpr zx_ticks_t kInvalidConflictStartTime = 0;
+  inline uint16_t lock_class() const { return static_cast<uint16_t>((encoded_id_ >> 32) & 0xFFFF); }
+  inline uint32_t lock_id() const { return static_cast<uint32_t>(encoded_id_ & 0xFFFFFFFF); }
 
   const char* func_;
   uint64_t encoded_id_;
@@ -190,8 +202,7 @@ class CltTraceAccounting<true> {
 }  // namespace internal
 
 #define CLT_TAG_EXPLICIT_LINE(tag, line)                                                           \
-  []() constexpr                                                                                   \
-      -> ::kconcurrent::internal::CltTraceAccounting<::kconcurrent::kCltTraceAccountingEnabled> {  \
+  []() -> ::kconcurrent::internal::CltTraceAccounting<::kconcurrent::kCltTraceAccountingEnabled> { \
     using fxt::operator"" _intern;                                                                 \
     return ::kconcurrent::internal::CltTraceAccounting<::kconcurrent::kCltTraceAccountingEnabled>{ \
         tag##_intern, line};                                                                       \
@@ -290,6 +301,7 @@ class ChainLockTransaction {
 
  protected:
   friend class ::kconcurrent::ChainLock;
+  friend struct ::kconcurrent::SchedulerUtils;
 
   // ChainLockTransaction objects should not be instantiated directly.  Instead, users should
   // instantiate transactions using one of the specialized versions.
@@ -403,8 +415,23 @@ class ChainLockTransaction {
     trace_.RecordConflictStart();
   }
 
+  // The token used to obtain all ChainLocks during this transaction.
   ChainLock::Token active_token_{};
+
+  // The per-cpu conflict ID recorded the last time that a thread encountered a
+  // conflict and was forced to back off during this transaction.  When threads
+  // successfully record a conflict, they can back off to the Relax point, and
+  // wait for their CPU's conflict ID (stored in the per-cpu data structure) to
+  // change.  This will happen when the thread who currently owns the lock which
+  // triggered the backoff releases the lock, letting the Relaxing thread know
+  // that it may now make another attempt.
+  uint64_t conflict_id_{0};
+
+  // Extra data used to support more internal consistency checks.  Only present
+  // when enabled.
   [[no_unique_address]] internal::CltDebugAccounting<kDebugAccountingEnabled> debug_{};
+
+  // Extra data used to support conflict tracing.  Only present when enabled.
   [[no_unique_address]] internal::CltTraceAccounting<kCltTraceAccountingEnabled> trace_;
 };
 
@@ -454,6 +481,18 @@ class TA_SCOPED_CAP ChainLockTransaction : public ::kconcurrent::ChainLockTransa
     debug_.AssertNumLocksHeld(0);
     debug_.AssertNotFinalized();
 
+    auto pause = [this]() {
+      if (conflict_id_) {
+        struct percpu* pcpu = arch_get_curr_percpu();
+        do {
+          arch::Yield();
+        } while (pcpu->chain_lock_conflict_id.load(ktl::memory_order_acquire) == conflict_id_);
+        conflict_id_ = 0;
+      } else {
+        arch::Yield();
+      }
+    };
+
     // We might be about to either re-enable preemption or interrupt (or both)
     // depending on what their states were when we entered this CLT.
     //
@@ -471,14 +510,16 @@ class TA_SCOPED_CAP ChainLockTransaction : public ::kconcurrent::ChainLockTransa
     // entered, we can skip the un-register/re-register steps.
     if constexpr (kType != CltType::NoIrqSave) {
       DoUnregister();
-      arch::Yield();
+      pause();
       DoRegister();
     } else {
-      arch::Yield();
+      pause();
     }
   }
 
  private:
+  friend struct ::kconcurrent::SchedulerUtils;
+
   explicit ChainLockTransaction(internal::TrampolineTransactionTag t)
       TA_REQ(chainlock_transaction_token)
       : Base(t) {
@@ -551,6 +592,7 @@ class TA_SCOPED_CAP ChainLockTransactionEagerReschedDisableAndIrqSave
 
 struct RescheduleContext {
  private:
+  friend struct ::kconcurrent::SchedulerUtils;
   friend class ::Scheduler;
 
   RescheduleContext(ChainLockTransaction* clt, const ChainLock::Token token)
@@ -558,6 +600,94 @@ struct RescheduleContext {
 
   ChainLockTransaction* const orig_transaction;
   const ChainLock::Token orig_token;
+};
+
+// The scheduler has to do a few very special things in order to properly
+// reschedule and context switch.  We don't really want anyone else to be doing
+// stuff like this, and we don't really want to just give access to all of the
+// internals of ChainLocks and ChainLockTransactions.
+//
+// Instead, we introduce |SchedulerUtils|.  It contains all of the specialized
+// operations used during rescheduling as static private methods.  It declares
+// the Scheduler as a friend, and is declared as a friend of the ChainLock and
+// ChainLockTransaction classes.  This allows the Scheduler (an no one else) to
+// perform its specialized actions, while not simply handing over total access
+// to the lock internals.  All of the Very Special Scheduler Stuff should be
+// localized to just these methods.
+//
+struct SchedulerUtils {
+ private:
+  friend class ::Scheduler;
+
+  // At the start of a reschedule operation, we should have an active chain lock
+  // transaction and should be holding exactly one lock (that of the current
+  // thread).
+  //
+  // We need to switch to using a special scheduler token to prevent schedulers
+  // from ever losing lock arbitration and being told to back off.  Later on,
+  // after the reschedule operation has completed, we will restore the original
+  // token (after perhaps switching to a different CLT instance after a context
+  // switch) before unwinding.
+  //
+  // Prepare for reschedule will:
+  //
+  // 1) Verify the pre-requisites stated above.
+  // 2) Replace the active CLT's token with the scheduler token.
+  // 3) Replace the current thread's lock's token with the scheduler token.
+  // 4) Return the token which had been used so that it can be stored on the
+  //    current thread's stack, and restored later on after the thread is
+  //    scheduled to run again.
+  //
+  static RescheduleContext PrepareForReschedule() TA_REQ(chainlock_transaction_token);
+
+  // The inverse of PrepareForReschedule, called when no context switch actually
+  // took place.  This method will restore the original token which was used as
+  // the start of RescheduleCommon in both the active transaction as well as
+  // current thread's lock.  The actual active transaction pointer should not
+  // have changed and should still be located on the active thread's stack.
+  //
+  static void RestoreRescheduleContext(const RescheduleContext& ctx)
+      TA_REQ(chainlock_transaction_token);
+
+  // Similar to RestoreRescheduleContext, but used after a context switch has
+  // occurred.  Both the previous thread, and the current thread's locks should
+  // be held at this point in time.  The current active transaction according to
+  // per-cpu bookkeeping is the previous thread's transaction.  It will be
+  // replaced by the (new) current thread's transaction, and the original token
+  // used by the current thread will be restored to its transaction as well as
+  // its lock.  Finally, the previous thread's lock will be dropped (but only
+  // after it's transaction has been swapped out).
+  static void PostContextSwitchLockHandoff(const RescheduleContext& ctx, Thread* previous_thread)
+      TA_REQ(chainlock_transaction_token) TA_REL(previous_thread->get_lock());
+
+  // A special-case method used to manage the lock handoff for a newly launched
+  // thread.
+  //
+  // During normal operation, when a thread (A) enters the scheduler for a
+  // reschedule operation, there must exist an active ChainLockTransaction
+  // (A_trans, somewhere on the stack above the call) and current thread's lock
+  // must be held.  When a new thread (B) is selected to run, it must first be locked
+  // using A_trans.  Then, after the context switch takes place and we are
+  // running on B's stack, we need to swap the active transaction (A_trans) for
+  // the transaction that was on B's stack the last time it was switched away
+  // from (B_trans).  Finally, we can drop A's lock and unwind with an active
+  // transaction holding a single lock (B's lock), exactly as it was when B
+  // entered the reschedule operation.
+  //
+  // Launching a thread for the first time, however, requires some cheating.
+  // When B launches for the first time, it's entry point is the threads
+  // trampoline routine.  It has no active transaction on the stack to switch
+  // back to and it needs to synthesize one.
+  //
+  // TrampolineLockHandoff handles this special case.  It creates a special
+  // "fake" transaction on its stack.  This transaction does not attempt to
+  // automatically register itself as the new transaction (there is already an
+  // active transaction), is created with its internal accounting saying it is
+  // holding two locks (the previous thread's lock and the current thread's
+  // lock).  Now the context switch can proceed as normal.  The new "fake"
+  // B_trans is swapped in for the previous A_trans, the previous thread's lock
+  // is dropped, and finally the current thread's lock is dropped.
+  static void TrampolineLockHandoff();
 };
 
 template <typename TransactionType>

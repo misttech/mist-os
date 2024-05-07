@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <string.h>
 #include <sys/types.h>
 #include <trace.h>
@@ -19,7 +20,6 @@
 #include <arch/riscv64/feature.h>
 #include <arch/riscv64/vector.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <ktl/align.h>
 #include <ktl/bit.h>
 
@@ -30,7 +30,7 @@
 zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t* out) {
   LTRACEF("thread %p out %p\n", thread, out);
 
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_general_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -51,7 +51,7 @@ zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t
 zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_regs_t* in) {
   LTRACEF("thread %p in %p\n", thread, in);
 
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_general_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -72,7 +72,7 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
 zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs_t* out) {
   LTRACEF("thread %p out %p\n", thread, out);
 
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_fp_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -98,7 +98,7 @@ zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in
     }
   }
 
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_fp_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -122,7 +122,7 @@ zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* 
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_vector_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
   *out = thread->arch().vector_state;
@@ -169,7 +169,7 @@ zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_re
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_vector_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 

@@ -13,6 +13,7 @@
 #include <lib/arch/intrin.h>
 #include <lib/console.h>
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/lockup_detector.h>
 #include <lib/system-topology.h>
 #include <lib/zircon-internal/macros.h>
@@ -37,7 +38,6 @@
 #include <kernel/scheduler.h>
 #include <kernel/spinlock.h>
 #include <kernel/stats.h>
-#include <kernel/thread_lock.h>
 #include <kernel/timer.h>
 #include <ktl/bit.h>
 #include <lk/init.h>
@@ -215,11 +215,17 @@ void mp_sync_exec(mp_ipi_target_t target, cpu_mask_t mask, mp_sync_task_t task, 
   mp.ipi_task_lock.ReleaseIrqRestore(irqstate);
 }
 
-void mp_unplug_current_cpu(Guard<MonitoredSpinLock, NoIrqSave>&& incoming_guard) {
-  Guard<MonitoredSpinLock, NoIrqSave> guard{AdoptLock, ktl::move(incoming_guard)};
+void mp_unplug_current_cpu() {
+  // We had better not be holding any OwnedWaitQueues at this point in time
+  // (it is unclear how we would have ever obtained any in the first place)
+  if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
+    Thread* const current_thread = Thread::Current::Get();
+    SingletonChainLockGuardIrqSave guard{current_thread->get_lock(),
+                                         CLT_TAG("mp_unplug_current_cpu")};
+    current_thread->wait_queue_state().AssertNoOwnedWaitQueues();
+  }
 
   lockup_secondary_shutdown();
-
   Scheduler::MigrateUnpinnedThreads();
   DEBUG_ASSERT(!mp_is_cpu_active(arch_curr_cpu_num()));
 
@@ -236,14 +242,6 @@ void mp_unplug_current_cpu(Guard<MonitoredSpinLock, NoIrqSave>&& incoming_guard)
   // of the other CPUs finish their work (very unlikely, since tasks
   // should be quick), then this CPU may execute the task.
   mp_set_curr_cpu_online(false);
-
-  // We had better not be holding any OwnedWaitQueues at this point in time
-  // (it is unclear how we would have ever obtained any in the first place
-  // since everything this thread ever does is in this function).
-  Thread::Current::Get()->wait_queue_state().AssertNoOwnedWaitQueues();
-
-  // Release the thread lock while keeping interrupts disabled.
-  guard.Release();
 
   // Stop and then shutdown this CPU's platform timer.
   platform_stop_timer();
@@ -496,7 +494,9 @@ static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
     cpu_mask_t mask = cpu_num_to_mask(target_cpu);
     cpu_num_t sending_cpu;
     {
-      Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+      // Disable interrupts so that the sending CPU we record here cannot change
+      // during our call to mp_reschedule.
+      InterruptDisableGuard irqd;
       sending_cpu = arch_curr_cpu_num();
       mp_reschedule(mask, 0);
     }

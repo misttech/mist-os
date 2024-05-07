@@ -24,6 +24,8 @@
 #include <lib/fit/defer.h>
 #include <lib/fxt/interned_string.h>
 #include <lib/heap.h>
+#include <lib/kconcurrent/chainlock.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/thread_sampler/thread_sampler.h>
@@ -42,6 +44,7 @@
 #include <arch/exception.h>
 #include <arch/interrupt.h>
 #include <arch/ops.h>
+#include <arch/thread.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
 #include <kernel/dpc.h>
@@ -52,7 +55,6 @@
 #include <kernel/restricted.h>
 #include <kernel/scheduler.h>
 #include <kernel/stats.h>
-#include <kernel/thread_lock.h>
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <ktl/atomic.h>
@@ -96,7 +98,7 @@ KCOUNTER(thread_sampling_failed, "thread.sampling_failed")
 // The global thread list. This is a lazy_init type, since initial thread code
 // manipulates the list before global constructors are run. This is initialized by
 // thread_init_early.
-static lazy_init::LazyInit<Thread::List> thread_list;
+static lazy_init::LazyInit<Thread::List> thread_list TA_GUARDED(Thread::get_list_lock());
 
 Thread::MigrateList Thread::migrate_list_;
 
@@ -135,28 +137,17 @@ static void init_thread_lock_state(Thread* t) {
 #endif
 }
 
-void WaitQueueCollection::ThreadState::Block(Interruptible interruptible, zx_status_t status) {
+void WaitQueueCollection::ThreadState::Block(Thread* const current_thread,
+                                             Interruptible interruptible, zx_status_t status) {
   blocked_status_ = status;
   interruptible_ = interruptible;
-  Scheduler::Block();
+  Scheduler::Block(current_thread);
   interruptible_ = Interruptible::No;
-}
-
-void WaitQueueCollection::ThreadState::UnblockIfInterruptible(Thread* thread, zx_status_t status) {
-  if (interruptible_ == Interruptible::Yes) {
-    WaitQueue::UnblockThread(thread, status);
-  }
 }
 
 void WaitQueueCollection::ThreadState::Unsleep(Thread* thread, zx_status_t status) {
   blocked_status_ = status;
   Scheduler::Unblock(thread);
-}
-
-void WaitQueueCollection::ThreadState::UnsleepIfInterruptible(Thread* thread, zx_status_t status) {
-  if (interruptible_ == Interruptible::Yes) {
-    Unsleep(thread, status);
-  }
 }
 
 WaitQueueCollection::ThreadState::~ThreadState() {
@@ -202,11 +193,29 @@ void TaskState::Init(thread_start_routine entry, void* arg) {
   arg_ = arg;
 }
 
-zx_status_t TaskState::Join(zx_time_t deadline) {
-  return retcode_wait_queue_.Block(deadline, Interruptible::No);
+zx_status_t TaskState::Join(Thread* const current_thread, zx_time_t deadline) {
+  return retcode_wait_queue_.Block(current_thread, deadline, Interruptible::No);
 }
 
-void TaskState::WakeJoiners(zx_status_t status) { retcode_wait_queue_.WakeAll(status); }
+bool TaskState::TryWakeJoiners(zx_status_t status) {
+  ktl::optional<uint32_t> result;
+
+  // Attempt to lock the queue first.
+  if (retcode_wait_queue_.get_lock().Acquire() == ChainLock::LockResult::kOk) {
+    // We got the lock, make sure we drop it before exiting.
+    retcode_wait_queue_.get_lock().AssertAcquired();
+
+    // Now, try to lock and wake all of our waiting threads.
+    result = retcode_wait_queue_.WakeAllLocked(status);
+
+    // No matter what just happened, we need to drop the queue's lock.
+    retcode_wait_queue_.get_lock().Release();
+  }
+
+  // If we got a result, then we succeeded in waking the threads we wanted to
+  // wake.
+  return result != ktl::nullopt;
+}
 
 static void free_thread_resources(Thread* t) {
   // free the thread structure itself.  Manually trigger the struct's
@@ -257,12 +266,16 @@ zx_status_t Thread::Current::Fault(Thread::Current::FaultType type, vaddr_t va, 
 }
 
 void Thread::Trampoline() {
-  // Release the incoming lock held across reschedule.
-  Scheduler::LockHandoff();
+  // Handle the special case of starting a new thread for the first time,
+  // releasing the previous thread's lock as well as the current thread's lock
+  // in the process, before restoring interrupts and dropping into the thread's
+  // entry point.
+  Scheduler::TrampolineLockHandoff();
   arch_enable_ints();
 
-  Thread* ct = Thread::Current::Get();
-  int ret = ct->task_state_.entry()(ct->task_state_.arg());
+  // Call into the thread's entry point, and call exit when finished.
+  const TaskState& task_state = Thread::Current::Get()->task_state_;
+  int ret = task_state.entry()(task_state.arg());
   Thread::Current::Exit(ret);
 }
 
@@ -314,28 +327,62 @@ Thread* Thread::CreateEtc(Thread* t, const char* name, thread_start_routine entr
 
   construct_thread(t, name);
 
-  t->task_state_.Init(entry, arg);
-  Scheduler::InitializeThread(t, profile);
-
-  zx_status_t status = t->stack_.Init();
-  if (status != ZX_OK) {
-    free_thread_resources(t);
-    return nullptr;
-  }
-
-  // save whether or not we need to free the thread struct and/or stack
-  t->flags_ = flags;
-
-  if (likely(alt_trampoline == nullptr)) {
-    alt_trampoline = &Thread::Trampoline;
-  }
-
-  // set up the initial stack frame
-  arch_thread_initialize(t, (vaddr_t)alt_trampoline);
-
-  // add it to the global thread list
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    // Do not hold the thread's lock while we initialize it.  We are going to
+    // perform some operations (like dynamic memory allocation) which will
+    // require us to obtain potentially contested mutexes, something we cannot
+    // safely do while holding any spinlocks, or chainlocks.
+    //
+    // Not holding the thread's lock here _should_ be OK.  We are basically in
+    // the process of constructing the thread, no one else knows about this
+    // memory just yet.  There are a limited number of ways that other CPUs in
+    // the system could find out about this thread, and they should all involve
+    // synchronizing via a lock which should establish proper memory ordering
+    // semantics.
+    //
+    // 1) After we add the thread to the global thread list, debug code could
+    //    find the thread, but only after synchronizing via the global thread
+    //    list lock.
+    // 2) After we add the thread to the scheduler (after CreateEtc), other CPUs
+    //    can find out about it, but only after synchronizing via the
+    //    scheduler's queue lock.
+    //
+    struct FakeChainLockTransaction {
+      // Lie to the analyzer about the fact that we are in a CLT, so we can lie
+      // to the analyzer about holding the thread's lock.
+      FakeChainLockTransaction() TA_ACQ(chainlock_transaction_token) {}
+      ~FakeChainLockTransaction() TA_REL(chainlock_transaction_token) {}
+    } fake_clt{};
+    t->get_lock().MarkNeedsRelease();  // This is a lie, we don't hold the lock.  See above.
+
+    t->task_state_.Init(entry, arg);
+    Scheduler::InitializeThread(t, profile);
+
+    zx_status_t status = t->stack_.Init();
+    if (status != ZX_OK) {
+      t->get_lock().MarkReleased();
+      free_thread_resources(t);
+      return nullptr;
+    }
+
+    // save whether or not we need to free the thread struct and/or stack
+    t->flags_ = flags;
+
+    if (likely(alt_trampoline == nullptr)) {
+      alt_trampoline = &Thread::Trampoline;
+    }
+
+    // set up the initial stack frame
+    arch_thread_initialize(t, (vaddr_t)alt_trampoline);
+
+    t->get_lock().MarkReleased();
+  }
+
+  // Add it to the global thread list.  Be sure to grab the locks in the proper
+  // order; global thread list lock first, then the thread's lock second.
+  {
+    Guard<SpinLock, IrqSave> list_guard{&list_lock_};
+    SingletonChainLockGuardNoIrqSave thread_guard{t->get_lock(), CLT_TAG("Thread::CreateEtc")};
     thread_list->push_front(t);
   }
 
@@ -380,10 +427,17 @@ void Thread::Resume() {
                    arch_num_spinlocks_held(),
                    Thread::Current::Get()->preemption_state().PreemptIsEnabled());
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  // Explicitly disable preemption (if it has not been already) before grabbing
+  // the target thread's lock.  This will ensure that we have dropped the target
+  // thread's lock before any local reschedule takes place, helping to avoid
+  // lock thrash as the target thread becomes scheduled for the first time.
+  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("Thread::Resume")};
+  lock_.AcquireUnconditionally();
+  clt.Finalize();
 
   if (state() == THREAD_DEATH) {
     // The thread is dead, resuming it is a no-op.
+    lock_.Release();
     return;
   }
 
@@ -399,6 +453,8 @@ void Thread::Resume() {
   if (state() == THREAD_INITIAL || state() == THREAD_SUSPENDED) {
     // Wake up the new thread, putting it in a run queue on a cpu.
     Scheduler::Unblock(this);
+  } else {
+    lock_.Release();
   }
 
   kcounter_add(thread_resume_count, 1);
@@ -414,66 +470,154 @@ zx_status_t Thread::DetachAndResume() {
 }
 
 /**
- * @brief  Suspend an initialized/ready/running thread
+ * @brief  Suspend or Kill an initialized/ready/running thread
  *
  * @return ZX_OK on success, ZX_ERR_BAD_STATE if the thread is dead
  */
-zx_status_t Thread::Suspend() {
+zx_status_t Thread::SuspendOrKillInternal(SuspendOrKillOp op) {
   canary_.Assert();
   DEBUG_ASSERT(!IsIdle());
 
-  // Disable preemption to defer rescheduling until the end of this scope.
-  AnnotatedAutoPreemptDisabler preempt_disable;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  const bool suspend_op = op == SuspendOrKillOp::Suspend;
+  const zx_status_t wakeup_status =
+      suspend_op ? ZX_ERR_INTERNAL_INTR_RETRY : ZX_ERR_INTERNAL_INTR_KILLED;
+  auto set_signals = fit::defer([this, suspend_op]() {
+    if (suspend_op) {
+      signals_.fetch_or(THREAD_SIGNAL_SUSPEND, ktl::memory_order_relaxed);
+      kcounter_add(thread_suspend_count, 1);
+    } else {
+      signals_.fetch_or(THREAD_SIGNAL_KILL, ktl::memory_order_relaxed);
+    }
+  });
 
-  if (state() == THREAD_DEATH) {
-    return ZX_ERR_BAD_STATE;
+  // Disable preemption to defer rescheduling until the transaction is completed.
+  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("Thread::SuspendOrKillInternal")};
+  for (;; clt.Relax()) {
+    lock_.AcquireUnconditionally();
+    const thread_state cur_state = state();
+
+    // If this is a kill operation, and we are killing ourself, just set our
+    // signal bits and get out.  We will process the pending signal (eventually)
+    // as we unwind.
+    if ((suspend_op == false) && (this == Thread::Current::Get())) {
+      clt.Finalize();
+      DEBUG_ASSERT(cur_state == THREAD_RUNNING);
+      set_signals.call();
+      lock_.Release();
+      return ZX_OK;
+    }
+
+    // If the thread is in the DEATH state, it cannot be suspended.  Do not set
+    // any signals, or increment any kcounters on our way out.
+    if (cur_state == THREAD_DEATH) {
+      clt.Finalize();
+      set_signals.cancel();
+      lock_.Release();
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // If the thread is sleeping, or it is blocked, then we can only wake it up
+    // for the kill or suspend operation if it is currently interruptible.
+    // Check this; if the thread is not interruptible, simply set the signals
+    // and get out. Someday, when the thread finally unblocks, it can deal with
+    // the signals.
+    const bool is_blocked =
+        (cur_state == THREAD_BLOCKED) || (cur_state == THREAD_BLOCKED_READ_LOCK);
+    if ((is_blocked || (cur_state == THREAD_SLEEPING)) &&
+        (wait_queue_state_.interruptible() == Interruptible::No)) {
+      clt.Finalize();
+      set_signals.call();
+      lock_.Release();
+      return ZX_OK;
+    }
+
+    // Unblocking a thread who is blocked in a wait queue requires that we hold
+    // the entire PI chain starting from the thread before proceeding.
+    // Attempting to obtain this chain of locks might result in a conflict which
+    // requires us to back off, releasing all locks (including the initial
+    // thread's) before trying again.
+    WaitQueue* const wq = wait_queue_state_.blocking_wait_queue();
+    if (is_blocked && (OwnedWaitQueue::LockPiChain(*this) == ChainLock::LockResult::kBackoff)) {
+      lock_.Release();
+      continue;
+    }
+
+    // OK, we have now obtained all of our locks and are committed to the
+    // operation.  We can go ahead and set our signal state and increment our
+    // kcounters now.
+    clt.Finalize();
+    set_signals.call();
+
+    switch (cur_state) {
+      case THREAD_INITIAL:
+        // TODO(johngro); Figure out what to do about this.  The original
+        // versions of suspend and kill seem to disagree about whether or not it
+        // is safe to be suspending or killing a thread at this point.  The
+        // original suspend had the comment below, indicating that it should be
+        // OK to unblock the thread. The Kill code, however, had this comment:
+        //
+        // ```
+        // thread hasn't been started yet.
+        // not really safe to wake it up, since it's only in this state because it's under
+        // construction by the creator thread.
+        // ```
+        //
+        // indicating that the thread was not yet safe to wake.  It really feels
+        // like this should be an ASSERT (people should not be
+        // suspending/killing threads in the initial state), or it should just
+        // leave the thread as is.  The signal is set, and will be handled when
+        // the thread ends up running for the first time.
+
+        // Thread hasn't been started yet, add it to the run queue to transition
+        // properly through the INITIAL -> READY state machine first, then it
+        // will see the signal and go to SUSPEND before running user code.
+        //
+        // Though the state here is still INITIAL, the higher-level code has
+        // already executed ThreadDispatcher::Start() so all the userspace
+        // entry data has been initialized and will be ready to go as soon as
+        // the thread is unsuspended.
+        Scheduler::Unblock(this);
+        return ZX_OK;
+      case THREAD_READY:
+        // thread is ready to run and not blocked or suspended.
+        // will wake up and deal with the signal soon.
+        break;
+      case THREAD_RUNNING:
+        // thread is running (on another cpu)
+        // The following call is not essential.  It just makes the
+        // thread suspension/kill happen sooner rather than at the next
+        // timer interrupt or syscall.
+        mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
+        break;
+      case THREAD_BLOCKED:
+      case THREAD_BLOCKED_READ_LOCK:
+        // thread is blocked on something and marked interruptible.  We are
+        // holding the entire PI chain at this point, and calling UnblockThread
+        // on our blocking wait queue will release then entire PI chain for us
+        // as part of the unblock operation.
+        wq->get_lock().AssertAcquired();
+        wq->UnblockThread(this, wakeup_status);
+        return ZX_OK;
+      case THREAD_SLEEPING:
+        // thread is sleeping and interruptible
+        wait_queue_state_.Unsleep(this, wakeup_status);
+        return ZX_OK;
+      case THREAD_SUSPENDED:
+        // If this is a kill operation, and the thread is suspended, resume it
+        // so it can get the kill signal.  Otherwise, do nothing.  The thread
+        // was already suspended, and it still is.
+        if (suspend_op == false) {
+          Scheduler::Unblock(this);
+          return ZX_OK;
+        }
+        break;
+      default:
+        panic("Unexpected thread state %u", cur_state);
+    }
+
+    lock_.Release();
+    return ZX_OK;
   }
-
-  signals_.fetch_or(THREAD_SIGNAL_SUSPEND, ktl::memory_order_relaxed);
-
-  switch (state()) {
-    case THREAD_DEATH:
-      // This should be unreachable because this state was handled above.
-      panic("Unexpected thread state");
-    case THREAD_INITIAL:
-      // Thread hasn't been started yet, add it to the run queue to transition
-      // properly through the INITIAL -> READY state machine first, then it
-      // will see the signal and go to SUSPEND before running user code.
-      //
-      // Though the state here is still INITIAL, the higher-level code has
-      // already executed ThreadDispatcher::Start() so all the userspace
-      // entry data has been initialized and will be ready to go as soon as
-      // the thread is unsuspended.
-      Scheduler::Unblock(this);
-      break;
-    case THREAD_READY:
-      // thread is ready to run and not blocked or suspended.
-      // will wake up and deal with the signal soon.
-      break;
-    case THREAD_RUNNING:
-      // thread is running (on another cpu)
-      // The following call is not essential.  It just makes the
-      // thread suspension happen sooner rather than at the next
-      // timer interrupt or syscall.
-      mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
-      break;
-    case THREAD_SUSPENDED:
-      // thread is suspended already
-      break;
-    case THREAD_BLOCKED:
-    case THREAD_BLOCKED_READ_LOCK:
-      // thread is blocked on something and marked interruptible
-      wait_queue_state_.UnblockIfInterruptible(this, ZX_ERR_INTERNAL_INTR_RETRY);
-      break;
-    case THREAD_SLEEPING:
-      // thread is sleeping
-      wait_queue_state_.UnsleepIfInterruptible(this, ZX_ERR_INTERNAL_INTR_RETRY);
-      break;
-  }
-
-  kcounter_add(thread_suspend_count, 1);
-  return ZX_OK;
 }
 
 zx_status_t Thread::RestrictedKick() {
@@ -484,20 +628,35 @@ zx_status_t Thread::RestrictedKick() {
 
   bool kicking_myself = (Thread::Current::Get() == this);
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  // Hold the thread's lock while we examine its state and figure out what to
+  // do.
+  cpu_mask_t ipi_mask{0};
+  {
+    SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::RestrictedKick")};
 
-  if (state() == THREAD_DEATH) {
-    return ZX_ERR_BAD_STATE;
+    if (state() == THREAD_DEATH) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    signals_.fetch_or(THREAD_SIGNAL_RESTRICTED_KICK, ktl::memory_order_relaxed);
+
+    if (state() == THREAD_RUNNING && !kicking_myself) {
+      // thread is running (on another cpu)
+      // Send an IPI after dropping this thread's lock to make sure that the
+      // thread processes the new signals. If the thread executes a regular
+      // syscall or is rescheduled the signals will also be processed then, but
+      // there's no upper bound on how long that could take.
+      //
+      // TODO(johngro) - what about a thread which is in a transient state
+      // (active migration or being stolen).  Should we skip the IPI and just
+      // make sure to force the scheduler to always re-evaluate pending signals
+      // after exiting a transient state?
+      ipi_mask = cpu_num_to_mask(scheduler_state_.curr_cpu_);
+    }
   }
 
-  signals_.fetch_or(THREAD_SIGNAL_RESTRICTED_KICK, ktl::memory_order_relaxed);
-
-  if (state() == THREAD_RUNNING && !kicking_myself) {
-    // thread is running (on another cpu)
-    // Send an interrupt to make sure that the thread processes the new signals.
-    // If the thread executes a regular syscall or is rescheduled the signals will
-    // also be processed then, but there's no upper bound on how long that could take.
-    mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
+  if (ipi_mask != 0) {
+    mp_interrupt(MP_IPI_TARGET_MASK, ipi_mask);
   }
 
   kcounter_add(thread_restricted_kick_count, 1);
@@ -513,7 +672,7 @@ zx_status_t Thread::RestrictedKick() {
 void Thread::Current::SignalPolicyException(uint32_t policy_exception_code,
                                             uint32_t policy_exception_data) {
   Thread* t = Thread::Current::Get();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{t->lock_, CLT_TAG("Thread::Current::SignalPolicyException")};
   t->signals_.fetch_or(THREAD_SIGNAL_POLICY_EXCEPTION, ktl::memory_order_relaxed);
   t->extra_policy_exception_code_ = policy_exception_code;
   t->extra_policy_exception_data_ = policy_exception_data;
@@ -529,36 +688,76 @@ void Thread::EraseFromListsLocked() {
 zx_status_t Thread::Join(int* out_retcode, zx_time_t deadline) {
   canary_.Assert();
 
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  // No thread should be attempting to join itself.
+  Thread* const current_thread = Thread::Current::Get();
+  DEBUG_ASSERT(this != current_thread);
 
-    if (flags_ & THREAD_FLAG_DETACHED) {
-      // the thread is detached, go ahead and exit
-      return ZX_ERR_BAD_STATE;
-    }
+  for (bool finished = false; !finished;) {
+    ChainLockTransactionIrqSave clt{CLT_TAG("Thread::Join")};
+    for (;; clt.Relax()) {
+      // Start by locking the global thread list lock, and the target thread's lock.
+      Guard<SpinLock, NoIrqSave> list_guard{&list_lock_};
+      UnconditionalChainLockGuard guard{lock_};
 
-    // wait for the thread to die
-    if (state() != THREAD_DEATH) {
-      zx_status_t status = task_state_.Join(deadline);
-      if (status != ZX_OK) {
-        return status;
+      if (flags_ & THREAD_FLAG_DETACHED) {
+        // the thread is detached, go ahead and exit
+        return ZX_ERR_BAD_STATE;
       }
+
+      // If we need to wait for our thread to die, we need exchange our current
+      // locks (the target thread's lock and the list lock) for the current thread
+      // and the wait_queue's lock.  If this operation fails with a back-off
+      // error, we need to drop all of our locks and try again.
+      if (state() != THREAD_DEATH) {
+        ktl::array lock_set{&current_thread->get_lock(), &task_state_.get_lock()};
+        if (AcquireChainLockSet(lock_set) == ChainLock::LockResult::kBackoff) {
+          continue;
+        }
+        current_thread->get_lock().AssertAcquired();
+        task_state_.get_lock().AssertAcquired();
+
+        // We now have all of the locks we need for this operation.
+        clt.Finalize();
+
+        // Now go ahead and drop our other locks, and block in the wait queue.
+        // This will release the wait queue's lock for us, and will release and
+        // re-acquire our thread's lock (as we block and eventually become
+        // rescheduled).  Once we are done waiting, drop the current thread's
+        // lock, then either start again, or propagate any wait error we encounter
+        // up the stack.
+        guard.Release();
+        list_guard.Release();
+        const zx_status_t status = task_state_.Join(current_thread, deadline);
+        current_thread->get_lock().Release();
+        if (status != ZX_OK) {
+          return status;
+        }
+
+        // break out of the lock-acquisition loop, but do not set the finished
+        // flag.  This way, we will start a ChainLockTransaction on the new
+        // check of the thread's state instead of attempting to use our already
+        // finalized transaction.
+        break;
+      }
+
+      canary_.Assert();
+      DEBUG_ASSERT(state() == THREAD_DEATH);
+      wait_queue_state_.AssertNotBlocked();
+
+      // save the return code
+      if (out_retcode) {
+        *out_retcode = task_state_.retcode();
+      }
+
+      // remove it from global lists
+      EraseFromListsLocked();
+
+      // Our canary_ will be cleared out in free_thread_resources, which
+      // explicitly invokes ~Thread.  Set the finished flag and break out of our
+      // retry loop, dropping our locks in the process.
+      finished = true;
+      break;
     }
-
-    canary_.Assert();
-    DEBUG_ASSERT(state() == THREAD_DEATH);
-    wait_queue_state_.AssertNotBlocked();
-
-    // save the return code
-    if (out_retcode) {
-      *out_retcode = task_state_.retcode();
-    }
-
-    // remove it from global lists
-    EraseFromListsLocked();
-
-    // Our canary_ will be cleared out in free_thread_resources, which
-    // explicitly invokes ~Thread.
   }
 
   free_thread_resources(this);
@@ -571,21 +770,33 @@ zx_status_t Thread::Join(int* out_retcode, zx_time_t deadline) {
 zx_status_t Thread::Detach() {
   canary_.Assert();
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("Thread::Detach")};
+  for (;; clt.Relax()) {
+    // Lock the target thread's state before proceeding.
+    UnconditionalChainLockGuard guard{lock_};
 
-  // if another thread is blocked inside Join() on this thread,
-  // wake them up with a specific return code
-  task_state_.WakeJoiners(ZX_ERR_BAD_STATE);
+    // Try to wake our joiners with the error "BAD_STATE" (the thread is now
+    // detached and can no longer be joined).  If we fail, we need to drop our
+    // locks and try again.  If we succeed, our transaction will be finalized
+    // and we can finish updating all of our state.
+    if (task_state_.TryWakeJoiners(ZX_ERR_BAD_STATE) == false) {
+      continue;
+    }
 
-  // if it's already dead, then just do what join would have and exit
-  if (state() == THREAD_DEATH) {
+    // If the target thread is not yet dead, flag it as detached and get out.
+    if (state() != THREAD_DEATH) {
+      flags_ |= THREAD_FLAG_DETACHED;
+      return ZX_OK;
+    }
+
+    // Looks like the thread has already died.  Make sure the DETACHED flag has
+    // been cleared (so that Join continues), then drop our lock and Join to
+    // finish the cleanup.
     flags_ &= ~THREAD_FLAG_DETACHED;  // makes sure Join continues
-    guard.Release();
-    return Join(nullptr, 0);
-  } else {
-    flags_ |= THREAD_FLAG_DETACHED;
-    return ZX_OK;
+    break;
   }
+
+  return Join(nullptr, 0);
 }
 
 // called back in the DPC worker thread to free the stack and/or the thread structure
@@ -594,67 +805,20 @@ void Thread::FreeDpc(Dpc* dpc) {
   Thread* t = dpc->arg<Thread>();
 
   t->canary_.Assert();
-  DEBUG_ASSERT(t->state() == THREAD_DEATH);
 
-  // grab and release the thread lock, which effectively serializes us with
-  // the thread that is queuing itself for destruction.
+  // grab and release the thread's lock, which effectively serializes us with
+  // the thread that is queuing itself for destruction.  It ensures that:
+  //
+  // 1) The thread is no longer on any lists or referenced in any way.
+  // 2) The thread is no longer assigned to any scheduler, and it has already
+  //    entered the scheduler for the final time.
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("Thread::FreeDpc")};
+    DEBUG_ASSERT(t->state() == THREAD_DEATH);
     ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   }
 
   free_thread_resources(t);
-}
-
-__NO_RETURN void Thread::Current::ExitLocked(int retcode) TA_REQ(thread_lock) {
-  Thread* current_thread = Thread::Current::Get();
-
-  // create a dpc on the stack to queue up a free.
-  // must be put at top scope in this function to force the compiler to keep it from
-  // reusing the stack before the function exits
-  Dpc free_dpc;
-
-  // enter the dead state
-  current_thread->set_death();
-  current_thread->task_state_.set_retcode(retcode);
-  current_thread->CallMigrateFnLocked(Thread::MigrateStage::Exiting);
-
-  // Make sure that we have released any wait queues we may have owned when we
-  // exited.  TODO(johngro):  Should we log a warning or take any other
-  // actions here?  Normally, if a thread exits while owning a wait queue, it
-  // means that it exited while holding some sort of mutex or other
-  // synchronization object which will now never be released.  This is usually
-  // Very Bad.  If any of the OwnedWaitQueues are being used for user-mode
-  // futexes, who can say what the right thing to do is.  In the case of a
-  // kernel mode mutex, it might be time to panic.
-  OwnedWaitQueue::DisownAllQueues(current_thread);
-
-  // Disable preemption to keep from switching to the DPC thread until the final
-  // reschedule.
-  current_thread->preemption_state().PreemptDisable();
-
-  // if we're detached, then do our teardown here
-  if (current_thread->flags_ & THREAD_FLAG_DETACHED) {
-    kcounter_add(thread_detached_exit_count, 1);
-
-    // remove it from global lists
-    current_thread->EraseFromListsLocked();
-
-    // queue a dpc to free the stack and, optionally, the thread structure
-    if (current_thread->stack_.base() || (current_thread->flags_ & THREAD_FLAG_FREE_STRUCT)) {
-      free_dpc = Dpc(&Thread::FreeDpc, current_thread);
-      zx_status_t status = free_dpc.QueueThreadLocked();
-      DEBUG_ASSERT(status == ZX_OK);
-    }
-  } else {
-    // signal if anyone is waiting
-    current_thread->task_state_.WakeJoiners(ZX_OK);
-  }
-
-  // Final reschedule.
-  Scheduler::RescheduleInternal();
-
-  panic("somehow fell through thread_exit()\n");
 }
 
 /**
@@ -667,16 +831,14 @@ __NO_RETURN void Thread::Current::ExitLocked(int retcode) TA_REQ(thread_lock) {
  * This will free any resources allocated by thread_create.
  */
 void Thread::Forget() {
+  DEBUG_ASSERT(Thread::Current::Get() != this);
+
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-
-    [[maybe_unused]] Thread* current_thread = Thread::Current::Get();
-    DEBUG_ASSERT(current_thread != this);
-
+    Guard<SpinLock, IrqSave> list_guard{&list_lock_};
+    SingletonChainLockGuardNoIrqSave guard{lock_, CLT_TAG("Thread::Forget")};
+    DEBUG_ASSERT(!wait_queue_state_.InWaitQueue());
     EraseFromListsLocked();
   }
-
-  DEBUG_ASSERT(!wait_queue_state_.InWaitQueue());
 
   free_thread_resources(this);
 }
@@ -688,131 +850,209 @@ void Thread::Forget() {
  *
  * This function does not return.
  */
-void Thread::Current::Exit(int retcode) {
-  Thread* current_thread = Thread::Current::Get();
+__NO_RETURN void Thread::Current::Exit(int retcode) {
+  // create a dpc on the stack to queue up a free.
+  // must be put at top scope in this function to force the compiler to keep it from
+  // reusing the stack before the function exits
+  Dpc free_dpc;
 
+  Thread* const current_thread = Thread::Current::Get();
   current_thread->canary_.Assert();
-  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   DEBUG_ASSERT(!current_thread->IsIdle());
 
   if (current_thread->user_thread_) {
-    DEBUG_ASSERT(!arch_ints_disabled() || !thread_lock.IsHeld());
+    DEBUG_ASSERT(!arch_ints_disabled());
     current_thread->user_thread_->ExitingCurrent();
   }
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  Thread::Current::ExitLocked(retcode);
+  // Start by locking this thread, and setting the flag which indicates that it
+  // can no longer be the owner of any OwnedWaitQueues in the system.  This will
+  // ensure that the OWQ code no longer allows the thread to become the owner of
+  // any queues.
+  //
+  AnnotatedAutoPreemptDisabler aapd;
+  InterruptDisableGuard irqd;
+  {
+    SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                           CLT_TAG("Thread::Current::Exit deny WQ ownership")};
+    current_thread->can_own_wait_queues_ = false;
+  }
+
+  // Now that that we can no longer own queues, we can disown any queues that we
+  // currently happen to own.
+  OwnedWaitQueue::DisownAllQueues(current_thread);
+
+  // Now, to complete the exit operation, we must be holding this thread's lock in
+  // addition to the global thread list lock.
+  bool queue_free_dpc{false};
+  {
+    Guard<SpinLock, NoIrqSave> list_guard{&list_lock_};
+    SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                           CLT_TAG("Thread::Current::Exit finish in list_guard")};
+
+    // enter the dead state and finish any migration.
+    Scheduler::RunInLockedCurrentScheduler([current_thread]() {
+      ChainLockTransaction::AssertActive();
+      current_thread->get_lock().AssertHeld();
+      current_thread->set_death();
+    });
+    current_thread->task_state_.set_retcode(retcode);
+    current_thread->CallMigrateFnLocked(Thread::MigrateStage::Exiting);
+
+    // if we're detached, then do our teardown here
+    if (current_thread->flags_ & THREAD_FLAG_DETACHED) {
+      kcounter_add(thread_detached_exit_count, 1);
+
+      // remove it from global lists and drop the global list lock.
+      current_thread->EraseFromListsLocked();
+      list_guard.Release();
+
+      // Remember to queue a dpc to free the stack and, optionally, the thread
+      // structure
+      //
+      // We are detached and will need to queue a DPC in order to clean up our
+      // thread structure and stack after we are gone.  Queueing a DPC will
+      // involve signaling the DPC thread, so we (technically) need to drop our
+      // thread's lock and end our current chain lock transaction  before doing
+      // so.
+      //
+      // Preemption is disabled, interrupts are off, and DPC threads always run
+      // on the CPU they were queued from.  Because of this, we can be sure that
+      // the DPC thread is not going to preempt us and free our stack out from
+      // under us before we manage to complete our final reschedule and context
+      // switch.
+      //
+      // TODO(johngro): I cannot think of a way where waking up a DPC thread
+      // should result in us deadlocking in a lock cycle.  Logically, our
+      // current thread is no longer visible to anyone.
+      //
+      // 1) We are the currently running thread in a scheduler which cannot
+      //    currently reschedule (until we drop into our final reschedule).
+      // 2) We are not in any wait queues.
+      // 3) We have become disconnected from our ThreadDispatcher and all
+      //    handles referring to it.
+      //
+      // Waking the DPC thread would involve holding the DPC thread's lock and
+      // its wait queues lock in order to remove the thread from the queue,
+      // followed by holding our schedulers lock to insert the DPC thread.
+      //
+      // In _theory_ it should be OK to use our existing ChainLockTransaction to
+      // queue the DPC while holding our thread's lock.  If we can prove that
+      // this is safe, it may be a good idea to come back here later and queue
+      // the DPC while holding the thread's lock, just to simplify the structure
+      // of the code around here.
+      if (current_thread->stack_.base() || (current_thread->flags_ & THREAD_FLAG_FREE_STRUCT)) {
+        queue_free_dpc = true;
+      }
+    } else {
+      // Looks like we didn't need the global list lock after all.  Drop it and
+      // signal anyone who is waiting to join us.
+      list_guard.Release();
+
+      // Our thread is both running, and exiting.  It is not a member of any
+      // wait queue, and cannot be rescheduled (preemption is disabled).  It
+      // should not be possible for it to be involved in any lock cycles, so we
+      // are free to keep trying to to wake our joiners until we finally
+      // succeed.
+      //
+      // Do not drop our thread's lock here, we *must* hold it until after the
+      // final reschedule is complete.  Failure to do this means that a joiner
+      // thread might wake up and free our stack out from under us before our
+      // final reschedule.
+      //
+      // TODO(johngro): TryWakeJoiners may need to lock a wait queue and more
+      // than one thread in order to wake the current set of joiners.  We have
+      // already finalized our transaction at this point, and are still holding
+      // a lock.  Bending the rules here requires that we do something we really
+      // don't want to be doing, which is to undo the Finalized state of the
+      // transaction while we are still holding a lock.
+      //
+      // It would be *much* cleaner if we didn't have to do this.  We would
+      // rather be in a position to drop our thread's lock and allow an
+      // unconditional wake of our joiners instead.
+      //
+      // So, look introducing a new lock (the thread cleanup spinlock?) which
+      // could provide us the protection we would need.  The idea would be:
+      //
+      // 1) Earlier in this function, obtain this new cleanup lock.
+      // 2) When we get to here, drop the thread's lock for the wakeup
+      //    operation.
+      // 3) Once wakeup is complete, re-obtain the thread's lock.
+      // 4) Drop the cleanup lock.
+      // 5) Enter the final reschedule.
+      //
+      // On the joiner/cleanup side of things, the last joiner out of the door
+      // would just need to:
+      //
+      // 1) Obtain the cleanup lock.
+      // 2) Obtain the thread's lock.
+      // 3) Drop all locks.  We have now synced up with everyone else and should
+      //    be free to cleanup the memory now.
+      ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
+      active_clt.Restart(CLT_TAG("Thread::Current::Exit wake joiners"));
+      while (current_thread->task_state_.TryWakeJoiners(ZX_OK) == false) {
+        // Note, we are still holding the current thread's lock, so we cannot
+        // fully relax the active CLT (which would demand that we hold zero
+        // locks).  See the note above about potentially finding a way to be
+        // able to drop the current thread's lock here.
+        arch::Yield();
+      }
+    }
+
+    if (!queue_free_dpc) {
+      // Drop into the final reschedule while still holding our lock.  There
+      // should be no coming back from this.  We may have gotten here because we
+      // were still joinable, or because we were detached but had a statically
+      // allocated stack/thread-struct, but either way, we don't need to drop and
+      // re-acquire our thread's lock in order to finish exiting at this point.
+      Scheduler::RescheduleInternal(current_thread);
+      panic("somehow fell through thread_exit()\n");
+    }
+  }
+
+  // It should not be possible to get to this point without needing to drop our
+  // locks and queue a DPC to clean ourselves up.
+  ASSERT(queue_free_dpc);
+  free_dpc = Dpc(&Thread::FreeDpc, current_thread);
+  [[maybe_unused]] zx_status_t status = free_dpc.Queue();
+  DEBUG_ASSERT(status == ZX_OK);
+
+  // Relock our thread one last time before dropping into our final reschedule
+  // operation.
+  SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                         CLT_TAG("Thread::Current::Exit final reschedule")};
+  Scheduler::RescheduleInternal(current_thread);
+  panic("somehow fell through thread_exit()\n");
 }
 
 void Thread::Current::Kill() {
   Thread* current_thread = Thread::Current::Get();
 
   current_thread->canary_.Assert();
-  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   DEBUG_ASSERT(!current_thread->IsIdle());
 
   current_thread->Kill();
 }
 
-// kill a thread
-void Thread::Kill() {
+cpu_mask_t Thread::SetCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
-
-  // Disable preemption to defer rescheduling until the end of this scope.
-  AnnotatedAutoPreemptDisabler preempt_disable;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-
-  // deliver a signal to the thread.
-  signals_.fetch_or(THREAD_SIGNAL_KILL, ktl::memory_order_relaxed);
-
-  // we are killing ourself
-  if (this == Thread::Current::Get()) {
-    return;
-  }
-
-  // general logic is to wake up the thread so it notices it had a signal delivered to it
-
-  switch (state()) {
-    case THREAD_INITIAL:
-      // thread hasn't been started yet.
-      // not really safe to wake it up, since it's only in this state because it's under
-      // construction by the creator thread.
-      break;
-    case THREAD_READY:
-      // thread is ready to run and not blocked or suspended.
-      // will wake up and deal with the signal soon.
-      // TODO: short circuit if it was blocked from user space
-      break;
-    case THREAD_RUNNING:
-      // thread is running (on another cpu).
-      // The following call is not essential.  It just makes the
-      // thread termination happen sooner rather than at the next
-      // timer interrupt or syscall.
-      mp_interrupt(MP_IPI_TARGET_MASK, cpu_num_to_mask(scheduler_state_.curr_cpu_));
-      break;
-    case THREAD_SUSPENDED:
-      // thread is suspended, resume it so it can get the kill signal
-      Scheduler::Unblock(this);
-      break;
-    case THREAD_BLOCKED:
-    case THREAD_BLOCKED_READ_LOCK:
-      // thread is blocked on something and marked interruptible
-      wait_queue_state_.UnblockIfInterruptible(this, ZX_ERR_INTERNAL_INTR_KILLED);
-      break;
-    case THREAD_SLEEPING:
-      // thread is sleeping
-      wait_queue_state_.UnsleepIfInterruptible(this, ZX_ERR_INTERNAL_INTR_KILLED);
-      break;
-    case THREAD_DEATH:
-      // thread is already dead
-      return;
-  }
+  return Scheduler::SetCpuAffinity<Affinity::Hard>(*this, affinity);
 }
 
 cpu_mask_t Thread::GetCpuAffinity() const {
   canary_.Assert();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::GetCpuAffinity")};
   return scheduler_state_.hard_affinity();
-}
-
-cpu_mask_t Thread::SetCpuAffinity(cpu_mask_t affinity) {
-  canary_.Assert();
-  DEBUG_ASSERT_MSG(
-      (affinity & mp_get_active_mask()) != 0,
-      "Attempted to set affinity mask to %#x, which has no overlap of active CPUs %#x.", affinity,
-      mp_get_active_mask());
-
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-
-  const cpu_mask_t previous_affinity = scheduler_state_.hard_affinity();
-  scheduler_state_.hard_affinity_ = affinity;
-
-  // Migrate to a different CPU if the current is no longer in the affinity mask.
-  if ((affinity & cpu_num_to_mask(arch_curr_cpu_num())) == 0) {
-    Scheduler::Migrate(this);
-  }
-
-  return previous_affinity;
 }
 
 cpu_mask_t Thread::SetSoftCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-
-  const cpu_mask_t previous_affinity = scheduler_state_.soft_affinity();
-  scheduler_state_.soft_affinity_ = affinity;
-
-  // Migrate to a different CPU if the current is no longer in the affinity mask.
-  if ((affinity & cpu_num_to_mask(arch_curr_cpu_num())) == 0) {
-    Scheduler::Migrate(this);
-  }
-
-  return previous_affinity;
+  return Scheduler::SetCpuAffinity<Affinity::Soft>(*this, affinity);
 }
 
 cpu_mask_t Thread::GetSoftCpuAffinity() const {
   canary_.Assert();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::GetSoftCpuAffinity")};
   return scheduler_state_.soft_affinity_;
 }
 
@@ -821,47 +1061,54 @@ void Thread::Current::MigrateToCpu(const cpu_num_t target_cpu) {
 }
 
 void Thread::SetMigrateFn(MigrateFn migrate_fn) {
-  canary_.Assert();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  Guard<SpinLock, IrqSave> list_guard{&get_list_lock()};
+  SingletonChainLockGuardNoIrqSave thread_guard{lock_, CLT_TAG("Thread::SetMigrateFn")};
   SetMigrateFnLocked(ktl::move(migrate_fn));
 }
 
 void Thread::SetMigrateFnLocked(MigrateFn migrate_fn) {
-  DEBUG_ASSERT(!migrate_fn || !migrate_pending_);
-  canary_.Assert();
-  // If |migrate_fn_| was previously set, remove |this| from |migrate_list_|.
-  if (migrate_fn_) {
-    migrate_list_.erase(*this);
-  }
+  Scheduler::RunInThreadsSchedulerLocked(this, [this, &migrate_fn]() {
+    ChainLockTransaction::AssertActive();
+    get_lock().AssertHeld();
+    get_list_lock().lock().AssertHeld();
 
-  migrate_fn_ = ktl::move(migrate_fn);
+    // We should never be assigning a new migration function while there is a
+    // migration still in progress.
+    DEBUG_ASSERT(!migrate_fn || !migrate_pending_);
 
-  // Clear stale state when (un) setting the migrate fn.
-  // TODO(https://fxbug.dev/42164826): Cleanup the migrate fn feature and associated state
-  // and clearly define and check invariants.
-  scheduler_state().next_cpu_ = INVALID_CPU;
-  migrate_pending_ = false;
+    // If |migrate_fn_| was previously set, remove |this| from |migrate_list_|.
+    if (migrate_fn_) {
+      migrate_list_.erase(*this);
+    }
 
-  // If |migrate_fn_| is valid, add |this| to |migrate_list_|.
-  if (migrate_fn_) {
-    migrate_list_.push_front(this);
-  }
+    migrate_fn_ = ktl::move(migrate_fn);
+
+    // Clear stale state when (un) setting the migrate fn.
+    //
+    // TODO(https://fxbug.dev/42164826): Cleanup the migrate fn feature and associated state
+    // and clearly define and check invariants.
+    migrate_pending_ = false;
+
+    // If |migrate_fn_| is valid, add |this| to |migrate_list_|.
+    if (migrate_fn_) {
+      migrate_list_.push_front(this);
+    }
+  });
 }
 
 void Thread::CallMigrateFnLocked(MigrateStage stage) {
   if (unlikely(migrate_fn_)) {
     switch (stage) {
       case MigrateStage::Before:
-        // We are leaving our last CPU and calling our migration function as we
-        // go.  Assert that we are running on the proper CPU, and clear our last
-        // cpu bookkeeping to indicate that the migration has started.
-        DEBUG_ASSERT_MSG(scheduler_state().last_cpu_ == arch_curr_cpu_num(),
-                         "Attempting to run Before stage of migration on a CPU "
-                         "which is not the last CPU the thread ran on (last cpu = "
-                         "%u, curr cpu = %u)\n",
-                         scheduler_state().last_cpu_, arch_curr_cpu_num());
-        scheduler_state().last_cpu_ = INVALID_CPU;
         if (!migrate_pending_) {
+          // We are leaving our last CPU and calling our migration function as we
+          // go.  Assert that we are running on the proper CPU, and clear our last
+          // cpu bookkeeping to indicate that the migration has started.
+          DEBUG_ASSERT_MSG(scheduler_state().last_cpu_ == arch_curr_cpu_num(),
+                           "Attempting to run Before stage of migration on a CPU "
+                           "which is not the last CPU the thread ran on (last cpu = "
+                           "%u, curr cpu = %u)\n",
+                           scheduler_state().last_cpu_, arch_curr_cpu_num());
           migrate_pending_ = true;
           migrate_fn_(this, stage);
         }
@@ -881,8 +1128,20 @@ void Thread::CallMigrateFnLocked(MigrateStage stage) {
   }
 }
 
-void Thread::CallMigrateFnForCpuLocked(cpu_num_t cpu) {
+// Go over every thread which has a migrate function assigned to it, and which
+// last ran on the current CPU, but is not in the ready state.  The current CPU
+// is becoming unavailable, and the currently running thread is the last change
+// anything is going to have to run on this CPU for a while.  If there are
+// threads out there which are blocked, but which need to record some per-cpu
+// state (eg; VCPU threads), this will be their last chance to do so.  The next
+// time they become scheduled to run, they are going to run on a different CPU.
+void Thread::CallMigrateFnForCpu(cpu_num_t cpu) {
+  DEBUG_ASSERT(arch_ints_disabled());
+  Guard<SpinLock, NoIrqSave> list_guard{&list_lock_};
+
   for (auto& thread : migrate_list_) {
+    SingletonChainLockGuardNoIrqSave thread_guard{thread.lock_,
+                                                  CLT_TAG("Thread::CallMigrateFnForCpu")};
     if (thread.state() != THREAD_READY && thread.scheduler_state().last_cpu_ == cpu) {
       thread.CallMigrateFnLocked(Thread::MigrateStage::Before);
     }
@@ -891,7 +1150,7 @@ void Thread::CallMigrateFnForCpuLocked(cpu_num_t cpu) {
 
 void Thread::SetContextSwitchFn(ContextSwitchFn context_switch_fn) {
   canary_.Assert();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::SetContextSwitchFn")};
   SetContextSwitchFnLocked(ktl::move(context_switch_fn));
 }
 
@@ -901,8 +1160,6 @@ void Thread::SetContextSwitchFnLocked(ContextSwitchFn context_switch_fn) {
 }
 
 bool Thread::CheckKillSignal() {
-  thread_lock.AssertHeld();
-
   if (signals() & THREAD_SIGNAL_KILL) {
     // Ensure we don't recurse into thread_exit.
     DEBUG_ASSERT(state() != THREAD_DEATH);
@@ -925,7 +1182,7 @@ zx_status_t Thread::CheckKillOrSuspendSignal() const {
 
 // finish suspending the current thread
 void Thread::Current::DoSuspend() {
-  Thread* current_thread = Thread::Current::Get();
+  Thread* const current_thread = Thread::Current::Get();
 
   // Note: After calling this callback, we must not return without
   // calling the callback with THREAD_USER_STATE_RESUME.  That is
@@ -933,37 +1190,51 @@ void Thread::Current::DoSuspend() {
   // safe for the zx_thread_read_state()/zx_thread_write_state()
   // syscalls to access the userland register state kept by Thread.
   if (current_thread->user_thread_) {
-    DEBUG_ASSERT(!arch_ints_disabled() || !thread_lock.IsHeld());
+    DEBUG_ASSERT(!arch_ints_disabled());
     current_thread->user_thread_->Suspending();
   }
 
+  bool do_exit{false};
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    // Hold the thread's lock while we set up the suspend operation.
+    SingletonChainLockGuardIrqSave guard{current_thread->lock_,
+                                         CLT_TAG("Thread::Current::DoSuspend")};
 
     // make sure we haven't been killed while the lock was dropped for the user callback
     if (current_thread->CheckKillSignal()) {
-      guard.Release();
-      Thread::Current::Exit(0);
+      // Exit the thread, but only after we have dropped our locks and
+      // re-enabled IRQs.
+      do_exit = true;
     }
-
     // Make sure the suspend signal wasn't cleared while we were running the
     // callback.
-    if (current_thread->signals() & THREAD_SIGNAL_SUSPEND) {
-      current_thread->set_suspended();
+    else if (current_thread->signals() & THREAD_SIGNAL_SUSPEND) {
+      Scheduler::RunInLockedCurrentScheduler([current_thread]() {
+        ChainLockTransaction::AssertActive();
+        current_thread->get_lock().AssertHeld();
+        current_thread->set_suspended();
+      });
       current_thread->signals_.fetch_and(~THREAD_SIGNAL_SUSPEND, ktl::memory_order_relaxed);
 
-      // directly invoke the context switch, since we've already manipulated this thread's state
-      Scheduler::RescheduleInternal();
+      // directly invoke the context switch, since we've already manipulated
+      // this thread's state. Note that our thread's lock will be dropped and
+      // re-acquired as we block and later become re-scheduled.
+      Scheduler::RescheduleInternal(current_thread);
 
-      // If the thread was killed, we should not allow it to resume.  We
-      // shouldn't call user_callback() with THREAD_USER_STATE_RESUME in
-      // this case, because there might not have been any request to
-      // resume the thread.
+      // If the thread was killed while we were suspended, we should not allow
+      // it to resume.  We shouldn't call user_callback() with
+      // THREAD_USER_STATE_RESUME in this case, because there might not have
+      // been any request to resume the thread.
       if (current_thread->CheckKillSignal()) {
-        guard.Release();
-        Thread::Current::Exit(0);
+        // Exit the thread, but only after we have dropped our locks and
+        // re-enabled IRQs.
+        do_exit = true;
       }
     }
+  }
+
+  if (do_exit) {
+    Thread::Current::Exit(0);
   }
 
   if (current_thread->user_thread_) {
@@ -1021,7 +1292,6 @@ void Thread::Current::DoSampleStack(GeneralRegsSource source, void* gregs) {
 }
 
 bool Thread::SaveUserStateLocked() {
-  thread_lock.AssertHeld();
   DEBUG_ASSERT(this == Thread::Current::Get());
   DEBUG_ASSERT(user_thread_ != nullptr);
 
@@ -1034,7 +1304,6 @@ bool Thread::SaveUserStateLocked() {
 }
 
 void Thread::RestoreUserStateLocked() {
-  thread_lock.AssertHeld();
   DEBUG_ASSERT(this == Thread::Current::Get());
   DEBUG_ASSERT(user_thread_ != nullptr);
 
@@ -1045,15 +1314,19 @@ void Thread::RestoreUserStateLocked() {
 
 ScopedThreadExceptionContext::ScopedThreadExceptionContext(const arch_exception_context_t* context)
     : thread_(Thread::Current::Get()), context_(context) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{thread_->get_lock(),
+                                       CLT_TAG("ScopedThreadExceptionContext")};
+
   // It's possible that the context and state have been installed/saved earlier in the call chain.
-  // If so, then it's some other object's responsibilty to remove/restore.
+  // If so, then it's some other object's responsibility to remove/restore.
   need_to_remove_ = arch_install_exception_context(thread_, context_);
   need_to_restore_ = thread_->SaveUserStateLocked();
 }
 
 ScopedThreadExceptionContext::~ScopedThreadExceptionContext() {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{thread_->get_lock(),
+                                       CLT_TAG("~ScopedThreadExceptionContext")};
+
   // Did we save the state?  If so, then it's our job to restore it.
   if (need_to_restore_) {
     thread_->RestoreUserStateLocked();
@@ -1092,8 +1365,9 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       // this thread has user mode component, call arch_set_suspended_general_regs() to make the
       // general registers available to a debugger during the exception.
       if (current_thread->user_thread_) {
-        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
-        Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread's lock here?
+        SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                               CLT_TAG("Thread::Current::ProcessPendingSignals")};
         arch_set_suspended_general_regs(current_thread, source, gregs);
       }
 
@@ -1120,8 +1394,9 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       uint32_t policy_exception_code;
       uint32_t policy_exception_data;
       {
-        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
-        Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread's lock here?
+        SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                               CLT_TAG("Thread::Current::ProcessPendingSignals")};
 
         // Policy exceptions are user-visible so must make the general register state available to
         // a debugger.
@@ -1141,8 +1416,9 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       arch_disable_ints();
 
       {
-        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
-        Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread's lock here?
+        SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                               CLT_TAG("Thread::Current::ProcessPendingSignals")};
         arch_reset_suspended_general_regs(current_thread);
       }
     }
@@ -1153,8 +1429,9 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       if (has_user_thread) {
         bool saved;
         {
-          // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
-          Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+          // TODO(https://fxbug.dev/42076855): Do we need to hold the thread's lock here?
+          SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                                 CLT_TAG("Thread::Current::ProcessPendingSignals")};
 
           // This thread has been asked to suspend.  When a user thread is suspended, its full
           // register state (not just the general purpose registers) is accessible to a debugger.
@@ -1173,8 +1450,9 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
         arch_disable_ints();
 
         {
-          // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
-          Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+          // TODO(https://fxbug.dev/42076855): Do we need to hold the thread's lock here?
+          SingletonChainLockGuardNoIrqSave guard{current_thread->lock_,
+                                                 CLT_TAG("Thread::Current::ProcessPendingSignals")};
 
           if (saved) {
             current_thread->RestoreUserStateLocked();
@@ -1260,16 +1538,16 @@ bool Thread::Current::CheckForRestrictedKick() {
  * no other threads are waiting to execute.
  */
 void Thread::Current::Yield() {
-  [[maybe_unused]] Thread* current_thread = Thread::Current::Get();
+  Thread* current_thread = Thread::Current::Get();
 
   current_thread->canary_.Assert();
-  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   DEBUG_ASSERT(!arch_blocking_disallowed());
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{current_thread->lock_, CLT_TAG("Thread::Current::Yield")};
+  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
 
   CPU_STATS_INC(yields);
-  Scheduler::Yield();
+  Scheduler::Yield(current_thread);
 }
 
 /**
@@ -1282,15 +1560,12 @@ void Thread::Current::Preempt() {
   Thread* current_thread = Thread::Current::Get();
 
   current_thread->canary_.Assert();
-  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   DEBUG_ASSERT(!arch_blocking_disallowed());
 
   if (!current_thread->IsIdle()) {
     // only track when a meaningful preempt happens
     CPU_STATS_INC(irq_preempts);
   }
-
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
   Scheduler::Preempt();
 }
@@ -1306,12 +1581,13 @@ void Thread::Current::Reschedule() {
   Thread* current_thread = Thread::Current::Get();
 
   current_thread->canary_.Assert();
-  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   DEBUG_ASSERT(!arch_blocking_disallowed());
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{current_thread->lock_,
+                                       CLT_TAG("Thread::Current::Reschedule")};
 
-  Scheduler::Reschedule();
+  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
+  Scheduler::Reschedule(current_thread);
 }
 
 void PreemptionState::SetPreemptionTimerForExtension(zx_time_t deadline) {
@@ -1326,37 +1602,29 @@ void PreemptionState::FlushPendingContinued(Flush flush) {
   // local may trigger a reschedule.
   DEBUG_ASSERT(((flush & FlushLocal) == 0) || !arch_blocking_disallowed());
 
-  const auto do_flush = [this, flush]() TA_REQ(thread_lock) {
-    // Recheck, pending preemptions could have been flushed by a context switch
-    // before interrupts were disabled.
-    const cpu_mask_t pending_mask = preempts_pending_;
-
-    // If there is a pending local preemption the scheduler will take care of
-    // flushing all pending reschedules.
-    const cpu_mask_t current_cpu_mask = cpu_num_to_mask(arch_curr_cpu_num());
-    if ((pending_mask & current_cpu_mask) != 0 && (flush & FlushLocal) != 0) {
-      // Clear the local preempt pending flag before calling preempt.  Failure
-      // to do this can cause recursion during Scheduler::Preempt if any code
-      // (such as debug tracing code) attempts to disable and re-enable
-      // preemption during the scheduling operation.
-      preempts_pending_ &= ~current_cpu_mask;
-      Scheduler::Preempt();
-    } else if ((flush & FlushRemote) != 0) {
-      // The current cpu is ignored by mp_reschedule if present in the mask.
-      mp_reschedule(pending_mask, 0);
-      preempts_pending_ &= current_cpu_mask;
-    }
-  };
-
-  // This method may be called with interrupts enabled or disabled and with or
-  // without holding the thread lock.
   InterruptDisableGuard interrupt_disable;
-  if (thread_lock.IsHeld()) {
-    thread_lock.AssertHeld();
-    do_flush();
-  } else {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    do_flush();
+  // Recheck, pending preemptions could have been flushed by a context switch
+  // before interrupts were disabled.
+  const cpu_mask_t pending_mask = preempts_pending_;
+
+  // If there is a pending local preemption the scheduler will take care of
+  // flushing all pending reschedules.
+  const cpu_mask_t current_cpu_mask = cpu_num_to_mask(arch_curr_cpu_num());
+  if ((pending_mask & current_cpu_mask) != 0 && (flush & FlushLocal) != 0) {
+    // Clear the local preempt pending flag before calling preempt.  Failure
+    // to do this can cause recursion during Scheduler::Preempt if any code
+    // (such as debug tracing code) attempts to disable and re-enable
+    // preemption during the scheduling operation.
+    preempts_pending_ &= ~current_cpu_mask;
+
+    // TODO(johngro): We cannot be holding the current thread's lock while we do
+    // this.  Is there a good way to enforce this requirement via either static
+    // annotation or dynamic checks?
+    Scheduler::Preempt();
+  } else if ((flush & FlushRemote) != 0) {
+    // The current cpu is ignored by mp_reschedule if present in the mask.
+    mp_reschedule(pending_mask, 0);
+    preempts_pending_ &= current_cpu_mask;
   }
 }
 
@@ -1368,21 +1636,28 @@ void Thread::SleepHandler(Timer* timer, zx_time_t now, void* arg) {
 }
 
 void Thread::HandleSleep(Timer* timer, zx_time_t now) {
-  // spin trylocking on the thread lock since the routine that set up the callback,
-  // thread_sleep_etc, may be trying to simultaneously cancel this timer while holding the
-  // thread_lock.
-  if (timer->TrylockOrCancel(&thread_lock)) {
+  // spin trylocking on the thread lock since the routine that set up the
+  // callback, thread_sleep_etc, may be trying to simultaneously cancel this
+  // timer while holding the thread_lock.
+  ChainLockTransactionIrqSave clt{CLT_TAG("HandleSleep")};
+  if (timer->TrylockOrCancel(lock_)) {
     return;
   }
+
+  // We only need to be holding the thread's lock in order "unsleep" it.  It is
+  // not waiting in a wait queue, so there is no WaitQueue lock which needs to
+  // be held.
+  clt.Finalize();
 
   if (state() != THREAD_SLEEPING) {
-    thread_lock.Release();
+    lock_.Release();
     return;
   }
 
-  // Unblock the thread, regardless of whether the sleep was interruptible.
+  // Unblock the thread, regardless of whether the sleep was interruptible.  Not
+  // that calling Unsleep will cause the scheduler to drop the thread's lock for
+  // us after it has been successfully assigned to a scheduler instance.
   wait_queue_state_.Unsleep(this, ZX_OK);
-  thread_lock.Release();
 }
 
 #define MIN_SLEEP_SLACK ZX_USEC(1)
@@ -1416,7 +1691,6 @@ zx_status_t Thread::Current::SleepEtc(const Deadline& deadline, Interruptible in
   Thread* current_thread = Thread::Current::Get();
 
   current_thread->canary_.Assert();
-  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
   DEBUG_ASSERT(!current_thread->IsIdle());
   DEBUG_ASSERT(!arch_blocking_disallowed());
 
@@ -1426,28 +1700,45 @@ zx_status_t Thread::Current::SleepEtc(const Deadline& deadline, Interruptible in
   }
 
   Timer timer;
+  zx_status_t final_blocked_status;
+  {
+    SingletonChainLockGuardIrqSave guard{current_thread->lock_,
+                                         CLT_TAG("Thread::Current::SleepEtc")};
+    DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-
-  // if we've been killed and going in interruptible, abort here
-  if (interruptible == Interruptible::Yes && unlikely((current_thread->signals()))) {
-    if (current_thread->signals() & THREAD_SIGNAL_KILL) {
-      return ZX_ERR_INTERNAL_INTR_KILLED;
-    } else {
-      return ZX_ERR_INTERNAL_INTR_RETRY;
+    // if we've been killed and going in interruptible, abort here
+    if (interruptible == Interruptible::Yes && unlikely((current_thread->signals()))) {
+      if (current_thread->signals() & THREAD_SIGNAL_KILL) {
+        return ZX_ERR_INTERNAL_INTR_KILLED;
+      } else {
+        return ZX_ERR_INTERNAL_INTR_RETRY;
+      }
     }
+
+    // set a one shot timer to wake us up and reschedule
+    timer.Set(deadline, &Thread::SleepHandler, current_thread);
+
+    current_thread->set_sleeping();
+    current_thread->wait_queue_state_.Block(current_thread, interruptible, ZX_OK);
+
+    // Once we wake up again, we will be holding the current thread's lock once
+    // again.  That said, the lock had been dropped, and was re-acquired while we
+    // were blocked.  Stash our BlockedStatus while we are still holding our lock,
+    // but make sure to drop the lock before we call into timer.Cancel().
+    //
+    // When we call into timer.Cancel(), if we discover a timer callback in
+    // flight, we are going to spin until the timer callback flags itself as
+    // completed, ensuring that it is safe for the Timer on our stack to be
+    // destroyed.  The timer callback is going to need this lock as well, if it
+    // gets run, however.  So, if we are still holding our lock when we call
+    // cancel, we risk deadlock.
+    //
+    // always cancel the timer, since we may be racing with the timer tick on
+    // other cpus
+    final_blocked_status = current_thread->wait_queue_state_.BlockedStatus();
   }
-
-  // set a one shot timer to wake us up and reschedule
-  timer.Set(deadline, &Thread::SleepHandler, current_thread);
-
-  current_thread->set_sleeping();
-  current_thread->wait_queue_state_.Block(interruptible, ZX_OK);
-
-  // always cancel the timer, since we may be racing with the timer tick on other cpus
   timer.Cancel();
-
-  return current_thread->wait_queue_state_.BlockedStatus();
+  return final_blocked_status;
 }
 
 zx_status_t Thread::Current::Sleep(zx_time_t deadline) {
@@ -1471,11 +1762,11 @@ zx_status_t Thread::Current::SleepInterruptible(zx_time_t deadline) {
 /**
  * @brief Return the number of nanoseconds a thread has been running for.
  *
- * This takes the thread_lock to ensure there are no races while calculating the
- * runtime of the thread.
+ * This takes the thread's lock to ensure there are no races while calculating
+ * the runtime of the thread.
  */
 zx_duration_t Thread::Runtime() const {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::Runtime")};
 
   zx_duration_t runtime = scheduler_state_.runtime_ns();
   if (state() == THREAD_RUNNING) {
@@ -1492,7 +1783,7 @@ zx_duration_t Thread::Runtime() const {
  * thread has never run.
  */
 cpu_num_t Thread::LastCpu() const {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::LastCpu")};
   return scheduler_state_.last_cpu_;
 }
 
@@ -1513,26 +1804,32 @@ void thread_construct_first(Thread* t, const char* name) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   construct_thread(t, name);
-  t->set_detached(true);
 
-  // Setup the scheduler state.
-  Scheduler::InitializeFirstThread(t);
+  auto InitThreadState = [](Thread* const t) TA_NO_THREAD_SAFETY_ANALYSIS {
+    t->set_detached(true);
 
-  // Start out with preemption disabled to avoid attempts to reschedule until
-  // threading is fulling enabled. This simplifies code paths shared between
-  // initialization and runtime (e.g. logging). Preemption is enabled when the
-  // idle thread for the current CPU is ready.
-  t->preemption_state().PreemptDisable();
+    // Setup the scheduler state.
+    Scheduler::InitializeFirstThread(t);
 
-  arch_thread_construct_first(t);
+    // Start out with preemption disabled to avoid attempts to reschedule until
+    // threading is fulling enabled. This simplifies code paths shared between
+    // initialization and runtime (e.g. logging). Preemption is enabled when the
+    // idle thread for the current CPU is ready.
+    t->preemption_state().PreemptDisable();
 
-  // Take care not to touch any locks when invoked by early init code that runs
-  // before global ctors are called. The thread_list is safe to mutate before
-  // global ctors are run.
+    arch_thread_construct_first(t);
+  };
+
+  // Take care not to touch any global locks when invoked by early init code
+  // that runs before global ctors are called. The thread_list is safe to mutate
+  // before global ctors are run.
   if (lk_global_constructors_called()) {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    Guard<SpinLock, IrqSave> list_guard{&Thread::get_list_lock()};
+    SingletonChainLockGuardNoIrqSave thread_guard{t->get_lock(), CLT_TAG("thread_construct_first")};
+    InitThreadState(t);
     thread_list->push_front(t);
   } else {
+    InitThreadState(t);
     [t]() TA_NO_THREAD_SAFETY_ANALYSIS { thread_list->push_front(t); }();
   }
 }
@@ -1547,7 +1844,7 @@ void thread_init_early() {
 
   // Initialize the thread list. This needs to be done manually now, since initial thread code
   // manipulates the list before global constructors are run.
-  thread_list.Initialize();
+  []() TA_NO_THREAD_SAFETY_ANALYSIS { thread_list.Initialize(); }();
 
   // Init the boot percpu data.
   percpu::InitializeBoot();
@@ -1575,27 +1872,6 @@ void Thread::Current::SetName(const char* name) {
  */
 void Thread::SetBaseProfile(const SchedulerState::BaseProfile& profile) {
   canary_.Assert();
-  // It is not sufficient to simply hold the thread lock while changing the
-  // profile of a thread. Doing so runs the risk that a change to a PI graph
-  // results in another thread becoming "more runnable" than we are, and then
-  // immediately context switching to that thread.
-  //
-  // Basically, when we interact with the scheduler, we cannot always think of
-  // the thread lock as a lock.  While we cannot take any interrupts, and no
-  // other threads can access our object's state, we _can_ accidentally give up
-  // our timeslice to another thread, and the thread lock as well in the
-  // process.  That thread can then (rarely) end up calling back into object
-  // state we are modifying (like, an OwnedWaitQueue) which could end up being
-  // Very Bad.
-  //
-  // By adding an AutoPreemptDisabler, we can make the thread_lock behave more
-  // like a real lock (at least for the OWQ state).  Interactions with the
-  // scheduler might result in another thread needing to run, but at least we
-  // will have have deferred that until we are finished interacting with our
-  // queue and have dropped the thread lock.
-  AnnotatedAutoPreemptDisabler apd;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  this->get_lock().AssertHeld();
   OwnedWaitQueue::SetThreadBaseProfileAndPropagate(*this, profile);
 }
 
@@ -1609,6 +1885,8 @@ void Thread::SetBaseProfile(const SchedulerState::BaseProfile& profile) {
  */
 void Thread::SetUsermodeThread(fbl::RefPtr<ThreadDispatcher> user_thread) {
   canary_.Assert();
+
+  SingletonChainLockGuardIrqSave thread_guard{lock_, CLT_TAG("Thread::SetUsermodeThread")};
   DEBUG_ASSERT(state() == THREAD_INITIAL);
   DEBUG_ASSERT(!user_thread_);
 
@@ -1634,45 +1912,42 @@ void Thread::Current::BecomeIdle() {
   Thread* t = Thread::Current::Get();
   cpu_num_t curr_cpu = arch_curr_cpu_num();
 
-  // Set our name
-  char name[16];
-  snprintf(name, sizeof(name), "idle %u", curr_cpu);
-  Thread::Current::SetName(name);
-
-  // Mark ourself as idle
-  t->flags_ |= THREAD_FLAG_IDLE;
-
-  // Now that we are the idle thread, make sure that we drop out of the
-  // scheduler's bookkeeping altogether.
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    // Hold our own lock while we fix up our bookkeeping
+    SingletonChainLockGuardNoIrqSave thread_guard{t->lock_, CLT_TAG("Thread::Current::BecomeIdle")};
+
+    // Set our name
+    char name[16];
+    snprintf(name, sizeof(name), "idle %u", curr_cpu);
+    Thread::Current::SetName(name);
+
+    // Mark ourself as idle
+    t->flags_ |= THREAD_FLAG_IDLE;
+
+    // Now that we are the idle thread, make sure that we drop out of the
+    // scheduler's bookkeeping altogether.
     Scheduler::RemoveFirstThread(t);
+    t->set_running();
+
+    // Cpu is active.
+    mp_set_curr_cpu_active(true);
+    mp_set_cpu_idle(curr_cpu);
+
+    // Pend a preemption to ensure a reschedule.
+    arch_set_blocking_disallowed(true);
+    t->preemption_state().PreemptSetPending();
+    arch_set_blocking_disallowed(false);
   }
-  t->set_running();
 
-  // Cpu is active.
-  mp_set_curr_cpu_active(true);
-  mp_set_cpu_idle(curr_cpu);
-
-  // Pend a preemption to ensure a reschedule.
-  arch_set_blocking_disallowed(true);
-  t->preemption_state().PreemptSetPending();
-  arch_set_blocking_disallowed(false);
-
+  // Signal that our current CPU is now ready before we re-enable interrupts,
+  // re-enable preemption, and finally drop into our idle routine, and never
+  // return.
   mp_signal_curr_cpu_ready();
-
-  // Enable preemption to start scheduling. Preemption is disabled during early
-  // threading startup on each CPU to prevent incidental thread wakeups (e.g.
-  // due to logging) from rescheduling on the local CPU before the idle thread
-  // is ready.
+  arch_enable_ints();
   t->preemption_state().PreemptReenable();
   DEBUG_ASSERT(t->preemption_state().PreemptIsEnabled());
 
-  // We're now properly in the idle routine. Reenable interrupts and drop
-  // into the idle routine, never return.
-  arch_enable_ints();
   IdlePowerThread::Run(nullptr);
-
   __UNREACHABLE;
 }
 
@@ -1731,8 +2006,9 @@ void thread_secondary_cpu_entry() {
 
   // Remove ourselves from the Scheduler's bookkeeping.
   {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    Scheduler::RemoveFirstThread(Thread::Current::Get());
+    Thread& current = *Thread::Current::Get();
+    SingletonChainLockGuardIrqSave guard{current.get_lock(), CLT_TAG("thread_secondary_cpu_entry")};
+    Scheduler::RemoveFirstThread(&current);
   }
 
   mp_signal_curr_cpu_ready();
@@ -1756,17 +2032,23 @@ Thread* Thread::CreateIdleThread(cpu_num_t cpu_num) {
   if (t == nullptr) {
     return t;
   }
-  t->flags_ |= THREAD_FLAG_IDLE | THREAD_FLAG_DETACHED;
-  t->scheduler_state_.hard_affinity_ = cpu_num_to_mask(cpu_num);
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  Scheduler::UnblockIdle(t);
+  {
+    SingletonChainLockGuardIrqSave guard{t->lock_, CLT_TAG("Thread::CreateIdleThread")};
+
+    t->flags_ |= THREAD_FLAG_IDLE | THREAD_FLAG_DETACHED;
+    t->scheduler_state_.hard_affinity_ = cpu_num_to_mask(cpu_num);
+
+    Scheduler::UnblockIdle(t);
+  }
   return t;
 }
 
 void Thread::ReviveIdlePowerThread(cpu_num_t cpu_num) {
   DEBUG_ASSERT(cpu_num != 0 && cpu_num < SMP_MAX_CPUS);
   Thread* thread = &percpu::Get(cpu_num).idle_power_thread.thread();
+
+  SingletonChainLockGuardIrqSave guard{thread->lock_, CLT_TAG("Thread::ReviveIdlePowerThread")};
 
   DEBUG_ASSERT(thread->flags() & THREAD_FLAG_IDLE);
   DEBUG_ASSERT(thread->scheduler_state().hard_affinity() == cpu_num_to_mask(cpu_num));
@@ -1832,8 +2114,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
   t->OwnerName(oname);
 
   char profile_str[64]{0};
-  if (const SchedulerState::EffectiveProfile ep =
-          t->scheduler_state().SnapshotEffectiveProfileLocked();
+  if (const SchedulerState::EffectiveProfile& ep = t->scheduler_state().effective_profile();
       ep.IsFair()) {
     snprintf(profile_str, sizeof(profile_str), "Fair (w %ld)", ep.fair.weight.raw_value());
   } else {
@@ -1864,7 +2145,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
             t->wait_queue_state().interruptible_ == Interruptible::Yes ? "yes" : "no",
             t->wait_queue_state().owned_wait_queues_.is_empty() ? "no" : "yes");
 
-    dprintf(INFO, "\taspace %p\n", t->aspace_);
+    dprintf(INFO, "\taspace %p\n", t->GetAspaceRefLocked().get());
     dprintf(INFO, "\tuser_thread %p, pid %" PRIu64 ", tid %" PRIu64 "\n", t->user_thread_.get(),
             t->pid(), t->tid());
     arch_dump_thread(t);
@@ -1876,7 +2157,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
 }
 
 void Thread::Dump(bool full) const {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::Dump")};
   ThreadDumper::DumpLocked(this, full);
 }
 
@@ -1890,17 +2171,21 @@ void Thread::DumpAllLocked(bool full) {
       hexdump(&t, sizeof(Thread));
       break;
     }
-    ThreadDumper::DumpLocked(&t, full);
+
+    {
+      SingletonChainLockGuardIrqSave guard{t.get_lock(), CLT_TAG("Thread::DumpAllLocked")};
+      ThreadDumper::DumpLocked(&t, full);
+    }
   }
 }
 
 void Thread::DumpAll(bool full) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  Guard<SpinLock, IrqSave> list_guard{&list_lock_};
   DumpAllLocked(full);
 }
 
 void Thread::DumpTid(zx_koid_t tid, bool full) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  Guard<SpinLock, IrqSave> list_guard{&list_lock_};
   DumpTidLocked(tid, full);
 }
 
@@ -1915,12 +2200,15 @@ void Thread::DumpTidLocked(zx_koid_t tid, bool full) {
       hexdump(&t, sizeof(Thread));
       break;
     }
-    ThreadDumper::DumpLocked(&t, full);
+
+    // TODO(johngro): Is it ok to stop searching now?  In theory, no two threads
+    // should share a TID.
+    t.Dump(full);
+    break;
   }
 }
 
 Thread* thread_id_to_thread_slow(zx_koid_t tid) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
   for (Thread& t : thread_list.Get()) {
     if (t.tid() == tid) {
       return &t;
@@ -1935,7 +2223,7 @@ Thread* thread_id_to_thread_slow(zx_koid_t tid) {
 // Used by ktrace at the start of a trace to ensure that all
 // the running threads, processes, and their names are known
 void ktrace_report_live_threads() {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
   for (Thread& t : thread_list.Get()) {
     t.canary().Assert();
     KTRACE_KERNEL_OBJECT_ALWAYS(t.tid(), ZX_OBJ_TYPE_THREAD, t.name(),
@@ -1947,6 +2235,21 @@ void Thread::UpdateRuntimeStats(thread_state new_state) {
   if (user_thread_) {
     user_thread_->UpdateRuntimeStats(new_state);
   }
+}
+
+fbl::RefPtr<VmAspace> Thread::GetAspaceRef() const {
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::GetAspaceRef")};
+  return GetAspaceRefLocked();
+}
+
+fbl::RefPtr<VmAspace> Thread::GetAspaceRefLocked() const {
+  VmAspace* const cur_aspace = aspace_;
+  if (!cur_aspace || scheduler_state().state() == THREAD_DEATH) {
+    return nullptr;
+  }
+
+  cur_aspace->AddRef();
+  return fbl::ImportFromRawPtr(cur_aspace);
 }
 
 namespace {
@@ -2021,7 +2324,7 @@ void Thread::Current::GetBacktrace(vaddr_t fp, Backtrace& out_bt) {
 }
 
 void Thread::GetBacktrace(Backtrace& out_bt) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::GetBacktrace")};
 
   // Get the starting point if it's in a usable state.
   vaddr_t fp = 0;
@@ -2041,4 +2344,16 @@ void Thread::GetBacktrace(Backtrace& out_bt) {
   }
 
   GetBacktraceCommon(this, fp, out_bt);
+}
+
+SchedulerState::EffectiveProfile Thread::SnapshotEffectiveProfile() const {
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::SnapshotEffectiveeProfile")};
+  SchedulerState::EffectiveProfile ret = SnapshotEffectiveProfileLocked();
+  return ret;
+}
+
+SchedulerState::BaseProfile Thread::SnapshotBaseProfile() const {
+  SingletonChainLockGuardIrqSave guard{lock_, CLT_TAG("Thread::SnapshotBaseProfile")};
+  SchedulerState::BaseProfile ret = SnapshotBaseProfileLocked();
+  return ret;
 }

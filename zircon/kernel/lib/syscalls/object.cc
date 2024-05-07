@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/heap.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/syscalls/forward.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -20,7 +21,6 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mp.h>
 #include <kernel/stats.h>
-#include <kernel/thread_lock.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
 #include <object/bus_transaction_initiator_dispatcher.h>
@@ -714,14 +714,16 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
 
         // account for idle time if a cpu is currently idle
         {
-          Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+          const Thread& idle_power_thread = cpu->idle_power_thread.thread();
+          ChainLockTransactionIrqSave clt{CLT_TAG("ZX_INFO_CPU_STATS idle time rollup")};
+          UnconditionalChainLockGuard guard{idle_power_thread.get_lock()};
+          clt.Finalize();
 
           zx_time_t idle_time = cpu->stats.idle_time;
           bool is_idle = mp_is_cpu_idle(i);
           if (is_idle) {
             zx_duration_t recent_idle = zx_time_sub_time(
-                current_time(),
-                cpu->idle_power_thread.thread().scheduler_state().last_started_running());
+                current_time(), idle_power_thread.scheduler_state().last_started_running());
             idle_time = zx_duration_add_duration(idle_time, recent_idle);
           }
           stats.idle_time = idle_time;

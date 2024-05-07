@@ -240,6 +240,63 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // Update time spent contended on locks. This is called by lock implementations.
   void AddLockContentionTicks(zx_ticks_t ticks);
 
+  class CoreThreadObservation {
+   public:
+    CoreThreadObservation() = default;
+    ~CoreThreadObservation() { Release(); }
+
+    void Release() {
+      if (core_thread_ != nullptr) {
+        DEBUG_ASSERT(lock_ != nullptr);
+
+        lock_->AssertHeld();
+        [this]() TA_NO_THREAD_SAFETY_ANALYSIS { lock_->Release(); }();
+
+        core_thread_ = nullptr;
+        lock_ = nullptr;
+      } else {
+        DEBUG_ASSERT(lock_ == nullptr);
+      }
+    }
+
+    Thread* core_thread() const { return core_thread_; }
+
+    CoreThreadObservation(const CoreThreadObservation&) = delete;
+    CoreThreadObservation& operator=(const CoreThreadObservation&) = delete;
+
+    CoreThreadObservation(CoreThreadObservation&& other) { *this = ktl::move(other); }
+
+    CoreThreadObservation& operator=(CoreThreadObservation&& other) {
+      // We should only ever be moving into a CoreThreadObservation instance
+      // which has been default constructed (eg, empty)
+      DEBUG_ASSERT((core_thread_ == nullptr) && (lock_ == nullptr));
+
+      core_thread_ = other.core_thread_;
+      lock_ = other.lock_;
+      other.core_thread_ = nullptr;
+      other.lock_ = nullptr;
+
+      return *this;
+    }
+
+   private:
+    friend class ThreadDispatcher;
+
+    CoreThreadObservation(Thread* core_thread, SpinLock* lock)
+        : core_thread_(core_thread), lock_(lock) {
+      if (lock_ != nullptr) {
+        [this]() TA_NO_THREAD_SAFETY_ANALYSIS { lock_->Acquire(); }();
+      }
+    }
+
+    Thread* core_thread_{nullptr};
+    SpinLock* lock_{nullptr};
+  };
+
+  CoreThreadObservation ObserveCoreThread() TA_REQ(get_lock()) {
+    return CoreThreadObservation{core_thread_, &core_thread_lock_.lock()};
+  }
+
  private:
   ThreadDispatcher(fbl::RefPtr<ProcessDispatcher> process, uint32_t flags);
   ThreadDispatcher(const ThreadDispatcher&) = delete;
@@ -276,6 +333,11 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   template <typename T, typename F>
   zx_status_t WriteStateGeneric(F set_state_func, user_in_ptr<const void> buffer,
                                 size_t buffer_size) TA_EXCL(get_lock());
+
+  void ResetCoreThread() TA_REQ(get_lock(), core_thread_lock_) {
+    DEBUG_ASSERT(core_thread_ != nullptr);
+    core_thread_ = nullptr;
+  }
 
   // a ref pointer back to the parent process.
   const fbl::RefPtr<ProcessDispatcher> process_;
@@ -342,6 +404,12 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // and therefor the thread's futex-context lock can be used to guard this
   // futex ID.
   FutexId blocking_futex_id_{FutexId::Null()};
+  // A lower level lock which is needed to satisfy some odd synchronization
+  // requirements when blocking a thread in a futex and declaring a new owner in
+  // the process.
+  DECLARE_SPINLOCK(ThreadDispatcher) core_thread_lock_;
+
+  DECLARE_SPINLOCK(ThreadDispatcher) scheduler_stats_writer_exclusion_lock_;
 
   // Marker to denote that thread sampling has been requested for this thread and that we should
   // take a sample when we handle THREAD_SIGNAL_SAMPLE_STACK.

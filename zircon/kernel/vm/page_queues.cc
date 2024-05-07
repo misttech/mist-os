@@ -654,6 +654,12 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
   DeferPendingSignals dps{*this};
   // Ensure the list is empty before we start.
   deferred_list.Flush();
+
+  // Note: we need to make sure that we disable local preemption while we are
+  // holding our local lock.  Otherwise, if/when we end up posting to our mru
+  // semaphore, it could result in us triggering a preemption while we are
+  // holding the spinlock, which is not something we can allow.
+  AutoPreemptDisabler apd;
   Guard<SpinLock, IrqSave> guard{&lock_};
   const PageQueue mru_queue = mru_gen_to_queue();
   const uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);

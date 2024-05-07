@@ -35,19 +35,20 @@ class StackOwnedLoanedPagesInterval {
   StackOwnedLoanedPagesInterval(StackOwnedLoanedPagesInterval&& to_move) = delete;
   StackOwnedLoanedPagesInterval& operator=(StackOwnedLoanedPagesInterval&& to_move) = delete;
 
-  StackOwnedLoanedPagesInterval() {
-    Thread* current_thread = Thread::Current::Get();
-    // outermost interval wins; inner intervals don't do much
-    if (unlikely(current_thread->stack_owned_loaned_pages_interval_)) {
-      // Strictly speaking we don't need this assignment, but go ahead and set to nullptr in this
-      // unlikely path, for the benefit of asserts in the destructor.
-      owning_thread_ = nullptr;
-      return;
+  // The owning_thread_ state of this interval is either the current thread if
+  // this is the outermost interval on the current thread's stack, or it is
+  // nullptr.  Blocking threads will only ever interact with the outermost
+  // interval; subsequent intervals placed on the stack by the current thread
+  // are basically glorified ref-counts.
+  StackOwnedLoanedPagesInterval()
+      : owning_thread_{Thread::Current::Get()->stack_owned_loaned_pages_interval_ == nullptr
+                           ? Thread::Current::Get()
+                           : nullptr} {
+    // If this was the outermost interval, record that in the current thread's
+    // bookkeeping.
+    if (owning_thread_ != nullptr) {
+      owning_thread_->stack_owned_loaned_pages_interval_ = this;
     }
-    // We delay AssignOnwer(current_thread) until PrepareForWaiter(), since often there will be no
-    // waiter.
-    owning_thread_ = current_thread;
-    current_thread->stack_owned_loaned_pages_interval_ = this;
   }
 
   ~StackOwnedLoanedPagesInterval() {
@@ -64,39 +65,42 @@ class StackOwnedLoanedPagesInterval {
         // common path.
         WakeWaitersAndClearOwner(current_thread);
       }
-      // PrepareForWaiter() was never called, so no need to acquire thread_lock.  This is very
-      // likely.  Done.
+      // PrepareForWaiter() was never called, so no need to acquire lock_.  This
+      // is very likely.  Done.
     }
   }
 
+  static auto& get_lock() TA_RET_CAP(lock_) { return lock_; }
   static StackOwnedLoanedPagesInterval& current();
   static StackOwnedLoanedPagesInterval* maybe_current();
-
-  static void WaitUntilContiguousPageNotStackOwned(vm_page* page) TA_EXCL(thread_lock);
+  static void WaitUntilContiguousPageNotStackOwned(vm_page* page)
+      TA_EXCL(chainlock_transaction_token, lock_);
 
  private:
+  static inline DECLARE_SPINLOCK(StackOwnedLoanedPagesInterval) lock_;
+
   // This sets up to permit a waiter, and asserts that the calling thread is not the constructing
   // thread, since waiting by the constructing/destructing thread would block (or maybe fail).
-  void PrepareForWaiter() TA_REQ(thread_lock, preempt_disabled_token);
-
-  void WakeWaitersAndClearOwner(Thread* current_thread) TA_EXCL(thread_lock);
+  void PrepareForWaiter() TA_REQ(lock_, preempt_disabled_token);
+  void WakeWaitersAndClearOwner(Thread* current_thread) TA_EXCL(lock_);
 
   // magic value
   fbl::Canary<fbl::magic("SOPI")> canary_;
-  // We stash the owning thread as part of delaying OwnedWaitQueue::AssignOwner(), to avoid putting
-  // unnecessary pressure on thread_lock when there's no waiter.
-  //
-  // Only set during the constructor.  Only read after that.  Intentionally not initialized here to
-  // avoid redundant initialization.
-  Thread* owning_thread_;
-  // This is atomic because in the common case of no waiter, the OwnedWaitQueue
-  // isn't created and the
+
+  // We stash the owning thread as part of delaying
+  // OwnedWaitQueue::AssignOwner(), to avoid putting unnecessary pressure on
+  // lock_ when there's no waiter.
+  Thread* const owning_thread_;
+
   // This is atomic because in the common case of no waiter, the thread with
-  // StackOwnedLoanedPagesInterval on its stack doesn't need to acquire the thread_lock to read
-  // false from here during destruction (and so never needs to acquire thread_lock).
+  // StackOwnedLoanedPagesInterval on its stack doesn't need to acquire the
+  // lock_ to read false from here during destruction (and so never needs
+  // to acquire lock_).
   ktl::atomic<bool> is_ready_for_waiter_{false};
-  // In the common case of no waiter, this never gets constructed or destructed.  We only construct
-  // this on PrepareForWaiter() during WaitUntilContiguousPageNotStackOwned().
+
+  // In the common case of no waiter, this never gets constructed or destructed.
+  // We only construct this on PrepareForWaiter() during
+  // WaitUntilContiguousPageNotStackOwned().
   ktl::optional<OwnedWaitQueue> owned_wait_queue_;
 };
 

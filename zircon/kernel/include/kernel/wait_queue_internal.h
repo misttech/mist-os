@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_WAIT_QUEUE_INTERNAL_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_WAIT_QUEUE_INTERNAL_H_
 
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 #include <platform.h>
 #include <zircon/errors.h>
@@ -46,10 +47,12 @@
 // WaitQueue::BlockEtc/Block, or OwnedWaitQueue::BlockAndAssignOwner
 // instead.
 //
-inline zx_status_t WaitQueue::BlockEtcPreamble(const Deadline& deadline, uint signal_mask,
+inline zx_status_t WaitQueue::BlockEtcPreamble(Thread* const current_thread,
+                                               const Deadline& deadline, uint signal_mask,
                                                ResourceOwnership reason,
-                                               Interruptible interruptible) TA_REQ(thread_lock) {
-  Thread* current_thread = Thread::Current::Get();
+                                               Interruptible interruptible)
+    TA_REQ(lock_, GetThreadsLock(current_thread)) {
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
 
   if (deadline.when() != ZX_TIME_INFINITE && deadline.when() <= current_time()) {
     return ZX_ERR_TIMED_OUT;
@@ -78,8 +81,10 @@ inline zx_status_t WaitQueue::BlockEtcPreamble(const Deadline& deadline, uint si
   return ZX_OK;
 }
 
-inline zx_status_t WaitQueue::BlockEtcPostamble(const Deadline& deadline) TA_REQ(thread_lock) {
-  Thread* current_thread = Thread::Current::Get();
+inline zx_status_t WaitQueue::BlockEtcPostamble(Thread* const current_thread,
+                                                const Deadline& deadline)
+    TA_REQ(current_thread->get_lock()) TA_EXCL(lock_) {
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
   Timer timer;
 
   // if the deadline is nonzero or noninfinite, set a callback to yank us out of the queue
@@ -87,7 +92,7 @@ inline zx_status_t WaitQueue::BlockEtcPostamble(const Deadline& deadline) TA_REQ
     timer.Set(deadline, &WaitQueue::TimeoutHandler, (void*)current_thread);
   }
 
-  Scheduler::Block();
+  Scheduler::Block(current_thread);
 
   // we don't really know if the timer fired or not, so it's better safe to try to cancel it
   if (deadline.when() != ZX_TIME_INFINITE) {
@@ -95,7 +100,6 @@ inline zx_status_t WaitQueue::BlockEtcPostamble(const Deadline& deadline) TA_REQ
   }
 
   current_thread->wait_queue_state().interruptible_ = Interruptible::No;
-
   return current_thread->wait_queue_state().blocked_status_;
 }
 

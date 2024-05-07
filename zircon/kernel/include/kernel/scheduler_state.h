@@ -17,7 +17,6 @@
 #include <ffl/fixed.h>
 #include <kernel/cpu.h>
 #include <kernel/spinlock.h>
-#include <kernel/thread_lock.h>
 #include <ktl/limits.h>
 #include <ktl/move.h>
 #include <ktl/pair.h>
@@ -394,27 +393,11 @@ class SchedulerState {
     return active_mask & hard_affinity_;
   }
 
-  void RecomputeEffectiveProfile() TA_REQ(thread_lock);
-
-  EffectiveProfile SnapshotEffectiveProfileLocked() const TA_REQ(thread_lock) {
-    return effective_profile_;
-  }
-  EffectiveProfile SnapshotEffectiveProfile() const TA_EXCL(thread_lock) {
-    Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-    return SnapshotEffectiveProfileLocked();
-  }
-
-  BaseProfile SnapshotBaseProfileLocked() const TA_REQ(thread_lock) { return base_profile_; }
-  BaseProfile SnapshotBaseProfile() const TA_EXCL(thread_lock) {
-    Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-    return SnapshotBaseProfileLocked();
-  }
-
   // Returns the current effective profile for this thread.
   const EffectiveProfile& effective_profile() const { return effective_profile_; }
 
   // Returns the type of scheduling discipline for this thread.
-  SchedDiscipline discipline() const TA_REQ(thread_lock) { return effective_profile_.discipline; }
+  SchedDiscipline discipline() const { return effective_profile_.discipline; }
 
   // Returns the key used to order the run queue.
   KeyType key() const { return {start_time_, generation_}; }
@@ -434,7 +417,7 @@ class SchedulerState {
   cpu_mask_t hard_affinity() const { return hard_affinity_; }
   cpu_mask_t soft_affinity() const { return soft_affinity_; }
 
-  int32_t weight() const TA_REQ(thread_lock) {
+  int32_t weight() const {
     return discipline() == SchedDiscipline::Fair
                ? static_cast<int32_t>(effective_profile_.fair.weight.raw_value())
                : ktl::numeric_limits<int32_t>::max();
@@ -445,10 +428,6 @@ class SchedulerState {
 
   thread_state state() const { return state_; }
   void set_state(thread_state state) { state_ = state; }
-
-  void set_next_cpu(cpu_num_t next_cpu) { next_cpu_ = next_cpu; }
-
-  Thread* previous_thread() const { return previous_thread_; }
 
  private:
   friend class Scheduler;
@@ -462,37 +441,17 @@ class SchedulerState {
   friend class LoadBalancerTest;
   friend struct WaitQueueOrderingTests;
   friend class unittest::ThreadEffectiveProfileObserver;
+  friend Thread;
 
   // TODO(eieio): Remove these once all of the members accessed by Thread are
   // moved to accessors.
-  friend Thread;
   friend void thread_construct_first(Thread*, const char*);
-  friend void dump_thread_locked(Thread*, bool);
+  friend void dump_thread_locked(const Thread*, bool);
 
-  // Returns true of the task state is currently enqueued in the run queue.
-  bool InQueue() const { return run_queue_node_.InContainer(); }
-
-  // Returns true if the task is active (queued or running) on a run queue.
-  bool active() const { return active_; }
-
-  // Sets the task state to active (on a run queue). Returns true if the task
-  // was not previously active.
-  bool OnInsert() {
-    const bool was_active = active_;
-    active_ = true;
-    return !was_active;
-  }
-
-  // Sets the task state to inactive (not on a run queue). Returns true if the
-  // task was previously active.
-  bool OnRemove() {
-    const bool was_active = active_;
-    active_ = false;
-    return was_active;
-  }
-
-  // WAVLTree node state.
-  fbl::WAVLTreeNodeState<Thread*> run_queue_node_;
+  // RecomputeEffectiveProfile should only ever be called from the accessor in
+  // Thread (where we can use static analysis to ensure that we are holding the
+  // thread's lock, as required).
+  void RecomputeEffectiveProfile();
 
   // The start time of the thread's current bandwidth request. This is the
   // virtual start time for fair tasks and the period start for deadline tasks.
@@ -509,15 +468,12 @@ class SchedulerState {
   // thread with the earliest finish time that also has an eligible start time.
   SchedTime min_finish_time_{0};
 
-  // Flag indicating whether this thread is associated with a run queue.
-  bool active_{false};
-
   // The scheduling state of the thread.
   thread_state state_{THREAD_INITIAL};
 
-  TA_GUARDED(thread_lock) BaseProfile base_profile_;
-  TA_GUARDED(thread_lock) InheritedProfileValues inherited_profile_values_;
-  TA_GUARDED(thread_lock) EffectiveProfile effective_profile_;
+  BaseProfile base_profile_;
+  InheritedProfileValues inherited_profile_values_;
+  EffectiveProfile effective_profile_;
 
   // The current timeslice allocated to the thread.
   SchedDuration time_slice_ns_{0};
@@ -546,9 +502,10 @@ class SchedulerState {
   // is added to the run queue.
   uint64_t generation_{0};
 
+  // The thread which ran just before this thread was scheduled.  Used by
+  // Scheduler::LockHandoff to release the previous thread's lock after a
+  // context switch operation has fully completed.
   Thread* previous_thread_{nullptr};
-  bool incoming_locked_{false};
-  bool outgoing_locked_{false};
 
   // The current sched_latency flow id for this thread.
   uint64_t flow_id_{0};
@@ -559,10 +516,6 @@ class SchedulerState {
   // The last CPU the thread ran on. INVALID_CPU before it first runs.
   cpu_num_t last_cpu_{INVALID_CPU};
 
-  // The next CPU the thread should run on after the thread's migrate function
-  // is called.
-  cpu_num_t next_cpu_{INVALID_CPU};
-
   // The set of CPUs the thread is permitted to run on. The thread is never
   // assigned to CPUs outside of this set.
   cpu_mask_t hard_affinity_{CPU_MASK_ALL};
@@ -570,6 +523,72 @@ class SchedulerState {
   // The set of CPUs the thread should run on if possible. The thread may be
   // assigned to CPUs outside of this set if necessary.
   cpu_mask_t soft_affinity_{CPU_MASK_ALL};
+};
+
+struct SchedulerQueueState {
+  // Occasionally, a thread needs to be removed from a scheduler and reassigned
+  // to a different one, but without holding the thread's lock (which protects
+  // the thread's curr_cpu_ member in its scheduler_state_ structure).
+  //
+  // In order to complete the transition, the thread's lock must (eventually) be
+  // obtained exclusively, which cannot be done while holding either the
+  // source's or destination's queue_lock.  To work around the lock-ordering
+  // issues, we:
+  //
+  // 1) Remove the thread from the source scheduler's queue (requires access to
+  //    the thread's SchedulerQueueState which is owned by the scheduler, not the
+  //    thread).
+  // 2) Remove the thread's bookkeeping from the source scheduler (requires
+  //    read-only access to the thread's scheduler state).
+  // 3) Record that the thread is transitioning to a new scheduler (and the
+  //    reason why) in the transient state member of SchedulerQueueState.
+  // 4a) Drop the source scheduler lock.
+  // 4b) Obtain the thread's lock.
+  // 4c) Obtain the destination scheduler lock.
+  // 5) Finish the transition by adding the thread to the new scheduler and
+  //    clearing the transient state back to None.
+  //
+  // So, if something like a PI propagation event encounters a thread whose
+  // transient_state is anything but None, it knows that the thread is
+  // (temporarily) not a member of any scheduler, even though its current state
+  // must be READY and its curr_cpu_ identifies the source scheduler it just
+  // left.  When the propagation event modifies the scheduler's effective
+  // profile, it can skip updating the thread's position in its scheduler's run
+  // queue (it is not in one) and it can skip updating its scheduler's overall
+  // bookkeeping (that was already done in step #2 above).
+  enum class TransientState : uint32_t {
+    None = 0,
+    Rescheduling,
+    Stolen,
+    Migrating,
+  };
+
+  SchedulerQueueState() = default;
+  ~SchedulerQueueState() = default;
+
+  // Returns true of the task state is currently enqueued in the run queue.
+  bool InQueue() const { return run_queue_node.InContainer(); }
+
+  // Sets the task state to active (on a run queue). Returns true if the task
+  // was not previously active.
+  bool OnInsert() {
+    const bool was_active = active;
+    active = true;
+    return !was_active;
+  }
+
+  // Sets the task state to inactive (not on a run queue). Returns true if the
+  // task was previously active.
+  bool OnRemove() {
+    const bool was_active = active;
+    active = false;
+    return was_active;
+  }
+
+  // WAVLTree node state.
+  fbl::WAVLTreeNodeState<Thread*> run_queue_node{};
+  TransientState transient_state{TransientState::None};
+  bool active{false};  // Flag indicating whether this thread is associated with a run queue.
 };
 
 FBL_ENABLE_ENUM_BITS(SchedulerState::ProfileDirtyFlag)

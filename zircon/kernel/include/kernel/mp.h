@@ -48,7 +48,7 @@ void mp_sync_exec(mp_ipi_target_t, cpu_mask_t mask, mp_sync_task_t task, void* c
 
 zx_status_t mp_hotplug_cpu_mask(cpu_mask_t mask);
 
-void mp_unplug_current_cpu(Guard<MonitoredSpinLock, NoIrqSave>&& guard) TA_REQ(thread_lock);
+void mp_unplug_current_cpu();
 
 // Unplug the cpu specified by |mask|, waiting, up to |deadline| for its "shutdown" thread to
 // complete.

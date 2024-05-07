@@ -9,15 +9,17 @@
 #define ZIRCON_KERNEL_INCLUDE_ARCH_THREAD_H_
 
 #include <arch.h>
+#include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/compiler.h>
 
 #include <arch/arch_thread.h>
-#include <kernel/thread_lock.h>
+#include <kernel/thread.h>
 
 struct Thread;
 
-void arch_thread_initialize(Thread*, vaddr_t entry_point);
-void arch_context_switch(Thread* oldthread, Thread* newthread) TA_REQ(thread_lock);
+void arch_thread_initialize(Thread* thread, vaddr_t entry_point) TA_REQ(thread->get_lock());
+void arch_context_switch(Thread* oldthread, Thread* newthread)
+    TA_REQ(oldthread->get_lock(), newthread->get_lock());
 void arch_save_user_state(Thread* thread);
 void arch_restore_user_state(Thread* thread);
 void arch_thread_construct_first(Thread*);

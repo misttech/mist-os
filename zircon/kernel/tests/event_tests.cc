@@ -5,12 +5,12 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 
 #include <kernel/event.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 
 // This tests that the result in an event_signal_etc call is propagated to the waiter
 // when the event is signaled before any thread waits on the event.
@@ -60,7 +60,8 @@ static bool event_signal_result_after_wait_test() {
     {
       // Check if the waiter thread is in the blocked state, indicating that the event
       // has latched.
-      Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+      SingletonChainLockGuardIrqSave guard{waiter->get_lock(),
+                                           CLT_TAG("event_signal_result_after_wait_test")};
       if (waiter->state() == THREAD_BLOCKED) {
         break;
       }

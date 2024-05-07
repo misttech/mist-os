@@ -7,14 +7,28 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_OWNED_WAIT_QUEUE_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_OWNED_WAIT_QUEUE_H_
 
+#include <lib/kconcurrent/chainlock.h>
+
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/macros.h>
 #include <kernel/scheduler_state.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <kernel/wait.h>
 #include <ktl/optional.h>
+#include <ktl/variant.h>
+
+// Helpers used to identify which locks need to be held for various templated PI
+// interactions which could be operating on a Thread->Thread, Thread->OWQ,
+// OWQ->Thread or OWQ->OWQ.
+namespace internal {
+inline const ChainLock& GetPiNodeLock(const Thread& node);
+inline const ChainLock& GetPiNodeLock(const WaitQueue& node);
+inline const ChainLock& GetPiNodeLock(const OwnedWaitQueue& node);
+}  // namespace internal
+
+// fwd decl so we can be friends with our tests.
+struct OwnedWaitQueueTopologyTests;
 
 // Owned wait queues are an extension of wait queues which adds the concept of
 // ownership for use when profile inheritance semantics are needed.
@@ -46,57 +60,95 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // OwnedWaitQueue should go through the OWQ specific APIs instead of
   // attempting to use the base WaitQueue APIs.
   using WaitQueue::Count;
+  using WaitQueue::get_lock;
   using WaitQueue::IsEmpty;
 
-  // A small helper class which can be injected into Wake and Requeue
-  // operations to allow calling code to get a callback for each thread which
-  // is either woken, or requeued.  This callback serves two purposes...
-  //
-  // 1) It allows the caller to perform some limited filtering operations, and
-  //    to choose which thread (if any) becomes the new owner of the queue.
-  //    See the comments in the |Action| enum member for details.
-  // 2) It gives code such as |FutexContext| a chance to perform their own
-  //    per-thread bookkeeping as the wait queue code chooses which threads to
-  //    either wake or re-queue.
-  //
-  // Note that during a wake or requeue operation, the threads being
-  // considered will each be presented to the user provided Hook (if any)
-  // by the OwnedWaitQueue code before deciding whether or not to actually
-  // wake or requeue the thread.
-  class Hook {
+  struct IWakeRequeueHook {
    public:
-    // A set of 3 actions which may be taken when considering whether or not
-    // to wake or requeue a thread.  If no user supplied Hook is provided
-    // for a given operation, the default behavior will be to return
-    // Action::SelectAndKeepGoing.
-    enum class Action {
-      // Do not wake or requeue this thread and stop considering threads.
-      Stop,
+    IWakeRequeueHook() = default;
 
-      // Select this thread to be either woken or requeued, then continue
-      // to consider more threads (if any).  Do not assign this thread to
-      // be the owner.
-      SelectAndKeepGoing,
+    // Note; do not force a virtual destructor here.  This interface exists
+    // only for the purpose of injecting into various wake operations to be
+    // used during thread selection and to update external bookkeeping.
+    // Instances of it are meant to be stack allocated and should always be
+    // destroyed in the scope where they were created.  They are never meant to
+    // be heap allocated or have their lifecycle managed using an IWakeRequeueHook
+    // pointer.
 
-      // Select this thread to be either woken or requeued, assign it to
-      // to be the owner of the queue, then stop considering more threads.
-      // It is illegal to wake a thread and assign it as the owner for the
-      // queue if at least one thread has already been woken.
-      SelectAndAssignOwner,
-    };
+    IWakeRequeueHook(const IWakeRequeueHook&) = delete;
+    IWakeRequeueHook(IWakeRequeueHook&&) = delete;
+    IWakeRequeueHook& operator=(const IWakeRequeueHook&) = delete;
+    IWakeRequeueHook& operator=(IWakeRequeueHook&&) = delete;
 
-    using Callback = Action (*)(Thread* thrd, void* ctx);
+    // The Allow hook is called during the locking phase of a wake or a requeue
+    // operation.  The locking code is holding the queue's lock at this point,
+    // but not the thread's lock yet.  The thread is still a member of the
+    // queue, meaning we have read-only access to the thread's variables.
+    //
+    // The implementation may use this hook to decide if this thread should be
+    // woken or not, returning true if it should be and false otherwise.  If
+    // true is returned, the locking operation will attempt to lock the thread
+    // in order to commit it to waking, backing of if needed.  If false is
+    // returned, the thread will be left in the queue and the enumeration of
+    // threads in the queue ceases.
+    //
+    // Allow may be called multiple times for the same thread during a locking
+    // operation if the code needs to back off and attempt to obtain lock the
+    // set of threads to be woken multiple times.
+    virtual bool Allow(const Thread& t) TA_REQ_SHARED(t.get_lock()) { return true; }
 
-    Hook() : cbk_(nullptr) {}
-    Hook(Callback cbk, void* ctx) : cbk_(cbk), ctx_(ctx) {}
+    // OnWakeOrRequeue is called in the second phase of a wake/requeue
+    // operation.  At this point, all of the threads to wake have been
+    // identified and successfully locked.  This hook is called _just_ before
+    // the thread is removed from its queue, and either unblocked (wake
+    // operation) or moved to a different queue (requeue).
+    virtual void OnWakeOrRequeue(Thread& t) TA_REQ(t.get_lock()) {}
 
-    Action operator()(Thread* thrd) const TA_REQ(thread_lock) {
-      return cbk_ ? cbk_(thrd, ctx_) : Action::SelectAndKeepGoing;
-    }
+   protected:
+    ~IWakeRequeueHook() = default;
+  };
 
-   private:
-    Callback cbk_;
-    void* ctx_;
+  static IWakeRequeueHook& default_wake_hooks() { return default_wake_hooks_; }
+
+  // A small struct which contains details about the locking used in order to
+  // prepare for a BlockAndAssignOwner operation.  See the comments in
+  // LockForBAAOOperation for details.
+  struct BAAOLockingDetails {
+    explicit BAAOLockingDetails(Thread* initial_new_owner) : new_owner{initial_new_owner} {}
+
+    Thread* new_owner;
+    const void* stop_point{nullptr};
+  };
+
+  using ReplaceOwnerLockingDetails = struct BAAOLockingDetails;
+
+  struct WakeRequeueThreadDetails {
+    Thread::UnblockList wake_threads{};
+    Thread::UnblockList requeue_threads{};
+  };
+
+  struct RequeueLockingDetails {
+    // No copy, yes move (because of the unblock lists)
+    RequeueLockingDetails() = default;
+    RequeueLockingDetails(const RequeueLockingDetails&) = delete;
+    RequeueLockingDetails& operator=(const RequeueLockingDetails&) = delete;
+    RequeueLockingDetails(RequeueLockingDetails&&) = default;
+    RequeueLockingDetails& operator=(RequeueLockingDetails&&) = default;
+
+    Thread* new_requeue_target_owner{nullptr};
+    const void* new_requeue_target_owner_stop_point{nullptr};
+    const void* old_wake_queue_owner_stop_point{nullptr};
+    const void* old_requeue_target_owner_stop_point{nullptr};
+    WakeRequeueThreadDetails threads{};
+  };
+
+  // A structure which holds the state of the queue as observed just before the
+  // queue lock was dropped.  Used by futex and kernel mutex implementations to
+  // update their bookkeeping before unwinding after a wake operation.
+  struct WakeThreadsResult {
+    uint32_t woken{0};
+    uint32_t still_waiting{0};
+    Thread* owner{nullptr};
   };
 
   // A enum which determines the specific behavior of the Propagate method.
@@ -121,6 +173,9 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
     constexpr operator PropagateOp() const { return Op; }
   };
 
+  // Behavior control for wake/requeue operations
+  enum class WakeOption { None, AssignOwner };
+
   static constexpr PropagateOpTag<PropagateOp::AddSingleEdge> AddSingleEdgeOp{};
   static constexpr PropagateOpTag<PropagateOp::RemoveSingleEdge> RemoveSingleEdgeOp{};
   static constexpr PropagateOpTag<PropagateOp::BaseProfileChanged> BaseProfileChangedOp{};
@@ -134,17 +189,43 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
 
   // Release ownership of all wait queues currently owned by |t| and update
   // bookkeeping as appropriate.  This is meant to be called from the thread
-  // itself and therefor it is assumed that the thread in question is not
+  // itself and therefore it is assumed that the thread in question is not
   // blocked on any other wait queues.
-  static void DisownAllQueues(Thread* t) TA_REQ(thread_lock);
+  static void DisownAllQueues(Thread* t) TA_EXCL(chainlock_transaction_token, t->get_lock());
 
   // Change a thread's base profile and deal with profile propagation side effects.
   static void SetThreadBaseProfileAndPropagate(Thread& thread,
                                                const SchedulerState::BaseProfile& profile)
-      TA_REQ(thread_lock, preempt_disabled_token);
+      TA_EXCL(chainlock_transaction_token, thread.get_lock());
+
+  // Attempt to lock the rest of a PI chain, starting from the (already locked)
+  // node given by |start|.
+  static ChainLock::LockResult LockPiChain(Thread& start)
+      TA_REQ(chainlock_transaction_token, start.get_lock()) {
+    WaitQueue* wq = start.wait_queue_state().blocking_wait_queue_;
+
+    if (wq == nullptr) {
+      return ChainLock::LockResult::kOk;
+    }
+
+    // Note: If we refuse cycles, the only possible variant return type for
+    // LockPiChainCommon is ChainLock::LockResult.
+    return LockPiChainCommonRefuseCycle(*wq);
+  }
+
+  static ChainLock::LockResult LockPiChain(WaitQueue& start)
+      TA_REQ(chainlock_transaction_token, start.get_lock()) {
+    Thread* t = GetQueueOwner(&start);
+
+    if (t == nullptr) {
+      return ChainLock::LockResult::kOk;
+    }
+
+    return LockPiChainCommonRefuseCycle(*t);
+  }
 
   // const accessor for the owner member.
-  Thread* owner() const TA_REQ(thread_lock) { return owner_; }
+  Thread* owner() const TA_REQ(get_lock()) { return owner_; }
 
   // Debug Assert wrapper which skips the thread analysis checks just to
   // assert that a specific queue is unowned.  Used by FutexContext
@@ -160,7 +241,9 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   //
   // Returns ZX_ERR_BAD_STATE if a cycle would have been produced, and ZX_OK
   // otherwise.
-  zx_status_t AssignOwner(Thread* new_owner) TA_REQ(thread_lock, preempt_disabled_token);
+  zx_status_t AssignOwner(Thread* new_owner) TA_EXCL(chainlock_transaction_token, get_lock());
+
+  void ResetOwnerIfNoWaiters() TA_EXCL(chainlock_transaction_token, get_lock());
 
   // Block the current thread on this wait queue, and re-assign ownership to
   // the specified thread (or remove ownership if new_owner is null);  If a
@@ -172,13 +255,95 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // will be replaced with no owner in this situation.
   zx_status_t BlockAndAssignOwner(const Deadline& deadline, Thread* new_owner,
                                   ResourceOwnership resource_ownership, Interruptible interruptible)
-      TA_REQ(thread_lock, preempt_disabled_token);
+      TA_EXCL(chainlock_transaction_token) TA_REQ(preempt_disabled_token);
 
-  // Wake the up to specified number of threads from the wait queue and then
-  // handle the ownership bookkeeping based on what the Hook told us to do.
-  // See |Hook::Action| for details.
-  void WakeThreads(uint32_t wake_count, Hook on_thread_wake_hook = {})
-      TA_REQ(thread_lock, preempt_disabled_token);
+  zx_status_t BlockAndAssignOwnerLocked(Thread* const current_thread, const Deadline& deadline,
+                                        const BAAOLockingDetails& details,
+                                        ResourceOwnership resource_ownership,
+                                        Interruptible interruptible)
+      TA_REQ(chainlock_transaction_token, current_thread->get_lock(), preempt_disabled_token)
+          TA_REL(get_lock());
+
+  // Cancel a block and assign owner operation that we have already locked for.
+  // Basically, just drop all of the locks and get out.
+  void CancelBAAOOperationLocked(Thread* const current_thread, const BAAOLockingDetails& details)
+      TA_REQ(chainlock_transaction_token) TA_REL(get_lock(), current_thread->get_lock());
+
+  // Obtain all of the locks needed for a BlockAndAssignOwner operation,
+  // handling the special case of new+old owner which share a PI graph target.
+  BAAOLockingDetails LockForBAAOOperation(Thread* const current_thread, Thread* new_owner)
+      TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock(), current_thread->get_lock());
+
+  // Attempt to obtain all of the locks needed for a BAAO operation while
+  // already holding this queue's lock.  On success, the current thread's lock
+  // will have been obtained in addition to any other locks in the PI chain
+  // which are needed, and the details of the locking operation will be
+  // returned.  On failure, returns ktl::nullopt after dropping any locks which
+  // had been obtained.
+  ktl::optional<BAAOLockingDetails> LockForBAAOOperationLocked(Thread* const current_thread,
+                                                               Thread* new_owner)
+      TA_REQ(chainlock_transaction_token, get_lock());
+
+  // Wake the up to specified number of threads from the wait queue, removing
+  // any current queue owner in the process.
+  WakeThreadsResult WakeThreads(uint32_t wake_count,
+                                IWakeRequeueHook& wake_hooks = default_wake_hooks_)
+      TA_EXCL(chainlock_transaction_token, get_lock());
+
+  // Attempt to wake exactly one thread, and assign ownership of the queue to
+  // the woken thread (if any).
+  WakeThreadsResult WakeThreadAndAssignOwner(IWakeRequeueHook& wake_hooks = default_wake_hooks_)
+      TA_EXCL(chainlock_transaction_token, get_lock());
+
+  WakeThreadsResult WakeThreadsLocked(Thread::UnblockList threads, IWakeRequeueHook& wake_hooks,
+                                      WakeOption option = WakeOption::None)
+      TA_REQ(chainlock_transaction_token, get_lock(), preempt_disabled_token);
+
+  // Obtain all of the locks needed for a WakeThreads operation.
+  Thread::UnblockList LockForWakeOperation(uint32_t max_wake, IWakeRequeueHook& wake_hooks)
+      TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock());
+
+  ktl::optional<Thread::UnblockList> LockForWakeOperationLocked(uint32_t max_wake,
+                                                                IWakeRequeueHook& wake_hooks)
+      TA_REQ(chainlock_transaction_token, get_lock());
+
+  WakeThreadsResult WakeAndRequeue(OwnedWaitQueue& requeue_target, Thread* new_requeue_owner,
+                                   uint32_t wake_count, uint32_t requeue_count,
+                                   IWakeRequeueHook& wake_hooks, IWakeRequeueHook& requeue_hooks,
+                                   WakeOption wake_option)
+      TA_EXCL(chainlock_transaction_token, get_lock(), requeue_target.get_lock());
+
+  // Accessor used only by the scheduler's PiNodeAdapter to handle bookkeeping
+  // during profile inheritance situations.
+  SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage() {
+    return inherited_scheduler_state_storage_;
+  }
+
+ private:
+  // Give permission to the WaitQueue thunk to call the PropagateRemove method
+  friend zx_status_t WaitQueue::UnblockThread(Thread* t, zx_status_t wait_queue_error);
+  friend struct OwnedWaitQueueTopologyTests;
+
+  struct DefaultWakeHooks : public IWakeRequeueHook {};
+  static inline DefaultWakeHooks default_wake_hooks_;
+
+  // Behavior control for locking pi paths.
+  enum class LockingBehavior { RefuseCycle, StopAtCycle };
+
+  // Assert that a thread (which we have locked exclusively) owns a specific
+  // wait queue, meaning that we should be able to examine parts of that queue's
+  // state (like, whether or not it has any blocked threads, and what the IPVs
+  // of the queue currently are).  See comments in ApplyIpvDeltaToThread for
+  // details.
+  static inline void AssertOwnsWaitQueue(const Thread& t, const OwnedWaitQueue& owq)
+      TA_REQ(t.get_lock()) TA_ASSERT_SHARED(owq.get_lock()) {
+    [&]() TA_NO_THREAD_SAFETY_ANALYSIS { DEBUG_ASSERT(owq.owner_ == &t); }();
+  }
+
+  // Note that the locks for the entire PI chain starting from this OWQ, as well
+  // as from the one starting from the new owner, need to be held at this point.
+  void AssignOwnerInternal(Thread* new_owner)
+      TA_REQ(chainlock_transaction_token, get_lock(), preempt_disabled_token);
 
   // A specialization of WakeThreads which will...
   //
@@ -192,42 +357,25 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // profiles for PI purposes.  We don't want to re-evaluate ownership or PI
   // pressure until after all of the changes to wait queue have taken place.
   //
-  // |requeue_target| *must* be non-null.  If there is no |requeue_target|,
-  // use WakeThreads instead.
-  //
   // Note, if the |requeue_owner| exists, but is dead or dying, it will not be
   // permitted to become the new owner of the |requeue_target|.  Any existing
   // owner will be replaced with no owner in this situation.
-  void WakeAndRequeue(uint32_t wake_count, OwnedWaitQueue* requeue_target, uint32_t requeue_count,
-                      Thread* requeue_owner, Hook on_thread_wake_hook = {},
-                      Hook on_thread_requeue_hook = {}) TA_REQ(thread_lock, preempt_disabled_token);
+  WakeThreadsResult WakeAndRequeueInternal(RequeueLockingDetails& details,
+                                           OwnedWaitQueue& requeue_target,
+                                           IWakeRequeueHook& wake_hooks,
+                                           IWakeRequeueHook& requeue_hooks,
+                                           WakeOption wake_option = WakeOption::None)
+      TA_REL(get_lock(), requeue_target.get_lock())
+          TA_REQ(chainlock_transaction_token, preempt_disabled_token);
 
-  // Accessor used only by the scheduler's PiNodeAdapter to handle bookkeeping
-  // during profile inheritance situations.
-  SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage() {
-    return inherited_scheduler_state_storage_;
-  }
-
- private:
-  // Give permission to the WaitQueue thunk to call the PropagateRemove method
-  friend zx_status_t WaitQueue::UnblockThread(Thread* t, zx_status_t wait_queue_error);
-
-  void AssignOwnerInternal(Thread* new_owner) TA_REQ(thread_lock, preempt_disabled_token);
-
-  // Wake the specified number of threads from the wait queue, calling the user
-  // supplied on_thread_wake_hook as we go to allow the user to maintain their
-  // bookkeeping, and choose a new owner if desired.
-  void WakeThreadsInternal(uint32_t wake_count, zx_time_t now, Hook on_thread_wake_hook)
-      TA_REQ(thread_lock, preempt_disabled_token);
-
-  void ValidateSchedStateStorageUnconditional();
-  void ValidateSchedStateStorage() {
+  void ValidateSchedStateStorageUnconditional() TA_REQ(get_lock());
+  void ValidateSchedStateStorage() TA_REQ(get_lock()) {
     if constexpr (kSchedulerExtraInvariantValidation) {
       ValidateSchedStateStorageUnconditional();
     }
   }
 
-  void UpdateSchedStateStorageThreadRemoved(Thread& t) TA_REQ(thread_lock) {
+  void UpdateSchedStateStorageThreadRemoved(Thread& t) TA_REQ(get_lock(), t.get_lock()) {
     DEBUG_ASSERT(inherited_scheduler_state_storage_ != nullptr);
 
     SchedulerState::WaitQueueInheritedSchedulerState& old_iss =
@@ -242,7 +390,7 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
     }
   }
 
-  void UpdateSchedStateStorageThreadAdded(Thread& t) TA_REQ(thread_lock) {
+  void UpdateSchedStateStorageThreadAdded(Thread& t) TA_REQ(get_lock(), t.get_lock()) {
     if (inherited_scheduler_state_storage_ == nullptr) {
       DEBUG_ASSERT_MSG(this->Count() == 1, "Expected count == 1, instead of %u", this->Count());
       inherited_scheduler_state_storage_ = &t.wait_queue_state().inherited_scheduler_state_storage_;
@@ -257,7 +405,7 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // inherited profile values along with its base profile, which should be the
   // profile pressure it is transmitting to the next node in the graph.
   static SchedulerState::InheritedProfileValues SnapshotThreadIpv(Thread& thread)
-      TA_REQ(thread_lock);
+      TA_REQ(thread.get_lock());
 
   // Apply a change in IPV to a thread.  When non-null, |old_ipv| points to the
   // IPV values which need to be removed from the thread's IPVs, while |new_ipv|
@@ -275,23 +423,13 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   //
   static void ApplyIpvDeltaToThread(const SchedulerState::InheritedProfileValues* old_ipv,
                                     const SchedulerState::InheritedProfileValues* new_ipv,
-                                    Thread& thread) TA_REQ(thread_lock);
+                                    Thread& thread) TA_REQ(thread.get_lock());
 
   // Apply a change in IPV to an owned wait queue.  See ApplyIpvDeltaToThread
   // for an explanation of the parameters.
   static void ApplyIpvDeltaToOwq(const SchedulerState::InheritedProfileValues* old_ipv,
                                  const SchedulerState::InheritedProfileValues* new_ipv,
-                                 OwnedWaitQueue& owq) TA_REQ(thread_lock);
-
-  // Checks to see if a cycle would be formed if |owner_thread| was to become
-  // the owner of |owq| and |blocking_thread| were to block in |owq|.
-  //
-  // While |owq| and |owner_thread| are required parameters, |blocking_thread|
-  // is optional. Users may test to see if a change of ownership would for a
-  // cycle even without a thread blocking concurrently by passing nullptr for
-  // |blocking_thread|.
-  static bool CheckForCycle(const OwnedWaitQueue* owq, const Thread* owner_thread,
-                            const Thread* blocking_thread = nullptr) TA_REQ(thread_lock);
+                                 OwnedWaitQueue& owq) TA_REQ(owq.get_lock());
 
   // Begin a propagation operation starting from an upstream thread, and going
   // through a downstream owned wait queue.  Only for use during edge add/remove
@@ -299,9 +437,15 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // required.  Note: Links between the upstream thread and downstream queue
   // should have already been added/removed by the time that this method is
   // called.
+  //
+  // The entire PI chain starting from the wait queue needs to be locked before
+  // calling this, and the contents of the chain after the starting thread will
+  // be released during the operation (the thread will remain locked).
   template <PropagateOp Op>
   static void BeginPropagate(Thread& upstream_node, OwnedWaitQueue& downstream_node,
-                             PropagateOpTag<Op>) TA_REQ(thread_lock, preempt_disabled_token);
+                             PropagateOpTag<Op>)
+      TA_REQ(chainlock_transaction_token, preempt_disabled_token, upstream_node.get_lock(),
+             downstream_node.get_lock());
 
   // Begin a propagation operation starting from an upstream owned wait queue,
   // and going through a downstream thread.  Only for use during edge add/remove
@@ -309,9 +453,18 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // required.  Note: Links between the upstream queue and downstream thread
   // should *not* have already been added/removed by the time that this method
   // is called.  The method will handle updating the links.
+  //
+  // The entire PI chain starting from the wait queue needs to be locked before
+  // calling this, and the entire chain will be released during the operation.
+  //
+  // Additionally, the upstream node must be an instance of an OwnedWaitQueue.
+  // It is passed as a simple WaitQueue instead of an OwnedWaitQueue just to
+  // work around some static analyzer issues.
   template <PropagateOp Op>
   static void BeginPropagate(OwnedWaitQueue& upstream_node, Thread& downstream_node,
-                             PropagateOpTag<Op>) TA_REQ(thread_lock, preempt_disabled_token);
+                             PropagateOpTag<Op>)
+      TA_REQ(chainlock_transaction_token, preempt_disabled_token, upstream_node.get_lock(),
+             downstream_node.get_lock());
 
   // Finishing handling a propagation operations started from either version of
   // BeginPropagate, or from SetThreadBasePriority.  Traverses the PI chain
@@ -321,7 +474,9 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   static void FinishPropagate(UpstreamNodeType& upstream_node, DownstreamNodeType& downstream_node,
                               const SchedulerState::InheritedProfileValues* added_ipv,
                               const SchedulerState::InheritedProfileValues* lost_ipv,
-                              PropagateOpTag<Op>) TA_REQ(thread_lock, preempt_disabled_token);
+                              PropagateOpTag<Op>)
+      TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream_node),
+             internal::GetPiNodeLock(downstream_node), preempt_disabled_token);
 
   // Upcast from a WaitQueue to an OwnedWaitQueue if possible, using the magic
   // number to detect the underlying nature of the object.  Returns nullptr if
@@ -331,7 +486,63 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
                                                            : nullptr;
   }
 
-  TA_GUARDED(thread_lock) Thread* owner_ = nullptr;
+  static Thread* GetQueueOwner(WaitQueue* wq) TA_REQ(chainlock_transaction_token, wq->get_lock()) {
+    const OwnedWaitQueue* owq = DowncastToOwq(wq);
+
+    if (owq != nullptr) {
+      // The static analyzer is not clever enough to know that wq->get_lock() is
+      // the same lock as owq->get_lock(), so we make it happy using a no-op
+      // assert.
+      owq->get_lock().MarkHeld();
+      return owq->owner_;
+    }
+
+    return nullptr;
+  }
+
+  RequeueLockingDetails LockForRequeueOperation(OwnedWaitQueue& requeue_target,
+                                                Thread* new_requeue_target_owner, uint32_t max_wake,
+                                                uint32_t max_requeue, IWakeRequeueHook& wake_hooks,
+                                                IWakeRequeueHook& requeue_hooks)
+      TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock(), requeue_target.get_lock());
+
+  ktl::variant<ChainLock::LockResult, ReplaceOwnerLockingDetails> LockForOwnerReplacement(
+      Thread* new_owner, const Thread* blocking_thread = nullptr,
+      bool propagate_new_owner_cycle_error = false) TA_REQ(chainlock_transaction_token, get_lock());
+
+  ktl::optional<Thread::UnblockList> LockAndMakeWaiterListLocked(zx_time_t now, uint32_t max_count,
+                                                                 IWakeRequeueHook& hooks)
+      TA_REQ(chainlock_transaction_token, get_lock());
+
+  ktl::optional<WakeRequeueThreadDetails> LockAndMakeWakeRequeueThreadListsLocked(
+      zx_time_t now, uint32_t max_wake_count, IWakeRequeueHook& wake_hooks,
+      uint32_t max_requeue_count, IWakeRequeueHook& requeue_hooks)
+      TA_REQ(chainlock_transaction_token, get_lock());
+
+  ktl::optional<Thread::UnblockList> TryLockAndMakeWaiterListLocked(zx_time_t now,
+                                                                    uint32_t max_count,
+                                                                    IWakeRequeueHook& hooks)
+      TA_REQ(chainlock_transaction_token, get_lock());
+
+  void UnlockAndClearWaiterListLocked(Thread::UnblockList list)
+      TA_REQ(chainlock_transaction_token, get_lock());
+
+  // Common handler for PI chain locking/unlocking
+  template <LockingBehavior Behavior, typename StartNodeType>
+  static ktl::variant<ChainLock::LockResult, const void*> LockPiChainCommon(StartNodeType& start)
+      TA_REQ(chainlock_transaction_token);
+
+  template <typename StartNodeType>
+  static inline ChainLock::LockResult LockPiChainCommonRefuseCycle(StartNodeType& start)
+      TA_REQ(chainlock_transaction_token) {
+    return ktl::get<ChainLock::LockResult>(LockPiChainCommon<LockingBehavior::RefuseCycle>(start));
+  }
+
+  template <typename StartNodeType>
+  static void UnlockPiChainCommon(StartNodeType& start, const void* stop_point = nullptr)
+      TA_REQ(chainlock_transaction_token) TA_REL(internal::GetPiNodeLock(start));
+
+  TA_GUARDED(get_lock()) Thread* owner_ = nullptr;
 
   // A pointer to a thread (which _must_ be a current member of this owned wait queue's)
   // collection which holds the current inherited scheduler state storage for
@@ -359,7 +570,20 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // Cons: Storage of the free tokens would require some central pool system
   //       which would act as a central choke point, which might become a
   //       scalability issue on systems where the processor count is high.
+  //
   SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage_{nullptr};
 };
+
+namespace internal {
+inline const ChainLock& GetPiNodeLock(const Thread& node) TA_RET_CAP(node.get_lock()) {
+  return node.get_lock();
+}
+inline const ChainLock& GetPiNodeLock(const WaitQueue& node) TA_RET_CAP(node.get_lock()) {
+  return node.get_lock();
+}
+inline const ChainLock& GetPiNodeLock(const OwnedWaitQueue& node) TA_RET_CAP(node.get_lock()) {
+  return node.get_lock();
+}
+}  // namespace internal
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_OWNED_WAIT_QUEUE_H_

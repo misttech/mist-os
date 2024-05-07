@@ -7,6 +7,7 @@
 #include <lib/affine/ratio.h>
 #include <lib/arch/intrin.h>
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zx/time.h>
@@ -46,12 +47,11 @@ bool mutex_spin_time_test(void) {
 
   // No matter what happens from here on out, make sure we restore our main
   // thread's priority and cpu affinity.
-  auto cleanup =
-      fit::defer([affinity = Thread::Current::Get()->GetCpuAffinity(),
-                  bp = Thread::Current::Get()->scheduler_state().SnapshotBaseProfile()]() {
-        Thread::Current::Get()->SetCpuAffinity(affinity);
-        Thread::Current::Get()->SetBaseProfile(bp);
-      });
+  auto cleanup = fit::defer([affinity = Thread::Current::Get()->GetCpuAffinity(),
+                             bp = Thread::Current::Get()->SnapshotBaseProfile()]() {
+    Thread::Current::Get()->SetCpuAffinity(affinity);
+    Thread::Current::Get()->SetBaseProfile(bp);
+  });
 
   constexpr zx::duration kTimeouts[] = {
       zx::usec(0), zx::usec(50), zx::usec(250), zx::usec(750), zx::usec(5000),
@@ -114,17 +114,12 @@ bool mutex_spin_time_test(void) {
       args.interlock.store(false);
 
       // Spin until we notice that the thread is blocked.
-      thread_state s;
-      while (true) {
-        {
-          Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-          s = test_thread->state();
-        }
+      auto get_thread_state = [](const Thread& t) -> thread_state {
+        SingletonChainLockGuardIrqSave guard{t.get_lock(), CLT_TAG("mutex_spin_time_test")};
+        return t.state();
+      };
 
-        if (s == THREAD_BLOCKED) {
-          break;
-        }
-
+      while (get_thread_state(*test_thread) != THREAD_BLOCKED) {
         arch::Yield();
       }
 

@@ -8,14 +8,15 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_TIMER_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_TIMER_H_
 
+#include <lib/kconcurrent/chainlock.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
-#include <ktl/atomic.h>
 #include <kernel/deadline.h>
 #include <kernel/spinlock.h>
+#include <ktl/atomic.h>
 
 // Rules for Timers:
 // - Timer callbacks occur from interrupt context.
@@ -68,10 +69,12 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
     return Set(Deadline::no_slack(deadline), callback, arg);
   }
 
-  // Special helper routine to simultaneously try to acquire a spinlock and check for
-  // timer cancel, which is needed in a few special cases.
-  // returns ZX_OK if spinlock was acquired, ZX_ERR_TIMED_OUT if timer was canceled.
+  // Special helper routine to simultaneously try to acquire a spinlock and
+  // check for timer cancel, which is needed in a few special cases. Returns
+  // ZX_OK if spinlock was acquired, ZX_ERR_TIMED_OUT if timer was canceled.
   zx_status_t TrylockOrCancel(MonitoredSpinLock* lock) TA_TRY_ACQ(false, lock);
+  zx_status_t TrylockOrCancel(ChainLock& lock) TA_REQ(chainlock_transaction_token)
+      TA_TRY_ACQ(false, lock);
 
   // Private accessors for timer tests.
   zx_duration_t slack_for_test() const { return slack_; }

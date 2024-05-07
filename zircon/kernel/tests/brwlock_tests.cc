@@ -41,8 +41,7 @@ class BrwLockTest {
     Thread* writer_threads[writers];
     Thread* upgrader_threads[upgraders];
 
-    SchedulerState::BaseProfile old_bp =
-        Thread::Current::Get()->scheduler_state().SnapshotBaseProfile();
+    const SchedulerState::BaseProfile old_bp = Thread::Current::Get()->SnapshotBaseProfile();
 
     // Run at high priority so that we can be validating what the other threads are doing.
     // Unless we are a uniprocessor, in which case we will just have to live with poor

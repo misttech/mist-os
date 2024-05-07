@@ -13,12 +13,12 @@
 
 #include "kernel/scheduler.h"
 
-// Profile inheritance graphs (like all graphs) are directed graphs made up of a
-// set of nodes which express the relationship between various threads and the
-// wait queues they are waiting in.  Every node in the graph is either a Thread,
-// or a WaitQueue.  Nodes in the graph always alternate between threads (blocked
-// in a wait queue) and wait queues (owned by a thread).  While these graphs can
-// be arbitrarily deep and arbitrarily wide, they are always convergent, meaning
+// Profile inheritance graphs are directed graphs made up of a set of nodes
+// which express the relationship between various threads and the wait queues
+// they are waiting in.  Every node in the graph is either a Thread, or a
+// WaitQueue.  Nodes in the graph always alternate between threads (blocked in a
+// wait queue) and wait queues (owned by a thread).  While these graphs can be
+// arbitrarily deep and arbitrarily wide, they are always convergent, meaning
 // that they always terminate at a single node (called the "target").
 //
 // When propagating the consequences of a mutation to a PI graph, it is possible
@@ -28,10 +28,58 @@
 // in the target node regardless of whether or not the target node is a thread
 // or a wait queue instance.
 //
+// Note on locking annotations:
+//
+// These adapters end up wrapping Thread and OwnedWaitQueue objects, which makes
+// static thread analysis annotations a bit difficult to use.  The short version
+// of this is that clang has a hard time telling that the internally held
+// reference to the object is the same thing as the object used to construct the
+// adapter, meaning that when the adapter attempts to access its wrapper object
+// reference, it has trouble proving that the lock is properly held.
+//
+// To work around this, we have a few odd seeming annotations on the adapter
+// objects themselves.
+//
+// 1) The constructor of the adapter demands that the object lock be held, and
+//    then asserts that the lock of the adapter's object reference is also held.
+//    This allows methods of the object to demand that their reference's lock is
+//    held (allowing them to access the underlying objects methods).  As long as
+//    you are in the scope where the adapter was created, the TA_ASSERT in the
+//    constructor will provide the permission to call its methods.
+// 2) The adapter exposes its object reference's lock via a get_lock() method.
+//    This allows functions which take an adapter as a parameter to demand that
+//    the adapter's object reference's lock be held.  Functions which created the
+//    adapter can easily call these functions (because of #1), and the target
+//    function can still access the adapter methods because of the static
+//    requirement.
+// 3) The underlying object accessors (thread() and owq()) each require that the
+//    adapter's lock be held in order to access the underlying object, and in
+//    turn assert that the lock for the object reference it holds is held.  This
+//    allows code to say things like `adapter.thread().SomeFunction()`, even
+//    when SomeFunction requires the underlying object lock.  Again, the problem
+//    here is that Clang cannot figure out that `adapter.thread_` is the same
+//    thing as `adapter.thread()`.
+// 4) Finally, the lambdas used with HandleCommonPiInteraction present some
+//    issues.  It is easy enough to annotate the lambda itself based on its
+//    parameters, but objects which are captured by the lambda are more
+//    problematic.  When they are invoked by the common handler, Clang cannot
+//    seem to figure out that the objects were "locked" when the lambda was
+//    created, and remain locked when the () operator is invoked.
+//    `AssertLocked()` is a method on the adapter which asserts that the
+//    adapter's object reference's lock is held, but does not actually perform
+//    any runtime checks.  It should only be used for the lambda's mentioned
+//    here, where it is very clear from context that the captured adapters are
+//    locked for the entire lifetime of the lambda.
+//
+// Provided that the lock on an underlying object is *never* dropped while there
+// exists an adapter object referencing it, this should all work as intended,
+// even given the limitations of the clang analysis.
+//
 template <>
 class Scheduler::PiNodeAdapter<Thread> {
  public:
-  explicit PiNodeAdapter(Thread& thread) : thread_(thread) {}
+  explicit PiNodeAdapter(Thread& thread) TA_REQ(thread.get_lock()) TA_ASSERT(thread_.get_lock())
+      : thread_(thread) {}
 
   // No copy, no move.
   PiNodeAdapter(const PiNodeAdapter&) = delete;
@@ -39,23 +87,36 @@ class Scheduler::PiNodeAdapter<Thread> {
   PiNodeAdapter& operator=(const PiNodeAdapter&) = delete;
   PiNodeAdapter& operator=(PiNodeAdapter&&) = delete;
 
-  Thread& thread() { return thread_; }
+  ChainLock& get_lock() const TA_RET_CAP(thread_.get_lock()) { return thread_.get_lock(); }
+  Thread& thread() TA_REQ(get_lock()) TA_ASSERT(this->thread().get_lock()) { return thread_; }
+  void AssertLocked() TA_ASSERT(get_lock()) {}
 
-  const SchedulerState::EffectiveProfile& effective_profile() {
+  TA_REQ(get_lock()) const SchedulerState::EffectiveProfile& effective_profile() {
     return thread_.scheduler_state().effective_profile_;
   }
 
-  void RecomputeEffectiveProfile() TA_REQ(thread_lock) {
+  TA_REQ(get_lock()) void RecomputeEffectiveProfile() {
     thread_.scheduler_state().RecomputeEffectiveProfile();
   }
 
-  void AssertEpDirtyState(SchedulerState::ProfileDirtyFlag expected) TA_REQ(thread_lock) {
+  TA_REQ(get_lock()) void AssertEpDirtyState(SchedulerState::ProfileDirtyFlag expected) {
     thread_.scheduler_state().effective_profile_.AssertDirtyState(expected);
   }
 
-  SchedTime& start_time() { return thread_.scheduler_state().start_time_; }
-  SchedTime& finish_time() { return thread_.scheduler_state().finish_time_; }
-  SchedDuration& time_slice_ns() { return thread_.scheduler_state().time_slice_ns_; }
+  TA_REQ(get_lock()) SchedTime& start_time() { return thread_.scheduler_state().start_time_; }
+  TA_REQ(get_lock()) SchedTime& finish_time() { return thread_.scheduler_state().finish_time_; }
+  TA_REQ(get_lock()) SchedDuration& time_slice_ns() {
+    return thread_.scheduler_state().time_slice_ns_;
+  }
+
+  // Thread specific accessors, declared here to making the locking annotation a
+  // bit easier.
+  TA_REQ(get_lock()) SchedulerState& scheduler_state() { return thread_.scheduler_state(); }
+  TA_REQ(get_lock()) thread_state state() { return thread_.state(); }
+  TA_REQ(get_lock()) zx_koid_t tid() { return thread_.state(); }
+  TA_REQ(get_lock()) WaitQueue* blocking_wait_queue() {
+    return thread_.wait_queue_state().blocking_wait_queue_;
+  }
 
  private:
   Thread& thread_;
@@ -64,7 +125,8 @@ class Scheduler::PiNodeAdapter<Thread> {
 template <>
 class Scheduler::PiNodeAdapter<OwnedWaitQueue> {
  public:
-  explicit PiNodeAdapter(OwnedWaitQueue& owq) : owq_(owq) {
+  explicit PiNodeAdapter(OwnedWaitQueue& owq) TA_REQ(owq.get_lock()) TA_ASSERT(owq_.get_lock())
+      : owq_(owq) {
     DEBUG_ASSERT(owq.inherited_scheduler_state_storage() != nullptr);
     SchedulerState::WaitQueueInheritedSchedulerState& iss =
         *owq.inherited_scheduler_state_storage();
@@ -90,10 +152,12 @@ class Scheduler::PiNodeAdapter<OwnedWaitQueue> {
   PiNodeAdapter& operator=(const PiNodeAdapter&) = delete;
   PiNodeAdapter& operator=(PiNodeAdapter&&) = delete;
 
-  OwnedWaitQueue& owq() { return owq_; }
+  ChainLock& get_lock() const TA_RET_CAP(owq_.get_lock()) { return owq_.get_lock(); }
+  OwnedWaitQueue& owq() TA_REQ(get_lock()) TA_ASSERT(this->owq().get_lock()) { return owq_; }
+  void AssertLocked() TA_ASSERT(get_lock()) {}
 
   const SchedulerState::EffectiveProfile& effective_profile() { return effective_profile_; }
-  void RecomputeEffectiveProfile() TA_REQ(thread_lock) {}
+  void RecomputeEffectiveProfile() {}
 
   // OwnedWaitQueues do not need to bother to track the dirty or clean state of their implied
   // effective profile.  They have no base profile (only inherited values) which gets turned into an
@@ -106,11 +170,19 @@ class Scheduler::PiNodeAdapter<OwnedWaitQueue> {
   // 2) Cannot contribute to a scheduler's bookkeeping (because OWQs are not things which get
   //    scheduled).
   //
-  void AssertEpDirtyState(SchedulerState::ProfileDirtyFlag expected) TA_REQ(thread_lock) {}
+  void AssertEpDirtyState(SchedulerState::ProfileDirtyFlag expected) {}
 
-  SchedTime& start_time() { return owq_.inherited_scheduler_state_storage()->start_time; }
-  SchedTime& finish_time() { return owq_.inherited_scheduler_state_storage()->finish_time; }
-  SchedDuration& time_slice_ns() { return owq_.inherited_scheduler_state_storage()->time_slice_ns; }
+  TA_REQ(get_lock()) SchedTime& start_time() {
+    return owq_.inherited_scheduler_state_storage()->start_time;
+  }
+
+  TA_REQ(get_lock()) SchedTime& finish_time() {
+    return owq_.inherited_scheduler_state_storage()->finish_time;
+  }
+
+  TA_REQ(get_lock()) SchedDuration& time_slice_ns() {
+    return owq_.inherited_scheduler_state_storage()->time_slice_ns;
+  }
 
  private:
   OwnedWaitQueue& owq_;
@@ -121,45 +193,79 @@ template <typename TargetType, typename Callable>
 inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<TargetType>& target,
                                                  Callable UpdateDynamicParams) {
   if constexpr (ktl::is_same_v<TargetType, Thread>) {
-    Thread& thread = target.thread();
-    SchedulerState& ss = thread.scheduler_state();
+    SchedulerState& ss = target.scheduler_state();
 
     if (const cpu_num_t curr_cpu = ss.curr_cpu_; curr_cpu != INVALID_CPU) {
-      DEBUG_ASSERT_MSG((thread.state() == THREAD_RUNNING) || (thread.state() == THREAD_READY),
-                       "Unexpected thread state %u for tid %" PRIu64 "\n", thread.state(),
-                       thread.tid());
+      DEBUG_ASSERT_MSG((target.state() == THREAD_RUNNING) || (target.state() == THREAD_READY),
+                       "Unexpected target state %u for tid %" PRIu64 "\n", target.state(),
+                       target.tid());
 
       Scheduler& scheduler = *Get(curr_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler.queue_lock_, SOURCE_TAG};
       scheduler.ValidateInvariants();
-      SchedulerState& tss = thread.scheduler_state();
+      scheduler.AssertInScheduler(target.thread());
+      const SchedulerQueueState& sqs = target.thread().scheduler_queue_state();
 
-      if (thread.state() == THREAD_READY) {
-        // If the thread is in the READY state, we need to remove it from its
-        // scheduler's run queue before updating the effective profile.  We'll
-        // put it back in when we are done with the update.
-        DEBUG_ASSERT(tss.active());
-        scheduler.EraseFromQueue(&thread);
+      // Notes about transient states and bookkeeping.
+      //
+      // RUNNING threads are always expected to have an assigned CPU, to be
+      // "active" (contributing to a scheduler's total weight/utilization), and
+      // to not have any transient state.
+      //
+      // READY threads may have an assigned CPU, but some other combination of
+      // the other factors.
+      //
+      // Typically, a READY thread will be active and have no transient state.
+      // This means that it is waiting in a queue to be scheduled, and will be
+      // accounted for in its scheduler's bookkeeping.  It needs to:
+      //
+      // 1) Be removed from its queue (because its position is about to change)
+      // 2) have its old effective profile be removed from bookkeeping.
+      // 3) Update its EP.
+      // 4) have its new effective profile be added to bookkeeping.
+      // 5) Be re-inserted into the proper run queue.
+      //
+      // If a READY thread's transient state is "rescheduling", however, then it
+      // has been removed from its scheduler's run queue (it is about to become
+      // scheduled), but it has not had its EP removed from bookkeeping.  We do
+      // not want to remove or re-insert the thread into any queue, but we do
+      // need to maintain its scheduler's bookkeeping.
+      //
+      // Finally, the thread could have a transient state of "migrating" or
+      // "stolen".  In this case, it has both been removed from its old
+      // scheduler bookkeeping and its run queues.  We just need to update its
+      // effective profile, which will be properly accounted for in its new
+      // scheduler when it finally arrives there.
+      if (target.state() == THREAD_READY) {
+        if (sqs.transient_state == SchedulerQueueState::TransientState::None) {
+          DEBUG_ASSERT(sqs.active);
+          scheduler.EraseFromQueue(&target.thread());
+        } else {
+          DEBUG_ASSERT(!sqs.run_queue_node.InContainer());
+        }
       } else {
         // The target thread's state is RUNNING.  Make sure to update its TSR
         // before we update either the dynamic parameters, or the scheduler's
-        // parameters which depend on our static profile parameters.
-        const SchedDuration actual_runtime_ns = now - tss.last_started_running_;
-        const SchedDuration scaled_actual_runtime_ns = tss.effective_profile().IsDeadline()
+
+        // Running threads should always be "active", and have no transient state.
+        DEBUG_ASSERT(sqs.active &&
+                     (sqs.transient_state == SchedulerQueueState::TransientState::None));
+        const SchedDuration actual_runtime_ns = now - ss.last_started_running_;
+        const SchedDuration scaled_actual_runtime_ns = ss.effective_profile().IsDeadline()
                                                            ? scheduler.ScaleDown(actual_runtime_ns)
                                                            : actual_runtime_ns;
 
-        tss.runtime_ns_ += actual_runtime_ns;
-        const SchedDuration new_tsr = (tss.time_slice_ns_ <= scaled_actual_runtime_ns)
+        ss.runtime_ns_ += actual_runtime_ns;
+        const SchedDuration new_tsr = (ss.time_slice_ns_ <= scaled_actual_runtime_ns)
                                           ? SchedDuration{0}
-                                          : (tss.time_slice_ns_ - scaled_actual_runtime_ns);
-        tss.time_slice_ns_ = new_tsr;
-        if (EffectiveProfile& cur_ep = tss.effective_profile_; cur_ep.IsFair()) {
+                                          : (ss.time_slice_ns_ - scaled_actual_runtime_ns);
+        ss.time_slice_ns_ = new_tsr;
+        if (EffectiveProfile& cur_ep = ss.effective_profile_; cur_ep.IsFair()) {
           cur_ep.fair.normalized_timeslice_remainder =
               new_tsr / ktl::max(cur_ep.fair.initial_time_slice_ns, SchedDuration{1});
         };
 
-        tss.last_started_running_ = now;
+        ss.last_started_running_ = now;
         scheduler.start_of_current_time_slice_ns_ = now;
       }
 
@@ -168,21 +274,23 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
       target.RecomputeEffectiveProfile();
       const EffectiveProfile& new_ep = ss.effective_profile();
 
-      // Deal with the scheduler's bookkeeping.
-      if (old_ep.IsFair()) {
-        scheduler.weight_total_ -= old_ep.fair.weight;
-        --scheduler.runnable_fair_task_count_;
-      } else {
-        scheduler.UpdateTotalDeadlineUtilization(-old_ep.deadline.utilization);
-        --scheduler.runnable_deadline_task_count_;
-      }
+      // If the thread is active, deal with its scheduler's bookkeeping.
+      if (sqs.active) {
+        if (old_ep.IsFair()) {
+          scheduler.weight_total_ -= old_ep.fair.weight;
+          --scheduler.runnable_fair_task_count_;
+        } else {
+          scheduler.UpdateTotalDeadlineUtilization(-old_ep.deadline.utilization);
+          --scheduler.runnable_deadline_task_count_;
+        }
 
-      if (new_ep.IsFair()) {
-        scheduler.weight_total_ += new_ep.fair.weight;
-        ++scheduler.runnable_fair_task_count_;
-      } else {
-        scheduler.UpdateTotalDeadlineUtilization(new_ep.deadline.utilization);
-        ++scheduler.runnable_deadline_task_count_;
+        if (new_ep.IsFair()) {
+          scheduler.weight_total_ += new_ep.fair.weight;
+          ++scheduler.runnable_fair_task_count_;
+        } else {
+          scheduler.UpdateTotalDeadlineUtilization(new_ep.deadline.utilization);
+          ++scheduler.runnable_deadline_task_count_;
+        }
       }
 
       DEBUG_ASSERT(scheduler.weight_total_ >= SchedWeight{0});
@@ -192,14 +300,17 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
 
       // OK, we are done updating this thread's state, as well as most of its
       // scheduler's state.  The last thing to do is to either put the thread
-      // back into the proper run queue (if it is READY), or to adjust the
-      // preemption time for the scheduler (if this thread is actively running)
-      if (thread.state() == THREAD_READY) {
-        scheduler.QueueThread(&thread, Placement::Adjustment);
+      // back into the proper run queue (if it is READY and active), or to
+      // adjust the preemption time for the scheduler (if this thread is
+      // actively running)
+      if (target.state() == THREAD_READY) {
+        if (sqs.transient_state == SchedulerQueueState::TransientState::None) {
+          scheduler.QueueThread(&target.thread(), Placement::Adjustment);
+        }
       } else {
-        DEBUG_ASSERT(thread.state() == THREAD_RUNNING);
+        DEBUG_ASSERT(target.state() == THREAD_RUNNING);
         scheduler.target_preemption_time_ns_ =
-            scheduler.start_of_current_time_slice_ns_ + scheduler.ScaleUp(tss.time_slice_ns_);
+            scheduler.start_of_current_time_slice_ns_ + scheduler.ScaleUp(ss.time_slice_ns_);
       }
 
       // We have made a change to this scheduler's state, we need to trigger a
@@ -214,7 +325,22 @@ inline void Scheduler::HandlePiInteractionCommon(SchedTime now, PiNodeAdapter<Ta
       // all done, update the dynamic parameters of the target using the
       // callback provided by the specific operation.
       SchedulerState::EffectiveProfile old_ep = target.effective_profile();
-      if (WaitQueue* wq = target.thread().wait_queue_state().blocking_wait_queue_; wq != nullptr) {
+      if (WaitQueue* wq = target.blocking_wait_queue(); wq != nullptr) {
+        // Note that to update our position in the WaitQueue this thread is
+        // blocked in, we need to holding that wait queue's lock.  (It has to be
+        // a WaitQueue and not an OwnedWaitQueue, or the PI operation's target
+        // would be the final OWQ, not the blocked Thread.)
+        //
+        // This should always be the case.  We need to holding the entire PI
+        // chain during PI propagation.  That said, this is pretty much an
+        // impossible thing to represent using static annotations, so we need to
+        // fall back on a dynamic assert here instead.  We know that we are
+        // holding the thread locked (because of all of the static annotations),
+        // so we can use the token that is currently locking the thread's lock
+        // to verify that the WaitQueue is both locked, and part of the same
+        // locked chain that this operation owns and is currently locking the
+        // thread.
+        wq->get_lock().AssertHeld();
         wq->UpdateBlockedThreadEffectiveProfile(target.thread());
       } else {
         target.RecomputeEffectiveProfile();
@@ -303,6 +429,7 @@ void Scheduler::UpstreamThreadBaseProfileChanged(Thread& _upstream, TargetType& 
     // same way that we penalize any other thread.  Basically, don't write code
     // where you block a thread behind another thread and then start to change
     // its profile while blocked.
+    target.AssertLocked();
     const SchedulerState::EffectiveProfile& ep = target.effective_profile();
     if (ep.IsFair()) {
       target.start_time() = virt_now;
@@ -333,6 +460,9 @@ void Scheduler::JoinNodeToPiGraph(UpstreamType& _upstream, TargetType& _target) 
 
   auto f = [&target, &upstream, now](const SchedulerState::EffectiveProfile& target_old_ep,
                                      SchedTime) {
+    upstream.AssertLocked();
+    target.AssertLocked();
+
     const SchedulerState::EffectiveProfile& upstream_ep = upstream.effective_profile();
     const SchedulerState::EffectiveProfile& target_new_ep = target.effective_profile();
 
@@ -406,6 +536,9 @@ void Scheduler::SplitNodeFromPiGraph(UpstreamType& _upstream, TargetType& _targe
 
   auto f = [&target, &upstream, now](const SchedulerState::EffectiveProfile& target_old_ep,
                                      SchedTime) {
+    upstream.AssertLocked();
+    target.AssertLocked();
+
     const SchedulerState::EffectiveProfile& upstream_ep = upstream.effective_profile();
     const SchedulerState::EffectiveProfile& target_new_ep = target.effective_profile();
 

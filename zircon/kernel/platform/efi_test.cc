@@ -22,7 +22,7 @@ NO_ASAN bool TestEfiPresent() {
   BEGIN_TEST;
 
   // Grab our current aspace.
-  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
+  VmAspace* old_aspace = Thread::Current::active_aspace();
 
   // Attempt to fetch EFI services.
   EfiServicesActivation services = TryActivateEfiServices();
@@ -34,7 +34,7 @@ NO_ASAN bool TestEfiPresent() {
     services.reset();
 
     // Make sure it actually did.
-    EXPECT_EQ(old_aspace, Thread::Current::Get()->active_aspace());
+    EXPECT_EQ(old_aspace, Thread::Current::active_aspace());
   } else {
     printf("Unknown if EFI is expected to be supported on platform. Skipping test.\n");
   }

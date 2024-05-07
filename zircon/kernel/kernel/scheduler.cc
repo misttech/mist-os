@@ -10,6 +10,8 @@
 #include <debug.h>
 #include <inttypes.h>
 #include <lib/counters.h>
+#include <lib/kconcurrent/chainlock.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -23,6 +25,7 @@
 #include <new>
 
 #include <arch/ops.h>
+#include <arch/thread.h>
 #include <ffl/string.h>
 #include <kernel/auto_lock.h>
 #include <kernel/auto_preempt_disabler.h>
@@ -33,19 +36,21 @@
 #include <kernel/scheduler_internal.h>
 #include <kernel/scheduler_state.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <ktl/algorithm.h>
 #include <ktl/forward.h>
 #include <ktl/limits.h>
 #include <ktl/move.h>
 #include <ktl/pair.h>
 #include <ktl/span.h>
+#include <ktl/tuple.h>
+#include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
 #include <vm/vm.h>
 
 #include <ktl/enforce.h>
 
 using ffl::Round;
+using ::kconcurrent::SchedulerUtils;
 
 // Counts the number of times we set the preemption timer to fire at a point
 // that's prior to the time at which the CPU last entered the scheduler.  See
@@ -68,7 +73,7 @@ constexpr zx_time_t& operator+=(zx_time_t& value, SchedDuration delta) {
   return value;
 }
 
-inline zx_thread_state_t UserThreadState(const Thread* thread) {
+inline zx_thread_state_t UserThreadState(const Thread* thread) TA_REQ_SHARED(thread->get_lock()) {
   switch (thread->state()) {
     case THREAD_INITIAL:
     case THREAD_READY:
@@ -93,7 +98,8 @@ constexpr int32_t kIdleWeight = ktl::numeric_limits<int32_t>::min();
 // Writes a context switch record to the ktrace buffer. This is always enabled
 // so that user mode tracing can track which threads are running.
 inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_thread,
-                               cpu_num_t current_cpu) TA_REQ(thread_lock) {
+                               cpu_num_t current_cpu)
+    TA_REQ_SHARED(current_thread->get_lock(), next_thread->get_lock()) {
   const SchedulerState& current_state = current_thread->scheduler_state();
   const SchedulerState& next_state = next_thread->scheduler_state();
   KTRACE_CONTEXT_SWITCH(
@@ -105,7 +111,8 @@ inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_
 
 // Writes a thread wakeup record to the ktrace buffer. This is always enabled
 // so that user mode tracing can track which threads are waking.
-inline void TraceWakeup(const Thread* thread, cpu_num_t target_cpu) TA_REQ(thread_lock) {
+inline void TraceWakeup(const Thread* thread, cpu_num_t target_cpu)
+    TA_REQ_SHARED(thread->get_lock()) {
   const SchedulerState& state = thread->scheduler_state();
   KTRACE_THREAD_WAKEUP("kernel:sched", target_cpu, thread->fxt_ref(),
                        ("weight", thread->IsIdle() ? kIdleWeight : state.weight()));
@@ -186,7 +193,7 @@ void PreemptReset(cpu_num_t current_cpu, zx_time_t now, zx_time_t deadline) {
 // used for trace analysis to compute statistics about overall utilization,
 // taking CPU affinity into account.
 inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
-                                             Thread* thread) const {
+                                             const Thread* thread) const {
   // Traces marking the end of a queue/dequeue operation have arguments encoded
   // as follows:
   //
@@ -218,15 +225,6 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
 }
 
 void Scheduler::Dump(FILE* output_target) {
-  // TODO(eieio): HACK! Take the thread lock here to prevent the IO path from
-  // attempting to acquire the thread lock after the queue lock. Figure out a
-  // similar strategy to prevent lock order inversion with whichever lock
-  // protects the IO path once the thread lock is removed.
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  DumpThreadLocked(output_target);
-}
-
-void Scheduler::DumpThreadLocked(FILE* output_target) {
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
 
   fprintf(output_target,
@@ -237,8 +235,9 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
           total_expected_runtime_ns_.raw_value(), Format(total_deadline_utilization_).c_str());
 
   if (active_thread_ != nullptr) {
-    const SchedulerState& state = active_thread_->scheduler_state();
-    const EffectiveProfile ep = state.SnapshotEffectiveProfileLocked();
+    AssertInScheduler(*active_thread_);
+    const SchedulerState& state = const_cast<const Thread*>(active_thread_)->scheduler_state();
+    const EffectiveProfile& ep = state.effective_profile();
     if (ep.IsFair()) {
       fprintf(output_target,
               "\t-> name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
@@ -258,8 +257,9 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
   }
 
   for (const Thread& thread : deadline_run_queue_) {
+    AssertInScheduler(thread);
     const SchedulerState& state = thread.scheduler_state();
-    const EffectiveProfile ep = state.SnapshotEffectiveProfileLocked();
+    const EffectiveProfile& ep = state.effective_profile();
     fprintf(output_target,
             "\t   name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
             " ts=%" PRId64 " ema=%" PRId64 "\n",
@@ -269,14 +269,33 @@ void Scheduler::DumpThreadLocked(FILE* output_target) {
   }
 
   for (const Thread& thread : fair_run_queue_) {
+    AssertInScheduler(thread);
     const SchedulerState& state = thread.scheduler_state();
-    const EffectiveProfile ep = state.SnapshotEffectiveProfileLocked();
+    const EffectiveProfile& ep = state.effective_profile();
     fprintf(output_target,
             "\t   name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
             " ema=%" PRId64 "\n",
             thread.name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
             state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
             state.expected_runtime_ns_.raw_value());
+  }
+}
+
+void Scheduler::DumpActiveThread(FILE* output_target) {
+  Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
+
+  if (active_thread_ != nullptr) {
+    AssertInScheduler(*active_thread_);
+    fprintf(output_target, "thread: pid=%lu tid=%lu\n", active_thread_->pid(),
+            active_thread_->tid());
+    ThreadDispatcher* user_thread = active_thread_->user_thread();
+    if (user_thread != nullptr) {
+      ProcessDispatcher* process = user_thread->process();
+      char name[ZX_MAX_NAME_LEN]{};
+      [[maybe_unused]] zx_status_t status = process->get_name(name);
+      DEBUG_ASSERT(status == ZX_OK);
+      fprintf(output_target, "process: name=%s\n", name);
+    }
   }
 }
 
@@ -308,11 +327,18 @@ size_t Scheduler::GetRunnableTasks() const {
 Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eligible_time) {
   return FindEarliestEligibleThread(run_queue, eligible_time, [](const auto iter) { return true; });
 }
+
 template <typename Predicate>
 Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eligible_time,
                                               Predicate&& predicate) {
+  auto GetSchedulerState = [this](const Thread& t)
+                               TA_REQ(this->queue_lock_) -> const SchedulerState& {
+    AssertInScheduler(t);
+    return t.scheduler_state();
+  };
+
   // Early out if there is no eligible thread.
-  if (run_queue->is_empty() || run_queue->front().scheduler_state().start_time_ > eligible_time) {
+  if (run_queue->is_empty() || GetSchedulerState(run_queue->front()).start_time_ > eligible_time) {
     return nullptr;
   }
 
@@ -330,14 +356,16 @@ Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eli
   // that are not eligible. Eligible tasks are both in the left partition and
   // along the search path, tracked by |path|.
   while (node) {
-    if (node->scheduler_state().start_time_ <= eligible_time) {
-      if (!path || path->scheduler_state().finish_time_ > node->scheduler_state().finish_time_) {
+    const SchedulerState& node_state = GetSchedulerState(*node);
+
+    if (node_state.start_time_ <= eligible_time) {
+      if (!path || GetSchedulerState(*path).finish_time_ > node_state.finish_time_) {
         path = node;
       }
 
       if (auto left = node.left();
-          !subtree || (left && subtree->scheduler_state().min_finish_time_ >
-                                   left->scheduler_state().min_finish_time_)) {
+          !subtree || (left && (GetSchedulerState(*subtree).min_finish_time_ >
+                                GetSchedulerState(*left).min_finish_time_))) {
         subtree = left;
       }
 
@@ -350,22 +378,24 @@ Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eli
   if (!subtree) {
     return path && accept(path) ? path.CopyPointer() : nullptr;
   }
-  if (subtree->scheduler_state().min_finish_time_ >= path->scheduler_state().finish_time_ &&
-      accept(path)) {
+
+  const SchedulerState& subtree_state = GetSchedulerState(*subtree);
+  if ((subtree_state.min_finish_time_ >= GetSchedulerState(*path).finish_time_) && accept(path)) {
     return path.CopyPointer();
   }
 
-  // Find the node with the earliest finish time among the decendents of the
+  // Find the node with the earliest finish time among the descendants of the
   // subtree with the smallest minimum finish time.
   node = subtree;
   do {
-    if (subtree->scheduler_state().min_finish_time_ == node->scheduler_state().finish_time_ &&
-        accept(node)) {
+    const SchedulerState& node_state = GetSchedulerState(*node);
+
+    if ((subtree_state.min_finish_time_ == node_state.finish_time_) && accept(node)) {
       return node.CopyPointer();
     }
 
-    if (auto left = node.left(); left && node->scheduler_state().min_finish_time_ ==
-                                             left->scheduler_state().min_finish_time_) {
+    if (auto left = node.left();
+        left && (node_state.min_finish_time_ == GetSchedulerState(*left).min_finish_time_)) {
       node = left;
     } else {
       node = node.right();
@@ -400,34 +430,20 @@ void Scheduler::InitializeFirstThread(Thread* thread) {
   ss.state_ = THREAD_RUNNING;
   ss.curr_cpu_ = current_cpu;
   ss.last_cpu_ = current_cpu;
-  ss.next_cpu_ = INVALID_CPU;
   ss.hard_affinity_ = cpu_num_to_mask(current_cpu);
 
   // Finally, make sure that the thread is the active thread for the scheduler,
   // and that the weight_total bookkeeping is accurate.
-  Scheduler* sched = Get(current_cpu);
   {
+    Scheduler* sched = Get(current_cpu);
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&sched->queue_lock_, SOURCE_TAG};
-    ss.active_ = true;
+    sched->AssertInScheduler(*thread);
+
+    SchedulerQueueState& sqs = thread->scheduler_queue_state();
+    sqs.active = true;
     sched->active_thread_ = thread;
 
-    // Don't bother holding the ThreadLock while we access this thread's
-    // effective profile in order to initialize the scheduler's weight total.
-    // The value of fair.weight was just assigned on this thread during
-    // placement construction of the scheduler state during the call to
-    // InitializeThread (above).  No one else can see the thread yet (it has not
-    // been assigned to the scheduler yet), therefore there should be no chance
-    // of an incoherent read.
-    //
-    // In order for anyone else to be able to see this thread's effective
-    // profile, they will first need to recognize that the thread itself exists.
-    // This will require holding this scheduler's queue_lock, and this should
-    // serve as a sufficient barrier to ensure that everyone else sees a
-    // coherent view of the effective profile.
-    [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-      sched->weight_total_ = ss.effective_profile_.fair.weight;
-    }();
-
+    sched->weight_total_ = ss.effective_profile_.fair.weight;
     sched->runnable_fair_task_count_++;
     sched->UpdateTotalExpectedRuntime(ss.expected_runtime_ns_);
   }
@@ -463,6 +479,8 @@ void Scheduler::RemoveFirstThread(Thread* thread) {
 
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&sched->queue_lock_, SOURCE_TAG};
+    sched->AssertInScheduler(*thread);
+    SchedulerQueueState& sqs = thread->scheduler_queue_state();
 
     // We are becoming the idle thread.  We should currently be running with a
     // fair (not deadline) profile, and we should not be holding any locks
@@ -475,7 +493,7 @@ void Scheduler::RemoveFirstThread(Thread* thread) {
     // longer.  We are about to either exit, or "UnblockIdle".
     DEBUG_ASSERT(sched->active_thread_ == thread);
     DEBUG_ASSERT(sched->runnable_fair_task_count_ > 0);
-    ss.active_ = false;
+    sqs.active = false;
     sched->active_thread_ = nullptr;
     sched->weight_total_ -= ss.effective_profile_.fair.weight;
     sched->runnable_fair_task_count_--;
@@ -504,30 +522,60 @@ Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSa
     return DequeueFairThread();
   }
 
-  // Release the queue lock while attempting to seal work, leaving IRQs disabled.
+  // Release the queue lock while attempting to steal work, leaving IRQs
+  // disabled.  Latch our scale up factor to use while determining whether or
+  // not we can steal a given thread before we drop our lock.
   Thread* thread;
+  SchedPerformanceScale scale_up_factor = performance_scale_reciprocal_.load();
   queue_guard.CallUnlocked([&] {
-    thread_lock.AssertHeld();
-    thread = StealWork(now);
+    ChainLockTransaction::AssertActive();
+    thread = StealWork(now, scale_up_factor);
   });
 
-  return thread != nullptr ? thread : &self.idle_power_thread.thread();
+  // If we successfully stole a thread, it should now be in the Rescheduling
+  // transient state.  It needed to be marked as such to prevent PI and
+  // Migration code from messing with its (new) scheduler bookkeeping while we
+  // were not holding that scheduler's lock.
+  //
+  // Now that we have re-obtained the scheduler lock, go ahead an clear the
+  // Rescheduling flag so that the stolen thread looks exactly like a thread
+  // that had been dequeued.
+  //
+  // TODO(johngro): reconsider this approach.  We need to hold both the thread's
+  // lock and this scheduler's lock in order to add it to this scheduler.  The
+  // thread's lock must be acquired before the scheduler's lock, which happens
+  // at the end of StealWork.  After that, however, we need to drop both locks
+  // before returning from StealWork, only to immediately re-acquire the queue
+  // lock and return the dequeued thread (without the dequeued thread's lock
+  // held).
+  //
+  // If we changed the semantics of Dequeue thread to return a _locked_ thread,
+  // we could have StealWork return a thread which was in the Stolen transient
+  // state instead.  Then we could lock the thread, and re-lock our scheduler's
+  // queue, and return a locked thread to RescheduleCommon.  This would mean
+  // that we don't have to drop the scheduler's lock later on in order to finish
+  // the reschedule (or migration) operation.
+  if (thread != nullptr) {
+    AssertInScheduler(*thread);
+    SchedulerQueueState& sqs = thread->scheduler_queue_state();
+    DEBUG_ASSERT(sqs.transient_state == SchedulerQueueState::TransientState::Rescheduling);
+    sqs.transient_state = SchedulerQueueState::TransientState::None;
+    return thread;
+  }
+
+  return &self.idle_power_thread.thread();
 }
 
 // Attempts to steal work from other busy CPUs and move it to the local run
 // queues. Returns a pointer to the stolen thread that is now associated with
 // the local Scheduler instance, or nullptr is no work was stolen.
-Thread* Scheduler::StealWork(SchedTime now) {
+Thread* Scheduler::StealWork(SchedTime now, SchedPerformanceScale scale_up_factor) {
+  using TransientState = SchedulerQueueState::TransientState;
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "StealWork");
 
   const cpu_num_t current_cpu = this_cpu();
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
   const cpu_mask_t active_cpu_mask = mp_get_active_mask();
-
-  // Returns true if the given thread can run on this CPU.
-  const auto check_affinity = [current_cpu_mask, active_cpu_mask](const Thread& thread) -> bool {
-    return current_cpu_mask & thread.scheduler_state().GetEffectiveCpuMask(active_cpu_mask);
-  };
 
   Thread* thread = nullptr;
   const CpuSearchSet& search_set = percpu::Get(current_cpu).search_set;
@@ -543,51 +591,109 @@ Thread* Scheduler::StealWork(SchedTime now) {
 
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue->queue_lock_, SOURCE_TAG};
 
+      // Note that in the lambdas below we will be making use of both the
+      // MarkHasSchedulerAccess (but only on |queue|) and
+      // MarkHasOwnedThreadAccess.  We just acquired |queue|'s queue lock, and
+      // each thread we will be examining is a member of one of |queue|'s run
+      // queues (either fair or deadline).  This should satisfy the requirements
+      // of both no-op checks.
+
+      // Returns true if the given thread can run on this CPU.  Static analysis
+      // needs to be disabled, but this should be fine.  We only need R/O access
+      // to the thread's scheduler state, which we have because we are holding
+      // the queue lock for a thread which belongs to that queue (see below).
+      const auto check_affinity = [current_cpu_mask,
+                                   active_cpu_mask](const Thread& thread) -> bool {
+        MarkHasOwnedThreadAccess(thread);
+        return current_cpu_mask & thread.scheduler_state().GetEffectiveCpuMask(active_cpu_mask);
+      };
+
+      // Common routine for stealing from a RunQueue when we find a thread we
+      // are interested in.
+      const auto StealFromQueue = [check_affinity, queue](RunQueue& rq, Thread& thread) {
+        // check_affinity is only used in a DEBUG_ASSERT.  Ideally we'd annotate
+        // it with [[maybe_unused]], but we can't do that in a lambda capture.
+        ktl::ignore = check_affinity;
+
+        MarkHasOwnedThreadAccess(thread);
+        MarkHasSchedulerAccess(*queue);
+
+        DEBUG_ASSERT(!thread.has_migrate_fn());
+        DEBUG_ASSERT(check_affinity(thread));
+        DEBUG_ASSERT((&rq == &queue->fair_run_queue_) || (&rq == &queue->deadline_run_queue_));
+
+        rq.erase(thread);
+        queue->RemoveForTransition(&thread, TransientState::Stolen);
+        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_intern, &thread);
+      };
+
       // Returns true if the given thread in the run queue meets the criteria to
-      // run on this CPU.
-      const auto deadline_predicate = [this, check_affinity](const auto iter) TA_REQ(thread_lock) {
-        const SchedulerState& state = iter->scheduler_state();
+      // run on this CPU.  Don't attempt to steal any threads which are
+      // currently in the process of being scheduled.
+      const auto deadline_predicate = [check_affinity, scale_up_factor](const auto iter) -> bool {
+        const Thread& t = *iter;
+        MarkHasOwnedThreadAccess(t);
+
+        const SchedulerState& state = t.scheduler_state();
+        const SchedulerQueueState& sqs = t.scheduler_queue_state();
         const EffectiveProfile& ep = state.effective_profile_;
-        const SchedUtilization scaled_utilization = ScaleUp(ep.deadline.utilization);
+        const SchedUtilization scaled_utilization = ep.deadline.utilization * scale_up_factor;
         const bool is_scheduleable = scaled_utilization <= kThreadUtilizationMax;
-        return check_affinity(*iter) && is_scheduleable && !iter->has_migrate_fn();
+        const bool transition_in_progress = sqs.transient_state != TransientState::None;
+
+        return !transition_in_progress && check_affinity(t) && is_scheduleable &&
+               !t.has_migrate_fn();
       };
 
       // Attempt to find a deadline thread that can run on this CPU.
       thread =
           queue->FindEarliestEligibleThread(&queue->deadline_run_queue_, now, deadline_predicate);
       if (thread != nullptr) {
-        DEBUG_ASSERT(!thread->has_migrate_fn());
-        DEBUG_ASSERT(check_affinity(*thread));
-        queue->deadline_run_queue_.erase(*thread);
-        queue->Remove(thread);
-        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_intern, thread);
+        StealFromQueue(queue->deadline_run_queue_, *thread);
         break;
       }
 
       // Returns true if the given thread in the run queue meets the criteria to
       // run on this CPU.
-      const auto fair_predicate = [check_affinity](const auto iter) {
-        return check_affinity(*iter) && !iter->has_migrate_fn();
+      //
+      // See the arguments for |deadline_predicate| (above) for why we can
+      // disable static analysis here.
+      const auto fair_predicate = [check_affinity](const auto iter) -> bool {
+        const Thread& t = *iter;
+        MarkHasOwnedThreadAccess(t);
+
+        const SchedulerQueueState& sqs = t.scheduler_queue_state();
+
+        const bool transition_in_progress = sqs.transient_state != TransientState::None;
+        return !transition_in_progress && check_affinity(t) && !t.has_migrate_fn();
       };
 
       // TODO(eieio): Revisit the eligibility time parameter if/when moving to
       // WF2Q.
       queue->UpdateTimeline(now);
       SchedTime eligible_time = queue->virtual_time_;
-      if (!queue->fair_run_queue_.is_empty()) {
-        const auto& earliest_thread = queue->fair_run_queue_.front();
-        const auto earliest_start = earliest_thread.scheduler_state().start_time_;
+      for (auto iter = queue->fair_run_queue_.cbegin(); iter.IsValid();) {
+        const Thread& earliest_thread = *iter;
+        MarkHasOwnedThreadAccess(earliest_thread);
+
+        // Skip the first thread is it is in the process of being rescheduled.
+        // We cannot steal that one.
+        const SchedulerQueueState& sqs = earliest_thread.scheduler_queue_state();
+        const bool reschedule_in_progress = sqs.transient_state == TransientState::Rescheduling;
+        if (reschedule_in_progress) {
+          ++iter;
+          continue;
+        }
+
+        const SchedTime earliest_start = earliest_thread.scheduler_state().start_time_;
         eligible_time = ktl::max(eligible_time, earliest_start);
+        break;
       }
+
       thread =
           queue->FindEarliestEligibleThread(&queue->fair_run_queue_, eligible_time, fair_predicate);
       if (thread != nullptr) {
-        DEBUG_ASSERT(!thread->has_migrate_fn());
-        DEBUG_ASSERT(check_affinity(*thread));
-        queue->fair_run_queue_.erase(*thread);
-        queue->Remove(thread);
-        queue->TraceThreadQueueEvent("tqe_deque_steal_work"_intern, thread);
+        StealFromQueue(queue->fair_run_queue_, *thread);
         break;
       }
     }
@@ -596,8 +702,41 @@ Thread* Scheduler::StealWork(SchedTime now) {
   if (thread) {
     // Associate the thread with this Scheduler, but don't enqueue it. It
     // will run immediately on this CPU as if dequeued from a local queue.
+    ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
+    active_clt.Restart(CLT_TAG("Scheduler::StealWork (restart)"));
+
+    UnconditionalChainLockGuard thread_guard{thread->get_lock()};
+    active_clt.Finalize();
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
-    Insert(now, thread, Placement::Association);
+
+    // The use of the no-op assert which gives us access to the thread's
+    // scheduler-variables requires a bit of explanation.  The thread is in the
+    // process of being stolen.  Its scheduler state cpu_id still indicates that
+    // it is a member of its previous scheduler, but it is no longer present in
+    // that scheduler.  Because of this, reschedule operations on that scheduler
+    // will not be able to consider the thread, and will not be able to access
+    // the scheduler variables.
+    //
+    // A PI operation targeting the thread which runs before we acquire the
+    // thread's lock exclusively (just above this one) will end up acquiring
+    // the old scheduler's lock (because of the stale cpu_id), but it must have
+    // happened-before this code (because we hold the thread's lock), and will
+    // therefore also be able to see that the thread is in the process of being
+    // stolen (because it synchronized with that state when it acquired the old
+    // scheduler's queue lock, which was what was being held the last time the
+    // steal_in_progress flag was mutated.  The PI operation will _never_ mutate
+    // any of these flags.  This is a requirement, although there is no good way
+    // to statically enforce it.
+    //
+    // Finally, we have just acquired our own queue_lock in order to place the
+    // thread into our run queue.  We know that no one can have mutated the
+    // flag, since no other reschedule operation can find the thread while it is
+    // moving, and PI ops will never mutate the flag.  We were the ones to last
+    // mutate the flag while holding the thread's old scheduler queue lock, so
+    // our view of the flag should be coherent as well.
+    //
+    MarkHasOwnedThreadAccess(*thread);
+    FinishTransition(now, thread);
   }
   return thread;
 }
@@ -608,7 +747,13 @@ Thread* Scheduler::DequeueFairThread() {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "dequeue_fair_thread");
 
   // Snap the virtual clock to the earliest start time.
+  //
+  // It should be safe to use the no-op assert here.  We know we are holding
+  // this scheduler's queue lock (a requirement to call the function), and we
+  // know that the thread must be a member of this scheduler (since we just
+  // found it in the fair run queue).
   const auto& earliest_thread = fair_run_queue_.front();
+  MarkHasOwnedThreadAccess(earliest_thread);
   const auto earliest_start = earliest_thread.scheduler_state().start_time_;
   const SchedTime eligible_time = ktl::max(virtual_time_, earliest_start);
 
@@ -629,6 +774,9 @@ Thread* Scheduler::DequeueFairThread() {
                    earliest_thread.scheduler_state().finish_time_.raw_value(),
                    earliest_thread.scheduler_state().min_finish_time_.raw_value());
 
+  // Same argument as before for the use of the no-op assert.  We are holding
+  // the queue lock, and we just found this thread in the scheduler.
+  MarkHasOwnedThreadAccess(*eligible_thread);
   virtual_time_ = eligible_time;
   fair_run_queue_.erase(*eligible_thread);
   TraceThreadQueueEvent("tqe_deque_fair"_intern, eligible_thread);
@@ -641,18 +789,13 @@ Thread* Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "dequeue_deadline_thread");
 
   Thread* const eligible_thread = FindEarliestEligibleThread(&deadline_run_queue_, eligible_time);
-  DEBUG_ASSERT_MSG(eligible_thread != nullptr,
-                   "eligible_time=%" PRId64 ", start_time=%" PRId64 ", finish_time=%" PRId64
-                   ", min_finish_time=%" PRId64 "!",
-                   eligible_time.raw_value(),
-                   eligible_thread->scheduler_state().start_time_.raw_value(),
-                   eligible_thread->scheduler_state().finish_time_.raw_value(),
-                   eligible_thread->scheduler_state().min_finish_time_.raw_value());
+  DEBUG_ASSERT_MSG(eligible_thread != nullptr, "eligible_time=%" PRId64, eligible_time.raw_value());
 
+  MarkHasOwnedThreadAccess(*eligible_thread);  // See DequeueFairThread
   deadline_run_queue_.erase(*eligible_thread);
   TraceThreadQueueEvent("tqe_deque_deadline"_intern, eligible_thread);
 
-  const SchedulerState& state = eligible_thread->scheduler_state();
+  const SchedulerState& state = const_cast<const Thread*>(eligible_thread)->scheduler_state();
   if (state.finish_time_ <= eligible_time) {
     kcounter_add(counter_deadline_past, 1);
   }
@@ -666,17 +809,28 @@ Thread* Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
 // the run queue is empty.
 Thread* Scheduler::FindEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time) {
   Thread* const eligible_thread = FindEarliestEligibleThread(&deadline_run_queue_, eligible_time);
-  const bool found_earlier_deadline =
-      eligible_thread && eligible_thread->scheduler_state().finish_time_ < finish_time;
-  return found_earlier_deadline ? eligible_thread : nullptr;
+
+  if (eligible_thread != nullptr) {
+    MarkHasOwnedThreadAccess(*eligible_thread);  // See DequeueFairThread
+    const bool found_earlier_deadline =
+        const_cast<const Thread*>(eligible_thread)->scheduler_state().finish_time_ < finish_time;
+    return found_earlier_deadline ? eligible_thread : nullptr;
+  } else {
+    return nullptr;
+  }
 }
 
 // Returns the time that the next deadline task will become eligible or infinite
 // if there are no ready deadline tasks or there is pending work for the idle
 // thread to perform.
 SchedTime Scheduler::GetNextEligibleTime() {
-  return deadline_run_queue_.is_empty() ? SchedTime{ZX_TIME_INFINITE}
-                                        : deadline_run_queue_.front().scheduler_state().start_time_;
+  if (deadline_run_queue_.is_empty()) {
+    return SchedTime{ZX_TIME_INFINITE};
+  }
+
+  const Thread& front = deadline_run_queue_.front();
+  MarkHasOwnedThreadAccess(front);
+  return front.scheduler_state().start_time_;
 }
 
 // Dequeues the eligible thread with the earliest deadline that is also earlier
@@ -687,6 +841,7 @@ Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTi
   Thread* const eligible_thread = FindEarlierDeadlineThread(eligible_time, finish_time);
 
   if (eligible_thread != nullptr) {
+    MarkHasOwnedThreadAccess(*eligible_thread);
     deadline_run_queue_.erase(*eligible_thread);
     TraceThreadQueueEvent("tqe_deque_earlier_deadline"_intern, eligible_thread);
   }
@@ -699,6 +854,7 @@ Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTi
 Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
                                       SchedDuration total_runtime_ns,
                                       Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
+  using TransientState = SchedulerQueueState::TransientState;
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_thread");
 
   const bool is_idle = current_thread->IsIdle();
@@ -711,16 +867,20 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
   const cpu_mask_t active_mask = mp_get_active_mask();
 
   // Returns true when the given thread requires active migration.
-  const auto needs_migration = [active_mask, current_cpu_mask](Thread* const thread) {
+  const auto needs_migration = [active_mask,
+                                current_cpu_mask](const Thread& thread) TA_REQ(this->queue_lock_) {
+    // We are examining threads owned by this scheduler while holding the queue lock.  We should
+    // have read-only access to scheduler_state, and exclusive access to scheduler_queue_state.
+    MarkHasOwnedThreadAccess(thread);
+
     // Threads may be created and resumed before the thread init level. Work
     // around an empty active mask by assuming only the current cpu is available.
     return active_mask != 0 &&
-           ((thread->scheduler_state().GetEffectiveCpuMask(active_mask) & current_cpu_mask) == 0 ||
-            thread->scheduler_state().next_cpu_ != INVALID_CPU);
+           ((thread.scheduler_state().GetEffectiveCpuMask(active_mask) & current_cpu_mask) == 0);
   };
 
   Thread* next_thread = nullptr;
-  if (is_active && needs_migration(current_thread)) {
+  if (is_active && needs_migration(*current_thread)) {
     // Avoid putting the current thread into the run queue in any of the paths
     // below if it needs active migration. Let the migration loop below handle
     // moving the thread. This avoids an edge case where time slice expiration
@@ -753,7 +913,13 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
       next_thread = current_thread;
     }
   } else if (!is_active && likely(!is_idle)) {
-    // The current thread is no longer ready, remove its accounting.
+    // The current thread is no longer ready, remove its accounting.  Note,
+    // active_thread_ can either equal current_thread at this point, or be
+    // nullptr if the thread has already been removed from bookkeeping.  Remove
+    // handles this edge case and does not remove the thread from bookkeeping if
+    // it has already been removed.
+    DEBUG_ASSERT((active_thread_ == current_thread) || (active_thread_ == nullptr));
+    MarkHasOwnedThreadAccess(*current_thread);
     Remove(current_thread);
   }
 
@@ -780,57 +946,77 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
   //     balancer. NOT YET IMPLEMENTED.
   //
   cpu_mask_t cpus_to_reschedule_mask = 0;
-  for (; needs_migration(next_thread); next_thread = DequeueThread(now, queue_guard)) {
-    SchedulerState* const next_state = &next_thread->scheduler_state();
+  for (; needs_migration(*next_thread); next_thread = DequeueThread(now, queue_guard)) {
+    MarkHasOwnedThreadAccess(*next_thread);
 
-    // If the thread is not scheduled to migrate to a specific CPU, find a
-    // suitable target CPU. If the thread has a migration function, the search
-    // will schedule the thread to migrate to a specific CPU and return the
-    // current CPU.
-    cpu_num_t target_cpu = INVALID_CPU;
-    if (next_state->next_cpu_ == INVALID_CPU) {
-      target_cpu = FindTargetCpu(next_thread);
-      DEBUG_ASSERT(target_cpu != this_cpu() || next_state->next_cpu_ != INVALID_CPU);
+    // Remove accounting from this run queue and flag the thread as being in the
+    // process of migration.  If the next thread is the same thing as the
+    // current thread, be sure to replace the Rescheduling transient state with
+    // a Migrating transient state.
+    if (next_thread == current_thread) {
+      AssertInScheduler(*current_thread);
+      DEBUG_ASSERT(current_thread->scheduler_queue_state().transient_state ==
+                   TransientState::Rescheduling);
+      current_thread->scheduler_queue_state().transient_state = TransientState::None;
     }
+    RemoveForTransition(next_thread, TransientState::Migrating);
 
-    // If the thread is scheduled to migrate to a specific CPU, set the target
-    // to that CPU and call the migration function.
-    if (next_state->next_cpu_ != INVALID_CPU) {
-      DEBUG_ASSERT_MSG(next_state->last_cpu_ == this_cpu(),
-                       "name=\"%s\" this_cpu=%u last_cpu=%u next_cpu=%u hard_affinity=%x "
-                       "soft_affinity=%x migrate_pending=%d",
-                       next_thread->name(), this_cpu(), next_state->last_cpu_,
-                       next_state->next_cpu_, next_state->hard_affinity(),
-                       next_state->soft_affinity(), next_thread->migrate_pending());
-      target_cpu = next_state->next_cpu_;
-      thread_lock.AssertHeld();  // TODO(eieio): HACK!
-      next_thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
-      next_state->next_cpu_ = INVALID_CPU;
+    // Now that the thread has been removed from this scheduler and has been
+    // marked as being in the middle of a migration, we need to finish the
+    // transition by adding it to its new target scheduler, but only if the
+    // thread being migrated is not the current thread.
+    //
+    // Doing this involves dropping our current scheduler's queue lock, then
+    // obtaining the target scheduler's lock while holding the migrating
+    // thread's lock.  Thread's locks must always be obtained before obtaining a
+    // scheduler's queue lock.
+    //
+    // If the migrating thread happens to be the current thread, we need to
+    // defer this operation until a bit later in the reschedule operation.  We
+    // need to continue to hold the current thread's lock until after the
+    // point where we have obtain the next thread's lock, and have re-acquired
+    // our queue lock (which we we need to drop temporarily in order to obtain
+    // the next thread's lock).
+    //
+    // Once we hold all of the required locks, we can finish the thread's
+    // transition into its new scheduler, calling the migration function and
+    // clearing its transient state in the process.
+    if (current_thread != next_thread) {
+      queue_guard.CallUnlocked([&] {
+        // Lock the next thread, then call the Before stage its migrate function
+        // (if any).  This is its last chance to run on this CPU.
+        ChainLockTransaction::AssertActive();
+        ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
+
+        active_clt.Restart(CLT_TAG("Scheduler::EvaluateNextThread (restart)"));
+        UnconditionalChainLockGuard next_thread_guard{next_thread->get_lock()};
+        active_clt.Finalize();
+        next_thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+
+        // Lock the target scheduler and finish the thread's transition to its
+        // new CPU.  The After stage of migration will be run the next time the
+        // thread becomes scheduled.
+        const cpu_num_t target_cpu = FindTargetCpu(next_thread, FindTargetCpuReason::Migrating);
+        Scheduler* const target = Get(target_cpu);
+        Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+        MarkHasOwnedThreadAccess(*next_thread);
+        DEBUG_ASSERT(next_thread->scheduler_queue_state().transient_state ==
+                     TransientState::Migrating);
+        target->FinishTransition(now, next_thread);
+        cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+      });
     }
-
-    // The target CPU must always be different than the current CPU.
-    DEBUG_ASSERT(target_cpu != this_cpu());
-
-    // Remove accounting from this run queue and insert in the target run queue.
-    Remove(next_thread);
-    Scheduler* const target = Get(target_cpu);
-
-    queue_guard.CallUnlocked([&] {
-      Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
-      thread_lock.AssertHeld();
-      target->Insert(now, next_thread);
-    });
-
-    cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
   }
 
   // Issue reschedule IPIs to CPUs with migrated threads.
-  mp_reschedule(cpus_to_reschedule_mask, 0);
+  if (cpus_to_reschedule_mask) {
+    mp_reschedule(cpus_to_reschedule_mask, 0);
+  }
 
   return next_thread;
 }
 
-cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
+cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_target");
 
   const cpu_num_t current_cpu = arch_curr_cpu_num();
@@ -841,20 +1027,33 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   //
   // Threads may be created and resumed before the thread init level. Work around
   // an empty active mask by assuming the current cpu is scheduleable.
-  const cpu_mask_t available_mask = active_mask != 0
-                                        ? thread->scheduler_state().GetEffectiveCpuMask(active_mask)
-                                        : current_cpu_mask;
+  const SchedulerState& thread_state = const_cast<const Thread*>(thread)->scheduler_state();
+  const cpu_mask_t available_mask =
+      active_mask != 0 ? thread_state.GetEffectiveCpuMask(active_mask) : current_cpu_mask;
   DEBUG_ASSERT_MSG(available_mask != 0,
                    "thread=%s affinity=%#x soft_affinity=%#x active=%#x "
                    "idle=%#x arch_ints_disabled=%d",
-                   thread->name(), thread->scheduler_state().hard_affinity_,
-                   thread->scheduler_state().soft_affinity_, active_mask, mp_get_idle_mask(),
-                   arch_ints_disabled());
+                   thread->name(), thread_state.hard_affinity_, thread_state.soft_affinity_,
+                   active_mask, mp_get_idle_mask(), arch_ints_disabled());
 
   LOCAL_KTRACE(DETAILED, "target_mask", ("online", mp_get_online_mask()), ("active", active_mask));
 
-  const cpu_num_t last_cpu = thread->scheduler_state().last_cpu_;
-  const cpu_mask_t last_cpu_mask = cpu_num_to_mask(last_cpu);
+  // If our thread is unblocking (or coming out of sleep/suspend), and it has
+  // run on a CPU in the past, and it has a migration function whose Before
+  // phase has not been called yet, then we must always send it back to the last
+  // CPU it ran on.
+  //
+  // When the thread is selected to run on its last CPU, if it needs to be
+  // migrated, the Before stage of the migration will be executed, and the
+  // scheduler will then immediately re-assign the thread to a different
+  // scheduler to complete the migration operation.
+  //
+  const cpu_num_t last_cpu = thread_state.last_cpu_;
+  if ((reason == FindTargetCpuReason::Unblocking) && thread->has_migrate_fn() &&
+      !thread->migrate_pending() && (last_cpu != INVALID_CPU)) {
+    trace = KTRACE_END_SCOPE(("last_cpu", last_cpu), ("target_cpu", last_cpu));
+    return last_cpu;
+  }
 
   // Find the best target CPU starting at the last CPU the task ran on, if any.
   // Alternatives are considered in order of best to worst potential cache
@@ -870,29 +1069,57 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   ASSERT_MSG(search_set.cpu_count() <= SMP_MAX_CPUS,
              "current_cpu=%u starting_cpu=%u active_mask=%x thread=%p search_set=%p cpu_count=%zu "
              "entries=%p",
-             current_cpu, starting_cpu, active_mask, thread, &search_set, search_set.cpu_count(),
+             current_cpu, starting_cpu, active_mask, &thread, &search_set, search_set.cpu_count(),
              search_set.const_iterator().data());
+
+  // A combination of a scheduler and its latched scale-up factor.  Whenever we
+  // consider a scheduler, we observe its current scale factor exactly once, so
+  // that we can be sure that the value remains consistent for all of the
+  // comparisons we do in |compare| and |is_sufficient| (below).  Note that we
+  // skip obtaining the queue lock when we observe the performance scale factor.
+  //
+  // Finding a target CPU is a best effort heuristic, and we would really rather
+  // not be fighting over scheduler's queue lock while we do it.  Other places
+  // in the scheduler code use the queue lock to protect these scale factors,
+  // but here it should be sufficient to simply atomically load the scale
+  // factor, which is also atomically written during its only update location in
+  // RescheduleCommon, which avoids formal C++ data races.  All of these atomic
+  // accesses are relaxed, however, meaning that their values have no defined
+  // ordering relationship relative to other non-locked queue values (like
+  // predicted queue time).
+  struct CandidateQueue {
+    CandidateQueue() = default;
+    explicit CandidateQueue(const Scheduler* s)
+        : queue{s}, scale_up_factor{LatchScaleUpFactor(s)} {}
+
+    const Scheduler* queue{nullptr};
+    SchedPerformanceScale scale_up_factor{1};
+
+    static SchedPerformanceScale LatchScaleUpFactor(const Scheduler* s) {
+      return [s]()
+                 TA_NO_THREAD_SAFETY_ANALYSIS { return s->performance_scale_reciprocal_.load(); }();
+    }
+  };
 
   // Compares candidate queues and returns true if |queue_a| is a better
   // alternative than |queue_b|. This is used by the target selection loop to
   // determine whether the next candidate is better than the current target.
-  const auto compare = [thread](const Scheduler* queue_a,
-                                const Scheduler* queue_b) TA_REQ(thread_lock) {
-    const SchedDuration a_predicted_queue_time_ns = queue_a->predicted_queue_time_ns();
-    const SchedDuration b_predicted_queue_time_ns = queue_b->predicted_queue_time_ns();
+  const auto compare = [&thread_state](const CandidateQueue& a, const CandidateQueue& b) {
+    const SchedDuration a_predicted_queue_time_ns = a.queue->predicted_queue_time_ns();
+    const SchedDuration b_predicted_queue_time_ns = b.queue->predicted_queue_time_ns();
 
     ktrace::Scope trace_compare = LOCAL_KTRACE_BEGIN_SCOPE(
         DETAILED, "compare", ("predicted queue time a", Round<uint64_t>(a_predicted_queue_time_ns)),
         ("predicted queue time b", Round<uint64_t>(b_predicted_queue_time_ns)));
 
-    const EffectiveProfile& ep = thread->scheduler_state().effective_profile_;
+    const EffectiveProfile& ep = thread_state.effective_profile_;
     if (ep.IsFair()) {
       // CPUs in the same logical cluster are considered equivalent in terms of
       // cache affinity. Choose the least loaded among the members of a cluster.
-      if (queue_a->cluster() == queue_b->cluster()) {
-        ktl::pair a{a_predicted_queue_time_ns, queue_a->predicted_deadline_utilization()};
-        ktl::pair b{b_predicted_queue_time_ns, queue_b->predicted_deadline_utilization()};
-        return a < b;
+      if (a.queue->cluster() == b.queue->cluster()) {
+        ktl::pair a_pair{a_predicted_queue_time_ns, a.queue->predicted_deadline_utilization()};
+        ktl::pair b_pair{b_predicted_queue_time_ns, b.queue->predicted_deadline_utilization()};
+        return a_pair < b_pair;
       }
 
       // Only consider crossing cluster boundaries if the current candidate is
@@ -901,35 +1128,35 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
              a_predicted_queue_time_ns < b_predicted_queue_time_ns;
     } else {
       const SchedUtilization utilization = ep.deadline.utilization;
-      const SchedUtilization scaled_utilization_a = queue_a->ScaleUp(utilization);
-      const SchedUtilization scaled_utilization_b = queue_b->ScaleUp(utilization);
+      const SchedUtilization scaled_utilization_a = utilization * a.scale_up_factor;
+      const SchedUtilization scaled_utilization_b = utilization * a.scale_up_factor;
 
-      ktl::pair a{scaled_utilization_a, a_predicted_queue_time_ns};
-      ktl::pair b{scaled_utilization_b, b_predicted_queue_time_ns};
-      ktl::pair a_prime{queue_a->predicted_deadline_utilization(), a};
-      ktl::pair b_prime{queue_b->predicted_deadline_utilization(), b};
+      ktl::pair a_pair{scaled_utilization_a, a_predicted_queue_time_ns};
+      ktl::pair b_pair{scaled_utilization_b, b_predicted_queue_time_ns};
+      ktl::pair a_prime{a.queue->predicted_deadline_utilization(), a_pair};
+      ktl::pair b_prime{b.queue->predicted_deadline_utilization(), b_pair};
       return a_prime < b_prime;
     }
   };
 
   // Determines whether the current target is sufficiently good to terminate the
   // selection loop.
-  const auto is_sufficient = [thread](const Scheduler* queue) TA_REQ(thread_lock) {
-    const SchedDuration candidate_queue_time_ns = queue->predicted_queue_time_ns();
+  const auto is_sufficient = [&thread_state](const CandidateQueue& q) {
+    const SchedDuration candidate_queue_time_ns = q.queue->predicted_queue_time_ns();
 
     ktrace::Scope trace_is_sufficient = LOCAL_KTRACE_BEGIN_SCOPE(
         DETAILED, "is_sufficient",
         ("intra cluster threshold", Round<uint64_t>(kIntraClusterThreshold)),
-        ("candidate queue time", Round<uint64_t>(candidate_queue_time_ns)));
+        ("candidate q.queue time", Round<uint64_t>(candidate_queue_time_ns)));
 
-    const EffectiveProfile& ep = thread->scheduler_state().effective_profile_;
+    const EffectiveProfile& ep = thread_state.effective_profile_;
     if (ep.IsFair()) {
       return candidate_queue_time_ns <= kIntraClusterThreshold;
     }
 
-    const SchedUtilization predicted_utilization = queue->predicted_deadline_utilization();
+    const SchedUtilization predicted_utilization = q.queue->predicted_deadline_utilization();
     const SchedUtilization utilization = ep.deadline.utilization;
-    const SchedUtilization scaled_utilization = queue->ScaleUp(utilization);
+    const SchedUtilization scaled_utilization = utilization * q.scale_up_factor;
 
     return candidate_queue_time_ns <= kIntraClusterThreshold &&
            scaled_utilization <= kThreadUtilizationMax &&
@@ -939,15 +1166,15 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   // Loop over the search set for CPU the task last ran on to find a suitable
   // target.
   cpu_num_t target_cpu = INVALID_CPU;
-  Scheduler* target_queue = nullptr;
+  CandidateQueue target_queue{};
 
   for (const auto& entry : search_set.const_iterator()) {
     const cpu_num_t candidate_cpu = entry.cpu;
     const bool candidate_available = available_mask & cpu_num_to_mask(candidate_cpu);
-    Scheduler* const candidate_queue = Get(candidate_cpu);
+    const CandidateQueue candidate_queue{Get(candidate_cpu)};
 
     if (candidate_available &&
-        (target_queue == nullptr || compare(candidate_queue, target_queue))) {
+        (target_queue.queue == nullptr || compare(candidate_queue, target_queue))) {
       target_cpu = candidate_cpu;
       target_queue = candidate_queue;
 
@@ -959,28 +1186,8 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   }
 
   DEBUG_ASSERT(target_cpu != INVALID_CPU);
-
   trace = KTRACE_END_SCOPE(("last_cpu", last_cpu), ("target_cpu", target_cpu));
-
-  // If we have a migration function, and the CPU we have chosen is not the same as the last CPU we
-  // ran on, we need to override the choice of CPU to run on our last CPU.  When we join our last
-  // CPU's queue, we will have either migration function called (either by the scheduler, or by a
-  // thread who is de-activating that CPU in MigrateUnpinnedThreads) before being immediately
-  // re-assigned to a different CPU.
-  bool delay_migration =
-      last_cpu != target_cpu && last_cpu != INVALID_CPU && thread->has_migrate_fn();
-  if (unlikely(delay_migration)) {
-    DEBUG_ASSERT_MSG(((active_mask & last_cpu_mask) != 0) ||
-                         Get(last_cpu)->cpu_deactivating_.load(ktl::memory_order_acquire),
-                     "Thread with migration function needs to run on CPU %u, "
-                     "but the CPU is currently inactive (mask = 0x%x) and not "
-                     "in the process of deactivating",
-                     last_cpu, active_mask);
-    thread->scheduler_state().next_cpu_ = target_cpu;
-    return last_cpu;
-  } else {
-    return target_cpu;
-  }
+  return target_cpu;
 }
 
 void Scheduler::UpdateTimeline(SchedTime now) {
@@ -999,33 +1206,82 @@ void Scheduler::UpdateTimeline(SchedTime now) {
        KTRACE_ANNOTATED_VALUE(AssertHeld(queue_lock_), Round<uint64_t>(virtual_time_))));
 }
 
-void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace) {
+void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
+                                 EndTraceCallback end_outer_trace) {
+  using TransientState = SchedulerQueueState::TransientState;
   ktrace::Scope trace =
       LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "reschedule_common", ("now", Round<uint64_t>(now)));
 
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
   const cpu_num_t current_cpu = arch_curr_cpu_num();
-  Thread* const current_thread = Thread::Current::Get();
   SchedulerState* const current_state = &current_thread->scheduler_state();
 
-  current_thread->get_lock().AssertHeld();
-
-  // Aside from the invariant lock, spinlocks should never be held over a reschedule.
-  DEBUG_ASSERT(arch_num_spinlocks_held() == 1);
-  DEBUG_ASSERT_MSG(current_thread->state() != THREAD_RUNNING, "state %d\n",
-                   current_thread->state());
+  // No spinlocks should be held as we come into a reschedule operation.  Only
+  // the current thread's lock should be held.
+  DEBUG_ASSERT_MSG(const uint32_t locks_held = arch_num_spinlocks_held();
+                   locks_held == 0, "arch_num_spinlocks_held() == %u\n", locks_held);
   DEBUG_ASSERT(!arch_blocking_disallowed());
-  DEBUG_ASSERT_MSG(current_cpu == this_cpu(), "current_cpu=%u this_cpu=%u", current_cpu,
-                   this_cpu());
+  DEBUG_ASSERT_MSG(const cpu_num_t tcpu = this_cpu();
+                   current_cpu == tcpu, "current_cpu=%u this_cpu=%u", current_cpu, tcpu);
+  ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
+  active_clt.AssertNumLocksHeld(1);
 
   CPU_STATS_INC(reschedules);
+
+  // Prepare for rescheduling by backing up the chain lock context and switching
+  // to the special "sched token" which we use during reschedule operations in
+  // order to guarantee that we will win arbitration with other active
+  // transactions which are not reschedule operations.  We will restore this
+  // context at the end of the operation (whether we context switched or not).
+  const kconcurrent::RescheduleContext orig_chainlock_context =
+      SchedulerUtils::PrepareForReschedule();
 
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
   UpdateTimeline(now);
 
+  // When calling into reschedule, the current thread is only allowed to be in a
+  // limited number of states, depending on where it came from.
+  //
+  // RUNNING   : Thread is the currently active thread on this CPU.
+  // BLOCKED   : Thread has been inserted into its blocked queue and is in the process of
+  //             de-activating.
+  // SUSPENDED : Thread is in the process of suspending (but is not in any queue).
+  // DEAD      : Thread is in the process of dying, this is its final reschedule.
+  //
+  // In particular, however, the thread may not be in the READY state.  If the
+  // current thread were in the ready state on the way into RescheduleCommon
+  // (before its scheduler's queue lock was held), it would mean that the thread
+  // could have been subject to theft by another scheduler.
+  //
+  // Now that we hold the scheduler's lock, we can go ahead and transition a
+  // RUNNING thread's state to READY.  We also mark the thread as being in the
+  // middle of a reschedule, which will prevent it from being stolen out from
+  // under us until after the reschedule is complete.
+  [&]() TA_REQ(current_thread->get_lock(), queue_lock()) {
+    AssertInScheduler(*current_thread);
+    DEBUG_ASSERT(current_thread->state() != THREAD_READY);
+    DEBUG_ASSERT_MSG(
+        current_thread->scheduler_queue_state().transient_state == TransientState::None,
+        "Unexpected transient state at the start of RescheduleCommon (tid %lu, "
+        "state %u, transient_state %u",
+        current_thread->tid(), static_cast<uint32_t>(current_thread->state()),
+        static_cast<uint32_t>(current_thread->scheduler_queue_state().transient_state));
+    if (current_thread->state() == THREAD_RUNNING) {
+      current_thread->set_ready();
+      current_thread->scheduler_queue_state().transient_state = TransientState::Rescheduling;
+    }
+  }();
+
+  // Assert that the current thread is a member of this scheduler, and that we
+  // have access to the thread's scheduler owned variables.  Note, that as soon
+  // as we call "EvaluateNextThread", the thread's curr_cpu_ state may end up
+  // being reset to INVALID_CPU (if the thread is no longer ready), meaning that
+  // this is the last time we own and have access to these variables.
+  AssertInScheduler(*current_thread);
+
   const SchedDuration total_runtime_ns = now - start_of_current_time_slice_ns_;
   const SchedDuration actual_runtime_ns = now - current_state->last_started_running_;
   current_state->last_started_running_ = now;
-  thread_lock.AssertHeld();  // TODO(eieio): HACK!
   current_thread->UpdateRuntimeStats(current_thread->state());
 
   // Update the runtime accounting for the thread that just ran.
@@ -1106,26 +1362,131 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
       actual_runtime_ns.raw_value(), current_state->finish_time_.raw_value(),
       current_state->time_slice_ns_.raw_value(), start_of_current_time_slice_ns_.raw_value());
 
-  // Select a thread to run.
+  // Select the next thread to run.
   Thread* const next_thread =
       EvaluateNextThread(now, current_thread, timeslice_expired, total_runtime_ns, queue_guard);
   DEBUG_ASSERT(next_thread != nullptr);
-  SchedulerState* const next_state = &next_thread->scheduler_state();
+  const bool thread_changed{current_thread != next_thread};
 
   // Flush pending preemptions.
   mp_reschedule(current_thread->preemption_state().preempts_pending(), 0);
   current_thread->preemption_state().preempts_pending_clear();
 
+  // If the next_thread is not the same as the current thread, we will need to
+  // (briefly) drop the scheduler's queue lock in order to acquire the next
+  // thread's lock exclusively.  If we have selected the same thread as before,
+  // we can skip this step.
+  //
+  // If we do need to acquire next_thread's lock, we use the same chain lock
+  // token that was used to acquire current_thread's lock.  We know this is safe
+  // because:
+  //
+  // TODO(johngro): THIS IS NOT SAFE - FIX THIS COMMENT
+  //
+  // This turned out to not be safe after all.  The deadlock potential below is
+  // why we need to switch to the special "scheduler" token at the start of the
+  // operation.
+  //
+  // While there cannot be any cycles in this individual operation (trivial to
+  // show since there are two different locks here), deadlock is still possible.
+  //
+  // The flow is:
+  // 1) T0 is running on CPU X, and is locked entering a reschedule operation.
+  // 2) T1 is selected as the next thread to run, and is being locked
+  //    exclusively (after dropping the scheduler's lock).  At the same time:
+  // 3) T2 is running on CPU Y, and is blocking on an OWQ which currently has T0
+  //    as the owner.  T1 has been selected as the new owner.
+  // 4) T2 and the queue have been locked by the BAAO operation.
+  // 5) T1 is the start of the new owner chain and is locked.
+  // 6) The next step in the BAAO locking is to lock the old owner chain,
+  //    starting from T0.
+  //
+  // So:
+  // X has T0 and wants T1.
+  // Y has T1 and wants T0.
+  //
+  // CPU Y is in a sequence which obeys the backoff protocol, so as long as its
+  // token value > X's token value, Y will back off and we will be OK.  If not,
+  // however, we deadlock.  The reschedule operation cannot backoff and drop
+  // T0's lock, so it is stuck trying to get T1 from Y.
+  //
+  // TODO(johngro): END TODO
+  //
+  // 1) current_thread is currently running.  Because of this, we know that it
+  //    is the target node of it's PI graph.
+  // 2) next thread is currently READY, which means it is also the target node
+  //    of it's PI graph.
+  // 3) PI graphs always have exactly one target node.
+  // 4) Therefore, current and next cannot be members of the same graph, and can
+  //    both be acquired unconditionally.
+  //
+  if (thread_changed) {
+    // Mark the next_thread as "becoming scheduled" while we drop the lock.
+    // This will prevent another scheduler from stealing this thread out from
+    // under as while we have the queue_lock dropped.  To make static analysis
+    // happy, we have to prove that this thread is currently in this scheduler,
+    // and that we hold the scheduler's queue_lock_.
+    AssertInScheduler(*next_thread);
+    SchedulerQueueState& sqs = next_thread->scheduler_queue_state();
+
+    // The new thread we just selected should not currently be in a transient
+    // state. It now needs to be in the Rescheduling state while we drop our
+    // current scheduler's lock in order to obtain the thread's lock
+    // exclusively.
+    DEBUG_ASSERT(sqs.transient_state == TransientState::None);
+    sqs.transient_state = TransientState::Rescheduling;
+
+    // The ChainLockTransaction we were in when we entered RescheduleCommon has
+    // already been finalized.  We need to restart it in order to obtain new
+    // locks.
+    active_clt.Restart(CLT_TAG("Scheduler::RescheduleCommon (restart)"));
+
+    // Now drop the queue lock, obtain the next thread's lock, and re-acquire the queue lock.
+    //
+    // TODO(johngro): Need to talk to eieio@ to make absolutely sure that the
+    // current scheduler's bookkeeping is coherent at this point in time.  IOW -
+    // if (while we had the lock dropped) someone grabbed the lock to record the
+    // consequences of a PI propagation, or stole a thread from our ready queue,
+    // we need to make sure that _their_ updating of the scheduler's bookkeeping
+    // will make sense and leave the bookkeeping in a valid state.
+    //
+    // Right now, I _think_ that this is the case.  So far, I don't think that
+    // we have actually mutated the scheduler specific state in any way which
+    // matters.  We have simple decided that we are going to switch to a
+    // different thread, and picked that thread out.  We are now committed to
+    // running that thread, regardless of any external changes to our
+    // bookkeeping.  This should be fine, any externally made changes should
+    // result in a reschedule being queued where (if our current choice is no
+    // longer the correct thread) we will pick a new best thread.
+    queue_guard.CallUnlocked([next_thread]() TA_ACQ(next_thread->get_lock()) {
+      ChainLockTransaction::AssertActive();
+      next_thread->get_lock().AcquireUnconditionally();
+    });
+
+    // Now we have all of the locks we need for the reschedule operation.  Go
+    // ahead and re-finalize the transaction.
+    active_clt.Finalize();
+  }
+
+  // Now that we are sure that next_thread is properly locked, if we are
+  // actually changing threads, trace the activation of the next thread before
+  // context switching.  We can also clear the resched-in-progress flag on the next thread.
+  next_thread->get_lock().AssertHeld();
+  if (thread_changed) {
+    AssertInScheduler(*next_thread);
+
+    SchedulerQueueState& sqs = next_thread->scheduler_queue_state();
+    DEBUG_ASSERT(sqs.transient_state == TransientState::Rescheduling);
+    sqs.transient_state = TransientState::None;
+  }
+
   // Update the state of the current and next thread.
+  const SchedulerQueueState& current_queue_state = current_thread->scheduler_queue_state();
+  SchedulerState* const next_state = &next_thread->scheduler_state();
   next_thread->set_running();
   next_state->last_cpu_ = current_cpu;
-  next_state->curr_cpu_ = current_cpu;
+  DEBUG_ASSERT(next_state->curr_cpu_ == current_cpu);
   active_thread_ = next_thread;
-
-  // Trace the activation of the next thread before context switching.
-  if (current_thread != next_thread) {
-    TraceThreadQueueEvent("tqe_activate"_intern, next_thread);
-  }
 
   // Handle any pending migration work.
   next_thread->CallMigrateFnLocked(Thread::MigrateStage::After);
@@ -1134,7 +1495,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   // Only update the thread and aggregate values if the current thread is still
   // associated with this CPU or is no longer ready.
   const bool current_is_associated =
-      !current_state->active() || current_state->curr_cpu_ == current_cpu;
+      !current_queue_state.active || current_state->curr_cpu_ == current_cpu;
   if (!current_thread->IsIdle() && current_is_associated &&
       (timeslice_expired || current_thread != next_thread)) {
     ktrace::Scope trace_update_ema = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "update_expected_runtime");
@@ -1146,7 +1507,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     const SchedDuration adjusted_total_runtime_ns = ScaleDown(total_runtime_ns);
     current_state->banked_runtime_ns_ += adjusted_total_runtime_ns;
 
-    if (timeslice_expired || !current_state->active()) {
+    if (timeslice_expired || !current_queue_state.active) {
       const SchedDuration delta_ns =
           PeakDecayDelta(current_state->expected_runtime_ns_, current_state->banked_runtime_ns_,
                          kExpectedRuntimeAlpha, kExpectedRuntimeBeta);
@@ -1155,7 +1516,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
 
       // Adjust the aggregate value by the same amount. The adjustment is only
       // necessary when the thread is still active on this CPU.
-      if (current_state->active()) {
+      if (current_queue_state.active) {
         UpdateTotalExpectedRuntime(delta_ns);
       }
     }
@@ -1197,7 +1558,7 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
                                      ? SchedTime(ZX_TIME_INFINITE)
                                      : GetNextEligibleTime();
     PreemptReset(current_cpu, now.raw_value(), target_preemption_time_ns_.raw_value());
-  } else if (timeslice_expired || next_thread != current_thread) {
+  } else if (timeslice_expired || thread_changed) {
     ktrace::Scope trace_start_preemption = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "next_slice");
 
     // Re-compute the time slice and deadline for the new thread based on the
@@ -1275,7 +1636,8 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
   // is only one task available to run. Revisit this assertion at that time.
   DEBUG_ASSERT(next_thread->IsIdle() || percpu::Get(current_cpu).timer_queue.PreemptArmed());
 
-  if (next_thread != current_thread) {
+  // Almost done, we need to handle the actual context switch (if any).
+  if (thread_changed) {
     LOCAL_KTRACE(
         DETAILED, "switch_threads",
         ("total threads", runnable_fair_task_count_ + runnable_deadline_task_count_),
@@ -1284,8 +1646,53 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
          Round<uint64_t>(current_thread->scheduler_state().time_slice_ns_)),
         ("next thread time slice", Round<uint64_t>(next_thread->scheduler_state().time_slice_ns_)));
 
+    // Our current thread should have been flagged as either Rescheduling or
+    // Migrating at this point.
+    bool finish_migrate_current{false};
+    if (current_thread->scheduler_queue_state().transient_state == TransientState::Rescheduling) {
+      // If the current thread was simply Rescheduling, we simply need to clear
+      // that flag.  Other CPUs are free to attempt to steal this thread now;
+      // they will not succeed until after the actual context switch is done and
+      // we drop the current thread's lock (even through we are just about to
+      // drop the current scheduler's queue lock).
+      current_thread->scheduler_queue_state().transient_state = TransientState::None;
+    } else if (current_thread->scheduler_queue_state().transient_state ==
+               TransientState::Migrating) {
+      // Looks like the current thread needs to finish its migration.  Do so
+      // after we have dropped this scheduler's queue lock.
+      finish_migrate_current = true;
+    } else {
+      DEBUG_ASSERT(current_thread->scheduler_queue_state().transient_state == TransientState::None);
+      DEBUG_ASSERT((current_thread->state() != THREAD_RUNNING) &&
+                   (current_thread->state() != THREAD_READY));
+    }
+
+    TraceThreadQueueEvent("tqe_astart"_intern, next_thread);
+
     // Release queue lock before context switching.
     queue_guard.Release();
+
+    // Now finish any pending migration of the current thread.  Again, this will
+    // make it available to be selected to run on another CPU, or be stolen by
+    // another CPU.  This is OK, as with clearing the rescheduling flag (above),
+    // the other CPUs operation cannot complete until after the context switch
+    // is finished and we have dropped the current thread's lock.
+    if (finish_migrate_current) {
+      // Call the Before stage of the thread's migration function as it leaves
+      // this CPU.
+      current_thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+
+      const cpu_num_t target_cpu = FindTargetCpu(current_thread, FindTargetCpuReason::Migrating);
+      DEBUG_ASSERT((target_cpu != INVALID_CPU) && (target_cpu != this_cpu_));
+      Scheduler* const target = Get(target_cpu);
+      {
+        Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+        target->FinishTransition(now, current_thread);
+      }
+
+      // Fire off an IPI to the CPU we just moved the thread to.
+      mp_reschedule(cpu_num_to_mask(target_cpu), 0);
+    }
 
     TraceContextSwitch(current_thread, next_thread, current_cpu);
 
@@ -1295,9 +1702,27 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     current_thread->CallContextSwitchFnLocked();
     next_thread->CallContextSwitchFnLocked();
 
-    if (current_thread->active_aspace() != next_thread->active_aspace()) {
-      vmm_context_switch(current_thread->active_aspace(), next_thread->active_aspace());
-    }
+    // Notes about Thread aspace rules:
+    //
+    // Typically, it is only safe for the current thread to access its aspace
+    // member directly, as only a running thread can change its own aspace, and
+    // if a thread is running, then its process must also be alive and therefore
+    // its aspace must also be alive.
+    //
+    // Context switching is a bit of an edge case.  The current thread is
+    // becoming the next thread.  Both aspaces must still be alive (even if the
+    // current thread is in the process of becoming rescheduled for the very
+    // last time as it exits), and neither one can change its own aspace right
+    // now (they are not really running).
+    //
+    // Because of this, it should be OK for us to directly access the aspaces
+    // during the context switch, without needing to either check the thread's
+    // state, or add any references to the VmAstate object.
+    [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
+      if (current_thread->aspace() != next_thread->aspace()) {
+        vmm_context_switch(current_thread->aspace(), next_thread->aspace());
+      }
+    }();
 
     CPU_STATS_INC(context_switches);
 
@@ -1311,38 +1736,78 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
       end_outer_trace();
     }
 
-    // Record the thread that was previously running for lock handoff after the
-    // context switch.
-    current_state->incoming_locked_ = true;
-    next_state->outgoing_locked_ = next_state->incoming_locked_;
-    next_state->incoming_locked_ = true;
-    next_state->previous_thread_ = current_thread;
+    if constexpr (SCHEDULER_QUEUE_TRACING_ENABLED) {
+      const uint64_t arg0 = 0;
+      const uint64_t arg1 = (ktl::clamp<uint64_t>(this_cpu_, 0, 0xF) << 16);
+      ktrace_probe(TraceAlways, TraceContext::Cpu, "tqe_afinish"_intern, arg0, arg1);
+    }
 
+    // Remember the pointer to the current thread's active ChainLockTransaction.
+    // When the current thread is (eventually) scheduled again (on this CPU, or
+    // a different CPU) will will eventually need to restore the thread's CLT
+    // pointer (which exists somewhere up the thread's stack) to the per-cpu
+    // data structure so it can properly unwind.
+
+    // Time for the context switch.  Before actually performing the switch,
+    // record the current thread as the "previous thread" for the next thread
+    // becoming scheduled.  The next thread needs to know which thread preceded
+    // it in order to drop its lock before unwinding, and our current stack is
+    // not going to be available to it.
+    DEBUG_ASSERT(next_thread->scheduler_state().previous_thread_ == nullptr);
+    next_thread->scheduler_state().previous_thread_ = current_thread;
     arch_context_switch(current_thread, next_thread);
 
-    // After the context switch, current_thread holds the same value as
-    // next_thread from the previous thread's context.
-    LockHandoffInternal(current_thread);
+    // We made it to the other side of the switch.  We have switched stacks, so
+    // the local variable meanings have become redefined.
+    //
+    // ++ The value of current_thread after the context switch is the value of
+    //    next_thread before the switch.
+    // ++ The value of next_thread after the context switch is the thread that
+    //    the new current_thread context-switched to the last time it ran
+    //    through here.  We don't even know if this thread exists now, so its
+    //    value is junk.
+    // ++ The value of current_thread before the switch has been stashed in
+    //    the new current thread's scheduler_state's previous thread member.
+    //
+    // We need to drop the old current thread's lock, while continuing to hold
+    // the new current thread's lock as we unwind.
+    // Scheduler::LockHandoffInternal will take care of dropping the previous
+    // current_thread's lock, but at this point, the static analyzer is going to
+    // be extremely confused because it does not (and cannot) know about the
+    // stack-swap which just happened. It thinks that we are still holding
+    // next_thread's lock (and we are; it is now current thread) and that we
+    // need to drop it (it is wrong about this, we need to drop the previous
+    // current thread's lock).  So, just lie to it. Tell it that we have dropped
+    // next_thread's lock using a no-op assert (we don't actually want to
+    // examine the state of the lock in any way, since next thread is no longer
+    // valid).
+    Scheduler::LockHandoffInternal(orig_chainlock_context, current_thread);
+    next_thread->get_lock().MarkReleased();
+  } else {
+    // No context switch was needed.  Our current thread should have been
+    // flagged as being in the process of rescheduling.  We can clear this flag
+    // now.
+    DEBUG_ASSERT(current_thread->scheduler_queue_state().transient_state ==
+                 TransientState::Rescheduling);
+    current_thread->scheduler_queue_state().transient_state = TransientState::None;
+
+    // Restore our reschedule context and drop our queue guard before unwinding.
+    SchedulerUtils::RestoreRescheduleContext(orig_chainlock_context);
+    queue_guard.Release();
   }
 }
 
-void Scheduler::LockHandoffInternal(Thread* thread) {
-  SchedulerState* const state = &thread->scheduler_state();
-  DEBUG_ASSERT(state->previous_thread_ != nullptr);
+void Scheduler::TrampolineLockHandoff() { SchedulerUtils::TrampolineLockHandoff(); }
 
-  state->previous_thread_->get_lock().AssertHeld();
-  state->previous_thread_->get_lock().Release();
-  if (state->outgoing_locked_) {
-    thread->get_lock().Acquire(SOURCE_TAG);
-  }
-
-  state->previous_thread_ = nullptr;
-  state->incoming_locked_ = state->outgoing_locked_ = false;
-}
-
-void Scheduler::LockHandoff() {
+void Scheduler::LockHandoffInternal(const kconcurrent::RescheduleContext& ctx,
+                                    Thread* const current_thread) {
   DEBUG_ASSERT(arch_ints_disabled());
-  LockHandoffInternal(Thread::Current::Get());
+  Thread* const previous_thread = current_thread->scheduler_state().previous_thread_;
+  DEBUG_ASSERT(previous_thread != nullptr);
+
+  current_thread->scheduler_state().previous_thread_ = nullptr;
+  previous_thread->get_lock().AssertAcquired();
+  SchedulerUtils::PostContextSwitchLockHandoff(ctx, previous_thread);
 }
 
 void Scheduler::UpdatePeriod() {
@@ -1362,10 +1827,10 @@ void Scheduler::UpdatePeriod() {
   trace = KTRACE_END_SCOPE(("task count", num_tasks));
 }
 
-SchedDuration Scheduler::CalculateTimeslice(Thread* thread) {
+SchedDuration Scheduler::CalculateTimeslice(const Thread* thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "calculate_timeslice");
-  SchedulerState* const state = &thread->scheduler_state();
-  const EffectiveProfile& ep = state->effective_profile_;
+  const SchedulerState& state = thread->scheduler_state();
+  const EffectiveProfile& ep = state.effective_profile_;
 
   // Calculate the relative portion of the scheduling period.
   const SchedWeight proportional_time_slice_grans =
@@ -1375,11 +1840,11 @@ SchedDuration Scheduler::CalculateTimeslice(Thread* thread) {
   const int64_t time_slice_grans = Round<int64_t>(proportional_time_slice_grans);
   const int64_t minimum_time_slice_grans = time_slice_grans > 0 ? time_slice_grans : 1;
 
-  // Calcluate the time slice in nanoseconds.
+  // Calculate the time slice in nanoseconds.
   const SchedDuration time_slice_ns = minimum_time_slice_grans * minimum_granularity_ns_;
 
   trace = KTRACE_END_SCOPE(
-      ("weight", KTRACE_ANNOTATED_VALUE(thread_lock.AssertHeld(), ep.fair.weight.raw_value())),
+      ("weight", ep.fair.weight.raw_value()),
       ("total weight", KTRACE_ANNOTATED_VALUE(AssertHeld(queue_lock_), weight_total_.raw_value())));
   return time_slice_ns;
 }
@@ -1389,9 +1854,14 @@ SchedTime Scheduler::ClampToDeadline(SchedTime completion_time) {
 }
 
 SchedTime Scheduler::ClampToEarlierDeadline(SchedTime completion_time, SchedTime finish_time) {
-  Thread* const thread = FindEarlierDeadlineThread(completion_time, finish_time);
-  return thread ? ktl::min(completion_time, thread->scheduler_state().start_time_)
-                : completion_time;
+  const Thread* const thread = FindEarlierDeadlineThread(completion_time, finish_time);
+
+  if (thread != nullptr) {
+    AssertInScheduler(*thread);
+    return ktl::min(completion_time, thread->scheduler_state().start_time_);
+  }
+
+  return completion_time;
 }
 
 SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
@@ -1579,16 +2049,17 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
 
-  SchedulerState* const state = &thread->scheduler_state();
-  const EffectiveProfile& ep = state->effective_profile_;
+  SchedulerQueueState& queue_state = thread->scheduler_queue_state();
+  SchedulerState& state = thread->scheduler_state();
+  const EffectiveProfile& ep = state.effective_profile_;
 
   // Ensure insertion happens only once, even if Unblock is called multiple times.
-  if (state->OnInsert()) {
+  if (queue_state.OnInsert()) {
     // Insertion can happen from a different CPU. Set the thread's current
     // CPU to the one this scheduler instance services.
-    state->curr_cpu_ = this_cpu();
+    state.curr_cpu_ = this_cpu();
 
-    UpdateTotalExpectedRuntime(state->expected_runtime_ns_);
+    UpdateTotalExpectedRuntime(state.expected_runtime_ns_);
 
     if (IsFairThread(thread)) {
       runnable_fair_task_count_++;
@@ -1610,34 +2081,45 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
       QueueThread(thread, placement, now);
     } else {
       // Connect the flow into the previous queue to the new queue.
-      LOCAL_KTRACE_FLOW_STEP(FLOW, "sched_latency", state->flow_id(), ("tid", thread->tid()));
+      LOCAL_KTRACE_FLOW_STEP(FLOW, "sched_latency", state.flow_id(), ("tid", thread->tid()));
     }
   }
 }
 
-void Scheduler::Remove(Thread* thread) {
+void Scheduler::RemoveForTransition(Thread* thread,
+                                    SchedulerQueueState::TransientState target_state) {
+  using TransientState = SchedulerQueueState::TransientState;
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "remove");
 
+  // RemoveForTransition is used when channels are being actively migrated, and
+  // when they are being stolen, but also as just common shared code for when
+  // Scheduler::Remove is called.  In this case, the |target_state| will just be
+  // None.
+  DEBUG_ASSERT_MSG((target_state == TransientState::None) ||
+                       (target_state == TransientState::Migrating) ||
+                       (target_state == TransientState::Stolen),
+                   "Bad target transient state! (%u)\n", static_cast<uint32_t>(target_state));
   DEBUG_ASSERT(!thread->IsIdle());
 
-  SchedulerState* const state = &thread->scheduler_state();
-  const EffectiveProfile& ep = state->effective_profile_;
-  DEBUG_ASSERT(!state->InQueue());
+  SchedulerQueueState& queue_state = thread->scheduler_queue_state();
+  const SchedulerState& state = const_cast<const Thread*>(thread)->scheduler_state();
+  const EffectiveProfile& ep = state.effective_profile_;
+
+  DEBUG_ASSERT_MSG(queue_state.transient_state == TransientState::None,
+                   "Attempting to transition a thread which is already transitioning! (%u)\n",
+                   static_cast<uint32_t>(queue_state.transient_state));
+  DEBUG_ASSERT(!queue_state.InQueue());
+  queue_state.transient_state = target_state;
 
   // Ensure that removal happens only once, even if Block() is called multiple times.
-  if (state->OnRemove()) {
-    state->curr_cpu_ = INVALID_CPU;
-
-    UpdateTotalExpectedRuntime(-state->expected_runtime_ns_);
+  if (queue_state.OnRemove()) {
+    UpdateTotalExpectedRuntime(-state.expected_runtime_ns_);
 
     if (IsFairThread(thread)) {
       DEBUG_ASSERT(runnable_fair_task_count_ > 0);
       runnable_fair_task_count_--;
 
       UpdatePeriod();
-
-      state->start_time_ = SchedNs(0);
-      state->finish_time_ = SchedNs(0);
 
       weight_total_ -= ep.fair.weight;
       DEBUG_ASSERT(weight_total_ >= 0);
@@ -1650,47 +2132,140 @@ void Scheduler::Remove(Thread* thread) {
   }
 }
 
+void Scheduler::FinishTransition(SchedTime now, Thread* thread) {
+  // We had better either be in the process of being stolen or migrated.
+  using TransientState = SchedulerQueueState::TransientState;
+  SchedulerQueueState& sqs = thread->scheduler_queue_state();
+
+  // Note, we don't have to reset curr_cpu_ in the thread's scheduler state.
+  // Insert (called below) will do that for us.
+  if (IsFairThread(thread)) {
+    thread->scheduler_state().start_time_ = SchedNs(0);
+    thread->scheduler_state().finish_time_ = SchedNs(0);
+  }
+
+  if (sqs.transient_state == TransientState::Migrating) {
+    // Active migration uses a Placement of Insertion.
+    Insert(now, thread, Placement::Insertion);
+
+    // Our transition is complete, update our transient state.
+    sqs.transient_state = TransientState::None;
+  } else {
+    // If the transition wasn't an active migration, it must be that the thread
+    // was stolen.
+    DEBUG_ASSERT_MSG(sqs.transient_state == TransientState::Stolen,
+                     "Bad transient state when finishing transition! (%u)\n",
+                     static_cast<uint32_t>(sqs.transient_state));
+
+    // Add ourselves to our new scheduler's run queue.  Stolen threads use a
+    // placement of Association.
+    Insert(now, thread, Placement::Association);
+
+    // Our transition is not quite done yet.  We were just stolen, which means
+    // that we are in the process of becoming the active thread on this
+    // scheduler (but have not done so yet).  Change our transient state to
+    // "Rescheduling"
+    sqs.transient_state = TransientState::Rescheduling;
+  }
+}
+
 void Scheduler::ValidateInvariantsUnconditional() const {
   using ProfileDirtyFlag = SchedulerState::ProfileDirtyFlag;
 
-  auto ObserveFairThread = [&](const Thread& t) TA_REQ(thread_lock) {
-    auto& ss = t.scheduler_state();
-    const auto& ep = ss.effective_profile();
-    const auto& bp = ss.base_profile_;
-    const auto& ipv = ss.inherited_profile_values_;
+  auto ObserveFairThread = [&](const Thread& t) TA_REQ(this->queue_lock_,
+                                                       chainlock_transaction_token) {
+    // We are holding the scheduler's queue lock, and observing thread which are
+    // either active, or members of our queues.  Tell the static analyzer that
+    // it is OK for us to access a thread's effective profile in a read-only
+    // fashion, even though we don't explicitly hold the thread's lock.
+    [&t]() {
+      MarkHasOwnedThreadAccess(t);
+      const auto& ss = t.scheduler_state();
+      const auto& ep = ss.effective_profile();
+      ASSERT_MSG(ep.IsFair(), "Fair thread %" PRIu64 " has non-fair effective profile", t.tid());
+    }();
 
-    ASSERT_MSG(ep.IsFair(), "Fair thread %" PRIu64 " has non-fair effective profile", t.tid());
-    if constexpr (ktl::remove_reference_t<decltype(ep)>::kDirtyTrackingEnabled) {
-      if (!(ss.effective_profile_.dirty_flags() & ProfileDirtyFlag::BaseDirty)) {
-        ASSERT_MSG(bp.IsFair(), "Fair thread %" PRIu64 " has clean, but non-fair, base profile",
-                   t.tid());
-      }
-      if (!(ss.effective_profile_.dirty_flags() & ProfileDirtyFlag::InheritedDirty)) {
-        ASSERT_MSG(ipv.uncapped_utilization == SchedUtilization{0},
-                   "Fair thread %" PRIu64
-                   " has clean IPV, but non-zero inherited utilization (%" PRId64 ")",
-                   t.tid(), ipv.uncapped_utilization.raw_value());
+    // If we have dirty tracking enabled for effective profiles (only enabled in
+    // builds with extra scheduler state validation enabled) we can try to make
+    // some extra checks.
+    //
+    // 1) If we know that the current base profile is clean, we can assert that
+    //    the base profile is fair.
+    // 2) If we know that the current IPVs are clean, we can assert that the IPV
+    //    utilization is zero.
+    //
+    // In order to safely observe these things, however, we need to be holding
+    // the thread's lock.  Threads can change their base profile or IPVs (and
+    // the flags which indicate if they are dirty or nor) while only holding
+    // their lock.  They do not need to be holding the scheduler's queue lock if
+    // the thread happens to be running or ready.
+    //
+    // So, _try_ to get the thread's lock if we don't already hold it, and if we
+    // succeed, go ahead a perform our checks.  If we fail to get the lock for
+    // any reason, just skip the checks this time.
+    if constexpr (EffectiveProfile::kDirtyTrackingEnabled) {
+      auto ExtraChecks = [&t]() TA_REQ(t.get_lock()) -> void {
+        const auto& ss = t.scheduler_state();
+        const auto& ep = ss.effective_profile();
+        const auto& bp = ss.base_profile_;
+        const auto& ipv = ss.inherited_profile_values_;
+
+        if (!(ep.dirty_flags() & ProfileDirtyFlag::BaseDirty)) {
+          ASSERT_MSG(bp.IsFair(), "Fair thread %" PRIu64 " has clean, but non-fair, base profile",
+                     t.tid());
+        }
+        if (!(ep.dirty_flags() & ProfileDirtyFlag::InheritedDirty)) {
+          ASSERT_MSG(ipv.uncapped_utilization == SchedUtilization{0},
+                     "Fair thread %" PRIu64
+                     " has clean IPV, but non-zero inherited utilization (%" PRId64 ")",
+                     t.tid(), ipv.uncapped_utilization.raw_value());
+        }
+      };
+
+      if (t.get_lock().is_held()) {
+        t.get_lock().MarkHeld();
+        ExtraChecks();
+      } else if (t.get_lock().TryAcquire<ChainLock::FinalizedTransactionAllowed::Yes>()) {
+        ExtraChecks();
+        t.get_lock().Release();
       }
     }
   };
 
-  auto ObserveDeadlineThread = [&](const Thread& t) TA_REQ(thread_lock) {
-    auto& ss = t.scheduler_state();
+  auto ObserveDeadlineThread = [&](const Thread& t) TA_REQ(this->queue_lock_,
+                                                           chainlock_transaction_token) {
+    // See above for the locking rules for accessing the pieces of effective profile.
+    [&t]() {
+      MarkHasOwnedThreadAccess(t);
+      const auto& ss = t.scheduler_state();
+      const auto& ep = ss.effective_profile();
+      ASSERT_MSG(ep.IsDeadline(), "Deadline thread %" PRIu64 " has non-deadline effective profile",
+                 t.tid());
+    }();
 
-    const auto& ep = ss.effective_profile();
-    const auto& bp = ss.base_profile_;
-    const auto& ipv = ss.inherited_profile_values_;
+    if constexpr (EffectiveProfile::kDirtyTrackingEnabled) {
+      auto ExtraChecks = [&t]() TA_REQ(t.get_lock()) -> void {
+        const auto& ss = t.scheduler_state();
+        const auto& ep = ss.effective_profile();
+        const auto& bp = ss.base_profile_;
+        const auto& ipv = ss.inherited_profile_values_;
 
-    ASSERT_MSG(ep.IsDeadline(), "Deadline thread %" PRIu64 " has non-deadline effective profile",
-               t.tid());
-    if constexpr (ktl::remove_reference_t<decltype(ep)>::kDirtyTrackingEnabled) {
-      if (ss.effective_profile_.dirty_flags() == ProfileDirtyFlag::Clean) {
-        ASSERT_MSG(
-            bp.IsDeadline() || (ipv.uncapped_utilization > SchedUtilization{0}),
-            "Deadline thread %" PRIu64
-            " has a clean effective profile, but neither a deadline base profile (%s), nor a "
-            "non-zero inherited utilization (%" PRId64 ")",
-            t.tid(), bp.IsFair() ? "Fair" : "Deadline", ipv.uncapped_utilization.raw_value());
+        if (ep.dirty_flags() == ProfileDirtyFlag::Clean) {
+          ASSERT_MSG(
+              bp.IsDeadline() || (ipv.uncapped_utilization > SchedUtilization{0}),
+              "Deadline thread %" PRIu64
+              " has a clean effective profile, but neither a deadline base profile (%s), nor a "
+              "non-zero inherited utilization (%" PRId64 ")",
+              t.tid(), bp.IsFair() ? "Fair" : "Deadline", ipv.uncapped_utilization.raw_value());
+        }
+      };
+
+      if (t.get_lock().is_held()) {
+        t.get_lock().MarkHeld();
+        ExtraChecks();
+      } else if (t.get_lock().TryAcquire<ChainLock::FinalizedTransactionAllowed::Yes>()) {
+        ExtraChecks();
+        t.get_lock().Release();
       }
     }
   };
@@ -1704,70 +2279,84 @@ void Scheduler::ValidateInvariantsUnconditional() const {
   }
 
   ASSERT(active_thread_ != nullptr);
-  if (active_thread_->scheduler_state().effective_profile().IsFair()) {
-    ObserveFairThread(*active_thread_);
+  const Thread& active_thread = *active_thread_;
+  MarkHasOwnedThreadAccess(active_thread);  // This should be safe, see above.
+  if (active_thread.scheduler_state().effective_profile().IsFair()) {
+    ObserveFairThread(active_thread);
   } else {
-    ASSERT(active_thread_->scheduler_state().effective_profile().IsDeadline());
-    ObserveDeadlineThread(*active_thread_);
+    ASSERT(active_thread.scheduler_state().effective_profile().IsDeadline());
+    ObserveDeadlineThread(active_thread);
   }
 }
 
-void Scheduler::Block() {
+void Scheduler::Block(Thread* const current_thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_block");
 
-  Thread* const current_thread = Thread::Current::Get();
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
   current_thread->canary().Assert();
-  current_thread->get_lock().AssertHeld();
   DEBUG_ASSERT(current_thread->state() != THREAD_RUNNING);
 
   const SchedTime now = CurrentTime();
-  Scheduler::Get()->RescheduleCommon(now, trace.Completer());
+  Scheduler::Get()->RescheduleCommon(current_thread, now, trace.Completer());
 }
 
 void Scheduler::Unblock(Thread* thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_unblock");
+  ChainLockTransaction::ActiveRef().AssertFinalized();
 
   thread->canary().Assert();
 
   const SchedTime now = CurrentTime();
-  const cpu_num_t target_cpu = FindTargetCpu(thread);
+  const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Unblocking);
   Scheduler* const target = Get(target_cpu);
 
-  thread->set_ready();
   TraceWakeup(thread, target_cpu);
-  thread->UpdateRuntimeStats(thread->state());
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
+    // TODO(johngro): What if the CPU is now offline?  Do we need to retry?
+    // This thread is now owned by this scheduler.
+    thread->scheduler_state().curr_cpu_ = target_cpu;
+    thread->set_ready();
+    target->AssertInScheduler(*thread);
     target->Insert(now, thread);
+    thread->UpdateRuntimeStats(thread->state());
   }
 
   trace.End();
+  thread->get_lock().Release();
   RescheduleMask(cpu_num_to_mask(target_cpu));
 }
 
 void Scheduler::Unblock(Thread::UnblockList list) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_unblock_list");
+  ChainLockTransaction::ActiveRef().AssertFinalized();
 
   const SchedTime now = CurrentTime();
-
   cpu_mask_t cpus_to_reschedule_mask = 0;
+
   Thread* thread;
   while ((thread = list.pop_back()) != nullptr) {
     thread->canary().Assert();
     DEBUG_ASSERT(!thread->IsIdle());
+    thread->get_lock().AssertAcquired();
 
-    const cpu_num_t target_cpu = FindTargetCpu(thread);
+    const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Unblocking);
     Scheduler* const target = Get(target_cpu);
 
-    thread->set_ready();
     TraceWakeup(thread, target_cpu);
     thread->UpdateRuntimeStats(thread->state());
     {
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
+      // TODO(johngro): What if the CPU is now offline?  Do we need to retry?
+      // This thread is now owned by this scheduler.
+      thread->scheduler_state().curr_cpu_ = target_cpu;
+      thread->set_ready();
+      target->AssertInScheduler(*thread);
       target->Insert(now, thread);
     }
 
     cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+    thread->get_lock().Release();
   }
 
   trace.End();
@@ -1778,70 +2367,72 @@ void Scheduler::UnblockIdle(Thread* thread) {
   SchedulerState* const state = &thread->scheduler_state();
 
   DEBUG_ASSERT(thread->IsIdle());
-  DEBUG_ASSERT(state->hard_affinity_ && (state->hard_affinity_ & (state->hard_affinity_ - 1)) == 0);
+  DEBUG_ASSERT(ktl::popcount(state->hard_affinity_) == 1);
 
-  thread->set_ready();
-  state->curr_cpu_ = lowest_cpu_set(state->hard_affinity_);
+  {
+    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&Get()->queue_lock_, SOURCE_TAG};
+    thread->set_ready();
+    state->curr_cpu_ = lowest_cpu_set(state->hard_affinity_);
+  }
 }
 
-void Scheduler::Yield() {
+void Scheduler::Yield(Thread* const current_thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_yield");
-
-  Thread* const current_thread = Thread::Current::Get();
-  current_thread->get_lock().AssertHeld();
-
-  SchedulerState* const current_state = &current_thread->scheduler_state();
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
   DEBUG_ASSERT(!current_thread->IsIdle());
 
   if (IsFairThread(current_thread)) {
-    Scheduler* const current = Get();
+    Scheduler& current_scheduler = *Get();
     const SchedTime now = CurrentTime();
 
     {
       // TODO(eieio,johngro): What is this protecting?
-      Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current->queue_lock_, SOURCE_TAG};
+      Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current_scheduler.queue_lock_, SOURCE_TAG};
+      SchedulerState& current_state = current_thread->scheduler_state();
       EffectiveProfile& ep = current_thread->scheduler_state().effective_profile_;
 
       // Update the virtual timeline in preparation for snapping the thread's
       // virtual finish time to the current virtual time.
-      current->UpdateTimeline(now);
+      current_scheduler.UpdateTimeline(now);
 
       // Set the time slice to expire now.
-      current_thread->set_ready();
-      current_state->time_slice_ns_ = SchedDuration{0};
+      current_state.time_slice_ns_ = SchedDuration{0};
 
       // The thread is re-evaluated with zero lag against other competing threads
       // and may skip lower priority threads with similar arrival times.
-      current_state->finish_time_ = current->virtual_time_;
-      ep.fair.initial_time_slice_ns = current_state->time_slice_ns_;
+      current_state.finish_time_ = current_scheduler.virtual_time_;
+      ep.fair.initial_time_slice_ns = current_state.time_slice_ns_;
       ep.fair.normalized_timeslice_remainder = SchedRemainder{1};
     }
 
-    current->RescheduleCommon(now, trace.Completer());
+    current_scheduler.RescheduleCommon(current_thread, now, trace.Completer());
   }
 }
 
 void Scheduler::Preempt() {
-  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_preempt");
-
-  Thread* const current_thread = Thread::Current::Get();
-  current_thread->get_lock().AssertHeld();
-  SchedulerState* const current_state = &current_thread->scheduler_state();
-  const cpu_num_t current_cpu = arch_curr_cpu_num();
-
-  DEBUG_ASSERT(current_state->curr_cpu_ == current_cpu);
-  DEBUG_ASSERT(current_state->last_cpu_ == current_state->curr_cpu_);
-
-  const SchedTime now = CurrentTime();
-  current_thread->set_ready();
-  Get()->RescheduleCommon(now, trace.Completer());
+  Thread* current_thread = Thread::Current::Get();
+  SingletonChainLockGuardIrqSave thread_guard{current_thread->get_lock(),
+                                              CLT_TAG("Scheduler::Preempt")};
+  PreemptLocked(current_thread);
 }
 
-void Scheduler::Reschedule() {
+void Scheduler::PreemptLocked(Thread* current_thread) {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_preempt");
+  SchedulerState& current_state = current_thread->scheduler_state();
+  const cpu_num_t current_cpu = arch_curr_cpu_num();
+
+  DEBUG_ASSERT(current_state.curr_cpu_ == current_cpu);
+  DEBUG_ASSERT(current_state.last_cpu_ == current_state.curr_cpu_);
+  DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
+
+  const SchedTime now = CurrentTime();
+  Get()->RescheduleCommon(current_thread, now, trace.Completer());
+}
+
+void Scheduler::Reschedule(Thread* const current_thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_reschedule");
 
-  Thread* const current_thread = Thread::Current::Get();
-  current_thread->get_lock().AssertHeld();
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
   SchedulerState* const current_state = &current_thread->scheduler_state();
   const cpu_num_t current_cpu = arch_curr_cpu_num();
 
@@ -1859,65 +2450,100 @@ void Scheduler::Reschedule() {
   DEBUG_ASSERT(current_state->last_cpu_ == current_state->curr_cpu_);
 
   const SchedTime now = CurrentTime();
-  current_thread->set_ready();
-  Get()->RescheduleCommon(now, trace.Completer());
+  Get()->RescheduleCommon(current_thread, now, trace.Completer());
 }
 
-void Scheduler::RescheduleInternal() {
+void Scheduler::RescheduleInternal(Thread* const current_thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_resched_internal");
-  Get()->RescheduleCommon(CurrentTime(), trace.Completer());
+  Get()->RescheduleCommon(current_thread, CurrentTime(), trace.Completer());
 }
 
 void Scheduler::Migrate(Thread* thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_migrate");
 
-  thread->get_lock().AssertHeld();
-
   SchedulerState* const state = &thread->scheduler_state();
   const cpu_mask_t effective_cpu_mask = state->GetEffectiveCpuMask(mp_get_active_mask());
-  const cpu_mask_t curr_cpu_mask = cpu_num_to_mask(state->curr_cpu_);
-  const cpu_mask_t next_cpu_mask = cpu_num_to_mask(state->next_cpu_);
-
-  const bool stale_curr_cpu = (curr_cpu_mask & effective_cpu_mask) == 0;
-  const bool stale_next_cpu =
-      state->next_cpu_ != INVALID_CPU && (next_cpu_mask & effective_cpu_mask) == 0;
-
-  // Clear the next CPU if it is no longer in the effective CPU mask. A new value will be
-  // determined, if necessary.
-  if (stale_next_cpu) {
-    state->next_cpu_ = INVALID_CPU;
-  }
-
+  const cpu_mask_t thread_cpu_mask = cpu_num_to_mask(state->curr_cpu_);
+  const bool stale_curr_cpu = (thread_cpu_mask & effective_cpu_mask) == 0;
   cpu_mask_t cpus_to_reschedule_mask = 0;
-  if (thread->state() == THREAD_RUNNING && stale_curr_cpu) {
-    // The CPU the thread is running on will take care of the actual migration.
-    cpus_to_reschedule_mask |= curr_cpu_mask;
-  } else if (thread->state() == THREAD_READY && (stale_curr_cpu || stale_next_cpu)) {
-    Scheduler* current = Get(state->curr_cpu_);
-    const cpu_num_t target_cpu = FindTargetCpu(thread);
 
-    // If the thread has a migration function it will stay on the same CPU until
-    // the migration function is called there. Otherwise, the migration is
-    // handled here.
-    if (target_cpu != state->curr_cpu()) {
-      {
-        Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current->queue_lock_, SOURCE_TAG};
-        current->EraseFromQueue(thread);
-        current->Remove(thread);
-      }
+  if (stale_curr_cpu) {
+    if (thread->state() == THREAD_RUNNING) {
+      // The CPU the thread is running on will take care of the actual migration.
+      cpus_to_reschedule_mask |= thread_cpu_mask;
+    } else if (thread->state() == THREAD_READY) {
+      bool removed_thread_for_migrate{false};
 
-      Scheduler* const target = Get(target_cpu);
-      {
+      do {  // Explicit scope top hold the lock for this thread's current scheduler.
+        Scheduler& thread_sched = *Get(state->curr_cpu_);
+        Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&thread_sched.queue_lock_, SOURCE_TAG};
+        thread_sched.AssertInScheduler(*thread);
+        SchedulerQueueState& sqs = thread->scheduler_queue_state();
+        const cpu_num_t current_cpu = arch_curr_cpu_num();
+
+        // If the thread is currently in a transient state (rescheduling, being
+        // stolen, or migrating), don't do anything else.  When the thread gets
+        // to wherever it is finally going, if that location turns out to be
+        // incompatible with its affinity masks, a new CPU should end up being
+        // selected instead of wherever it was going.
+        if (sqs.transient_state != SchedulerQueueState::TransientState::None) {
+          break;
+        }
+
+        // Try find a new CPU to run this thread on. Things are simple if the
+        // thread has no migration function, or if the thread has a migration
+        // function, but has already called the Before stage of migration.  We
+        // can just remove the thread from this queue, and put it into a
+        // different one.
+        //
+        // If the thread does have a migration function, and does need the
+        // Before stage to be called, we can do that too, but only if we are
+        // currently running on the last CPU the thread ran on.  Otherwise, the
+        // best we can do is to poke the thread's last CPU and have it
+        // reschedule.  The next time this thread comes up in the queue, it will
+        // be actively migrated by the CPU it last ran on.
+        if (thread->has_migrate_fn() && !thread->migrate_pending() &&
+            (thread->scheduler_state().last_cpu_ != INVALID_CPU) &&
+            (thread->scheduler_state().last_cpu_ != current_cpu)) {
+          cpus_to_reschedule_mask |= thread_cpu_mask;
+          break;
+        }
+
+        // Looks like we can take care of migrating the thread right now.  There
+        // is either no migration function to run, or we are able to run it on
+        // this CPU.  Remove the thread, drop its old scheduler's lock, and
+        // finish the migration.
+        thread_sched.EraseFromQueue(thread);
+        thread_sched.Remove(thread, SchedulerQueueState::TransientState::Migrating);
+        removed_thread_for_migrate = true;
+      } while (false);
+
+      if (removed_thread_for_migrate) {
+        // Before obtaining any new locks, try to call the thread's migration
+        // function.  CallMigrateFnLocked will do nothing if we have no
+        // migration function, or if we have already started the migration (eg;
+        // called the Before stage).
+        thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+
+        // Find a new CPU for this thread and add it to the queue.
+        const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Migrating);
+        Scheduler* target = Get(target_cpu);
         Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&target->queue_lock_, SOURCE_TAG};
-        target->Insert(CurrentTime(), thread);
-      }
+        MarkHasOwnedThreadAccess(*thread);
+        target->FinishTransition(CurrentTime(), thread);
 
-      // Reschedule both CPUs to handle the run queue changes.
-      cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu) | curr_cpu_mask;
+        // Reschedule both CPUs to handle the run queue changes.
+        cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu) | thread_cpu_mask;
+      }
     }
   }
 
+  // The operation is finished.  Drop the thread's lock before we call into
+  // reschedule so that we are certain to not be holding any threads' locks
+  // during the RescheduleMask operation (which might result in an immediate
+  // preempt).
   trace.End();
+  thread->get_lock().Release();
   RescheduleMask(cpus_to_reschedule_mask);
 }
 
@@ -1959,14 +2585,13 @@ void Scheduler::MigrateUnpinnedThreads() {
   //     assigned to this CPU (because we cleared our active flag)
   // 2a) Threads who were not ready but needed to have their migration function
   //     called were found and had their migration function called during
-  //     CallMigrateFnForCpuLocked  --- OR ---
+  //     CallMigrateFnForCpu  --- OR ---
   // 2b) The non-ready thread with a migration function unblocked and joined the
   //     ready queue of this scheduler while it was being deactivated.  We will
   //     call their migration functions next as we move all of the READY threads
   //     off of this scheduler and over to a different one.
   //
-  thread_lock.AssertHeld();  // TODO(eieio): HACK!
-  Thread::CallMigrateFnForCpuLocked(current_cpu);
+  Thread::CallMigrateFnForCpu(current_cpu);
 
   // There should no longer be any non-ready threads who need to run a
   // migration function on this CPU, and there should not be any new one until
@@ -1975,72 +2600,74 @@ void Scheduler::MigrateUnpinnedThreads() {
   DEBUG_ASSERT(current->cpu_deactivating_.load(ktl::memory_order_relaxed));
   current->cpu_deactivating_.store(false, ktl::memory_order_release);
 
-  // Now move any READY threads who can be moved over to a different CPU,
-  // calling their migrate functions as needed.
+  // Now move any READY threads who can be moved over to a temporary list,
+  // flagging them as in the process of currently migrating.
+  Thread::UnblockList migrating_threads;
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current->queue_lock_, SOURCE_TAG};
 
-    RunQueue pinned_threads;
-    while (!current->fair_run_queue_.is_empty()) {
-      Thread* const thread = current->fair_run_queue_.pop_front();
+    auto MoveThreads = [&migrating_threads, current, current_cpu_mask](
+                           RunQueue& run_queue,
+                           const fxt::InternedString& trace_tag) TA_REQ(current->queue_lock_) {
+      DEBUG_ASSERT((&run_queue == &current->fair_run_queue_) ||
+                   (&run_queue == &current->deadline_run_queue_));
 
-      if (thread->scheduler_state().hard_affinity_ == current_cpu_mask) {
-        // Keep track of threads pinned to this CPU.
-        pinned_threads.insert(thread);
-      } else {
-        // Move unpinned threads to another available CPU.
-        current->TraceThreadQueueEvent("tqe_deque_migrate_unpinned_fair"_intern, thread);
-        current->Remove(thread);
+      for (RunQueue::iterator iter = run_queue.begin(); iter.IsValid();) {
+        Thread& consider = *(iter++);
 
-        queue_guard.CallUnlocked([&] {
-          thread_lock.AssertHeld();  // TODO(eieio): HACK!
-          thread->scheduler_state().last_cpu_ = INVALID_CPU;
-          thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
-          thread->scheduler_state().next_cpu_ = INVALID_CPU;
+        // The no-op version of this assertion should be sufficient here.  We
+        // are holding the scheduler's queue lock, and iterating over the
+        // scheduler's run queues.  All of the threads in those queues are
+        // clearly owned by this scheduler right now.
+        MarkHasOwnedThreadAccess(consider);
+        const SchedulerState& ss = const_cast<const Thread&>(consider).scheduler_state();
 
-          const cpu_num_t target_cpu = FindTargetCpu(thread);
-          Scheduler* const target = Get(target_cpu);
-          DEBUG_ASSERT(target != current);
-          cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
-
-          Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
-          target->Insert(now, thread);
-        });
+        // If the thread can run on any other CPU, take it off of this one.
+        // Flag it as migrating as we do, and add it to our list of migrating
+        // threads.
+        if (ss.hard_affinity_ != current_cpu_mask) {
+          current->TraceThreadQueueEvent(trace_tag, &consider);
+          run_queue.erase(consider);
+          current->RemoveForTransition(&consider, SchedulerQueueState::TransientState::Migrating);
+          migrating_threads.push_back(&consider);
+        }
       }
-    }
+    };
 
-    // Return the pinned threads to the fair run queue.
-    current->fair_run_queue_ = ktl::move(pinned_threads);
+    MoveThreads(current->fair_run_queue_, "tqe_deque_migrate_unpinned_fair"_intern);
+    MoveThreads(current->deadline_run_queue_, "tqe_deque_migrate_unpinned_deadline"_intern);
+  }
 
-    while (!current->deadline_run_queue_.is_empty()) {
-      Thread* const thread = current->deadline_run_queue_.pop_front();
+  // OK, now that we have dropped our queue lock, go over our list of migrating
+  // threads and finish the migration process.  Don't make any assumptions about
+  // the fair/deadline nature of the threads as we migrate.  Since we dropped
+  // the scheduler's queue lock, it is possible that these threads have changed
+  // effective priority since being remove from their old scheduler, but before
+  // arriving at a new one.
+  while (!migrating_threads.is_empty()) {
+    Thread* thread = migrating_threads.pop_front();
+    SingletonChainLockGuardIrqSave guard{thread->get_lock(),
+                                         CLT_TAG("Scheduler::MigrateUnpinnedThreads")};
 
-      if (thread->scheduler_state().hard_affinity_ == current_cpu_mask) {
-        // Keep track of threads pinned to this CPU.
-        pinned_threads.insert(thread);
-      } else {
-        // Move unpinned threads to another available CPU.
-        current->TraceThreadQueueEvent("tqe_deque_migrate_unpinned_deadline"_intern, thread);
-        current->Remove(thread);
+    // Call the Before stage of the thread's migration function as it leaves
+    // this CPU.
+    thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
 
-        queue_guard.CallUnlocked([&] {
-          thread_lock.AssertHeld();  // TODO(eieio): HACK!
-          thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
-          thread->scheduler_state().next_cpu_ = INVALID_CPU;
+    // Now, pick a CPU (other than this one) for the thread to go to, then put
+    // it there.
+    const cpu_num_t target_cpu = FindTargetCpu(thread, FindTargetCpuReason::Migrating);
+    Scheduler* const target = Get(target_cpu);
+    DEBUG_ASSERT(target != current);
+    Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-          const cpu_num_t target_cpu = FindTargetCpu(thread);
-          Scheduler* const target = Get(target_cpu);
-          DEBUG_ASSERT(target != current);
-          cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+    // Finish the transition and add the thread to the new target queue.  The
+    // After stage of the migration function will be called on the new CPU the
+    // next time the thread becomes scheduled.
+    MarkHasOwnedThreadAccess(*thread);
+    target->FinishTransition(now, thread);
 
-          Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
-          target->Insert(now, thread);
-        });
-      }
-    }
-
-    // Return the pinned threads to the deadline run queue.
-    current->deadline_run_queue_ = ktl::move(pinned_threads);
+    // Arrange a reschedule on our target scheduler.
+    cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
   }
 
   trace.End();
@@ -2053,16 +2680,21 @@ void Scheduler::TimerTick(SchedTime now) {
 }
 
 void Scheduler::InitializePerformanceScale(SchedPerformanceScale scale) {
+  // This happens early in boot, before the scheduler is actually running.  We
+  // should be able to treat these assignments as if they were done in a
+  // constructor and skip obtaining the queue lock.
   DEBUG_ASSERT(scale > 0);
-  performance_scale_ = scale;
-  default_performance_scale_ = scale;
-  pending_user_performance_scale_ = scale;
-  performance_scale_reciprocal_ = 1 / scale;
+  [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
+    performance_scale_ = scale;
+    default_performance_scale_ = scale;
+    pending_user_performance_scale_ = scale;
+    performance_scale_reciprocal_ = 1 / scale;
+  }();
 }
 
 void Scheduler::UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t count) {
   DEBUG_ASSERT(count <= percpu::processor_count());
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  InterruptDisableGuard irqd;
 
   cpu_num_t cpus_to_reschedule_mask = 0;
   for (auto& entry : ktl::span{info, count}) {
@@ -2070,6 +2702,7 @@ void Scheduler::UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t 
 
     cpus_to_reschedule_mask |= cpu_num_to_mask(entry.logical_cpu_number);
     Scheduler* scheduler = Scheduler::Get(entry.logical_cpu_number);
+    Guard<MonitoredSpinLock, NoIrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
 
     // TODO(eieio): Apply a minimum value threshold and update the entry if
     // the requested value is below it.
@@ -2084,9 +2717,9 @@ void Scheduler::UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t 
 
 void Scheduler::GetPerformanceScales(zx_cpu_performance_info_t* info, size_t count) {
   DEBUG_ASSERT(count <= percpu::processor_count());
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
   for (cpu_num_t i = 0; i < count; i++) {
     Scheduler* scheduler = Scheduler::Get(i);
+    Guard<MonitoredSpinLock, IrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
     info[i].logical_cpu_number = i;
     info[i].performance_scale = ToUserPerformanceScale(scheduler->pending_user_performance_scale_);
   }
@@ -2094,10 +2727,96 @@ void Scheduler::GetPerformanceScales(zx_cpu_performance_info_t* info, size_t cou
 
 void Scheduler::GetDefaultPerformanceScales(zx_cpu_performance_info_t* info, size_t count) {
   DEBUG_ASSERT(count <= percpu::processor_count());
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
   for (cpu_num_t i = 0; i < count; i++) {
     Scheduler* scheduler = Scheduler::Get(i);
+    Guard<MonitoredSpinLock, IrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
     info[i].logical_cpu_number = i;
     info[i].performance_scale = ToUserPerformanceScale(scheduler->default_performance_scale_);
   }
 }
+
+template <Affinity AffinityType>
+cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
+  if constexpr (AffinityType == Affinity::Hard) {
+    DEBUG_ASSERT_MSG(
+        (affinity & mp_get_active_mask()) != 0,
+        "Attempted to set affinity mask to %#x, which has no overlap of active CPUs %#x.", affinity,
+        mp_get_active_mask());
+  }
+
+  auto AssignAffinity = [](Thread& thread, cpu_mask_t affinity)
+                            TA_NO_THREAD_SAFETY_ANALYSIS -> cpu_mask_t {
+    cpu_mask_t previous_affinity;
+
+    if constexpr (AffinityType == Affinity::Hard) {
+      previous_affinity = thread.scheduler_state().hard_affinity_;
+      thread.scheduler_state().hard_affinity_ = affinity;
+    } else {
+      static_assert(AffinityType == Affinity::Soft);
+      previous_affinity = thread.scheduler_state().soft_affinity_;
+      thread.scheduler_state().soft_affinity_ = affinity;
+    }
+
+    return previous_affinity;
+  };
+
+  // Acquire the thread's lock unconditionally, and without using a guard.  The
+  // call to Scheduler::Migrate will drop the lock for us before potentially
+  // rescheduling.
+  ChainLockTransactionIrqSave clt{CLT_TAG("Scheduler::SetCpuAffinity")};
+  for (;; clt.Relax()) {
+    thread.get_lock().AcquireUnconditionally();
+
+    // set the affinity mask.  Note: to mutate the scheduler state (instead of
+    // just reading it), we need to hold both the thread's lock, as well as the
+    // lock of any container the thread happens to be in at the time (if any).
+    //
+    // TODO(johngro): It is really easy to mess this requirement up.  Is there a
+    // better way to statically assert these requirements?
+    cpu_mask_t previous_affinity;
+    if ((thread.state() == THREAD_RUNNING) || (thread.state() == THREAD_READY)) {
+      // We are assigned to a scheduler, we need to hold its lock while mutate
+      // our affinity.  That said, we have all of the chain locks we need, so go
+      // ahead and finalize our transaction now.
+      clt.Finalize();
+      SchedulerState& ss = thread.scheduler_state();
+      DEBUG_ASSERT(ss.curr_cpu() != INVALID_CPU);
+      Scheduler* scheduler = Scheduler::Get(ss.curr_cpu());
+      Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler->queue_lock(), SOURCE_TAG};
+      previous_affinity = AssignAffinity(thread, affinity);
+    } else if (thread.state() == THREAD_BLOCKED) {
+      // We are in a wait queue, we need to obtain the wait queue's lock, and be
+      // prepared to back off if needed.
+      WaitQueue* wq = thread.wait_queue_state().blocking_wait_queue_;
+      DEBUG_ASSERT(wq != nullptr);
+
+      if (wq->get_lock().Acquire() == ChainLock::LockResult::kBackoff) {
+        thread.get_lock().Release();
+        continue;
+      }
+
+      clt.Finalize();
+      wq->get_lock().AssertAcquired();
+      previous_affinity = AssignAffinity(thread, affinity);
+      wq->get_lock().Release();
+    } else {
+      // No container, we have all the locks we need.
+      clt.Finalize();
+      previous_affinity = AssignAffinity(thread, affinity);
+    }
+
+    // Is our new affinity mask incompatible with our current CPU?  If so, let
+    // let Scheduler::Migrate deal with the rest of the migration, it will drop
+    // our lock for us.  Otherwise, just drop the thread's lock and get out.
+    if ((affinity & cpu_num_to_mask(arch_curr_cpu_num())) == 0) {
+      Scheduler::Migrate(&thread);
+    } else {
+      thread.get_lock().Release();
+    }
+
+    return previous_affinity;
+  }
+}
+
+template cpu_mask_t Scheduler::SetCpuAffinity<Affinity::Hard>(Thread& thread, cpu_mask_t affinity);
+template cpu_mask_t Scheduler::SetCpuAffinity<Affinity::Soft>(Thread& thread, cpu_mask_t affinity);

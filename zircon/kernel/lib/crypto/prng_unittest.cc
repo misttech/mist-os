@@ -6,12 +6,12 @@
 
 #include <lib/crypto/entropy_pool.h>
 #include <lib/crypto/prng.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 #include <stdint.h>
 
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 
 namespace crypto {
 
@@ -170,7 +170,7 @@ bool prng_blocks() {
   while (true) {
     {
       // The drawer thread should be blocked waiting for the prng to have enough entropy.
-      Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+      SingletonChainLockGuardIrqSave guard{drawer->get_lock(), CLT_TAG("prng_blocks")};
       if (drawer->state() == THREAD_BLOCKED) {
         break;
       }

@@ -17,6 +17,8 @@
 #include <arch/kernel_aspace.h>
 #include <arch/x86/registers.h>
 
+struct syscall_regs_t;
+
 // Bit 63 of the page_fault_resume field is used to indicate whether a data fault should first
 // handle the fault, or immediately return the resume location. The 63'rd bit is selected as this
 // bit is invariant over all kernel addresses.

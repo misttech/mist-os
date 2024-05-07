@@ -16,6 +16,7 @@
 #include <arch/arm64/mp.h>
 #include <arch/arm64/registers.h>
 #include <arch/arm64/uarch.h>
+#include <arch/thread.h>
 #include <kernel/thread.h>
 
 #define LOCAL_TRACE 0
@@ -103,7 +104,8 @@ static void arm64_debug_restore_state(Thread* thread) {
   }
 }
 
-static void arm64_context_switch_spec_mitigations(Thread* oldthread, Thread* newthread) {
+static void arm64_context_switch_spec_mitigations(Thread* oldthread,
+                                                  Thread* newthread) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Spectre V2: Flush Indirect Branch Predictor State, if:
   // 0) Speculative Execution infoleak mitigations are enabled AND
   // 1) The current CPU requires Spectre V2 mitigations AND
@@ -116,7 +118,8 @@ static void arm64_context_switch_spec_mitigations(Thread* oldthread, Thread* new
   }
 }
 
-void arch_context_switch(Thread* oldthread, Thread* newthread) {
+void arch_context_switch(Thread* oldthread, Thread* newthread)
+    TA_REQ(oldthread->get_lock(), newthread->get_lock()) {
   LTRACEF("old %p (%s), new %p (%s)\n", oldthread, oldthread->name(), newthread, newthread->name());
 
   // DSB here to make sure any pending TLB or cache operations that we may be
