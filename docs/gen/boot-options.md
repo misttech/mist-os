@@ -1120,6 +1120,12 @@ Note: The default value may vary for each architecture.
 
 This enables use of ASIDs. True by default if the underlying hardware supports 16-bit ASIDs.
 
+### kernel.riscv64.phys.mmu=\<bool>
+
+**Default:** `true`
+
+This enables use of the MMU in the kernel's early boot phase.
+
 
 ## Options available only on x86 machines
 

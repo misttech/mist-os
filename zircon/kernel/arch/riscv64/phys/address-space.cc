@@ -8,8 +8,12 @@
 
 #include <lib/arch/cache.h>
 #include <lib/arch/riscv64/page-table.h>
+#include <lib/boot-options/boot-options.h>
 
 void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
+  if (gBootOptions && !gBootOptions->riscv64_phys_mmu) {
+    return;
+  }
   aspace.Init();
   aspace.SetUpIdentityMappings();
   aspace.Install();
