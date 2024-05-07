@@ -1,0 +1,64 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/devicetree/devicetree_visitor.gni")
+import("//build/test.gni")
+
+group("tests") {
+  deps = [ ":amlogic-canvas-visitor-test" ]
+  testonly = true
+}
+
+devicetree_visitor("amlogic-canvas-visitor") {
+  deps = [ ":amlogic-canvas" ]
+}
+
+source_set("amlogic-canvas") {
+  sources = [
+    "amlogic-canvas-visitor.cc",
+    "amlogic-canvas-visitor.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:registration",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/ddk",
+  ]
+}
+
+test("amlogic-canvas-visitor-test-bin") {
+  sources = [ "test/amlogic-canvas-visitor-test.cc" ]
+  deps = [
+    ":amlogic-canvas",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
+    "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
+    "//sdk/lib/driver/devicetree/visitors:registry",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+dtb("amlogic-canvas-dtb") {
+  sources = [ "test/dts/amlogic-canvas.dts" ]
+}
+
+resource("amlogic-canvas-dtb-file") {
+  sources = get_target_outputs(":amlogic-canvas-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":amlogic-canvas-dtb" ]
+}
+
+fuchsia_unittest_package("amlogic-canvas-visitor-test") {
+  component_name = "amlogic-canvas-visitor-test"
+  deps = [
+    ":amlogic-canvas-dtb-file",
+    ":amlogic-canvas-visitor-test-bin",
+  ]
+}

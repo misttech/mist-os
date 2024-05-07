@@ -6,6 +6,7 @@ import("//build/devicetree/devicetree_visitor.gni")
 
 group("tests") {
   deps = [
+    "amlogic-canvas:tests",
     "clock-controllers:tests",
     "ethernet:tests",
     "gpio-controllers:tests",
@@ -24,6 +25,7 @@ group("tests") {
 
 devicetree_visitor_collection("all-driver-visitors") {
   deps = [
+    "//sdk/lib/driver/devicetree/visitors/drivers/amlogic-canvas:amlogic-canvas-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/ethernet/ethernet-phy:ethernet-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor",
