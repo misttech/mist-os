@@ -35,6 +35,7 @@
 #include <zircon/rights.h>
 #include <zircon/types.h>
 
+#include <cerrno>
 #include <numeric>
 #include <optional>
 
@@ -47,6 +48,7 @@
 #include <ktl/span.h>
 
 #include "../kernel_priv.h"
+#include "fbl/alloc_checker.h"
 
 #include <ktl/enforce.h>
 
@@ -230,28 +232,28 @@ struct LoadedElf {
 };
 
 fit::result<Errno, LoadedElf> load_elf(
-    const FileHandle& file, const zx::vmo& vmo,
+    const FileHandle& file, zx::ArcVmo vmo,
     const fbl::RefPtr<starnix::MemoryManager>& mm /*file_write_guard: FileWriteGuardRef,*/) {
   LTRACE;
   auto diag = GetDiagnostics();
-  elfldltl::UnownedVmoFile vmo_file(vmo.borrow(), diag);
+  elfldltl::UnownedVmoFile vmo_file(vmo->as_ref().borrow(), diag);
   auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
       diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
-  zx::vmar tmp_user_vmar;
-  {
-    Guard<Mutex> lock(mm->mm_state_rw_lock());
-    const auto& state = mm->state();
-    tmp_user_vmar.reset(state.user_vmar().get());
-  }
-  elfldltl::StaticOrDynExecutableVmarLoader loader{tmp_user_vmar,
+  // zx::vmar tmp_user_vmar;
+  //{
+  Guard<Mutex> lock(mm->mm_state_rw_lock());
+  const auto& state = mm->state();
+  // tmp_user_vmar.reset(state.user_vmar().get());
+  //}
+  elfldltl::StaticOrDynExecutableVmarLoader loader{state.user_vmar(),
                                                    (ehdr.type == elfldltl::ElfType::kDyn)};
   elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container> load_info;
   ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(PAGE_SIZE)));
-  ZX_ASSERT(loader.Load(diag, load_info, vmo.borrow()));
+  ZX_ASSERT(loader.Load(diag, load_info, vmo->as_ref().borrow()));
 
   LTRACEF("loaded at %p, entry point %p\n", (void*)(load_info.vaddr_start() + loader.load_bias()),
           (void*)(ehdr.entry + loader.load_bias()));
@@ -291,7 +293,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     constexpr size_t kInterpMaxLen = ZBI_BOOTFS_MAX_NAME_LEN;
 
     if (interp->filesz > kInterpMaxLen) {
-      fit::error(errno(from_status_like_fdio(ZX_ERR_INVALID_ARGS)));
+      return fit::error(errno(from_status_like_fdio(ZX_ERR_INVALID_ARGS)));
     }
 
     // Add one for the trailing nul.
@@ -300,7 +302,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     // Copy the suffix.
     zx_status_t status = vmo.read(interp_path, interp->offset, interp->filesz);
     if (status != ZX_OK) {
-      fit::error(errno(from_status_like_fdio(status)));
+      return fit::error(errno(from_status_like_fdio(status)));
     }
 
     // Copy the nul.
@@ -316,13 +318,17 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     zx::vmo interp_vmo;
     status = open_result->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &interp_vmo);
     if (status != ZX_OK) {
-      fit::error(errno(from_status_like_fdio(status)));
+      return fit::error(errno(from_status_like_fdio(status)));
     }
 
+    fbl::AllocChecker ac;
     resolved_interp = starnix::ResolvedInterpElf{
         open_result.value(),
-        ktl::move(interp_vmo),
+        ktl::move(fbl::AdoptRef(new (&ac) zx::Arc<zx::vmo>(ktl::move(interp_vmo)))),
     };
+    if (!ac.check()) {
+      return fit::error(errno(ENOMEM));
+    }
   }
 
   /*
@@ -336,8 +342,14 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
   fbl::Vector<fbl::String> environ_cpy;
   ktl::copy(environ.begin(), environ.end(), util::back_inserter(environ_cpy));
 
+  fbl::AllocChecker ac;
+  auto arc_vmo = fbl::AdoptRef(new (&ac) zx::Arc<zx::vmo>(ktl::move(vmo)));
+  if (!ac.check()) {
+    return fit::error(errno(ENOMEM));
+  }
+
   return fit::ok(starnix::ResolvedElf{
-      ktl::move(file), ktl::move(vmo), ktl::move(resolved_interp), ktl::move(argv_cpy),
+      ktl::move(file), ktl::move(arc_vmo), ktl::move(resolved_interp), ktl::move(argv_cpy),
       ktl::move(environ_cpy) /*, selinux_state, file_write_guard*/});
 }
 

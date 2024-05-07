@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
 #include <lib/mistos/zx/vmar.h>
+#include <lib/mistos/zx/vmo.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
@@ -23,6 +24,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <ktl/span.h>
 #include <zxtest/cpp/zxtest_prod.h>
 
 using namespace starnix_uapi;
@@ -108,7 +110,7 @@ struct MappingBackingVmo {
   UserAddress base;
 
   // The VMO that contains the memory used in this mapping.
-  zx::vmo vmo;
+  zx::ArcVmo vmo;
 
   // The offset in the VMO that corresponds to the base address.
   uint64_t vmo_offset;
@@ -141,8 +143,8 @@ struct MappingBacking {
 
 class Mapping : public fbl::RefCounted<Mapping> {
  public:
-  static zx_status_t New(UserAddress base, zx::vmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
-                         fbl::RefPtr<Mapping>* out);
+  static zx_status_t New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
+                         MappingFlagsImpl flags, fbl::RefPtr<Mapping>* out);
 
   const MappingName& name() const { return name_; }
   MappingName& name() { return name_; }
@@ -166,7 +168,7 @@ class Mapping : public fbl::RefCounted<Mapping> {
  private:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Mapping);
 
-  Mapping(UserAddress base, zx::vmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
+  Mapping(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
           MappingName name);
 
   // Object backing this mapping.
@@ -206,12 +208,12 @@ class MemoryManagerState {
       DesiredAddress addr, size_t length, ProtectionFlags prot_flags, MappingOptionsFlags options,
       MappingName name, std::vector<fbl::RefPtr<Mapping>>& released_mappings);
 
-  fit::result<Errno, UserAddress> map_internal(DesiredAddress addr, zx::vmo& vmo,
+  fit::result<Errno, UserAddress> map_internal(DesiredAddress addr, const zx::vmo& vmo,
                                                uint64_t vmo_offset, size_t length,
                                                MappingFlags flags, bool populate);
 
   fit::result<Errno> validate_addr(DesiredAddress addr, size_t length);
-  fit::result<Errno, UserAddress> map_vmo(DesiredAddress addr, zx::vmo& vmo, uint64_t vmo_offset,
+  fit::result<Errno, UserAddress> map_vmo(DesiredAddress addr, zx::ArcVmo vmo, uint64_t vmo_offset,
                                           size_t length, MappingFlags flags, bool populate,
                                           MappingName name,
                                           std::vector<fbl::RefPtr<Mapping>>& released_mappings);
@@ -270,7 +272,7 @@ class CurrentTask;
 
 class MemoryManager : public fbl::RefCounted<MemoryManager> {
  public:
-  static zx_status_t New(zx::vmar, fbl::RefPtr<MemoryManager>* out);
+  static zx_status_t New(zx::vmar root_vmar, fbl::RefPtr<MemoryManager>* out);
 
   bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) {
     return root_vmar_ == other->root_vmar_;
@@ -310,7 +312,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   //
   // Instead of mapping memory directly in this VMAR, we map the memory in
   // `state.user_vmar`.
-  zx::vmar root_vmar_;
+  const zx::vmar root_vmar_;
 
   // The base address of the root_vmar.
   UserAddress base_addr_;
@@ -363,7 +365,7 @@ fit::result<E, std::vector<T>> read_to_vec(
 
 /// Creates a VMO that can be used in an anonymous mapping for the `mmap`
 /// syscall.
-fit::result<Errno, zx::vmo> create_anonymous_mapping_vmo(size_t size);
+fit::result<Errno, zx::ArcVmo> create_anonymous_mapping_vmo(size_t size);
 
 }  // namespace starnix
 

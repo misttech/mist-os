@@ -17,6 +17,8 @@
 #include <fbl/vector.h>
 #include <ktl/array.h>
 
+#include "lib/mistos/zx/arc.h"
+
 constexpr size_t HASH_BANG_SIZE = 2;
 constexpr ktl::array<char, HASH_BANG_SIZE> HASH_BANG = {'#', '!'};
 constexpr size_t MAX_RECURSION_DEPTH = 5;
@@ -35,7 +37,7 @@ struct ResolvedInterpElf {
   /// A file handle to the resolved ELF interpreter.
   FileHandle file;
   // A VMO to the resolved ELF interpreter.
-  zx::vmo vmo;
+  zx::ArcVmo vmo;
   /// Exec/write lock.
   // file_write_guard: FileWriteGuardRef,
 };
@@ -45,7 +47,7 @@ struct ResolvedElf {
   /// A file handle to the resolved ELF executable.
   FileHandle file;
   // A VMO to the resolved ELF executable.
-  zx::vmo vmo;
+  zx::ArcVmo vmo;
   /// An ELF interpreter, if specified in the ELF executable header.
   ktl::optional<ResolvedInterpElf> interp;
   /// Arguments to be passed to the new process.

@@ -18,6 +18,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <trace.h>
 
 #include <optional>
 #include <utility>

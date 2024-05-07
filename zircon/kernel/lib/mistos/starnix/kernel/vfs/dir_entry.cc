@@ -14,6 +14,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <trace.h>
 #include <zircon/assert.h>
 
 #include <utility>

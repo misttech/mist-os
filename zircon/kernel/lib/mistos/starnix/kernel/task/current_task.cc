@@ -20,6 +20,7 @@
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
+#include <lib/mistos/userloader/start.h>
 #include <lib/mistos/userloader/userloader.h>
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/mistos/zbi_parser/bootfs.h>
@@ -290,22 +291,29 @@ fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
   return fit::ok();
 }
 
+// This is a temporary code while we do not support file system.
+// We just return the "file" VMO
 fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const fbl::String& path) {
   LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
 
-  const zx::unowned_vmo zbi{userloader::gVmos[userloader::kZbi]};
+  ktl::array<zx_handle_t, userloader::kHandleCount> handles = ExtractHandles(userloader::gHandles);
 
-  // This is a temporary code while we do not support file system.
-  // We just return the "file" VMO
-  zx::vmar vmar_self{VmAspace::kernel_aspace()->RootVmar()};
+  zx::unowned_vmar vmar_self = zx::vmar::root_self();
 
-  auto get_bootfs_result = zbi_parser::GetBootfsFromZbi(vmar_self, *zbi, false);
+  auto [power, vmex] = CreateResources({}, handles);
+
+  // Locate the ZBI_TYPE_STORAGE_BOOTFS item and decompress it. This will be used to load
+  // the binary referenced by userboot.next, as well as libc. Bootfs will be fully parsed
+  // and hosted under '/boot' either by bootsvc or component manager.
+  const zx::unowned_vmo zbi{handles[userloader::kZbi]};
+
+  auto get_bootfs_result = zbi_parser::GetBootfsFromZbi(*vmar_self, *zbi, false);
   if (get_bootfs_result.is_error()) {
     return fit::error(errno(from_status_like_fdio(get_bootfs_result.error_value())));
   }
 
-  zx::vmo bootfs_vmo = std::move(get_bootfs_result.value());
-  zbi_parser::Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo)};
+  zx::vmo bootfs_vmo = ktl::move(get_bootfs_result.value());
+  zbi_parser::Bootfs bootfs{vmar_self->borrow(), ktl::move(bootfs_vmo), ktl::move(vmex)};
 
   auto open_result = bootfs.Open("", path, "CurrentTask::open_file");
   if (open_result.is_error()) {

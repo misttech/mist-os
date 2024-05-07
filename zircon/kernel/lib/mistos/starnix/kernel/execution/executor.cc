@@ -102,7 +102,7 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
     auto& process = current_task->thread_group()->process();
     zx_status_t status =
         process.start(thread.value(), current_task.thread_state().registers.real_registers.rip,
-                      current_task.thread_state().registers.real_registers.rsp, 0, 0);
+                      current_task.thread_state().registers.real_registers.rsp, {}, 0);
     if (status != ZX_OK) {
       TRACEF("failed to start process %d\n", status);
       return fit::error(status);
