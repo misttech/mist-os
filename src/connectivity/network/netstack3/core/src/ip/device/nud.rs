@@ -5415,7 +5415,7 @@ mod tests {
 
         let (local, local_device) = build_ctx(I::FAKE_CONFIG);
         let (remote, remote_device) = build_ctx(I::FAKE_CONFIG.swap());
-        let net = crate::context::testutil::new_simple_fake_network(
+        let net = crate::testutil::new_simple_fake_network(
             "local",
             local,
             local_device.downgrade(),

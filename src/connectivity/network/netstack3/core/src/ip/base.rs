@@ -4284,7 +4284,7 @@ mod tests {
             set_forwarding_enabled::<_, I>(&mut alice, &alice_device_ids[0].clone().into(), true);
         }
         let (bob, bob_device_ids) = FakeEventDispatcherBuilder::from_config(fake_config).build();
-        let mut net = crate::context::testutil::new_simple_fake_network(
+        let mut net = crate::testutil::new_simple_fake_network(
             a,
             alice,
             alice_device_ids[0].downgrade(),

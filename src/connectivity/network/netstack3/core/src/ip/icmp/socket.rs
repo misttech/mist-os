@@ -989,7 +989,7 @@ mod tests {
         const REMOTE_CTX_NAME: &str = "bob";
         let (local, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
         let (remote, remote_device_ids) = I::FAKE_CONFIG.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_simple_fake_network(
+        let mut net = crate::testutil::new_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
             local_device_ids[0].downgrade(),
@@ -1053,18 +1053,24 @@ mod tests {
         net.run_until_idle();
 
         assert_eq!(
-            net.core_ctx(LOCAL_CTX_NAME).inner_icmp_state::<I>().rx_counters.echo_reply.get(),
+            net.context(LOCAL_CTX_NAME)
+                .core_ctx
+                .inner_icmp_state::<I>()
+                .rx_counters
+                .echo_reply
+                .get(),
             1
         );
         assert_eq!(
-            net.core_ctx(ctx_name_receiving_req)
+            net.context(ctx_name_receiving_req)
+                .core_ctx
                 .inner_icmp_state::<I>()
                 .rx_counters
                 .echo_request
                 .get(),
             1
         );
-        let replies = net.bindings_ctx(LOCAL_CTX_NAME).take_icmp_replies(&conn);
+        let replies = net.context(LOCAL_CTX_NAME).bindings_ctx.take_icmp_replies(&conn);
         let expected = Buf::new(echo_body, ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 *config.local_ip,

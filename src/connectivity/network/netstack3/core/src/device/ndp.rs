@@ -304,7 +304,7 @@ mod tests {
 
         let local_eth_device_id = local_device_ids[local_dev_idx].clone();
         let remote_eth_device_id = remote_device_ids[remote_dev_idx].clone();
-        let net = crate::context::testutil::new_simple_fake_network(
+        let net = crate::testutil::new_simple_fake_network(
             "local",
             local,
             local_eth_device_id.downgrade(),
@@ -394,17 +394,17 @@ mod tests {
 
         let _: StepResult = net.step();
         assert_eq!(
-            net.core_ctx("remote").ndp_counters().rx.neighbor_solicitation.get(),
+            net.context("remote").core_ctx.ndp_counters().rx.neighbor_solicitation.get(),
             1,
             "remote received solicitation"
         );
-        assert_matches!(&net.bindings_ctx("remote").copy_ethernet_frames()[..], [_frame]);
+        assert_matches!(&net.context("remote").bindings_ctx.copy_ethernet_frames()[..], [_frame]);
 
         // Forward advertisement response back to local.
         let _: StepResult = net.step();
 
         assert_eq!(
-            net.core_ctx("local").ndp_counters().rx.neighbor_advertisement.get(),
+            net.context("local").core_ctx.ndp_counters().rx.neighbor_advertisement.get(),
             1,
             "local received advertisement"
         );
@@ -416,7 +416,12 @@ mod tests {
         });
         let _: StepResult = net.step();
         assert_eq!(
-            net.core_ctx("remote").inner_icmp_state::<Ipv6>().rx_counters.echo_request.get(),
+            net.context("remote")
+                .core_ctx
+                .inner_icmp_state::<Ipv6>()
+                .rx_counters
+                .echo_request
+                .get(),
             1
         );
 
@@ -453,7 +458,7 @@ mod tests {
 
         let (local, local_device_id) = make_ctx_and_dev();
         let (remote, remote_device_id) = make_ctx_and_dev();
-        let mut net = crate::context::testutil::new_simple_fake_network(
+        let mut net = crate::testutil::new_simple_fake_network(
             "local",
             local,
             local_device_id.downgrade(),
@@ -810,10 +815,10 @@ mod tests {
         // The local host should have sent out 3 packets while the remote one
         // should only have sent out 1.
         assert_matches!(
-            &net.bindings_ctx("local").copy_ethernet_frames()[..],
+            &net.context("local").bindings_ctx.copy_ethernet_frames()[..],
             [_frame1, _frame2, _frame3]
         );
-        assert_matches!(&net.bindings_ctx("remote").copy_ethernet_frames()[..], [_frame1]);
+        assert_matches!(&net.context("remote").bindings_ctx.copy_ethernet_frames()[..], [_frame1]);
 
         let _: StepResult = net.step();
 

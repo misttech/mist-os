@@ -395,11 +395,12 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::PureIpDeviceAndIpVersion,
         device::{pure_ip::PureIpDeviceCreationProperties, DeviceId, TransmitQueueConfiguration},
         ip::IpLayerIpExt,
         sync::RemoveResourceResult,
-        testutil::{FakeBindingsCtx, TestIpExt, DEFAULT_INTERFACE_METRIC},
+        testutil::{
+            FakeBindingsCtx, PureIpDeviceAndIpVersion, TestIpExt, DEFAULT_INTERFACE_METRIC,
+        },
         types::WorkQueueReport,
         StackState,
     };

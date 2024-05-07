@@ -66,6 +66,8 @@ pub mod sync {
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     mod fake_bindings;
+    mod fake_network;
+
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
@@ -75,4 +77,8 @@ pub mod testutil {
     };
     pub use crate::trace::testutil::FakeTracingCtx;
     pub use fake_bindings::FakeBindingsCtx;
+    pub use fake_network::{
+        FakeNetwork, FakeNetworkContext, FakeNetworkLinks, PendingFrame, PendingFrameData,
+        StepResult,
+    };
 }
