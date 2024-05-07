@@ -10,10 +10,10 @@ driver_bind_rules("ot_radio_bind") {
   tests = "bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.nordic.platform",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.spi",
   ]
 }
 
