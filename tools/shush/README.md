@@ -5,21 +5,24 @@ This tool consumes json diagnostics emitted by the rust compiler (and clippy), a
 # Usage:
 
 ``` sh
-# Allow a specific lint or category
-fx clippy -f <source file> --raw | shush --lint clippy::suspicious_splitn --mock allow
+# Allow a specific lint or category (skip generating bugs)
+fx clippy -f <source file> --raw | shush --api $API_PATH --mock lint --lint clippy::suspicious_splitn allow
 
 # See all clippy lints in our tree
-fx clippy --all --raw | shush --lint clippy::all --dryrun --mock allow
+fx clippy --all --raw | shush --api $API_PATH --mock lint --lint clippy::all --dryrun --mock allow
 
 # Manually specify a fuchsia checkout to run on
-shush lint_file.json --lint clippy::style --fuchsia-dir ~/myfuchsia fix
+shush lint lint_file.json --lint clippy::style --fuchsia-dir ~/myfuchsia fix
 
 # Run shush on itself
 fx clippy '//tools/shush(//build/toolchain:host_x64)' --raw |
-    shush --force --lint clippy::needless_borrow fix
+    shush lint --force --lint clippy::needless_borrow fix
 
-# Emit markdown (useful for creating bugs)
-shush lint_file.json --lint clippy::absurd_extreme_comparisons allow
+# Automatically generate bugs while allowing
+shush --api $API_PATH lint lint_file.json --lint clippy::absurd_extreme_comparisons allow
+
+# Roll out generated bugs (do this after checking in allows)
+shush --api $API_PATH rollout
 ```
 
 Run `fx shush --help` for details.
@@ -31,9 +34,9 @@ Run `fx shush --help` for details.
 1. Create a tracking issue by hand. This can be done from the issue tracker UI. Keep the issue number for later.
 2. Get an issue tracker API binary. This should accept a `bugspec` and respond to create, update, and list-components requests.
 3. Pick a commit to generate codesearch links with. This should be a commit prior to the lint rollout CL.
-4. Write an issue description template in Markdown. The file should contain `INSERT_DETAILS_HERE` where code links should be added.
-5. `fx clippy --all --raw | shush --lint $LINT --api $API_PATH allow --codesearch_tag $COMMIT --template $TEMPLATE --blocking-issue $ISSUE`
+4. Write an issue description template in Markdown. The file should contain `INSERT_DETAILS_HERE` where code links should be added. See `description_template.md` for an example.
+5. `fx clippy --all --raw | shush lint --lint $LINT --api $API_PATH allow --codesearch_ref $COMMIT --template $TEMPLATE --blocking-issue $ISSUE`
 6. Land a CL with the generated changes.
 7. `shush --api $API_PATH rollout`
 
-`shush allow` also takes additional arguments for customizing the generated issues, including CC limits and issue labels.
+`shush allow` also takes additional arguments for customizing the generated issues, including CC limits and the component to create the issues in.
