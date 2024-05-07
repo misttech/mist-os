@@ -245,15 +245,15 @@ fuchsia_test_package("use_h264_decoder_concurrent_stream_switching_tests") {
   test_components =
       [ ":use_h264_decoder_concurrent_stream_switching_test_comp" ]
   test_specs = {
-    # Should pass when run on VIM2, astro, sherlock, or QEMU.
-
     environments = [
       atlas_env,
       astro_env,
       nelson_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
+
+      # We don't run this on NUC because the SW h264 decoder is used on NUC, and
+      # the SW decoder flakes when running this test.
     ]
   }
 }
