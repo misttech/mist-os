@@ -3,10 +3,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Wlan affordance implementation using SL4F."""
-
-from dataclasses import asdict
 import enum
 from collections.abc import Mapping
+from dataclasses import asdict
 
 from honeydew.interfaces.affordances.wlan import wlan
 from honeydew.transports.sl4f import SL4F
