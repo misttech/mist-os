@@ -12,7 +12,7 @@ use {
         channel::oneshot,
         future::{join_all, BoxFuture, FutureExt},
     },
-    std::collections::{HashMap, HashSet},
+    std::collections::HashMap,
     std::sync::Arc,
 };
 
@@ -51,13 +51,12 @@ struct ActionController {
 /// Each action is mapped to a future that returns when the action is complete.
 pub struct ActionSet {
     rep: HashMap<ActionKey, ActionController>,
-    history: HashSet<ActionKey>,
     passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
 }
 
 impl ActionSet {
     pub fn new() -> Self {
-        ActionSet { rep: HashMap::new(), history: HashSet::new(), passive_waiters: HashMap::new() }
+        ActionSet { rep: HashMap::new(), passive_waiters: HashMap::new() }
     }
 
     pub async fn contains(&self, key: ActionKey) -> bool {
@@ -75,21 +74,6 @@ impl ActionSet {
     #[cfg(test)]
     pub fn remove_notifier(&mut self, key: ActionKey) {
         self.rep.remove(&key).expect("No notifier found with that key");
-    }
-
-    /// Returns a oneshot receiver that will receive a message once the component has finished
-    /// performing an action with the given key. The oneshot will receive a message immediately if
-    /// the component has ever finished such an action. Does not cause any new actions to be
-    /// started.
-    pub async fn wait_for_action(&mut self, action_key: ActionKey) -> oneshot::Receiver<()> {
-        let (sender, receiver) = oneshot::channel();
-        if self.history.contains(&action_key) {
-            sender.send(()).unwrap();
-            receiver
-        } else {
-            self.passive_waiters.entry(action_key).or_insert(vec![]).push(sender);
-            receiver
-        }
     }
 
     /// Registers an action in the set, but does not wait for it to complete, instead returning a
@@ -120,7 +104,6 @@ impl ActionSet {
     /// Removes an action from the set, completing it.
     pub(super) fn finish<'a>(&mut self, key: &'a ActionKey) {
         self.rep.remove(key);
-        self.history.insert(key.clone());
         for sender in self.passive_waiters.entry(key.clone()).or_insert(vec![]).drain(..) {
             let _ = sender.send(());
         }

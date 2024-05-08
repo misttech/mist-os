@@ -180,14 +180,6 @@ impl ActionsManager {
         self.action_set.remove_notifier(key)
     }
 
-    /// Returns a oneshot receiver that will receive a message once the component has finished
-    /// performing an action with the given key. The oneshot will receive a message immediately if
-    /// the component has ever finished such an action. Does not cause any new actions to be
-    /// started.
-    pub async fn wait_for_action(&mut self, action_key: ActionKey) -> oneshot::Receiver<()> {
-        self.action_set.wait_for_action(action_key).await
-    }
-
     /// Registers an action in the set, returning when the action is finished (which may represent
     /// a task that's already running for this action).
     pub async fn register<A>(

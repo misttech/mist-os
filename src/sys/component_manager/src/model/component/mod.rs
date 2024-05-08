@@ -11,8 +11,8 @@ use {
         framework::controller,
         model::{
             actions::{
-                start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType,
-                StartAction, UnresolveAction,
+                start, ActionKey, ActionsManager, DestroyAction, ResolveAction, ShutdownAction,
+                ShutdownType, StartAction, UnresolveAction,
             },
             context::ModelContext,
             environment::Environment,
@@ -381,6 +381,18 @@ impl ComponentInstance {
                     .into());
                 }
                 Ok(None)
+            }
+
+            // A resolve action will set the resolved state on a component before finishing its
+            // work (such as sending events). If there's an in-progress resolve action, let's
+            // wait for that to complete before proceeding (as opposed to just checking what
+            // state the component is in). See https://fxbug.dev/320698181#comment21 for why.
+            let maybe_notifier = {
+                let actions = self.lock_actions().await;
+                actions.wait(ActionKey::Resolve).await
+            };
+            if let Some(notifier) = maybe_notifier {
+                notifier.await?;
             }
 
             if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
@@ -1180,19 +1192,31 @@ impl ComponentInstance {
         self: &Arc<Self>,
         look_up_moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let mut cur = self.clone();
-        for moniker in look_up_moniker.path().iter() {
-            cur = {
-                let cur_state = cur.lock_resolved_state().await?;
-                if let Some(c) = cur_state.get_child(moniker) {
-                    c.clone()
-                } else {
-                    return Err(ModelError::instance_not_found(look_up_moniker.clone()));
-                }
+        let mut name_iterator = look_up_moniker.path().iter();
+        let mut component = self.clone();
+        loop {
+            // Check the resolved state directly instead of calling `lock_resolve_state`
+            // because that function will wait on any in-progress resolve actions, and we may
+            // have been called from a resolve action.
+            if component.lock_state().await.get_resolved_state().is_none() {
+                component.resolve().await?;
+            }
+            let Some(child_name) = name_iterator.next() else {
+                return Ok(component);
             };
+            let state = component.lock_state().await;
+            let Some(resolved_state) = state.get_resolved_state() else {
+                // The component must have unresolved while waiting on the resolve action.
+                continue;
+            };
+            if let Some(child) = resolved_state.get_child(child_name) {
+                let child = child.clone();
+                drop(state);
+                component = child;
+            } else {
+                return Err(ModelError::instance_not_found(look_up_moniker.clone()));
+            }
         }
-        cur.lock_resolved_state().await?;
-        Ok(cur)
     }
 
     /// Finds a component matching the moniker, if such a component exists.

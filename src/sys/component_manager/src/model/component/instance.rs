@@ -11,7 +11,7 @@ use {
                 resolve::sandbox_construction::{
                     self, build_component_sandbox, extend_dict_with_offers,
                 },
-                shutdown, ActionKey, ActionsManager, DiscoverAction, StopAction,
+                shutdown, ActionsManager, DiscoverAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
@@ -1256,13 +1256,6 @@ impl Routable for CapabilityRequestedHook {
             name: self.name.to_string(),
             receiver: receiver.clone(),
         });
-        // TODO(https://fxbug.dev/320698181): Before dispatching events we need to wait for any
-        // in-progress resolve actions to end. See https://fxbug.dev/320698181#comment21 for why.
-        {
-            let resolve_completed =
-                source.lock_actions().await.wait_for_action(ActionKey::Resolve).await;
-            resolve_completed.await.unwrap();
-        }
         source.hooks.dispatch(&event).await;
         if receiver.is_taken() {
             Ok(sender.into())
