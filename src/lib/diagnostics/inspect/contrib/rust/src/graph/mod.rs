@@ -50,7 +50,7 @@
 //!
 //! Each vertex also has a child `relationships` which contains all the outgoing edges of that
 //! vertex. Each edge is identified by an incremental ID assigned at runtime and contains a property
-//! `@to` which represents the vertex that has that incomimng edge. Similar to vertices, it also
+//! `@to` which represents the vertex that has that incoming edge. Similar to vertices, it also
 //! has a `meta` containing metadata key value pairs.
 //!
 //! ## Semantics
@@ -141,6 +141,7 @@ pub use {
 };
 
 /// A directed graph on top of Inspect.
+#[derive(Debug)]
 pub struct Digraph<I> {
     _node: inspect::Node,
     topology_node: inspect::Node,
@@ -149,7 +150,7 @@ pub struct Digraph<I> {
 }
 
 /// Options used to configure the `Digraph`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DigraphOpts {
     max_events: usize,
 }
@@ -199,6 +200,7 @@ where
 
 /// A vertex of the graph. When this is dropped, all the outgoing edges and metadata fields will
 /// removed from Inspect.
+#[derive(Debug)]
 pub struct Vertex<I: VertexId> {
     _node: inspect::Node,
     outgoing_edges_node: inspect::Node,
@@ -275,6 +277,7 @@ where
 }
 
 /// An Edge in the graph.
+#[derive(Debug)]
 pub struct Edge {
     metadata: EdgeGraphMetadata,
     weak_node: inspect::Node,
@@ -297,7 +300,7 @@ impl Edge {
         let metadata_iterator = initial_metadata.into_iter();
         let (node, metadata) = from.outgoing_edges_node.atomic_update(|parent| {
             let node = parent.create_child(to_id.as_ref());
-            node.record_uint("id", id);
+            node.record_uint("edge_id", id);
             if let Some(ref events_tracker) = events_tracker {
                 events_tracker.record_added(
                     from.id().get_id().as_ref(),
@@ -375,7 +378,7 @@ mod tests {
                         },
                         "relationships": {
                             "element-2": {
-                                "id": edge_foo_bar.id(),
+                                "edge_id": edge_foo_bar.id(),
                                 "meta": {
                                     "type": "passive",
                                     src: "on",
@@ -412,6 +415,9 @@ mod tests {
                 Metadata::new("uint_property", 4u64),
                 Metadata::new("boolean_property", true),
                 Metadata::new("double_property", 2.5),
+                Metadata::new("intvec_property", vec![16i64, 32i64, 64i64]),
+                Metadata::new("uintvec_property", vec![16u64, 32u64, 64u64]),
+                Metadata::new("doublevec_property", vec![16.0, 32.0, 64.0]),
             ],
         );
 
@@ -425,6 +431,9 @@ mod tests {
                             uint_property: 4u64,
                             boolean_property: true,
                             double_property: 2.5f64,
+                            intvec_property: vec![16i64, 32i64, 64i64],
+                            uintvec_property: vec![16u64, 32u64, 64u64],
+                            doublevec_property: vec![16.0, 32.0, 64.0],
                         },
                         "relationships": {}
                     },
@@ -438,6 +447,9 @@ mod tests {
         vertex.meta().set("double_property", 4.25);
         vertex.meta().set("boolean_property", false);
         vertex.meta().set("string_property", "hello world");
+        vertex.meta().set("intvec_property", vec![15i64, 31i64, 63i64]);
+        vertex.meta().set("uintvec_property", vec![15u64, 31u64, 63u64]);
+        vertex.meta().set("doublevec_property", vec![15.0, 31.0, 63.0]);
 
         // Or insert properties.
         vertex.meta().set("new_one", 123);
@@ -453,6 +465,10 @@ mod tests {
                             double_property: 4.25f64,
                             boolean_property: false,
                             new_one: 123i64,
+                            // TODO(https://fxbug.dev/338660036): feature addition later.
+                            intvec_property: vec![16i64, 32i64, 64i64],
+                            uintvec_property: vec![16u64, 32u64, 64u64],
+                            doublevec_property: vec![16.0, 32.0, 64.0],
                         },
                         "relationships": {}
                     },
@@ -466,6 +482,9 @@ mod tests {
         vertex.meta().remove("uint_property");
         vertex.meta().remove("double_property");
         vertex.meta().remove("boolean_property");
+        vertex.meta().remove("intvec_property");
+        vertex.meta().remove("uintvec_property");
+        vertex.meta().remove("doublevec_property");
 
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
@@ -499,8 +518,40 @@ mod tests {
                 Metadata::new("uint_property", 4u64),
                 Metadata::new("boolean_property", true),
                 Metadata::new("double_property", 2.5),
+                Metadata::new("intvec_property", vec![16i64, 32i64, 64i64]),
+                Metadata::new("uintvec_property", vec![16u64, 32u64, 64u64]),
+                Metadata::new("doublevec_property", vec![16.0, 32.0, 64.0]),
             ],
         );
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Graph": {
+                "topology": {
+                    "test-node-1": {
+                        "meta": {},
+                        "relationships": {
+                            "test-node-2": {
+                                "edge_id": edge.id(),
+                                "meta": {
+                                    string_property: "i'm a string",
+                                    int_property: 2i64,
+                                    uint_property: 4u64,
+                                    double_property: 2.5,
+                                    boolean_property: true,
+                                    intvec_property: vec![16i64, 32i64, 64i64],
+                                    uintvec_property: vec![16u64, 32u64, 64u64],
+                                    doublevec_property: vec![16.0, 32.0, 64.0],
+                                },
+                            }
+                        }
+                    },
+                    "test-node-2": {
+                        "meta": {},
+                        "relationships": {},
+                    }
+                }
+            }
+        });
 
         // We can update all properties.
         edge.meta().set("int_property", 1i64);
@@ -508,6 +559,9 @@ mod tests {
         edge.meta().set("double_property", 4.25);
         edge.meta().set("boolean_property", false);
         edge.meta().set("string_property", "hello world");
+        edge.meta().set("intvec_property", vec![15i64, 31i64, 63i64]);
+        edge.meta().set("uintvec_property", vec![15u64, 31u64, 63u64]);
+        edge.meta().set("doublevec_property", vec![15.0, 31.0, 63.0]);
 
         // Or insert properties.
         edge.meta().set("new_one", 123);
@@ -519,7 +573,7 @@ mod tests {
                         "meta": {},
                         "relationships": {
                             "test-node-2": {
-                                "id": edge.id(),
+                                "edge_id": edge.id(),
                                 "meta": {
                                     string_property: "hello world",
                                     int_property: 1i64,
@@ -527,6 +581,10 @@ mod tests {
                                     double_property: 4.25f64,
                                     boolean_property: false,
                                     new_one: 123i64,
+                                    // TODO(https://fxbug.dev/338660036): feature addition later.
+                                    intvec_property: vec![16i64, 32i64, 64i64],
+                                    uintvec_property: vec![16u64, 32u64, 64u64],
+                                    doublevec_property: vec![16.0, 32.0, 64.0],
                                 },
                             }
                         }
@@ -545,6 +603,9 @@ mod tests {
         edge.meta().remove("uint_property");
         edge.meta().remove("double_property");
         edge.meta().remove("boolean_property");
+        edge.meta().remove("intvec_property");
+        edge.meta().remove("uintvec_property");
+        edge.meta().remove("doublevec_property");
 
         // Or even change the type.
         edge.meta().set("new_one", "no longer an int");
@@ -556,7 +617,7 @@ mod tests {
                         "meta": {},
                         "relationships": {
                             "test-node-2": {
-                                "id": edge.id(),
+                                "edge_id": edge.id(),
                                 "meta": {
                                     new_one: "no longer an int",
                                 }
@@ -598,13 +659,13 @@ mod tests {
                         },
                         "relationships": {
                             "foo": {
-                                "id": edge.id(),
+                                "edge_id": edge.id(),
                                 "meta": {
                                     hey: "hi",
                                 },
                             },
                             "baz": {
-                                "id": edge_to_baz.id(),
+                                "edge_id": edge_to_baz.id(),
                                 "meta": {
                                     good: "bye",
                                 },
@@ -637,7 +698,7 @@ mod tests {
                         },
                         "relationships": {
                             "baz": {
-                                "id": edge_to_baz.id(),
+                                "edge_id": edge_to_baz.id(),
                                 "meta": {
                                     good: "bye",
                                 },
@@ -697,7 +758,7 @@ mod tests {
                         "meta": {},
                         "relationships": {
                             "test-node-2": {
-                                "id": edge.id(),
+                                "edge_id": edge.id(),
                                 "meta": {},
                             }
                         }
@@ -749,7 +810,7 @@ mod tests {
                     "0": {
                         "@time": AnyProperty,
                         "event": "add_vertex",
-                        "id": "test-node-1",
+                        "vertex_id": "test-node-1",
                         "meta": {
                             "level": 1u64,
                         }
@@ -757,7 +818,7 @@ mod tests {
                     "1": {
                         "@time": AnyProperty,
                         "event": "add_vertex",
-                        "id": "test-node-2",
+                        "vertex_id": "test-node-2",
                         "meta": {}
                     },
                     "2": {
@@ -765,7 +826,7 @@ mod tests {
                         "from": "test-node-1",
                         "to": "test-node-2",
                         "event": "add_edge",
-                        "id": edge.id(),
+                        "edge_id": edge.id(),
                         "meta": {
                             "some-property": 10i64,
                         }
@@ -779,7 +840,7 @@ mod tests {
                         },
                         "relationships": {
                             "test-node-2": {
-                                "id": edge.id(),
+                                "edge_id": edge.id(),
                                 "meta": {
                                     "some-property": 10i64,
                                     "other": "not tracked",
@@ -815,7 +876,7 @@ mod tests {
                     "1": {
                         "@time": AnyProperty,
                         "event": "add_vertex",
-                        "id": "test-node-2",
+                        "vertex_id": "test-node-2",
                         "meta": {}
                     },
                     "2": {
@@ -823,7 +884,7 @@ mod tests {
                         "from": "test-node-1",
                         "to": "test-node-2",
                         "event": "add_edge",
-                        "id": edge.id(),
+                        "edge_id": edge.id(),
                         "meta": {
                             "some-property": 10i64,
                         }
@@ -858,7 +919,7 @@ mod tests {
                         },
                         "relationships": {
                             "test-node-2": {
-                                "id": edge.id(),
+                                "edge_id": edge.id(),
                                 "meta": {
                                     "some-property": 123i64,
                                     "other": "goodbye",
@@ -888,17 +949,17 @@ mod tests {
                     "6": {
                         "@time": AnyProperty,
                         "event": "remove_edge",
-                        "id": edge_id,
+                        "edge_id": edge_id,
                     },
                     "7": {
                         "@time": AnyProperty,
                         "event": "remove_vertex",
-                        "id": "test-node-1",
+                        "vertex_id": "test-node-1",
                     },
                     "8": {
                         "@time": AnyProperty,
                         "event": "remove_vertex",
-                        "id": "test-node-2",
+                        "vertex_id": "test-node-2",
                     }
                 },
                 "topology": {}

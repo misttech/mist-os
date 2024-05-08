@@ -7,7 +7,7 @@ use super::{
     types::{EdgeMarker, VertexMarker},
     GraphObject, VertexId,
 };
-use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect::{self as inspect, ArrayProperty, Property};
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// An enum encoding all the possible metadata value types and contents.
@@ -17,6 +17,9 @@ pub enum MetadataValue<'a> {
     Double(f64),
     Str(Cow<'a, str>),
     Bool(bool),
+    IntVec(Vec<i64>),
+    UintVec(Vec<u64>),
+    DoubleVec(Vec<f64>),
 }
 
 impl MetadataValue<'_> {
@@ -27,6 +30,33 @@ impl MetadataValue<'_> {
             Self::Double(value) => node.record_double(key, *value),
             Self::Str(value) => node.record_string(key, value.as_ref()),
             Self::Bool(value) => node.record_bool(key, *value),
+            Self::IntVec(value) => {
+                node.atomic_update(|node| {
+                    let prop = node.create_int_array(key, value.len());
+                    for (idx, v) in value.into_iter().enumerate() {
+                        prop.set(idx, *v);
+                    }
+                    node.record(prop);
+                });
+            }
+            Self::UintVec(value) => {
+                node.atomic_update(|node| {
+                    let prop = node.create_uint_array(key, value.len());
+                    for (idx, v) in value.into_iter().enumerate() {
+                        prop.set(idx, *v);
+                    }
+                    node.record(prop);
+                });
+            }
+            Self::DoubleVec(value) => {
+                node.atomic_update(|node| {
+                    let prop = node.create_double_array(key, value.len());
+                    for (idx, v) in value.into_iter().enumerate() {
+                        prop.set(idx, *v);
+                    }
+                    node.record(prop);
+                });
+            }
         }
     }
 }
@@ -82,6 +112,30 @@ impl<'a> From<Cow<'a, str>> for MetadataValue<'a> {
     }
 }
 
+impl<'a> From<Vec<i64>> for MetadataValue<'a> {
+    fn from(value: Vec<i64>) -> MetadataValue<'a> {
+        MetadataValue::IntVec(value)
+    }
+}
+
+impl<'a> From<Vec<u8>> for MetadataValue<'a> {
+    fn from(value: Vec<u8>) -> MetadataValue<'a> {
+        MetadataValue::UintVec(value.into_iter().map(|v| v as u64).collect())
+    }
+}
+
+impl<'a> From<Vec<u64>> for MetadataValue<'a> {
+    fn from(value: Vec<u64>) -> MetadataValue<'a> {
+        MetadataValue::UintVec(value)
+    }
+}
+
+impl<'a> From<Vec<f64>> for MetadataValue<'a> {
+    fn from(value: Vec<f64>) -> MetadataValue<'a> {
+        MetadataValue::DoubleVec(value)
+    }
+}
+
 /// A metadata item used to initialize metadata key value pairs of nodes and edges.
 pub struct Metadata<'a> {
     /// The key of the metadata field.
@@ -106,6 +160,7 @@ impl<'a> Metadata<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct VertexGraphMetadata<I>
 where
     I: VertexId,
@@ -147,6 +202,7 @@ impl<I: VertexId> VertexGraphMetadata<I> {
     }
 }
 
+#[derive(Debug)]
 pub struct EdgeGraphMetadata {
     inner: GraphMetadata<EdgeMarker>,
 }
@@ -185,15 +241,21 @@ impl EdgeGraphMetadata {
     }
 }
 
+#[derive(Debug)]
+#[allow(dead_code)] // TODO(https://fxbug.dev/338660036)
 enum MetadataProperty {
     Int(inspect::IntProperty),
     Uint(inspect::UintProperty),
     Double(inspect::DoubleProperty),
     Str(inspect::StringProperty),
     Bool(inspect::BoolProperty),
+    IntVec(inspect::IntArrayProperty),
+    UintVec(inspect::UintArrayProperty),
+    DoubleVec(inspect::DoubleArrayProperty),
 }
 
 /// The metadata of a vertex or edge in the graph.
+#[derive(Debug)]
 struct GraphMetadata<T: GraphObject> {
     id: T::Id,
     map: BTreeMap<String, (MetadataProperty, bool)>,
@@ -258,6 +320,15 @@ where
                     self.log_update_key(key.as_ref(), &value)
                 }
             }
+            (Some((MetadataProperty::IntVec(_), _)), MetadataValue::IntVec(_)) => {
+                // TODO(https://fxbug.dev/338660036): implement later.
+            }
+            (Some((MetadataProperty::UintVec(_), _)), MetadataValue::UintVec(_)) => {
+                // TODO(https://fxbug.dev/338660036): implement later.
+            }
+            (Some((MetadataProperty::DoubleVec(_), _)), MetadataValue::DoubleVec(_)) => {
+                // TODO(https://fxbug.dev/338660036): implement later.
+            }
             (Some((_, track_events)), value) => {
                 if *track_events {
                     self.log_update_key(key.as_ref(), &value)
@@ -314,6 +385,36 @@ where
             MetadataValue::Bool(value) => {
                 let property = node.create_bool(&key, *value);
                 map.insert(key, (MetadataProperty::Bool(property), track_events));
+            }
+            MetadataValue::IntVec(value) => {
+                let property = node.atomic_update(|node| {
+                    let property = node.create_int_array(&key, value.len());
+                    for (idx, v) in value.into_iter().enumerate() {
+                        property.set(idx, *v);
+                    }
+                    property
+                });
+                map.insert(key, (MetadataProperty::IntVec(property), track_events));
+            }
+            MetadataValue::UintVec(value) => {
+                let property = node.atomic_update(|node| {
+                    let property = node.create_uint_array(&key, value.len());
+                    for (idx, v) in value.into_iter().enumerate() {
+                        property.set(idx, *v);
+                    }
+                    property
+                });
+                map.insert(key, (MetadataProperty::UintVec(property), track_events));
+            }
+            MetadataValue::DoubleVec(value) => {
+                let property = node.atomic_update(|node| {
+                    let property = node.create_double_array(&key, value.len());
+                    for (idx, v) in value.into_iter().enumerate() {
+                        property.set(idx, *v);
+                    }
+                    property
+                });
+                map.insert(key, (MetadataProperty::DoubleVec(property), track_events));
             }
         }
     }

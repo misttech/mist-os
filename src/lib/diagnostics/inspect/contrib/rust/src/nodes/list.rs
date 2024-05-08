@@ -12,6 +12,7 @@ use std::collections::VecDeque;
 /// index is always increasing and does not wrap around. For example, if capacity is 3,
 /// then the children names are `[0, 1, 2]` on first three addition. When a new node is
 /// added, `0` is popped, and the children names are `[1, 2, 3]`.
+#[derive(Debug)]
 pub struct BoundedListNode {
     node: Node,
     index: usize,

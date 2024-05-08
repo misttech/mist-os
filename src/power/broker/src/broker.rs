@@ -887,10 +887,13 @@ struct Catalog {
 
 impl Catalog {
     fn new() -> Self {
+        let inspect = component::inspector().root();
+        let inspect_graph = inspect.create_child("topology");
+        let inspect_leases = inspect.create_child("leases");
         Catalog {
-            topology: Topology::new(),
+            topology: Topology::new(inspect_graph),
             leases: HashMap::new(),
-            lease_status: SubscribeMap::new(component::inspector().root().create_child("leases")),
+            lease_status: SubscribeMap::new(inspect_leases),
             active_claims: ClaimActivationTracker::new(),
             passive_claims: ClaimActivationTracker::new(),
         }

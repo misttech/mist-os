@@ -4,8 +4,15 @@
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
 use fidl_fuchsia_power_broker::{self as fpb, PowerLevel};
+use fuchsia_inspect::Node as INode;
+use fuchsia_inspect_contrib::graph::{
+    Digraph as IGraph, DigraphOpts as IGraphOpts, Edge as IGraphEdge, Metadata as IGraphMeta,
+    Vertex as IGraphVertex,
+};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 use uuid::Uuid;
 
 /// If true, use non-random IDs for ease of debugging.
@@ -68,18 +75,33 @@ impl fmt::Display for Dependency {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Element {
+    #[allow(dead_code)]
     id: ElementID,
+    #[allow(dead_code)]
     name: String,
     // Sorted ascending.
     valid_levels: Vec<PowerLevel>,
+    inspect_vertex: Rc<RefCell<IGraphVertex<ElementID>>>,
+    inspect_edges: Rc<RefCell<HashMap<ElementID, IGraphEdge>>>,
 }
 
 impl Element {
-    fn new(id: ElementID, name: String, mut valid_levels: Vec<PowerLevel>) -> Self {
+    fn new(
+        id: ElementID,
+        name: String,
+        mut valid_levels: Vec<PowerLevel>,
+        inspect_vertex: IGraphVertex<ElementID>,
+    ) -> Self {
         valid_levels.sort();
-        Self { id, name, valid_levels }
+        Self {
+            id,
+            name,
+            valid_levels,
+            inspect_vertex: Rc::new(RefCell::new(inspect_vertex)),
+            inspect_edges: Rc::new(RefCell::new(HashMap::new())),
+        }
     }
 }
 
@@ -100,7 +122,7 @@ impl Into<fpb::AddElementError> for AddElementError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ModifyDependencyError {
     AlreadyExists,
     Invalid,
@@ -126,14 +148,18 @@ pub struct Topology {
     elements: HashMap<ElementID, Element>,
     active_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     passive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
+    inspect_graph: IGraph<ElementID>,
+    _inspect_node: INode, // keeps inspect_graph alive
 }
 
 impl Topology {
-    pub fn new() -> Self {
+    pub fn new(inspect_node: INode) -> Self {
         Topology {
             elements: HashMap::new(),
             active_dependencies: HashMap::new(),
             passive_dependencies: HashMap::new(),
+            inspect_graph: IGraph::new(&inspect_node, IGraphOpts::default()),
+            _inspect_node: inspect_node,
         }
     }
 
@@ -147,7 +173,14 @@ impl Topology {
         } else {
             ElementID::from(Uuid::new_v4().as_simple().to_string())
         };
-        self.elements.insert(id.clone(), Element::new(id.clone(), name.into(), valid_levels));
+        let inspect_vertex = self.inspect_graph.add_vertex(
+            id.clone(),
+            &[IGraphMeta::new("name", name), IGraphMeta::new("valid_levels", valid_levels.clone())],
+        );
+        self.elements.insert(
+            id.clone(),
+            Element::new(id.clone(), name.into(), valid_levels, inspect_vertex),
+        );
         Ok(id)
     }
 
@@ -235,6 +268,9 @@ impl Topology {
 
     /// Checks that a dependency is valid. Returns ModifyDependencyError if not.
     fn check_valid_dependency(&self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
+        if &dep.dependent.element_id == &dep.requires.element_id {
+            return Err(ModifyDependencyError::Invalid);
+        }
         if !self.elements.contains_key(&dep.dependent.element_id) {
             return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
         }
@@ -259,6 +295,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
+        self.add_inspect_for_dependency(dep, true)?;
         Ok(())
     }
 
@@ -279,6 +316,7 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
+        self.remove_inspect_for_dependency(dep)?;
         Ok(())
     }
 
@@ -299,6 +337,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
+        self.add_inspect_for_dependency(dep, false)?;
         Ok(())
     }
 
@@ -319,6 +358,44 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
+        self.remove_inspect_for_dependency(dep)?;
+        Ok(())
+    }
+
+    fn add_inspect_for_dependency(
+        &mut self,
+        dep: &Dependency,
+        is_active: bool,
+    ) -> Result<(), ModifyDependencyError> {
+        let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
+        let (Some(dp), Some(rq)) = (self.elements.get(dp_id), self.elements.get(rq_id)) else {
+            // elements[dp_id] and elements[rq_id] guaranteed by prior validation
+            return Err(ModifyDependencyError::Invalid);
+        };
+        let (dp_level, rq_level) = (dep.dependent.level, dep.requires.level);
+        dp.inspect_edges
+            .borrow_mut()
+            .entry(rq_id.clone())
+            .or_insert_with(|| {
+                let dp_vertex = dp.inspect_vertex.borrow();
+                let mut rq_vertex = rq.inspect_vertex.borrow_mut();
+                dp_vertex.add_edge(&mut rq_vertex, &[])
+            })
+            .meta()
+            .set(dp_level.to_string(), format!("{}{}", rq_level, if is_active { "" } else { "p" }));
+        Ok(())
+    }
+
+    fn remove_inspect_for_dependency(
+        &mut self,
+        dep: &Dependency,
+    ) -> Result<(), ModifyDependencyError> {
+        // elements[dp_id] and elements[rq_id] guaranteed by prior validation
+        let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
+        let dp = self.elements.get(dp_id).ok_or(ModifyDependencyError::Invalid)?;
+        let mut dp_edges = dp.inspect_edges.borrow_mut();
+        let inspect = dp_edges.get_mut(rq_id).ok_or(ModifyDependencyError::Invalid)?;
+        inspect.meta().remove(&dep.dependent.level.to_string());
         Ok(())
     }
 }
@@ -326,18 +403,32 @@ impl Topology {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl_fuchsia_power_broker::BinaryPowerLevel;
     use power_broker_client::BINARY_POWER_LEVELS;
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
-        let mut t = Topology::new();
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut t = Topology::new(inspect_node);
         let water =
             t.add_element("Water", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         let earth =
             t.add_element("Earth", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         let fire = t.add_element("Fire", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         let air = t.add_element("Air", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            water.to_string() =>
+                { meta: { name: "Water", valid_levels: v01.clone()}, relationships: {}},
+            earth.to_string() =>
+                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+            fire.to_string() =>
+                { meta: { name: "Fire", valid_levels: v01.clone()}, relationships: {}},
+            air.to_string() =>
+                { meta: { name: "Air", valid_levels: v01.clone()}, relationships: {}},
+        }}}});
 
         t.add_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -350,6 +441,17 @@ mod tests {
             },
         })
         .expect("add_active_dependency failed");
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            water.to_string() =>
+                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
+                    { earth.to_string() => { edge_id: AnyProperty, "meta": { "1": "1" }}}},
+            earth.to_string() =>
+                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+            fire.to_string() =>
+                { meta: { name: "Fire", valid_levels: v01.clone()}, relationships: {}},
+            air.to_string() =>
+                { meta: { name: "Air", valid_levels: v01.clone()}, relationships: {}},
+        }}}});
 
         let extra_add_dep_res = t.add_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -374,6 +476,17 @@ mod tests {
             },
         })
         .expect("remove_active_dependency failed");
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            water.to_string() =>
+                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
+                    { earth.to_string() => { edge_id: AnyProperty, "meta": {}}}},
+            earth.to_string() =>
+                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+            fire.to_string() =>
+                { meta: { name: "Fire", valid_levels: v01.clone()}, relationships: {}},
+            air.to_string() =>
+                { meta: { name: "Air", valid_levels: v01.clone()}, relationships: {}},
+        }}}});
 
         let extra_remove_dep_res = t.remove_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -393,6 +506,13 @@ mod tests {
         assert_eq!(t.element_exists(&air), true);
         t.remove_element(&air);
         assert_eq!(t.element_exists(&air), false);
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            water.to_string() =>
+                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
+                    { earth.to_string() => { edge_id: AnyProperty, "meta": {}}}},
+            earth.to_string() =>
+                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+        }}}});
 
         let element_not_found_res = t.add_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -417,68 +537,72 @@ mod tests {
             },
         });
         assert!(matches!(req_element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
+
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            water.to_string() =>
+                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
+                    { earth.to_string() => { edge_id: AnyProperty, "meta": {}}}},
+            earth.to_string() =>
+                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+        }}}});
     }
 
     #[fuchsia::test]
     fn test_add_remove_direct_deps() {
-        let mut t = Topology::new();
-        let a = t.add_element("A", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
-        let b = t.add_element("B", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
-        let c = t.add_element("C", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
-        let d = t.add_element("D", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut t = Topology::new(inspect_node);
+
+        let v012_u8: Vec<u8> = vec![0, 1, 2];
+        let v012: Vec<u64> = v012_u8.iter().map(|&v| v as u64).collect();
+
+        let a = t.add_element("A", v012_u8.clone()).expect("add_element failed");
+        let b = t.add_element("B", v012_u8.clone()).expect("add_element failed");
+        let c = t.add_element("C", v012_u8.clone()).expect("add_element failed");
+        let d = t.add_element("D", v012_u8.clone()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
-            dependent: ElementLevel {
-                element_id: b.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: a.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+            dependent: ElementLevel { element_id: b.clone(), level: 1 },
+            requires: ElementLevel { element_id: a.clone(), level: 1 },
         };
         t.add_active_dependency(&ba).expect("add_active_dependency failed");
         let cb = Dependency {
-            dependent: ElementLevel {
-                element_id: c.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: b.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+            dependent: ElementLevel { element_id: c.clone(), level: 1 },
+            requires: ElementLevel { element_id: b.clone(), level: 1 },
         };
         t.add_active_dependency(&cb).expect("add_active_dependency failed");
         let cd = Dependency {
-            dependent: ElementLevel {
-                element_id: c.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: d.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+            dependent: ElementLevel { element_id: c.clone(), level: 1 },
+            requires: ElementLevel { element_id: d.clone(), level: 1 },
         };
         t.add_active_dependency(&cd).expect("add_active_dependency failed");
+        let cd2 = Dependency {
+            dependent: ElementLevel { element_id: c.clone(), level: 2 },
+            requires: ElementLevel { element_id: d.clone(), level: 2 },
+        };
+        t.add_active_dependency(&cd2).expect("add_active_dependency failed");
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            a.to_string() => { meta: { name: "A", valid_levels: v012.clone()}, relationships: {}},
+            b.to_string() => { meta: { name: "B", valid_levels: v012.clone()}, relationships: {
+                a.to_string() => { edge_id: AnyProperty, "meta": { "1": "1" }}}},
+            c.to_string() => { meta: { name: "C", valid_levels: v012.clone()}, relationships: {
+                b.to_string() => { edge_id: AnyProperty, "meta": { "1": "1" }},
+                d.to_string() => { edge_id: AnyProperty, "meta": { "1": "1", "2": "2" }}}},
+            d.to_string() => { meta: { name: "D", valid_levels: v012.clone()}, relationships: {}},
+        }}}});
 
-        let mut a_deps = t.direct_active_dependencies(&ElementLevel {
-            element_id: a.clone(),
-            level: BinaryPowerLevel::On.into_primitive(),
-        });
+        let mut a_deps =
+            t.direct_active_dependencies(&ElementLevel { element_id: a.clone(), level: 1 });
         a_deps.sort();
         assert_eq!(a_deps, []);
 
-        let mut b_deps = t.direct_active_dependencies(&ElementLevel {
-            element_id: b.clone(),
-            level: BinaryPowerLevel::On.into_primitive(),
-        });
+        let mut b_deps =
+            t.direct_active_dependencies(&ElementLevel { element_id: b.clone(), level: 1 });
         b_deps.sort();
         assert_eq!(b_deps, [ba]);
 
-        let mut c_deps = t.direct_active_dependencies(&ElementLevel {
-            element_id: c.clone(),
-            level: BinaryPowerLevel::On.into_primitive(),
-        });
+        let mut c_deps =
+            t.direct_active_dependencies(&ElementLevel { element_id: c.clone(), level: 1 });
         let mut want_c_deps = [cb, cd];
         c_deps.sort();
         want_c_deps.sort();
@@ -487,11 +611,30 @@ mod tests {
 
     #[fuchsia::test]
     fn test_all_active_and_passive_dependencies() {
-        let mut t = Topology::new();
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut t = Topology::new(inspect_node);
+
+        let (v023_u8, v015_u8, v01_u8, v03_u8): (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) =
+            (vec![0, 2, 3], vec![0, 1, 5], vec![0, 1], vec![0, 3]);
+        let (v023, v015, v01, v03): (Vec<u64>, Vec<u64>, Vec<u64>, Vec<u64>) = (
+            v023_u8.iter().map(|&v| v as u64).collect(),
+            v015_u8.iter().map(|&v| v as u64).collect(),
+            v01_u8.iter().map(|&v| v as u64).collect(),
+            v03_u8.iter().map(|&v| v as u64).collect(),
+        );
+
         let a = t.add_element("A", vec![0, 2, 3]).expect("add_element failed");
         let b = t.add_element("B", vec![0, 1, 5]).expect("add_element failed");
         let c = t.add_element("C", vec![0, 1]).expect("add_element failed");
         let d = t.add_element("D", vec![0, 3]).expect("add_element failed");
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            a.to_string() => { meta: { name: "A", valid_levels: v023.clone()}, relationships: {}},
+            b.to_string() => { meta: { name: "B", valid_levels: v015.clone()}, relationships: {}},
+            c.to_string() => { meta: { name: "C", valid_levels: v01.clone()}, relationships: {}},
+            d.to_string() => { meta: { name: "D", valid_levels: v03.clone()}, relationships: {}},
+        }}}});
+
         // C has direct active dependencies on B and D.
         // B only has passive dependencies on A.
         // Therefore, C has a transitive passive dependency on A.
@@ -518,6 +661,15 @@ mod tests {
             requires: ElementLevel { element_id: d.clone(), level: 3 },
         };
         t.add_active_dependency(&c1_d3).expect("add_active_dependency failed");
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            a.to_string() => { meta: { name: "A", valid_levels: v023.clone()}, relationships: {}},
+            b.to_string() => { meta: { name: "B", valid_levels: v015.clone()}, relationships: {
+                a.to_string() => { edge_id: AnyProperty, "meta": { "1": "2p", "5": "3p" }}}},
+            c.to_string() => { meta: { name: "C", valid_levels: v01.clone()}, relationships: {
+                b.to_string() => { edge_id: AnyProperty, "meta": { "1": "5" }},
+                d.to_string() => { edge_id: AnyProperty, "meta": { "1": "3" }}}},
+            d.to_string() => { meta: { name: "D", valid_levels: v03.clone()}, relationships: {}},
+        }}}});
 
         let (a_active_deps, a_passive_deps) = t
             .all_active_and_passive_dependencies(&ElementLevel { element_id: a.clone(), level: 1 });
