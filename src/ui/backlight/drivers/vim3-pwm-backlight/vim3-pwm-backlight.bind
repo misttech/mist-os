@@ -8,6 +8,7 @@ using fuchsia.hardware.gpio;
 using fuchsia.hardware.pwm;
 using fuchsia.pwm;
 using fuchsia.gpio;
+using fuchsia.display;
 
 primary node "pwm" {
   fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
@@ -17,4 +18,8 @@ primary node "pwm" {
 node "gpio-lcd-backlight-enable" {
   fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE;
+}
+
+node "mipi-dsi-display" {
+  fuchsia.display.OUTPUT == fuchsia.display.OUTPUT.MIPI_DSI;
 }

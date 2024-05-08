@@ -68,14 +68,6 @@ class Vim3 : public Vim3Type {
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Vim3);
 
-  // Returns true iff the board has a MIPI-DSI display attached.
-  //
-  // This board driver assumes the user will not attach / detach a DSI cable
-  // from a running system, since the DSI display on VIM3 is not designed to be
-  // hot-pluggable. The return value of this method is constant over the
-  // lifetime of the board driver.
-  bool HasLcd();
-
   zx::result<> AdcInit();
   zx::result<> HrTimerInit();
   zx_status_t AudioInit();
@@ -127,8 +119,6 @@ class Vim3 : public Vim3Type {
 
   // TODO(https://fxbug.dev/42059490): migrate to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
-
-  std::optional<bool> has_lcd_;
 
   std::optional<ddk::InitTxn> init_txn_;
   fidl::Arena<> init_arena_;

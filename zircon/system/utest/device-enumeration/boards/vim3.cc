@@ -39,7 +39,6 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1c/aml_nna",
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:00:10/aml-canvas",
-      "sys/platform/05:06:d/display/amlogic-display/display-coordinator",
       "sys/platform/05:06:1d",  // pwm
       "sys/platform/05:06:1d/aml-pwm-device/pwm-4/pwm_init",
       "sys/platform/05:06:1d/aml-pwm-device/pwm-0/pwm_vreg_big/pwm_vreg_big",
@@ -134,6 +133,13 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+
+  static const char* kDisplayDevicePaths[] = {
+      "sys/platform/05:06:d/hdmi-display/amlogic-display/display-coordinator",
+      "sys/platform/05:06:d/dsi-display/amlogic-display/display-coordinator",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kDisplayDevicePaths, std::size(kDisplayDevicePaths))));
 }
 
 }  // namespace

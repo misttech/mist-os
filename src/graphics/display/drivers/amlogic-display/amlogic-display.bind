@@ -8,6 +8,7 @@ using fuchsia.hardware.amlogiccanvas;
 using fuchsia.hardware.gpio;
 using fuchsia.gpio;
 using fuchsia.platform;
+using fuchsia.display;
 using fuchsia.hardware.sysmem;
 using fuchsia.amlogic.platform;
 
@@ -39,4 +40,12 @@ node "sysmem" {
 
 node "canvas" {
   fuchsia.hardware.amlogiccanvas.Service == fuchsia.hardware.amlogiccanvas.Service.ZirconTransport;
+}
+
+optional node "mipi-dsi-display" {
+  fuchsia.display.OUTPUT == fuchsia.display.OUTPUT.MIPI_DSI;
+}
+
+optional node "hdmi-display" {
+  fuchsia.display.OUTPUT == fuchsia.display.OUTPUT.HDMI;
 }

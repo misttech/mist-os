@@ -13,6 +13,7 @@ group("tests") {
     "goldfish-display:tests",
     "intel-i915:tests",
     "simple:tests",
+    "vim3-display-detect:tests",
     "virtio-guest:tests",
   ]
 }

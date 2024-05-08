@@ -9,6 +9,7 @@
 
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/display/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
@@ -22,10 +23,6 @@
 namespace vim3 {
 
 zx_status_t Vim3::BacklightInit() {
-  if (!HasLcd()) {
-    return ZX_OK;
-  }
-
   const ddk::BindRule gpio_lcd_reset_bind_rules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
@@ -53,9 +50,18 @@ zx_status_t Vim3::BacklightInit() {
                         bind_fuchsia_pwm::PWM_ID_FUNCTION_LCD_BRIGHTNESS),
   };
 
+  const ddk::BindRule dsi_display_bind[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia_display::OUTPUT, bind_fuchsia_display::OUTPUT_MIPI_DSI),
+  };
+
+  const device_bind_prop_t dsi_display_properties[] = {
+      ddk::MakeProperty(bind_fuchsia_display::OUTPUT, bind_fuchsia_display::OUTPUT_MIPI_DSI),
+  };
+
   auto status = DdkAddCompositeNodeSpec(
       "backlight", ddk::CompositeNodeSpec(gpio_lcd_reset_bind_rules, gpio_lcd_reset_properties)
-                       .AddParentSpec(pwm_bind_rules, pwm_properties));
+                       .AddParentSpec(pwm_bind_rules, pwm_properties)
+                       .AddParentSpec(dsi_display_bind, dsi_display_properties));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddCompositeNodeSpec failed: %d", status);
     return status;

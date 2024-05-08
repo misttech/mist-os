@@ -1,0 +1,48 @@
+[
+    {
+        "node": "pdev",
+        "tests": [
+            {
+                "expected": "match",
+                "name": "Match pdev",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY_DETECT"
+                }
+            },
+            {
+                "expected": "abort",
+                "name": "Invalid DID",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY"
+                }
+            }
+        ]
+    },
+    {
+        "node": "gpio-display-detect",
+        "tests": [
+            {
+                "expected": "match",
+                "name": "Match gpio-display-detect",
+                "device": {
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_RESET"
+                }
+            },
+            {
+                "expected": "abort",
+                "name": "Invalid function",
+                "device": {
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_ENABLE"
+                }
+            }
+        ]
+    }
+]

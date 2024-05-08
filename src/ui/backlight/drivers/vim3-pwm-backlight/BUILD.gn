@@ -16,6 +16,7 @@ driver_bind_rules("vim3-pwm-backlight-bind") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
+    "//src/devices/bind/fuchsia.display",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.khadas.platform",
     "//src/devices/bind/fuchsia.platform",
