@@ -227,7 +227,7 @@ Vcpu::~Vcpu() {
     // either our thread, or nullptr if the thread has already exited.
     Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
     if (thread_ != nullptr) {
-      UnconditionalChainLockGuard thread_guard{thread_->get_lock()};
+      SingletonChainLockGuardNoIrqSave thread_guard{thread_->get_lock(), CLT_TAG("Vcpu::~Vcpu")};
       thread_->set_vcpu(false);
       // Clear the migration function, so that |thread_| does not reference
       // |this| after destruction of the VCPU.

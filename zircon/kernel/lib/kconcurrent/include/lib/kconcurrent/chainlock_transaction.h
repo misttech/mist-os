@@ -233,7 +233,9 @@ class ChainLockTransaction {
   //
   static ChainLockTransaction* Active() { return arch_get_curr_percpu()->active_cl_transaction; }
   static ChainLockTransaction& ActiveRef() TA_REQ(chainlock_transaction_token) {
-    return *arch_get_curr_percpu()->active_cl_transaction;
+    ChainLockTransaction* const transaction = Active();
+    DEBUG_ASSERT(transaction != nullptr);
+    return *transaction;
   }
 
   static void AssertActive() TA_ASSERT(chainlock_transaction_token) {
