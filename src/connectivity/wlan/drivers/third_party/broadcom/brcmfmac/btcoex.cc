@@ -361,8 +361,8 @@ zx_status_t brcmf_btcoex_attach(struct brcmf_cfg80211_info* cfg) {
   btci->timer_on = false;
   btci->timeout = BRCMF_BTCOEX_OPPR_WIN_TIME_MSEC;
   btci->timer = new Timer(
-      cfg->pub->device->GetTimerDispatcher(), [btci] { return brcmf_btcoex_timerfunc(btci); },
-      false);
+      cfg->pub->device->GetTimerDispatcher(), [btci] { brcmf_btcoex_timerfunc(btci); },
+      Timer::Type::OneShot);
   btci->cfg = cfg;
   btci->saved_regs_part1 = false;
   btci->saved_regs_part2 = false;

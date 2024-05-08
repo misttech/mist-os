@@ -657,9 +657,7 @@ TEST_F(SdioTest, SdioTimeoutRecoveryVmo) {
 struct MinimalBrcmfSdio {
   MinimalBrcmfSdio(enum brcmf_sdiod_state sdiod_state, zx_duration_t ctl_done_timeout,
                    const char* workqueue_name, void (*work_item_handler)(WorkItem* work))
-      : wq(workqueue_name),
-        loop(std::make_unique<::async::Loop>(&kAsyncLoopConfigNeverAttachToThread)),
-        timer(std::make_unique<Timer>(loop->dispatcher(), []() {}, false)) {
+      : wq(workqueue_name) {
     sdio_dev = {.ctl_done_timeout = ctl_done_timeout, .drvr = &drvr, .state = sdiod_state};
 
     drvr.recovery_trigger = std::make_unique<wlan::brcmfmac::RecoveryTrigger>(nullptr);
@@ -673,7 +671,7 @@ struct MinimalBrcmfSdio {
     sdio_dev.bus = &bus;
     bus.sdiodev = &sdio_dev;
 
-    bus.timer = timer.get();
+    bus.timer = &timer;
 
     // Prepare a WorkQueue with a single WorkItem to run the work_item_handler.
     bus.brcmf_wq = &wq;
@@ -689,9 +687,8 @@ struct MinimalBrcmfSdio {
   struct brcmf_sdio bus {};
   WorkQueue wq;
 
-  // Fake loop and timer that do nothing. These need to exist for ResetClearsTxGlom test.
-  std::unique_ptr<async::Loop> loop;
-  std::unique_ptr<Timer> timer;
+  // Fake timer that does nothing. This needs to exist for ResetClearsTxGlom test.
+  Timer timer{fdf::Dispatcher::GetCurrent()->async_dispatcher(), [] {}, Timer::Type::OneShot};
 };
 
 /*

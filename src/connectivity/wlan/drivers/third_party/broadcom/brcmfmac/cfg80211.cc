@@ -3093,8 +3093,9 @@ static void brcmf_init_escan(struct brcmf_cfg80211_info* cfg) {
   brcmf_fweh_register(cfg->pub, BRCMF_E_ESCAN_RESULT, brcmf_cfg80211_escan_handler);
   cfg->escan_info.escan_state = WL_ESCAN_STATE_IDLE;
   /* Init scan_timeout timer */
-  cfg->escan_timer =
-      new Timer(cfg->pub->device->GetTimerDispatcher(), std::bind(brcmf_escan_timeout, cfg), false);
+  cfg->escan_timer = new Timer(
+      cfg->pub->device->GetTimerDispatcher(), [cfg] { brcmf_escan_timeout(cfg); },
+      Timer::Type::OneShot);
   cfg->escan_timeout_work = WorkItem(brcmf_cfg80211_escan_timeout_worker);
 }
 
@@ -6591,20 +6592,23 @@ static zx_status_t brcmf_init_cfg(struct brcmf_cfg80211_info* cfg) {
   brcmf_init_conf(cfg->conf);
 
   // Initialize the disconnect timer
-  cfg->disconnect_timer = new Timer(dispatcher, std::bind(brcmf_disconnect_timeout, cfg), false);
+  cfg->disconnect_timer =
+      new Timer(dispatcher, [cfg] { brcmf_disconnect_timeout(cfg); }, Timer::Type::OneShot);
   cfg->disconnect_timeout_work = WorkItem(brcmf_disconnect_timeout_worker);
   // Initialize the signal report timer
   cfg->signal_report_timer =
-      new Timer(dispatcher, std::bind(brcmf_signal_report_timeout, cfg), true);
+      new Timer(dispatcher, [cfg] { brcmf_signal_report_timeout(cfg); }, Timer::Type::Periodic);
   cfg->signal_report_work = WorkItem(brcmf_signal_report_worker);
   // Initialize the ap start timer
-  cfg->ap_start_timer = new Timer(dispatcher, std::bind(brcmf_ap_start_timeout, cfg), false);
+  cfg->ap_start_timer =
+      new Timer(dispatcher, [cfg] { brcmf_ap_start_timeout(cfg); }, Timer::Type::OneShot);
   cfg->ap_start_timeout_work = WorkItem(brcmf_ap_start_timeout_worker);
   // Initialize the connect timer
-  cfg->connect_timer = new Timer(dispatcher, std::bind(brcmf_connect_timeout, cfg), false);
+  cfg->connect_timer =
+      new Timer(dispatcher, [cfg] { brcmf_connect_timeout(cfg); }, Timer::Type::OneShot);
   cfg->connect_timeout_work = WorkItem(brcmf_connect_timeout_worker);
   // Initialize the roam timer.
-  cfg->roam_timer = new Timer(dispatcher, [cfg] { return brcmf_roam_timeout(cfg); }, false);
+  cfg->roam_timer = new Timer(dispatcher, [cfg] { brcmf_roam_timeout(cfg); }, Timer::Type::OneShot);
   cfg->roam_timeout_work = WorkItem(brcmf_roam_timeout_worker);
 
   cfg->vif_disabled = {};

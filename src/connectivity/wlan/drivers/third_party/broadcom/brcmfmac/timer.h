@@ -13,47 +13,64 @@
 
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_TIMER_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_TIMER_H_
+
 #include <lib/async/dispatcher.h>
-#include <lib/async/task.h>
-#include <lib/sync/completion.h>
+#include <zircon/compiler.h>
 #include <zircon/time.h>
 
 #include <functional>
+#include <memory>
 #include <mutex>
-
-// This is the function that timer users write to receive callbacks.
-typedef void(brcmf_timer_callback_t)(void* data);
-
-typedef enum brcmf_timer_type {
-  BRCMF_TIMER_SINGLE_SHOT = 1,
-  BRCMF_TIMER_PERIODIC = 2,
-} brcmf_timer_type_t;
 
 class Timer {
  public:
-  Timer(async_dispatcher_t* dispatcher, std::function<void()> callback, bool periodic);
-  // If timer is active it will call the callback function, must wait/cancel timer
+  // A OneShot timer will only fire once for each call to Start. A Periodic timer will fire
+  // regularly at the interval specified in the Start call.
+  enum class Type { OneShot, Periodic };
+
+  // Construct a timer that will run on |dispatcher| and call |callback| whenever the timer is
+  // triggered. If |type| is Periodic the timer will restart itself after calling |callback|. To
+  // prevent this, call Start with a duration of zero. This can be done inside |callback| to prevent
+  // further timer callbacks. Caller must ensure that |dispatcher| remains running for the lifetime
+  // of the Timer object or until Stop has been called on the timer.
+  Timer(async_dispatcher_t* dispatcher, std::function<void()>&& callback, Type type);
+  // Destroying the timer will synchronously Stop the timer before completing destruction.
   ~Timer();
-  // To avoid accidentally creating multiple timers using the same callback/data
+  // Timers cannot be safely copied or moved.
   Timer(const Timer&) = delete;
-  Timer(Timer&& t) = delete;
-  // @interval: Interval of time before timer triggers. Same interval used for periodic timers.
-  void Start(zx_duration_t interval);
+  Timer& operator=(Timer&) = delete;
+  // Start the timer with |interval| amount of time before the timer triggers. The same interval is
+  // used when restarting the timer if it is periodic. Calling Start with an |interval| of zero on a
+  // periodic timer will allow the timer to trigger at its next scheduled time but it will not
+  // restart after that. Calling Start with an |interval| of zero on a one-shot timer has no effect.
+  // Calling Start with |interval| greater than zero will adjust the timer interval to the new value
+  // AND postpone any upcoming trigger to not be called until |interval| amount of time has passed.
+  // For periodic timers this will also adjust the interval of all future timer triggers. This can
+  // safely be done from the timer callback.
+  // Returns |ZX_OK| on success.
+  // Returns |ZX_ERR_BAD_STATE| if the dispatcher is shutting down.
+  // Returns |ZX_ERR_NOT_SUPPORTED| if not supported by the dispatcher.
+  zx_status_t Start(zx_duration_t interval);
+  // Stop a running timer synchronously, blocking until the stop is complete. When Stop returns the
+  // callback provided in the constructor is guaranteed to not run again until Start is called. If
+  // the callback is currently running it will run to completion before Stop returns.
   void Stop();
-  bool Stopped() { return !scheduled_; }
+  bool Stopped();
 
  private:
-  static void TimerHandler(async_dispatcher_t* dispatcher, async_task_t* task, zx_status_t status);
+  // Called by Instance when the timer triggers. This in turn will call the user-provided callback.
+  void TimerHandler();
 
-  async_task_t task_;
-  std::function<void()> callback_;
-  brcmf_timer_type_t type_;
+  // A class that represents each internal instance of a Timer, started by a call to Start. See
+  // implementation for more details.
+  class Instance;
 
-  std::mutex lock_;
-  zx_duration_t interval_;
-  bool scheduled_;
-  sync_completion_t finished_;
-  async_dispatcher_t* dispatcher_;
+  std::shared_ptr<Instance> instance_ __TA_GUARDED(mutex_);
+  std::mutex mutex_;
+
+  async_dispatcher_t* const dispatcher_;
+  const std::function<void()> callback_;
+  const Type type_;
 };
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_TIMER_H_

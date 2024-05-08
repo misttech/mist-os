@@ -4103,8 +4103,9 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev, bool reloadi
     bus->sdiodev->drvr->settings = bus->sdiodev->settings;
 
     /* Set up the watchdog timer */
-    bus->timer = new Timer(bus->sdiodev->drvr->device->GetTimerDispatcher(),
-                           std::bind(brcmf_sdio_watchdog, bus), false);
+    bus->timer = new Timer(
+        bus->sdiodev->drvr->device->GetTimerDispatcher(), [bus] { brcmf_sdio_watchdog(bus); },
+        Timer::Type::OneShot);
 
     ret = brcmf_attach(bus->sdiodev->drvr);
     if (ret != ZX_OK) {

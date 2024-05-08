@@ -96,10 +96,7 @@ source_set("bcdc") {
 source_set("timer") {
   sources = [ "timer.cc" ]
   public = [ "timer.h" ]
-  public_deps = [
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/sync",
-  ]
+  public_deps = [ "//zircon/system/ulib/async" ]
 }
 
 # Sources for the driver core logic.
