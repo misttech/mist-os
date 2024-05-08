@@ -15,7 +15,6 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/spi/cpp/bind.h>
 #include <bind/fuchsia/infineon/platform/cpp/bind.h>
-#include <bind/fuchsia/spi/cpp/bind.h>
 
 #include "sdk/lib/driver/component/cpp/composite_node_spec.h"
 #include "sdk/lib/driver/component/cpp/node_add_args.h"
@@ -269,8 +268,6 @@ zx::result<> PostInit::AddSelinaCompositeNode() {
   };
 
   const std::vector<fuchsia_driver_framework::NodeProperty> spi_properties{
-      // TODO(fxbug.dev/333883536): Remove this after Selina has been switched to the rule below.
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
       fdf::MakeProperty(bind_fuchsia_hardware_spi::SERVICE,
                         bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,

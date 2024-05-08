@@ -43,7 +43,6 @@ fuchsia_driver("post-init-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.infineon.platform:fuchsia.infineon.platform_cpp",
-    "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
     "//src/devices/lib/amlogic",
     "//src/graphics/display/lib/device-protocol-display",
     "//src/lib/ddk",

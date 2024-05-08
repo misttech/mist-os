@@ -26,16 +26,18 @@ group("tests") {
 group("common") {
   public_deps = [
     ":spi_bind",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fit",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/ddk:ddk_metadata",
+    "//zircon/system/ulib/async",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
@@ -52,10 +54,7 @@ fuchsia_driver("spi-driver") {
     "spi-child.cc",
     "spi.cc",
   ]
-  deps = [
-    ":common",
-    "//src/devices/lib/driver",
-  ]
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("spi") {
@@ -80,15 +79,11 @@ test("spi-test-bin") {
   ]
   deps = [
     ":common",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//src/devices/lib/fidl-metadata",
-    "//src/devices/testing/mock-ddk",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/spi",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",

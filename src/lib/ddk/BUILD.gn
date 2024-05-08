@@ -245,7 +245,6 @@ sdk_static_library("ddk") {
     "//src/devices/serial/drivers/uart16550:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/spi/bin/spiutil:*",
-    "//src/devices/spi/drivers/spi:*",
     "//src/devices/sysmem/drivers/sysmem:*",
     "//src/devices/sysmem/tests/sysmem:*",
     "//src/devices/temperature/drivers/shtv3:*",

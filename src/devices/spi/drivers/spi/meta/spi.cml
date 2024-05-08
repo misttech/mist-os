@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: 'driver',
+        binary: 'driver/spi.so',
         bind: 'meta/bind/spi.bindbc',
-        compat: 'driver/spi.so',
         colocate: 'true',
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
