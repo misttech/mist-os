@@ -4,19 +4,49 @@
 
 #include "internal_buffer.h"
 
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fpromise/result.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <threads.h>
 
 #include <limits>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 
 #include "src/lib/memory_barriers/memory_barriers.h"
 
 fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::Create(
+    const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
+    const zx::unowned_bti& bti, size_t size, bool is_secure, bool is_writable,
+    bool is_mapping_needed) {
+  return CreateAligned(name, sysmem, bti, size, 0, is_secure, is_writable, is_mapping_needed);
+}
+
+fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::Create(
     const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
     size_t size, bool is_secure, bool is_writable, bool is_mapping_needed) {
   return CreateAligned(name, sysmem, bti, size, 0, is_secure, is_writable, is_mapping_needed);
+}
+
+fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::CreateAligned(
+    const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
+    const zx::unowned_bti& bti, size_t size, size_t alignment, bool is_secure, bool is_writable,
+    bool is_mapping_needed) {
+  ZX_DEBUG_ASSERT(sysmem);
+  ZX_DEBUG_ASSERT(*sysmem);
+  ZX_DEBUG_ASSERT(*bti);
+  ZX_DEBUG_ASSERT(size);
+  ZX_DEBUG_ASSERT(size % ZX_PAGE_SIZE == 0);
+  ZX_DEBUG_ASSERT(!is_mapping_needed || !is_secure);
+  InternalBuffer local_result(size, is_secure, is_writable, is_mapping_needed);
+  zx_status_t status = local_result.Init(name, sysmem, alignment, bti);
+  if (status != ZX_OK) {
+    fprintf(stderr, "Init() failed status=%i\n", status);
+    return fpromise::error(status);
+  }
+  return fpromise::ok(std::move(local_result));
 }
 
 fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::CreateAligned(
@@ -28,13 +58,18 @@ fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::CreateAligned(
   ZX_DEBUG_ASSERT(size);
   ZX_DEBUG_ASSERT(size % ZX_PAGE_SIZE == 0);
   ZX_DEBUG_ASSERT(!is_mapping_needed || !is_secure);
-  InternalBuffer local_result(size, is_secure, is_writable, is_mapping_needed);
-  zx_status_t status = local_result.Init(name, sysmem, alignment, bti);
-  if (status != ZX_OK) {
-    fprintf(stderr, "Init() failed status=%i", status);
-    return fpromise::error(status);
-  }
-  return fpromise::ok(std::move(local_result));
+
+  // Get sysmem2 from sysmem(1). This overload of CreateAligned is deprecated and will be removed
+  // once all clients are using the sysmem2 version instead.
+  auto sysmem2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+  ZX_ASSERT(sysmem2_endpoints.is_ok());
+  zx_status_t status = (*sysmem)->ConnectToSysmem2Allocator(
+      fidl::InterfaceRequest<fuchsia::sysmem2::Allocator>(sysmem2_endpoints->server.TakeChannel()));
+  ZX_ASSERT(status == ZX_OK);
+  auto sysmem2_sync = fidl::SyncClient(std::move(sysmem2_endpoints->client));
+
+  return CreateAligned(name, &sysmem2_sync, bti, size, alignment, is_secure, is_writable,
+                       is_mapping_needed);
 }
 
 InternalBuffer::~InternalBuffer() { DeInit(); }
@@ -183,7 +218,8 @@ InternalBuffer::InternalBuffer(size_t size, bool is_secure, bool is_writable,
   check_pin_ = [this] { ZX_ASSERT(!pin_); };
 }
 
-zx_status_t InternalBuffer::Init(const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem,
+zx_status_t InternalBuffer::Init(const char* name,
+                                 fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
                                  size_t alignment, const zx::unowned_bti& bti) {
   ZX_DEBUG_ASSERT(!is_moved_out_);
   // Init() should only be called on newly-constructed instances using a constructor other than the
@@ -191,35 +227,38 @@ zx_status_t InternalBuffer::Init(const char* name, fuchsia::sysmem::AllocatorSyn
   ZX_ASSERT(!pin_);
 
   // Let's interact with BufferCollection sync, since we're the only participant.
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  (*sysmem)->AllocateNonSharedCollection(buffer_collection.NewRequest());
+  auto collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
+  ZX_ASSERT(collection_endpoints.is_ok());
+  fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest non_shared_request;
+  non_shared_request.collection_request() = std::move(collection_endpoints->server);
+  // discard result; deal with potential wait failed below instead
+  (void)(*sysmem)->AllocateNonSharedCollection(std::move(non_shared_request));
+  auto buffer_collection = fidl::SyncClient(std::move(collection_endpoints->client));
 
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
-  constraints.usage.video = fuchsia::sysmem::videoUsageHwDecoderInternal;
+  fuchsia_sysmem2::BufferCollectionConstraints constraints;
+  auto& usage = constraints.usage().emplace();
+  usage.video() = fuchsia_sysmem2::kVideoUsageHwDecoderInternal;
   // we only want one buffer
-  constraints.min_buffer_count_for_camping = 1;
-  ZX_DEBUG_ASSERT(constraints.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(constraints.min_buffer_count_for_shared_slack == 0);
-  ZX_DEBUG_ASSERT(constraints.min_buffer_count == 0);
-  constraints.max_buffer_count = 1;
+  constraints.min_buffer_count_for_camping() = 1;
+  constraints.max_buffer_count() = 1;
 
   // Allocate enough so that some portion must be aligned and large enough.
   alignment_ = alignment;
   real_size_ = size_ + alignment;
   ZX_DEBUG_ASSERT(real_size_ < std::numeric_limits<uint32_t>::max());
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints.min_size_bytes = static_cast<uint32_t>(real_size_);
-  constraints.buffer_memory_constraints.max_size_bytes = static_cast<uint32_t>(real_size_);
+  auto& bmc = constraints.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = static_cast<uint32_t>(real_size_);
+  bmc.max_size_bytes() = static_cast<uint32_t>(real_size_);
   // amlogic-video always requires contiguous; only contiguous is supported by InternalBuffer.
-  constraints.buffer_memory_constraints.physically_contiguous_required = true;
-  constraints.buffer_memory_constraints.secure_required = is_secure_;
+  bmc.physically_contiguous_required() = true;
+  bmc.secure_required() = is_secure_;
   // If we need a mapping, then we don't want INACCESSIBLE domain, so we need to support at least
   // one other domain.  We choose RAM domain since InternalBuffer(s) are always used for HW DMA, and
   // we always have to CachFlush() after any write, or CacheInvalidate() before any read.  So RAM
   // domain is a better fit than CPU domain, even though we're not really sharing with any other
   // participant so the choice is less critical here.
-  constraints.buffer_memory_constraints.cpu_domain_supported = false;
-  constraints.buffer_memory_constraints.ram_domain_supported = is_mapping_needed_;
+  bmc.cpu_domain_supported() = false;
+  bmc.ram_domain_supported() = is_mapping_needed_;
   // Secure buffers need support for INACCESSIBLE, and it's fine to indicate support for
   // INACCESSIBLE as long as we don't need to map, but when is_mapping_needed_ we shouldn't accept
   // INACCESSIBLE.
@@ -228,43 +267,57 @@ zx_status_t InternalBuffer::Init(const char* name, fuchsia::sysmem::AllocatorSyn
   // and PIN are the same right and sysmem assumes PIN will be needed so always grants MAP, but if
   // the rights were separated, we'd potentially want to exclude MAP unless CPU/RAM domain in
   // sysmem.
-  constraints.buffer_memory_constraints.inaccessible_domain_supported = !is_mapping_needed_;
+  bmc.inaccessible_domain_supported() = !is_mapping_needed_;
 
-  constraints.buffer_memory_constraints.heap_permitted_count = 1;
   if (is_secure_) {
     // AMLOGIC_SECURE_VDEC is only ever allocated for input/output buffers, never for internal
     // buffers.  This is "normal" non-VDEC secure memory.  See also secmem TA's ProtectMemory /
     // sysmem.
-    constraints.buffer_memory_constraints.heap_permitted[0] =
-        fuchsia::sysmem::HeapType::AMLOGIC_SECURE;
+    bmc.permitted_heaps() = {
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0)};
   } else {
-    constraints.buffer_memory_constraints.heap_permitted[0] = fuchsia::sysmem::HeapType::SYSTEM_RAM;
+    bmc.permitted_heaps() = {sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
   }
 
   // InternalBuffer(s) don't need any image format constraints, as they don't store image data.
-  ZX_DEBUG_ASSERT(constraints.image_format_constraints_count == 0);
+  ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
-  buffer_collection->SetName(10u, name);
-  buffer_collection->SetConstraints(true, std::move(constraints));
+  fuchsia_sysmem2::NodeSetNameRequest set_name_request;
+  set_name_request.priority() = 10u;
+  set_name_request.name() = name;
+  // discard result; deal with potential wait failed below instead
+  (void)buffer_collection->SetName(std::move(set_name_request));
+
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  // discard result; deal with potential wait failed below instead
+  (void)buffer_collection->SetConstraints(std::move(set_constraints_request));
 
   // There's only one participant, and we've already called SetConstraints(), so this should be
   // quick.
-  zx_status_t server_status = ZX_OK;
-  fuchsia::sysmem::BufferCollectionInfo_2 out_buffer_collection_info;
-  zx_status_t status =
-      buffer_collection->WaitForBuffersAllocated(&server_status, &out_buffer_collection_info);
-  if (status != ZX_OK) {
-    fprintf(stderr, "WaitForBuffersAllocated() failed status=%i", status);
+  auto wait_result = buffer_collection->WaitForAllBuffersAllocated();
+  if (wait_result.is_error()) {
+    zx_status_t status;
+    if (wait_result.error_value().is_framework_error()) {
+      status = wait_result.error_value().framework_error().status();
+      fprintf(stderr, "WaitForBuffersAllocated() failed status=%d\n", status);
+    } else {
+      status = sysmem::V1CopyFromV2Error(wait_result.error_value().domain_error());
+      fprintf(stderr, "WaitForBuffersAllocated() failed error=%u status=%d\n",
+              fidl::ToUnderlying(wait_result.error_value().domain_error()), status);
+    }
     return status;
   }
+  auto out_buffer_collection_info = std::move(*wait_result->buffer_collection_info());
 
-  if (!!is_secure_ != !!out_buffer_collection_info.settings.buffer_settings.is_secure) {
-    fprintf(stderr, "sysmem bug?");
+  if (!!is_secure_ != !!*out_buffer_collection_info.settings()->buffer_settings()->is_secure()) {
+    fprintf(stderr, "sysmem bug?\n");
     return ZX_ERR_INTERNAL;
   }
 
-  ZX_DEBUG_ASSERT(out_buffer_collection_info.buffers[0].vmo_usable_start % ZX_PAGE_SIZE == 0);
-  zx::vmo vmo = std::move(out_buffer_collection_info.buffers[0].vmo);
+  ZX_DEBUG_ASSERT(
+      out_buffer_collection_info.buffers()->at(0).vmo_usable_start().value() % ZX_PAGE_SIZE == 0);
+  zx::vmo vmo = std::move(*out_buffer_collection_info.buffers()->at(0).vmo());
 
   uintptr_t virt_base = 0;
   if (is_mapping_needed_) {
@@ -273,10 +326,10 @@ zx_status_t InternalBuffer::Init(const char* name, fuchsia::sysmem::AllocatorSyn
       map_options |= ZX_VM_PERM_WRITE;
     }
 
-    status = zx::vmar::root_self()->map(map_options, /*vmar_offset=*/0, vmo, /*vmo_offset=*/0,
-                                        real_size_, &virt_base);
+    zx_status_t status = zx::vmar::root_self()->map(map_options, /*vmar_offset=*/0, vmo,
+                                                    /*vmo_offset=*/0, real_size_, &virt_base);
     if (status != ZX_OK) {
-      fprintf(stderr, "zx::vmar::root_self()->map() failed status=%i", status);
+      fprintf(stderr, "zx::vmar::root_self()->map() failed status=%i\n", status);
       return status;
     }
   }
@@ -288,10 +341,11 @@ zx_status_t InternalBuffer::Init(const char* name, fuchsia::sysmem::AllocatorSyn
 
   zx_paddr_t phys_base;
   zx::pmt pin;
-  status = bti->pin(pin_options, vmo, out_buffer_collection_info.buffers[0].vmo_usable_start,
-                    real_size_, &phys_base, 1, &pin);
+  zx_status_t status =
+      bti->pin(pin_options, vmo, *out_buffer_collection_info.buffers()->at(0).vmo_usable_start(),
+               real_size_, &phys_base, 1, &pin);
   if (status != ZX_OK) {
-    fprintf(stderr, "BTI pin() failed status=%i", status);
+    fprintf(stderr, "BTI pin() failed status=%i\n", status);
     return status;
   }
 
