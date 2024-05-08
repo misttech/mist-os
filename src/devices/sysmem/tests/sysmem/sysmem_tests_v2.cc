@@ -5790,6 +5790,11 @@ TEST(Sysmem, GetVmoInfo) {
   ASSERT_TRUE(weak_wait_result.is_ok());
   auto weak_collection_info = std::move(*weak_wait_result->buffer_collection_info());
 
+  // Close collection to get rid of the strong VMOs held server-side by collection, so that we can
+  // test closing the last strong VMO below.
+  (void)collection->Release();
+  collection.TakeClientEnd();
+
   auto sysmem_result = connect_to_sysmem_service_v2();
   ASSERT_TRUE(sysmem_result.is_ok());
   auto sysmem = std::move(sysmem_result.value());
@@ -5808,6 +5813,12 @@ TEST(Sysmem, GetVmoInfo) {
     ASSERT_EQ(buffer_collection_id, vmo_info.buffer_collection_id());
     ASSERT_EQ(buffer_index, vmo_info.buffer_index());
     ASSERT_FALSE(vmo_info.close_weak_asap().has_value());
+
+    if (buffer_index % 2 == 0) {
+      // for half the buffers, close the last strong VMO before GetVmoInfo(weak)
+      collection_info.buffers()->at(buffer_index).vmo().reset();
+      zx::nanosleep(zx::deadline_after(zx::msec(50)));
+    }
 
     zx::vmo dup_weak_vmo;
     ASSERT_OK(weak_collection_info.buffers()

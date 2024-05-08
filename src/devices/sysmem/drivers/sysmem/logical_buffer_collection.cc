@@ -177,7 +177,7 @@ bool IsNonZeroPowerOf2(T value) {
 template <typename Type>
 class IsStdVector : public std::false_type {};
 template <typename Type>
-class IsStdVector<std::vector<Type>> : public std::true_type {};
+class IsStdVector<std::vector<Type>> : public std::true_type{};
 template <typename Type>
 inline constexpr bool IsStdVector_v = IsStdVector<Type>::value;
 
@@ -188,7 +188,7 @@ template <typename Type, typename enable = void>
 class IsStdString : public std::false_type {};
 template <typename Type>
 class IsStdString<Type, std::enable_if_t<std::is_same_v<std::string, std::decay_t<Type>>>>
-    : public std::true_type {};
+    : public std::true_type{};
 template <typename Type>
 inline constexpr bool IsStdString_v = IsStdString<Type>::value;
 
@@ -4094,11 +4094,15 @@ fit::result<zx_status_t, zx::eventpair> LogicalBuffer::DupCloseWeakAsapClientEnd
     // Later when ~strong_parent_vmo_, ~close_weak_asap_ will signal clients via
     // ZX_EVENTPAIR_PEER_CLOSED.
     close_weak_asap_created_ = true;
+    // If the last strong VMO has already been deleted, we need to close server_end here.
+    if (!strong_parent_vmo_) {
+      close_weak_asap_->server_end.reset();
+    }
   }
   ZX_DEBUG_ASSERT(close_weak_asap_created_);
-  // The caller shouldn't be sending a weak VMO in this case, because strong_parent_vmo_ is gone,
-  // meaning there are no remaining strong VMOs.
-  ZX_DEBUG_ASSERT(close_weak_asap_.has_value());
+  // The client_end is kept even after server_end is reset(), so we can still send the client_end to
+  // the client, without creating a new kernel object for every GetVmoInfo() request.
+  ZX_DEBUG_ASSERT(close_weak_asap_->client_end.is_valid());
   zx::eventpair dup_client_end;
   zx_status_t dup_status =
       close_weak_asap_->client_end.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_client_end);
@@ -4953,7 +4957,10 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
 
         // signal client_weak_asap client_end(s) to tell clients holding weak VMOs to close any weak
         // VMOs asap, now that there are zero strong VMOs
-        close_weak_asap_.reset();
+        if (close_weak_asap_.has_value()) {
+          close_weak_asap_->server_end.reset();
+        }
+
         if (!weak_parent_vmos_.empty()) {
           close_weak_asap_time_ = zx::clock::get_monotonic();
         }
