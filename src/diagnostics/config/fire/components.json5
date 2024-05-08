@@ -285,11 +285,6 @@
         moniker: "bootstrap/ptysvc",
     },
     {
-        id: 176,
-        label: "Password Authenticator",
-        moniker: "core/account/password_authenticator",
-    },
-    {
         id: 177,
         label: "Battery Manager",
         moniker: "core/battery_manager",

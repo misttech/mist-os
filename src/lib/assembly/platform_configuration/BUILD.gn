@@ -29,7 +29,6 @@ rustc_library("platform_configuration") {
     "src/subsystems/graphics.rs",
     "src/subsystems/hwinfo.rs",
     "src/subsystems/icu.rs",
-    "src/subsystems/identity.rs",
     "src/subsystems/input_groups.rs",
     "src/subsystems/intl.rs",
     "src/subsystems/kernel.rs",

@@ -39,7 +39,6 @@ mod forensics;
 mod graphics;
 mod hwinfo;
 mod icu;
-mod identity;
 mod input_groups;
 mod intl;
 mod kernel;
@@ -296,9 +295,6 @@ fn configure_subsystems(
 
     icu::IcuSubsystem::define_configuration(context, &platform.icu, builder)
         .context("Configuring the 'icu' subsystem")?;
-
-    identity::IdentitySubsystemConfig::define_configuration(context, &platform.identity, builder)
-        .context("Configuring the 'identity' subsystem")?;
 
     input_groups::InputGroupsSubsystem::define_configuration(
         context,

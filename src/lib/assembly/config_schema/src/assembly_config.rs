@@ -171,7 +171,7 @@ impl CompiledPackageDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::{FeatureControl, PackageSet};
+    use crate::common::PackageSet;
     use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
     use crate::platform_config::swd_config::{OtaConfigs, UpdateChecker};
     use crate::platform_config::{BuildType, FeatureSupportLevel};
@@ -293,9 +293,6 @@ mod tests {
         {
           platform: {
             build_type: "eng",
-            identity : {
-                "password_pinweaver": "allowed",
-            }
           },
           product: {
               packages: {
@@ -338,7 +335,6 @@ mod tests {
                 config_data: Vec::default()
             }]
         );
-        assert_eq!(platform.identity.password_pinweaver, FeatureControl::Allowed);
         assert_eq!(
             config.product.base_drivers,
             vec![DriverDetails {

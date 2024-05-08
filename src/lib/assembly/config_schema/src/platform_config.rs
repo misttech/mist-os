@@ -17,7 +17,6 @@ pub mod fonts_config;
 pub mod forensics_config;
 pub mod graphics_config;
 pub mod icu_config;
-pub mod identity_config;
 pub mod input_groups_config;
 pub mod intl_config;
 pub mod kernel_config;
@@ -97,10 +96,6 @@ pub struct PlatformConfig {
     /// Platform configuration options for graphics
     #[serde(default)]
     pub graphics: graphics_config::GraphicsConfig,
-
-    /// Platform configuration options for the identity area.
-    #[serde(default)]
-    pub identity: identity_config::PlatformIdentityConfig,
 
     /// Opaque groups of inputs that many products tend to include, but have
     /// not been organized into more specific features.
