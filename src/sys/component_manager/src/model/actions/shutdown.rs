@@ -4015,11 +4015,13 @@ mod tests {
         // Mock a failure to stop "d".
         {
             let mut actions = component_d.lock_actions().await;
-            actions.mock_result(
-                ActionKey::Shutdown,
-                Err(ActionError::StopError { err: StopActionError::GetParentFailed })
-                    as Result<(), ActionError>,
-            );
+            actions
+                .mock_result(
+                    ActionKey::Shutdown,
+                    Err(ActionError::StopError { err: StopActionError::GetParentFailed })
+                        as Result<(), ActionError>,
+                )
+                .await;
         }
 
         // Register shutdown action on "a", and wait for it. "d" fails to shutdown, so "a" fails
@@ -4038,7 +4040,7 @@ mod tests {
         // Remove the mock from "d"
         {
             let mut actions = component_d.lock_actions().await;
-            actions.remove_notifier(ActionKey::Shutdown);
+            actions.remove_notifier(ActionKey::Shutdown).await;
         }
 
         // Register shutdown action on "a" again which should succeed

@@ -81,7 +81,7 @@ use {
     std::fmt::Debug,
     std::hash::Hash,
     std::pin::Pin,
-    std::sync::Arc,
+    std::sync::{Arc, Mutex},
 };
 
 /// A action on a component that must eventually be fulfilled.
@@ -151,13 +151,16 @@ impl Future for ActionNotifier {
 }
 
 pub struct ActionsManager {
-    action_set: set::ActionSet,
+    action_set: Arc<Mutex<set::ActionSet>>,
     component: WeakComponentInstance,
 }
 
 impl ActionsManager {
     pub fn new() -> Self {
-        Self { action_set: set::ActionSet::new(), component: WeakComponentInstance::invalid() }
+        Self {
+            action_set: Arc::new(Mutex::new(set::ActionSet::new())),
+            component: WeakComponentInstance::invalid(),
+        }
     }
 
     /// Sets the component reference against which actions on this component will be run. If an
@@ -167,17 +170,17 @@ impl ActionsManager {
     }
 
     pub async fn contains(&self, key: ActionKey) -> bool {
-        self.action_set.contains(key).await
+        self.action_set.lock().unwrap().contains(key)
     }
 
     #[cfg(test)]
-    pub fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
-        self.action_set.mock_result(key, result)
+    pub async fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
+        self.action_set.lock().unwrap().mock_result(key, result)
     }
 
     #[cfg(test)]
-    pub fn remove_notifier(&mut self, key: ActionKey) {
-        self.action_set.remove_notifier(key)
+    pub async fn remove_notifier(&mut self, key: ActionKey) {
+        self.action_set.lock().unwrap().remove_notifier(key)
     }
 
     /// Registers an action in the set, returning when the action is finished (which may represent
@@ -207,16 +210,12 @@ impl ActionsManager {
     {
         let component =
             self.component.upgrade().expect("tried to register action on nonexistent component");
-        self.action_set.register_no_wait(&component, action).await
+        set::ActionSet::register_no_wait(self.action_set.clone(), &component, action)
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
     pub async fn wait(&self, action_key: ActionKey) -> Option<ActionNotifier> {
-        self.action_set.wait(action_key)
-    }
-
-    fn finish<'a>(&mut self, key: &'a ActionKey) {
-        self.action_set.finish(key)
+        self.action_set.lock().unwrap().wait(action_key)
     }
 }
 

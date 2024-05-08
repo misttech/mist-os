@@ -855,14 +855,16 @@ pub mod tests {
         // Mock a failure to delete "d".
         {
             let mut actions = component_d.lock_actions().await;
-            actions.mock_result(
-                ActionKey::Destroy,
-                Err(ActionError::DestroyError {
-                    err: DestroyActionError::InstanceNotFound {
-                        moniker: component_d.moniker.clone(),
-                    },
-                }) as Result<(), ActionError>,
-            );
+            actions
+                .mock_result(
+                    ActionKey::Destroy,
+                    Err(ActionError::DestroyError {
+                        err: DestroyActionError::InstanceNotFound {
+                            moniker: component_d.moniker.clone(),
+                        },
+                    }) as Result<(), ActionError>,
+                )
+                .await;
         }
 
         component_b
@@ -906,7 +908,7 @@ pub mod tests {
         // Remove the mock from "d"
         {
             let mut actions = component_d.lock_actions().await;
-            actions.remove_notifier(ActionKey::Destroy);
+            actions.remove_notifier(ActionKey::Destroy).await;
         }
 
         // Register destroy action on "a" again. "d"'s delete succeeds, and "a" is deleted
