@@ -148,7 +148,7 @@ func description(value string) string {
 		{"<", "&lt;"},
 		{">", "&gt;"},
 		{"|", "\\|"},
-		{"\n\n", "<br><br>"},
+		{"\n", "<br>"},
 	}
 	value = strings.TrimSpace(value)
 	for _, r := range replacements {
