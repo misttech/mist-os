@@ -83,7 +83,7 @@ impl ExtFilesystem {
         let pager = Arc::new(Pager::new(vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
         let fs = Self { parser, pager: pager.clone() };
         let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
-        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), fs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), fs, options)?;
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
         fs.set_root_node(root);

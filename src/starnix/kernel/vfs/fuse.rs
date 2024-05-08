@@ -149,7 +149,7 @@ pub fn new_fuse_fs(
         CacheMode::Cached(CacheConfig::default()),
         FuseFs { connection: connection.clone(), default_permissions },
         options,
-    );
+    )?;
     let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64);
     fuse_node.state.lock().nlookup += 1;
 
@@ -181,7 +181,7 @@ pub fn new_fusectl_fs(
         CacheMode::Uncached,
         Arc::clone(fusectl_fs(current_task)),
         options,
-    );
+    )?;
     let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
         info.chmod(mode!(IFDIR, 0o755));
     });

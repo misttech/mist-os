@@ -102,7 +102,7 @@ impl RemoteBundle {
                 },
                 params: Default::default(),
             },
-        );
+        )?;
         let mut root_node = FsNode::new_root(DirectoryObject);
         root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
         fs.set_root_node(root_node);

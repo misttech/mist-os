@@ -21,8 +21,8 @@ use crate::{
         socket::{SocketAddress, SocketHandle, UnixSocket},
         CheckAccessReason, DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode,
-        SymlinkTarget, UnlinkKind,
+        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MultiContextOptions, PathBuilder,
+        RenameFlags, SeLinuxContexts, SimpleFileNode, SymlinkTarget, UnlinkKind,
     },
 };
 use fidl_fuchsia_io as fio;
@@ -699,8 +699,14 @@ impl FileSystemCreator for Arc<Kernel> {
                 // TODO(http://b/320436714): use hard-coded security context only for SELinux Fake
                 // mode once SELinux is implemented for the file subsystem.
                 if self.security_server.is_some() {
-                    let label = b"u:object_r:tmpfs:s0";
-                    fs.selinux_context.set(label.into()).unwrap();
+                    let context = SeLinuxContexts::Multi(MultiContextOptions {
+                        def: Some(b"u:object_r:tmpfs:s0".into()),
+                        fs: None,
+                        root: None,
+                    });
+                    fs.selinux_context
+                        .set(context)
+                        .expect("initialize tmpfs selinux security context");
                 }
                 fs
             }

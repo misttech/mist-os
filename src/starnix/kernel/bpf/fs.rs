@@ -120,7 +120,7 @@ impl BpfFs {
         kernel: &Arc<Kernel>,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
         let node = FsNode::new_root_with_properties(
             BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT.into()),
             |info| {

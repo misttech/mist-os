@@ -10,7 +10,7 @@ use crate::{
     vfs::{
         buffers::{with_iovec_segments, InputBuffer, OutputBuffer},
         default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-        fileops_impl_seekable, fs_args, fs_node_impl_not_dir, fs_node_impl_symlink,
+        fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
         fsverity::FsVerityState,
         Anon, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
@@ -18,7 +18,7 @@ use crate::{
         ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
     },
 };
-use bstr::{ByteSlice, B};
+use bstr::ByteSlice;
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
@@ -242,22 +242,12 @@ impl RemoteFs {
         // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
         // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
         // selinux support is further along, we might want to remove this mount option.
-        let context: Option<FsString> = if kernel.has_fake_selinux() {
-            fs_args::generic_parse_mount_options(options.params.as_ref())?
-                .get(B("defcontext"))
-                .map(|v| v.to_owned())
-        } else {
-            None
-        };
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached(CacheConfig::default()),
             RemoteFs { supports_open2, use_remote_ids, root_proxy },
             options,
-        );
-        if let Some(context) = context {
-            fs.selinux_context.set(context).unwrap();
-        }
+        )?;
         let mut root_node = FsNode::new_root(remote_node);
         if use_remote_ids {
             root_node.node_id = node_id;

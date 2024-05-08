@@ -41,7 +41,8 @@ impl SysFs {
         // we set CacheMode::Permanent here to hopefully avoid immediate issues. For now, every
         // created cgroup will continue to exist, which doesn't match cgroup lifetime semantics, so
         // we may still see some issues from this until cgroup lifetimes are implemented.
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFs, options)
+            .expect("sysfs constructed with valid options");
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir(current_task, "fs", 0o755, |dir| {

@@ -35,7 +35,8 @@ impl LayeredFs {
     ) -> FileSystemHandle {
         let options = base_fs.options.clone();
         let layered_fs = Arc::new(LayeredFs { base_fs, mappings });
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, layered_fs.clone(), options);
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, layered_fs.clone(), options)
+            .expect("layeredfs constructed with valid options");
         fs.set_root_node(FsNode::new_root(layered_fs));
         fs
     }

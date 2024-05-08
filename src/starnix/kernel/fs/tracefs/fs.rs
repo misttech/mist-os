@@ -17,7 +17,9 @@ use starnix_uapi::{
 use std::sync::Arc;
 
 pub fn trace_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
-    current_task.kernel().trace_fs.get_or_init(|| TraceFs::new_fs(current_task, options))
+    current_task.kernel().trace_fs.get_or_init(|| {
+        TraceFs::new_fs(current_task, options).expect("tracefs constructed with valid options")
+    })
 }
 
 pub struct TraceFs;
@@ -33,9 +35,12 @@ impl FileSystemOps for Arc<TraceFs> {
 }
 
 impl TraceFs {
-    pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
+    pub fn new_fs(
+        current_task: &CurrentTask,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(TraceFs), options);
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(TraceFs), options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         dir.node(
@@ -87,6 +92,6 @@ impl TraceFs {
         );
         dir.build_root();
 
-        fs
+        Ok(fs)
     }
 }

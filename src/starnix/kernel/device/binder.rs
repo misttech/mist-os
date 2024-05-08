@@ -4577,7 +4577,7 @@ impl BinderFs {
         kernel: &Arc<Kernel>,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
         let mut root = BinderFsDir::new(kernel)?;
         for name in DEFAULT_BINDERS {
             root.add_binder_device(kernel, FsString::from(name))?;

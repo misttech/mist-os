@@ -25,5 +25,6 @@ impl FileSystemOps for SocketFs {
 pub fn socket_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {
     kernel.socket_fs.get_or_init(|| {
         FileSystem::new(kernel, CacheMode::Uncached, SocketFs, FileSystemOptions::default())
+            .expect("socketfs constructed with valid options")
     })
 }

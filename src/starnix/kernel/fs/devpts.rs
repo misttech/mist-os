@@ -111,7 +111,8 @@ fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSy
     // Register tty and ptmx device types.
     kernel.device_registry.register_major(TTY_ALT_MAJOR, device, DeviceMode::Char).unwrap();
 
-    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options);
+    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options)
+        .expect("devpts filesystem constructed with valid options");
     let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
         info.ino = ROOT_NODE_ID;
     });
