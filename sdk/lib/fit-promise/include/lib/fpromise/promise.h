@@ -285,9 +285,9 @@ namespace fpromise {
 // EXAMPLE
 //
 // -
-// https://fuchsia.googlesource.com/fuchsia/+/HEAD/zircon/system/utest/fit/examples/promise_example1.cc
+// https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/lib/fit-promise/tests/examples/promise_example1.cc
 // -
-// https://fuchsia.googlesource.com/fuchsia/+/HEAD/zircon/system/utest/fit/examples/promise_example2.cc
+// https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/lib/fit-promise/tests/examples/promise_example2.cc
 //
 template <typename V = void, typename E = void>
 using promise = promise_impl<::fit::function<result<V, E>(fpromise::context&)>>;
@@ -1066,7 +1066,7 @@ enum class future_state {
 // EXAMPLE
 //
 // -
-// https://fuchsia.googlesource.com/fuchsia/+/HEAD/zircon/system/utest/fit/examples/promise_example2.cc
+// https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/lib/fit-promise/tests/examples/promise_example2.cc
 template <typename V = void, typename E = void>
 using future = future_impl<promise<V, E>>;
 
