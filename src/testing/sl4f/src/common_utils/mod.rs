@@ -7,5 +7,4 @@ pub mod common;
 pub mod error;
 pub mod fidl;
 pub mod lowpan_context;
-pub mod namespace_binder;
 pub mod test;
