@@ -13,6 +13,11 @@ use crate::{registry, CapabilityTrait};
 pub struct OneShotHandle(Arc<Mutex<Option<zx::Handle>>>);
 
 impl OneShotHandle {
+    /// Creates a new [OneShotHandle] containing a Zircon `handle`.
+    pub fn new(handle: zx::Handle) -> Self {
+        Self(Arc::new(Mutex::new(Some(handle))))
+    }
+
     /// Returns the handle in this [OneShotHandle], taking it out.
     ///
     /// Subsequent calls will return an `Unavailable` error.
@@ -50,6 +55,14 @@ mod tests {
     use fidl_fuchsia_component_sandbox as fsandbox;
     use fuchsia_zircon::{self as zx, HandleBased};
     use zx::AsHandleRef;
+
+    #[fuchsia::test]
+    fn construction() {
+        let event = zx::Event::create();
+        let one_shot = OneShotHandle::new(event.into_handle());
+        assert_matches!(one_shot.get_handle(), Ok(_));
+        assert_matches!(one_shot.get_handle(), Err(_));
+    }
 
     // Tests converting the OneShotHandle to FIDL and back.
     #[fuchsia::test]

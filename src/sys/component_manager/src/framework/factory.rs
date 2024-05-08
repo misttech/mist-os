@@ -118,6 +118,10 @@ impl FactoryCapabilityHost {
                 let sender = self.create_sender(receiver);
                 responder.send(sender)?;
             }
+            fsandbox::FactoryRequest::CreateHandle { handle, responder } => {
+                let handle = self.create_handle(handle);
+                responder.send(handle)?;
+            }
             fsandbox::FactoryRequest::CreateDictionary { responder } => {
                 let client_end = self.create_dictionary();
                 responder.send(client_end)?;
@@ -127,6 +131,10 @@ impl FactoryCapabilityHost {
             }
         }
         Ok(())
+    }
+
+    fn create_handle(&self, handle: zx::Handle) -> fsandbox::HandleCapability {
+        fsandbox::HandleCapability::from(sandbox::OneShotHandle::new(handle))
     }
 
     fn create_sender(
@@ -222,6 +230,25 @@ mod tests {
             host.serve(stream).await.unwrap();
         });
         (tasks, factory_proxy)
+    }
+
+    #[fuchsia::test]
+    async fn create_handle() {
+        let (tasks, factory_proxy) = factory();
+
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
+
+        let one_shot = factory_proxy.create_handle(event.into()).await.unwrap();
+        let (handle_client, handle_server) = create_endpoints::<fsandbox::HandleMarker>();
+        factory_proxy.connect_to_handle(one_shot, handle_server.into()).unwrap();
+        let handle_proxy = handle_client.into_proxy().unwrap();
+        let event_back = handle_proxy.get_handle().await.unwrap().unwrap();
+        assert!(event_back.get_koid().unwrap() == expected_koid);
+
+        drop(handle_proxy);
+        drop(factory_proxy);
+        tasks.join().await;
     }
 
     /// Tests that the OneShotHandle implementation of the GetHandle method
