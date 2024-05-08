@@ -1,3 +1,4 @@
+awdavies@google.com
 olivernewman@google.com
 
 per-file             add-update-source,lib/updates.sh,ota,serve = file: /src/sys/pkg/OWNERS
