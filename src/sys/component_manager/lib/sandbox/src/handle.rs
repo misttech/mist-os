@@ -4,13 +4,11 @@
 
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::sync::{Arc, Mutex};
-use vfs::directory::entry::DirectoryEntry;
 
-use crate::{registry, CapabilityTrait, ConversionError};
+use crate::{registry, CapabilityTrait};
 
 /// A capability that vends a single Zircon handle.
 #[derive(Clone, Debug)]
@@ -71,32 +69,7 @@ impl OneShotHandle {
     }
 }
 
-impl CapabilityTrait for OneShotHandle {
-    /// Attempts to convert into a DirectoryEntry that calls `fuchsia.io.Openable/Open` on the handle.
-    ///
-    /// The handle must be a channel that speaks the `Openable` protocol.
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-        let handle = self.get_handle().map_err(|err| ConversionError::Handle { err })?;
-
-        let basic_info = handle.basic_info().map_err(|_| ConversionError::NotSupported)?;
-        if basic_info.object_type != zx::ObjectType::CHANNEL {
-            return Err(ConversionError::NotSupported);
-        }
-
-        let openable = ClientEnd::<fio::OpenableMarker>::from(handle).into_proxy().unwrap();
-
-        Ok(vfs::service::endpoint(move |_scope, server_end| {
-            // TODO(b/306037927): Calling Open on a channel that doesn't speak Openable may
-            // inadvertently close the channel.
-            let _ = openable.open(
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end.into_zx_channel().into(),
-            );
-        }))
-    }
-}
+impl CapabilityTrait for OneShotHandle {}
 
 impl From<OneShotHandle> for ClientEnd<fsandbox::HandleCapabilityMarker> {
     /// Serves the `fuchsia.sandbox.HandleCapability` protocol for this OneShotHandle
