@@ -497,8 +497,8 @@ class KernelDriver {
   }
 
   // This is the FILE-compatible API: `FILE::stdout_ = FILE{&driver};`.
-  template <typename LockPolicy = DefaultLockPolicy>
-  int Write(std::string_view str) {
+  template <typename LockPolicy = DefaultLockPolicy, typename... Args>
+  int Write(std::string_view str, Args&&... waiter_args) {
     uart::CharsFrom chars(str);  // Massage into uint8_t with \n -> CRLF.
     auto it = chars.begin();
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
@@ -508,10 +508,13 @@ class KernelDriver {
       while (!ready) {
         // Block or just unlock and spin or whatever "wait" means to Sync.
         // If that means blocking for interrupt wakeup, enable tx interrupts.
-        waiter_.Wait(lock, [this]() {
-          SyncPolicy::AssertHeld(lock_);
-          uart_.EnableTxInterrupt(io_);
-        });
+        waiter_.template Wait(
+            lock,
+            [this]() {
+              SyncPolicy::AssertHeld(lock_);
+              uart_.EnableTxInterrupt(io_);
+            },
+            std::forward<Args>(waiter_args)...);
         ready = uart_.TxReady(io_);
       }
       // Advance the iterator by writing some.
