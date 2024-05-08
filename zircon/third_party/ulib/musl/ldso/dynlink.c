@@ -625,7 +625,6 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
         if (stride < 3)
           addend = reloc_addr[1];
         if (runtime && def.dso->tls_id >= static_tls_cnt) {
-#if !TLSDESC_DIRECT
           size_t* new = dl_alloc(2 * sizeof(size_t));
           if (!new) {
             error("Error relocating %s: cannot allocate TLSDESC for %s", dso->l_map.l_name, name);
@@ -633,11 +632,7 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
           }
           new[0] = def.dso->tls_id;
           new[1] = tls_val + addend;
-          reloc_addr[1] = (size_t) new;
-#else
-          reloc_addr[1] = tls_val + addend;
-          reloc_addr[2] = def.dso->tls_id;
-#endif
+          reloc_addr[1] = (size_t)new;
           reloc_addr[0] = (size_t)__tlsdesc_dynamic;
         } else {
           reloc_addr[0] = (size_t)__tlsdesc_static;

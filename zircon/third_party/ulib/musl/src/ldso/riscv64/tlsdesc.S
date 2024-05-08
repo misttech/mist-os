@@ -4,12 +4,16 @@
 
 #include <lib/arch/asm.h>
 
-// The argument in a0 points to the GOT.  Unlike other machines, this has not
-// just a slot for the function pointer and one other slot, but three more
-// slots.  So we store both the offset and the module ID there with no
-// additional indirection.  On other machines the second slot has to be a
-// pointer to the pair of module ID and offset.  The return address is in t0
-// rather than ra.  No registers other than a0 and t0 may be clobbered.
+// In both the static and dynamic cases, a0 will point to the GOT. The psABI
+// for RISC-V defines a 2-Slot layout, like other machines for TLSDESC
+// resolution. In the static case, the second slot has the offset from tp of the
+// symbol.
+//
+// In the dynamic case, the second slot has to be a pointer to the pair of
+// module ID and offset.
+//
+// In both cases, the return address is in t0 rather than ra.  No registers
+// other than a0 and t0 may be clobbered.
 
 // For static TLS, the offset stored is the tp offset.  Just return it.
 .function __tlsdesc_static, global
@@ -38,21 +42,33 @@
   .cfi_same_value t5
   .cfi_same_value t6
 
-  // Take 4 slots to 16-byte alignment, though we only need 3 slots.
+  // Take 4 slots to 16-byte alignment, though we only need 3 slots. We leave
+  // the last slot available so that the slow path can store t0, in addition to
+  // the other saved registers.
   add sp, sp, -4*8
   .cfi_adjust_cfa_offset 4*8
   sd a1, 1*8(sp)
-  .cfi_offset a1, (1-4)*8
+  .cfi_rel_offset a1, 1*8
   sd a2, 2*8(sp)
-  .cfi_offset a2, (2-4)*8
-  sd a3, 3*8(sp)
-  .cfi_offset a3, (3-4)*8
+  .cfi_rel_offset a2, 2*8
+  sd a3, 2*8(sp)
+  .cfi_rel_offset a3, 3*8
 
-  ld a2, 8(tp)   // DTV
-  ld a1, 16(a0)  // module ID
-  ld a0, 8(a0)   // Offset.
-  ld a2, (a2)    // DTV[0], generation ID
-  bgt a1, a2, .Lneed_new_dtv
+  // size_t __tlsdesc_dynamic(size_t *a)
+  // {
+  // 	struct {size_t modidx,off;} *p = (void*)a[1];
+  // 	size_t *dtv = *(size_t**)(tp - 24);
+  // 	if (p->modidx <= dtv[0])
+  // 		return dtv[p->modidx] + p->off - tp;
+  // 	return __tls_get_new(p[1], p[0]) - tp;
+  // }
+
+  ld a1, 8(a0)   // Pointer to struct: p
+  ld a0, 8(a1)   // Offset: p->offset
+  ld a1, (a1)    // module ID: p->modidx
+  ld a2, -24(tp) // DTV
+  ld a3, (a2)    // DTV[0], generation ID
+  bgt a1, a3, .Lneed_new_dtv
   .cfi_remember_state
   slli a1, a1, 3 // Scale module ID to words.
   add a1, a1, a2 // &DTV[ID]
@@ -61,11 +77,11 @@
 
 .Lret:
   sub a0, a0, tp // TLS block pointer - tp
-  ld a1, 0*8(sp)
+  ld a1, 1*8(sp)
   .cfi_same_value a1
-  ld a2, 1*8(sp)
+  ld a2, 2*8(sp)
   .cfi_same_value a2
-  ld a3, 2*8(sp)
+  ld a3, 3*8(sp)
   .cfi_same_value a2
   add sp, sp, 4*8
   .cfi_adjust_cfa_offset -4*8
@@ -84,12 +100,14 @@
     // they already were and 31 more slots for the remaining saved registers.
     // So now CFA - 34*8 matches the sp, and the \idx is how many slots above
     // that \reg is stored.
-    .cfi_offset \reg, (\idx - 34) * 8
+    .cfi_rel_offset \reg, \idx * 8
   .endm
+
   .macro reload reg, idx, f=
     \f\()ld \reg, \idx*8(sp)
     .cfi_same_value \reg
   .endm
+
   .macro on_saved_regs op
     \op ra, 0
     \op a4, 1
@@ -126,18 +144,19 @@
     \op fa5, 27, f
     \op fa6, 28, f
     \op fa7, 29, f
+    \op t0, 30
   .endm
 
   // We need 30 slots here
-  add sp, sp, -30*8
-  .cfi_adjust_cfa_offset 30*8
+  add sp, sp, -32*8
+  .cfi_adjust_cfa_offset 32*8
   on_saved_regs spill
 
   call __tls_get_new
 
   on_saved_regs reload
   add sp, sp, 30*8
-  .cfi_adjust_cfa_offset -30*8
+  .cfi_adjust_cfa_offset -32*8
   j .Lret
 
 .end_function
