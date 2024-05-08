@@ -71,6 +71,7 @@ const device_bind_prop_t kPwmProperties[] = {
 const ddk::BindRule kGpioWifiRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_WIFI_32K)),
 };
 
@@ -83,6 +84,7 @@ const device_bind_prop_t kGpioWifiProperties[] = {
 const ddk::BindRule kGpioBtRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_BT_EN)),
 };
 

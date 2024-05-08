@@ -162,6 +162,7 @@ std::vector<fuchsia_driver_framework::ParentSpec> GetDisplayCommonParents() {
   std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_EXPANDER_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_LCD_RESET)),
   };
 
@@ -174,6 +175,7 @@ std::vector<fuchsia_driver_framework::ParentSpec> GetDisplayCommonParents() {
   std::vector<fuchsia_driver_framework::BindRule> gpio_hdmi_hotplug_detect_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_HPD_IN)),
   };
 

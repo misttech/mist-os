@@ -113,6 +113,7 @@ zx_status_t Vim3::AudioInit() {
 
   const std::vector<fdf::BindRule> kTdmASclkRules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_BTPCM_CLK)),
   };
   const std::vector<fdf::NodeProperty> kTdmASclkProperties{
@@ -122,6 +123,7 @@ zx_status_t Vim3::AudioInit() {
 
   const std::vector<fdf::BindRule> kTdmBSclkRules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_I2SB_SCLK)),
   };
   const std::vector<fdf::NodeProperty> kTdmBSclkProperties{

@@ -94,7 +94,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:40/ddr-temp-sensor/aml-trip-device",  // DDR Temperature Sensor
 
       // GPIO
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-107",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-7",
 
       // Touch panel
       //
@@ -103,7 +103,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // interrupt pin
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-21",
       // reset pin
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-106",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-6",
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/mcu-composite/vim3-mcu",
 

@@ -98,6 +98,7 @@ const device_bind_prop_t kI2cProperties[] = {
 const ddk::BindRule kGpioRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_FUSB302_INT))};
 
 const device_bind_prop_t kGpioProperties[] = {

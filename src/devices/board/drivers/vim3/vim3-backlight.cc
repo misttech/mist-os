@@ -26,6 +26,7 @@ zx_status_t Vim3::BacklightInit() {
   const ddk::BindRule gpio_lcd_reset_bind_rules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_EXPANDER_GPIO_ID),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               static_cast<uint32_t>(VIM3_LCD_BACKLIGHT_ENABLE)),
   };
