@@ -18,6 +18,7 @@ mod vmo;
 #[argh(subcommand)]
 pub enum StarnixSubCommand {
     Adb(adb::StarnixAdbCommand),
+    #[cfg(feature = "enable_console_tool")]
     Console(console::StarnixConsoleCommand),
     Vmo(vmo::StarnixVmoCommand),
 }
@@ -50,6 +51,7 @@ impl FfxMain for StarnixTool {
                     .await
                     .map_err(|e| Error::User(e))
             }
+            #[cfg(feature = "enable_console_tool")]
             StarnixSubCommand::Console(command) => {
                 console::starnix_console(command, &self.rcs_proxy, writer)
                     .await

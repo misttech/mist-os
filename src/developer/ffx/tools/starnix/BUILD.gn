@@ -7,6 +7,14 @@ import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
+declare_args() {
+  # The console tool is intended only for interactive use. Currently, this tool
+  # is included in the build by default, but we plan to remove it from the
+  # default build so that we do not accidentally rely on the tool in automated
+  # tests.
+  starnix_enable_console_tool = true
+}
+
 rustc_library("lib") {
   name = "ffx_starnix"
   edition = "2021"
@@ -25,15 +33,20 @@ rustc_library("lib") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-net",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:nix",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:signal-hook",
-    "//third_party/rust_crates:termion",
     "//third_party/rust_crates:tracing",
   ]
+
+  if (starnix_enable_console_tool) {
+    deps += [
+      "//third_party/rust_crates:blocking",
+      "//third_party/rust_crates:nix",
+      "//third_party/rust_crates:termion",
+    ]
+  }
 
   sources = [
     "src/adb.rs",
@@ -42,6 +55,11 @@ rustc_library("lib") {
     "src/lib.rs",
     "src/vmo.rs",
   ]
+
+  features = []
+  if (starnix_enable_console_tool) {
+    features += [ "enable_console_tool" ]
+  }
 }
 
 ffx_tool("ffx_starnix") {

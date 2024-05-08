@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![cfg(feature = "enable_console_tool")]
+
 use anyhow::{anyhow, bail, Result};
 use argh::{ArgsInfo, FromArgs};
 use blocking::Unblock;
