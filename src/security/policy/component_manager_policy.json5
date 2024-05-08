@@ -30,6 +30,10 @@
                 target_monikers: [
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
+
+                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
+                    // no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -583,6 +587,10 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/cr50_agent",
+
+                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
+                    // no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
                 ],
             },
 
@@ -597,6 +605,10 @@
                     "/bootstrap/cr50_agent",
                     "/bootstrap/console-launcher",
                     "/bootstrap/paver",
+
+                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
+                    // no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
                 ],
             },
             {

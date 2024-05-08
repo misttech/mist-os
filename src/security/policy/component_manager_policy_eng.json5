@@ -45,6 +45,10 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/testing/vfs-compliance-tests:**",
+
+                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -185,13 +189,10 @@
                 source_name: "fuchsia.kernel.ProfileResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/bootstrap/role_manager",
                     "/bootstrap/console-launcher",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
-                    // capability no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
