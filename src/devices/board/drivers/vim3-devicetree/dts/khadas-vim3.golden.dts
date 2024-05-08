@@ -34,6 +34,7 @@
 	};
 
 	pwm_a-regulator {
+		#regulator-cells = <0x00>;
 		compatible = "amlogic,pwm-regulator";
 		pinctrl-0 = <0x1d>;
 		pwms = <0x0d 0x00 0x4e2 0x00>;
@@ -44,6 +45,7 @@
 	};
 
 	pwm_a0_d-regulator {
+		#regulator-cells = <0x00>;
 		compatible = "amlogic,pwm-regulator";
 		pinctrl-0 = <0x1c>;
 		pwms = <0x0d 0x09 0x4e2 0x00>;

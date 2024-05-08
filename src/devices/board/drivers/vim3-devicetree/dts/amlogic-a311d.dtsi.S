@@ -33,6 +33,7 @@
 		regulator-min-microvolt = <690000>;
 		regulator-max-microvolt = <1050000>;
 		regulator-step-microvolt = <1000>;
+		#regulator-cells = <0>;
 	 };
 
 	vddcpu1: pwm_a-regulator {
@@ -43,6 +44,7 @@
 		regulator-min-microvolt = <690000>;
 		regulator-max-microvolt = <1050000>;
 		regulator-step-microvolt = <1000>;
+		#regulator-cells = <0>;
 	};
 };
 
