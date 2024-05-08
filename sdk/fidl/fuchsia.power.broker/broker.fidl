@@ -244,6 +244,7 @@ type LeaseStatus = flexible enum {
 /// Provides lease-scoped access to actions that can be taken on a lease
 /// previously acquired via Lessor.Lease. Closing this control channel drops
 /// the lease.
+/// TODO(https://fxbug.dev/339474151): Switch from a protocol to an eventpair.
 open protocol LeaseControl {
     /// Get the current status of the lease.
     /// If last_status is UNKNOWN, the call will return immediately
