@@ -61,4 +61,11 @@ void AnalyticsReporter::ReportCommand(const CommandReport& report) const {
   Analytics::IfEnabledSendEvent(session_, std::move(command_event));
 }
 
+void AnalyticsReporter::ReportConsoleType(ConsoleType::Type type) const {
+  auto console_type = std::make_unique<ConsoleType>(session_id_);
+  console_type->SetConsoleType(type);
+
+  Analytics::IfEnabledSendEvent(session_, std::move(console_type));
+}
+
 }  // namespace zxdb
