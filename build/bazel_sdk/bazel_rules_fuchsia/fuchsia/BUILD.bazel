@@ -6,6 +6,12 @@
 
 load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "fuchsia_api_level")
 
+# We need to export the top level bzl files for documentation generation.
+exports_files(
+    ["licenses.bzl"],
+    visibility = ["//visibility:public"],
+)
+
 # Specifies the API level to use when building a package. A user can set this
 # flag on the command line to override the package level or they can set it on
 # their package. If left empty, the build will fail.
@@ -29,10 +35,4 @@ fuchsia_api_level(
 toolchain_type(
     name = "toolchain",
     visibility = ["//visibility:public"],
-)
-
-# Export files for use in documentation.
-exports_files(
-    glob(["*.bzl"]),
-    visibility = ["//:__subpackages__"],
 )

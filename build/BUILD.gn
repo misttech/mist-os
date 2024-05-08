@@ -132,6 +132,7 @@ group("non_hermetic_deps") {
     "//build/bazel:*",
     "//build/bazel/assembly/*",
     "//build/bazel/bazel_sdk:*",
+    "//build/bazel/bazel_sdk/docs:*",
     "//build/bazel/bazel_sdk/tests:*",
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",

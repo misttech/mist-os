@@ -1,0 +1,17 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//tools/bazel-docgen/bazel_docgen.gni")
+
+# Create documentation for the Bazel SDK rules
+if (is_host) {
+  # The following are the public APIs that we are exposing
+  extract_bazel_doc_textproto("licenses") {
+    bazel_target = "//build/bazel/bazel_sdk/docs:licenses"
+  }
+
+  bazel_docgen("docs") {
+    textproto_targets = [ ":licenses" ]
+  }
+}

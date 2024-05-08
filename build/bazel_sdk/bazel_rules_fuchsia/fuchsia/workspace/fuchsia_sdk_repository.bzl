@@ -65,6 +65,9 @@ def _merge_rules_fuchsia(ctx):
     rules_fuchsia_root = ctx.path(Label("//:BUILD.bazel")).dirname
     ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
+    # Merge the doc_gen directory so we can generate our build rules
+    ctx.symlink(rules_fuchsia_root.get_child("doc_gen"), "doc_gen")
+
     # LINT.IfChange
     # Link the common directory so that we can later use it as its own repo.
     ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
