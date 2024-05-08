@@ -21,6 +21,7 @@
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
@@ -487,7 +488,8 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{fuchsia::ui::input3::Keyboard::Name_}},
          .source = ParentRef(),
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
+        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
+                          Protocol{fuchsia::sysmem2::Allocator::Name_}},
          .source = ParentRef(),
          .targets = {target, ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::scheduler::RoleManager::Name_}},

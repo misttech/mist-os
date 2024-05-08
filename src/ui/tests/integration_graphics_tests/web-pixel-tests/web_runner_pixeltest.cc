@@ -16,6 +16,7 @@
 #include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
@@ -165,6 +166,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
              .source = ChildRef{kMockCobalt},
              .targets = {ChildRef{kMemoryPressureProvider}}},
             {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
+                              Protocol{fuchsia::sysmem2::Allocator::Name_},
                               Protocol{fuchsia::vulkan::loader::Loader::Name_}},
              .source = ParentRef(),
              .targets = {ChildRef{kMemoryPressureProvider}, target}},
