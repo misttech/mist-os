@@ -57,44 +57,6 @@ struct Type {
   // For IdentifierType, can only be called after the Decl has been compiled.
   Resourceness Resourceness() const;
 
-  // Comparison helper object.
-  class Comparison {
-   public:
-    Comparison() = default;
-    template <class T>
-    Comparison Compare(const T& a, const T& b) const {
-      if (result_ != 0)
-        return Comparison(result_);
-      if (a < b)
-        return Comparison(-1);
-      if (b < a)
-        return Comparison(1);
-      return Comparison(0);
-    }
-
-    bool IsLessThan() const { return result_ < 0; }
-
-   private:
-    explicit Comparison(int result) : result_(result) {}
-
-    const int result_ = 0;
-  };
-
-  bool operator<(const Type& other) const {
-    if (kind != other.kind)
-      return kind < other.kind;
-    return Compare(other).IsLessThan();
-  }
-
-  // Compare this object against 'other'.
-  // It's guaranteed that this->kind == other.kind.
-  // Return <0 if *this < other, ==0 if *this == other, and >0 if *this > other.
-  // Derived types should override this, but also call this implementation.
-  virtual Comparison Compare(const Type& other) const {
-    ZX_ASSERT(kind == other.kind);
-    return Comparison().Compare(IsNullable(), other.IsNullable());
-  }
-
   // Apply the provided constraints to this type, returning the newly constrained
   // Type and recording the invocation inside resolved_args.
   // For types in the new syntax, we receive the unresolved TypeConstraints.
@@ -137,13 +99,6 @@ struct ArrayType final : public Type, public ArrayConstraints {
   Type* element_type;
   const SizeValue* element_count;
 
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const ArrayType&>(other);
-    return Type::Compare(o)
-        .Compare(element_count->value, o.element_count->value)
-        .Compare(*element_type, *o.element_type);
-  }
-
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
                         std::unique_ptr<Type>* out_type,
@@ -174,15 +129,7 @@ struct VectorType final : public Type, public VectorConstraints {
   Type* element_type;
 
   uint32_t ElementCount() const { return size ? size->value : SizeValue::Max().value; }
-
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
-
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const VectorType&>(other);
-    return Type::Compare(o)
-        .Compare(ElementCount(), o.ElementCount())
-        .Compare(*element_type, *o.element_type);
-  }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
@@ -198,13 +145,7 @@ struct StringType final : public Type, public VectorConstraints {
       : Type(name, Kind::kString), Constraints(std::move(constraints)) {}
 
   uint32_t MaxSize() const { return size ? size->value : SizeValue::Max().value; }
-
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
-
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const StringType&>(other);
-    return Type::Compare(o).Compare(MaxSize(), o.MaxSize());
-  }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
@@ -231,19 +172,6 @@ struct HandleType final : public Type, HandleConstraints {
 
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
-  Comparison Compare(const Type& other) const override {
-    const auto& other_handle_type = *static_cast<const HandleType*>(&other);
-    auto rights_val = static_cast<const NumericConstantValue<RightsWrappedType>*>(rights);
-    auto other_rights_val =
-        static_cast<const NumericConstantValue<RightsWrappedType>*>(other_handle_type.rights);
-    // TODO: move Compare into constraints.
-    ZX_ASSERT(kind == other.kind);
-    return Comparison()
-        .Compare(nullability, other_handle_type.nullability)
-        .Compare(subtype, other_handle_type.subtype)
-        .Compare(*rights_val, *other_rights_val);
-  }
-
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
                         std::unique_ptr<Type>* out_type,
@@ -259,11 +187,6 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
       : Type(name, Kind::kPrimitive), subtype(subtype) {}
 
   PrimitiveSubtype subtype;
-
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const PrimitiveType&>(other);
-    return Type::Compare(o).Compare(subtype, o.subtype);
-  }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
@@ -283,11 +206,6 @@ struct InternalType final : public Type, public Constraints<> {
 
   InternalSubtype subtype;
 
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const InternalType&>(other);
-    return Type::Compare(o).Compare(subtype, o.subtype);
-  }
-
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
                         std::unique_ptr<Type>* out_type,
@@ -306,11 +224,6 @@ struct IdentifierType final : public Type, public Constraints<ConstraintKind::kN
   TypeDecl* type_decl;
 
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
-
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const IdentifierType&>(other);
-    return Type::Compare(o).Compare(name, o.name);
-  }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
@@ -352,14 +265,6 @@ struct TransportSideType final : public Type, public TransportSideConstraints {
   // declaration.
   const std::string_view protocol_transport;
 
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const TransportSideType&>(other);
-    return Type::Compare(o)
-        .Compare(name, o.name)
-        .Compare(end, o.end)
-        .Compare(protocol_decl, o.protocol_decl);
-  }
-
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
                         std::unique_ptr<Type>* out_type,
@@ -385,11 +290,6 @@ struct BoxType final : public Type, public BoxConstraints {
   // All boxes are implicitly nullable.
   bool IsNullable() const override { return true; }
 
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const BoxType&>(other);
-    return Type::Compare(o).Compare(name, o.name).Compare(boxed_type, o.boxed_type);
-  }
-
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,
                         std::unique_ptr<Type>* out_type,
@@ -413,11 +313,6 @@ struct ZxExperimentalPointerType final : public Type, public Constraints<> {
       : Type(name, Kind::kZxExperimentalPointer), pointee_type(pointee_type) {}
 
   Type* pointee_type;
-
-  Comparison Compare(const Type& other) const override {
-    const auto& o = static_cast<const ZxExperimentalPointerType&>(other);
-    return Type::Compare(o).Compare(pointee_type, o.pointee_type);
-  }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                         const TypeConstraints& constraints, const Reference& layout,

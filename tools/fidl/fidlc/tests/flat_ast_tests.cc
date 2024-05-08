@@ -23,44 +23,6 @@ TEST(FlatAstTests, GoodImplicitAssumptions) {
   EXPECT_TRUE(Nullability::kNullable < Nullability::kNonnullable);
 }
 
-TEST(FlatAstTests, GoodCompareHandles) {
-  auto name_not_important = Name::CreateIntrinsic(nullptr, "ignore");
-  auto fake_source_file = SourceFile("fake.fidl", "123");
-  auto fake_source_span = SourceSpan(fake_source_file.data(), fake_source_file);
-  auto fake_token = Token(fake_source_span, 0, Token::Kind::kNumericLiteral, Token::Subkind::kNone);
-  auto fake_source_element = SourceElement(fake_token, fake_token);
-  auto fake_literal = RawLiteral(fake_source_element, RawLiteral::Kind::kNumeric);
-  auto rights1Constant = std::make_unique<LiteralConstant>(&fake_literal);
-  rights1Constant->ResolveTo(std::make_unique<HandleRightsValue>(1), nullptr);
-  auto rights1Value = static_cast<const HandleRightsValue*>(&rights1Constant->Value());
-  auto rights2Constant = std::make_unique<LiteralConstant>(&fake_literal);
-  rights2Constant->ResolveTo(std::make_unique<HandleRightsValue>(2), nullptr);
-  auto rights2Value = static_cast<const HandleRightsValue*>(&rights2Constant->Value());
-  Resource* resource_decl_not_needed = nullptr;
-  HandleType nonnullable_channel_rights1(
-      name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(HandleSubtype::kChannel, rights1Value, Nullability::kNonnullable));
-  HandleType nullable_channel_rights1(
-      name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(HandleSubtype::kChannel, rights1Value, Nullability::kNullable));
-  HandleType nonnullable_event_rights1(
-      name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(HandleSubtype::kEvent, rights1Value, Nullability::kNonnullable));
-  HandleType nullable_event_rights1(
-      name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(HandleSubtype::kEvent, rights1Value, Nullability::kNullable));
-  HandleType nullable_event_rights2(
-      name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(HandleSubtype::kEvent, rights2Value, Nullability::kNullable));
-
-  // Comparison is nullability, then type.
-  EXPECT_TRUE(nullable_channel_rights1 < nonnullable_channel_rights1);
-  EXPECT_TRUE(nullable_event_rights1 < nonnullable_event_rights1);
-  EXPECT_TRUE(nonnullable_channel_rights1 < nonnullable_event_rights1);
-  EXPECT_TRUE(nullable_channel_rights1 < nullable_event_rights1);
-  EXPECT_TRUE(nullable_event_rights1 < nullable_event_rights2);
-}
-
 TEST(FlatAstTests, BadCannotReferenceAnonymousName) {
   TestLibrary library;
   library.AddFile("bad/fi-0058.test.fidl");
