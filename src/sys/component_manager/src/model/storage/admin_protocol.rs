@@ -792,24 +792,18 @@ mod tests {
     use {
         super::{DirType, StorageAdmin, StorageError},
         async_trait::async_trait,
-        fidl::endpoints::{self, ServerEnd},
-        fidl_fuchsia_io::{self as fio, DirectoryProxy},
-        fuchsia_fs as ffs, fuchsia_zircon as zx,
+        fidl::endpoints::ServerEnd,
+        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         std::{fmt::Formatter, path::PathBuf, sync::Arc},
         test_case::test_case,
         vfs::{
             directory::{
                 dirents_sink,
                 entry_container::{Directory, DirectoryWatcher},
-                helper::DirectlyMutable,
                 immutable::connection::ImmutableConnection,
-                mutable::connection::MutableConnection,
-                simple::Simple,
                 traversal_position::TraversalPosition,
             },
             execution_scope::ExecutionScope,
-            file::vmo::read_only,
-            mut_pseudo_directory,
             path::Path,
             ObjectRequestRef, ToObjectRequest,
         },
@@ -848,120 +842,127 @@ mod tests {
         assert_eq!(StorageAdmin::is_storage_dir(full_path), (r#type, data_path, path_remainder));
     }
 
-    fn connect_to_directory(
-        dir: Arc<Simple<MutableConnection>>,
-        scope: ExecutionScope,
-    ) -> fio::DirectoryProxy {
-        let (client, server) = endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
-
-        dir.open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
-        client.into_proxy().unwrap()
+    async fn create_file(directory: &fio::DirectoryProxy, file_name: &str, contents: &str) {
+        let file = fuchsia_fs::directory::open_file(
+            directory,
+            file_name,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::CREATE_IF_ABSENT
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .await
+        .expect("Failed to create file");
+        fuchsia_fs::file::write(&file, contents).await.expect("Failed to write file contents");
     }
 
-    async fn delete_all_storage(storage: &DirectoryProxy) -> Result<(), StorageError> {
-        StorageAdmin::delete_all_storage(storage, StorageAdmin::delete_dir_contents).await
+    async fn create_directory(
+        directory: &fio::DirectoryProxy,
+        directory_name: &str,
+    ) -> fio::DirectoryProxy {
+        fuchsia_fs::directory::create_directory(
+            directory,
+            directory_name,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .await
+        .expect("Failed to create directory")
+    }
+
+    fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
+        fuchsia_fs::directory::open_in_namespace(
+            tempdir.path().to_str().unwrap(),
+            fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .expect("Failed to open directory")
+    }
+
+    const NO_DIR_ENTRIES: &[String] = &[];
+
+    /// Returns a sorted list of directory entry names.
+    async fn readdir(directory: &fio::DirectoryProxy) -> Vec<String> {
+        let mut entries: Vec<String> = fuchsia_fs::directory::readdir(directory)
+            .await
+            .expect("Failed to read directory")
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+        entries.sort();
+        entries
+    }
+
+    async fn delete_all_storage(storage: &fio::DirectoryProxy) -> Result<(), StorageError> {
+        StorageAdmin::delete_all_storage(&storage, StorageAdmin::delete_dir_contents).await
     }
 
     #[fuchsia::test]
     async fn test_id_storage_simple_no_files() {
-        let component_storage_dir_name =
+        const COMPONENT_STORAGE_DIR_NAME: &str =
             "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-        let component_storage_dir = mut_pseudo_directory! {};
-        let storage_dir = mut_pseudo_directory! {
-            component_storage_dir_name  => component_storage_dir,
-        };
 
-        let scope = ExecutionScope::new();
-        let dir_proxy = connect_to_directory(storage_dir.clone(), scope.clone());
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_dir = open_tempdir(&temp_directory);
+        create_directory(&storage_dir, COMPONENT_STORAGE_DIR_NAME).await;
 
-        delete_all_storage(&dir_proxy).await.unwrap();
+        delete_all_storage(&storage_dir).await.unwrap();
     }
 
     #[fuchsia::test]
     async fn test_id_storage_simple_files() {
-        let component_storage_dir_name =
+        const COMPONENT_STORAGE_DIR_NAME: &str =
             "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-        let component_storage_dir = mut_pseudo_directory! {
-            "file1.txt" => read_only(b"hello world"),
-            "file2" => read_only(b"hi there!"),
-        };
-        let storage_host = mut_pseudo_directory! {
-            component_storage_dir_name => component_storage_dir.clone(),
-        };
 
-        let scope = ExecutionScope::new();
-        let storage_host_proxy = connect_to_directory(storage_host.clone(), scope.clone());
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+        let component_storage = create_directory(&storage_host, COMPONENT_STORAGE_DIR_NAME).await;
+        create_file(&component_storage, "file1.txt", "hello world").await;
+        create_file(&component_storage, "file2", "hi there").await;
 
-        delete_all_storage(&storage_host_proxy).await.unwrap();
+        delete_all_storage(&storage_host).await.unwrap();
 
         // Check that the component storage dir was emptied
-        let storage_dir_proxy = connect_to_directory(component_storage_dir.clone(), scope.clone());
-        assert_eq!(0, ffs::directory::readdir(&storage_dir_proxy).await.unwrap().len());
+        assert_eq!(readdir(&component_storage).await, NO_DIR_ENTRIES);
 
         // Check that the top-level storage directory still contains exactly
         // one item and that it's name is the expected one
-        let mut entries = ffs::directory::readdir(&storage_host_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!(component_storage_dir_name, &entries.pop().unwrap().name);
+        assert_eq!(readdir(&storage_host).await, [COMPONENT_STORAGE_DIR_NAME]);
     }
 
     #[fuchsia::test]
     /// The directory structure should look something like
     ///   abcdef1234567890abcdef1234567890/
-    ///      file.txt
-    ///      subdir/
-    ///             file.txt
+    ///      something.png
+    ///      subdir1/
+    ///             file
     ///             subdir2/
     ///                     file.txt
 
     async fn test_id_storage_nested_contents_deleted() {
-        let component_storage_dir_name =
-            "12341234123412341234123412341234abcdef1234567890abcdef1234567890";
-        let subdir_name = "subdir1";
-        let nested_subdir_name = "subdir2";
+        const COMPONENT_STORAGE_DIR_NAME: &str =
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
-        let nested_subdir = mut_pseudo_directory! {
-            "file.text" => read_only(b"hola!")
-        };
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+        let component_storage = create_directory(&storage_host, COMPONENT_STORAGE_DIR_NAME).await;
 
-        let subdir = mut_pseudo_directory! {
-            "file" => read_only(b"so we meet again!"),
-            nested_subdir_name => nested_subdir.clone(),
-        };
+        let subdir = create_directory(&component_storage, "subdir1").await;
+        create_file(&component_storage, "something.png", "not really a picture").await;
 
-        let component_storage_dir = mut_pseudo_directory! {
-            subdir_name => subdir.clone(),
-            "something.png" => read_only(b"not really a picture"),
-        };
+        let nested_subdir = create_directory(&subdir, "subdir2").await;
+        create_file(&subdir, "file", "so we meet again!").await;
 
-        let storage_host = mut_pseudo_directory! {
-            component_storage_dir_name => component_storage_dir.clone(),
-        };
+        create_file(&nested_subdir, "file.text", "hola").await;
 
-        let scope = ExecutionScope::new();
-        let storage_host_proxy = connect_to_directory(storage_host.clone(), scope.clone());
-        let storage_proxy = connect_to_directory(component_storage_dir.clone(), scope.clone());
-        let subdir_proxy = connect_to_directory(subdir.clone(), scope.clone());
-        let nested_subdir_proxy = connect_to_directory(subdir.clone(), scope.clone());
-
-        delete_all_storage(&storage_host_proxy).await.unwrap();
+        delete_all_storage(&storage_host).await.unwrap();
 
         // Check that the top-level storage directory still contains exactly
         // one item and that it's name is the expected one
-        let mut entries = ffs::directory::readdir(&storage_host_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!(component_storage_dir_name, &entries.pop().unwrap().name);
-
-        assert_eq!(0, ffs::directory::readdir(&storage_proxy).await.unwrap().len());
-        assert_eq!(0, ffs::directory::readdir(&subdir_proxy).await.unwrap().len());
-        assert_eq!(0, ffs::directory::readdir(&nested_subdir_proxy).await.unwrap().len());
+        assert_eq!(readdir(&storage_host).await, [COMPONENT_STORAGE_DIR_NAME]);
+        assert_eq!(readdir(&component_storage).await, NO_DIR_ENTRIES);
+        assert_eq!(readdir(&subdir).await, NO_DIR_ENTRIES);
+        assert_eq!(readdir(&nested_subdir).await, NO_DIR_ENTRIES);
     }
 
     #[fuchsia::test]
@@ -971,105 +972,58 @@ mod tests {
     ///    component/data/file.txt
 
     async fn test_moniker_storage_simple() {
-        let component1_dir_name = "a:0";
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+
+        const COMPONENT1_DIR_NAME: &str = "a:0";
+        let component1_dir = create_directory(&storage_host, COMPONENT1_DIR_NAME).await;
+        let storage_data_dir1 = create_directory(&component1_dir, "data").await;
+        create_file(&storage_data_dir1, "file.txt", "hello world!").await;
+
         // Although most monikers have a colon-number postfix, there's nothing
         // that requires this so let's try something without it
-        let component2_dir_name = "component";
+        const COMPONENT2_DIR_NAME: &str = "component";
+        let component2_dir = create_directory(&storage_host, COMPONENT2_DIR_NAME).await;
+        let storage_data_dir2 = create_directory(&component2_dir, "data").await;
+        create_file(&storage_data_dir2, "file.txt", "hello yourself!").await;
 
-        let storage_data_dir1 = mut_pseudo_directory! {
-            "file.txt" => read_only(b"hello world!"),
-        };
-
-        let component1_dir = mut_pseudo_directory! {
-            "data" => storage_data_dir1.clone(),
-        };
-
-        let storage_data_dir2 = mut_pseudo_directory! {
-            "file.txt" => read_only(b"hello yourself"),
-        };
-
-        let component2_dir = mut_pseudo_directory! {
-            "data" => storage_data_dir2.clone(),
-        };
-
-        let storage_host_dir = mut_pseudo_directory! {
-            component1_dir_name => component1_dir.clone(),
-            component2_dir_name => component2_dir.clone(),
-        };
-
-        let scope = ExecutionScope::new();
-        let component1_dir_proxy = connect_to_directory(component1_dir.clone(), scope.clone());
-        let component2_dir_proxy = connect_to_directory(component2_dir.clone(), scope.clone());
-        let data_dir1_proxy = connect_to_directory(storage_data_dir1.clone(), scope.clone());
-        let data_dir2_proxy = connect_to_directory(storage_data_dir2.clone(), scope.clone());
-        let storage_host_proxy = connect_to_directory(storage_host_dir.clone(), scope.clone());
-
-        delete_all_storage(&storage_host_proxy).await.unwrap();
+        delete_all_storage(&storage_host).await.unwrap();
 
         // Verify the components' storage directories are still present
-        let mut entries = ffs::directory::readdir(&storage_host_proxy).await.unwrap();
-        assert_eq!(2, entries.len());
-        assert_eq!(component2_dir_name, &entries.pop().unwrap().name);
-        assert_eq!(component1_dir_name, &entries.pop().unwrap().name);
+        assert_eq!(readdir(&storage_host).await, [COMPONENT1_DIR_NAME, COMPONENT2_DIR_NAME]);
 
         // Verify the directories still have a "data" subdirectory
-        entries = ffs::directory::readdir(&component1_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("data", entries.pop().unwrap().name);
-        entries = ffs::directory::readdir(&component2_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("data", entries.pop().unwrap().name);
+        assert_eq!(readdir(&component1_dir).await, ["data"]);
+        assert_eq!(readdir(&component2_dir).await, ["data"]);
 
         // Verify the data subdirs were purged
-        assert_eq!(0, ffs::directory::readdir(&data_dir1_proxy).await.unwrap().len());
-        assert_eq!(0, ffs::directory::readdir(&data_dir2_proxy).await.unwrap().len());
+        assert_eq!(readdir(&storage_data_dir1).await, NO_DIR_ENTRIES);
+        assert_eq!(readdir(&storage_data_dir2).await, NO_DIR_ENTRIES);
     }
 
     #[fuchsia::test]
     /// The directory structure looks like
     /// a:0/data/
-    ///          file.txt
+    ///          b_file
     ///          subdir/
-    ///                 file.txt
+    ///                 a_file
     async fn test_moniker_storage_nested_deletion() {
-        let component_dir_name = "a:0";
-        let subdir_name = "subdir";
+        const COMPONENT_DIR_NAME: &str = "a:0";
 
-        let subdir = mut_pseudo_directory! {
-            "a_file" => read_only(b"content"),
-        };
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+        let component_dir = create_directory(&storage_host, COMPONENT_DIR_NAME).await;
+        let data_dir = create_directory(&component_dir, "data").await;
+        create_file(&data_dir, "b_file", "other content").await;
+        let subdir = create_directory(&data_dir, "subdir").await;
+        create_file(&subdir, "a_file", "content").await;
 
-        let data_dir = mut_pseudo_directory! {
-            "b_file" => read_only(b"other content"),
-            subdir_name => subdir.clone(),
-        };
+        delete_all_storage(&storage_host).await.unwrap();
 
-        let component_dir = mut_pseudo_directory! {
-            "data" => data_dir.clone(),
-        };
-
-        let storage_host_dir = mut_pseudo_directory! {
-            component_dir_name => component_dir.clone(),
-        };
-
-        let scope = ExecutionScope::new();
-        let subdir_proxy = connect_to_directory(subdir.clone(), scope.clone());
-        let data_dir_proxy = connect_to_directory(data_dir.clone(), scope.clone());
-        let component_dir_proxy = connect_to_directory(component_dir.clone(), scope.clone());
-        let storage_host_proxy = connect_to_directory(storage_host_dir.clone(), scope.clone());
-
-        delete_all_storage(&storage_host_proxy).await.unwrap();
-
-        let mut entries = ffs::directory::readdir(&storage_host_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!(component_dir_name, &entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&component_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("data", entries.pop().unwrap().name);
-
-        assert_eq!(0, ffs::directory::readdir(&data_dir_proxy).await.unwrap().len());
-        assert_eq!(0, ffs::directory::readdir(&subdir_proxy).await.unwrap().len());
+        assert_eq!(readdir(&storage_host).await, [COMPONENT_DIR_NAME]);
+        assert_eq!(readdir(&component_dir).await, ["data"]);
+        assert_eq!(readdir(&data_dir).await, NO_DIR_ENTRIES);
+        assert_eq!(readdir(&subdir).await, NO_DIR_ENTRIES);
     }
 
     #[fuchsia::test]
@@ -1078,149 +1032,72 @@ mod tests {
     ///                       file.txt
     ///                       file2.txt
     async fn test_moniker_storage_child_data_deletion() {
-        let parent_dir_name = "a:0";
-        let child_dir_name = "b:0";
+        const PARENT_DIR_NAME: &str = "a:0";
+        const CHILD_DIR_NAME: &str = "b:0";
 
-        let child_data_dir = mut_pseudo_directory! {
-            "file1.txt" => read_only(b"hello"),
-            "file2.txt" => read_only(b" world!"),
-        };
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+        let parent_dir = create_directory(&storage_host, PARENT_DIR_NAME).await;
+        let children_dir = create_directory(&parent_dir, "children").await;
+        let child_dir = create_directory(&children_dir, CHILD_DIR_NAME).await;
+        let child_data_dir = create_directory(&child_dir, "data").await;
+        create_file(&child_data_dir, "file1.txt", "hello").await;
+        create_file(&child_data_dir, "file2.txt", " world!").await;
 
-        let child_dir = mut_pseudo_directory! {
-            "data" => child_data_dir.clone(),
-        };
+        delete_all_storage(&storage_host).await.unwrap();
 
-        let children_dir = mut_pseudo_directory! {
-            child_dir_name => child_dir.clone(),
-        };
-
-        let parent_dir = mut_pseudo_directory! {
-            "children" => children_dir.clone(),
-        };
-
-        let storage_host_dir = mut_pseudo_directory! {
-            parent_dir_name => parent_dir.clone(),
-        };
-
-        let scope = ExecutionScope::new();
-        let child_data_dir_proxy = connect_to_directory(child_data_dir.clone(), scope.clone());
-        let child_dir_proxy = connect_to_directory(child_dir.clone(), scope.clone());
-        let children_dir_proxy = connect_to_directory(children_dir.clone(), scope.clone());
-        let parent_dir_proxy = connect_to_directory(parent_dir.clone(), scope.clone());
-        let storage_host_proxy = connect_to_directory(storage_host_dir.clone(), scope.clone());
-
-        delete_all_storage(&storage_host_proxy).await.unwrap();
-
-        let mut entries = ffs::directory::readdir(&storage_host_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!(parent_dir_name, entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&parent_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("children", entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&children_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!(child_dir_name, entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&child_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("data", entries.pop().unwrap().name);
-
-        assert_eq!(0, ffs::directory::readdir(&child_data_dir_proxy).await.unwrap().len());
+        assert_eq!(readdir(&storage_host).await, [PARENT_DIR_NAME]);
+        assert_eq!(readdir(&parent_dir).await, ["children"]);
+        assert_eq!(readdir(&children_dir).await, [CHILD_DIR_NAME]);
+        assert_eq!(readdir(&child_dir).await, ["data"]);
+        assert_eq!(readdir(&child_data_dir).await, NO_DIR_ENTRIES);
     }
 
     #[fuchsia::test]
     /// The directory layout is
     /// a:0/children/
-    ///              b:0/data/file.txt
-    ///              c:0/data/file.txt
-
+    ///              b:0/data/file1.txt
+    ///              c:0/data/file2.txt
     async fn test_moniker_storage_multipled_nested_children_cleared() {
-        let parent_dir_name = "a:0";
-        let child1_name = "b:0";
-        let child2_name = "c:0";
+        const PARENT_DIR_NAME: &str = "a:0";
+        const CHILD1_NAME: &str = "b:0";
+        const CHILD2_NAME: &str = "c:0";
 
-        let child1_data_dir = mut_pseudo_directory! {
-            "file1.txt" => read_only(b"hello"),
-        };
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+        let parent_dir = create_directory(&storage_host, PARENT_DIR_NAME).await;
+        let children_dir = create_directory(&parent_dir, "children").await;
 
-        let child1_dir = mut_pseudo_directory! {
-            "data" => child1_data_dir.clone(),
-        };
+        let child1_dir = create_directory(&children_dir, CHILD1_NAME).await;
+        let child1_data_dir = create_directory(&child1_dir, "data").await;
+        create_file(&child1_data_dir, "file1.txt", "hello").await;
 
-        let child2_data_dir = mut_pseudo_directory! {
-            "file2.txt" => read_only(b" world!"),
-        };
+        let child2_dir = create_directory(&children_dir, CHILD2_NAME).await;
+        let child2_data_dir = create_directory(&child2_dir, "data").await;
+        create_file(&child2_data_dir, "file2.txt", " world!").await;
 
-        let child2_dir = mut_pseudo_directory! {
-            "data" => child2_data_dir.clone(),
-        };
+        delete_all_storage(&storage_host).await.unwrap();
 
-        let children_dir = mut_pseudo_directory! {
-            child1_name => child2_dir.clone(),
-            child2_name => child1_dir.clone(),
-        };
-
-        let parent_dir = mut_pseudo_directory! {
-            "children" => children_dir.clone(),
-        };
-
-        let storage_host_dir = mut_pseudo_directory! {
-            parent_dir_name => parent_dir.clone(),
-        };
-
-        let scope = ExecutionScope::new();
-        let child1_data_dir_proxy = connect_to_directory(child1_data_dir.clone(), scope.clone());
-        let child1_dir_proxy = connect_to_directory(child1_dir.clone(), scope.clone());
-        let child2_data_dir_proxy = connect_to_directory(child2_data_dir.clone(), scope.clone());
-        let child2_dir_proxy = connect_to_directory(child2_dir.clone(), scope.clone());
-        let children_dir_proxy = connect_to_directory(children_dir.clone(), scope.clone());
-        let parent_dir_proxy = connect_to_directory(parent_dir.clone(), scope.clone());
-        let storage_host_proxy = connect_to_directory(storage_host_dir.clone(), scope.clone());
-
-        delete_all_storage(&storage_host_proxy).await.unwrap();
-
-        let mut entries = ffs::directory::readdir(&storage_host_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!(parent_dir_name, entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&parent_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("children", entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&children_dir_proxy).await.unwrap();
-        assert_eq!(2, entries.len());
-        assert_eq!(child2_name, entries.pop().unwrap().name);
-        assert_eq!(child1_name, entries.pop().unwrap().name);
-
-        entries = ffs::directory::readdir(&child1_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("data", entries.pop().unwrap().name);
-
-        assert_eq!(0, ffs::directory::readdir(&child1_data_dir_proxy).await.unwrap().len());
-
-        entries = ffs::directory::readdir(&child2_dir_proxy).await.unwrap();
-        assert_eq!(1, entries.len());
-        assert_eq!("data", entries.pop().unwrap().name);
-
-        assert_eq!(0, ffs::directory::readdir(&child2_data_dir_proxy).await.unwrap().len());
+        assert_eq!(readdir(&storage_host).await, [PARENT_DIR_NAME]);
+        assert_eq!(readdir(&parent_dir).await, ["children"]);
+        assert_eq!(readdir(&children_dir).await, [CHILD1_NAME, CHILD2_NAME]);
+        assert_eq!(readdir(&child1_dir).await, ["data"]);
+        assert_eq!(readdir(&child1_data_dir).await, NO_DIR_ENTRIES);
+        assert_eq!(readdir(&child2_dir).await, ["data"]);
+        assert_eq!(readdir(&child2_data_dir).await, NO_DIR_ENTRIES);
     }
 
     #[fuchsia::test]
     async fn test_moniker_storage_no_data_dirs() {
-        let component1_name = "a:0";
-        let component2_name = "b:0";
+        const COMPONENT1_NAME: &str = "a:0";
+        const COMPONENT2_NAME: &str = "b:0";
 
-        let storage_host_dir = mut_pseudo_directory! {
-            component1_name => mut_pseudo_directory!{},
-            component2_name => mut_pseudo_directory!{},
-        };
+        let temp_directory = tempfile::tempdir().unwrap();
+        let storage_host = open_tempdir(&temp_directory);
+        create_directory(&storage_host, COMPONENT1_NAME).await;
+        create_directory(&storage_host, COMPONENT2_NAME).await;
 
-        let scope = ExecutionScope::new();
-        let storage_host_proxy = connect_to_directory(storage_host_dir.clone(), scope.clone());
-
-        match delete_all_storage(&storage_host_proxy).await {
+        match delete_all_storage(&storage_host).await {
             Err(StorageError::NoStorageFound) => {}
             v => panic!("Expected {:?}, found {:?}", StorageError::NoStorageFound, v),
         }
@@ -1228,78 +1105,24 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_deletion_fn_called() {
-        let filename1 = "component_data.txt";
-        let filename2 = "component_data_another";
-        let filename3 = "nested_file.txt";
+        const HEX_STORAGE_ID: &str =
+            "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        const FILENAME_IGNORED: &str = "file";
 
-        let hex_storage_id = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
-        let nested_dir_name = "subdir";
+        let temp_directory = tempfile::tempdir().unwrap();
+        let test_dir = open_tempdir(&temp_directory);
+        create_file(&test_dir, FILENAME_IGNORED, "hello world!").await;
+        let storage_dir = create_directory(&test_dir, HEX_STORAGE_ID).await;
+        create_file(&storage_dir, "component_data.txt", "{}").await;
+        create_file(&storage_dir, "component_data_another", "fa la la da da te da").await;
+        let nested_dir = create_directory(&storage_dir, "subdir").await;
+        create_file(&nested_dir, "nested_file.txt", "hello world").await;
 
-        let filename_ignored = "file";
+        delete_all_storage(&test_dir).await.unwrap();
 
-        let nested_storage_dir = mut_pseudo_directory! {
-            filename3 => read_only(b"hellow world"),
-        };
-
-        let storage_dir = mut_pseudo_directory! {
-            filename1 => read_only(b"{}"),
-            filename2 => read_only(b"fa la la da da te da"),
-            nested_dir_name => nested_storage_dir.clone(),
-        };
-
-        storage_dir
-            .add_entry("something", nested_storage_dir.clone())
-            .expect("Adding entry failed");
-
-        let test_dir = mut_pseudo_directory! {
-            filename_ignored => read_only(b"hello world!"),
-            hex_storage_id => storage_dir.clone(),
-        };
-
-        let (client, server) = endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
-        let dir_proxy = client.into_proxy().unwrap();
-
-        let scope = ExecutionScope::new();
-        test_dir.clone().open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
-
-        // Do some spot checks
-        let _ = test_dir.get_entry(hex_storage_id).expect("entry retrieval failed!");
-        let _ = storage_dir.get_entry(filename1).expect("subdir request failed.");
-
-        // let mut deleted_paths = HashSet::<String>::new();
-
-        StorageAdmin::delete_all_storage(&dir_proxy, StorageAdmin::delete_dir_contents)
-            .await
-            .unwrap();
-
-        let _ = test_dir.get_entry(hex_storage_id).expect(
-            "storage container directory retrieval failed, directory should not have been deleted",
-        );
-        let _ = test_dir
-            .get_entry(filename_ignored)
-            .expect("file at stop level appears deleted, but should have been retained.");
-        match storage_dir.get_entry(filename1) {
-            Ok(_) => panic!("entry unexpectedly present!"),
-            Err(zx::Status::NOT_FOUND) => {}
-            Err(e) => panic!("unexpected error checking for file presence: {:?}", e),
-        }
-        match storage_dir.get_entry(filename2) {
-            Ok(_) => panic!("entry unexpectedly present!"),
-            Err(zx::Status::NOT_FOUND) => {}
-            Err(e) => panic!("unexpected error checking for file presence: {:?}", e),
-        }
-        match nested_storage_dir.get_entry(filename3) {
-            Ok(_) => panic!("entry unexpectedly present!"),
-            Err(zx::Status::NOT_FOUND) => {}
-            Err(e) => panic!("unexpected error checking for file presence: {:?}", e),
-        }
+        assert_eq!(readdir(&test_dir).await, [HEX_STORAGE_ID, FILENAME_IGNORED]);
+        assert_eq!(readdir(&storage_dir).await, NO_DIR_ENTRIES);
+        assert_eq!(readdir(&nested_dir).await, NO_DIR_ENTRIES);
     }
 
     struct FakeDir {
