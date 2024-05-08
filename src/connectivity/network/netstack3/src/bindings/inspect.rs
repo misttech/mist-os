@@ -7,7 +7,7 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use std::{fmt::Display, string::ToString as _};
+use std::string::ToString as _;
 
 use fuchsia_inspect::Node;
 use net_types::{
@@ -16,8 +16,7 @@ use net_types::{
     UnicastAddr, Witness as _,
 };
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
-
-use tracing::warn;
+use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 
 use crate::bindings::{
     devices::{
@@ -26,99 +25,22 @@ use crate::bindings::{
     BindingsCtx, Ctx, DeviceIdExt as _,
 };
 
-struct BindingsInspector<'a> {
-    node: &'a Node,
-    unnamed_count: usize,
-}
-
-impl<'a> BindingsInspector<'a> {
-    fn new(node: &'a Node) -> Self {
-        Self { node, unnamed_count: 0 }
+impl InspectorDeviceIdProvider<DeviceId<BindingsCtx>> for BindingsCtx {
+    fn device_id(id: &DeviceId<BindingsCtx>) -> u64 {
+        id.bindings_id().id.into()
     }
 }
 
-impl<'a> netstack3_core::inspect::Inspector for BindingsInspector<'a> {
-    type ChildInspector<'l> = BindingsInspector<'l>;
-
-    fn record_child<F: FnOnce(&mut Self::ChildInspector<'_>)>(&mut self, name: &str, f: F) {
-        self.node.record_child(name, |node| f(&mut BindingsInspector::new(node)))
-    }
-
-    fn record_unnamed_child<F: FnOnce(&mut Self::ChildInspector<'_>)>(&mut self, f: F) {
-        let Self { node: _, unnamed_count } = self;
-        let id = core::mem::replace(unnamed_count, *unnamed_count + 1);
-        self.record_child(&format!("{id}"), f)
-    }
-
-    fn record_usize<T: Into<usize>>(&mut self, name: &str, value: T) {
-        let value: u64 = value.into().try_into().unwrap_or_else(|e| {
-            warn!("failed to inspect usize value that does not fit in a u64: {e:?}");
-            u64::MAX
-        });
-        self.node.record_uint(name, value)
-    }
-
-    fn record_uint<T: Into<u64>>(&mut self, name: &str, value: T) {
-        self.node.record_uint(name, value.into())
-    }
-
-    fn record_int<T: Into<i64>>(&mut self, name: &str, value: T) {
-        self.node.record_int(name, value.into())
-    }
-
-    fn record_double<T: Into<f64>>(&mut self, name: &str, value: T) {
-        self.node.record_double(name, value.into())
-    }
-
-    fn record_str(&mut self, name: &str, value: &str) {
-        self.node.record_string(name, value)
-    }
-
-    fn record_string(&mut self, name: &str, value: String) {
-        self.node.record_string(name, value)
-    }
-
-    fn record_bool(&mut self, name: &str, value: bool) {
-        self.node.record_bool(name, value)
-    }
-}
-
-impl<'a> netstack3_core::inspect::InspectorDeviceExt<DeviceId<BindingsCtx>>
-    for BindingsInspector<'a>
-{
-    fn record_device<I: netstack3_core::Inspector>(
-        inspector: &mut I,
-        name: &str,
-        device: &DeviceId<BindingsCtx>,
-    ) {
-        inspector.record_uint(name, device.bindings_id().id)
-    }
-
-    fn device_identifier_as_address_zone(id: DeviceId<BindingsCtx>) -> impl Display {
-        id.bindings_id().id
-    }
-}
-
-impl<'a> netstack3_core::inspect::InspectorDeviceExt<WeakDeviceId<BindingsCtx>>
-    for BindingsInspector<'a>
-{
-    fn record_device<I: netstack3_core::Inspector>(
-        inspector: &mut I,
-        name: &str,
-        device: &WeakDeviceId<BindingsCtx>,
-    ) {
-        inspector.record_uint(name, device.bindings_id().id)
-    }
-
-    fn device_identifier_as_address_zone(id: WeakDeviceId<BindingsCtx>) -> impl Display {
-        id.bindings_id().id
+impl InspectorDeviceIdProvider<WeakDeviceId<BindingsCtx>> for BindingsCtx {
+    fn device_id(id: &WeakDeviceId<BindingsCtx>) -> u64 {
+        id.bindings_id().id.into()
     }
 }
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    let mut bindings_inspector = BindingsInspector::new(inspector.root());
+    let mut bindings_inspector = FuchsiaInspector::<BindingsCtx>::new(inspector.root());
     ctx.api().tcp::<Ipv4>().inspect(&mut bindings_inspector);
     ctx.api().tcp::<Ipv6>().inspect(&mut bindings_inspector);
     ctx.api().udp::<Ipv4>().inspect(&mut bindings_inspector);
@@ -131,7 +53,7 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    let mut bindings_inspector = BindingsInspector::new(inspector.root());
+    let mut bindings_inspector = FuchsiaInspector::<BindingsCtx>::new(inspector.root());
     ctx.api().routes::<Ipv4>().inspect(&mut bindings_inspector);
     ctx.api().routes::<Ipv6>().inspect(&mut bindings_inspector);
     inspector
@@ -151,10 +73,14 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             node.record_string("Name", &name);
             node.record_uint("InterfaceId", (*binding_id).into());
             node.record_child("IPv4", |node| {
-                ctx.api().device_ip::<Ipv4>().inspect(&device_id, &mut BindingsInspector::new(node))
+                ctx.api()
+                    .device_ip::<Ipv4>()
+                    .inspect(&device_id, &mut FuchsiaInspector::<BindingsCtx>::new(node))
             });
             node.record_child("IPv6", |node| {
-                ctx.api().device_ip::<Ipv6>().inspect(&device_id, &mut BindingsInspector::new(node))
+                ctx.api()
+                    .device_ip::<Ipv6>()
+                    .inspect(&device_id, &mut FuchsiaInspector::<BindingsCtx>::new(node))
             });
             external_state.with_common_info(
                 |DynamicCommonInfo {
@@ -183,7 +109,9 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                     info.with_dynamic_info(|dynamic| record_network_device(node, dynamic, None));
                 }
             }
-            ctx.api().device_any().inspect(&device_id, &mut BindingsInspector::new(node));
+            ctx.api()
+                .device_any()
+                .inspect(&device_id, &mut FuchsiaInspector::<BindingsCtx>::new(node));
         })
     }
     inspector
@@ -219,7 +147,7 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
     });
     for device in ethernet_devices {
         inspector.root().record_child(&device.bindings_id().name, |node| {
-            let mut inspector = BindingsInspector::new(node);
+            let mut inspector = FuchsiaInspector::<BindingsCtx>::new(node);
             ctx.api()
                 .neighbor::<Ipv4, EthernetLinkDevice>()
                 .inspect_neighbors(&device, &mut inspector);
@@ -233,12 +161,14 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
 
 pub(crate) fn counters(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    ctx.api().counters().inspect_stack_counters(&mut BindingsInspector::new(inspector.root()));
+    ctx.api()
+        .counters()
+        .inspect_stack_counters(&mut FuchsiaInspector::<BindingsCtx>::new(inspector.root()));
     inspector
 }
 
 pub(crate) fn filtering_state(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    ctx.api().filter().inspect_state(&mut BindingsInspector::new(inspector.root()));
+    ctx.api().filter().inspect_state(&mut FuchsiaInspector::<BindingsCtx>::new(inspector.root()));
     inspector
 }
