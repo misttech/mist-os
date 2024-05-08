@@ -41,7 +41,6 @@ type Client struct {
 	workaroundBrokenTimeSkip bool
 	bootCounter              *uint32
 	repoPort                 int
-	ffxIsolateDir            ffx.IsolateDir
 }
 
 // NewClient creates a new Client.
@@ -53,7 +52,6 @@ func NewClient(
 	sshConnectBackoff retry.Backoff,
 	workaroundBrokenTimeSkip bool,
 	serialConn *SerialConn,
-	ffxIsolateDir ffx.IsolateDir,
 ) (*Client, error) {
 	sshConfig, err := newSSHConfig(privateKey)
 	if err != nil {
@@ -94,7 +92,6 @@ func NewClient(
 		workaroundBrokenTimeSkip: workaroundBrokenTimeSkip,
 		bootCounter:              bootCounter,
 		repoPort:                 repoPort,
-		ffxIsolateDir:            ffxIsolateDir,
 	}
 
 	if err := c.postConnectSetup(ctx); err != nil {
@@ -124,10 +121,6 @@ func newSSHConfig(privateKey ssh.Signer) (*ssh.ClientConfig, error) {
 // Close the Client connection
 func (c *Client) Close() {
 	c.sshClient.Close()
-}
-
-func (c *Client) FfxIsolateDir() ffx.IsolateDir {
-	return c.ffxIsolateDir
 }
 
 // Run all setup steps after we've connected to a device.
@@ -706,14 +699,10 @@ func (c *Client) Pave(
 // Flash the device to the specified build. Does not reconnect to the device.
 func (c *Client) Flash(
 	ctx context.Context,
+	ffx *ffx.FFXTool,
 	build artifacts.Build,
 	publicKey ssh.PublicKey,
 ) error {
-	ffx, err := build.GetFfx(ctx, c.ffxIsolateDir)
-	if err != nil {
-		return err
-	}
-
 	manifest, err := build.GetFlashManifest(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get flash manifest from build: %w", err)

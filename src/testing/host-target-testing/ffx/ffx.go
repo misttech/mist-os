@@ -41,6 +41,16 @@ func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
 	}, nil
 }
 
+func (f *FFXTool) IsolateDir() IsolateDir {
+	return f.isolateDir
+}
+
+func (f *FFXTool) StopDaemon(ctx context.Context) error {
+	args := []string{"daemon", "stop", "--wait"}
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
+}
+
 type targetEntry struct {
 	NodeName    string   `json:"nodename"`
 	Addresses   []string `json:"addresses"`

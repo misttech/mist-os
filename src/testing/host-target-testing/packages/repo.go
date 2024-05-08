@@ -103,12 +103,6 @@ type custom struct {
 func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ffx.FFXTool, deliveryBlobType *int) (*Repository, error) {
 	logger.Infof(ctx, "creating a repository for %q and %q", dir, blobStore.Dir())
 
-	// The repository may have out of date metadata. This updates the repository to
-	// the latest version so TUF won't complain about the data being old.
-	if err := ffx.RepositoryPublish(ctx, dir, []string{}, "--refresh-root"); err != nil {
-		return nil, err
-	}
-
 	return &Repository{
 		rootDir:          dir,
 		metadataDir:      filepath.Join(dir, "repository"),
@@ -133,6 +127,20 @@ func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.
 		ffx,
 		deliveryBlobType,
 	)
+}
+
+// RefreshMetadata updates the expiration of TUF metadata.
+func (r *Repository) RefreshMetadata(ctx context.Context) error {
+	return r.RefreshMetadataWithFfx(ctx, r.ffx)
+}
+
+// RefreshMetadataWithFfx uses a custom ffx to update the expiration of TUF metadata.
+func (r *Repository) RefreshMetadataWithFfx(ctx context.Context, ffx *ffx.FFXTool) error {
+	logger.Infof(ctx, "Refreshing TUF metadata %s", r.metadataDir)
+
+	// The repository may have out of date metadata. This updates the repository to
+	// the latest version so TUF won't complain about the data being old.
+	return ffx.RepositoryPublish(ctx, r.rootDir, []string{}, "--refresh-root")
 }
 
 // This clones this repository, copying the repository metadata into this

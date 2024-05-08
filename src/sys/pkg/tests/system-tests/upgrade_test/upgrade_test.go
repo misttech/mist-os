@@ -63,37 +63,36 @@ func TestOTA(t *testing.T) {
 	l.SetFlags(logger.Ldate | logger.Ltime | logger.LUTC | logger.Lshortfile)
 	ctx = logger.WithLogger(ctx, l)
 
-	defer c.installerConfig.Shutdown(ctx)
-
-	ffxIsolateDirPath, err := os.MkdirTemp("", "ffx-isolate-dir")
-	if err != nil {
-		t.Fatalf("failed to create ffx isolate dir: %v", err)
-	}
-	ffxIsolateDir := ffx.NewIsolateDir(ffxIsolateDirPath)
-
-	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
-	if err != nil {
-		t.Fatalf("failed to create ota test client: %v", err)
-	}
-	defer deviceClient.Close()
-
-	if err := doTest(ctx, deviceClient); err != nil {
+	if err := doTest(ctx); err != nil {
 		logger.Errorf(ctx, "test failed: %v", err)
 		errutil.HandleError(ctx, c.deviceConfig.SerialSocketPath, err)
 		t.Fatal(err)
 	}
 }
 
-func doTest(
-	ctx context.Context,
-	deviceClient *device.Client,
-) error {
-	outputDir, cleanup, err := c.archiveConfig.OutputDir()
+func doTest(ctx context.Context) error {
+	defer c.installerConfig.Shutdown(ctx)
+
+	outputDir, outputCleanup, err := c.archiveConfig.OutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to get output directory: %w", err)
 	}
-	defer cleanup()
+	defer outputCleanup()
 
+	ffx, ffxCleanup, err := c.ffxConfig.NewFfxTool(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create ffx: %w", err)
+	}
+	defer ffxCleanup()
+
+	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
+	if err != nil {
+		return fmt.Errorf("failed to create ota test client: %w", err)
+	}
+	defer deviceClient.Close()
+
+	// Now that we're connected to the device we can emit logs with the
+	// estimated device monotonic time.
 	l := logger.NewLogger(
 		logger.TraceLevel,
 		color.NewColor(color.ColorAuto),
@@ -104,13 +103,27 @@ func doTest(
 	l.SetFlags(logger.Ldate | logger.Ltime | logger.LUTC | logger.Lshortfile)
 	ctx = logger.WithLogger(ctx, l)
 
-	// Adapt the builds for the device.
 	chainedBuilds, err := c.chainedBuildConfig.GetBuilds(ctx, deviceClient, outputDir)
 	if err != nil {
 		return fmt.Errorf("failed to get builds: %w", err)
 	}
 
 	for i, build := range chainedBuilds {
+		// FIXME(https://fxbug.dev/336897946): We need to use the latest ffx because
+		// F11's ffx doesn't actually refresh metadata. We can remove this once
+		// we cut the next stepping stone.
+		logger.Infof(ctx, "Refreshing TUF metadata in build %s with latest ffx", build)
+
+		repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffx.IsolateDir())
+		if err != nil {
+			return fmt.Errorf("error getting repository: %w", err)
+		}
+
+		if err := repo.RefreshMetadataWithFfx(ctx, ffx); err != nil {
+			return fmt.Errorf("failed to refresh TUF metadata latest ffx: %w", err)
+		}
+
+		// Adapt the build for the installer.
 		build, err = c.installerConfig.ConfigureBuild(ctx, deviceClient, build)
 		if err != nil {
 			return fmt.Errorf("failed to configure build for device: %w", err)
@@ -119,6 +132,7 @@ func doTest(
 		if build == nil {
 			return fmt.Errorf("installer did not configure a build")
 		}
+
 		chainedBuilds[i] = build
 	}
 
@@ -131,7 +145,7 @@ func doTest(
 
 	ch := make(chan *sl4f.Configuration, 1)
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
-		currentBootSlot, err := initializeDevice(ctx, deviceClient, initialBuild)
+		currentBootSlot, err := initializeDevice(ctx, deviceClient, ffx, initialBuild)
 		ch <- currentBootSlot
 		return err
 	}); err != nil {
@@ -142,12 +156,13 @@ func doTest(
 
 	currentBootSlot := <-ch
 
-	return testOTAs(ctx, deviceClient, chainedBuilds, currentBootSlot)
+	return testOTAs(ctx, deviceClient, ffx.IsolateDir(), chainedBuilds, currentBootSlot)
 }
 
 func testOTAs(
 	ctx context.Context,
 	device *device.Client,
+	ffxIsolateDir ffx.IsolateDir,
 	builds []artifacts.Build,
 	currentBootSlot *sl4f.Configuration,
 ) error {
@@ -161,7 +176,7 @@ func testOTAs(
 			}
 
 			if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-				return doTestOTAs(ctx, device, build, currentBootSlot, checkPrime)
+				return doTestOTAs(ctx, device, ffxIsolateDir, build, currentBootSlot, checkPrime)
 			}); err != nil {
 				return fmt.Errorf("OTA Attempt %d failed: %w", i, err)
 			}
@@ -174,6 +189,7 @@ func testOTAs(
 func doTestOTAs(
 	ctx context.Context,
 	device *device.Client,
+	ffxIsolateDir ffx.IsolateDir,
 	build artifacts.Build,
 	currentBootSlot *sl4f.Configuration,
 	checkPrime bool,
@@ -182,7 +198,7 @@ func doTestOTAs(
 
 	startTime := time.Now()
 
-	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, device.FfxIsolateDir())
+	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffxIsolateDir)
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -227,9 +243,15 @@ func doTestOTAs(
 		}
 
 		// Reset our client state since the device has _potentially_ rebooted
-		ffxIsolateDir := device.FfxIsolateDir()
 		device.Close()
-		newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
+
+		// We should now be using the ffx from the new build.
+		ffx, err := build.GetFfx(ctx, ffxIsolateDir)
+		if err != nil {
+			return fmt.Errorf("failed to get ffx from build %s: %w", build, err)
+		}
+
+		newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
 		if err != nil {
 			return fmt.Errorf("failed to create ota test client: %w", err)
 		}
@@ -251,6 +273,7 @@ func doTestOTAs(
 				ctx,
 				rand,
 				device,
+				ffxIsolateDir,
 				repo,
 				currentBootSlot,
 				!c.buildExpectUnknownFirmware,
@@ -275,9 +298,14 @@ func doTestOTAs(
 
 			// Reset our client state since the device has _potentially_
 			// rebooted
-			ffxIsolateDir := device.FfxIsolateDir()
 			device.Close()
-			newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffxIsolateDir)
+
+			ffx, err := build.GetFfx(ctx, ffxIsolateDir)
+			if err != nil {
+				return fmt.Errorf("failed to get ffx from build %s: %w", build, err)
+			}
+
+			newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
 			if err != nil {
 				return fmt.Errorf("failed to create ota test client: %w", err)
 			}
@@ -303,6 +331,7 @@ func doTestOTAs(
 func initializeDevice(
 	ctx context.Context,
 	device *device.Client,
+	ffx *ffx.FFXTool,
 	build artifacts.Build,
 ) (*sl4f.Configuration, error) {
 	logger.Infof(ctx, "Initializing device")
@@ -316,7 +345,7 @@ func initializeDevice(
 	if build != nil {
 		// We don't need to prefetch all the blobs, since we only use a subset of
 		// packages from the repository, like run, sl4f.
-		repo, err = build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, device.FfxIsolateDir())
+		repo, err = build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffx.IsolateDir())
 		if err != nil {
 			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
 		}
@@ -351,11 +380,11 @@ func initializeDevice(
 			}
 
 			if c.useFlash {
-				if err := flash.FlashDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
+				if err := flash.FlashDevice(ctx, device, ffx, build, sshPrivateKey.PublicKey()); err != nil {
 					return nil, fmt.Errorf("failed to flash device during initialization: %w", err)
 				}
 			} else {
-				if err := pave.PaveDevice(ctx, device, build, sshPrivateKey.PublicKey()); err != nil {
+				if err := pave.PaveDevice(ctx, device, ffx, build, sshPrivateKey.PublicKey()); err != nil {
 					return nil, fmt.Errorf("failed to pave device during initialization: %w", err)
 				}
 			}
@@ -391,6 +420,7 @@ func systemOTA(
 	ctx context.Context,
 	rand *rand.Rand,
 	device *device.Client,
+	ffxIsolateDir ffx.IsolateDir,
 	repo *packages.Repository,
 	currentBootSlot *sl4f.Configuration,
 	checkForUnknownFirmware bool,
