@@ -24,7 +24,7 @@ use fidl_fuchsia_posix_socket_packet as fpacket;
 use fuchsia_async::{
     self as fasync,
     net::{DatagramSocket, UdpSocket},
-    TimeoutExt as _,
+    DurationExt, TimeoutExt as _,
 };
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
 use futures::{
@@ -46,7 +46,8 @@ use net_types::{
     Witness as _,
 };
 use netemul::{
-    InterfaceConfig, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface,
+    InterfaceConfig, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _,
+    TestFakeEndpoint, TestInterface, TestNetwork,
 };
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
@@ -54,14 +55,16 @@ use netstack_testing_common::{
     interfaces::TestInterfaceExt as _,
     ndp, ping,
     realms::{KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
-    Result,
+    Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 
 use netstack_testing_macros::netstack_test;
 use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
     arp::{ArpOp, ArpPacketBuilder},
-    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
+    ethernet::{
+        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    },
     icmp::{
         ndp::{
             options::{NdpOptionBuilder, PrefixInformation},
@@ -3772,4 +3775,129 @@ async fn tcp_accept_with_removed_device_scope<N: Netstack>(name: &str) {
     assert_eq!(v6_addr.ip(), &client_addr);
     assert_eq!(v6_addr.port(), client_port);
     assert_eq!(v6_addr.scope_id(), server_scope);
+}
+
+trait MulticastTestIpExt:
+    packet_formats::ip::IpExt
+    + packet_formats::ip::IpProtoExt
+    + packet_formats::icmp::IcmpIpExt
+    + TestIpExt
+{
+    const NETWORKS: [fnet::Subnet; 2];
+    const MCAST_ADDR: std::net::SocketAddr;
+}
+
+impl MulticastTestIpExt for Ipv4 {
+    const NETWORKS: [fnet::Subnet; 2] =
+        [fidl_subnet!("50.28.45.23/24"), fidl_subnet!("10.0.0.1/24")];
+    const MCAST_ADDR: std::net::SocketAddr = std_socket_addr!("224.0.0.5:3513");
+}
+
+impl MulticastTestIpExt for Ipv6 {
+    const NETWORKS: [fnet::Subnet; 2] =
+        [fidl_subnet!("2001:db8::1/64"), fidl_subnet!("2001:ac::1/64")];
+    const MCAST_ADDR: std::net::SocketAddr = std_socket_addr!("[FF00::1:2]:3513");
+}
+
+#[netstack_test]
+#[test_case(0)]
+#[test_case(1)]
+async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+    name: &str,
+    target_interface: usize,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    struct Network<'a> {
+        _net: TestNetwork<'a>,
+        iface: TestInterface<'a>,
+        receiver: TestFakeEndpoint<'a>,
+    }
+
+    let mut networks: Vec<Network<'_>> = vec![];
+    for i in 0..I::NETWORKS.len() {
+        let net =
+            sandbox.create_network(format!("net{i}")).await.expect("failed to create network");
+        let iface =
+            client.join_network(&net, format!("if{i}")).await.expect("failed to join network");
+        iface.add_address_and_subnet_route(I::NETWORKS[i].clone()).await.expect("failed to set ip");
+        let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+        networks.push(Network { _net: net, iface, receiver });
+    }
+
+    let sock = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+
+    match I::VERSION {
+        IpVersion::V4 => {
+            let addr = match I::NETWORKS[target_interface].addr {
+                fnet::IpAddress::Ipv4(a) => a.addr.into(),
+                fnet::IpAddress::Ipv6(_) => unreachable!("NETWORKS expected to be Ipv4"),
+            };
+            sock.set_multicast_if_v4(&addr).expect("failed to set IP_MULTICAST_IF")
+        }
+        IpVersion::V6 => sock
+            .set_multicast_if_v6(networks[target_interface].iface.id().try_into().unwrap())
+            .expect("failed to set IPV6_MULTICAST_IF"),
+    };
+
+    let _ = sock
+        .send_to(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], &I::MCAST_ADDR.into())
+        .expect("failed to send multicast packet");
+
+    // Check that the packet is sent to the selected network.
+    for (index, network) in networks.iter().enumerate() {
+        let mut stream = std::pin::pin!(network
+            .receiver
+            .frame_stream()
+            .map(|r| r.expect("failed to read frame"))
+            .filter_map(|(data, dropped)| async move {
+                assert_eq!(dropped, 0);
+                let (_payload, _src_mac, _dst_mac, _src_ip, dst_ip, proto, _ttl) =
+                    match packet_formats::testutil::parse_ip_packet_in_ethernet_frame::<I>(
+                        &data[..],
+                        EthernetFrameLengthCheck::NoCheck,
+                    ) {
+                        Ok(result) => result,
+                        Err(_e) => {
+                            // Packet may fail to parse if it was for a
+                            // different IP version. Just skip it.
+                            return None;
+                        }
+                    };
+
+                if proto != IpProto::Udp.into() {
+                    return None;
+                }
+
+                if dst_ip.to_ip_addr() != I::MCAST_ADDR.ip().into() {
+                    panic!("UDP Packet send to an unexpected address: {:?}", dst_ip);
+                }
+
+                Some(())
+            }));
+
+        if index == target_interface {
+            // Check that the packet is delivered to the target interface.
+            stream
+                .next()
+                .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+                    panic!("timed out waiting for the multicast packet")
+                })
+                .await
+                .expect("didn't receive the packet before end of the stream");
+        } else {
+            // Check that the packet is not sent to the other interface.
+            stream
+                .next()
+                .map(|_| panic!("MulticastPacket was sent to a wrong interface"))
+                .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || ())
+                .await;
+        }
+    }
 }
