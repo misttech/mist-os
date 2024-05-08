@@ -5,7 +5,6 @@
 #ifndef SRC_MEDIA_LIB_INTERNAL_BUFFER_INTERNAL_BUFFER_H_
 #define SRC_MEDIA_LIB_INTERNAL_BUFFER_INTERNAL_BUFFER_H_
 
-#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <threads.h>
@@ -34,20 +33,10 @@ class InternalBuffer {
   // |is_mapping_needed| if a mapping to the allocated buffer is needed.  This must be false if
   // is_secure.
   static fpromise::result<InternalBuffer, zx_status_t> Create(
-      const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
-      const zx::unowned_bti& bti, size_t size, bool is_secure, bool is_writable,
-      bool is_mapping_needed);
-  // deprecated; use sysmem2 overload above instead
-  static fpromise::result<InternalBuffer, zx_status_t> Create(
       const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
       size_t size, bool is_secure, bool is_writable, bool is_mapping_needed);
 
   // Same as above, but alignment is the byte multiple to align the buffer to.
-  static fpromise::result<InternalBuffer, zx_status_t> CreateAligned(
-      const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
-      const zx::unowned_bti& bti, size_t size, size_t alignment, bool is_secure, bool is_writable,
-      bool is_mapping_needed);
-  // deprecated; use sysmem2 overload above instead
   static fpromise::result<InternalBuffer, zx_status_t> CreateAligned(
       const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
       size_t size, size_t alignment, bool is_secure, bool is_writable, bool is_mapping_needed);
@@ -88,8 +77,8 @@ class InternalBuffer {
   InternalBuffer(size_t size, bool is_secure, bool is_writable, bool is_mapping_needed);
 
   InternalBuffer(size_t size);
-  zx_status_t Init(const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
-                   size_t alignment, const zx::unowned_bti& bti);
+  zx_status_t Init(const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, size_t alignment,
+                   const zx::unowned_bti& bti);
   void DeInit();
   void CacheFlushPossibleInvalidate(size_t offset, size_t length, bool invalidate);
 
@@ -106,7 +95,7 @@ class InternalBuffer {
   fit::closure check_pin_;
   zx::pmt pin_;
   zx_paddr_t phys_base_{};
-  fidl::SyncClient<fuchsia_sysmem2::BufferCollection> buffer_collection_;
+  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollection> buffer_collection_;
   zx::vmo vmo_;
   bool is_moved_out_ = false;
 };
