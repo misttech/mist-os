@@ -196,110 +196,113 @@ async fn connect_to_target(
 #[async_trait(?Send)]
 impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
+    async fn main(self, writer: Self::Writer) -> Result<()> {
+        serve_impl(self.target_collection_proxy, self.cmd, self.context, writer).await?;
+        Ok(())
+    }
+}
 
-    async fn main(self, mut writer: SimpleWriter) -> Result<()> {
-        let bg: bool = self
-            .context
-            .get(REPO_BACKGROUND_FEATURE_FLAG)
-            .await
-            .context("checking for background server flag")?;
-        if bg {
-            ffx_bail!(
-                r#"The ffx setting '{}' and the foreground server '{}' are mutually incompatible.
+async fn serve_impl<W: Write + 'static>(
+    target_collection_proxy: TargetCollectionProxy,
+    cmd: ServeCommand,
+    context: EnvironmentContext,
+    mut writer: W,
+) -> Result<()> {
+    let bg: bool = context
+        .get(REPO_BACKGROUND_FEATURE_FLAG)
+        .await
+        .context("checking for background server flag")?;
+    if bg {
+        ffx_bail!(
+            r#"The ffx setting '{}' and the foreground server '{}' are mutually incompatible.
 Please disable background serving by running the following commands:
 $ ffx config remove repository.server.enabled
 $ ffx doctor --restart-daemon"#,
-                REPO_BACKGROUND_FEATURE_FLAG,
-                REPO_FOREGROUND_FEATURE_FLAG,
-            );
+            REPO_BACKGROUND_FEATURE_FLAG,
+            REPO_FOREGROUND_FEATURE_FLAG,
+        );
+    }
+
+    let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
+
+    let repo_path = match (cmd.repo_path, cmd.product_bundle) {
+        (Some(_), Some(_)) => {
+            ffx_bail!("Cannot specify both --repo-path and --product-bundle");
         }
-
-        let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
-
-        let repo_path = match (self.cmd.repo_path, self.cmd.product_bundle) {
-            (Some(_), Some(_)) => {
-                ffx_bail!("Cannot specify both --repo-path and --product-bundle");
+        (None, Some(product_bundle)) => {
+            if cmd.repository.is_some() {
+                ffx_bail!("--repository is not supported with --product-bundle");
             }
-            (None, Some(product_bundle)) => {
-                if self.cmd.repository.is_some() {
-                    ffx_bail!("--repository is not supported with --product-bundle");
-                }
-                let repositories = sdk_metadata::get_repositories(product_bundle.clone())
-                    .with_context(|| {
-                        format!("getting repositories from product bundle {product_bundle}")
-                    })?;
-                for repository in repositories {
-                    let repo_name = repository.aliases().first().unwrap().clone();
+            let repositories = sdk_metadata::get_repositories(product_bundle.clone())
+                .with_context(|| {
+                    format!("getting repositories from product bundle {product_bundle}")
+                })?;
+            for repository in repositories {
+                let repo_name = repository.aliases().first().unwrap().clone();
 
-                    let repo_client =
-                        RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
-                            .await
-                            .with_context(|| format!("Creating a repo client for {repo_name}"))?;
-                    repo_manager.add(repo_name, repo_client);
-                }
-                product_bundle
+                let repo_client = RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
+                    .await
+                    .with_context(|| format!("Creating a repo client for {repo_name}"))?;
+                repo_manager.add(repo_name, repo_client);
             }
-            (repo_path, None) => {
-                let repo_path = if let Some(repo_path) = repo_path {
-                    repo_path
-                } else {
-                    let fuchsia_build_dir = self.context.build_dir().unwrap_or(&Path::new(""));
-                    let fuchsia_build_dir =
-                        Utf8Path::from_path(fuchsia_build_dir).with_context(|| {
-                            format!("converting repo path to UTF-8 {:?}", repo_path)
-                        })?;
-
-                    fuchsia_build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
-                };
-
-                // Create PmRepository and RepoClient
-                let repo_path = repo_path
-                    .canonicalize_utf8()
-                    .with_context(|| format!("canonicalizing repo path {:?}", repo_path))?;
-                let pm_backend = PmRepository::new(repo_path.clone());
-                let pm_repo_client =
-                    RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>)
-                        .await
-                        .with_context(|| format!("creating repo client"))?;
-
-                let repo_name =
-                    self.cmd.repository.unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
-                repo_manager.add(repo_name, pm_repo_client);
+            product_bundle
+        }
+        (repo_path, None) => {
+            let repo_path = if let Some(repo_path) = repo_path {
                 repo_path
-            }
-        };
+            } else {
+                let fuchsia_build_dir = context.build_dir().unwrap_or(&Path::new(""));
+                let fuchsia_build_dir = Utf8Path::from_path(fuchsia_build_dir)
+                    .with_context(|| format!("converting repo path to UTF-8 {:?}", repo_path))?;
 
-        // Serve RepositoryManager over a RepositoryServer
-        let (server_fut, _, server) =
-            RepositoryServer::builder(self.cmd.address, Arc::clone(&repo_manager))
-                .start()
+                fuchsia_build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
+            };
+
+            // Create PmRepository and RepoClient
+            let repo_path = repo_path
+                .canonicalize_utf8()
+                .with_context(|| format!("canonicalizing repo path {:?}", repo_path))?;
+            let pm_backend = PmRepository::new(repo_path.clone());
+            let pm_repo_client = RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>)
                 .await
-                .with_context(|| format!("starting repository server"))?;
+                .with_context(|| format!("creating repo client"))?;
 
-        // Write port file if needed
-        if let Some(port_path) = self.cmd.port_path {
-            let port = server.local_addr().port().to_string();
+            let repo_name = cmd.repository.unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
+            repo_manager.add(repo_name, pm_repo_client);
+            repo_path
+        }
+    };
 
-            fs::write(port_path, port.clone())
-                .with_context(|| format!("creating port file for port {}", port))?;
-        };
+    // Serve RepositoryManager over a RepositoryServer
+    let (server_fut, _, server) = RepositoryServer::builder(cmd.address, Arc::clone(&repo_manager))
+        .start()
+        .await
+        .with_context(|| format!("starting repository server"))?;
 
-        let server_addr = server.local_addr().clone();
+    // Write port file if needed
+    if let Some(port_path) = cmd.port_path {
+        let port = server.local_addr().port().to_string();
 
-        let server_task = fasync::Task::local(server_fut);
-        let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
-        let (loop_stop_tx, mut loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
+        fs::write(port_path, port.clone())
+            .with_context(|| format!("creating port file for port {}", port))?;
+    };
 
-        if !self.cmd.no_device {
-            // Resolving the default target is typically fast
-            // or does not succeed, in which case we return
-            tracing::info!("Getting target specifier");
-            let target_spec = timeout(Duration::from_secs(1), get_target_specifier(&self.context))
-                .await
-                .context("getting target specifier")??;
+    let server_addr = server.local_addr().clone();
 
-            let mut server_stop_tx = server_stop_tx.clone();
-            let _conn_loop_task = fasync::Task::local(async move {
+    let server_task = fasync::Task::local(server_fut);
+    let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
+    let (loop_stop_tx, mut loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
+
+    if !cmd.no_device {
+        // Resolving the default target is typically fast
+        // or does not succeed, in which case we return
+        tracing::info!("Getting target specifier");
+        let target_spec = timeout(Duration::from_secs(1), get_target_specifier(&context))
+            .await
+            .context("getting target specifier")??;
+
+        let mut server_stop_tx = server_stop_tx.clone();
+        let _conn_loop_task = fasync::Task::local(async move {
                'conn: loop {
                     // This blocks until the default target becomes available
                     // if a connection is possible.
@@ -309,12 +312,12 @@ $ ffx doctor --restart-daemon"#,
                     }
                     let connection = connect_to_target(
                         target_spec.clone(),
-                        Some(self.cmd.alias.clone()),
-                        self.cmd.storage_type,
+                        Some(cmd.alias.clone()),
+                        cmd.storage_type,
                         server_addr,
                         Arc::clone(&repo_manager),
-                        &self.target_collection_proxy,
-                        self.cmd.alias_conflict_mode.into(),
+                        &target_collection_proxy,
+                        cmd.alias_conflict_mode.into(),
                     )
                     .await;
 
@@ -341,7 +344,7 @@ $ ffx doctor --restart-daemon"#,
                                 }
                                 if let Err(e) = knock_target_by_name(
                                     &target_spec.clone(),
-                                    &self.target_collection_proxy,
+                                    &target_collection_proxy,
                                     SERVE_KNOCK_TIMEOUT,
                                     SERVE_KNOCK_TIMEOUT,
                                 )
@@ -362,26 +365,25 @@ $ ffx doctor --restart-daemon"#,
                     };
                 }
             }).detach();
-        } else {
-            let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
-            writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
-            tracing::info!("{}", s);
-        }
-
-        let _ = fasync::Task::local(async move {
-            if let Some(_) = server_stop_rx.next().await {
-                server.stop();
-            }
-        })
-        .detach();
-
-        // Register signal handler.
-        start_signal_monitoring(loop_stop_tx, server_stop_tx);
-
-        // Wait for the server to shut down.
-        server_task.await;
-        Ok(())
+    } else {
+        let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
+        writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
+        tracing::info!("{}", s);
     }
+
+    let _ = fasync::Task::local(async move {
+        if let Some(_) = server_stop_rx.next().await {
+            server.stop();
+        }
+    })
+    .detach();
+
+    // Register signal handler.
+    start_signal_monitoring(loop_stop_tx, server_stop_tx);
+
+    // Wait for the server to shut down.
+    server_task.await;
+    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////////////////////
