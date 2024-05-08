@@ -5024,9 +5024,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
+                FakeCoreCtx, FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
-                WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
+                WithFakeFrameContext, WithFakeTimerContext,
             },
             ContextProvider, InstantContext, ReferenceNotifiers,
         },
@@ -5180,12 +5180,27 @@ mod tests {
         }
     }
 
-    type TcpCoreCtx<D, BT> = WrappedFakeCoreCtx<
-        FakeDualStackTcpState<D, BT>,
-        FakeDualStackIpSocketCtx<D>,
-        DualStackSendIpPacketMeta<D>,
-        D,
-    >;
+    struct TcpCoreCtx<D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
+        tcp: FakeDualStackTcpState<D, BT>,
+        ip_socket_ctx: FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+    }
+
+    impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes> ContextProvider for TcpCoreCtx<D, BT> {
+        type Context = Self;
+
+        fn context(&mut self) -> &mut Self::Context {
+            self
+        }
+    }
+
+    impl<D, BT> DeviceIdContext<AnyDevice> for TcpCoreCtx<D, BT>
+    where
+        D: FakeStrongDeviceId,
+        BT: TcpBindingsTypes,
+    {
+        type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+    }
 
     type TcpCtx<D> = ContextPair<TcpCoreCtx<D, TcpBindingsCtx<D>>, TcpBindingsCtx<D>>;
 
@@ -5198,7 +5213,7 @@ mod tests {
             &mut self,
             f: F,
         ) -> O {
-            f(&mut self.core_ctx.inner.frames)
+            f(&mut self.core_ctx.ip_socket_ctx.frames)
         }
     }
 
@@ -5434,11 +5449,17 @@ mod tests {
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(&mut self.inner.state, addr)
+            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(
+                &mut self.ip_socket_ctx.state,
+                addr,
+            )
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(&mut self.inner.state, device)
+            TransportIpContext::<I, BC>::get_default_hop_limits(
+                &mut self.ip_socket_ctx.state,
+                device,
+            )
         }
 
         fn confirm_reachable_with_destination(
@@ -5448,7 +5469,7 @@ mod tests {
             device: Option<&Self::DeviceId>,
         ) {
             TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                &mut self.inner.state,
+                &mut self.ip_socket_ctx.state,
                 bindings_ctx,
                 dst,
                 device,
@@ -5469,7 +5490,7 @@ mod tests {
             proto: I::Proto,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
             IpSocketHandler::<I, BC>::new_ip_socket(
-                &mut self.inner,
+                &mut self.ip_socket_ctx,
                 bindings_ctx,
                 device,
                 local_ip,
@@ -5491,7 +5512,7 @@ mod tests {
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
-            self.inner.send_ip_packet(bindings_ctx, socket, body, mtu, options)
+            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }
     }
 
@@ -5502,14 +5523,14 @@ mod tests {
     {
         type IpTransportCtx<'a> = Self;
         fn with_demux<O, F: FnOnce(&DemuxState<Ipv4, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
-            cb(&self.outer.v4.demux.borrow())
+            cb(&self.tcp.v4.demux.borrow())
         }
 
         fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv4, D::Weak, BC>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v4.demux.borrow_mut())
+            cb(&mut self.tcp.v4.demux.borrow_mut())
         }
 
         fn with_demux_mut_and_ip_transport_ctx<
@@ -5519,7 +5540,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            let demux = Rc::clone(&self.outer.v4.demux);
+            let demux = Rc::clone(&self.tcp.v4.demux);
             let mut demux = demux.borrow_mut();
             cb(&mut *demux, self)
         }
@@ -5532,14 +5553,14 @@ mod tests {
     {
         type IpTransportCtx<'a> = Self;
         fn with_demux<O, F: FnOnce(&DemuxState<Ipv6, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
-            cb(&self.outer.v6.demux.borrow())
+            cb(&self.tcp.v6.demux.borrow())
         }
 
         fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv6, D::Weak, BC>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v6.demux.borrow_mut())
+            cb(&mut self.tcp.v6.demux.borrow_mut())
         }
 
         fn with_demux_mut_and_ip_transport_ctx<
@@ -5549,7 +5570,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            let demux = Rc::clone(&self.outer.v6.demux);
+            let demux = Rc::clone(&self.tcp.v6.demux);
             let mut demux = demux.borrow_mut();
             cb(&mut *demux, self)
         }
@@ -5581,7 +5602,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v6.all_sockets)
+            cb(&mut self.tcp.v6.all_sockets)
         }
 
         fn for_each_socket<
@@ -5614,7 +5635,7 @@ mod tests {
             id: &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
             cb: F,
         ) -> O {
-            let isn = Rc::clone(&self.outer.v6.isn_generator);
+            let isn = Rc::clone(&self.tcp.v6.isn_generator);
             cb(MaybeDualStack::DualStack((self, ())), id.get_mut().deref_mut(), isn.deref())
         }
 
@@ -5648,7 +5669,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v4.all_sockets)
+            cb(&mut self.tcp.v4.all_sockets)
         }
 
         fn for_each_socket<
@@ -5682,7 +5703,7 @@ mod tests {
             cb: F,
         ) -> O {
             let isn: Rc<IsnGenerator<<BC as InstantBindingsTypes>::Instant>> =
-                Rc::clone(&self.outer.v4.isn_generator);
+                Rc::clone(&self.tcp.v4.isn_generator);
             cb(MaybeDualStack::NotDualStack((self, ())), id.get_mut().deref_mut(), isn.deref())
         }
 
@@ -5725,7 +5746,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v6.demux.borrow_mut(), &mut self.outer.v4.demux.borrow_mut())
+            cb(&mut self.tcp.v6.demux.borrow_mut(), &mut self.tcp.v4.demux.borrow_mut())
         }
         fn with_both_demux_mut_and_ip_transport_ctx<
             O,
@@ -5738,8 +5759,8 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            let demux_v6 = Rc::clone(&self.outer.v6.demux);
-            let demux_v4 = Rc::clone(&self.outer.v4.demux);
+            let demux_v6 = Rc::clone(&self.tcp.v6.demux);
+            let demux_v4 = Rc::clone(&self.tcp.v4.demux);
             let mut demux_v6 = demux_v6.borrow_mut();
             let mut demux_v4 = demux_v4.borrow_mut();
             cb(&mut demux_v6, &mut demux_v4, self)
@@ -5750,9 +5771,19 @@ mod tests {
         for TcpCoreCtx<D, BT>
     {
         fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
-            let counters =
-                I::map_ip((), |()| &self.outer.v4.counters, |()| &self.outer.v6.counters);
+            let counters = I::map_ip((), |()| &self.tcp.v4.counters, |()| &self.tcp.v6.counters);
             cb(counters)
+        }
+    }
+
+    impl<D, BT> TcpCoreCtx<D, BT>
+    where
+        D: FakeStrongDeviceId,
+        BT: TcpBindingsTypes,
+        BT::Instant: Default,
+    {
+        fn with_ip_socket_ctx_state(state: FakeDualStackIpSocketCtx<D>) -> Self {
+            Self { tcp: Default::default(), ip_socket_ctx: FakeCoreCtx::with_state(state) }
         }
     }
 
@@ -5762,25 +5793,21 @@ mod tests {
             peer: SpecifiedAddr<I::Addr>,
             _prefix: u8,
         ) -> Self {
-            Self::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
+            Self::with_ip_socket_ctx_state(FakeDualStackIpSocketCtx::new(core::iter::once(
+                FakeDeviceConfig {
                     device: FakeDeviceId,
                     local_ips: vec![addr],
                     remote_ips: vec![peer],
-                })),
-                FakeDualStackTcpState::default(),
-            )
+                },
+            )))
         }
     }
 
     impl TcpCoreCtx<MultipleDevicesId, TcpBindingsCtx<MultipleDevicesId>> {
         fn new_multiple_devices() -> Self {
-            Self::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new(core::iter::empty::<
-                    FakeDeviceConfig<MultipleDevicesId, SpecifiedAddr<IpAddr>>,
-                >()),
-                Default::default(),
-            )
+            Self::with_ip_socket_ctx_state(FakeDualStackIpSocketCtx::new(core::iter::empty::<
+                FakeDeviceConfig<MultipleDevicesId, SpecifiedAddr<IpAddr>>,
+            >()))
         }
     }
 
@@ -6668,7 +6695,7 @@ mod tests {
         set_logger_for_test();
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
-        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_ip_socket_ctx_state(
             FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
                 FakeDeviceConfig {
                     device,
@@ -6676,7 +6703,6 @@ mod tests {
                     remote_ips: vec![ll_addr.into_specified()],
                 }
             })),
-            Default::default(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let socket = api.create(Default::default());
@@ -6698,7 +6724,7 @@ mod tests {
         set_logger_for_test();
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
-        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_ip_socket_ctx_state(
             FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
                 FakeDeviceConfig {
                     device,
@@ -6706,7 +6732,6 @@ mod tests {
                     remote_ips: vec![ll_addr.into_specified()],
                 }
             })),
-            Default::default(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let socket = api.create(Default::default());
@@ -7458,13 +7483,12 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
-        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_ip_socket_ctx_state(
             FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
                 device: FakeDeviceId,
                 local_ips: addrs.iter().cloned().map(SpecifiedAddr::<IpAddr>::from).collect(),
                 remote_ips: Default::default(),
             })),
-            FakeDualStackTcpState::default(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7732,7 +7756,7 @@ mod tests {
             .expect("failed to create a connection socket");
 
         let (core_ctx, bindings_ctx) = api.contexts();
-        let frames = core_ctx.inner.take_frames();
+        let frames = core_ctx.ip_socket_ctx.take_frames();
         let frame = assert_matches!(&frames[..], [(_meta, frame)] => frame);
 
         deliver_icmp_error::<I, _, _>(

@@ -3549,13 +3549,6 @@ pub(crate) mod testutil {
         type WeakDeviceId = D::Weak;
     }
 
-    impl<Outer, Inner: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
-        for crate::context::testutil::Wrapped<Outer, Inner>
-    {
-        type DeviceId = Inner::DeviceId;
-        type WeakDeviceId = Inner::WeakDeviceId;
-    }
-
     #[derive(Debug, GenericOverIp)]
     #[generic_over_ip()]
     pub(crate) enum DualStackSendIpPacketMeta<D> {

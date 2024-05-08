@@ -184,10 +184,7 @@ pub(crate) mod testutil {
     use core::fmt::Debug;
 
     #[cfg(test)]
-    use crate::{
-        context::ContextProvider,
-        filter::{FilterBindingsTypes, FilterHandlerProvider},
-    };
+    use crate::filter::{FilterBindingsTypes, FilterHandlerProvider};
     use crate::{
         device::link::LinkDevice,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
@@ -305,46 +302,6 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    #[derive(Default)]
-    pub(crate) struct Wrapped<Outer, Inner> {
-        pub(crate) inner: Inner,
-        pub(crate) outer: Outer,
-    }
-
-    #[cfg(test)]
-    impl<Outer, Inner> ContextProvider for Wrapped<Outer, Inner> {
-        type Context = Self;
-        fn context(&mut self) -> &mut Self::Context {
-            self
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) type WrappedFakeCoreCtx<Outer, S, Meta, DeviceId> =
-        Wrapped<Outer, FakeCoreCtx<S, Meta, DeviceId>>;
-
-    #[cfg(test)]
-    impl<Outer, S, Meta, DeviceId> WrappedFakeCoreCtx<Outer, S, Meta, DeviceId> {
-        pub(crate) fn with_inner_and_outer_state(inner: S, outer: Outer) -> Self {
-            Self { inner: FakeCoreCtx::with_state(inner), outer }
-        }
-    }
-
-    #[cfg(test)]
-    impl<Outer, T, Inner: AsRef<T>> AsRef<T> for Wrapped<Outer, Inner> {
-        fn as_ref(&self) -> &T {
-            self.inner.as_ref()
-        }
-    }
-
-    #[cfg(test)]
-    impl<Outer, T, Inner: AsMut<T>> AsMut<T> for Wrapped<Outer, Inner> {
-        fn as_mut(&mut self) -> &mut T {
-            self.inner.as_mut()
-        }
-    }
-
-    #[cfg(test)]
     impl<I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>
         FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
     {
@@ -352,29 +309,6 @@ pub(crate) mod testutil {
 
         fn filter_handler(&mut self) -> Self::Handler<'_> {
             crate::filter::NoopImpl
-        }
-    }
-
-    #[cfg(test)]
-    impl<Outer, I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>
-        FilterHandlerProvider<I, BC> for Wrapped<Outer, FakeCoreCtx<S, Meta, DeviceId>>
-    {
-        type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
-
-        fn filter_handler(&mut self) -> Self::Handler<'_> {
-            crate::filter::NoopImpl
-        }
-    }
-
-    #[cfg(test)]
-    impl<Outer, Inner: WithFakeFrameContext<Meta>, Meta> WithFakeFrameContext<Meta>
-        for Wrapped<Outer, Inner>
-    {
-        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O {
-            self.inner.with_fake_frame_ctx_mut(f)
         }
     }
 }
