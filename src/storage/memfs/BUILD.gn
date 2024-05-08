@@ -45,7 +45,6 @@ static_library("lib") {
     "//src/storage/conformance/conformance_harness/memfs:bin",
     "//src/storage/memfs/test/*",
     "//src/sys/component_manager/tests/rights:expose_dir_rights_bin",
-    "//zircon/system/ulib/fdio-caller/test:fdio-caller",
   ]
 }
 
