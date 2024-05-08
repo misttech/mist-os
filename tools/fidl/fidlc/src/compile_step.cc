@@ -351,13 +351,16 @@ bool CompileStep::ResolveIdentifierConstant(IdentifierConstant* identifier_const
 
       switch (parent->kind) {
         case Decl::Kind::kConst: {
-          if (const_type->name != identifier_type->type_decl->name)
+          if (const_type->kind != Type::Kind::kIdentifier ||
+              static_cast<const IdentifierType*>(const_type)->type_decl !=
+                  identifier_type->type_decl) {
             return fail_with_mismatched_type(const_type->name);
+          }
           break;
         }
         case Decl::Kind::kBits:
         case Decl::Kind::kEnum: {
-          if (parent->name != identifier_type->type_decl->name)
+          if (parent != identifier_type->type_decl)
             return fail_with_mismatched_type(parent->name);
           break;
         }

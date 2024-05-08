@@ -151,60 +151,14 @@ class NamingContext : public std::enable_shared_from_this<NamingContext> {
   std::optional<std::string> flattened_name_override_;
 };
 
-// Name represents a named entry in a particular scope.
-
-// Names have different flavors based on their origins, which can be determined by the discriminant
-// `Name::Kind`. See the documentation for `Name::Kind` for details.
+// Name represents the name of a declaration. There are three kinds of names:
+// sourced (the usual kind), anonymous (derived from source but chosen by the
+// compiler), and intrinsic (not derived from any user source).
 class Name final {
  public:
-  // Helper type to use when looking up and comparing names. This may be useful for associative
-  // containers.
-  //
-  // Note that this type contains `std::string_view`s, so it must not outlive the strings its
-  // members reference.
-  class Key final {
-   public:
-    // Intentionally allow for implicit conversions from `Name`, as `Name` should be freely
-    // convertible to its `Key`.
-    //
-    // NOLINTNEXTLINE
-    Key(const Name& name)
-        : compare_context_(name.library(), name.decl_name(),
-                           name.member_name().has_value()
-                               ? std::make_optional(std::string_view(name.member_name().value()))
-                               : std::nullopt) {}
-
-    Key(const Library* library, std::string_view decl_name)
-        : compare_context_(library, decl_name, std::nullopt) {}
-
-    Key(const Library* library, std::string_view decl_name, std::string_view member_name)
-        : compare_context_(library, decl_name, member_name) {}
-
-    friend bool operator==(const Key& lhs, const Key& rhs) {
-      return lhs.compare_context_ == rhs.compare_context_;
-    }
-
-    friend bool operator!=(const Key& lhs, const Key& rhs) {
-      return lhs.compare_context_ != rhs.compare_context_;
-    }
-
-    friend bool operator<(const Key& lhs, const Key& rhs) {
-      return lhs.compare_context_ < rhs.compare_context_;
-    }
-
-   private:
-    using CompareContext =
-        std::tuple<const Library*, std::string_view, std::optional<std::string_view>>;
-
-    CompareContext compare_context_;
-  };
-
-  static Name CreateSourced(const Library* library, SourceSpan span) {
-    return Name(library, SourcedNameContext(span), std::nullopt);
-  }
-
-  static Name CreateSourced(const Library* library, SourceSpan span, std::string member_name) {
-    return Name(library, SourcedNameContext(span), member_name);
+  static Name CreateSourced(const Library* library, SourceSpan span,
+                            std::optional<std::string> member_name = std::nullopt) {
+    return Name(library, Sourced{span}, std::move(member_name));
   }
 
   enum class Provenance : uint8_t {
@@ -220,45 +174,11 @@ class Name final {
 
   static Name CreateAnonymous(const Library* library, SourceSpan span,
                               std::shared_ptr<NamingContext> context, Provenance provenance) {
-    return Name(library, AnonymousNameContext(std::move(context), provenance, span), std::nullopt);
+    return Name(library, Anonymous{std::move(context), provenance, span}, std::nullopt);
   }
 
   static Name CreateIntrinsic(const Library* library, std::string name) {
-    return Name(library, IntrinsicNameContext(std::move(name)), std::nullopt);
-  }
-
-  Name(const Name& other) noexcept = default;
-
-  Name(Name&& other) noexcept
-      : library_(other.library_),
-        name_context_(std::move(other.name_context_)),
-        member_name_(std::move(other.member_name_)) {
-    other.library_ = nullptr;
-    other.name_context_ = std::monostate();
-  }
-
-  Name& operator=(const Name& other) noexcept {
-    if (&other == this) {
-      return *this;
-    }
-
-    library_ = other.library_;
-    name_context_ = other.name_context_;
-
-    return *this;
-  }
-
-  Name& operator=(Name&& other) noexcept {
-    if (&other == this) {
-      return *this;
-    }
-
-    library_ = other.library_;
-    other.library_ = nullptr;
-    name_context_ = std::move(other.name_context_);
-    other.name_context_ = std::monostate();
-
-    return *this;
+    return Name(library, Intrinsic{std::move(name)}, std::nullopt);
   }
 
   Name WithMemberName(std::string member_name) const {
@@ -269,38 +189,17 @@ class Name final {
   }
 
   const Library* library() const { return library_; }
-
   std::optional<SourceSpan> span() const;
   std::string_view decl_name() const;
   std::string full_name() const;
   const std::optional<std::string>& member_name() const { return member_name_; }
 
-  Key memberless_key() const { return Key(library_, decl_name()); }
-
-  Key key() const { return Key(*this); }
-
-  friend bool operator==(const Name& lhs, const Name& rhs) { return lhs.key() == rhs.key(); }
-  friend bool operator!=(const Name& lhs, const Name& rhs) { return lhs.key() != rhs.key(); }
-  friend bool operator<(const Name& lhs, const Name& rhs) { return lhs.key() < rhs.key(); }
-
  private:
-  struct SourcedNameContext {
-    explicit SourcedNameContext(SourceSpan span) : span(span) {}
-
-    // The span of the name.
+  struct Sourced {
     SourceSpan span;
   };
 
-  struct AnonymousNameContext {
-    AnonymousNameContext(std::shared_ptr<NamingContext> context, Provenance provenance,
-                         SourceSpan span)
-        : flattened_name(context->flattened_name()),
-          context(std::move(context)),
-          provenance(provenance),
-          span(span) {}
-
-    // The string is owned by the naming context.
-    std::string_view flattened_name;
+  struct Anonymous {
     std::shared_ptr<NamingContext> context;
     Provenance provenance;
     // The span of the object to which this anonymous name refers to (anonymous names
@@ -308,40 +207,23 @@ class Name final {
     SourceSpan span;
   };
 
-  struct IntrinsicNameContext {
-    explicit IntrinsicNameContext(std::string name) : name(std::move(name)) {}
-
-    // The intrinsic name.
+  struct Intrinsic {
     std::string name;
   };
 
-  Name(const Library* library, SourcedNameContext name_context,
-       std::optional<std::string> member_name)
-      : library_(library), name_context_(name_context), member_name_(std::move(member_name)) {}
+  using Value = std::variant<Sourced, Anonymous, Intrinsic>;
 
-  Name(const Library* library, AnonymousNameContext name_context,
-       std::optional<std::string> member_name)
-      : library_(library),
-        name_context_(std::move(name_context)),
-        member_name_(std::move(member_name)) {}
-
-  Name(const Library* library, IntrinsicNameContext name_context,
-       std::optional<std::string> member_name)
-      : library_(library),
-        name_context_(std::move(name_context)),
-        member_name_(std::move(member_name)) {}
+  Name(const Library* library, Value value, std::optional<std::string> member_name)
+      : library_(library), value_(std::move(value)), member_name_(std::move(member_name)) {}
 
   const Library* library_;
-  std::variant<std::monostate, SourcedNameContext, AnonymousNameContext, IntrinsicNameContext>
-      name_context_;
+  Value value_;
   std::optional<std::string> member_name_;
 
  public:
-  bool is_sourced() const { return std::get_if<SourcedNameContext>(&name_context_); }
-  bool is_intrinsic() const { return std::get_if<IntrinsicNameContext>(&name_context_); }
-  const AnonymousNameContext* as_anonymous() const {
-    return std::get_if<AnonymousNameContext>(&name_context_);
-  }
+  bool is_sourced() const { return std::get_if<Sourced>(&value_); }
+  bool is_intrinsic() const { return std::get_if<Intrinsic>(&value_); }
+  const Anonymous* as_anonymous() const { return std::get_if<Anonymous>(&value_); }
 };
 
 }  // namespace fidlc
