@@ -173,16 +173,6 @@ impl ActionsManager {
         self.action_set.lock().unwrap().contains(key)
     }
 
-    #[cfg(test)]
-    pub async fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
-        self.action_set.lock().unwrap().mock_result(key, result)
-    }
-
-    #[cfg(test)]
-    pub async fn remove_notifier(&mut self, key: ActionKey) {
-        self.action_set.lock().unwrap().remove_notifier(key)
-    }
-
     /// Registers an action in the set, returning when the action is finished (which may represent
     /// a task that's already running for this action).
     pub async fn register<A>(

@@ -942,11 +942,13 @@ mod tests {
                 test_hook::Lifecycle,
             },
         },
+        async_utils::PollExt,
         cm_rust::{ComponentDecl, DependencyType, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         cm_types::AllowedOffers,
         errors::StopActionError,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+        fuchsia_async as fasync,
         maplit::{btreeset, hashmap, hashset},
         moniker::Moniker,
         std::collections::BTreeSet,
@@ -3977,108 +3979,116 @@ mod tests {
     ///
     /// `a` fails to finish shutdown the first time, but succeeds the second time.
     #[fuchsia::test]
-    async fn shutdown_error() {
-        let components = vec![
-            ("root", ComponentDeclBuilder::new().child_default("a").build()),
-            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
-            (
-                "b",
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("c").eager())
-                    .child(ChildBuilder::new().name("d").eager())
-                    .build(),
-            ),
-            ("c", component_decl_with_test_runner()),
-            ("d", component_decl_with_test_runner()),
-        ];
-        let test = ActionsTest::new("root", components, None).await;
-        let root = test.model.root();
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
-
-        // Component startup was eager, so they should all have an `Execution`.
-        root.start_instance(&component_a.moniker, &StartReason::Eager)
-            .await
-            .expect("could not start a");
-        assert!(component_a.is_started().await);
-        assert!(component_b.is_started().await);
-        assert!(component_c.is_started().await);
-        assert!(component_d.is_started().await);
-
-        let component_a_info = ComponentInfo::new(component_a).await;
-        let component_b_info = ComponentInfo::new(component_b).await;
-        let component_c_info = ComponentInfo::new(component_c).await;
-        let component_d_info = ComponentInfo::new(component_d.clone()).await;
-
-        // Mock a failure to stop "d".
-        {
-            let mut actions = component_d.lock_actions().await;
-            actions
-                .mock_result(
-                    ActionKey::Shutdown,
-                    Err(ActionError::StopError { err: StopActionError::GetParentFailed })
-                        as Result<(), ActionError>,
-                )
-                .await;
-        }
-
-        // Register shutdown action on "a", and wait for it. "d" fails to shutdown, so "a" fails
-        // too. The state of "c" is unknown at this point. The shutdown of stop targets occur
-        // simultaneously. "c" could've shutdown before "d" or it might not have.
-        ActionsManager::register(
-            component_a_info.component.clone(),
-            ShutdownAction::new(ShutdownType::Instance),
-        )
-        .await
-        .expect_err("shutdown succeeded unexpectedly");
-        component_a_info.check_not_shut_down(&test.runner).await;
-        component_b_info.check_not_shut_down(&test.runner).await;
-        component_d_info.check_not_shut_down(&test.runner).await;
-
-        // Remove the mock from "d"
-        {
-            let mut actions = component_d.lock_actions().await;
-            actions.remove_notifier(ActionKey::Shutdown).await;
-        }
-
-        // Register shutdown action on "a" again which should succeed
-        ActionsManager::register(
-            component_a_info.component.clone(),
-            ShutdownAction::new(ShutdownType::Instance),
-        )
-        .await
-        .expect("shutdown failed");
-        component_a_info.check_is_shut_down(&test.runner).await;
-        component_b_info.check_is_shut_down(&test.runner).await;
-        component_c_info.check_is_shut_down(&test.runner).await;
-        component_d_info.check_is_shut_down(&test.runner).await;
-        {
-            let mut events: Vec<_> = test
-                .test_hook
-                .lifecycle()
-                .into_iter()
-                .filter(|e| match e {
-                    Lifecycle::Stop(_) => true,
-                    _ => false,
-                })
-                .collect();
-            // The leaves could be stopped in any order.
-            let mut first: Vec<_> = events.drain(0..2).collect();
-            first.sort_unstable();
-            let expected: Vec<_> = vec![
-                Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
-                Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
+    fn shutdown_error() {
+        let mut executor = fasync::TestExecutor::new();
+        let mut test_body = Box::pin(async move {
+            let components = vec![
+                ("root", ComponentDeclBuilder::new().child_default("a").build()),
+                (
+                    "a",
+                    ComponentDeclBuilder::new()
+                        .child(ChildBuilder::new().name("b").eager())
+                        .build(),
+                ),
+                (
+                    "b",
+                    ComponentDeclBuilder::new()
+                        .child(ChildBuilder::new().name("c").eager())
+                        .child(ChildBuilder::new().name("d").eager())
+                        .build(),
+                ),
+                ("c", component_decl_with_test_runner()),
+                ("d", component_decl_with_test_runner()),
             ];
-            assert_eq!(first, expected);
-            assert_eq!(
-                events,
-                vec![
-                    Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a"].try_into().unwrap())
-                ]
-            );
-        }
+            let test = ActionsTest::new("root", components, None).await;
+            let root = test.model.root();
+            let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+            let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+            let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+            let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+
+            // Component startup was eager, so they should all have an `Execution`.
+            root.start_instance(&component_a.moniker, &StartReason::Eager)
+                .await
+                .expect("could not start a");
+            assert!(component_a.is_started().await);
+            assert!(component_b.is_started().await);
+            assert!(component_c.is_started().await);
+            assert!(component_d.is_started().await);
+
+            let component_a_info = ComponentInfo::new(component_a.clone()).await;
+            let component_b_info = ComponentInfo::new(component_b).await;
+            let component_c_info = ComponentInfo::new(component_c).await;
+            let component_d_info = ComponentInfo::new(component_d.clone()).await;
+
+            // Mock a failure to shutdown "d".
+            let (shutdown_completer, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
+            let _shutdown_notifier =
+                component_d.lock_actions().await.register_no_wait(mock_shutdown_action).await;
+
+            // Register shutdown action on "a", and wait for it. "d" fails to shutdown, so "a"
+            // fails too. The state of "c" is unknown at this point. The shutdown of stop targets
+            // occur simultaneously. "c" could've shutdown before "d" or it might not have.
+            let a_shutdown_notifier = component_a
+                .lock_actions()
+                .await
+                .register_no_wait(ShutdownAction::new(ShutdownType::Instance))
+                .await;
+
+            // We need to wait for the shutdown action of "b" to register a shutdown action on "d",
+            // which will be deduplicated with the shutdown action we registered on "d" earlier.
+            _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+
+            // Now we can allow the mock shutdown action to complete with an error, and wait for
+            // our destroy child call to finish.
+            shutdown_completer
+                .send(Err(ActionError::StopError { err: StopActionError::GetParentFailed }))
+                .unwrap();
+            a_shutdown_notifier.await.expect_err("shutdown succeeded unexpectedly");
+
+            component_a_info.check_not_shut_down(&test.runner).await;
+            component_b_info.check_not_shut_down(&test.runner).await;
+            component_d_info.check_not_shut_down(&test.runner).await;
+
+            // Register shutdown action on "a" again. Without our mock action queued up on it,
+            // "d"'s shutdown succeeds, and "a" is shutdown this time.
+            ActionsManager::register(
+                component_a_info.component.clone(),
+                ShutdownAction::new(ShutdownType::Instance),
+            )
+            .await
+            .expect("shutdown failed");
+            component_a_info.check_is_shut_down(&test.runner).await;
+            component_b_info.check_is_shut_down(&test.runner).await;
+            component_c_info.check_is_shut_down(&test.runner).await;
+            component_d_info.check_is_shut_down(&test.runner).await;
+            {
+                let mut events: Vec<_> = test
+                    .test_hook
+                    .lifecycle()
+                    .into_iter()
+                    .filter(|e| match e {
+                        Lifecycle::Stop(_) => true,
+                        _ => false,
+                    })
+                    .collect();
+                // The leaves could be stopped in any order.
+                let mut first: Vec<_> = events.drain(0..2).collect();
+                first.sort_unstable();
+                let expected: Vec<_> = vec![
+                    Lifecycle::Stop(vec!["a", "b", "c"].try_into().unwrap()),
+                    Lifecycle::Stop(vec!["a", "b", "d"].try_into().unwrap()),
+                ];
+                assert_eq!(first, expected);
+                assert_eq!(
+                    events,
+                    vec![
+                        Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+                        Lifecycle::Stop(vec!["a"].try_into().unwrap())
+                    ]
+                );
+            }
+        });
+        executor.run_until_stalled(&mut test_body).unwrap();
     }
 }

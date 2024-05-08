@@ -63,19 +63,6 @@ impl ActionSet {
         self.rep.contains_key(&key)
     }
 
-    #[cfg(test)]
-    pub fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
-        let (sender, receiver) = oneshot::channel();
-        sender.send(result).unwrap();
-        let notifier = ActionNotifier::new(receiver);
-        self.rep.insert(key, ActionController { notifier, maybe_abort_handle: None });
-    }
-
-    #[cfg(test)]
-    pub fn remove_notifier(&mut self, key: ActionKey) {
-        self.rep.remove(&key).expect("No notifier found with that key");
-    }
-
     /// Registers an action in the set, but does not wait for it to complete, instead returning a
     /// future that can be used to wait on the task. This function is a no-op if the task is
     /// already registered.
