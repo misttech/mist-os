@@ -508,3 +508,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0245_vmo_prefetch.md
   - title: "RFC-0246: API Levels are 32 bits"
     path: /docs/contribute/governance/rfcs/0246_api_levels_are_32_bits.md
+  - title: "RFC-0247: Enabling LTO in Fuchsia"
+    path: /docs/contribute/governance/rfcs/0247_enabling_lto_in_fuchsia.md
