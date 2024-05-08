@@ -11,6 +11,8 @@
 #include <set>
 #include <string>
 
+#include <gtest/gtest_prod.h>
+
 #include "src/developer/debug/debug_agent/component_manager.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
@@ -41,6 +43,9 @@ class ZirconComponentManager : public ComponentManager {
   auto GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
  private:
+  // For access to |running_component_info_|.
+  FRIEND_TEST(ZirconSystemInterfaceTest, FilterMatchComponents);
+
   class TestLauncher;
 
   void GetNextComponentEvent();
