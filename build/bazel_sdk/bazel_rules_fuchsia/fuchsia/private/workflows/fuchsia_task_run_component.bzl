@@ -41,7 +41,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             package_manifest,
         ]
         if ctx.attr.disable_repository:
-            disable_url = "fuchsia-pkg://%s/%s#meta/%s" % (ctx.attr.disable_repository, package, manifest)
+            disable_url = "fuchsia-pkg://%s/%s#%s" % (ctx.attr.disable_repository, package, manifest)
             args += [
                 "--disable-url",
                 disable_url,
