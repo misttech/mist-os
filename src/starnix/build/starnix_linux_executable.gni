@@ -12,7 +12,7 @@ import("//src/starnix/kernel/starnix.gni")
 # specified.
 #
 # Arguments to the template are the same as `executable()`, except `testonly = true` is forced.
-template("starnix_linux_test_executable") {
+template("starnix_linux_executable") {
   _output_name = target_name
   if (defined(invoker.output_name)) {
     _output_name = invoker.output_name
@@ -27,7 +27,6 @@ template("starnix_linux_test_executable") {
                              "*",
                              [
                                "output_name",
-                               "testonly",
                                "visibility",
                              ])
       output_name = _output_name
@@ -47,7 +46,13 @@ template("starnix_linux_test_executable") {
   _bin_label = ":${_bin_label}($target_linux_toolchain)"
   _bin_out_dir = get_label_info(_bin_label, "root_out_dir")
   resource(_resource_label) {
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "sources",
+                             "outputs",
+                             "deps",
+                           ])
 
     sources = [ "${_bin_out_dir}/${_output_name}" ]
     outputs = [ "data/tests/${_output_name}" ]

@@ -3,9 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/starnix/tests/build/starnix_linux_test_rustc_binary.gni")
+import("//src/starnix/build/starnix_linux_rustc_binary.gni")
 
-starnix_linux_test_rustc_binary("bin") {
+starnix_linux_rustc_binary("bin") {
   edition = "2021"
   output_name = "hello_debian_rust"
   source_root = "hello_debian.rs"

@@ -4,8 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/starnix/build/starnix_linux_executable.gni")
 import("//src/starnix/kernel/starnix.gni")
-import("//src/starnix/tests/build/starnix_linux_test_executable.gni")
 
 group("coredumps") {
   testonly = true
@@ -38,7 +38,8 @@ fuchsia_test_component("integration_test") {
   check_includes = false
 }
 
-starnix_linux_test_executable("generate_linux_coredump") {
+starnix_linux_executable("generate_linux_coredump") {
+  testonly = true
   sources = [ "src/coredump.cc" ]
 }
 
