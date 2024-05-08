@@ -66,6 +66,10 @@ pub struct MemoryPressureLevelConfig {
     pub background_task_period: Duration,
     /// The limit of cached nodes.
     pub cache_size_limit: usize,
+
+    // The initial delay before the background task runs. The background task has a longer initial
+    // delay to avoid running the task during boot.
+    pub background_task_initial_delay: Duration,
 }
 
 #[derive(Clone)]
@@ -98,14 +102,17 @@ impl Default for MemoryPressureConfig {
             mem_normal: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_secs(20),
                 cache_size_limit: DIRENT_CACHE_LIMIT,
+                background_task_initial_delay: Duration::from_secs(70),
             },
             mem_warning: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_secs(5),
                 cache_size_limit: 100,
+                background_task_initial_delay: Duration::from_secs(5),
             },
             mem_critical: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_millis(1500),
                 cache_size_limit: 20,
+                background_task_initial_delay: Duration::from_millis(1500),
             },
         }
     }
@@ -459,6 +466,7 @@ impl FxVolume {
         }
     }
 
+    #[trace]
     async fn background_task(
         self: Arc<Self>,
         config: MemoryPressureConfig,
@@ -469,7 +477,8 @@ impl FxVolume {
         let mut terminate = terminate.fuse();
         // Default to the normal period until updates come from the `level_stream`.
         let mut level = MemoryPressureLevel::Normal;
-        let mut timer = fasync::Timer::new(config.for_level(&level).background_task_period).fuse();
+        let mut timer =
+            fasync::Timer::new(config.for_level(&level).background_task_initial_delay).fuse();
 
         loop {
             let mut should_terminate = false;
@@ -1153,14 +1162,17 @@ mod tests {
                     mem_normal: MemoryPressureLevelConfig {
                         background_task_period: Duration::from_millis(100),
                         cache_size_limit: 100,
+                        background_task_initial_delay: Duration::from_millis(100),
                     },
                     mem_warning: MemoryPressureLevelConfig {
                         background_task_period: Duration::from_millis(100),
                         cache_size_limit: 100,
+                        background_task_initial_delay: Duration::from_millis(100),
                     },
                     mem_critical: MemoryPressureLevelConfig {
                         background_task_period: Duration::from_millis(100),
                         cache_size_limit: 100,
+                        background_task_initial_delay: Duration::from_millis(100),
                     },
                 },
                 None,
@@ -1250,14 +1262,17 @@ mod tests {
                 mem_normal: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
+                    background_task_initial_delay: Duration::from_secs(20),
                 },
                 mem_warning: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_millis(100),
                     cache_size_limit: 100,
+                    background_task_initial_delay: Duration::from_millis(100),
                 },
                 mem_critical: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
+                    background_task_initial_delay: Duration::from_secs(20),
                 },
             };
             vol.volume().start_background_task(flush_config, Some(&mem_pressure));
@@ -1361,14 +1376,17 @@ mod tests {
                 mem_normal: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
+                    background_task_initial_delay: Duration::from_secs(20),
                 },
                 mem_warning: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: 100,
+                    background_task_initial_delay: Duration::from_secs(20),
                 },
                 mem_critical: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
+                    background_task_initial_delay: Duration::from_secs(20),
                 },
             };
             vol.volume().start_background_task(flush_config, Some(&mem_pressure));
