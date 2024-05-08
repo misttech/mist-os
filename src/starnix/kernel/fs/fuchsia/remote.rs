@@ -1722,31 +1722,25 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn test_blocking_io() -> Result<(), anyhow::Error> {
+    async fn test_blocking_io() {
         let (kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)?;
-
-        let thread = kernel.kthreads.spawner().spawn_and_get_result({
-            move |locked, current_task| {
-                assert_eq!(
-                    64,
-                    pipe.read(locked, &current_task, &mut VecOutputBuffer::new(64)).unwrap()
-                );
-            }
-        });
-
-        // Wait for the thread to become blocked on the read.
-        zx::Duration::from_seconds(2).sleep();
+        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR).unwrap();
 
         let bytes = [0u8; 64];
-        assert_eq!(64, server.write(&bytes)?);
+        assert_eq!(bytes.len(), server.write(&bytes).unwrap());
 
-        // The thread should unblock and join us here.
-        thread.await.expect("join");
+        // Spawn a kthread to get the right lock context.
+        let bytes_read = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result_sync(move |locked, current_task| {
+                pipe.read(locked, &current_task, &mut VecOutputBuffer::new(64)).unwrap()
+            })
+            .unwrap();
 
-        Ok(())
+        assert_eq!(bytes_read, bytes.len());
     }
 
     #[::fuchsia::test]
