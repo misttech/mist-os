@@ -55,11 +55,6 @@ _FFX_CMDS: dict[str, list[str]] = {
     "TEST_RUN": ["test", "run"],
 }
 
-_TIMEOUTS: dict[str, float] = {
-    "TARGET_RCS_DISCONNECTION_ATTEMPT_WAIT": 2,
-    "SLEEP": 0.5,
-}
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _FFX_LOGS_LEVEL: str = "debug"

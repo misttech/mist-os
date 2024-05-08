@@ -15,7 +15,7 @@ from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {
     "FFX_CLI": 10,
-    "TARGET_ADD": 15,
+    "TARGET_ADD": 60,  # TODO(https://fxbug.dev/336608577): Increasing to 60sec as a workaround for this issue
     "TARGET_RCS_CONNECTION_WAIT": 15,
     "TARGET_RCS_DISCONNECTION_WAIT": 15,
 }
