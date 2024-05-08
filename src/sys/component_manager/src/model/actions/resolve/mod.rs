@@ -60,18 +60,12 @@ async fn do_resolve(
             });
         }
     }
-    // Ensure `Resolved` is dispatched after `Discovered`.
-    {
-        let discover_completed =
-            component.lock_actions().await.wait_for_action(ActionKey::Discover).await;
-        discover_completed.await.unwrap();
-    }
     let result = async move {
         let first_resolve = {
             let state = component.lock_state().await;
             match *state {
                 InstanceState::New => {
-                    panic!("Component should be at least discovered")
+                    panic!("Component {} should be at least discovered", component.moniker)
                 }
                 InstanceState::Unresolved(_) => true,
                 InstanceState::Resolved(_) | InstanceState::Started(_, _) => false,

@@ -1399,7 +1399,7 @@ impl BuiltinEnvironment {
     }
 
     /// Bind ServiceFs to the outgoing directory of this component, if it exists.
-    pub async fn bind_service_fs_to_out(&mut self) -> Result<(), Error> {
+    async fn bind_service_fs_to_out(&mut self) -> Result<(), Error> {
         let server_end = match fuchsia_runtime::take_startup_handle(
             fuchsia_runtime::HandleType::DirectoryRequest.into(),
         ) {
@@ -1457,7 +1457,11 @@ impl BuiltinEnvironment {
     }
 
     pub async fn run_root(&mut self) -> Result<(), Error> {
+        // We bind the service fs to out _after_ we discover the root component, so that these
+        // service implementations can safely assume the root component is discovered.
+        self.model.discover_root_component(self.root_component_input.clone()).await;
         self.bind_service_fs_to_out().await?;
+
         self.model.start(self.root_component_input.clone()).await;
         component::health().set_ok();
         self.wait_for_root_stop().await;

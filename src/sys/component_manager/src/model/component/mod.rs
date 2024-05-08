@@ -516,7 +516,7 @@ impl ComponentInstance {
             }
         }
 
-        let (child, discover_fut) = state
+        let child = state
             .add_child(
                 self,
                 child_decl,
@@ -528,11 +528,8 @@ impl ComponentInstance {
             )
             .await?;
 
-        // Release the component state lock so DiscoverAction can acquire it.
+        // Release the component state now that the component has been created and discovered.
         drop(state);
-
-        // Wait for the Discover action to finish.
-        discover_fut.await?;
 
         if let Some(start_reason) = maybe_start_reason {
             child

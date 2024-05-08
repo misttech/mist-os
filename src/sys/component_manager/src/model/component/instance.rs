@@ -55,13 +55,13 @@ use {
     cm_types::Name,
     config_encoder::ConfigFields,
     errors::{
-        ActionError, AddChildError, CreateNamespaceError, DynamicOfferError, OpenOutgoingDirError,
-        ResolveActionError, StopError,
+        AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicOfferError,
+        OpenOutgoingDirError, ResolveActionError, StopError,
     },
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::future::{BoxFuture, FutureExt},
+    futures::future::BoxFuture,
     hooks::{CapabilityReceiver, EventPayload},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{
@@ -789,8 +789,7 @@ impl ResolvedInstanceState {
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         input: ComponentInput,
-    ) -> Result<(Arc<ComponentInstance>, BoxFuture<'static, Result<(), ActionError>>), AddChildError>
-    {
+    ) -> Result<Arc<ComponentInstance>, AddDynamicChildError> {
         let (child, input) = self
             .add_child_internal(
                 component,
@@ -798,19 +797,23 @@ impl ResolvedInstanceState {
                 collection,
                 dynamic_offers,
                 dynamic_capabilities,
-                controller,
                 input,
             )
             .await?;
-        // Register a Discover action.
-        let discover_fut = child
-            .clone()
-            .lock_actions()
-            .await
-            .register_no_wait(DiscoverAction::new(input))
-            .await
-            .boxed();
-        Ok((child, discover_fut))
+
+        // Run a Discover action.
+        ActionsManager::register(child.clone(), DiscoverAction::new(input)).await?;
+
+        // The controller is not started until this point, because the child must be discovered
+        // before a reference to it is given out to anyone.
+        if let Some(controller) = controller {
+            if let Ok(stream) = controller.into_stream() {
+                child
+                    .nonblocking_task_group()
+                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
+            }
+        }
+        Ok(child)
     }
 
     /// Adds a new child of this instance for the given `ChildDecl`. Returns
@@ -823,17 +826,9 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(
-            component,
-            child,
-            collection,
-            None,
-            None,
-            None,
-            ComponentInput::default(),
-        )
-        .await
-        .map(|_| ())
+        self.add_child_internal(component, child, collection, None, None, ComponentInput::default())
+            .await
+            .map(|_| ())
     }
 
     async fn add_child_internal(
@@ -843,7 +838,6 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
-        controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         mut child_input: ComponentInput,
     ) -> Result<(Arc<ComponentInstance>, ComponentInput), AddChildError> {
         assert!(
@@ -899,13 +893,6 @@ impl ResolvedInstanceState {
             component.persistent_storage_for_child(collection),
         )
         .await;
-        if let Some(controller) = controller {
-            if let Ok(stream) = controller.into_stream() {
-                child
-                    .nonblocking_task_group()
-                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
-            }
-        }
         self.children.insert(child_moniker, child.clone());
 
         self.dynamic_offers.extend(dynamic_offers.into_iter());
