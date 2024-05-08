@@ -44,10 +44,5 @@
             from: "#exceptions",
             to: "#debugger",
         },
-        {
-            directory: "boot",
-            from: "parent",
-            to: "#debugger",
-        },
     ],
 }

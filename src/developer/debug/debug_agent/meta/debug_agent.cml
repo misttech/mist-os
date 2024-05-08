@@ -43,12 +43,6 @@
             ],
             from: "parent",
         },
-        {
-            // Some tests depend on "run /boot/bin/crasher".
-            directory: "boot",
-            rights: [ "x*" ],
-            path: "/boot",
-        },
     ],
     expose: [
         {

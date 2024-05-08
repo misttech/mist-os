@@ -55,11 +55,6 @@
             to: "#agents",
             source_availability: "unknown",
         },
-        {
-            directory: "boot",
-            from: "parent",
-            to: "#agents",
-        },
     ],
     expose: [
         {
