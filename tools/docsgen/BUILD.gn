@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/config/build_api_module.gni")
 import("//build/python/python_binary.gni")
+import("//build/python/python_host_test.gni")
 import("//build/sdk/sdk_documentation.gni")
 
 group("docsgen") {
@@ -92,29 +93,29 @@ action("invoke_fidldoc") {
   ]
 }
 
-clidoc_tarfile = "clidoc_out.tar.gz"
+if (is_host && has_board) {
+  clidoc_tarfile = "clidoc_out.tar.gz"
 
-# Some SDK dependencies lifted from //src/developer/ffx/build/ffx_action.
-# This is the actual label for the sdk host tools, and is used to provide the
-# path to the sdk molecule manifest.
-sdk_host_tools_visibility_bridge_label =
-    "//src/developer/ffx/build:internal_sdk_tools_for_ffx($host_toolchain)"
+  # Some SDK dependencies lifted from //src/developer/ffx/build/ffx_action.
+  # This is the actual label for the sdk host tools, and is used to provide the
+  # path to the sdk molecule manifest.
+  sdk_host_tools_visibility_bridge_label =
+      "//src/developer/ffx/build:internal_sdk_tools_for_ffx($host_toolchain)"
 
-_sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
+  _sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
 
-sdk_host_tools_manifest =
-    get_label_info(_sdk_host_tools_label, "root_out_dir") +
-    "/sdk/manifest/host_tools.internal"
+  sdk_host_tools_manifest =
+      get_label_info(_sdk_host_tools_label, "root_out_dir") +
+      "/sdk/manifest/host_tools.internal"
+  compiled_action("invoke_clidoc") {
+    tool = "//tools/clidoc:clidoc_bin"
+    tool_output_name = "clidoc"
+    depfile = "$target_out_dir/$target_name.d"
+    deps = [
+      "//sdk:host_tools",
+      sdk_host_tools_visibility_bridge_label,
+    ]
 
-compiled_action("invoke_clidoc") {
-  tool = "//tools/clidoc:clidoc_bin"
-  tool_output_name = "clidoc"
-  depfile = "$target_out_dir/$target_name.d"
-  deps = [
-    "//sdk:host_tools",
-    sdk_host_tools_visibility_bridge_label,
-  ]
-  if (is_host) {
     deps += [
       "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
       "//src/developer/ffx/tools($host_toolchain)",
@@ -122,40 +123,49 @@ compiled_action("invoke_clidoc") {
       # TODO(https://fxbug.dev/42167576) check if triage belongs in sdk docs.
       "//src/diagnostics/triage:triage_bin",
     ]
-  }
 
-  metadata = {
-    # Record metadata for the //tools/docsgen build API.
-    generated_docset = [
-      {
-        name = "clidoc"
-        archive = {
-          origin_file =
-              rebase_path("$target_out_dir/$clidoc_tarfile", root_build_dir)
-          base_folder = "clidoc"
-        }
-        dest_folder = "tools/sdk"
-      },
+    metadata = {
+      # Record metadata for the //tools/docsgen build API.
+      generated_docset = [
+        {
+          name = "clidoc"
+          archive = {
+            origin_file =
+                rebase_path("$target_out_dir/$clidoc_tarfile", root_build_dir)
+            base_folder = "clidoc"
+          }
+          dest_folder = "tools/sdk"
+        },
+      ]
+    }
+
+    inputs = [ sdk_host_tools_manifest ]
+    outputs = [ "$target_out_dir/$clidoc_tarfile" ]
+    args = [
+      "-o",
+      rebase_path("$target_gen_dir/sdk-docs", root_build_dir),
+      "--quiet",
+      "--archive-path",
+      rebase_path("$target_out_dir/$clidoc_tarfile", root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+      "--sdk-root",
+      rebase_path(root_build_dir, root_build_dir),
+      "--sdk-manifest",
+      rebase_path(sdk_host_tools_manifest, root_build_dir),
+      "--isolate-dir",
+      rebase_path(target_gen_dir, root_build_dir),
     ]
   }
 
-  inputs = [ sdk_host_tools_manifest ]
-  outputs = [ "$target_out_dir/$clidoc_tarfile" ]
-  args = [
-    "-o",
-    rebase_path("$target_gen_dir/sdk-docs", root_build_dir),
-    "--quiet",
-    "--archive-path",
-    rebase_path("$target_out_dir/$clidoc_tarfile", root_build_dir),
-    "--depfile",
-    rebase_path(depfile, root_build_dir),
-    "--sdk-root",
-    rebase_path(root_build_dir, root_build_dir),
-    "--sdk-manifest",
-    rebase_path(sdk_host_tools_manifest, root_build_dir),
-    "--isolate-dir",
-    rebase_path(target_gen_dir, root_build_dir),
-  ]
+  clidoc_tarball_outputs = get_target_outputs(":invoke_clidoc")
+
+  python_host_test("clidoc_test") {
+    main_source = "clidoc_test.py"
+    extra_args = [ rebase_path(clidoc_tarball_outputs[0], root_build_dir) ]
+    deps = [ ":invoke_clidoc($host_toolchain)" ]
+    sources = clidoc_tarball_outputs
+  }
 }
 
 _helpdoc_script_target = "helpdoc_generation"
@@ -312,13 +322,15 @@ build_api_module("generated_docs") {
   deps = [
     ":create_syscall_docs",
     ":invoke_assemblydoc",
-    ":invoke_clidoc",
     ":invoke_cmldoc",
     ":invoke_fidldoc",
     ":invoke_helpdoc",
     "//bundles/drivers:create_all_drivers_doc",
     "//sdk/lib/fdio:docs",
   ]
+  if (is_host && has_board) {
+    deps += [ ":invoke_clidoc" ]
+  }
 }
 
 # Set up targets and files for sdk_documentation
@@ -327,10 +339,6 @@ sdk_docs = [
   {
     target = ":invoke_assemblydoc"
     file = "assemblydoc.tar.gz"
-  },
-  {
-    target = ":invoke_clidoc"
-    file = "clidoc_out.tar.gz"
   },
   {
     target = ":invoke_cmldoc"
@@ -349,6 +357,15 @@ sdk_docs = [
     file = "fdio.zip"
   },
 ]
+
+if (is_host && has_board) {
+  sdk_docs += [
+    {
+      target = ":invoke_clidoc"
+      file = "clidoc_out.tar.gz"
+    },
+  ]
+}
 
 sdk_doc_files = []
 sdk_doc_targets = []
@@ -376,4 +393,7 @@ sdk_documentation("ref_docs_sdk") {
 group("tests") {
   testonly = true
   deps = [ "tests($host_toolchain)" ]
+  if (is_host && has_board) {
+    deps += [ ":clidoc_test($host_toolchain)" ]
+  }
 }
