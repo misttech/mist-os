@@ -36,20 +36,28 @@ async fn main() {
         info!("waiting for coredumper to stop...");
         EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut events).await.unwrap();
 
+        // The "earliest"/lowest index should be either 0 have advanced by how many were rolled out.
+        let expected_min_idx = current_idx.saturating_sub(report_capacity - 1);
+        let expected_len = (current_idx + 1).min(report_capacity);
+
         // Now that starnix has reported the component as stopped to the framework, we can expect
         // the kernel's inspect to have the last coredump.
         info!("retrieving coredump reports...");
-        let observed_coredumps = get_coredumps_from_inspect().await.unwrap();
+        let observed_coredumps = loop {
+            let observed_coredumps = get_coredumps_from_inspect().await.unwrap();
+
+            // There should be as many reports as loop iterations unless we're at capacity.
+            if observed_coredumps.len() == expected_len
+                && observed_coredumps.last().unwrap().idx == current_idx
+            {
+                break observed_coredumps;
+            } else {
+                // Retry until we have the correct number of coredumps.
+                continue;
+            }
+        };
 
         info!("observed coredump {current_idx} in inspect, validating...");
-        // The "earliest"/lowest index should be either 0 have advanced by how many were rolled out.
-        let expected_min_idx = current_idx.saturating_sub(report_capacity - 1);
-        // There should be as many reports as loop iterations unless we're at capacity.
-        let expected_len = (current_idx + 1).min(report_capacity);
-        assert_eq!(observed_coredumps.len(), expected_len);
-
-        // Ensure that (once sorted by the inspect function below) we have reasonable pids and
-        // indexes.
         let mut expected_idx = expected_min_idx;
         for coredump in observed_coredumps {
             assert_eq!(coredump.idx, expected_idx);
