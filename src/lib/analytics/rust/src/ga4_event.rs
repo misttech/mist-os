@@ -8,8 +8,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::env_info::{is_running_in_ci_bot_env, is_user_a_bot};
-
 const POST_EVENT_COUNT_MAX: usize = 25;
 const EVENT_PARAM_COUNT_MAX: usize = 25;
 const EVENT_NAME_LENGTH_MAX: usize = 40;
@@ -304,9 +302,6 @@ pub(crate) fn make_ga4_event<'a>(
 
     insert_if_present("args", params, action);
 
-    // TODO (b/333906243) remove this after one week of data collection in infra
-    add_ci_params(params);
-
     // for ga4 migration, if category name is 'general' then use 'invoke' for the event name.
     // if it is anthying else, use the category as the event name.
     // When UA is turned down and we migrate all client code, send event name explicitly
@@ -332,10 +327,6 @@ pub(crate) fn make_ga4_event<'a>(
     }
 }
 
-fn add_ci_params(params: &mut HashMap<String, GA4Value>) {
-    params.insert("is_bot".into(), GA4Value::Bool(is_running_in_ci_bot_env() || is_user_a_bot()));
-}
-
 // Creates a post body to send to GA4 analytics
 // containing exception and crash information
 pub(crate) fn make_ga4_crash_event(
@@ -356,8 +347,6 @@ pub(crate) fn make_ga4_crash_event(
         },
     );
     params.insert("description".into(), description.into());
-    // TODO (b/333906243) remove this after one week of data collection in infra
-    add_ci_params(params);
 
     Event::new("exception".into(), Some(Params { items: None, params: params.to_owned() }))
 }
@@ -602,7 +591,6 @@ mod tests {
                  {
                      "name": "invoke",
                      "params": {
-                         "is_bot": GA4Value::Bool(is_running_in_ci_bot_env() || is_user_a_bot()),
                          "label": "config analytics enable"
                      },
                      "timestamp_micros" : "1",
