@@ -7736,6 +7736,17 @@ Whether to use an alternate strategy for anonymous memory allocations.
 
 From //src/starnix/kernel/args.gni:27
 
+### starnix_enable_console_tool
+
+The console tool is intended only for interactive use. Currently, this tool
+is included in the build by default, but we plan to remove it from the
+default build so that we do not accidentally rely on the tool in automated
+tests.
+
+**Current value (from the default):** `true`
+
+From //src/developer/ffx/tools/starnix/BUILD.gn:15
+
 ### starnix_enable_trace_and_debug_logs_in_release
 
 Compiles-in trace and debug logging in release builds. By default, these
