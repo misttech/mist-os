@@ -65,7 +65,8 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   zx::result<fdf_devicetree::ParentNode> GetGpioNodeForPinConfig(
       fdf_devicetree::ReferenceNode& cfg_node);
 
-  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin, std::string gpio_name);
+  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin, uint32_t controller_id,
+                                std::string gpio_name);
 
   zx::result<> AddInitNodeSpec(fdf_devicetree::Node& child);
 

@@ -153,12 +153,13 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
 }
 
 zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin,
-                                               std::string gpio_name) {
+                                               uint32_t controller_id, std::string gpio_name) {
   auto gpio_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                                       bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, controller_id),
               fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, pin),
           },
       .properties =
@@ -412,7 +413,7 @@ zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
                                        reinterpret_cast<const uint8_t*>(&pin),
                                        reinterpret_cast<const uint8_t*>(&pin) + sizeof(gpio_pin_t));
 
-  return AddChildNodeSpec(child, pin.pin, reference_name);
+  return AddChildNodeSpec(child, pin.pin, parent.id(), reference_name);
 }
 
 zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
