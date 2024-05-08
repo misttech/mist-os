@@ -208,6 +208,7 @@ type RouterError = flexible enum : uint32 {
 };
 
 /// A router allows a client to request a capability.
+@discoverable
 @available(added=HEAD)
 open protocol Router {
     flexible Route(RouteRequest) -> (resource struct {

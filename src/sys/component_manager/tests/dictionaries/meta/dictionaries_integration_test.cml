@@ -46,6 +46,7 @@
             protocol: [
                 "fidl.test.components.Trigger-b",
                 "fidl.test.components.Trigger-c",
+                "fidl.test.components.Trigger-d",
             ],
             from: "self/outer/inner",
         },
