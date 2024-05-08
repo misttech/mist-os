@@ -16,7 +16,6 @@ fidl("fuchsia.component.sandbox") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.io",
-    "//sdk/fidl/fuchsia.unknown",
     "//zircon/vdso/zx",
   ]
 

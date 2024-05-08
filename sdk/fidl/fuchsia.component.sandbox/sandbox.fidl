@@ -5,7 +5,6 @@ library fuchsia.component.sandbox;
 
 using zx;
 using fuchsia.io;
-using fuchsia.unknown;
 
 /// Maximum number of bytes in a [DataCapability].
 const MAX_DATA_LENGTH uint32 = 8192;
@@ -14,9 +13,15 @@ const MAX_DATA_LENGTH uint32 = 8192;
 const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
 
 @available(added=HEAD)
-closed protocol HandleCapability {
-    compose fuchsia.unknown.Cloneable;
-    strict GetHandle() -> (resource struct {
+type HandleCapability = resource struct {
+    token zx.Handle:EVENTPAIR;
+};
+
+/// The `Handle` protocol allows a client to get the contained handle.
+@available(added=HEAD)
+open protocol Handle {
+    /// Take the handle or error if the handle was already taken.
+    flexible GetHandle() -> (resource struct {
         handle zx.Handle;
     }) error @generated_name("HandleCapabilityError") strict enum {
         UNAVAILABLE = 1;
@@ -39,7 +44,7 @@ type SenderCapability = resource struct {
 @available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
-    2: handle client_end:HandleCapability;
+    2: handle HandleCapability;
     3: data DataCapability;
     4: dictionary client_end:Dictionary;
     5: sender SenderCapability;
@@ -242,6 +247,17 @@ open protocol Factory {
     flexible ConnectToSender(resource struct {
         capability SenderCapability;
         server_end server_end:Sender;
+    });
+
+    /// Operate on the provided handle capability.
+    ///
+    /// Consumes a token referencing a bedrock object and serves the
+    /// corresponding FIDL representation on `server_end`. The peer of the
+    /// `server_end` is another reference to the bedrock object. Dropping the
+    /// control channel decreases one reference on the object.
+    flexible ConnectToHandle(resource struct {
+        capability HandleCapability;
+        server_end server_end:Handle;
     });
 
     /// Creates a `Sender` from a client served `Receiver`.

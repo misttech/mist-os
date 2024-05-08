@@ -135,8 +135,8 @@ impl TryFrom<fsandbox::Capability> for Capability {
     fn try_from(capability: fsandbox::Capability) -> Result<Self, Self::Error> {
         match capability {
             fsandbox::Capability::Unit(_) => Ok(crate::Unit::default().into()),
-            fsandbox::Capability::Handle(client_end) => {
-                try_from_handle_in_registry(client_end.as_handle_ref())
+            fsandbox::Capability::Handle(handle) => {
+                try_from_handle_in_registry(handle.token.as_handle_ref())
             }
             fsandbox::Capability::Data(data_capability) => {
                 Ok(crate::Data::try_from(data_capability)?.into())

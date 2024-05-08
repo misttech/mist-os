@@ -34,7 +34,6 @@ rustc_library("sandbox") {
   ]
 
   test_deps = [
-    "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",

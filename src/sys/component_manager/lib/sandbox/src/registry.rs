@@ -1,12 +1,15 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
+use futures::FutureExt;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
+use zx::AsHandleRef;
 
 use crate::Capability;
 
@@ -39,6 +42,19 @@ pub(crate) fn insert(
     });
     let existing = registry.insert(koid, Entry { capability, task: Some(task) });
     assert!(existing.is_none());
+}
+
+/// Inserts a capability into the registry and returns a token that can be
+/// used to lookup the same capability later. Short form of [`insert`] when
+/// the capability is represented externally as a token.
+pub(crate) fn insert_token(capability: Capability) -> zx::EventPair {
+    let (watcher, token) = zx::EventPair::create();
+    insert(
+        capability,
+        token.basic_info().unwrap().koid,
+        fasync::OnSignals::new(watcher, zx::Signals::OBJECT_PEER_CLOSED).map(|_| ()),
+    );
+    token
 }
 
 /// Get a capability from the global registry and returns it, if it exists.

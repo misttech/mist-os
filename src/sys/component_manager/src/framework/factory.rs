@@ -80,6 +80,23 @@ impl FactoryCapabilityHost {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
+            fsandbox::FactoryRequest::ConnectToHandle {
+                capability,
+                server_end,
+                control_handle: _,
+            } => match sandbox::Capability::try_from(fsandbox::Capability::Handle(capability)) {
+                Ok(capability) => match capability {
+                    sandbox::Capability::OneShotHandle(handle) => {
+                        let server_end: ServerEnd<fsandbox::HandleMarker> = server_end.into();
+                        self.tasks.spawn(serve_handle(handle, server_end.into_stream().unwrap()));
+                    }
+                    _ => unreachable!(),
+                },
+                Err(err) => {
+                    warn!("Error converting token to capability: {err:?}");
+                    _ = server_end.close_with_epitaph(err.as_zx_status());
+                }
+            },
             fsandbox::FactoryRequest::ConnectToSender {
                 capability,
                 server_end,
@@ -132,6 +149,21 @@ impl FactoryCapabilityHost {
     }
 }
 
+async fn serve_handle(handle: sandbox::OneShotHandle, mut stream: fsandbox::HandleRequestStream) {
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            fsandbox::HandleRequest::GetHandle { responder } => {
+                if let Err(_err) = responder.send(handle.get_handle()) {
+                    return;
+                }
+            }
+            fsandbox::HandleRequest::_UnknownMethod { ordinal, .. } => {
+                warn!("Received unknown Handle request with ordinal {ordinal}");
+            }
+        }
+    }
+}
+
 async fn serve_sender(sender: sandbox::Sender, mut stream: fsandbox::SenderRequestStream) {
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
@@ -174,21 +206,84 @@ impl FrameworkCapability for FactoryFrameworkCapability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx},
-    };
+    use fidl::endpoints::create_endpoints;
+    use fidl_fuchsia_component_sandbox as fsandbox;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, HandleBased};
+    use futures::join;
+    use sandbox::OneShotHandle;
 
-    #[fuchsia::test]
-    async fn create_sender() {
+    fn factory() -> (fasync::TaskGroup, fsandbox::FactoryProxy) {
         let mut tasks = fasync::TaskGroup::new();
-
         let host = FactoryCapabilityHost::new();
         let (factory_proxy, stream) =
             endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
         tasks.spawn(async move {
             host.serve(stream).await.unwrap();
         });
+        (tasks, factory_proxy)
+    }
+
+    /// Tests that the OneShotHandle implementation of the GetHandle method
+    /// returns the handle held by the OneShotHandle.
+    #[fuchsia::test]
+    async fn one_shot_serve_get_handle() {
+        let (tasks, factory_proxy) = factory();
+
+        // Create an Event and get its koid.
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
+
+        let one_shot = OneShotHandle::from(event.into_handle());
+        let fidl_one_shot: fsandbox::HandleCapability = one_shot.into();
+
+        let (handle_client, handle_server) = create_endpoints::<fsandbox::HandleMarker>();
+        factory_proxy.connect_to_handle(fidl_one_shot, handle_server).unwrap();
+        let handle_proxy = handle_client.into_proxy().unwrap();
+
+        let client = async move {
+            let handle = handle_proxy.get_handle().await.unwrap().unwrap();
+
+            // The handle should be for same Event that was in the OneShotHandle.
+            let got_koid = handle.get_koid().unwrap();
+            assert_eq!(got_koid, expected_koid);
+        };
+
+        drop(factory_proxy);
+        join!(client, tasks.join());
+    }
+
+    /// Tests that the OneShotHandle implementation of the HandleCapability.GetHandle method
+    /// returns the Unavailable error if GetHandle is called twice.
+    #[fuchsia::test]
+    async fn one_shot_serve_get_handle_unavailable() {
+        let (tasks, factory_proxy) = factory();
+
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
+
+        let one_shot = OneShotHandle::from(event.into_handle());
+        let fidl_one_shot: fsandbox::HandleCapability = one_shot.into();
+
+        let (handle_client, handle_server) = create_endpoints::<fsandbox::HandleMarker>();
+        factory_proxy.connect_to_handle(fidl_one_shot, handle_server).unwrap();
+        let handle_proxy = handle_client.into_proxy().unwrap();
+
+        let client = async move {
+            let handle = handle_proxy.get_handle().await.unwrap().unwrap();
+
+            // The handle should be for same Event that was in the OneShotHandle.
+            let got_koid = handle.get_koid().unwrap();
+            assert_eq!(got_koid, expected_koid);
+        };
+
+        drop(factory_proxy);
+        join!(client, tasks.join());
+    }
+
+    #[fuchsia::test]
+    async fn create_sender() {
+        let (_tasks, factory_proxy) = factory();
 
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
@@ -212,14 +307,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_dictionary() {
-        let mut tasks = fasync::TaskGroup::new();
-
-        let host = FactoryCapabilityHost::new();
-        let (factory_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
-        tasks.spawn(async move {
-            host.serve(stream).await.unwrap();
-        });
+        let (_tasks, factory_proxy) = factory();
 
         let dict = factory_proxy.create_dictionary().await.unwrap();
         let dict = dict.into_proxy().unwrap();

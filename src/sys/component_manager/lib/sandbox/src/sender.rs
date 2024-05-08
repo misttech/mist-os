@@ -1,11 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use crate::{registry, CapabilityTrait, ConversionError, Open};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{channel::mpsc, FutureExt};
+use fuchsia_zircon::{self as zx};
+use futures::channel::mpsc;
 use std::{fmt::Debug, sync::Arc};
 use vfs::directory::entry::DirectoryEntry;
 
@@ -80,13 +80,7 @@ impl CapabilityTrait for Sender {
 
 impl From<Sender> for fsandbox::SenderCapability {
     fn from(value: Sender) -> Self {
-        let (watcher, token) = zx::EventPair::create();
-        registry::insert(
-            value.into(),
-            token.basic_info().unwrap().koid,
-            fasync::OnSignals::new(watcher, zx::Signals::OBJECT_PEER_CLOSED).map(|_| ()),
-        );
-        fsandbox::SenderCapability { token }
+        fsandbox::SenderCapability { token: registry::insert_token(value.into()) }
     }
 }
 
