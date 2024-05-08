@@ -492,6 +492,9 @@ class FuchsiaDevice(
             errors.FuchsiaControllerError: On communications failure.
             errors.Sl4FError: On communications failure.
         """
+        # Create a new Fuchsia controller context for new device connection.
+        self.fuchsia_controller.create_context()
+
         # Ensure device is healthy
         self.health_check()
 
@@ -647,7 +650,7 @@ class FuchsiaDevice(
         """
         _LOGGER.info("Waiting for %s to go online...", self.device_name)
         try:
-            self.fuchsia_controller.check_connection(timeout=timeout)
+            self.ffx.wait_for_rcs_connection(timeout=timeout)
             _LOGGER.info("%s is online.", self.device_name)
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FuchsiaDeviceError(
