@@ -3087,7 +3087,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant},
             CtxPair,
         },
         device::{
@@ -4235,7 +4235,7 @@ mod tests {
             socket_api
                 .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)), REMOTE_ID)
                 .unwrap();
-            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
                 core_ctx,
                 bindings_ctx,
@@ -4307,7 +4307,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
@@ -4324,7 +4324,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4339,7 +4339,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
@@ -4373,7 +4373,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
@@ -4390,7 +4390,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4405,7 +4405,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
@@ -4437,7 +4437,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 );
@@ -4454,7 +4454,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4469,7 +4469,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
                     Icmpv4ParameterProblemCode::PointerIndicatesError,
                 );
@@ -4519,7 +4519,7 @@ mod tests {
             socket_api
                 .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)), REMOTE_ID)
                 .unwrap();
-            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
                 core_ctx,
                 bindings_ctx,
@@ -4598,7 +4598,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4613,7 +4613,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4628,7 +4628,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 1),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
@@ -4662,7 +4662,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4677,7 +4677,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4692,7 +4692,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
@@ -4724,7 +4724,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4739,7 +4739,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -4754,7 +4754,7 @@ mod tests {
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
                 ("IcmpEchoBindingsContext::receive_icmp_error", 0),
             ],
-            |FakeCtxWithCoreCtx { core_ctx, bindings_ctx: _ }| {
+            |CtxPair { core_ctx, bindings_ctx: _ }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
                     Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType,
                 );
@@ -4769,7 +4769,7 @@ mod tests {
 
         /// Call `send_icmpv4_ttl_expired` with fake values.
         fn send_icmpv4_ttl_expired_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_ttl_expired(
                 core_ctx,
@@ -4787,7 +4787,7 @@ mod tests {
 
         /// Call `send_icmpv4_parameter_problem` with fake values.
         fn send_icmpv4_parameter_problem_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_parameter_problem(
                 core_ctx,
@@ -4806,7 +4806,7 @@ mod tests {
 
         /// Call `send_icmpv4_dest_unreachable` with fake values.
         fn send_icmpv4_dest_unreachable_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv4>,
         ) {
             send_icmpv4_dest_unreachable(
                 core_ctx,
@@ -4824,7 +4824,7 @@ mod tests {
 
         /// Call `send_icmpv6_ttl_expired` with fake values.
         fn send_icmpv6_ttl_expired_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_ttl_expired(
                 core_ctx,
@@ -4841,7 +4841,7 @@ mod tests {
 
         /// Call `send_icmpv6_packet_too_big` with fake values.
         fn send_icmpv6_packet_too_big_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_packet_too_big(
                 core_ctx,
@@ -4859,7 +4859,7 @@ mod tests {
 
         /// Call `send_icmpv6_parameter_problem` with fake values.
         fn send_icmpv6_parameter_problem_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_parameter_problem(
                 core_ctx,
@@ -4877,7 +4877,7 @@ mod tests {
 
         /// Call `send_icmpv6_dest_unreachable` with fake values.
         fn send_icmpv6_dest_unreachable_helper(
-            FakeCtxWithCoreCtx { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
+            CtxPair { core_ctx, bindings_ctx }: &mut FakeIcmpCtx<Ipv6>,
         ) {
             send_icmpv6_dest_unreachable(
                 core_ctx,
@@ -4943,18 +4943,14 @@ mod tests {
         }
 
         fn with_errors_per_second_v4(errors_per_second: u64) -> FakeIcmpCtx<Ipv4> {
-            FakeCtxWithCoreCtx::with_core_ctx(FakeIcmpCoreCtx::with_errors_per_second(
-                errors_per_second,
-            ))
+            CtxPair::with_core_ctx(FakeIcmpCoreCtx::with_errors_per_second(errors_per_second))
         }
         run_test::<Ipv4, _, _>(with_errors_per_second_v4, send_icmpv4_ttl_expired_helper);
         run_test::<Ipv4, _, _>(with_errors_per_second_v4, send_icmpv4_parameter_problem_helper);
         run_test::<Ipv4, _, _>(with_errors_per_second_v4, send_icmpv4_dest_unreachable_helper);
 
         fn with_errors_per_second_v6(errors_per_second: u64) -> FakeIcmpCtx<Ipv6> {
-            FakeCtxWithCoreCtx::with_core_ctx(FakeIcmpCoreCtx::with_errors_per_second(
-                errors_per_second,
-            ))
+            CtxPair::with_core_ctx(FakeIcmpCoreCtx::with_errors_per_second(errors_per_second))
         }
 
         run_test::<Ipv6, _, _>(with_errors_per_second_v6, send_icmpv6_ttl_expired_helper);

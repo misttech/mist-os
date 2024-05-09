@@ -249,8 +249,8 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _,
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeTimerCtxExt as _},
+            CtxPair, InstantContext as _, SendFrameContext as _,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::testutil::FakeIpDeviceIdCtx,
@@ -319,8 +319,8 @@ mod tests {
 
     #[test]
     fn stop_router_solicitation() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+        let CtxPair { mut core_ctx, mut bindings_ctx } =
+            CtxPair::with_default_bindings_ctx(|bindings_ctx| {
                 FakeCoreCtxImpl::with_state(FakeRsContext {
                     max_router_solicitations: NonZeroU8::new(1),
                     rs_state: RsState::new::<_, IntoCoreTimerCtx>(
@@ -384,8 +384,8 @@ mod tests {
         link_layer_bytes: Option<Vec<u8>>,
         expected_sll_bytes: Option<&[u8]>,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+        let CtxPair { mut core_ctx, mut bindings_ctx } =
+            CtxPair::with_default_bindings_ctx(|bindings_ctx| {
                 FakeCoreCtxImpl::with_state(FakeRsContext {
                     max_router_solicitations: NonZeroU8::new(max_router_solicitations),
                     rs_state: RsState::new::<_, IntoCoreTimerCtx>(

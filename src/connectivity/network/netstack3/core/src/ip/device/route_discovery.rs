@@ -280,7 +280,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt as _},
             CtxPair,
         },
         device::{
@@ -405,7 +405,7 @@ mod tests {
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(3));
 
     fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
-        FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeIpv6RouteDiscoveryContext {
                 state: Ipv6RouteDiscoveryState::new::<_, IntoCoreTimerCtx>(
                     bindings_ctx,
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn new_route_no_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         RouteDiscoveryHandler::update_route(
             &mut core_ctx,
@@ -488,7 +488,7 @@ mod tests {
 
     #[test]
     fn new_route_already_exists() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Fake the route already being present in the routing table.
         assert!(core_ctx.state.route_table.route_table.insert(ROUTE1));
@@ -511,7 +511,7 @@ mod tests {
 
     #[test]
     fn invalidated_route_not_found() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
 
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn new_route_with_infinite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn update_route_from_infinite_to_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn invalidate_route_with_infinite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -572,7 +572,7 @@ mod tests {
     }
     #[test]
     fn new_route_with_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -585,7 +585,7 @@ mod tests {
 
     #[test]
     fn update_route_from_finite_to_infinite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn update_route_from_finite_to_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -631,7 +631,7 @@ mod tests {
 
     #[test]
     fn invalidate_route_with_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -645,7 +645,7 @@ mod tests {
 
     #[test]
     fn invalidate_all_routes() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
         discover_new_route(
             &mut core_ctx,
             &mut bindings_ctx,

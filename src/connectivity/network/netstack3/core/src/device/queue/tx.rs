@@ -245,7 +245,10 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx},
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx},
+            CtxPair,
+        },
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
             queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
@@ -371,11 +374,11 @@ mod tests {
 
     #[test]
     fn noqueue() {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         let body = Buf::new(vec![0], ..);
 
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
                 core_ctx,
@@ -402,20 +405,20 @@ mod tests {
             Ok(WorkQueueReport::AllDone),
         );
 
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), []);
     }
 
     #[test]
     fn fifo_queue_and_dequeue() {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         ctx.transmit_queue_api()
             .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::Fifo);
 
         for _ in 0..2 {
-            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             for i in 0..MAX_TX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
@@ -472,7 +475,7 @@ mod tests {
                 Ok(WorkQueueReport::AllDone),
             );
 
-            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
                 core::mem::take(&mut core_ctx.state.transmitted_packets),
                 (MAX_BATCH_SIZE * (MAX_TX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_TX_QUEUED_LEN)
@@ -498,12 +501,12 @@ mod tests {
 
     #[test]
     fn device_not_ready() {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         ctx.transmit_queue_api()
             .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::Fifo);
 
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
@@ -523,7 +526,7 @@ mod tests {
             ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
             Err(DeviceSendFrameError::DeviceNotReady(())),
         );
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.transmitted_packets, []);
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             &bindings_ctx.state;
@@ -540,7 +543,7 @@ mod tests {
             ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
             Ok(WorkQueueReport::AllDone),
         );
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), [body]);
     }
@@ -548,12 +551,12 @@ mod tests {
     #[test_case(true; "device not ready")]
     #[test_case(false; "device ready")]
     fn drain_before_noqueue(device_not_ready: bool) {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         ctx.transmit_queue_api()
             .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::Fifo);
 
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
@@ -572,7 +575,7 @@ mod tests {
         ctx.transmit_queue_api()
             .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::None);
 
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             &bindings_ctx.state;
         assert_eq!(woken_tx_tasks, &[]);

@@ -184,10 +184,7 @@ pub(crate) mod testutil {
     use core::fmt::Debug;
 
     #[cfg(test)]
-    use crate::{
-        context::CtxPair,
-        filter::{FilterBindingsTypes, FilterHandlerProvider},
-    };
+    use crate::filter::{FilterBindingsTypes, FilterHandlerProvider};
     use crate::{
         device::link::LinkDevice,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
@@ -229,14 +226,6 @@ pub(crate) mod testutil {
             *inner = Some(result);
         }
     }
-
-    #[cfg(test)]
-    pub(crate) type FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> =
-        CtxPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>>;
-
-    #[cfg(test)]
-    pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, BindingsCtxState> =
-        FakeCtxWithCoreCtx<FakeCoreCtx<S, Meta, DeviceId>, TimerId, Event, BindingsCtxState>;
 
     #[cfg(test)]
     impl<I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>

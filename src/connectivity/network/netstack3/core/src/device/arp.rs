@@ -658,8 +658,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetworkSpec,
-                WithFakeFrameContext,
+                FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeNetworkSpec, WithFakeFrameContext,
             },
             CtxPair, InstantContext as _, TimerHandler,
         },
@@ -735,7 +734,7 @@ mod tests {
     >;
 
     fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
-        FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeArpCtx::new(bindings_ctx))
         })
     }
@@ -955,7 +954,7 @@ mod tests {
         // Test that, when we receive a gratuitous ARP request, we cache the
         // sender's address information, and we do not send a response.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -983,7 +982,7 @@ mod tests {
         // Test that, when we receive a gratuitous ARP response, we cache the
         // sender's address information, and we do not send a response.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -1012,7 +1011,7 @@ mod tests {
         // a gratuitous ARP for the same host, we cancel the timer and notify
         // the device layer.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Trigger link resolution.
         assert_neighbor_unknown(
@@ -1060,7 +1059,7 @@ mod tests {
         // Test that, when we receive an ARP request, we cache the sender's
         // address information and send an ARP response.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         send_arp_packet(
             &mut core_ctx,
@@ -1147,7 +1146,7 @@ mod tests {
                 host_iter.clone().map(|cfg| {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
                     let mut ctx = new_context();
-                    let FakeCtx { core_ctx, bindings_ctx: _ } = &mut ctx;
+                    let CtxPair { core_ctx, bindings_ctx: _ } = &mut ctx;
                     core_ctx.state.hw_addr = UnicastAddr::new(*hw_addr).unwrap();
                     core_ctx.state.proto_addr = Some(*proto_addr);
                     (*name, ctx)
@@ -1181,7 +1180,7 @@ mod tests {
         } = requested_remote_cfg;
 
         // Trigger link resolution.
-        network.with_context(local_name, |FakeCtx { core_ctx, bindings_ctx }| {
+        network.with_context(local_name, |CtxPair { core_ctx, bindings_ctx }| {
             assert_neighbor_unknown(
                 core_ctx,
                 FakeLinkDeviceId,
@@ -1223,7 +1222,7 @@ mod tests {
 
         // The requested remote should have populated its ARP cache with the local's
         // information.
-        network.with_context(requested_remote_name, |FakeCtx { core_ctx, bindings_ctx: _ }| {
+        network.with_context(requested_remote_name, |CtxPair { core_ctx, bindings_ctx: _ }| {
             assert_dynamic_neighbor_with_addr(
                 core_ctx,
                 FakeLinkDeviceId,
@@ -1251,7 +1250,7 @@ mod tests {
 
         // The local should have populated its cache with the remote's
         // information.
-        network.with_context(local_name, |FakeCtx { core_ctx, bindings_ctx: _ }| {
+        network.with_context(local_name, |CtxPair { core_ctx, bindings_ctx: _ }| {
             assert_dynamic_neighbor_with_addr(
                 core_ctx,
                 FakeLinkDeviceId,
@@ -1265,7 +1264,7 @@ mod tests {
                 // The non-requested_remote should not have populated its ARP cache.
                 network.with_context(
                     *unrequested_remote_name,
-                    |FakeCtx { core_ctx, bindings_ctx: _ }| {
+                    |CtxPair { core_ctx, bindings_ctx: _ }| {
                         // The non-requested_remote should not have sent an ARP response.
                         assert_empty(core_ctx.frames().iter());
 
@@ -1292,7 +1291,7 @@ mod tests {
         frame_dst: FrameDestination,
         expect_solicited: bool,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Trigger link resolution.
         assert_neighbor_unknown(

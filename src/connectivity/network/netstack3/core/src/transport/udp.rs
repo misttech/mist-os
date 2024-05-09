@@ -2599,7 +2599,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx},
+            testutil::{FakeBindingsCtx, FakeCoreCtx},
             CtxPair,
         },
         device::{
@@ -6206,11 +6206,10 @@ mod tests {
         const REMOTE_IP: Ipv4Addr = ip_v4!("8.8.8.8");
         const REMOTE_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
         let bind_addr = bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED);
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
-                vec![SpecifiedAddr::new(REMOTE_IP).unwrap()],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
+            vec![SpecifiedAddr::new(REMOTE_IP).unwrap()],
+        ));
 
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
         let listener = api.create();
@@ -6259,11 +6258,10 @@ mod tests {
     #[test_case(DualStackBindAddr::V4Any, false; "v4 any bind v4 second")]
     #[test_case(DualStackBindAddr::V4Specific, false; "v4 specific bind v4 second")]
     fn dual_stack_bind_conflict(bind_addr: DualStackBindAddr, bind_v4_first: bool) {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
-                vec![],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
+            vec![],
+        ));
 
         let v4_listener = UdpApi::<Ipv4, _>::new(ctx.as_mut()).create();
         let v6_listener = UdpApi::<Ipv6, _>::new(ctx.as_mut()).create();
@@ -6300,14 +6298,13 @@ mod tests {
     #[test_case(IpVersion::V4; "v4_is_constrained")]
     #[test_case(IpVersion::V6; "v6_is_constrained")]
     fn dual_stack_local_port_alloc(ip_version_with_constrained_ports: IpVersion) {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![
-                    SpecifiedAddr::new(V4_LOCAL_IP.to_ip_addr()).unwrap(),
-                    SpecifiedAddr::new(V6_LOCAL_IP.to_ip_addr()).unwrap(),
-                ],
-                vec![],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![
+                SpecifiedAddr::new(V4_LOCAL_IP.to_ip_addr()).unwrap(),
+                SpecifiedAddr::new(V6_LOCAL_IP.to_ip_addr()).unwrap(),
+            ],
+            vec![],
+        ));
 
         // Specifically selected to be in the `EPHEMERAL_RANGE`.
         const AVAILABLE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(54321));
@@ -6354,11 +6351,10 @@ mod tests {
     #[test_case(DualStackBindAddr::V4Any; "v4 any")]
     #[test_case(DualStackBindAddr::V4Specific; "v4 specific")]
     fn dual_stack_enable(bind_addr: DualStackBindAddr) {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
-                vec![],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
+            vec![],
+        ));
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
 
         let bind_addr = bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED);
@@ -6392,11 +6388,10 @@ mod tests {
     #[test]
     fn dual_stack_bind_unassigned_v4_address() {
         const NOT_ASSIGNED_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:8.8.8.8");
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
-                vec![],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![SpecifiedAddr::new(V4_LOCAL_IP).unwrap()],
+            vec![],
+        ));
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
 
         let listener = api.create();
@@ -6416,11 +6411,10 @@ mod tests {
     // state maps, so make sure both entries are properly removed.
     #[test]
     fn dual_stack_connect_cleans_up_existing_listener() {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![Ipv6::FAKE_CONFIG.local_ip],
-                vec![Ipv6::FAKE_CONFIG.remote_ip],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![Ipv6::FAKE_CONFIG.local_ip],
+            vec![Ipv6::FAKE_CONFIG.remote_ip],
+        ));
 
         const DUAL_STACK_ANY_ADDR: Option<ZonedAddr<SpecifiedAddr<Ipv6Addr>, FakeDeviceId>> = None;
 
@@ -6484,16 +6478,15 @@ mod tests {
     #[test_case(V6_LOCAL_IP, true; "v6 specified dual stack enabled")]
     #[test_case(V6_LOCAL_IP, false; "v6 specified dual stack disabled")]
     fn dual_stack_get_info(bind_addr: Ipv6Addr, enable_dual_stack: bool) {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs::<
-                SpecifiedAddr<IpAddr>,
-            >(
-                vec![
-                    SpecifiedAddr::new(V4_LOCAL_IP).unwrap().into(),
-                    SpecifiedAddr::new(V6_LOCAL_IP).unwrap().into(),
-                ],
-                vec![],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs::<
+            SpecifiedAddr<IpAddr>,
+        >(
+            vec![
+                SpecifiedAddr::new(V4_LOCAL_IP).unwrap().into(),
+                SpecifiedAddr::new(V6_LOCAL_IP).unwrap().into(),
+            ],
+            vec![],
+        ));
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
 
         let listener = api.create();
@@ -6524,16 +6517,15 @@ mod tests {
         // Ensure that when a socket is removed, it doesn't leave behind state
         // in the demultiplexing maps. Do this by binding a new socket at the
         // same address and asserting success.
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs::<
-                SpecifiedAddr<IpAddr>,
-            >(
-                vec![
-                    SpecifiedAddr::new(V4_LOCAL_IP).unwrap().into(),
-                    SpecifiedAddr::new(V6_LOCAL_IP).unwrap().into(),
-                ],
-                vec![],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs::<
+            SpecifiedAddr<IpAddr>,
+        >(
+            vec![
+                SpecifiedAddr::new(V4_LOCAL_IP).unwrap().into(),
+                SpecifiedAddr::new(V6_LOCAL_IP).unwrap().into(),
+            ],
+            vec![],
+        ));
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
 
         let mut bind_listener = || {
@@ -7101,11 +7093,10 @@ mod tests {
     #[test_case(OriginalSocketState::Listener; "listener")]
     #[test_case(OriginalSocketState::Connected; "connected")]
     fn set_get_dual_stack_enabled_v4(original_state: OriginalSocketState) {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![Ipv4::FAKE_CONFIG.local_ip],
-                vec![Ipv4::FAKE_CONFIG.remote_ip],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![Ipv4::FAKE_CONFIG.local_ip],
+            vec![Ipv4::FAKE_CONFIG.remote_ip],
+        ));
         let mut api = UdpApi::<Ipv4, _>::new(ctx.as_mut());
         let socket = original_state.create_socket(&mut api);
 
@@ -7127,11 +7118,10 @@ mod tests {
         original_state: OriginalSocketState,
         expected_result: Result<(), SetDualStackEnabledError>,
     ) {
-        let mut ctx =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-                vec![Ipv6::FAKE_CONFIG.local_ip],
-                vec![Ipv6::FAKE_CONFIG.remote_ip],
-            ));
+        let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+            vec![Ipv6::FAKE_CONFIG.local_ip],
+            vec![Ipv6::FAKE_CONFIG.remote_ip],
+        ));
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
         let socket = original_state.create_socket(&mut api);
 

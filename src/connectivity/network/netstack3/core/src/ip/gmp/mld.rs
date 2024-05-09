@@ -436,7 +436,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeInstant, FakeTimerCtxExt},
-            InstantContext as _, SendFrameContext,
+            CtxPair, InstantContext as _, SendFrameContext,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -512,14 +512,7 @@ mod tests {
         }
     }
 
-    type FakeCtxImpl = crate::context::testutil::FakeCtx<
-        FakeMldCtx,
-        MldTimerId<FakeWeakDeviceId<FakeDeviceId>>,
-        MldFrameMetadata<FakeDeviceId>,
-        (),
-        FakeDeviceId,
-        (),
-    >;
+    type FakeCtxImpl = CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
     type FakeCoreCtxImpl = crate::context::testutil::FakeCoreCtx<
         FakeMldCtx,
         MldFrameMetadata<FakeDeviceId>,

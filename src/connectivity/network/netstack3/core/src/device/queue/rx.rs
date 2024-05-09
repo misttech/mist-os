@@ -164,7 +164,10 @@ mod tests {
     use packet::Buf;
 
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx},
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx},
+            CtxPair,
+        },
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
             queue::{api::ReceiveQueueApi, MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN},
@@ -248,10 +251,10 @@ mod tests {
 
     #[test]
     fn queue_and_dequeue() {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         for _ in 0..2 {
-            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             for i in 0..MAX_RX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
@@ -302,7 +305,7 @@ mod tests {
                 ctx.receive_queue_api().handle_queued_frames(&FakeLinkDeviceId),
                 WorkQueueReport::AllDone
             );
-            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
                 core::mem::take(&mut core_ctx.state.handled_frames),
                 (MAX_BATCH_SIZE * (MAX_RX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_RX_QUEUED_LEN)

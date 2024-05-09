@@ -2607,8 +2607,8 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, FakeNetwork,
-                FakeNetworkLinks, FakeTimerCtxExt as _, WithFakeFrameContext,
+                FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeNetwork, FakeNetworkLinks,
+                FakeTimerCtxExt as _, WithFakeFrameContext,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
@@ -2701,9 +2701,7 @@ mod tests {
     }
 
     fn new_context<I: Ip>() -> CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>> {
-        FakeCtxWithCoreCtx::with_default_bindings_ctx(|bindings_ctx| {
-            FakeCoreCtxImpl::<I>::new(bindings_ctx)
-        })
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| FakeCoreCtxImpl::<I>::new(bindings_ctx))
     }
 
     impl<I: Ip> DeviceIdContext<FakeLinkDevice> for FakeCoreCtxImpl<I> {
@@ -3424,7 +3422,7 @@ mod tests {
 
     #[ip_test]
     fn incomplete_to_stale_on_probe<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in INCOMPLETE.
         let queued_frame = init_incomplete_neighbor(&mut core_ctx, &mut bindings_ctx, true);
@@ -3455,7 +3453,7 @@ mod tests {
     #[test_case(false, true; "unsolicited override")]
     #[test_case(false, false; "unsolicited non-override")]
     fn incomplete_on_confirmation<I: Ip + TestIpExt>(solicited_flag: bool, override_flag: bool) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in INCOMPLETE.
         let queued_frame = init_incomplete_neighbor(&mut core_ctx, &mut bindings_ctx, true);
@@ -3492,7 +3490,7 @@ mod tests {
 
     #[ip_test]
     fn reachable_to_stale_on_timeout<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3526,7 +3524,7 @@ mod tests {
         initial_state: InitialState,
         update_link_address: bool,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let initial_state = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3574,7 +3572,7 @@ mod tests {
         initial_state: InitialState,
         override_flag: bool,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3616,7 +3614,7 @@ mod tests {
     >(
         initial_state: InitialState,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3658,7 +3656,7 @@ mod tests {
         initial_state: InitialState,
         override_flag: bool,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let expected_state =
@@ -3692,7 +3690,7 @@ mod tests {
     >(
         initial_state: InitialState,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3725,7 +3723,7 @@ mod tests {
 
     #[ip_test]
     fn reachable_to_reachable_on_probe_with_same_address<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3759,7 +3757,7 @@ mod tests {
     fn reachable_to_stale_on_non_override_confirmation_with_different_address<I: Ip + TestIpExt>(
         solicited_flag: bool,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in REACHABLE.
         init_reachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3800,7 +3798,7 @@ mod tests {
         initial_state: InitialState,
         solicited_flag: bool,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let initial_state = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3825,7 +3823,7 @@ mod tests {
 
     #[ip_test]
     fn stale_to_delay_on_packet_sent<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in STALE.
         init_stale_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -3872,7 +3870,7 @@ mod tests {
         initial_state: InitialState,
         expected_initial_event: NudEvent,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor.
         let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -3920,7 +3918,7 @@ mod tests {
 
     #[ip_test]
     fn unreachable_probes_with_exponential_backoff_while_packets_sent<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_unreachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
 
@@ -4047,7 +4045,7 @@ mod tests {
     #[test_case(true; "solicited confirmation")]
     #[test_case(false; "unsolicited confirmation")]
     fn confirmation_should_not_create_entry<I: Ip + TestIpExt>(solicited_flag: bool) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         let link_addr = FakeLinkAddress([1]);
         NudHandler::handle_neighbor_update(
@@ -4068,7 +4066,7 @@ mod tests {
     #[test_case(true; "set_with_dynamic")]
     #[test_case(false; "set_with_static")]
     fn pending_frames<I: Ip + TestIpExt>(dynamic: bool) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         // Send up to the maximum number of pending frames to some neighbor
@@ -4183,7 +4181,7 @@ mod tests {
 
     #[ip_test]
     fn static_neighbor<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_static_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1, ExpectedEvent::Added);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -4209,7 +4207,7 @@ mod tests {
 
     #[ip_test]
     fn dynamic_neighbor<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_stale_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -4248,7 +4246,7 @@ mod tests {
 
     #[ip_test]
     fn send_solicitation_on_lookup<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4312,7 +4310,7 @@ mod tests {
 
     #[ip_test]
     fn solicitation_failure_in_incomplete<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4359,7 +4357,7 @@ mod tests {
 
     #[ip_test]
     fn solicitation_failure_in_probe<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4402,7 +4400,7 @@ mod tests {
 
     #[ip_test]
     fn flush_entries<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4458,7 +4456,7 @@ mod tests {
 
     #[ip_test]
     fn delete_dynamic_entry<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4548,7 +4546,7 @@ mod tests {
                 observer
             })
             .collect::<Vec<_>>();
-        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
 
         // We should have initialized an incomplete neighbor and sent a neighbor probe
@@ -4632,7 +4630,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
 
         // We should have initialized an incomplete neighbor and sent a neighbor probe
@@ -4687,7 +4685,7 @@ mod tests {
         initial_state: InitialState,
         should_transition_to_reachable: bool,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let base_reachable_time = core_ctx.inner.base_reachable_time().get();
 
         let initial = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
@@ -4790,7 +4788,7 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_retains_static_entries<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Add `MAX_ENTRIES` STALE dynamic neighbors and `MAX_ENTRIES` static
         // neighbors to the neighbor table, interleaved to avoid accidental
@@ -4837,7 +4835,7 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_retains_in_use_entries<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Add enough static entries that the NUD table is near maximum capacity.
         for i in 0..MAX_ENTRIES - 1 {
@@ -4878,7 +4876,7 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_triggered_on_new_stale_entry<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
         core_ctx.nud.state.last_gc = Some(bindings_ctx.now());
 
@@ -4923,7 +4921,7 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_triggered_on_transition_to_unreachable<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
         core_ctx.nud.state.last_gc = Some(bindings_ctx.now());
 
@@ -4968,7 +4966,7 @@ mod tests {
 
     #[ip_test]
     fn garbage_collection_not_triggered_on_new_incomplete_entry<I: Ip + TestIpExt>() {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Fill the neighbor table to maximum capacity with static entries.
         for i in 0..MAX_ENTRIES {

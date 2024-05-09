@@ -1729,7 +1729,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _},
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt as _},
             CtxPair,
         },
         device::{
@@ -1912,7 +1912,7 @@ mod tests {
         dad_transmits: Option<NonZeroU16>,
         retrans_timer: Duration,
     ) -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
-        FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config,
                 dad_transmits,
@@ -1953,7 +1953,7 @@ mod tests {
         valid_lifetime_secs: u32,
         enable_stable_addresses: bool,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses, ..Default::default() },
             Default::default(),
             None,
@@ -1984,7 +1984,7 @@ mod tests {
     #[test_case(0; "deprecated")]
     #[test_case(1; "preferred")]
     fn generate_stable_address(preferred_lifetime_secs: u32) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             Default::default(),
             None,
@@ -2038,7 +2038,7 @@ mod tests {
     fn stable_address_conflict() {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             FakeSlaacAddrs {
                 slaac_addrs: Default::default(),
@@ -2071,7 +2071,7 @@ mod tests {
     fn remove_stable_address(reason: AddressRemovedReason) {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             Default::default(),
             None,
@@ -2239,7 +2239,7 @@ mod tests {
             effective_new_vl_secs,
         }: RefreshStableAddressTimersTest,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             Default::default(),
             None,
@@ -2441,7 +2441,7 @@ mod tests {
             enable,
         }: DontGenerateTemporaryAddressTest,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
                 temporary_address_configuration: enable.then(|| {
                     TemporarySlaacAddressConfiguration {
@@ -2577,7 +2577,7 @@ mod tests {
         let pl_config = Duration::from_secs(pl_config.into());
         let regen_advance = regen_advance(temp_idgen_retries, retrans_timer, dad_transmits);
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
                 temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
                     temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(

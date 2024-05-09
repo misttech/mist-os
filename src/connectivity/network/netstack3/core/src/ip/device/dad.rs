@@ -422,8 +422,8 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeTimerCtxExt as _},
-            InstantContext as _, SendFrameContext as _, TimerHandler,
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeTimerCtxExt as _},
+            CtxPair, InstantContext as _, SendFrameContext as _, TimerHandler,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::{
@@ -587,6 +587,8 @@ mod tests {
         unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
     const DAD_ADDRESS: UnicastAddr<Ipv6Addr> =
         unsafe { UnicastAddr::new_unchecked(Ipv6Addr::new([0xa, 0, 0, 0, 0, 0, 0, 1])) };
+
+    type FakeCtx = CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
 
     #[test]
     #[should_panic(expected = "expected address to be tentative")]

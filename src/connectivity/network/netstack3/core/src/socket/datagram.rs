@@ -4973,8 +4973,10 @@ pub(crate) mod testutil {
     use net_types::{ip::IpAddr, Witness};
 
     use crate::{
-        context::testutil::FakeCtxWithCoreCtx, device::testutil::FakeStrongDeviceId,
-        ip::socket::testutil::FakeDeviceConfig, testutil::TestIpExt,
+        context::{testutil::FakeBindingsCtx, CtxPair},
+        device::testutil::FakeStrongDeviceId,
+        ip::socket::testutil::FakeDeviceConfig,
+        testutil::TestIpExt,
     };
 
     // Helper function to ensure the Fake CoreCtx and BindingsCtx are setup with
@@ -4991,7 +4993,7 @@ pub(crate) mod testutil {
         remote_ip: SpecifiedAddr<IpAddr>,
         devices: impl IntoIterator<Item = D>,
         core_ctx_builder: impl FnOnce(Vec<FakeDeviceConfig<D, SpecifiedAddr<IpAddr>>>) -> CC,
-    ) -> FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> {
+    ) -> CtxPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>> {
         // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
         fn unmap_ip(addr: IpAddr) -> IpAddr {
             match addr {
@@ -5017,7 +5019,7 @@ pub(crate) mod testutil {
         // If the given remote_ip is unspecified, we won't be able to
         // connect; abort the test.
         let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
-        FakeCtxWithCoreCtx::with_core_ctx(core_ctx_builder(
+        CtxPair::with_core_ctx(core_ctx_builder(
             devices
                 .into_iter()
                 .map(|device| FakeDeviceConfig {
@@ -5049,7 +5051,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::FakeCtxWithCoreCtx,
+        context::CtxPair,
         data_structures::socketmap::SocketMap,
         device::testutil::{
             FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
@@ -6087,7 +6089,7 @@ mod test {
         local_ip: I::Addr,
         remote_ip: SpecifiedAddr<I::Addr>,
     ) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+        let CtxPair { mut core_ctx, mut bindings_ctx } =
             testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
@@ -6192,7 +6194,7 @@ mod test {
     #[test_case(net_ip_v6!("::FFFF:192.0.2.1"), ShutdownType::SendAndReceive; "other_stack_send_and_receive")]
     fn set_get_shutdown_dualstack(remote_ip: Ipv6Addr, shutdown: ShutdownType) {
         let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote_ip should be specified");
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+        let CtxPair { mut core_ctx, mut bindings_ctx } =
             testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 Ipv6::UNSPECIFIED_ADDRESS.into(),
                 remote_ip.into(),
@@ -6259,7 +6261,7 @@ mod test {
         const DEVICE_ID1: MultipleDevicesId = MultipleDevicesId::A;
         const DEVICE_ID2: MultipleDevicesId = MultipleDevicesId::B;
 
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
+        let CtxPair { mut core_ctx, mut bindings_ctx } =
             testutil::setup_fake_ctx_with_dualstack_conn_addrs(
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
