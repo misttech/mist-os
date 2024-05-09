@@ -13,7 +13,9 @@ use crate::{
     context::FilterBindingsContext, logic::FilterTimerId, packets::TransportPacket,
     FilterBindingsTypes, IpPacket, MaybeTransportPacket,
 };
-use netstack3_base::{sync::Mutex, CoreTimerContext, Instant, TimerContext};
+use netstack3_base::{
+    sync::Mutex, CoreTimerContext, Inspectable, Inspector, Instant, TimerContext,
+};
 
 /// The time from the end of one GC cycle to the beginning of the next.
 const GC_INTERVAL: Duration = Duration::from_secs(10);
@@ -59,6 +61,11 @@ struct TableInner<I: IpExt, BT: FilterBindingsTypes, E> {
     table: HashMap<Tuple<I>, Arc<ConnectionShared<I, BT, E>>>,
     /// A timer for triggering garbage collection events.
     gc_timer: BT::Timer,
+    /// The number of times the table size limit was hit.
+    table_limit_hits: u32,
+    /// Of the times the table limit was hit, the number of times we had to drop
+    /// a packet because we couldn't make space in the table.
+    table_limit_drops: u32,
 }
 
 #[allow(dead_code)]
@@ -90,6 +97,8 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                     bindings_ctx,
                     FilterTimerId::ConntrackGc(IpVersionMarker::<I>::new()),
                 ),
+                table_limit_hits: 0,
+                table_limit_drops: 0,
             }),
         }
     }
@@ -117,13 +126,14 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         };
 
         let mut guard = self.inner.lock();
-        let table = &mut guard.table;
 
         // We multiply the table size limit because each connection is inserted
         // into the table twice, once for the original tuple and again for the
         // reply tuple.
-        if table.len() >= TABLE_SIZE_LIMIT {
-            if let Some((original_tuple, reply_tuple)) = table
+        if guard.table.len() >= TABLE_SIZE_LIMIT {
+            guard.table_limit_hits = guard.table_limit_hits.saturating_add(1);
+            if let Some((original_tuple, reply_tuple)) = guard
+                .table
                 .iter()
                 .filter_map(|(_, conn)| {
                     if conn.state.lock().established {
@@ -134,9 +144,10 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                 })
                 .next()
             {
-                assert!(table.remove(&original_tuple).is_some());
-                assert!(table.remove(&reply_tuple).is_some());
+                assert!(guard.table.remove(&original_tuple).is_some());
+                assert!(guard.table.remove(&reply_tuple).is_some());
             } else {
+                guard.table_limit_drops = guard.table_limit_drops.saturating_add(1);
                 return Err(FinalizeConnectionError::TableFull);
             }
         }
@@ -155,17 +166,17 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         // be the case that packets for the same flow are handled sequentially,
         // so each subsequent packet should see the connection created by the
         // first one.
-        if table.contains_key(&exclusive.inner.original_tuple)
-            || table.contains_key(&exclusive.inner.reply_tuple)
+        if guard.table.contains_key(&exclusive.inner.original_tuple)
+            || guard.table.contains_key(&exclusive.inner.reply_tuple)
         {
             Err(FinalizeConnectionError::Conflict)
         } else {
             let shared = exclusive.make_shared();
 
-            let res = table.insert(shared.inner.original_tuple.clone(), shared.clone());
+            let res = guard.table.insert(shared.inner.original_tuple.clone(), shared.clone());
             debug_assert!(res.is_none());
 
-            let res = table.insert(shared.inner.reply_tuple.clone(), shared);
+            let res = guard.table.insert(shared.inner.reply_tuple.clone(), shared);
             debug_assert!(res.is_none());
 
             // For the most part, this will only schedule the timer once, when
@@ -260,6 +271,34 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
     }
 }
 
+impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I, BT, E> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        let guard = self.inner.lock();
+
+        inspector.record_usize("num_connections", guard.table.len() / 2);
+        inspector.record_uint("table_limit_hits", guard.table_limit_hits);
+        inspector.record_uint("table_limit_drops", guard.table_limit_drops);
+
+        inspector.record_child("connections", |inspector| {
+            guard
+                .table
+                .iter()
+                .filter_map(|(tuple, connection)| {
+                    if *tuple == connection.inner.original_tuple {
+                        Some(connection)
+                    } else {
+                        None
+                    }
+                })
+                .for_each(|connection| {
+                    inspector.record_unnamed_child(|inspector| {
+                        inspector.delegate_inspectable(connection.as_ref())
+                    });
+                });
+        });
+    }
+}
+
 /// A tuple for a flow in a single direction.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Tuple<I: IpExt> {
@@ -302,6 +341,16 @@ impl<I: IpExt> Tuple<I> {
             src_port_or_id: self.dst_port_or_id,
             dst_port_or_id: self.src_port_or_id,
         }
+    }
+}
+
+impl<I: IpExt> Inspectable for Tuple<I> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        inspector.record_debug("protocol", self.protocol);
+        inspector.record_ip_addr("src_addr", self.src_addr);
+        inspector.record_ip_addr("dst_addr", self.dst_addr);
+        inspector.record_usize("src_port_or_id", self.src_port_or_id);
+        inspector.record_usize("dst_port_or_id", self.dst_port_or_id);
     }
 }
 
@@ -436,6 +485,25 @@ pub struct ConnectionCommon<I: IpExt, E> {
     pub(crate) external_data: E,
 }
 
+impl<I: IpExt, E: Inspectable> Inspectable for ConnectionCommon<I, E> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        inspector.record_child("original_tuple", |inspector| {
+            inspector.delegate_inspectable(&self.original_tuple);
+        });
+
+        inspector.record_child("reply_tuple", |inspector| {
+            inspector.delegate_inspectable(&self.reply_tuple);
+        });
+
+        // We record external_data as an inspectable because that allows us to
+        // prevent accidentally leaking data, which could happen if we just used
+        // the Debug impl.
+        inspector.record_child("external_data", |inspector| {
+            inspector.delegate_inspectable(&self.external_data);
+        });
+    }
+}
+
 /// Dynamic per-connection state.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
@@ -464,6 +532,13 @@ impl<BT: FilterBindingsTypes> ConnectionState<BT> {
         }
 
         Ok(())
+    }
+}
+
+impl<BT: FilterBindingsTypes> Inspectable for ConnectionState<BT> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        inspector.record_bool("established", self.established);
+        inspector.record_inspectable_value("last_packet_time", &self.last_packet_time);
     }
 }
 
@@ -522,6 +597,13 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
         } else {
             duration >= CONNECTION_EXPIRY_TIME_UNESTABLISHED
         }
+    }
+}
+
+impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for ConnectionShared<I, BT, E> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        inspector.delegate_inspectable(&self.inner);
+        inspector.delegate_inspectable(&*self.state.lock());
     }
 }
 
@@ -1058,34 +1140,34 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), false);
     }
 
+    fn make_packets<I: IpExt + TestIpExt>(
+        index: usize,
+    ) -> (FakeIpPacket<I, FakeTcpSegment>, FakeIpPacket<I, FakeTcpSegment>) {
+        // This ensures that, no matter what size MAXIMUM_CONNECTIONS is
+        // (under 2^32, at least), we'll always have unique src and dst
+        // ports, and thus unique connections.
+        assert!(index < u32::MAX as usize);
+        let src = (index % (u16::MAX as usize)) as u16;
+        let dst = (index / (u16::MAX as usize)) as u16;
+
+        let packet = FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeTcpSegment { src_port: src, dst_port: dst },
+        };
+        let reply_packet = FakeIpPacket::<I, _> {
+            src_ip: I::DST_ADDR,
+            dst_ip: I::SRC_ADDR,
+            body: FakeTcpSegment { src_port: dst, dst_port: src },
+        };
+
+        (packet, reply_packet)
+    }
+
     #[ip_test]
     #[test_case(true; "existing connections established")]
     #[test_case(false; "existing connections unestablished")]
     fn table_size_limit<I: Ip + IpExt + TestIpExt>(established: bool) {
-        fn make_packets<I: IpExt + TestIpExt>(
-            index: usize,
-        ) -> (FakeIpPacket<I, FakeTcpSegment>, FakeIpPacket<I, FakeTcpSegment>) {
-            // This ensures that, no matter what size MAXIMUM_CONNECTIONS is
-            // (under 2^32, at least), we'll always have unique src and dst
-            // ports, and thus unique connections.
-            assert!(index < u32::MAX as usize);
-            let src = (index % (u16::MAX as usize)) as u16;
-            let dst = (index / (u16::MAX as usize)) as u16;
-
-            let packet = FakeIpPacket::<I, _> {
-                src_ip: I::SRC_ADDR,
-                dst_ip: I::DST_ADDR,
-                body: FakeTcpSegment { src_port: src, dst_port: dst },
-            };
-            let reply_packet = FakeIpPacket::<I, _> {
-                src_ip: I::DST_ADDR,
-                dst_ip: I::SRC_ADDR,
-                body: FakeTcpSegment { src_port: dst, dst_port: src },
-            };
-
-            (packet, reply_packet)
-        }
-
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
         bindings_ctx.sleep(Duration::from_secs(1));
         let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
@@ -1143,6 +1225,136 @@ mod tests {
             assert!(table
                 .finalize_connection(&mut bindings_ctx, conn)
                 .expect("connection finalize should succeed"));
+        }
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    #[ip_test]
+    fn inspect<I: Ip + IpExt + TestIpExt>() {
+        use alloc::{boxed::Box, string::ToString};
+        use netstack3_fuchsia::{
+            testutils::{assert_data_tree, Inspector},
+            FuchsiaInspector,
+        };
+
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        bindings_ctx.sleep(Duration::from_secs(1));
+        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        {
+            let inspector = Inspector::new(Default::default());
+            let mut bindings_inspector = FuchsiaInspector::<()>::new(inspector.root());
+            bindings_inspector.delegate_inspectable(&table);
+
+            assert_data_tree!(inspector, "root": {
+                "table_limit_drops": 0u64,
+                "table_limit_hits": 0u64,
+                "num_connections": 0u64,
+                "connections": {},
+            });
+        }
+
+        // Insert the first connection into the table in an unestablished state.
+        // This will later be evicted when the table fills up.
+        let (packet, _) = make_packets::<I>(0);
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
+        assert!(!conn.state().established);
+        assert!(table
+            .finalize_connection(&mut bindings_ctx, conn)
+            .expect("connection finalize should succeed"));
+
+        {
+            let inspector = Inspector::new(Default::default());
+            let mut bindings_inspector = FuchsiaInspector::<()>::new(inspector.root());
+            bindings_inspector.delegate_inspectable(&table);
+
+            assert_data_tree!(inspector, "root": {
+                "table_limit_drops": 0u64,
+                "table_limit_hits": 0u64,
+                "num_connections": 1u64,
+                "connections": {
+                    "0": {
+                        "original_tuple": {
+                            "protocol": "TCP",
+                            "src_addr": I::SRC_ADDR.to_string(),
+                            "dst_addr": I::DST_ADDR.to_string(),
+                            "src_port_or_id": 0u64,
+                            "dst_port_or_id": 0u64,
+                        },
+                        "reply_tuple": {
+                            "protocol": "TCP",
+                            "src_addr": I::DST_ADDR.to_string(),
+                            "dst_addr": I::SRC_ADDR.to_string(),
+                            "src_port_or_id": 0u64,
+                            "dst_port_or_id": 0u64,
+                        },
+                        "external_data": {},
+                        "established": false,
+                        "last_packet_time": 1_000_000_000u64,
+                    }
+                },
+            });
+        }
+
+        // Fill the table up the rest of the way.
+        for i in 1..MAXIMUM_CONNECTIONS {
+            let (packet, reply_packet) = make_packets(i);
+            let conn = table
+                .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                .expect("packet should be valid");
+            assert!(table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"));
+
+            let conn = table
+                .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
+                .expect("packet should be valid");
+            assert!(!table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"));
+        }
+
+        assert_eq!(table.inner.lock().table.len(), TABLE_SIZE_LIMIT);
+
+        // This first one should succeed because it can evict the
+        // non-established connection.
+        let (packet, reply_packet) = make_packets(MAXIMUM_CONNECTIONS);
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
+        assert!(table
+            .finalize_connection(&mut bindings_ctx, conn)
+            .expect("connection finalize should succeed"));
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
+            .expect("packet should be valid");
+        assert!(!table
+            .finalize_connection(&mut bindings_ctx, conn)
+            .expect("connection finalize should succeed"));
+
+        // This next one should fail because there are no connections left to
+        // evict.
+        let (packet, _) = make_packets(MAXIMUM_CONNECTIONS + 1);
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
+        assert_matches!(
+            table.finalize_connection(&mut bindings_ctx, conn),
+            Err(FinalizeConnectionError::TableFull)
+        );
+
+        {
+            let inspector = Inspector::new(Default::default());
+            let mut bindings_inspector = FuchsiaInspector::<()>::new(inspector.root());
+            bindings_inspector.delegate_inspectable(&table);
+
+            assert_data_tree!(inspector, "root": contains {
+                "table_limit_drops": 1u64,
+                "table_limit_hits": 2u64,
+                "num_connections": MAXIMUM_CONNECTIONS as u64,
+            });
         }
     }
 }

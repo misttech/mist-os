@@ -88,3 +88,9 @@ impl<'a, D, P: InspectorDeviceIdProvider<D>> InspectorDeviceExt<D> for FuchsiaIn
         P::device_id(&id)
     }
 }
+
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutils {
+    pub use diagnostics_assertions::assert_data_tree;
+    pub use fuchsia_inspect::Inspector;
+}

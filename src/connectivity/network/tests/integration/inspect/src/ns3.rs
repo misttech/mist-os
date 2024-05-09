@@ -950,6 +950,12 @@ async fn inspect_filtering_state(name: &str) {
                 "uninstalled": {
                     "routines": 0u64,
                 },
+                "conntrack": {
+                    "table_limit_drops": 0u64,
+                    "table_limit_hits": 0u64,
+                    "num_connections": 0u64,
+                    "connections": {},
+                }
             },
             "IPv6": {
                 "ingress": {
@@ -970,6 +976,12 @@ async fn inspect_filtering_state(name: &str) {
                 "uninstalled": {
                     "routines": 0u64,
                 },
+                "conntrack": {
+                    "table_limit_drops": 0u64,
+                    "table_limit_hits": 0u64,
+                    "num_connections": 0u64,
+                    "connections": {},
+                }
             },
         }
     });
@@ -1106,6 +1118,12 @@ async fn inspect_filtering_state(name: &str) {
                         "rules": 0u64,
                     },
                 },
+                "conntrack": {
+                    "table_limit_drops": 0u64,
+                    "table_limit_hits": 0u64,
+                    "num_connections": 0u64,
+                    "connections": {},
+                }
             },
             "IPv6": {
                 "ingress": {
@@ -1148,6 +1166,12 @@ async fn inspect_filtering_state(name: &str) {
                 "uninstalled": {
                     "routines": 0u64,
                 },
+                "conntrack": {
+                    "table_limit_drops": 0u64,
+                    "table_limit_hits": 0u64,
+                    "num_connections": 0u64,
+                    "connections": {},
+                }
             },
         }
     });

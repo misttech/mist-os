@@ -30,5 +30,18 @@ rustc_library_with_features("netstack3-fuchsia") {
       features = [ "instrumented" ]
       deps += [ "//src/connectivity/network/netstack3/core/base:netstack3-base-instrumented" ]
     },
+
+    {
+      target_name = "netstack3-fuchsia-testutils"
+      testonly = true
+      features = [
+        "testutils",
+        "instrumented",
+      ]
+      deps += [
+        "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
+        "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+      ]
+    },
   ]
 }

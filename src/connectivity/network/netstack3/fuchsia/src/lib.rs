@@ -11,3 +11,9 @@
 mod inspect;
 
 pub use inspect::{FuchsiaInspector, InspectorDeviceIdProvider};
+
+/// Test utilities provided to all users of the crate.
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutils {
+    pub use crate::inspect::testutils::{assert_data_tree, Inspector};
+}

@@ -54,6 +54,10 @@ rustc_library_with_features("netstack3-filter") {
         "//src/lib/const-unwrap",
         "//third_party/rust_crates:test-case",
       ]
+
+      if (!is_host) {
+        test_deps += [ "//src/connectivity/network/netstack3/fuchsia:netstack3-fuchsia-testutils" ]
+      }
     },
 
     {

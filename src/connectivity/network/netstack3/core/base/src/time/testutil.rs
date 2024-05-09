@@ -36,8 +36,8 @@ pub struct FakeInstant {
 }
 
 impl crate::inspect::InspectableValue for FakeInstant {
-    fn record<I: crate::inspect::Inspector>(&self, _name: &str, _inspector: &mut I) {
-        unimplemented!()
+    fn record<I: crate::inspect::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_uint(name, self.offset.as_nanos() as u64)
     }
 }
 
