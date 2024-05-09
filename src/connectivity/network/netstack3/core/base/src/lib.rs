@@ -11,10 +11,12 @@
 #![deny(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
+extern crate fakestd as std;
 
 mod context;
 mod counters;
 mod data_structures;
+mod error;
 mod event;
 mod frame;
 mod inspect;
@@ -25,6 +27,10 @@ mod trace;
 
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
+pub use error::{
+    AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
+    RemoteAddressError, SocketError, ZonedAddressError,
+};
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};

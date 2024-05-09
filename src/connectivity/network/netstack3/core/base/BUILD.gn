@@ -15,6 +15,7 @@ rustc_library_with_features("netstack3-base") {
     "src/counters.rs",
     "src/data_structures.rs",
     "src/data_structures/ref_counted_hash_map.rs",
+    "src/error.rs",
     "src/event.rs",
     "src/frame.rs",
     "src/inspect.rs",
@@ -36,6 +37,10 @@ rustc_library_with_features("netstack3-base") {
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:thiserror",
+
+    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
+    "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
   _testutils_deps = [

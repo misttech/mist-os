@@ -98,10 +98,13 @@ pub mod device_socket {
     };
 }
 
-// Allow direct public access to the error module. This module is unlikely to
-// evolve poorly or have sealed traits. We can revisit if this becomes hard to
-// uphold.
-pub mod error;
+/// Generic netstack errors.
+pub mod error {
+    pub use netstack3_base::{
+        AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
+        RemoteAddressError, SocketError, ZonedAddressError,
+    };
+}
 
 /// Framework for packet filtering.
 pub mod filter {
