@@ -25,9 +25,9 @@ usb_speed_t PortStatus::GetSpeed(usb_speed_t hub_speed) const {
   usb_speed_t speed;
   if (hub_speed == USB_SPEED_SUPER) {
     speed = USB_SPEED_SUPER;
-  } else if (status & USB_PORT_LOW_SPEED) {
+  } else if (status.w_port_status & USB_PORT_LOW_SPEED) {
     speed = USB_SPEED_LOW;
-  } else if (status & USB_PORT_HIGH_SPEED) {
+  } else if (status.w_port_status & USB_PORT_HIGH_SPEED) {
     speed = USB_SPEED_HIGH;
   } else {
     speed = USB_SPEED_FULL;
@@ -67,7 +67,7 @@ zx_status_t UsbHubDevice::GetPortStatus() {
     }
     fbl::AutoLock l(&async_execution_context_);
     ZX_ASSERT(index <= port_status_.size());
-    port_status_[index].status = result.value().w_port_status;
+    port_status_[index].status = result.value();
     index++;
   }
   return ZX_OK;
@@ -184,14 +184,17 @@ void UsbHubDevice::DdkInit(ddk::InitTxn txn) {
 
 void UsbHubDevice::HandlePortStatusChanged(PortNumber port) {
   const auto& status = port_status_[PortNumberToIndex(port).value()];
-  if (!status.connected && (status.status & USB_C_PORT_CONNECTION)) {
-    HandleDeviceConnected(port);
+  if (status.status.w_port_change & USB_C_PORT_CONNECTION) {
+    if (status.status.w_port_status & USB_C_PORT_CONNECTION) {
+      HandleDeviceConnected(port);
+    }
+
+    if (status.connected && !(status.status.w_port_status & USB_C_PORT_CONNECTION)) {
+      HandleDeviceDisconnected(port);
+    }
   }
-  if (status.connected && !(status.status & USB_C_PORT_CONNECTION)) {
-    HandleDeviceDisconnected(port);
-  }
-  if (status.reset_pending && (status.status & USB_C_PORT_ENABLE) &&
-      !(status.status & USB_C_PORT_RESET)) {
+  if (status.reset_pending && (status.status.w_port_status & USB_C_PORT_ENABLE) &&
+      !(status.status.w_port_status & USB_C_PORT_RESET)) {
     HandleResetComplete(port);
   }
 }
@@ -268,10 +271,9 @@ void UsbHubDevice::InterruptCallback() {
           zxlogf(ERROR, "Could not get port status");
           return;
         }
-        auto port_status = port_result.value();
         auto port_number = PortNumber(static_cast<uint8_t>(port));
         fbl::AutoLock l(&async_execution_context_);
-        port_status_[PortNumberToIndex(port_number).value()].status = port_status.w_port_status;
+        port_status_[PortNumberToIndex(port_number).value()].status = port_result.value();
         HandlePortStatusChanged(port_number);
       }
     }
@@ -285,7 +287,7 @@ void UsbHubDevice::InterruptCallback() {
     fbl::AutoLock l(&async_execution_context_);
     if (port_status_[index].connected) {
       port_status_[index].connected = false;
-      port_status_[index].status &= ~USB_C_PORT_CONNECTION;
+      port_status_[index].status.w_port_status &= ~USB_C_PORT_CONNECTION;
       HandleDeviceDisconnected(PortNumber(port));
     }
   }
@@ -342,6 +344,12 @@ void UsbHubDevice::BeginEnumeration(PortNumber port) {
 
 void UsbHubDevice::HandleDeviceConnected(PortNumber port) {
   auto& status = port_status_[PortNumberToIndex(port).value()];
+  if (status.connected) {
+    // Disconnect existing device.
+    HandleDeviceDisconnected(port);
+  }
+
+  // Connect new device.
   status.connected = true;
   bool was_empty = pending_enumeration_list_.is_empty();
   pending_enumeration_list_.push_back(&status);
