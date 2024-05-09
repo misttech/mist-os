@@ -5,15 +5,12 @@
 package upgrade
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -24,7 +21,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
@@ -140,12 +136,18 @@ func doTest(ctx context.Context) error {
 		return nil
 	}
 
-	initialBuild := chainedBuilds[0]
-	chainedBuilds = chainedBuilds[1:]
+	// Use a seeded random source so the OTA test is consistent across runs.
+	rand := rand.New(rand.NewSource(99))
+
+	// Generate OTAs for each build.
+	otas, err := newOtas(ctx, rand, ffx, chainedBuilds)
+	if err != nil {
+		return err
+	}
 
 	ch := make(chan *sl4f.Configuration, 1)
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
-		currentBootSlot, err := initializeDevice(ctx, deviceClient, ffx, initialBuild)
+		currentBootSlot, err := initializeDevice(ctx, deviceClient, ffx, otas[0])
 		ch <- currentBootSlot
 		return err
 	}); err != nil {
@@ -156,174 +158,49 @@ func doTest(ctx context.Context) error {
 
 	currentBootSlot := <-ch
 
-	return testOTAs(ctx, deviceClient, ffx.IsolateDir(), chainedBuilds, currentBootSlot)
+	return testOTAs(ctx, deviceClient, ffx.IsolateDir(), otas, currentBootSlot)
 }
 
 func testOTAs(
 	ctx context.Context,
 	device *device.Client,
 	ffxIsolateDir ffx.IsolateDir,
-	builds []artifacts.Build,
+	otas []*otaData,
 	currentBootSlot *sl4f.Configuration,
 ) error {
+	// Perform the OTA cycles.
 	for i := uint(1); i <= c.cycleCount; i++ {
-		logger.Infof(ctx, "OTA Attempt %d", i)
+		logger.Infof(ctx, "OTA Attempt Cycle %d. Time out in %s", i, c.cycleTimeout)
 
-		for index, build := range builds {
-			checkPrime := false
-			if index == len(builds)-1 {
-				checkPrime = true
-			}
+		startTime := time.Now()
 
-			if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-				return doTestOTAs(ctx, device, ffxIsolateDir, build, currentBootSlot, checkPrime)
-			}); err != nil {
-				return fmt.Errorf("OTA Attempt %d failed: %w", i, err)
-			}
-		}
-	}
+		if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
+			// Actually OTA through all the builds.
+			for i := 1; i < len(otas); i++ {
+				srcOta := otas[i-1]
+				dstOta := otas[i]
 
-	return nil
-}
+				logger.Infof(ctx, "Starting OTA Attempt from %s -> %s", srcOta, dstOta)
 
-func doTestOTAs(
-	ctx context.Context,
-	device *device.Client,
-	ffxIsolateDir ffx.IsolateDir,
-	build artifacts.Build,
-	currentBootSlot *sl4f.Configuration,
-	checkPrime bool,
-) error {
-	logger.Infof(ctx, "Starting OTA test cycle. Time out in %s", c.cycleTimeout)
-
-	startTime := time.Now()
-
-	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffxIsolateDir)
-	if err != nil {
-		return fmt.Errorf("error getting repository: %w", err)
-	}
-
-	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
-	if err != nil {
-		return err
-	}
-
-	// Install version N on the device if it is not already on that version.
-	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
-	if err != nil {
-		return fmt.Errorf("error extracting expected system image merkle from %s: %w", updatePackage.Path(), err)
-	}
-
-	// Attempt to check if the device is up-to-date, up to downgradeOTAAttempts times.
-	// We retry this since some downgrade builds contain bugs which make them spuriously reboot
-	// See https://fxbug.dev/42061177 for more details
-	var upToDate bool
-	var lastError error
-	for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
-		logger.Infof(ctx, "checking device version (attempt %d of %d)", attempt, c.downgradeOTAAttempts)
-		upToDate, lastError = check.IsDeviceUpToDate(ctx, device, expectedSystemImage)
-		if lastError == nil {
-			logger.Infof(ctx, "Got device version, upToDate: %t", upToDate)
-			break
-		}
-
-		if attempt == c.downgradeOTAAttempts {
-			return fmt.Errorf(
-				"OTA from N-1 -> N failed to check if device is up to date after %d attempts: Last error: %w",
-				c.downgradeOTAAttempts,
-				lastError,
-			)
-		} else {
-			logger.Warningf(
-				ctx,
-				"failed to check if device up to date, trying again %d times:: %v",
-				c.downgradeOTAAttempts-attempt,
-				lastError,
-			)
-		}
-
-		// Reset our client state since the device has _potentially_ rebooted
-		device.Close()
-
-		// We should now be using the ffx from the new build.
-		ffx, err := build.GetFfx(ctx, ffxIsolateDir)
-		if err != nil {
-			return fmt.Errorf("failed to get ffx from build %s: %w", build, err)
-		}
-
-		newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
-		if err != nil {
-			return fmt.Errorf("failed to create ota test client: %w", err)
-		}
-		*device = *newClient
-	}
-
-	// Use a seeded random source so the OTA test is consistent across runs.
-	rand := rand.New(rand.NewSource(99))
-
-	if !upToDate {
-		// Attempt an N-1 -> N OTA, up to downgradeOTAAttempts times.
-		// We optionally retry this OTA because some downgrade builds contain bugs which make them
-		// spuriously reboot. Those builds are already cut, but we still need to test them.
-		// See https://fxbug.dev/42061177 for more details.
-		for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
-			logger.Infof(ctx, "starting OTA from N-1 -> N test, attempt %d of %d", attempt, c.downgradeOTAAttempts)
-			otaTime := time.Now()
-			if lastError = systemOTA(
-				ctx,
-				rand,
-				device,
-				ffxIsolateDir,
-				repo,
-				currentBootSlot,
-				!c.buildExpectUnknownFirmware,
-			); lastError == nil {
-				logger.Infof(ctx, "OTA from N-1 -> N successful in %s", time.Now().Sub(otaTime))
-				break
-			}
-
-			if attempt == c.downgradeOTAAttempts {
-				return fmt.Errorf(
-					"OTA from N-1 -> N failed after %d attempts: Last error: %w",
-					c.downgradeOTAAttempts,
-					lastError,
-				)
-			} else {
-				logger.Warningf(
+				if err := systemOTA(
 					ctx,
-					"OTA from N-1 -> N failed, trying again %d times: %v",
-					c.downgradeOTAAttempts-attempt,
-					lastError)
+					device,
+					ffxIsolateDir,
+					srcOta,
+					dstOta,
+					currentBootSlot,
+				); err != nil {
+					return err
+				}
 			}
 
-			// Reset our client state since the device has _potentially_
-			// rebooted
-			device.Close()
-
-			ffx, err := build.GetFfx(ctx, ffxIsolateDir)
-			if err != nil {
-				return fmt.Errorf("failed to get ffx from build %s: %w", build, err)
-			}
-
-			newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
-			if err != nil {
-				return fmt.Errorf("failed to create ota test client: %w", err)
-			}
-			*device = *newClient
+			return nil
+		}); err != nil {
+			return fmt.Errorf("OTA Attempt %d failed: %w", i, err)
 		}
-	}
 
-	if !checkPrime {
-		return nil
+		logger.Infof(ctx, "OTA cycle %d sucessful in %s", i, time.Now().Sub(startTime))
 	}
-
-	logger.Infof(ctx, "starting OTA N -> N' test")
-	otaTime := time.Now()
-	if err := systemPrimeOTA(ctx, rand, device, repo, currentBootSlot); err != nil {
-		return fmt.Errorf("OTA from N -> N' failed: %w", err)
-	}
-	logger.Infof(ctx, "OTA from N -> N' successful in %s", time.Now().Sub(otaTime))
-	logger.Infof(ctx, "OTA cycle sucessful in %s", time.Now().Sub(startTime))
 
 	return nil
 }
@@ -332,79 +209,50 @@ func initializeDevice(
 	ctx context.Context,
 	device *device.Client,
 	ffx *ffx.FFXTool,
-	build artifacts.Build,
+	ota *otaData,
 ) (*sl4f.Configuration, error) {
 	logger.Infof(ctx, "Initializing device")
 
 	startTime := time.Now()
 
-	var repo *packages.Repository
-	var err error
-	var expectedSystemImage *packages.SystemImagePackage
-
-	if build != nil {
-		// We don't need to prefetch all the blobs, since we only use a subset of
-		// packages from the repository, like run, sl4f.
-		repo, err = build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffx.IsolateDir())
-		if err != nil {
-			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
-		}
-
-		updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
-		if err != nil {
-			return nil, err
-		}
-
-		systemImage, err := updatePackage.OpenSystemImagePackage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error extracting expected system image merkle from %s: %w", updatePackage.Path(), err)
-		}
-		expectedSystemImage = systemImage
+	systemImage, err := ota.updatePackage.OpenSystemImagePackage(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	var currentBootSlot *sl4f.Configuration
+	// Only pave if the device is not running the expected version.
+	upToDate, err := check.IsDeviceUpToDate(ctx, device, systemImage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if up to date during initialization: %w", err)
+	}
 
-	if build != nil {
-		// Only pave if the device is not running the expected version.
-		upToDate, err := check.IsDeviceUpToDate(ctx, device, expectedSystemImage)
+	if !c.installerConfig.NeedsInitialization() && upToDate {
+		logger.Infof(ctx, "device already up to date")
+	} else {
+		sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if up to date during initialization: %w", err)
+			return nil, fmt.Errorf("failed to get ssh key: %w", err)
 		}
 
-		if !c.installerConfig.NeedsInitialization() && upToDate {
-			logger.Infof(ctx, "device already up to date")
+		if c.useFlash {
+			if err := flash.FlashDevice(ctx, device, ffx, ota.build, sshPrivateKey.PublicKey()); err != nil {
+				return nil, fmt.Errorf("failed to flash device during initialization: %w", err)
+			}
 		} else {
-			sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get ssh key: %w", err)
-			}
-
-			if c.useFlash {
-				if err := flash.FlashDevice(ctx, device, ffx, build, sshPrivateKey.PublicKey()); err != nil {
-					return nil, fmt.Errorf("failed to flash device during initialization: %w", err)
-				}
-			} else {
-				if err := pave.PaveDevice(ctx, device, ffx, build, sshPrivateKey.PublicKey()); err != nil {
-					return nil, fmt.Errorf("failed to pave device during initialization: %w", err)
-				}
+			if err := pave.PaveDevice(ctx, device, ffx, ota.build, sshPrivateKey.PublicKey()); err != nil {
+				return nil, fmt.Errorf("failed to pave device during initialization: %w", err)
 			}
 		}
-
-		// We always boot into the A partition after a pave.
-		config := sl4f.ConfigurationA
-		currentBootSlot = &config
-	} else if c.checkABR {
-		config, err := check.DetermineCurrentABRConfig(ctx, device, repo)
-		if err != nil {
-			return nil, err
-		}
-		currentBootSlot = config
 	}
+
+	// We always boot into the A partition after initialization.
+	config := sl4f.ConfigurationA
+	currentBootSlot := &config
 
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		expectedSystemImage,
+		systemImage,
 		currentBootSlot,
 		c.checkABR,
 	); err != nil {
@@ -418,154 +266,100 @@ func initializeDevice(
 
 func systemOTA(
 	ctx context.Context,
-	rand *rand.Rand,
 	device *device.Client,
 	ffxIsolateDir ffx.IsolateDir,
-	repo *packages.Repository,
-	currentBootSlot *sl4f.Configuration,
-	checkForUnknownFirmware bool,
-) error {
-	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
-	if err != nil {
-		return fmt.Errorf("error opening update/0 package: %w", err)
-	}
-
-	return otaToPackage(
-		ctx,
-		rand,
-		device,
-		currentBootSlot,
-		updatePackage,
-		"ota-test-update/0",
-		checkForUnknownFirmware,
-	)
-}
-
-func systemPrimeOTA(
-	ctx context.Context,
-	rand *rand.Rand,
-	device *device.Client,
-	repo *packages.Repository,
+	srcOta *otaData,
+	dstOta *otaData,
 	currentBootSlot *sl4f.Configuration,
 ) error {
-	avbTool, err := c.installerConfig.AVBTool()
-	if err != nil {
-		return fmt.Errorf("failed to intialize AVBTool: %w", err)
-	}
+	var err error
 
-	zbiTool, err := c.installerConfig.ZBITool()
-	if err != nil {
-		return fmt.Errorf("failed to intialize ZBITool: %w", err)
-	}
+	// Attempt an N-1 -> N OTA, up to downgradeOTAAttempts times.
+	// We optionally retry this OTA because some downgrade builds contain bugs which make them
+	// spuriously reboot. Those builds are already cut, but we still need to test them.
+	// See https://fxbug.dev/42061177 for more details.
+	for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
+		logger.Infof(
+			ctx,
+			"starting OTA from %s -> %s test, attempt %d of %d",
+			srcOta,
+			dstOta,
+			attempt,
+			c.downgradeOTAAttempts,
+		)
 
-	srcUpdate, err := repo.OpenUpdatePackage(ctx, "update/0")
-	if err != nil {
-		return fmt.Errorf("failed to open update/0 package: %w", err)
-	}
+		otaTime := time.Now()
 
-	srcSystemImage, err := srcUpdate.OpenSystemImagePackage(ctx)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to open system_image/0 from %s update package: %w",
-			srcUpdate.Path(),
+		if err = otaToPackage(
+			ctx,
+			device,
+			dstOta,
+			currentBootSlot,
+			!c.buildExpectUnknownFirmware,
+		); err == nil {
+			logger.Infof(
+				ctx,
+				"OTA from %s -> %s successful in %s",
+				srcOta,
+				dstOta,
+				time.Now().Sub(otaTime),
+			)
+			return nil
+		}
+
+		logger.Warningf(
+			ctx,
+			"OTA from %s -> %s failed, trying again %d times: %v",
+			srcOta,
+			dstOta,
+			c.downgradeOTAAttempts-attempt,
 			err,
 		)
+
+		// Reset our client state since the device has _potentially_
+		// rebooted
+		device.Close()
+
+		// We should now be using the ffx from the new build.
+		ffx, err := dstOta.build.GetFfx(ctx, ffxIsolateDir)
+		if err != nil {
+			return fmt.Errorf("failed to get ffx from build %s: %w", dstOta, err)
+		}
+
+		newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
+		if err != nil {
+			return fmt.Errorf("failed to create ota test client: %w", err)
+		}
+		*device = *newClient
 	}
 
-	dstSystemImagePath := "system_image_prime/0"
-	dstSystemImage, err := srcSystemImage.EditContents(
-		ctx,
-		dstSystemImagePath,
-		func(tempDir string) error {
-			newResource := "Hello World!"
-			contents := bytes.NewReader([]byte(newResource))
-			data, err := io.ReadAll((contents))
-			if err != nil {
-				return fmt.Errorf("failed to read new content %q: %w", srcSystemImage.Path(), err)
-			}
-
-			tempPath := filepath.Join(tempDir, "dummy2.txt")
-			if err := os.MkdirAll(filepath.Dir(tempPath), os.ModePerm); err != nil {
-				return fmt.Errorf("failed to create parent directories for %q: %w", tempPath, err)
-			}
-
-			if err := os.WriteFile(tempPath, data, 0600); err != nil {
-				return fmt.Errorf(
-					"failed to write new data for %q to %q: %w",
-					dstSystemImagePath,
-					tempPath,
-					err,
-				)
-			}
-
-			return nil
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", dstSystemImage.Path(), err)
-	}
-
-	dstUpdatePath := "ota-test-update_prime/0"
-	dstUpdate, err := srcUpdate.EditUpdatePackageWithNewSystemImage(
-		ctx,
-		avbTool,
-		zbiTool,
-		"fuchsia.com",
-		dstSystemImage,
-		dstUpdatePath,
-		c.bootfsCompression,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", dstUpdatePath, err)
-	}
-
-	return otaToPackage(
-		ctx,
-		rand,
-		device,
-		currentBootSlot,
-		dstUpdate,
-		"ota-test-update_prime2/0",
-		true,
+	return fmt.Errorf(
+		"OTA from %s -> %s failed after %d attempts: Last error: %w",
+		srcOta,
+		dstOta,
+		c.downgradeOTAAttempts,
+		err,
 	)
 }
 
 func otaToPackage(
 	ctx context.Context,
-	rand *rand.Rand,
 	device *device.Client,
+	ota *otaData,
 	currentBootSlot *sl4f.Configuration,
-	srcUpdate *packages.UpdatePackage,
-	dstUpdatePath string,
 	checkForUnknownFirmware bool,
 ) error {
-	dstUpdate, dstSystemImage, err := AddRandomFilesToUpdate(
-		ctx,
-		rand,
-		srcUpdate,
-		dstUpdatePath,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create update package %s: %w", dstUpdatePath, err)
-	}
-
-	upToDate, err := check.IsDeviceUpToDate(ctx, device, dstSystemImage)
-	if err != nil {
-		return fmt.Errorf("failed to check if device is up to date: %w", err)
-	}
-	if upToDate {
-		return fmt.Errorf(
-			"device already updated to the expected version %q",
-			dstSystemImage.Merkle(),
-		)
-	}
-
 	u, err := c.installerConfig.Updater(checkForUnknownFirmware)
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
 	}
 
-	if err := u.Update(ctx, device, dstUpdate); err != nil {
+	systemImage, err := ota.updatePackage.OpenSystemImagePackage(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := u.Update(ctx, device, ota.updatePackage); err != nil {
 		return fmt.Errorf("failed to download OTA: %w", err)
 	}
 
@@ -585,7 +379,7 @@ func otaToPackage(
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		dstSystemImage,
+		systemImage,
 		currentBootSlot,
 		c.checkABR,
 	); err != nil {
@@ -593,129 +387,4 @@ func otaToPackage(
 	}
 
 	return nil
-}
-
-// AddRandomFilesToUpdate creates a new update package with a system image that
-// contains a number of extra files filled with random bytes, which should be
-// incompressible. It will loop until it has created an update package that is
-// smaller than `-max-ota-size`.
-func AddRandomFilesToUpdate(
-	ctx context.Context,
-	rand *rand.Rand,
-	srcUpdate *packages.UpdatePackage,
-	dstUpdatePath string,
-) (*packages.UpdatePackage, *packages.SystemImagePackage, error) {
-	avbTool, err := c.installerConfig.AVBTool()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to intialize AVBTool: %w", err)
-	}
-
-	zbiTool, err := c.installerConfig.ZBITool()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize ZBITool: %w", err)
-	}
-
-	srcSystemImage, err := srcUpdate.OpenSystemImagePackage(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	systemImageSize, err := srcSystemImage.SystemImageAlignedBlobSize(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error determining system image size: %w", err)
-	}
-
-	dstSystemImagePath := util.AddSuffixToPackageName(dstUpdatePath, "system-image")
-
-	// Add random files to the system image package in the update. Clamp the
-	// package size to the upper bound if we have one, otherwise we'll just add
-	// a single block to make it unique.
-	dstUpdate, dstSystemImage, err := srcUpdate.EditSystemImagePackage(
-		ctx,
-		avbTool,
-		zbiTool,
-		"fuchsia.com",
-		dstUpdatePath,
-		c.bootfsCompression,
-		func(systemImage *packages.SystemImagePackage) (*packages.SystemImagePackage, error) {
-			if c.maxSystemImageSize == 0 {
-				return systemImage.AddRandomFilesWithAdditionalBytes(
-					ctx,
-					rand,
-					dstSystemImagePath,
-					packages.BlobBlockSize,
-				)
-			} else if c.maxSystemImageSize < systemImageSize {
-				return nil, fmt.Errorf(
-					"max system image size %d is smaller than the size of the system image %d",
-					c.maxSystemImageSize,
-					systemImageSize,
-				)
-			} else {
-				return systemImage.AddRandomFilesWithUpperBound(
-					ctx,
-					rand,
-					dstSystemImagePath,
-					c.maxSystemImageSize,
-				)
-			}
-		},
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf(
-			"failed to add random files to system images %q in update package %q: %w",
-			dstSystemImagePath,
-			dstUpdatePath,
-			err,
-		)
-	}
-
-	// Optionally add random files to zbi package in the update images.
-	if c.maxUpdateImagesSize != 0 {
-		dstZbiPath := util.AddSuffixToPackageName(dstUpdatePath, "update-images-zbi")
-		dstUpdate, _, err = dstUpdate.EditUpdateImages(
-			ctx,
-			dstUpdatePath,
-			func(updateImages *packages.UpdateImages) (*packages.UpdateImages, error) {
-				return updateImages.AddRandomFilesWithUpperBound(
-					ctx,
-					rand,
-					dstZbiPath,
-					c.maxUpdateImagesSize,
-				)
-			},
-		)
-		if err != nil {
-			return nil, nil, fmt.Errorf(
-				"failed to add random files to zbi package %q in update package %q: %w",
-				dstZbiPath,
-				dstUpdatePath,
-				err,
-			)
-		}
-	}
-
-	// Optionally add random files to the update package.
-	if c.maxUpdatePackageSize != 0 {
-		dstUpdate, err = dstUpdate.EditPackage(
-			ctx,
-			func(p packages.Package) (packages.Package, error) {
-				return p.AddRandomFilesWithUpperBound(
-					ctx,
-					rand,
-					dstUpdatePath,
-					c.maxUpdatePackageSize,
-				)
-			},
-		)
-		if err != nil {
-			return nil, nil, fmt.Errorf(
-				"failed to add random files to update package %q: %w",
-				dstUpdatePath,
-				err,
-			)
-		}
-	}
-
-	return dstUpdate, dstSystemImage, nil
 }

@@ -100,7 +100,13 @@ type custom struct {
 
 // NewRepository parses the repository from the specified directory. It returns
 // an error if the repository does not exist, or it contains malformed metadata.
-func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ffx.FFXTool, deliveryBlobType *int) (*Repository, error) {
+func NewRepository(
+	ctx context.Context,
+	dir string,
+	blobStore BlobStore,
+	ffx *ffx.FFXTool,
+	deliveryBlobType *int,
+) (*Repository, error) {
 	logger.Infof(ctx, "creating a repository for %q and %q", dir, blobStore.Dir())
 
 	return &Repository{
