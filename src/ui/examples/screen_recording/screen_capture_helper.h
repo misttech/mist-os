@@ -21,23 +21,23 @@ using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using fuchsia::ui::composition::TransformId;
 using fuchsia::ui::composition::ViewportProperties;
 
-uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
+uint32_t GetPixelsPerRow(const fuchsia::sysmem2::SingleBufferSettings& settings,
                          uint32_t bytes_per_pixel, uint32_t image_width);
 
 void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
-                         fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info,
+                         fuchsia::sysmem2::BufferCollectionInfo& buffer_collection_info,
                          uint32_t buffer_collection_idx, uint32_t kBytesPerPixel,
                          uint32_t image_width, uint32_t image_height);
 
-fuchsia::sysmem::BufferCollectionInfo_2 CreateBufferCollectionInfo2WithConstraints(
-    fuchsia::sysmem::BufferCollectionConstraints constraints,
+fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfo2WithConstraints(
+    fuchsia::sysmem2::BufferCollectionConstraints constraints,
     allocation::BufferCollectionExportToken export_token,
     fuchsia::ui::composition::Allocator_Sync* flatland_allocator,
-    fuchsia::sysmem::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage);
+    fuchsia::sysmem2::Allocator_Sync* sysmem_allocator, RegisterBufferCollectionUsages usage);
 
 // This function returns a linear buffer of pixels of size width * height.
 std::vector<uint8_t> ExtractScreenCapture(
-    uint32_t buffer_id, fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info,
+    uint32_t buffer_id, fuchsia::sysmem2::BufferCollectionInfo& buffer_collection_info,
     uint32_t kBytesPerPixel, uint32_t render_target_width, uint32_t render_target_height);
 
 }  // namespace screen_recording_example

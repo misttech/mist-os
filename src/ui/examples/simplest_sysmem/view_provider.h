@@ -5,7 +5,7 @@
 #ifndef SRC_UI_EXAMPLES_SIMPLEST_SYSMEM_VIEW_PROVIDER_H_
 #define SRC_UI_EXAMPLES_SIMPLEST_SYSMEM_VIEW_PROVIDER_H_
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
@@ -49,11 +49,11 @@ class ViewProviderImpl final : fuchsia::ui::app::ViewProvider {
   // @param image_height Image height in number of pixels.
   // @param pixel_format One of pixel supported pixel format (ex: BGRA32, R8G8B8A8).
   void WriteToSysmem(uint8_t* image_data, uint32_t image_width, uint32_t image_height,
-                     fuchsia::sysmem::PixelFormatType pixel_format);
+                     fuchsia::images2::PixelFormat pixel_format);
 
   fidl::BindingSet<fuchsia::ui::app::ViewProvider> bindings_;
   std::optional<fuchsia::ui::composition::LayoutInfo> layout_;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::FlatlandPtr flatland_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
   fuchsia::ui::composition::ParentViewportWatcherPtr parent_watcher_;

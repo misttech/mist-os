@@ -5,7 +5,7 @@
 #ifndef SRC_UI_EXAMPLES_SCREEN_RECORDING_VIEW_PROVIDER_H_
 #define SRC_UI_EXAMPLES_SCREEN_RECORDING_VIEW_PROVIDER_H_
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/composition/internal/cpp/fidl.h>
@@ -50,7 +50,7 @@ class ViewProviderImpl final : fuchsia::ui::app::ViewProvider {
 
   fidl::BindingSet<fuchsia::ui::app::ViewProvider> bindings_;
   std::optional<fuchsia::ui::composition::LayoutInfo> layout_;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<simple_present::FlatlandConnection> flatland_connection_;
   fuchsia::ui::composition::Flatland* flatland_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
@@ -58,7 +58,7 @@ class ViewProviderImpl final : fuchsia::ui::app::ViewProvider {
   std::unique_ptr<sys::ComponentContext> context_;
 
   fuchsia::ui::composition::internal::ScreenCapturePtr screen_capture_;
-  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info_;
+  fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info_;
 
   const TransformId kRootTransformId{.value = 1};
   const TransformId kChildTransformId1{.value = 2};
