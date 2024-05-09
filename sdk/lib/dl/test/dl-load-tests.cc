@@ -67,7 +67,7 @@ TYPED_TEST(DlTests, NotFound) {
   auto result = this->DlOpen(kNotFoundFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open does-not-exist.so");
+    EXPECT_EQ(result.error_value().take_str(), "does-not-exist.so not found");
   } else {
     EXPECT_THAT(
         result.error_value().take_str(),
@@ -266,7 +266,7 @@ TYPED_TEST(DlTests, MissingDependency) {
   // between implementations.
   // Expect that the dependency lib to missing-dep.module.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open libmissing-dep-dep.so");
+    EXPECT_EQ(result.error_value().take_str(), "cannot open dependency: libmissing-dep-dep.so");
   } else {
     EXPECT_THAT(
         result.error_value().take_str(),

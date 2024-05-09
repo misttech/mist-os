@@ -28,9 +28,6 @@ DlLoadZirconTestsBase::RetrieveFile(Diagnostics& diag, std::string_view filename
   }
   // The only expected failure is a "not found" error.
   EXPECT_EQ(load_result->rv, ZX_ERR_NOT_FOUND);
-  // TODO(https://fxbug.dev/336633049): Have the caller responsible for emitting
-  // the error message for root module vs dependency.
-  diag.SystemError("cannot open ", filename);
   return fit::error(std::nullopt);
 }
 

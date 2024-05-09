@@ -123,9 +123,9 @@ class RuntimeDynamicLinker {
   // a module for `file` was not found.
   fit::result<Error, ModuleHandle*> CheckOpen(const char* file, int mode);
 
-  // Load the main module and all its dependencies, returning the list of all
-  // loaded modules. Starting with the main file that was `dlopen`-ed, a
-  // LoadModule is created for each file that is to be loaded, decoded, and its
+  // Load the root module and all its dependencies, returning the list of all
+  // loaded modules. Starting with the file that was `dlopen`-ed, a LoadModule
+  // is created for each file that is to be loaded, decoded, and its
   // dependencies parsed and enqueued to be processed in the same manner.
   // The `retrieve_file` argument is a callable passed down from `Open` and is
   // invoked to retrieve the module's file from the file system for processing.
@@ -135,38 +135,38 @@ class RuntimeDynamicLinker {
     static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
 
     // This is the list of modules to load and process. The first module of this
-    // list will always be the main file that was `dlopen`-ed.
+    // list will always be the file that was `dlopen`-ed.
     ModuleList<LoadModule<Loader>> pending_modules;
 
-    // TODO(https://fxbug.dev/338123289): Separate LoadModule::Create and
-    // ModuleHandle::Create so that failed allocations can be handled
-    // separately.
-    fbl::AllocChecker ac;
-    auto main_module = LoadModule<Loader>::Create(soname, ac);
-    if (!ac.check()) [[unlikely]] {
-      diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
-      return {};
-    }
-
-    pending_modules.push_back(std::move(main_module));
-
-    // TODO(https://fxbug.dev/333573264): This needs to handle if a dep is
-    // already loaded.
-    // Iterate over the pending modules that need to be loaded and dependencies
-    // enqueued, appending each new dependency to the pending_modules list so
-    // it can eventually be loaded and processed.
-    for (auto it = pending_modules.begin(); it != pending_modules.end(); it++) {
-      auto file = retrieve_file(diag, it->name().str());
+    // This lambda will retrieve the module's file, load the module into the
+    // system image, and then create a new LoadModule for each of its
+    // dependencies and enqueue it onto the `pending_modules` list. A
+    // fit::result<bool> is returned to the caller where the boolean indicates
+    // if the file was found, so that the caller can handle the "not-found"
+    // error case. This lambda is called to load the root module, and
+    // then in a loop to load all its dependencies.
+    auto load_and_enqueue_deps = [&](auto& module) -> fit::result<bool> {
+      auto file = retrieve_file(diag, module.name().str());
       if (file.is_error()) [[unlikely]] {
-        return {};
+        // Check if the error is a not-found error or a system error.
+        if (auto error = file.error_value()) {
+          // If a general system error occurred, emit the error for the module.
+          diag.SystemError("cannot open ", module.name().str(), ": ", *error);
+          return fit::error(false);
+        }
+        // A "not-found" error occurred, and the caller is responsible for
+        // emitting the error message for the module.
+        return fit::error(true);
       }
 
-      auto result = it->Load(diag, *std::move(file));
+      auto result = module.Load(diag, *std::move(file));
       if (!result) [[unlikely]] {
-        return {};
+        return fit::error(false);
       }
 
       for (const auto& needed_entry : *result) {
+        // TODO(https://fxbug.dev/333573264): Check if the module was already
+        // loaded by a previous dlopen call or at startup.
         // Skip if this dependency was already added to the pending_modules list.
         if (std::find(pending_modules.begin(), pending_modules.end(), needed_entry) !=
             pending_modules.end()) {
@@ -177,9 +177,45 @@ class RuntimeDynamicLinker {
         auto load_module = LoadModule<Loader>::Create(needed_entry, ac);
         if (!ac.check()) [[unlikely]] {
           diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
-          return {};
+          return fit::error(false);
         }
         pending_modules.push_back(std::move(load_module));
+      }
+
+      return fit::ok();
+    };
+
+    // TODO(https://fxbug.dev/338123289): Separate LoadModule::Create and
+    // ModuleHandle::Create so that failed allocations can be handled
+    // separately.
+    fbl::AllocChecker ac;
+    auto root_module = LoadModule<Loader>::Create(soname, ac);
+    if (!ac.check()) [[unlikely]] {
+      diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
+      return {};
+    }
+
+    pending_modules.push_back(std::move(root_module));
+
+    // Load the root module and enqueue all its dependencies.
+    if (auto result = load_and_enqueue_deps(pending_modules.front()); result.is_error()) {
+      if (result.error_value()) {
+        diag.SystemError(pending_modules.front().name().str(), " not found");
+      }
+      return {};
+    }
+
+    // Proceed to load and enqueue the root module's dependencies and their
+    // dependencies in a breadth-first order.
+    for (auto it = std::next(pending_modules.begin()); it != pending_modules.end(); it++) {
+      if (auto result = load_and_enqueue_deps(*it); result.is_error()) {
+        if (result.error_value()) {
+          // TODO(https://fxbug.dev/336633049): harmonize this error message
+          // with musl, which appends a "(needed by <depending module>)" to the
+          // message.
+          diag.MissingDependency(it->name().str());
+        }
+        return {};
       }
     }
 
