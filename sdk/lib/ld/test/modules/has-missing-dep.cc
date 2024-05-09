@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 #include <stdint.h>
-
-#include "test-start.h"
+#include <zircon/compiler.h>
 
 // The .ifs file missing-dep-dep.ifs creates a stub shared object that defines
 // the symbol `missing_dep_sym` and specifies its soname as libmissing_dep.so.
@@ -12,4 +11,4 @@
 
 extern "C" int64_t missing_dep_sym();
 
-extern "C" int64_t TestStart() { return missing_dep_sym(); }
+extern "C" __EXPORT int64_t has_missing_dep_sym() { return missing_dep_sym(); }

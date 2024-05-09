@@ -29,6 +29,14 @@ using namespace std::literals;
 using elfldltl::testing::ExpectedErrorList;
 using elfldltl::testing::ExpectReport;
 
+// These are a convenience functions to specify that a specific dependency
+// should or should not be found in the Needed set.
+constexpr std::pair<std::string_view, bool> Found(std::string_view name) { return {name, true}; }
+
+constexpr std::pair<std::string_view, bool> NotFound(std::string_view name) {
+  return {name, false};
+}
+
 template <class Fixture>
 using LdLoadTests = Fixture;
 
@@ -567,7 +575,7 @@ TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
 TYPED_TEST(LdLoadFailureTests, MissingDependency) {
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
-  ASSERT_NO_FATAL_FAILURE(this->Needed({std::pair{"libmissing-dep-dep.so", false}}));
+  ASSERT_NO_FATAL_FAILURE(this->Needed({NotFound("libmissing-dep-dep.so")}));
 
   ASSERT_NO_FATAL_FAILURE(  //
       this->LoadAndFail("missing-dep", ExpectedErrorList{
@@ -576,6 +584,21 @@ TYPED_TEST(LdLoadFailureTests, MissingDependency) {
                                                "libmissing-dep-dep.so",
                                            },
                                        }));
+}
+
+TYPED_TEST(LdLoadFailureTests, MissingTransitiveDependency) {
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(
+      this->Needed({Found("libhas-missing-dep.so"), NotFound("libmissing-dep-dep.so")}));
+
+  ASSERT_NO_FATAL_FAILURE(  //
+      this->LoadAndFail("missing-transitive-dep", ExpectedErrorList{
+                                                      ExpectReport{
+                                                          "cannot open dependency: ",
+                                                          "libmissing-dep-dep.so",
+                                                      },
+                                                  }));
 }
 
 TYPED_TEST(LdLoadFailureTests, Relro) {

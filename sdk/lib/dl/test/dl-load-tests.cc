@@ -19,8 +19,10 @@
 
 namespace {
 
-// This is a convenience function to specify that a specific dependency should
-// not be found in a Needed set.
+// These are a convenience functions to specify that a specific dependency
+// should or should not be found in the Needed set.
+constexpr std::pair<std::string_view, bool> Found(std::string_view name) { return {name, true}; }
+
 constexpr std::pair<std::string_view, bool> NotFound(std::string_view name) {
   return {name, false};
 }
@@ -253,6 +255,7 @@ TYPED_TEST(DlTests, MissingSymbol) {
   }
 }
 
+// Try to load a module that has a (direct) dependency that cannot be found.
 TYPED_TEST(DlTests, MissingDependency) {
   constexpr const char* kMissingDepFile = "missing-dep.module.so";
 
@@ -273,6 +276,31 @@ TYPED_TEST(DlTests, MissingDependency) {
         MatchesRegex(
             // emitted by Fuchsia-musl
             "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.module.so\\)"
+            // emitted by Linux-glibc
+            "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
+  }
+}
+
+// Try to load a module where the dependency of its direct dependency (i.e. a
+// transitive dependency of the root module) cannot be found.
+TYPED_TEST(DlTests, MissingTransitiveDependency) {
+  constexpr const char* kMissingDepFile = "missing-transitive-dep.module.so";
+
+  this->ExpectRootModule(kMissingDepFile);
+  this->Needed({Found("libhas-missing-dep.so"), NotFound("libmissing-dep-dep.so")});
+
+  auto result = this->DlOpen(kMissingDepFile, RTLD_NOW | RTLD_LOCAL);
+  // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
+  // between implementations.
+  // Expect that the dependency lib to libhas-missing-dep.so cannot be found.
+  if constexpr (TestFixture::kCanMatchExactError) {
+    EXPECT_EQ(result.error_value().take_str(), "cannot open dependency: libmissing-dep-dep.so");
+  } else {
+    EXPECT_THAT(
+        result.error_value().take_str(),
+        MatchesRegex(
+            // emitted by Fuchsia-musl
+            "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by libhas-missing-dep.so\\)"
             // emitted by Linux-glibc
             "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
   }

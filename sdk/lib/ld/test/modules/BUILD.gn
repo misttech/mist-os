@@ -43,6 +43,7 @@ non_module_in_process_executables = [
 executables = [
   ":missing-dep",
   ":missing-sym",
+  ":missing-transitive-dep",
   ":relro",
 ]
 
@@ -59,6 +60,7 @@ shlibs = [
   ":tls-dep",
   ":tls-ie-dep",
   ":tls-desc-dep",
+  ":has-missing-dep",
 ]
 
 modules = []
@@ -755,6 +757,9 @@ ifs_shared_library("missing-sym-dep-a") {
   data_deps = [ ":ld-dep-a" ]
 }
 
+# Includes a symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be
+# found:
+# missing-dep -> (x) missing-dep-dep
 test_executable("missing-dep") {
   sources = [ "missing-dep.cc" ]
 
@@ -766,6 +771,27 @@ ifs_shared_library("missing-dep-dep") {
   # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
   #testonly = true
   abi = "missing-dep-dep.ifs"
+}
+
+# Includes a symbol that is provided by a dependency of a DT_NEEDED, but that
+# dependency cannot be found:
+# missing-transitive-dep -> has-missing-dep -> (x) missing-dep-dep
+test_executable("missing-transitive-dep") {
+  sources = [ "missing-transitive-dep.cc" ]
+
+  shlib_deps = [ ":has-missing-dep" ]
+}
+
+# This shared library exports a symbol with a definition that includes another
+# symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be found.
+test_shared_library("has-missing-dep") {
+  sources = [ "has-missing-dep.cc" ]
+
+  # Note this isn't shlib_deps because there's no corresponding test data.
+  deps = [
+    ":missing-dep-dep",
+    "//zircon/system/public",
+  ]
 }
 
 test_executable("relro") {
