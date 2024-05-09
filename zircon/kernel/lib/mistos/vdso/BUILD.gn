@@ -24,9 +24,14 @@ fidl("linux") {
   ]
 
   # Order matters! It needs to match linux syscall numbers.
-  sources = [ "syscall.fidl" ]
-  if (!exclude_testonly_syscalls) {
-    sources += [ "syscall.test.fidl" ]
+  # NOSORT
+  sources = [
+    "syscall.fidl",
+    "syscall.test.fidl",
+  ]
+
+  if (exclude_testonly_syscalls) {
+    sources -= [ "syscall.test.fidl" ]
   }
 
   # TODO(https://fxbug.dev/42061412): Burn these down.

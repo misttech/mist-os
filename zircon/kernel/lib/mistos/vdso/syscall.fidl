@@ -343,6 +343,8 @@ closed protocol Syscall {
     strict ModifyLdt() -> () error int64;
     ///STUB 155
     strict PivotRoot() -> () error int64;
+    ///STUB 156 Not Implemented syscall
+    strict Ni_156() -> () error int64;
     ///STUB 157
     strict Prctl() -> () error int64;
     ///STUB 158
@@ -361,6 +363,8 @@ closed protocol Syscall {
     strict Settimeofday() -> () error int64;
     ///STUB 165
     strict Mount() -> () error int64;
+    ///STUB 166
+    strict Umount2() -> () error int64;
     ///STUB 167
     strict Swapon() -> () error int64;
     ///STUB 168
@@ -375,12 +379,30 @@ closed protocol Syscall {
     strict Iopl() -> () error int64;
     ///STUB 173
     strict Ioperm() -> () error int64;
+    ///STUB 174
+    strict CreateModule() -> () error int64;
     ///STUB 175
     strict InitModule() -> () error int64;
     ///STUB 176
     strict DeleteModule() -> () error int64;
+    ///STUB 177
+    strict GetKernelSyms() -> () error int64;
+    ///STUB 178
+    strict QueryModule() -> () error int64;
     ///STUB 179
     strict Quotactl() -> () error int64;
+    ///STUB 180
+    strict Nfsservctl() -> () error int64;
+    ///STUB 181
+    strict Getpmsg() -> () error int64;
+    ///STUB 182
+    strict Putpmsg() -> () error int64;
+    ///STUB 183
+    strict AfsSyscall() -> () error int64;
+    ///STUB 184
+    strict Tuxcall() -> () error int64;
+    ///STUB 185
+    strict Security() -> () error int64;
     ///STUB 186
     strict Gettid() -> () error int64;
     ///STUB 187
@@ -433,8 +455,14 @@ closed protocol Syscall {
     strict IoCancel() -> () error int64;
     ///STUB 211
     strict GetThreadArea() -> () error int64;
+    ///STUB 212
+    strict LookupDcookie() -> () error int64;
     ///STUB 213
     strict EpollCreate() -> () error int64;
+    ///STUB 214
+    strict EpollCtlOld() -> () error int64;
+    ///STUB 215
+    strict EpollWaitOld() -> () error int64;
     ///STUB 216
     strict RemapFilePages() -> () error int64;
     ///STUB 217
@@ -475,6 +503,8 @@ closed protocol Syscall {
     strict Tgkill() -> () error int64;
     ///STUB 235
     strict Utimes() -> () error int64;
+    ///STUB 236
+    strict Vserver() -> () error int64;
     ///STUB 237
     strict Mbind() -> () error int64;
     ///STUB 238
@@ -671,80 +701,184 @@ closed protocol Syscall {
     strict IoPgetevents() -> () error int64;
     ///STUB 334
     strict Rseq() -> () error int64;
-    ///STUB Dont use numbers 387
-    strict DontUseNumbers_387() -> () error int64;
-    ///STUB Dont use numbers 388
-    strict DontUseNumbers_388() -> () error int64;
-    ///STUB Dont use numbers 389
-    strict DontUseNumbers_389() -> () error int64;
-    ///STUB Dont use numbers 390
-    strict DontUseNumbers_390() -> () error int64;
-    ///STUB Dont use numbers 391
-    strict DontUseNumbers_391() -> () error int64;
-    ///STUB Dont use numbers 392
-    strict DontUseNumbers_392() -> () error int64;
-    ///STUB Dont use numbers 393
-    strict DontUseNumbers_393() -> () error int64;
-    ///STUB Dont use numbers 394
-    strict DontUseNumbers_394() -> () error int64;
-    ///STUB Dont use numbers 395
-    strict DontUseNumbers_395() -> () error int64;
-    ///STUB Dont use numbers 396
-    strict DontUseNumbers_396() -> () error int64;
-    ///STUB Dont use numbers 397
-    strict DontUseNumbers_397() -> () error int64;
-    ///STUB Dont use numbers 398
-    strict DontUseNumbers_398() -> () error int64;
-    ///STUB Dont use numbers 399
-    strict DontUseNumbers_399() -> () error int64;
-    ///STUB Dont use numbers 400
-    strict DontUseNumbers_400() -> () error int64;
-    ///STUB Dont use numbers 401
-    strict DontUseNumbers_401() -> () error int64;
-    ///STUB Dont use numbers 402
-    strict DontUseNumbers_402() -> () error int64;
-    ///STUB Dont use numbers 403
-    strict DontUseNumbers_403() -> () error int64;
-    ///STUB Dont use numbers 404
-    strict DontUseNumbers_404() -> () error int64;
-    ///STUB Dont use numbers 405
-    strict DontUseNumbers_405() -> () error int64;
-    ///STUB Dont use numbers 406
-    strict DontUseNumbers_406() -> () error int64;
-    ///STUB Dont use numbers 407
-    strict DontUseNumbers_407() -> () error int64;
-    ///STUB Dont use numbers 408
-    strict DontUseNumbers_408() -> () error int64;
-    ///STUB Dont use numbers 409
-    strict DontUseNumbers_409() -> () error int64;
-    ///STUB Dont use numbers 410
-    strict DontUseNumbers_410() -> () error int64;
-    ///STUB Dont use numbers 411
-    strict DontUseNumbers_411() -> () error int64;
-    ///STUB Dont use numbers 412
-    strict DontUseNumbers_412() -> () error int64;
-    ///STUB Dont use numbers 413
-    strict DontUseNumbers_413() -> () error int64;
-    ///STUB Dont use numbers 414
-    strict DontUseNumbers_414() -> () error int64;
-    ///STUB Dont use numbers 415
-    strict DontUseNumbers_415() -> () error int64;
-    ///STUB Dont use numbers 416
-    strict DontUseNumbers_416() -> () error int64;
-    ///STUB Dont use numbers 417
-    strict DontUseNumbers_417() -> () error int64;
-    ///STUB Dont use numbers 418
-    strict DontUseNumbers_418() -> () error int64;
-    ///STUB Dont use numbers 419
-    strict DontUseNumbers_419() -> () error int64;
-    ///STUB Dont use numbers 420
-    strict DontUseNumbers_420() -> () error int64;
-    ///STUB Dont use numbers 421
-    strict DontUseNumbers_421() -> () error int64;
-    ///STUB Dont use numbers 422
-    strict DontUseNumbers_422() -> () error int64;
-    ///STUB Dont use numbers 423
-    strict DontUseNumbers_423() -> () error int64;
+    ///STUB 335 Blank syscall number
+    strict Blank_335() -> () error int64;
+    ///STUB 336 Blank syscall number
+    strict Blank_336() -> () error int64;
+    ///STUB 337 Blank syscall number
+    strict Blank_337() -> () error int64;
+    ///STUB 338 Blank syscall number
+    strict Blank_338() -> () error int64;
+    ///STUB 339 Blank syscall number
+    strict Blank_339() -> () error int64;
+    ///STUB 340 Blank syscall number
+    strict Blank_340() -> () error int64;
+    ///STUB 341 Blank syscall number
+    strict Blank_341() -> () error int64;
+    ///STUB 342 Blank syscall number
+    strict Blank_342() -> () error int64;
+    ///STUB 343 Blank syscall number
+    strict Blank_343() -> () error int64;
+    ///STUB 344 Blank syscall number
+    strict Blank_344() -> () error int64;
+    ///STUB 345 Blank syscall number
+    strict Blank_345() -> () error int64;
+    ///STUB 346 Blank syscall number
+    strict Blank_346() -> () error int64;
+    ///STUB 347 Blank syscall number
+    strict Blank_347() -> () error int64;
+    ///STUB 348 Blank syscall number
+    strict Blank_348() -> () error int64;
+    ///STUB 349 Blank syscall number
+    strict Blank_349() -> () error int64;
+    ///STUB 350 Blank syscall number
+    strict Blank_350() -> () error int64;
+    ///STUB 351 Blank syscall number
+    strict Blank_351() -> () error int64;
+    ///STUB 352 Blank syscall number
+    strict Blank_352() -> () error int64;
+    ///STUB 353 Blank syscall number
+    strict Blank_353() -> () error int64;
+    ///STUB 354 Blank syscall number
+    strict Blank_354() -> () error int64;
+    ///STUB 355 Blank syscall number
+    strict Blank_355() -> () error int64;
+    ///STUB 356 Blank syscall number
+    strict Blank_356() -> () error int64;
+    ///STUB 357 Blank syscall number
+    strict Blank_357() -> () error int64;
+    ///STUB 358 Blank syscall number
+    strict Blank_358() -> () error int64;
+    ///STUB 359 Blank syscall number
+    strict Blank_359() -> () error int64;
+    ///STUB 360 Blank syscall number
+    strict Blank_360() -> () error int64;
+    ///STUB 361 Blank syscall number
+    strict Blank_361() -> () error int64;
+    ///STUB 362 Blank syscall number
+    strict Blank_362() -> () error int64;
+    ///STUB 363 Blank syscall number
+    strict Blank_363() -> () error int64;
+    ///STUB 364 Blank syscall number
+    strict Blank_364() -> () error int64;
+    ///STUB 365 Blank syscall number
+    strict Blank_365() -> () error int64;
+    ///STUB 366 Blank syscall number
+    strict Blank_366() -> () error int64;
+    ///STUB 367 Blank syscall number
+    strict Blank_367() -> () error int64;
+    ///STUB 368 Blank syscall number
+    strict Blank_368() -> () error int64;
+    ///STUB 369 Blank syscall number
+    strict Blank_369() -> () error int64;
+    ///STUB 370 Blank syscall number
+    strict Blank_370() -> () error int64;
+    ///STUB 371 Blank syscall number
+    strict Blank_371() -> () error int64;
+    ///STUB 372 Blank syscall number
+    strict Blank_372() -> () error int64;
+    ///STUB 373 Blank syscall number
+    strict Blank_373() -> () error int64;
+    ///STUB 374 Blank syscall number
+    strict Blank_374() -> () error int64;
+    ///STUB 375 Blank syscall number
+    strict Blank_375() -> () error int64;
+    ///STUB 376 Blank syscall number
+    strict Blank_376() -> () error int64;
+    ///STUB 377 Blank syscall number
+    strict Blank_377() -> () error int64;
+    ///STUB 378 Blank syscall number
+    strict Blank_378() -> () error int64;
+    ///STUB 379 Blank syscall number
+    strict Blank_379() -> () error int64;
+    ///STUB 380 Blank syscall number
+    strict Blank_380() -> () error int64;
+    ///STUB 381 Blank syscall number
+    strict Blank_381() -> () error int64;
+    ///STUB 382 Blank syscall number
+    strict Blank_382() -> () error int64;
+    ///STUB 383 Blank syscall number
+    strict Blank_383() -> () error int64;
+    ///STUB 384 Blank syscall number
+    strict Blank_384() -> () error int64;
+    ///STUB 385 Blank syscall number
+    strict Blank_385() -> () error int64;
+    ///STUB 386 Blank syscall number
+    strict Blank_386() -> () error int64;
+    ///STUB 387 Don't use
+    strict DontUse_387() -> () error int64;
+    ///STUB 388 Don't use
+    strict DontUse_388() -> () error int64;
+    ///STUB 389 Don't use
+    strict DontUse_389() -> () error int64;
+    ///STUB 390 Don't use
+    strict DontUse_390() -> () error int64;
+    ///STUB 391 Don't use
+    strict DontUse_391() -> () error int64;
+    ///STUB 392 Don't use
+    strict DontUse_392() -> () error int64;
+    ///STUB 393 Don't use
+    strict DontUse_393() -> () error int64;
+    ///STUB 394 Don't use
+    strict DontUse_394() -> () error int64;
+    ///STUB 395 Don't use
+    strict DontUse_395() -> () error int64;
+    ///STUB 396 Don't use
+    strict DontUse_396() -> () error int64;
+    ///STUB 397 Don't use
+    strict DontUse_397() -> () error int64;
+    ///STUB 398 Don't use
+    strict DontUse_398() -> () error int64;
+    ///STUB 399 Don't use
+    strict DontUse_399() -> () error int64;
+    ///STUB 400 Don't use
+    strict DontUse_400() -> () error int64;
+    ///STUB 401 Don't use
+    strict DontUse_401() -> () error int64;
+    ///STUB 402 Don't use
+    strict DontUse_402() -> () error int64;
+    ///STUB 403 Don't use
+    strict DontUse_403() -> () error int64;
+    ///STUB 404 Don't use
+    strict DontUse_404() -> () error int64;
+    ///STUB 405 Don't use
+    strict DontUse_405() -> () error int64;
+    ///STUB 406 Don't use
+    strict DontUse_406() -> () error int64;
+    ///STUB 407 Don't use
+    strict DontUse_407() -> () error int64;
+    ///STUB 408 Don't use
+    strict DontUse_408() -> () error int64;
+    ///STUB 409 Don't use
+    strict DontUse_409() -> () error int64;
+    ///STUB 410 Don't use
+    strict DontUse_410() -> () error int64;
+    ///STUB 411 Don't use
+    strict DontUse_411() -> () error int64;
+    ///STUB 412 Don't use
+    strict DontUse_412() -> () error int64;
+    ///STUB 413 Don't use
+    strict DontUse_413() -> () error int64;
+    ///STUB 414 Don't use
+    strict DontUse_414() -> () error int64;
+    ///STUB 415 Don't use
+    strict DontUse_415() -> () error int64;
+    ///STUB 416 Don't use
+    strict DontUse_416() -> () error int64;
+    ///STUB 417 Don't use
+    strict DontUse_417() -> () error int64;
+    ///STUB 418 Don't use
+    strict DontUse_418() -> () error int64;
+    ///STUB 419 Don't use
+    strict DontUse_419() -> () error int64;
+    ///STUB 420 Don't use
+    strict DontUse_420() -> () error int64;
+    ///STUB 421 Don't use
+    strict DontUse_421() -> () error int64;
+    ///STUB 422 Don't use
+    strict DontUse_422() -> () error int64;
+    ///STUB 423 Don't use
+    strict DontUse_423() -> () error int64;
     ///STUB 424
     strict PidfdSendSignal() -> () error int64;
     ///STUB 425
@@ -821,6 +955,106 @@ closed protocol Syscall {
     strict LsmSetSelfAttr() -> () error int64;
     ///STUB 461
     strict LsmListModules() -> () error int64;
+    ///STUB 462 Blank syscall number
+    strict Blank_462() -> () error int64;
+    ///STUB 463 Blank syscall number
+    strict Blank_463() -> () error int64;
+    ///STUB 464 Blank syscall number
+    strict Blank_464() -> () error int64;
+    ///STUB 465 Blank syscall number
+    strict Blank_465() -> () error int64;
+    ///STUB 466 Blank syscall number
+    strict Blank_466() -> () error int64;
+    ///STUB 467 Blank syscall number
+    strict Blank_467() -> () error int64;
+    ///STUB 468 Blank syscall number
+    strict Blank_468() -> () error int64;
+    ///STUB 469 Blank syscall number
+    strict Blank_469() -> () error int64;
+    ///STUB 470 Blank syscall number
+    strict Blank_470() -> () error int64;
+    ///STUB 471 Blank syscall number
+    strict Blank_471() -> () error int64;
+    ///STUB 472 Blank syscall number
+    strict Blank_472() -> () error int64;
+    ///STUB 473 Blank syscall number
+    strict Blank_473() -> () error int64;
+    ///STUB 474 Blank syscall number
+    strict Blank_474() -> () error int64;
+    ///STUB 475 Blank syscall number
+    strict Blank_475() -> () error int64;
+    ///STUB 476 Blank syscall number
+    strict Blank_476() -> () error int64;
+    ///STUB 477 Blank syscall number
+    strict Blank_477() -> () error int64;
+    ///STUB 478 Blank syscall number
+    strict Blank_478() -> () error int64;
+    ///STUB 479 Blank syscall number
+    strict Blank_479() -> () error int64;
+    ///STUB 480 Blank syscall number
+    strict Blank_480() -> () error int64;
+    ///STUB 481 Blank syscall number
+    strict Blank_481() -> () error int64;
+    ///STUB 482 Blank syscall number
+    strict Blank_482() -> () error int64;
+    ///STUB 483 Blank syscall number
+    strict Blank_483() -> () error int64;
+    ///STUB 484 Blank syscall number
+    strict Blank_484() -> () error int64;
+    ///STUB 485 Blank syscall number
+    strict Blank_485() -> () error int64;
+    ///STUB 486 Blank syscall number
+    strict Blank_486() -> () error int64;
+    ///STUB 487 Blank syscall number
+    strict Blank_487() -> () error int64;
+    ///STUB 488 Blank syscall number
+    strict Blank_488() -> () error int64;
+    ///STUB 489 Blank syscall number
+    strict Blank_489() -> () error int64;
+    ///STUB 490 Blank syscall number
+    strict Blank_490() -> () error int64;
+    ///STUB 491 Blank syscall number
+    strict Blank_491() -> () error int64;
+    ///STUB 492 Blank syscall number
+    strict Blank_492() -> () error int64;
+    ///STUB 493 Blank syscall number
+    strict Blank_493() -> () error int64;
+    ///STUB 494 Blank syscall number
+    strict Blank_494() -> () error int64;
+    ///STUB 495 Blank syscall number
+    strict Blank_495() -> () error int64;
+    ///STUB 496 Blank syscall number
+    strict Blank_496() -> () error int64;
+    ///STUB 497 Blank syscall number
+    strict Blank_497() -> () error int64;
+    ///STUB 498 Blank syscall number
+    strict Blank_498() -> () error int64;
+    ///STUB 499 Blank syscall number
+    strict Blank_499() -> () error int64;
+    ///STUB 500 Blank syscall number
+    strict Blank_500() -> () error int64;
+    ///STUB 501 Blank syscall number
+    strict Blank_501() -> () error int64;
+    ///STUB 502 Blank syscall number
+    strict Blank_502() -> () error int64;
+    ///STUB 503 Blank syscall number
+    strict Blank_503() -> () error int64;
+    ///STUB 504 Blank syscall number
+    strict Blank_504() -> () error int64;
+    ///STUB 505 Blank syscall number
+    strict Blank_505() -> () error int64;
+    ///STUB 506 Blank syscall number
+    strict Blank_506() -> () error int64;
+    ///STUB 507 Blank syscall number
+    strict Blank_507() -> () error int64;
+    ///STUB 508 Blank syscall number
+    strict Blank_508() -> () error int64;
+    ///STUB 509 Blank syscall number
+    strict Blank_509() -> () error int64;
+    ///STUB 510 Blank syscall number
+    strict Blank_510() -> () error int64;
+    ///STUB 511 Blank syscall number
+    strict Blank_511() -> () error int64;
     ///STUB 512
     strict CompatRtSigaction() -> () error int64;
     ///STUB 513

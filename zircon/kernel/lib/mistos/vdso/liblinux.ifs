@@ -8,9 +8,112 @@ Symbols:
   - { Name: _zx_acct, Type: Func }
   - { Name: _zx_add_key, Type: Func }
   - { Name: _zx_adjtimex, Type: Func }
+  - { Name: _zx_afs_syscall, Type: Func }
   - { Name: _zx_alarm, Type: Func }
   - { Name: _zx_arch_prctl, Type: Func }
   - { Name: _zx_bind, Type: Func }
+  - { Name: _zx_blank_335, Type: Func }
+  - { Name: _zx_blank_336, Type: Func }
+  - { Name: _zx_blank_337, Type: Func }
+  - { Name: _zx_blank_338, Type: Func }
+  - { Name: _zx_blank_339, Type: Func }
+  - { Name: _zx_blank_340, Type: Func }
+  - { Name: _zx_blank_341, Type: Func }
+  - { Name: _zx_blank_342, Type: Func }
+  - { Name: _zx_blank_343, Type: Func }
+  - { Name: _zx_blank_344, Type: Func }
+  - { Name: _zx_blank_345, Type: Func }
+  - { Name: _zx_blank_346, Type: Func }
+  - { Name: _zx_blank_347, Type: Func }
+  - { Name: _zx_blank_348, Type: Func }
+  - { Name: _zx_blank_349, Type: Func }
+  - { Name: _zx_blank_350, Type: Func }
+  - { Name: _zx_blank_351, Type: Func }
+  - { Name: _zx_blank_352, Type: Func }
+  - { Name: _zx_blank_353, Type: Func }
+  - { Name: _zx_blank_354, Type: Func }
+  - { Name: _zx_blank_355, Type: Func }
+  - { Name: _zx_blank_356, Type: Func }
+  - { Name: _zx_blank_357, Type: Func }
+  - { Name: _zx_blank_358, Type: Func }
+  - { Name: _zx_blank_359, Type: Func }
+  - { Name: _zx_blank_360, Type: Func }
+  - { Name: _zx_blank_361, Type: Func }
+  - { Name: _zx_blank_362, Type: Func }
+  - { Name: _zx_blank_363, Type: Func }
+  - { Name: _zx_blank_364, Type: Func }
+  - { Name: _zx_blank_365, Type: Func }
+  - { Name: _zx_blank_366, Type: Func }
+  - { Name: _zx_blank_367, Type: Func }
+  - { Name: _zx_blank_368, Type: Func }
+  - { Name: _zx_blank_369, Type: Func }
+  - { Name: _zx_blank_370, Type: Func }
+  - { Name: _zx_blank_371, Type: Func }
+  - { Name: _zx_blank_372, Type: Func }
+  - { Name: _zx_blank_373, Type: Func }
+  - { Name: _zx_blank_374, Type: Func }
+  - { Name: _zx_blank_375, Type: Func }
+  - { Name: _zx_blank_376, Type: Func }
+  - { Name: _zx_blank_377, Type: Func }
+  - { Name: _zx_blank_378, Type: Func }
+  - { Name: _zx_blank_379, Type: Func }
+  - { Name: _zx_blank_380, Type: Func }
+  - { Name: _zx_blank_381, Type: Func }
+  - { Name: _zx_blank_382, Type: Func }
+  - { Name: _zx_blank_383, Type: Func }
+  - { Name: _zx_blank_384, Type: Func }
+  - { Name: _zx_blank_385, Type: Func }
+  - { Name: _zx_blank_386, Type: Func }
+  - { Name: _zx_blank_462, Type: Func }
+  - { Name: _zx_blank_463, Type: Func }
+  - { Name: _zx_blank_464, Type: Func }
+  - { Name: _zx_blank_465, Type: Func }
+  - { Name: _zx_blank_466, Type: Func }
+  - { Name: _zx_blank_467, Type: Func }
+  - { Name: _zx_blank_468, Type: Func }
+  - { Name: _zx_blank_469, Type: Func }
+  - { Name: _zx_blank_470, Type: Func }
+  - { Name: _zx_blank_471, Type: Func }
+  - { Name: _zx_blank_472, Type: Func }
+  - { Name: _zx_blank_473, Type: Func }
+  - { Name: _zx_blank_474, Type: Func }
+  - { Name: _zx_blank_475, Type: Func }
+  - { Name: _zx_blank_476, Type: Func }
+  - { Name: _zx_blank_477, Type: Func }
+  - { Name: _zx_blank_478, Type: Func }
+  - { Name: _zx_blank_479, Type: Func }
+  - { Name: _zx_blank_480, Type: Func }
+  - { Name: _zx_blank_481, Type: Func }
+  - { Name: _zx_blank_482, Type: Func }
+  - { Name: _zx_blank_483, Type: Func }
+  - { Name: _zx_blank_484, Type: Func }
+  - { Name: _zx_blank_485, Type: Func }
+  - { Name: _zx_blank_486, Type: Func }
+  - { Name: _zx_blank_487, Type: Func }
+  - { Name: _zx_blank_488, Type: Func }
+  - { Name: _zx_blank_489, Type: Func }
+  - { Name: _zx_blank_490, Type: Func }
+  - { Name: _zx_blank_491, Type: Func }
+  - { Name: _zx_blank_492, Type: Func }
+  - { Name: _zx_blank_493, Type: Func }
+  - { Name: _zx_blank_494, Type: Func }
+  - { Name: _zx_blank_495, Type: Func }
+  - { Name: _zx_blank_496, Type: Func }
+  - { Name: _zx_blank_497, Type: Func }
+  - { Name: _zx_blank_498, Type: Func }
+  - { Name: _zx_blank_499, Type: Func }
+  - { Name: _zx_blank_500, Type: Func }
+  - { Name: _zx_blank_501, Type: Func }
+  - { Name: _zx_blank_502, Type: Func }
+  - { Name: _zx_blank_503, Type: Func }
+  - { Name: _zx_blank_504, Type: Func }
+  - { Name: _zx_blank_505, Type: Func }
+  - { Name: _zx_blank_506, Type: Func }
+  - { Name: _zx_blank_507, Type: Func }
+  - { Name: _zx_blank_508, Type: Func }
+  - { Name: _zx_blank_509, Type: Func }
+  - { Name: _zx_blank_510, Type: Func }
+  - { Name: _zx_blank_511, Type: Func }
   - { Name: _zx_bpf, Type: Func }
   - { Name: _zx_brk, Type: Func }
   - { Name: _zx_cachestat, Type: Func }
@@ -68,53 +171,56 @@ Symbols:
   - { Name: _zx_connect, Type: Func }
   - { Name: _zx_copy_file_range, Type: Func }
   - { Name: _zx_creat, Type: Func }
+  - { Name: _zx_create_module, Type: Func }
   - { Name: _zx_delete_module, Type: Func }
-  - { Name: _zx_dont_use_numbers_387, Type: Func }
-  - { Name: _zx_dont_use_numbers_388, Type: Func }
-  - { Name: _zx_dont_use_numbers_389, Type: Func }
-  - { Name: _zx_dont_use_numbers_390, Type: Func }
-  - { Name: _zx_dont_use_numbers_391, Type: Func }
-  - { Name: _zx_dont_use_numbers_392, Type: Func }
-  - { Name: _zx_dont_use_numbers_393, Type: Func }
-  - { Name: _zx_dont_use_numbers_394, Type: Func }
-  - { Name: _zx_dont_use_numbers_395, Type: Func }
-  - { Name: _zx_dont_use_numbers_396, Type: Func }
-  - { Name: _zx_dont_use_numbers_397, Type: Func }
-  - { Name: _zx_dont_use_numbers_398, Type: Func }
-  - { Name: _zx_dont_use_numbers_399, Type: Func }
-  - { Name: _zx_dont_use_numbers_400, Type: Func }
-  - { Name: _zx_dont_use_numbers_401, Type: Func }
-  - { Name: _zx_dont_use_numbers_402, Type: Func }
-  - { Name: _zx_dont_use_numbers_403, Type: Func }
-  - { Name: _zx_dont_use_numbers_404, Type: Func }
-  - { Name: _zx_dont_use_numbers_405, Type: Func }
-  - { Name: _zx_dont_use_numbers_406, Type: Func }
-  - { Name: _zx_dont_use_numbers_407, Type: Func }
-  - { Name: _zx_dont_use_numbers_408, Type: Func }
-  - { Name: _zx_dont_use_numbers_409, Type: Func }
-  - { Name: _zx_dont_use_numbers_410, Type: Func }
-  - { Name: _zx_dont_use_numbers_411, Type: Func }
-  - { Name: _zx_dont_use_numbers_412, Type: Func }
-  - { Name: _zx_dont_use_numbers_413, Type: Func }
-  - { Name: _zx_dont_use_numbers_414, Type: Func }
-  - { Name: _zx_dont_use_numbers_415, Type: Func }
-  - { Name: _zx_dont_use_numbers_416, Type: Func }
-  - { Name: _zx_dont_use_numbers_417, Type: Func }
-  - { Name: _zx_dont_use_numbers_418, Type: Func }
-  - { Name: _zx_dont_use_numbers_419, Type: Func }
-  - { Name: _zx_dont_use_numbers_420, Type: Func }
-  - { Name: _zx_dont_use_numbers_421, Type: Func }
-  - { Name: _zx_dont_use_numbers_422, Type: Func }
-  - { Name: _zx_dont_use_numbers_423, Type: Func }
+  - { Name: _zx_dont_use_387, Type: Func }
+  - { Name: _zx_dont_use_388, Type: Func }
+  - { Name: _zx_dont_use_389, Type: Func }
+  - { Name: _zx_dont_use_390, Type: Func }
+  - { Name: _zx_dont_use_391, Type: Func }
+  - { Name: _zx_dont_use_392, Type: Func }
+  - { Name: _zx_dont_use_393, Type: Func }
+  - { Name: _zx_dont_use_394, Type: Func }
+  - { Name: _zx_dont_use_395, Type: Func }
+  - { Name: _zx_dont_use_396, Type: Func }
+  - { Name: _zx_dont_use_397, Type: Func }
+  - { Name: _zx_dont_use_398, Type: Func }
+  - { Name: _zx_dont_use_399, Type: Func }
+  - { Name: _zx_dont_use_400, Type: Func }
+  - { Name: _zx_dont_use_401, Type: Func }
+  - { Name: _zx_dont_use_402, Type: Func }
+  - { Name: _zx_dont_use_403, Type: Func }
+  - { Name: _zx_dont_use_404, Type: Func }
+  - { Name: _zx_dont_use_405, Type: Func }
+  - { Name: _zx_dont_use_406, Type: Func }
+  - { Name: _zx_dont_use_407, Type: Func }
+  - { Name: _zx_dont_use_408, Type: Func }
+  - { Name: _zx_dont_use_409, Type: Func }
+  - { Name: _zx_dont_use_410, Type: Func }
+  - { Name: _zx_dont_use_411, Type: Func }
+  - { Name: _zx_dont_use_412, Type: Func }
+  - { Name: _zx_dont_use_413, Type: Func }
+  - { Name: _zx_dont_use_414, Type: Func }
+  - { Name: _zx_dont_use_415, Type: Func }
+  - { Name: _zx_dont_use_416, Type: Func }
+  - { Name: _zx_dont_use_417, Type: Func }
+  - { Name: _zx_dont_use_418, Type: Func }
+  - { Name: _zx_dont_use_419, Type: Func }
+  - { Name: _zx_dont_use_420, Type: Func }
+  - { Name: _zx_dont_use_421, Type: Func }
+  - { Name: _zx_dont_use_422, Type: Func }
+  - { Name: _zx_dont_use_423, Type: Func }
   - { Name: _zx_dup, Type: Func }
   - { Name: _zx_dup2, Type: Func }
   - { Name: _zx_dup3, Type: Func }
   - { Name: _zx_epoll_create, Type: Func }
   - { Name: _zx_epoll_create1, Type: Func }
   - { Name: _zx_epoll_ctl, Type: Func }
+  - { Name: _zx_epoll_ctl_old, Type: Func }
   - { Name: _zx_epoll_pwait, Type: Func }
   - { Name: _zx_epoll_pwait2, Type: Func }
   - { Name: _zx_epoll_wait, Type: Func }
+  - { Name: _zx_epoll_wait_old, Type: Func }
   - { Name: _zx_eventfd, Type: Func }
   - { Name: _zx_eventfd2, Type: Func }
   - { Name: _zx_execve, Type: Func }
@@ -156,6 +262,7 @@ Symbols:
   - { Name: _zx_futex_waitv, Type: Func }
   - { Name: _zx_futex_wake, Type: Func }
   - { Name: _zx_futimesat, Type: Func }
+  - { Name: _zx_get_kernel_syms, Type: Func }
   - { Name: _zx_get_mempolicy, Type: Func }
   - { Name: _zx_get_robust_list, Type: Func }
   - { Name: _zx_get_thread_area, Type: Func }
@@ -172,6 +279,7 @@ Symbols:
   - { Name: _zx_getpgid, Type: Func }
   - { Name: _zx_getpgrp, Type: Func }
   - { Name: _zx_getpid, Type: Func }
+  - { Name: _zx_getpmsg, Type: Func }
   - { Name: _zx_getppid, Type: Func }
   - { Name: _zx_getpriority, Type: Func }
   - { Name: _zx_getrandom, Type: Func }
@@ -221,6 +329,7 @@ Symbols:
   - { Name: _zx_listmount, Type: Func }
   - { Name: _zx_listxattr, Type: Func }
   - { Name: _zx_llistxattr, Type: Func }
+  - { Name: _zx_lookup_dcookie, Type: Func }
   - { Name: _zx_lremovexattr, Type: Func }
   - { Name: _zx_lseek, Type: Func }
   - { Name: _zx_lsetxattr, Type: Func }
@@ -268,6 +377,8 @@ Symbols:
   - { Name: _zx_name_to_handle_at, Type: Func }
   - { Name: _zx_nanosleep, Type: Func }
   - { Name: _zx_newfstatat, Type: Func }
+  - { Name: _zx_nfsservctl, Type: Func }
+  - { Name: _zx_ni_156, Type: Func }
   - { Name: _zx_open, Type: Func }
   - { Name: _zx_open_by_handle_at, Type: Func }
   - { Name: _zx_open_tree, Type: Func }
@@ -298,9 +409,11 @@ Symbols:
   - { Name: _zx_process_vm_writev, Type: Func }
   - { Name: _zx_pselect6, Type: Func }
   - { Name: _zx_ptrace, Type: Func }
+  - { Name: _zx_putpmsg, Type: Func }
   - { Name: _zx_pwrite64, Type: Func }
   - { Name: _zx_pwritev, Type: Func }
   - { Name: _zx_pwritev2, Type: Func }
+  - { Name: _zx_query_module, Type: Func }
   - { Name: _zx_quotactl, Type: Func }
   - { Name: _zx_quotactl_fd, Type: Func }
   - { Name: _zx_read, Type: Func }
@@ -342,6 +455,7 @@ Symbols:
   - { Name: _zx_sched_setscheduler, Type: Func }
   - { Name: _zx_sched_yield, Type: Func }
   - { Name: _zx_seccomp, Type: Func }
+  - { Name: _zx_security, Type: Func }
   - { Name: _zx_select, Type: Func }
   - { Name: _zx_semctl, Type: Func }
   - { Name: _zx_semget, Type: Func }
@@ -422,7 +536,9 @@ Symbols:
   - { Name: _zx_times, Type: Func }
   - { Name: _zx_tkill, Type: Func }
   - { Name: _zx_truncate, Type: Func }
+  - { Name: _zx_tuxcall, Type: Func }
   - { Name: _zx_umask, Type: Func }
+  - { Name: _zx_umount2, Type: Func }
   - { Name: _zx_uname, Type: Func }
   - { Name: _zx_unlink, Type: Func }
   - { Name: _zx_unlinkat, Type: Func }
@@ -436,6 +552,7 @@ Symbols:
   - { Name: _zx_vfork, Type: Func }
   - { Name: _zx_vhangup, Type: Func }
   - { Name: _zx_vmsplice, Type: Func }
+  - { Name: _zx_vserver, Type: Func }
   - { Name: _zx_wait4, Type: Func }
   - { Name: _zx_waitid, Type: Func }
   - { Name: _zx_write, Type: Func }
@@ -446,9 +563,112 @@ Symbols:
   - { Name: zx_acct, Type: Func, Weak: true }
   - { Name: zx_add_key, Type: Func, Weak: true }
   - { Name: zx_adjtimex, Type: Func, Weak: true }
+  - { Name: zx_afs_syscall, Type: Func, Weak: true }
   - { Name: zx_alarm, Type: Func, Weak: true }
   - { Name: zx_arch_prctl, Type: Func, Weak: true }
   - { Name: zx_bind, Type: Func, Weak: true }
+  - { Name: zx_blank_335, Type: Func, Weak: true }
+  - { Name: zx_blank_336, Type: Func, Weak: true }
+  - { Name: zx_blank_337, Type: Func, Weak: true }
+  - { Name: zx_blank_338, Type: Func, Weak: true }
+  - { Name: zx_blank_339, Type: Func, Weak: true }
+  - { Name: zx_blank_340, Type: Func, Weak: true }
+  - { Name: zx_blank_341, Type: Func, Weak: true }
+  - { Name: zx_blank_342, Type: Func, Weak: true }
+  - { Name: zx_blank_343, Type: Func, Weak: true }
+  - { Name: zx_blank_344, Type: Func, Weak: true }
+  - { Name: zx_blank_345, Type: Func, Weak: true }
+  - { Name: zx_blank_346, Type: Func, Weak: true }
+  - { Name: zx_blank_347, Type: Func, Weak: true }
+  - { Name: zx_blank_348, Type: Func, Weak: true }
+  - { Name: zx_blank_349, Type: Func, Weak: true }
+  - { Name: zx_blank_350, Type: Func, Weak: true }
+  - { Name: zx_blank_351, Type: Func, Weak: true }
+  - { Name: zx_blank_352, Type: Func, Weak: true }
+  - { Name: zx_blank_353, Type: Func, Weak: true }
+  - { Name: zx_blank_354, Type: Func, Weak: true }
+  - { Name: zx_blank_355, Type: Func, Weak: true }
+  - { Name: zx_blank_356, Type: Func, Weak: true }
+  - { Name: zx_blank_357, Type: Func, Weak: true }
+  - { Name: zx_blank_358, Type: Func, Weak: true }
+  - { Name: zx_blank_359, Type: Func, Weak: true }
+  - { Name: zx_blank_360, Type: Func, Weak: true }
+  - { Name: zx_blank_361, Type: Func, Weak: true }
+  - { Name: zx_blank_362, Type: Func, Weak: true }
+  - { Name: zx_blank_363, Type: Func, Weak: true }
+  - { Name: zx_blank_364, Type: Func, Weak: true }
+  - { Name: zx_blank_365, Type: Func, Weak: true }
+  - { Name: zx_blank_366, Type: Func, Weak: true }
+  - { Name: zx_blank_367, Type: Func, Weak: true }
+  - { Name: zx_blank_368, Type: Func, Weak: true }
+  - { Name: zx_blank_369, Type: Func, Weak: true }
+  - { Name: zx_blank_370, Type: Func, Weak: true }
+  - { Name: zx_blank_371, Type: Func, Weak: true }
+  - { Name: zx_blank_372, Type: Func, Weak: true }
+  - { Name: zx_blank_373, Type: Func, Weak: true }
+  - { Name: zx_blank_374, Type: Func, Weak: true }
+  - { Name: zx_blank_375, Type: Func, Weak: true }
+  - { Name: zx_blank_376, Type: Func, Weak: true }
+  - { Name: zx_blank_377, Type: Func, Weak: true }
+  - { Name: zx_blank_378, Type: Func, Weak: true }
+  - { Name: zx_blank_379, Type: Func, Weak: true }
+  - { Name: zx_blank_380, Type: Func, Weak: true }
+  - { Name: zx_blank_381, Type: Func, Weak: true }
+  - { Name: zx_blank_382, Type: Func, Weak: true }
+  - { Name: zx_blank_383, Type: Func, Weak: true }
+  - { Name: zx_blank_384, Type: Func, Weak: true }
+  - { Name: zx_blank_385, Type: Func, Weak: true }
+  - { Name: zx_blank_386, Type: Func, Weak: true }
+  - { Name: zx_blank_462, Type: Func, Weak: true }
+  - { Name: zx_blank_463, Type: Func, Weak: true }
+  - { Name: zx_blank_464, Type: Func, Weak: true }
+  - { Name: zx_blank_465, Type: Func, Weak: true }
+  - { Name: zx_blank_466, Type: Func, Weak: true }
+  - { Name: zx_blank_467, Type: Func, Weak: true }
+  - { Name: zx_blank_468, Type: Func, Weak: true }
+  - { Name: zx_blank_469, Type: Func, Weak: true }
+  - { Name: zx_blank_470, Type: Func, Weak: true }
+  - { Name: zx_blank_471, Type: Func, Weak: true }
+  - { Name: zx_blank_472, Type: Func, Weak: true }
+  - { Name: zx_blank_473, Type: Func, Weak: true }
+  - { Name: zx_blank_474, Type: Func, Weak: true }
+  - { Name: zx_blank_475, Type: Func, Weak: true }
+  - { Name: zx_blank_476, Type: Func, Weak: true }
+  - { Name: zx_blank_477, Type: Func, Weak: true }
+  - { Name: zx_blank_478, Type: Func, Weak: true }
+  - { Name: zx_blank_479, Type: Func, Weak: true }
+  - { Name: zx_blank_480, Type: Func, Weak: true }
+  - { Name: zx_blank_481, Type: Func, Weak: true }
+  - { Name: zx_blank_482, Type: Func, Weak: true }
+  - { Name: zx_blank_483, Type: Func, Weak: true }
+  - { Name: zx_blank_484, Type: Func, Weak: true }
+  - { Name: zx_blank_485, Type: Func, Weak: true }
+  - { Name: zx_blank_486, Type: Func, Weak: true }
+  - { Name: zx_blank_487, Type: Func, Weak: true }
+  - { Name: zx_blank_488, Type: Func, Weak: true }
+  - { Name: zx_blank_489, Type: Func, Weak: true }
+  - { Name: zx_blank_490, Type: Func, Weak: true }
+  - { Name: zx_blank_491, Type: Func, Weak: true }
+  - { Name: zx_blank_492, Type: Func, Weak: true }
+  - { Name: zx_blank_493, Type: Func, Weak: true }
+  - { Name: zx_blank_494, Type: Func, Weak: true }
+  - { Name: zx_blank_495, Type: Func, Weak: true }
+  - { Name: zx_blank_496, Type: Func, Weak: true }
+  - { Name: zx_blank_497, Type: Func, Weak: true }
+  - { Name: zx_blank_498, Type: Func, Weak: true }
+  - { Name: zx_blank_499, Type: Func, Weak: true }
+  - { Name: zx_blank_500, Type: Func, Weak: true }
+  - { Name: zx_blank_501, Type: Func, Weak: true }
+  - { Name: zx_blank_502, Type: Func, Weak: true }
+  - { Name: zx_blank_503, Type: Func, Weak: true }
+  - { Name: zx_blank_504, Type: Func, Weak: true }
+  - { Name: zx_blank_505, Type: Func, Weak: true }
+  - { Name: zx_blank_506, Type: Func, Weak: true }
+  - { Name: zx_blank_507, Type: Func, Weak: true }
+  - { Name: zx_blank_508, Type: Func, Weak: true }
+  - { Name: zx_blank_509, Type: Func, Weak: true }
+  - { Name: zx_blank_510, Type: Func, Weak: true }
+  - { Name: zx_blank_511, Type: Func, Weak: true }
   - { Name: zx_bpf, Type: Func, Weak: true }
   - { Name: zx_brk, Type: Func, Weak: true }
   - { Name: zx_cachestat, Type: Func, Weak: true }
@@ -506,53 +726,56 @@ Symbols:
   - { Name: zx_connect, Type: Func, Weak: true }
   - { Name: zx_copy_file_range, Type: Func, Weak: true }
   - { Name: zx_creat, Type: Func, Weak: true }
+  - { Name: zx_create_module, Type: Func, Weak: true }
   - { Name: zx_delete_module, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_387, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_388, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_389, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_390, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_391, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_392, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_393, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_394, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_395, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_396, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_397, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_398, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_399, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_400, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_401, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_402, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_403, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_404, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_405, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_406, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_407, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_408, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_409, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_410, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_411, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_412, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_413, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_414, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_415, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_416, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_417, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_418, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_419, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_420, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_421, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_422, Type: Func, Weak: true }
-  - { Name: zx_dont_use_numbers_423, Type: Func, Weak: true }
+  - { Name: zx_dont_use_387, Type: Func, Weak: true }
+  - { Name: zx_dont_use_388, Type: Func, Weak: true }
+  - { Name: zx_dont_use_389, Type: Func, Weak: true }
+  - { Name: zx_dont_use_390, Type: Func, Weak: true }
+  - { Name: zx_dont_use_391, Type: Func, Weak: true }
+  - { Name: zx_dont_use_392, Type: Func, Weak: true }
+  - { Name: zx_dont_use_393, Type: Func, Weak: true }
+  - { Name: zx_dont_use_394, Type: Func, Weak: true }
+  - { Name: zx_dont_use_395, Type: Func, Weak: true }
+  - { Name: zx_dont_use_396, Type: Func, Weak: true }
+  - { Name: zx_dont_use_397, Type: Func, Weak: true }
+  - { Name: zx_dont_use_398, Type: Func, Weak: true }
+  - { Name: zx_dont_use_399, Type: Func, Weak: true }
+  - { Name: zx_dont_use_400, Type: Func, Weak: true }
+  - { Name: zx_dont_use_401, Type: Func, Weak: true }
+  - { Name: zx_dont_use_402, Type: Func, Weak: true }
+  - { Name: zx_dont_use_403, Type: Func, Weak: true }
+  - { Name: zx_dont_use_404, Type: Func, Weak: true }
+  - { Name: zx_dont_use_405, Type: Func, Weak: true }
+  - { Name: zx_dont_use_406, Type: Func, Weak: true }
+  - { Name: zx_dont_use_407, Type: Func, Weak: true }
+  - { Name: zx_dont_use_408, Type: Func, Weak: true }
+  - { Name: zx_dont_use_409, Type: Func, Weak: true }
+  - { Name: zx_dont_use_410, Type: Func, Weak: true }
+  - { Name: zx_dont_use_411, Type: Func, Weak: true }
+  - { Name: zx_dont_use_412, Type: Func, Weak: true }
+  - { Name: zx_dont_use_413, Type: Func, Weak: true }
+  - { Name: zx_dont_use_414, Type: Func, Weak: true }
+  - { Name: zx_dont_use_415, Type: Func, Weak: true }
+  - { Name: zx_dont_use_416, Type: Func, Weak: true }
+  - { Name: zx_dont_use_417, Type: Func, Weak: true }
+  - { Name: zx_dont_use_418, Type: Func, Weak: true }
+  - { Name: zx_dont_use_419, Type: Func, Weak: true }
+  - { Name: zx_dont_use_420, Type: Func, Weak: true }
+  - { Name: zx_dont_use_421, Type: Func, Weak: true }
+  - { Name: zx_dont_use_422, Type: Func, Weak: true }
+  - { Name: zx_dont_use_423, Type: Func, Weak: true }
   - { Name: zx_dup, Type: Func, Weak: true }
   - { Name: zx_dup2, Type: Func, Weak: true }
   - { Name: zx_dup3, Type: Func, Weak: true }
   - { Name: zx_epoll_create, Type: Func, Weak: true }
   - { Name: zx_epoll_create1, Type: Func, Weak: true }
   - { Name: zx_epoll_ctl, Type: Func, Weak: true }
+  - { Name: zx_epoll_ctl_old, Type: Func, Weak: true }
   - { Name: zx_epoll_pwait, Type: Func, Weak: true }
   - { Name: zx_epoll_pwait2, Type: Func, Weak: true }
   - { Name: zx_epoll_wait, Type: Func, Weak: true }
+  - { Name: zx_epoll_wait_old, Type: Func, Weak: true }
   - { Name: zx_eventfd, Type: Func, Weak: true }
   - { Name: zx_eventfd2, Type: Func, Weak: true }
   - { Name: zx_execve, Type: Func, Weak: true }
@@ -594,6 +817,7 @@ Symbols:
   - { Name: zx_futex_waitv, Type: Func, Weak: true }
   - { Name: zx_futex_wake, Type: Func, Weak: true }
   - { Name: zx_futimesat, Type: Func, Weak: true }
+  - { Name: zx_get_kernel_syms, Type: Func, Weak: true }
   - { Name: zx_get_mempolicy, Type: Func, Weak: true }
   - { Name: zx_get_robust_list, Type: Func, Weak: true }
   - { Name: zx_get_thread_area, Type: Func, Weak: true }
@@ -610,6 +834,7 @@ Symbols:
   - { Name: zx_getpgid, Type: Func, Weak: true }
   - { Name: zx_getpgrp, Type: Func, Weak: true }
   - { Name: zx_getpid, Type: Func, Weak: true }
+  - { Name: zx_getpmsg, Type: Func, Weak: true }
   - { Name: zx_getppid, Type: Func, Weak: true }
   - { Name: zx_getpriority, Type: Func, Weak: true }
   - { Name: zx_getrandom, Type: Func, Weak: true }
@@ -659,6 +884,7 @@ Symbols:
   - { Name: zx_listmount, Type: Func, Weak: true }
   - { Name: zx_listxattr, Type: Func, Weak: true }
   - { Name: zx_llistxattr, Type: Func, Weak: true }
+  - { Name: zx_lookup_dcookie, Type: Func, Weak: true }
   - { Name: zx_lremovexattr, Type: Func, Weak: true }
   - { Name: zx_lseek, Type: Func, Weak: true }
   - { Name: zx_lsetxattr, Type: Func, Weak: true }
@@ -706,6 +932,8 @@ Symbols:
   - { Name: zx_name_to_handle_at, Type: Func, Weak: true }
   - { Name: zx_nanosleep, Type: Func, Weak: true }
   - { Name: zx_newfstatat, Type: Func, Weak: true }
+  - { Name: zx_nfsservctl, Type: Func, Weak: true }
+  - { Name: zx_ni_156, Type: Func, Weak: true }
   - { Name: zx_open, Type: Func, Weak: true }
   - { Name: zx_open_by_handle_at, Type: Func, Weak: true }
   - { Name: zx_open_tree, Type: Func, Weak: true }
@@ -736,9 +964,11 @@ Symbols:
   - { Name: zx_process_vm_writev, Type: Func, Weak: true }
   - { Name: zx_pselect6, Type: Func, Weak: true }
   - { Name: zx_ptrace, Type: Func, Weak: true }
+  - { Name: zx_putpmsg, Type: Func, Weak: true }
   - { Name: zx_pwrite64, Type: Func, Weak: true }
   - { Name: zx_pwritev, Type: Func, Weak: true }
   - { Name: zx_pwritev2, Type: Func, Weak: true }
+  - { Name: zx_query_module, Type: Func, Weak: true }
   - { Name: zx_quotactl, Type: Func, Weak: true }
   - { Name: zx_quotactl_fd, Type: Func, Weak: true }
   - { Name: zx_read, Type: Func, Weak: true }
@@ -780,6 +1010,7 @@ Symbols:
   - { Name: zx_sched_setscheduler, Type: Func, Weak: true }
   - { Name: zx_sched_yield, Type: Func, Weak: true }
   - { Name: zx_seccomp, Type: Func, Weak: true }
+  - { Name: zx_security, Type: Func, Weak: true }
   - { Name: zx_select, Type: Func, Weak: true }
   - { Name: zx_semctl, Type: Func, Weak: true }
   - { Name: zx_semget, Type: Func, Weak: true }
@@ -860,7 +1091,9 @@ Symbols:
   - { Name: zx_times, Type: Func, Weak: true }
   - { Name: zx_tkill, Type: Func, Weak: true }
   - { Name: zx_truncate, Type: Func, Weak: true }
+  - { Name: zx_tuxcall, Type: Func, Weak: true }
   - { Name: zx_umask, Type: Func, Weak: true }
+  - { Name: zx_umount2, Type: Func, Weak: true }
   - { Name: zx_uname, Type: Func, Weak: true }
   - { Name: zx_unlink, Type: Func, Weak: true }
   - { Name: zx_unlinkat, Type: Func, Weak: true }
@@ -874,6 +1107,7 @@ Symbols:
   - { Name: zx_vfork, Type: Func, Weak: true }
   - { Name: zx_vhangup, Type: Func, Weak: true }
   - { Name: zx_vmsplice, Type: Func, Weak: true }
+  - { Name: zx_vserver, Type: Func, Weak: true }
   - { Name: zx_wait4, Type: Func, Weak: true }
   - { Name: zx_waitid, Type: Func, Weak: true }
   - { Name: zx_write, Type: Func, Weak: true }

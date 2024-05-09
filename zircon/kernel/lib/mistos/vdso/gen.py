@@ -16,7 +16,18 @@ def parse_syscall_tbl(tbl_file):
         for line in f:
             items = re.split(r"\t+", line.strip())
             if len(items) >= 3:
-                syscall_info.append((int(items[0]), items[1], items[2]))
+                syscall_number = int(items[0])
+                syscall_name = items[1]
+                syscall_abi = items[2]
+                syscall_description = items[3] if len(items) >= 4 else None
+                syscall_info.append(
+                    (
+                        syscall_number,
+                        syscall_name,
+                        syscall_abi,
+                        syscall_description,
+                    )
+                )
     return syscall_info
 
 
@@ -54,17 +65,57 @@ def find_syscalls(source_dir):
 def generate_fidls(syscalls, syscall_info):
     fidl_definitions = []
     dummy_generated = False
-    for syscall_number, syscall_abi, syscall_name in syscall_info:
+    blank_generated = False
+    interval_generated = False
+    syscall_cout = 0
+    for syscall_number, syscall_abi, syscall_name, entry_point in syscall_info:
+        #print("{}-{}".format(syscall_name, entry_point))
+        if entry_point == "sys_ni_syscall":
+            fidl_definitions.append(
+                f"///STUB {syscall_number} Not Implemented syscall\nstrict Ni_{syscall_number}() -> () error int64;\n"
+            )
+            syscall_cout += 1
+            continue
+        if syscall_name == "umount2" or not entry_point:
+            camel_case_name = "".join(
+                word.capitalize() for word in syscall_name.split("_")
+            )
+            fidl_definitions.append(
+                f"///STUB {syscall_number}\nstrict {camel_case_name}() -> () error int64;\n"
+            )
+            syscall_cout += 1
+            continue
         for syscall, _ in syscalls:
             if syscall == syscall_name:
+                if syscall_number > 334 and not blank_generated:
+                    i = 335
+                    while i <= 386:
+                        fidl_definitions.append(
+                            f"///STUB {i} Blank syscall number\nstrict Blank_{i}() -> () error int64;\n"
+                        )
+                        i += 1
+                        syscall_cout += 1
+                    blank_generated = True
                 if syscall_number > 387 and not dummy_generated:
+                    # don't use numbers 387 through 423,
                     i = 387
                     while i <= 423:
                         fidl_definitions.append(
-                            f"///STUB Dont use numbers {i}\nstrict DontUseNumbers_{i}() -> () error int64;\n"
+                            f"///STUB {i} Don't use\nstrict DontUse_{i}() -> () error int64;\n"
                         )
                         i += 1
+                        syscall_cout += 1
                     dummy_generated = True
+                if syscall_number > 461 and not interval_generated:
+                    # don't use numbers 387 through 423,
+                    i = 462
+                    while i <= 511:
+                        fidl_definitions.append(
+                            f"///STUB {i} Blank syscall number\nstrict Blank_{i}() -> () error int64;\n"
+                        )
+                        i += 1
+                        syscall_cout += 1
+                    interval_generated = True
                 if syscall_abi == "x32":
                     syscall_name = f"compat_{syscall_name}"
                 camel_case_name = "".join(
@@ -73,7 +124,11 @@ def generate_fidls(syscalls, syscall_info):
                 fidl_definitions.append(
                     f"///STUB {syscall_number}\nstrict {camel_case_name}() -> () error int64;\n"
                 )
+                syscall_cout += 1
                 break
+        if syscall_cout != syscall_number + 1:
+            print("syscall_cout is {}".format(syscall_cout))
+            print("syscall_number is {}".format(syscall_number))
     return "".join(fidl_definitions)
 
 
