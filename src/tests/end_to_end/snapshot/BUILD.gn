@@ -22,7 +22,3 @@ if (is_host) {
     ]
   }
 }
-
-group("tests") {
-  testonly = true
-}
