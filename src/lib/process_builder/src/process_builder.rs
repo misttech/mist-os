@@ -313,7 +313,7 @@ impl ProcessBuilder {
     /// * [HandleType::ExecutableVmo]
     pub fn add_handles(
         &mut self,
-        mut startup_handles: Vec<process_args::StartupHandle>,
+        startup_handles: Vec<process_args::StartupHandle>,
     ) -> Result<(), ProcessBuilderError> {
         // Do a bit of validation before adding to the bootstrap handles.
         for h in &startup_handles {
@@ -345,7 +345,7 @@ impl ProcessBuilder {
         }
 
         // Intentionally separate from validation so that we don't partially add namespace entries.
-        for h in startup_handles.drain(..) {
+        for h in startup_handles {
             match h.info.handle_type() {
                 HandleType::LdsvcLoader => {
                     // Automatically pass this to |set_loader_service| instead.
