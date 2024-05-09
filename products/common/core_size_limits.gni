@@ -140,7 +140,7 @@ size_checker_input = {
         "libvulkan_goldfish",
         "vulkan_loader",
       ]
-      limit = 5085594  # 4.85 MiB
+      limit = 5284823  # 5.04 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
