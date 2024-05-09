@@ -13,7 +13,6 @@ group("tests") {
   # Please fix the failure and remove the condition below.
   if (!is_coverage) {
     deps += [
-      ":driver-host-runner-tests",
       ":driver-manager-tests",
       ":driver-runner-tests",
     ]
@@ -221,24 +220,6 @@ fuchsia_unittest_component("driver-host-loader-service-test") {
   test_type = "system"
 }
 
-test("driver_host_runner_test") {
-  sources = [ "driver_host_runner_test.cc" ]
-  deps = [
-    ":driver_runner_test_fixture",
-    "//src/devices/bin/driver_manager:driver_runner",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-fuchsia_unittest_component("driver-host-runner-test") {
-  manifest = "meta/driver-host-runner-test.cml"
-  deps = [ ":driver_host_runner_test" ]
-  test_type = "system"
-}
-
 test("composite_node_spec_manager_test") {
   sources = [ "composite_node_spec_manager_test.cc" ]
 
@@ -268,9 +249,4 @@ fuchsia_test_package("driver-manager-tests") {
     ":driver-host-loader-service-test",
     ":driver-manager-devfs-test",
   ]
-}
-
-fuchsia_test_package("driver-host-runner-tests") {
-  test_components = [ ":driver-host-runner-test" ]
-  deps = [ "//src/devices/bin/driver_host2:component" ]
 }
