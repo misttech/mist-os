@@ -1084,11 +1084,6 @@ TEST_F(SherlockPartitionerTests, InitializePartitionTable) {
     ASSERT_OK(gpt->Sync());
   }
 
-  auto result =
-      fidl::WireCall(gpt_dev->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
-  ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
-  ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
-
   zx::result status = CreatePartitioner(gpt_dev.get());
   ASSERT_OK(status);
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
