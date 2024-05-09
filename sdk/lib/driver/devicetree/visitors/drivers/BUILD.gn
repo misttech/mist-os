@@ -17,6 +17,7 @@ group("tests") {
     "pwm-controllers:tests",
     "registers:tests",
     "regulator:tests",
+    "sysmem:tests",
     "thermal:tests",
     "usb:tests",
   ]

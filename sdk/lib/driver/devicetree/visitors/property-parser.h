@@ -80,6 +80,12 @@ class Uint32Property : public Property {
       : Property(std::move(name), required) {}
 };
 
+class Uint64Property : public Property {
+ public:
+  explicit Uint64Property(PropertyName name, bool required = false)
+      : Property(std::move(name), required) {}
+};
+
 class StringProperty : public Property {
  public:
   explicit StringProperty(PropertyName name, bool required = false)

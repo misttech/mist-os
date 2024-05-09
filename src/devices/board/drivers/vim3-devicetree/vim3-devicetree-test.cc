@@ -44,7 +44,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/clock-controller-ff63c000",
       "sys/platform/dwmac-ff3f0000",
       "sys/platform/ethernet-phy-ff634000",
-      "sys/platform/fuchsia-contiguous",
+      "sys/platform/fuchsia-sysmem",
       "sys/platform/gpio-controller-ff634400",
       "sys/platform/gpu-ffe40000",
       "sys/platform/i2c-1c000",

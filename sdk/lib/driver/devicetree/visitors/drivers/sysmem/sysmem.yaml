@@ -1,0 +1,59 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/sysmem/sysmem.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Fuchsia sysmem
+
+maintainers:
+  - Puneetha Ramachandra (puneetha@google.com)
+  - Dustin Green (dustingreen@google.com)
+
+allOf:
+  - $ref: /schemas/reserved-memory/reserved-memory.yaml
+
+properties:
+  compatible:
+    const: fuchsia,sysmem
+
+  $nodename:
+    const: fuchsia,sysmem
+
+  vid:
+    description: Vendor ID of the board. Used to create a platform specific allocator.
+
+  pid:
+    description: Product ID of the board. Used to create a platform specific allocator.
+
+  size:
+    description:
+      This field is not used by the sysmem driver for allocation. The size is classified into
+      contiguous and protected size as listed below.
+
+  contiguous-size:
+    $ref: /schemas/types.yaml#/definitions/uint64
+    description: The size of the contiguous memory pool to be reserved.
+
+  protected-size:
+    $ref: /schemas/types.yaml#/definitions/uint64
+    description: The size of the protected memory pool to be reserved.
+
+required:
+  - compatible
+
+additionalProperties: true
+
+examples:
+  - |
+    sysmem: fuchsia,sysmem {
+      compatible = "fuchsia,sysmem";
+      size = <0x00 0x00>;
+      contiguous-size = <0x00 0x10000>;
+      protected-size = <0x00 0x2000>;
+      vid = <0x00 0x00>;
+      pid = <0x00 0x00>;
+    };

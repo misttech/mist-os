@@ -67,11 +67,12 @@
 		#size-cells = <0x02>;
 		ranges;
 
-		fuchsia,contiguous {
-			compatible = "sysmem";
+		fuchsia,sysmem {
+			compatible = "fuchsia,sysmem";
+			contiguous-size = <0x00 0xc800000>;
 			iommus = <0x03 0x01>;
 			pid = <0x06>;
-			size = <0x00 0xc800000>;
+			size = <0x00 0x00>;
 			vid = <0x05>;
 		};
 	};
