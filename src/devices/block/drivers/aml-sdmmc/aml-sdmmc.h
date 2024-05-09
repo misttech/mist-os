@@ -295,12 +295,20 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
       const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
       fuchsia_power_broker::PowerLevel power_level);
 
+  // Watches the required hardware power level and adjusts it accordingly. Also serves requests that
+  // were delayed because they were received during suspended state. Communicates power level
+  // transitions to the Power Broker.
+  void WatchHardwareRequiredLevel();
+
+  // Watches the required wake-on-request power level and replies to the Power Broker accordingly.
+  // Does not directly effect any real power level change of storage hardware. (That happens in
+  // WatchHardwareRequiredLevel().)
+  void WatchWakeOnRequestRequiredLevel();
+
   // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution State,
   // satisfying the hardware power element's lease status (which is passively dependent on SAG's
   // Execution State), and thus resuming power.
   zx_status_t ActivateWakeOnRequest() TA_REQ(lock_);
-
-  void AdjustHardwarePowerLevel();
 
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
 
@@ -331,7 +339,7 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
 
-  fidl::WireClient<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_;
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> wake_on_request_lease_control_client_end_
       TA_GUARDED(lock_);
 

@@ -245,69 +245,37 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
   zx::event wake_handling_active_;
 };
 
-class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
- public:
-  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& req,
-                   WatchStatusCompleter::Sync& completer) override {
-    completer.Reply(lease_status_);
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  static fuchsia_power_broker::LeaseStatus lease_status_;
-};
-
-fuchsia_power_broker::LeaseStatus FakeLeaseControl::lease_status_ =
-    fuchsia_power_broker::LeaseStatus::kPending;
-
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
+  void AddSideEffect(fit::function<void()> side_effect) { side_effect_ = std::move(side_effect); }
+
   void Lease(fuchsia_power_broker::LessorLeaseRequest& req,
              LeaseCompleter::Sync& completer) override {
+    if (side_effect_) {
+      side_effect_();
+    }
+
     auto [lease_control_client_end, lease_control_server_end] =
         fidl::Endpoints<fuchsia_power_broker::LeaseControl>::Create();
-
-    // Instantiate (fake) lease control implementation.
-    auto lease_control_impl = std::make_unique<FakeLeaseControl>();
-    lease_control_ = lease_control_impl.get();
-    lease_control_binding_ = fidl::BindServer<fuchsia_power_broker::LeaseControl>(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control_server_end),
-        std::move(lease_control_impl),
-        [](FakeLeaseControl* impl, fidl::UnbindInfo info,
-           fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end) mutable {});
-
     completer.Reply(fit::success(std::move(lease_control_client_end)));
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  FakeLeaseControl* lease_control_;
-
  private:
-  std::optional<fidl::ServerBindingRef<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
+  fit::function<void()> side_effect_;
 };
 
 class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
  public:
-  void AddSideEffect(
-      fit::function<void(fuchsia_power_broker::PowerLevel current_level)> side_effect) {
-    side_effect_ = std::move(side_effect);
-  }
-
   void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& req,
               UpdateCompleter::Sync& completer) override {
-    if (side_effect_) {
-      side_effect_(req.current_level());
-    }
     completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  fit::function<void(fuchsia_power_broker::PowerLevel)> side_effect_;
 };
 
 class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
@@ -319,7 +287,7 @@ class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLeve
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  fuchsia_power_broker::PowerLevel required_level_ = AmlSdmmc::kPowerLevelOn;
+  fuchsia_power_broker::PowerLevel required_level_ = AmlSdmmc::kPowerLevelOff;
 };
 
 class PowerElement {
@@ -401,17 +369,9 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
             [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
 
-    if (wake_on_request_current_level_ && hardware_power_lessor_) {
-      wake_on_request_current_level_->AddSideEffect(
-          [&](fuchsia_power_broker::PowerLevel current_level) {
-            if (current_level == AmlSdmmc::kPowerLevelOn) {
-              hardware_power_lessor_->lease_control_->lease_status_ =
-                  fuchsia_power_broker::LeaseStatus::kSatisfied;
-            } else if (current_level == AmlSdmmc::kPowerLevelOff) {
-              hardware_power_lessor_->lease_control_->lease_status_ =
-                  fuchsia_power_broker::LeaseStatus::kPending;
-            }
-          });
+    if (wake_on_request_lessor_ && hardware_power_required_level_) {
+      wake_on_request_lessor_->AddSideEffect(
+          [&]() { hardware_power_required_level_->required_level_ = AmlSdmmc::kPowerLevelOn; });
     }
 
     servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
@@ -2423,8 +2383,8 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
 
   // Trigger power level change to kPowerLevelOn.
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_lessor_->lease_control_->lease_status_ =
-        fuchsia_power_broker::LeaseStatus::kSatisfied;
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        AmlSdmmc::kPowerLevelOn;
   });
   runtime_.PerformBlockingWork([&] {
     bool clock_enabled;
@@ -2442,8 +2402,8 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
 
   // Trigger power level change to kPowerLevelOff.
   incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.hardware_power_lessor_->lease_control_->lease_status_ =
-        fuchsia_power_broker::LeaseStatus::kPending;
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        AmlSdmmc::kPowerLevelOff;
   });
   runtime_.PerformBlockingWork([&] {
     bool clock_enabled;
@@ -2466,16 +2426,27 @@ TEST_F(AmlSdmmcWithBanjoTest, WakeOnRequest) {
   auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
 
   ASSERT_OK(dut_->Init({}));
-  // Initial power level is kPowerLevelOff.
-  runtime_.PerformBlockingWork([&] {
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
 
-  auto check_power_suspended = [&](int wake_on_request_count) {
+  auto request_during_suspension = [&](std::optional<fit::function<void()>> request,
+                                       int wake_on_request_count) {
+    runtime_.PerformBlockingWork([&] {
+      if (request.has_value()) {
+        (*request)();
+
+        // Return driver to suspension.
+        incoming_.SyncCall([](IncomingNamespace* incoming) {
+          incoming->power_broker.hardware_power_required_level_->required_level_ =
+              AmlSdmmc::kPowerLevelOff;
+        });
+      }
+
+      bool clock_enabled;
+      do {
+        clock_enabled = incoming_.SyncCall(
+            [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
+      } while (clock_enabled);
+    });
+
     dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
     dut_->ExpectInspectPropertyValue("wake_on_request_count", wake_on_request_count);
     EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
@@ -2483,9 +2454,11 @@ TEST_F(AmlSdmmcWithBanjoTest, WakeOnRequest) {
         [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
   };
 
-  check_power_suspended(0);
+  // Initial power level is kPowerLevelOff.
+  request_during_suspension(std::nullopt, 0);
 
   fdf::WireSyncClient<fuchsia_hardware_sdmmc::Sdmmc> client = GetClient();
+  fdf::Arena arena('SDMM');
 
   // Issue request while power is suspended.
   zx::vmo vmo, dup;
@@ -2508,97 +2481,33 @@ TEST_F(AmlSdmmcWithBanjoTest, WakeOnRequest) {
   };
   auto requests =
       fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>::FromExternal(&request, 1);
-
-  runtime_.PerformBlockingWork([&] {
-    fdf::Arena arena('SDMM');
-    const auto result = client.buffer(arena)->Request(requests);
-    EXPECT_OK(result);
-
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
-
-  check_power_suspended(1);
+  request_during_suspension([&] { EXPECT_OK(client.buffer(arena)->Request(requests)); }, 1);
 
   // Issue SetBusWidth while power is suspended.
-  runtime_.PerformBlockingWork([&] {
-    fdf::Arena arena('SDMM');
-    const auto result =
-        client.buffer(arena)->SetBusWidth(fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour);
-    EXPECT_OK(result);
-
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
-
-  check_power_suspended(2);
+  request_during_suspension(
+      [&] {
+        EXPECT_OK(
+            client.buffer(arena)->SetBusWidth(fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour));
+      },
+      2);
 
   // Issue SetBusFreq while power is suspended.
-  runtime_.PerformBlockingWork([&] {
-    fdf::Arena arena('SDMM');
-    const auto result = client.buffer(arena)->SetBusFreq(100'000'000);
-    EXPECT_OK(result);
-
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
-
-  check_power_suspended(3);
+  request_during_suspension([&] { EXPECT_OK(client.buffer(arena)->SetBusFreq(100'000'000)); }, 3);
 
   // Issue SetTiming while power is suspended.
-  runtime_.PerformBlockingWork([&] {
-    fdf::Arena arena('SDMM');
-    const auto result =
-        client.buffer(arena)->SetTiming(fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400);
-    EXPECT_OK(result);
-
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
-
-  check_power_suspended(4);
+  request_during_suspension(
+      [&] {
+        EXPECT_OK(
+            client.buffer(arena)->SetTiming(fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400));
+      },
+      4);
 
   // Issue HwReset while power is suspended.
-  runtime_.PerformBlockingWork([&] {
-    fdf::Arena arena('SDMM');
-    const auto result = client.buffer(arena)->HwReset();
-    EXPECT_OK(result);
-
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
-
-  check_power_suspended(5);
+  request_during_suspension([&] { EXPECT_OK(client.buffer(arena)->HwReset()); }, 5);
 
   // Issue PerformTuning while power is suspended.
-  runtime_.PerformBlockingWork([&] {
-    fdf::Arena arena('SDMM');
-    const auto result = client.buffer(arena)->PerformTuning(SD_SEND_TUNING_BLOCK);
-    EXPECT_OK(result);
-
-    bool clock_enabled;
-    do {
-      clock_enabled = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); });
-    } while (clock_enabled);
-  });
-
-  check_power_suspended(6);
+  request_during_suspension(
+      [&] { EXPECT_OK(client.buffer(arena)->PerformTuning(SD_SEND_TUNING_BLOCK)); }, 6);
 }
 
 }  // namespace aml_sdmmc

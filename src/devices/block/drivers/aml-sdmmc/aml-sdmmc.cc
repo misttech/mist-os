@@ -354,8 +354,6 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       hardware_power_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
               std::move(description.current_level_client_.value()));
-      // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
-      // RequiredLevel.
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client_.value()), dispatcher());
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
@@ -366,8 +364,6 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       wake_on_request_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
               std::move(description.current_level_client_.value()));
-      // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
-      // RequiredLevel.
       wake_on_request_required_level_client_ =
           fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
               std::move(description.required_level_client_.value()), dispatcher());
@@ -378,57 +374,60 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
     }
   }
 
-  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end;
-  zx_status_t status = AcquireLease(hardware_power_lessor_client_, lease_control_client_end);
+  // The lease request on the hardware power element remains persistent throughout the lifetime
+  // of this driver.
+  zx_status_t status =
+      AcquireLease(hardware_power_lessor_client_, hardware_power_lease_control_client_end_);
   if (status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to acquire lease on hardware power: %s",
              zx_status_get_string(status));
     return zx::error(status);
   }
-  hardware_power_lease_control_client_ = fidl::WireClient<fuchsia_power_broker::LeaseControl>(
-      std::move(lease_control_client_end), dispatcher());
 
-  // Start continuous monitoring of the lease status and adjusting of the hardware's power level.
-  AdjustHardwarePowerLevel();
+  // Start continuous monitoring of the required level and adjusting of the hardware's power level.
+  WatchHardwareRequiredLevel();
+  WatchWakeOnRequestRequiredLevel();
 
   return zx::success();
 }
 
-void AmlSdmmc::AdjustHardwarePowerLevel() {
-  static fuchsia_power_broker::LeaseStatus last_lease_status =
-      fuchsia_power_broker::LeaseStatus::kUnknown;
-
-  // TODO(b/330223394): Update power level when ordered to do so by Power Broker via RequiredLevel
-  // (instead of monitoring LeaseStatus via the WatchStatus() call).
-  if (!hardware_power_lease_control_client_.is_valid()) {
-    FDF_LOGL(ERROR, logger(),
-             "Invalid hardware power lease control client. Stop monitoring lease status.");
-    return;
-  }
+void AmlSdmmc::WatchHardwareRequiredLevel() {
   fidl::Arena<> arena;
-  hardware_power_lease_control_client_.buffer(arena)
-      ->WatchStatus(last_lease_status)
-      .Then([this](
-                fidl::WireUnownedResult<fuchsia_power_broker::LeaseControl::WatchStatus>& result) {
+  hardware_power_required_level_client_.buffer(arena)->Watch().Then(
+      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
         auto defer = fit::defer([&]() {
           if (result.status() == ZX_ERR_CANCELED) {
             FDF_LOGL(WARNING, logger(),
-                     "WatchStatus returned canceled error. Stop monitoring lease status.");
+                     "Watch returned canceled error. Stop monitoring required power level.");
           } else {
-            // Recursively call self. The WatchStatus() call blocks until the current status differs
-            // from last_status (unless last_status is UNKNOWN).
-            AdjustHardwarePowerLevel();
+            // Recursively call self to watch the required hardware power level again. The Watch()
+            // call blocks until the required power level has changed.
+            WatchHardwareRequiredLevel();
           }
         });
 
         if (!result.ok()) {
-          FDF_LOGL(ERROR, logger(), "Call to WatchStatus failed: %s", result.status_string());
+          FDF_LOGL(ERROR, logger(), "Call to Watch failed: %s", result.status_string());
+          return;
+        }
+        if (result->is_error()) {
+          switch (result->error_value()) {
+            case fuchsia_power_broker::RequiredLevelError::kInternal:
+              FDF_LOGL(ERROR, logger(), "Watch returned internal error.");
+              break;
+            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
+              FDF_LOGL(ERROR, logger(), "Watch returned not authorized error.");
+              break;
+            default:
+              FDF_LOGL(ERROR, logger(), "Watch returned unknown error.");
+              break;
+          }
           return;
         }
 
-        const fuchsia_power_broker::LeaseStatus lease_status = result->status;
-        switch (lease_status) {
-          case fuchsia_power_broker::LeaseStatus::kSatisfied: {
+        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
+        switch (required_level) {
+          case kPowerLevelOn: {
             const zx::time start = zx::clock::get_monotonic();
 
             // If tuning was delayed, will do it now.
@@ -441,7 +440,6 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
               return;
             }
 
-            last_lease_status = lease_status;
             // Communicate to Power Broker that the hardware power level has been raised.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
 
@@ -500,20 +498,17 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
               }
               delayed_requests_.clear();
 
-              // Drop lease on wake-on-request power element. This lets the hardware power
-              // element's lease status revert to pending, unless there are other entities that
-              // are raising SAG's Execution State.
+              // Drop lease on wake-on-request power element. This lets the hardware power element's
+              // required level drop to kPowerLevelOff, unless there are other entities that are
+              // raising SAG's Execution State.
               ZX_ASSERT_MSG(wake_on_request_lease_control_client_end_.is_valid(),
                             "Requests delayed without leasing wake-on-request power element.");
               wake_on_request_lease_control_client_end_.channel().reset();
               ZX_ASSERT(!wake_on_request_lease_control_client_end_.is_valid());
-              // TODO(b/330223394): Update power level when ordered to do so by Power Broker
-              // via RequiredLevel.
-              UpdatePowerLevel(wake_on_request_current_level_client_, kPowerLevelOff);
             }
             break;
           }
-          case fuchsia_power_broker::LeaseStatus::kPending: {
+          case kPowerLevelOff: {
             // Complete any ongoing tuning first.
             std::lock_guard<std::mutex> tuning_lock(tuning_lock_);
             std::lock_guard<std::mutex> lock(lock_);
@@ -525,33 +520,60 @@ void AmlSdmmc::AdjustHardwarePowerLevel() {
               return;
             }
 
-            last_lease_status = lease_status;
             // Communicate to Power Broker that the hardware power level has been lowered.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
-
-            // TODO(b/330223394): Revert the following behaviour of releasing and reacquiring the
-            // lease.
-            // Release and reacquire lease on the hardware power element to unblock SAG's Execution
-            // State from going to inactive.
-            hardware_power_lease_control_client_ =
-                fidl::WireClient<fuchsia_power_broker::LeaseControl>();
-
-            fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end;
-            status = AcquireLease(hardware_power_lessor_client_, lease_control_client_end);
-            if (status != ZX_OK) {
-              FDF_LOGL(ERROR, logger(), "Failed to reacquire lease on hardware power: %s",
-                       zx_status_get_string(status));
-              return;
-            }
-            hardware_power_lease_control_client_ =
-                fidl::WireClient<fuchsia_power_broker::LeaseControl>(
-                    std::move(lease_control_client_end), dispatcher());
             break;
           }
           default:
-            FDF_LOGL(ERROR, logger(), "Unknown hardware power element lease status.");
-            break;
+            FDF_LOGL(ERROR, logger(), "Unexpected power level for hardware power element: %u",
+                     required_level);
+            return;
         }
+      });
+}
+
+void AmlSdmmc::WatchWakeOnRequestRequiredLevel() {
+  fidl::Arena<> arena;
+  wake_on_request_required_level_client_.buffer(arena)->Watch().Then(
+      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
+        auto defer = fit::defer([&]() {
+          if (result.status() == ZX_ERR_CANCELED) {
+            FDF_LOGL(WARNING, logger(),
+                     "Watch returned canceled error. Stop monitoring required power level.");
+          } else {
+            // Recursively call self to watch the required wake-on-request power level again. The
+            // Watch() call blocks until the required power level has changed.
+            WatchWakeOnRequestRequiredLevel();
+          }
+        });
+
+        if (!result.ok()) {
+          FDF_LOGL(ERROR, logger(), "Call to Watch failed: %s", result.status_string());
+          return;
+        }
+        if (result->is_error()) {
+          switch (result->error_value()) {
+            case fuchsia_power_broker::RequiredLevelError::kInternal:
+              FDF_LOGL(ERROR, logger(), "Watch returned internal error.");
+              break;
+            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
+              FDF_LOGL(ERROR, logger(), "Watch returned not authorized error.");
+              break;
+            default:
+              FDF_LOGL(ERROR, logger(), "Watch returned unknown error.");
+              break;
+          }
+          return;
+        }
+
+        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
+        if ((required_level != kPowerLevelOn) && (required_level != kPowerLevelOff)) {
+          FDF_LOGL(ERROR, logger(), "Unexpected power level for wake-on-request power element: %u",
+                   required_level);
+          return;
+        }
+
+        UpdatePowerLevel(wake_on_request_current_level_client_, required_level);
       });
 }
 
@@ -948,9 +970,6 @@ zx_status_t AmlSdmmc::ActivateWakeOnRequest() {
   }
 
   if (status == ZX_OK) {
-    // TODO(b/330223394): Update power level when ordered to do so by Power Broker via
-    // RequiredLevel.
-    UpdatePowerLevel(wake_on_request_current_level_client_, kPowerLevelOn);
     inspect_.wake_on_request_count.Add(1);
   }
 
