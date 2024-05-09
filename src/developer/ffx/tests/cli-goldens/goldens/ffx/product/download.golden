@@ -1,8 +1,8 @@
 {
   "name": "download",
-  "description": "Retrieve image data.",
+  "description": "Download Product Bundle from GCS.",
   "examples": [
-    "Auth flow choices for --auth include:\n  `--auth no-auth` do not use auth.\n  `--auth pkce` to use PKCE auth flow (requires GUI browser).\n  `--auth device-experimental` to use device flow.\n  `--auth <path/to/exe>` run tool at given path which will print an access token to stdout and exit 0.\n    \n  `--auth default` let the tool decide which auth flow to use."
+    "Sample invocations:\n\n    // Download core.vim3 of current ffx version.\n    ffx product download core.vim3 ~/local_pb\n\n    // Download core.vim3 with version 19.20240302.2.1\n    ffx product download core.vim3 ~/local_pb --version 19.20240302.2.1\n\n    // Download core.vim3 for latest version of f18\n    ffx product download core.vim3 ~/local_pb --branch f18 --force\n\n    Auth flow choices for --auth include:\n\n      `--auth no-auth` do not use auth.\n      `--auth pkce` to use PKCE auth flow (requires GUI browser).\n      `--auth device-experimental` to use device flow.\n      `--auth <path/to/exe>` run tool at given path which will print an access\n        token to stdout and exit 0.\n      `--auth default` let the tool decide which auth flow to use.\n    "
   ],
   "flags": [
     {
@@ -42,7 +42,7 @@
       "optionality": "optional",
       "long": "--base-url",
       "short": null,
-      "description": "where to look for product bundles manifest.",
+      "description": "location to look for product bundles manifest inside GCS.",
       "hidden": false
     },
     {
@@ -54,7 +54,7 @@
       "optionality": "optional",
       "long": "--version",
       "short": null,
-      "description": "filter on products of <version>.",
+      "description": "filter on products of <version>. The version number is in the format of `a.b.c.d`. e.g. 19.20240302.2.1. If this value is not passed in, the version will be defaulted to version of ffx tool itself.",
       "hidden": false
     },
     {
@@ -66,7 +66,7 @@
       "optionality": "optional",
       "long": "--branch",
       "short": null,
-      "description": "filter on products of <branch>.",
+      "description": "filter on products of <branch>. The branch is either in the form of f<N> (e.g. f18). This option is exclusive with version option.",
       "hidden": false
     }
   ],
@@ -81,7 +81,7 @@
     },
     {
       "name": "product_dir",
-      "description": "local name of the product bundle directory.",
+      "description": "path to the local directory to download the product bundle.",
       "optionality": "required",
       "hidden": false
     }

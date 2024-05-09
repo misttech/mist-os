@@ -7,20 +7,33 @@ use ffx_core::ffx_command;
 use pbms::AuthFlowChoice;
 use std::path::PathBuf;
 
-/// Retrieve image data.
+/// Download Product Bundle from GCS.
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
 #[argh(
     subcommand,
     name = "download",
     example = "\
-    Auth flow choices for --auth include:\
-    \n  `--auth no-auth` do not use auth.\
-    \n  `--auth pkce` to use PKCE auth flow (requires GUI browser).\
-    \n  `--auth device-experimental` to use device flow.\
-    \n  `--auth <path/to/exe>` run tool at given path which will print an \
-    access token to stdout and exit 0.
-    \n  `--auth default` let the tool decide which auth flow to use."
+    Sample invocations:
+
+    // Download core.vim3 of current ffx version.
+    ffx product download core.vim3 ~/local_pb
+
+    // Download core.vim3 with version 19.20240302.2.1
+    ffx product download core.vim3 ~/local_pb --version 19.20240302.2.1
+
+    // Download core.vim3 for latest version of f18
+    ffx product download core.vim3 ~/local_pb --branch f18 --force
+
+    Auth flow choices for --auth include:
+
+      `--auth no-auth` do not use auth.
+      `--auth pkce` to use PKCE auth flow (requires GUI browser).
+      `--auth device-experimental` to use device flow.
+      `--auth <path/to/exe>` run tool at given path which will print an access
+        token to stdout and exit 0.
+      `--auth default` let the tool decide which auth flow to use.
+    "
 )]
 pub struct DownloadCommand {
     /// get the data again, even if it's already present locally.
@@ -36,19 +49,22 @@ pub struct DownloadCommand {
     #[argh(positional)]
     pub manifest_url: String,
 
-    /// local name of the product bundle directory.
+    /// path to the local directory to download the product bundle.
     #[argh(positional)]
     pub product_dir: PathBuf,
 
-    /// where to look for product bundles manifest.
+    /// location to look for product bundles manifest inside GCS.
     #[argh(option)]
     pub base_url: Option<String>,
 
-    /// filter on products of <version>.
+    /// filter on products of <version>. The version number is in the format of
+    /// `a.b.c.d`. e.g. 19.20240302.2.1. If this value is not passed in, the
+    /// version will be defaulted to version of ffx tool itself.
     #[argh(option)]
     pub version: Option<String>,
 
-    /// filter on products of <branch>.
+    /// filter on products of <branch>. The branch is either in the form of f<N>
+    /// (e.g. f18). This option is exclusive with version option.
     #[argh(option)]
     pub branch: Option<String>,
 }

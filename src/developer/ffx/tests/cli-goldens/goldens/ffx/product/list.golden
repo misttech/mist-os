@@ -1,8 +1,8 @@
 {
   "name": "list",
-  "description": "Retrieve PB data.",
+  "description": "List all available products for a specific SDK version.",
   "examples": [
-    "Auth flow choices for --auth include:\n  `--auth oob` to use Out-of-Band auth (deprecated).\n  `--auth pkce` to use PKCE auth flow (requires GUI browser).\n  `--auth <path/to/exe>` run tool at given path which will print an access token to stdout and exit 0.\n    "
+    "Sample invocations:\n\n    // List all product names of current ffx version.\n    ffx product list\n\n    // List all product names with version 19.20240302.2.1\n    ffx product list --version 19.20240302.2.1\n\n    // List all product names for latest version of f18\n    ffx product list --branch f18\n\n    Auth flow choices for --auth include:\n\n      `--auth no-auth` do not use auth.\n      `--auth pkce` to use PKCE auth flow (requires GUI browser).\n      `--auth device-experimental` to use device flow.\n      `--auth <path/to/exe>` run tool at given path which will print an access\n        token to stdout and exit 0.\n      `--auth default` let the tool decide which auth flow to use.\n    "
   ],
   "flags": [
     {
@@ -34,7 +34,7 @@
       "optionality": "optional",
       "long": "--base-url",
       "short": null,
-      "description": "where to look for product bundles manifest.",
+      "description": "location to look for product bundles manifest inside GCS.",
       "hidden": false
     },
     {
@@ -46,7 +46,7 @@
       "optionality": "optional",
       "long": "--version",
       "short": null,
-      "description": "filter on products of <version>.",
+      "description": "filter on products of <version>. The version number is in the format of `a.b.c.d`. e.g. 19.20240302.2.1. If this value is not passed in, the version will be defaulted to version of ffx tool itself.",
       "hidden": false
     },
     {
@@ -58,7 +58,7 @@
       "optionality": "optional",
       "long": "--branch",
       "short": null,
-      "description": "filter on products of <branch>.",
+      "description": "filter on products of <branch>. The branch is either in the form of f<N> (e.g. f18). This option is exclusive with version option.",
       "hidden": false
     }
   ],
