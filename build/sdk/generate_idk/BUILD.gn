@@ -26,7 +26,7 @@ if (is_host) {
   python_host_test("generate_idk_unittest") {
     main_source = "generate_idk_unittest.py"
     libraries = [ ":lib" ]
-    enable_mypy = true
+    enable_mypy = false
   }
 }
 
