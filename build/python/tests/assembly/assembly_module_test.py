@@ -12,8 +12,9 @@ import unittest
 from assembly import AssemblyInputBundle, AIBCreator, BlobEntry, SubpackageEntry
 from assembly import FileEntry, FilePath, PackageManifest, PackageMetaData
 from assembly.assembly_input_bundle import (
-    CompiledPackageMainDefinition,
-    CompiledPackageAdditionalShards,
+    CompiledPackageDefinition,
+    CompiledPackageDefinitionFromGN,
+    CompiledComponentDefinition,
     DriverDetails,
     PackageDetails,
 )
@@ -235,25 +236,33 @@ raw_assembly_input_bundle_json = """{
   "packages_to_compile": [
     {
       "name": "foo",
-      "components": {
-        "bar": "baz.cml"
-      },
+      "components": [
+        {
+          "component_name": "bar",
+          "shards": [
+            "baz.cml"
+          ]
+        }
+      ],
       "contents": [],
       "includes": [
-        {
-          "source": "a/b",
-          "destination": "c/d"
-        }
+        "c/d"
       ],
       "bootfs_package": false
     },
     {
       "name": "foo",
-      "component_shards": {
-        "bar": [
-          "bar/meta.shard.cml"
-        ]
-      }
+      "components": [
+        {
+          "component_name": "bar",
+          "shards": [
+            "bar/meta.shard.cml"
+          ]
+        }
+      ],
+      "contents": [],
+      "includes": [],
+      "bootfs_package": false
     }
   ]
 }"""
@@ -294,13 +303,20 @@ class AssemblyInputBundleTest(unittest.TestCase):
         ]
         aib.shell_commands["package1"] = ["path/to/binary1", "path/to/binary2"]
         aib.packages_to_compile = [
-            CompiledPackageMainDefinition(
+            CompiledPackageDefinition(
                 name="foo",
-                components={"bar": "baz.cml"},
-                includes=set([FileEntry(source="a/b", destination="c/d")]),
+                components=[
+                    CompiledComponentDefinition("bar", set(["baz.cml"]))
+                ],
+                includes=set(["c/d"]),
             ),
-            CompiledPackageAdditionalShards(
-                name="foo", component_shards={"bar": ["bar/meta.shard.cml"]}
+            CompiledPackageDefinition(
+                name="foo",
+                components=[
+                    CompiledComponentDefinition(
+                        "bar", set(["bar/meta.shard.cml"])
+                    )
+                ],
             ),
         ]
 
@@ -342,13 +358,18 @@ class AssemblyInputBundleTest(unittest.TestCase):
         ]
         aib.shell_commands["package1"] = ["path/to/binary1", "path/to/binary2"]
         aib.packages_to_compile = [
-            CompiledPackageMainDefinition(
+            CompiledPackageDefinition(
                 name="foo",
-                components={"bar": "baz.cml"},
-                includes=set([FileEntry(source="a/b", destination="c/d")]),
+                components=[
+                    CompiledComponentDefinition("bar", set(["baz.cml"]))
+                ],
+                includes=set(["c/d"]),
             ),
-            CompiledPackageAdditionalShards(
-                name="foo", component_shards={"bar": ["bar/meta.cml"]}
+            CompiledPackageDefinition(
+                name="foo",
+                components=[
+                    CompiledComponentDefinition("bar", set(["bar/meta.cml"]))
+                ],
             ),
         ]
 

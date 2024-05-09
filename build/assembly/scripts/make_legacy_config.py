@@ -25,7 +25,8 @@ from assembly import (
     KernelInfo,
 )
 from assembly.assembly_input_bundle import (
-    CompiledPackageAdditionalShards,
+    CompiledPackageDefinitionFromGN,
+    CompiledComponentDefinition,
     DuplicatePackageException,
     PackageDetails,
     PackageManifestParsingException,
@@ -122,10 +123,13 @@ def copy_to_assembly_input_bundle(
 
     if core_realm_shards:
         # Pass the compiled_package_shards
-        additional_shards = CompiledPackageAdditionalShards(
-            "core", {"core": set(core_realm_shards)}
+        package = CompiledPackageDefinitionFromGN(
+            name="core",
+            components=[
+                CompiledComponentDefinition("core", set(core_realm_shards))
+            ],
         )
-        aib_creator.compiled_package_shards.append(additional_shards)
+        aib_creator.compiled_packages.append(package)
 
     return aib_creator.build()
 

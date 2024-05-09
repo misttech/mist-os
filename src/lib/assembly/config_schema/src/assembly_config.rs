@@ -5,7 +5,7 @@
 use crate::image_assembly_config::PartialKernelConfig;
 use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
-use assembly_file_relative_path::SupportsFileRelativePaths;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_util::{CompiledPackageDestination, FileEntry};
 use camino::Utf8PathBuf;
@@ -52,7 +52,7 @@ pub struct AssemblyConfigWrapperForOverrides {
 pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>;
 
 /// A bundle of inputs to be used in the assembly of a product.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyInputBundle {
     /// The parameters that specify which kernel to put into the ZBI.
@@ -105,6 +105,7 @@ pub struct AssemblyInputBundle {
     pub shell_commands: ShellCommands,
 
     /// Packages to create dynamically as part of the Assembly process.
+    #[file_relative_paths]
     #[serde(default)]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
@@ -116,56 +117,43 @@ pub struct AssemblyInputBundle {
 /// Contents of a compiled package. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
-#[serde(untagged)]
-pub enum CompiledPackageDefinition {
-    MainDefinition(MainPackageDefinition),
-    Additional(AdditionalPackageContents),
-}
-
-/// Primary definition of a compiled package. Only a single AIB should
-/// contain the main definition for a given package.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct MainPackageDefinition {
+pub struct CompiledPackageDefinition {
+    /// Name of the package to compile.
     pub name: CompiledPackageDestination,
-    /// Components to add to the package, mapping component name to
-    /// the primary cml definition of the component.
-    pub components: BTreeMap<String, Utf8PathBuf>,
+
+    /// Components to compile and add to the package.
+    #[file_relative_paths]
+    #[serde(default)]
+    pub components: Vec<CompiledComponentDefinition>,
+
     /// Non-component files to add to the package.
     #[serde(default)]
     pub contents: Vec<FileEntry<String>>,
+
     /// CML files included by the component cml.
     #[serde(default)]
     pub includes: Vec<Utf8PathBuf>,
+
     /// Whether the contents of this package should go into bootfs.
     /// Gated by allowlist -- please use this as a base package if possible.
     #[serde(default)]
-    pub bootfs_package: bool,
+    pub bootfs_package: Option<bool>,
 }
 
-/// Additional contents of the package to be defined in
-/// secondary AssemblyInputBundles. There can be many of these, and
-/// they will be merged into the final compiled package.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+/// Contents of a compiled component. The contents provided by all
+/// selected AIBs are merged by `name` into a single package
+/// at assembly time.
+#[derive(Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
-pub struct AdditionalPackageContents {
-    /// Name of the package to which these contents are associated.
-    /// This package should have a corresponding MainDefinition in another
-    /// AIB.
-    pub name: CompiledPackageDestination,
-    /// Additional component shards to combine with the primary manifest.
-    pub component_shards: BTreeMap<String, Vec<Utf8PathBuf>>,
-}
+pub struct CompiledComponentDefinition {
+    /// The name of the component to compile.
+    pub component_name: String,
 
-impl CompiledPackageDefinition {
-    pub fn name(&self) -> &CompiledPackageDestination {
-        match self {
-            CompiledPackageDefinition::MainDefinition(MainPackageDefinition { name, .. }) => name,
-            CompiledPackageDefinition::Additional(AdditionalPackageContents { name, .. }) => name,
-        }
-    }
+    /// CML file shards to include in the compiled component manifest.
+    #[file_relative_paths]
+    pub shards: Vec<FileRelativePathBuf>,
 }
 
 #[cfg(test)]
@@ -176,7 +164,6 @@ mod tests {
     use crate::platform_config::swd_config::{OtaConfigs, UpdateChecker};
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
-    use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_util as util;
 
     #[test]
@@ -509,12 +496,18 @@ mod tests {
                 "package1": ["path/to/binary1", "path/to/binary2"]
               },
               packages_to_compile: [
-                {
+                  {
                     name: "core",
-                    components: {
-                        "component1": "path/to/component1.cml",
-                        "component2": "path/to/component2.cml",
-                    },
+                    components: [
+                      {
+                        component_name: "component1",
+                        shards: ["path/to/component1.cml"],
+                      },
+                      {
+                        component_name: "component2",
+                        shards: ["path/to/component2.cml"],
+                      },
+                    ],
                     contents: [
                         {
                             source: "path/to/source",
@@ -523,16 +516,7 @@ mod tests {
                     ],
                     includes: [ "src/path/to/include.cml" ]
                 },
-                {
-                   name: "core",
-                   component_shards: {
-                        "component1": [
-                            "path/to/shard1.cml",
-                            "path/to/shard2.cml"
-                        ]
-                   }
-                }
-              ]
+               ]
             }
         "#;
         let bundle =

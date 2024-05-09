@@ -17,6 +17,7 @@ use assembly_config_schema::{
 };
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
+use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_named_file_map::NamedFileMap;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
@@ -137,7 +138,8 @@ impl ImageAssemblyConfigBuilder {
     /// If any of the items it's trying to add are duplicates (either of itself
     /// or others, this will return an error.)
     pub fn add_bundle(&mut self, bundle_path: impl AsRef<Utf8Path>) -> Result<()> {
-        let bundle = util::read_config(bundle_path.as_ref())?;
+        let bundle: AssemblyInputBundle = util::read_config(bundle_path.as_ref())?;
+        let bundle = bundle.resolve_paths_from_file(&bundle_path)?;
 
         // Strip filename from bundle path.
         let bundle_path =
@@ -594,12 +596,13 @@ impl ImageAssemblyConfigBuilder {
         compiled_package_def: &CompiledPackageDefinition,
         bundle_path: &Utf8Path,
     ) -> Result<()> {
-        let name = compiled_package_def.name().to_string();
+        let name = compiled_package_def.name.to_string();
+
         self.packages_to_compile
             .entry(name.clone())
-            .or_insert_with(|| CompiledPackageBuilder::new(name))
+            .or_insert_with(|| CompiledPackageBuilder::new(name.clone()))
             .add_package_def(compiled_package_def, bundle_path)
-            .context("adding package def")?;
+            .with_context(|| format!("Adding compiled-package definition: {}", name))?;
         Ok(())
     }
 
@@ -992,9 +995,7 @@ impl std::fmt::Display for PackageOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_config_schema::assembly_config::{
-        AdditionalPackageContents, MainPackageDefinition,
-    };
+    use assembly_config_schema::assembly_config::CompiledComponentDefinition;
     use assembly_config_schema::image_assembly_config::PartialKernelConfig;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_named_file_map::SourceMerklePair;
@@ -1617,31 +1618,50 @@ mod tests {
         std::fs::create_dir_all(&component2_dir).unwrap();
         std::fs::write(component1_dir.join("component1.cm"), "component fake contents").unwrap();
         std::fs::write(component2_dir.join("component2.cm"), "component fake contents").unwrap();
+        let bundle2_path = vars.bundle_path.parent().unwrap().join("bundle2");
 
         // Create 2 assembly bundle and add a config_data entry to it.
         let mut bundle1 = make_test_assembly_bundle(&vars.outdir, &vars.bundle_path);
-        bundle1.packages_to_compile.push(CompiledPackageDefinition::MainDefinition(
-            MainPackageDefinition {
+        bundle1.packages_to_compile.push(
+            CompiledPackageDefinition {
                 name: CompiledPackageDestination::Test(ForTest),
-                components: BTreeMap::from([
-                    ("component1".into(), "cml1".into()),
-                    ("component2".into(), "cml2".into()),
-                ]),
-                contents: Vec::default(),
-                includes: Vec::default(),
-                bootfs_package: false,
-            },
-        ));
+                components: vec![
+                    CompiledComponentDefinition {
+                        component_name: "component1".into(),
+                        shards: vec![FileRelativePathBuf::FileRelative(
+                            "compiled_packages/for_test/component1/cml1".into(),
+                        )],
+                    },
+                    CompiledComponentDefinition {
+                        component_name: "component2".into(),
+                        shards: vec![FileRelativePathBuf::FileRelative(
+                            "compiled_packages/for_test/component2/cml2".into(),
+                        )],
+                    },
+                ],
+                contents: Default::default(),
+                includes: Default::default(),
+                bootfs_package: Default::default(),
+            }
+            .resolve_paths_from_file(&vars.bundle_path)
+            .unwrap(),
+        );
+
         let bundle2 = AssemblyInputBundle {
-            packages_to_compile: vec![CompiledPackageDefinition::Additional(
-                AdditionalPackageContents {
-                    name: CompiledPackageDestination::Test(ForTest),
-                    component_shards: BTreeMap::from([(
-                        "component2".into(),
-                        vec!["shard1".into()],
-                    )]),
-                },
-            )],
+            packages_to_compile: vec![CompiledPackageDefinition {
+                name: CompiledPackageDestination::Test(ForTest),
+                components: vec![CompiledComponentDefinition {
+                    component_name: "component2".into(),
+                    shards: vec![FileRelativePathBuf::FileRelative(
+                        "compiled_packages/for_test/component2/shard1".into(),
+                    )],
+                }],
+                contents: Default::default(),
+                includes: Default::default(),
+                bootfs_package: Default::default(),
+            }
+            .resolve_paths_from_dir(&bundle2_path)
+            .unwrap()],
             ..Default::default()
         };
 
@@ -1659,7 +1679,7 @@ mod tests {
                         "merge",
                          "--output",
                           vars.outdir.join("for-test/component1/component1.cml").as_str(),
-                          vars.outdir.join("bundle/cml1").as_str()
+                          vars.outdir.join("compiled_packages/for_test/component1/cml1").as_str()
                     ]
                 },
                 {
@@ -1668,10 +1688,6 @@ mod tests {
                         "compile",
                         "--features=allow_long_names",
                         "--features=dictionaries",
-                        "--includeroot",
-                        vars.outdir.join("bundle/compiled_packages/include").as_str(),
-                        "--includepath",
-                        vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--config-package-path",
                         "meta/component1.cvf",
                         "-o",
@@ -1685,8 +1701,8 @@ mod tests {
                         "merge",
                         "--output",
                         vars.outdir.join("for-test/component2/component2.cml").as_str(),
-                        vars.outdir.join("bundle/cml2").as_str(),
-                        vars.outdir.join("bundle/shard1")
+                        vars.outdir.join("compiled_packages/for_test/component2/cml2").as_str(),
+                        bundle2_path.join("compiled_packages/for_test/component2/shard1")
                     ]
                 },
                 {
@@ -1695,10 +1711,6 @@ mod tests {
                         "compile",
                         "--features=allow_long_names",
                         "--features=dictionaries",
-                        "--includeroot",
-                        vars.outdir.join("bundle/compiled_packages/include").as_str(),
-                        "--includepath",
-                        vars.outdir.join("bundle/compiled_packages/include").as_str(),
                         "--config-package-path",
                         "meta/component2.cvf",
                         "-o",

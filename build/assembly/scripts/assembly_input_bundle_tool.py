@@ -8,11 +8,10 @@ import json
 import os
 import subprocess
 import sys
-from typing import Dict, List, Set, Tuple
+from typing import List, Set, Tuple
 import logging
 from assembly.assembly_input_bundle import (
-    CompiledPackageAdditionalShards,
-    CompiledPackageMainDefinition,
+    CompiledPackageDefinitionFromGN,
 )
 from depfile import DepFile
 from assembly import (
@@ -24,9 +23,8 @@ from assembly import (
     PackageDetails,
     PackageManifest,
 )
-from serialization.serialization import (
+from serialization import (
     instance_from_dict,
-    json_dumps,
     json_load,
 )
 
@@ -217,57 +215,26 @@ def add_config_data_entries_from_file(
 def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
     """
     compiled_packages should be
-    List[CompiledPackageMainDefinition|CompiledPackageAdditionalShards]
+    List[CompiledPackageDefinition]
     """
 
     _compiled_packages = _read_json_file(compiled_packages)
     for package_def in _compiled_packages:
-        # Differentiate entries by field names
-        if "component_shards" in package_def:
-            # Transform from the GN format to the internal format
-            shards = {}
-            for definition in package_def["component_shards"]:
-                if definition["component_name"] in shards:
-                    raise ValueError(
-                        f"Unexpected repeated component name: {definition['component_name']}"
-                    )
+        # Parse the dict into an object.
+        package_def = instance_from_dict(
+            CompiledPackageDefinitionFromGN, package_def
+        )
 
-                shards[definition["component_name"]] = definition["shards"]
-            package_def["component_shards"] = shards
-
-            aib_creator.compiled_package_shards.append(
-                instance_from_dict(CompiledPackageAdditionalShards, package_def)
+        # If a bootfs package, validate the package name against the allowlist
+        # for compiled packages in bootfs.
+        if (
+            package_def.bootfs_package
+            and package_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST
+        ):
+            raise ValueError(
+                f"Compiled package {package_def.name} not in bootfs allowlist!"
             )
-        else:
-            shards = {}
-            for definition in package_def["components"]:
-                if definition["component_name"] in shards:
-                    raise ValueError(
-                        f"Unexpected repeated component name: {definition['component_name']}"
-                    )
-
-                shards[definition["component_name"]] = definition["shards"]
-            package_def["components"] = shards
-
-            main_def = instance_from_dict(
-                CompiledPackageMainDefinition, package_def
-            )
-
-            # Type unsafe; see assembly_input_bundle.py
-            if package_def.get("component_includes"):
-                main_def.includes = [
-                    instance_from_dict(FileEntry, x)
-                    for x in package_def["component_includes"]
-                ]
-
-            if (
-                main_def.bootfs_package
-                and main_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST
-            ):
-                raise ValueError(
-                    f"Compiled package {main_def.name} not in bootfs allowlist!"
-                )
-            aib_creator.compiled_packages.append(main_def)
+        aib_creator.compiled_packages.append(package_def)
 
 
 def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):

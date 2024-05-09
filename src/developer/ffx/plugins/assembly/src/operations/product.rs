@@ -5,7 +5,7 @@
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
-    AdditionalPackageContents, AssemblyConfigWrapperForOverrides, CompiledPackageDefinition,
+    AssemblyConfigWrapperForOverrides, CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
 use assembly_config_schema::platform_config::PlatformConfig;
@@ -18,7 +18,6 @@ use assembly_tool::SdkToolProvider;
 use assembly_util::{read_config, BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageMode, PackageValidationHandling, ProductArgs};
-use std::collections::BTreeMap;
 use tracing::info;
 
 mod assembly_builder;
@@ -230,14 +229,16 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Add the core shards.
     if !configuration.core_shards.is_empty() {
-        let compiled_package_def =
-            CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::Core),
-                component_shards: BTreeMap::from([(
-                    "core".to_string(),
-                    configuration.core_shards.clone(),
-                )]),
-            });
+        let compiled_package_def: CompiledPackageDefinition = CompiledPackageDefinition {
+            name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::Core),
+            components: vec![CompiledComponentDefinition {
+                component_name: "core".to_string(),
+                shards: configuration.core_shards.iter().map(Into::into).collect(),
+            }],
+            contents: Default::default(),
+            includes: Default::default(),
+            bootfs_package: Default::default(),
+        };
         builder
             .add_compiled_package(&compiled_package_def, "".into())
             .context("Adding core shards")?;

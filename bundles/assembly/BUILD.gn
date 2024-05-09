@@ -116,7 +116,7 @@ assembly_input_bundle("embeddable") {
       components = [
         {
           component_name = "root"
-          shards = rebase_path("//src/sys/root/root.cml", root_build_dir)
+          shards = [ "//src/sys/root/root.cml" ]
         },
       ]
     },
@@ -126,8 +126,7 @@ assembly_input_bundle("embeddable") {
       components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path("//src/sys/bootstrap/meta/bootstrap.cml",
-                               root_build_dir)
+          shards = [ "//src/sys/bootstrap/meta/bootstrap.cml" ]
         },
       ]
     },
@@ -161,19 +160,18 @@ assembly_input_bundle("bootstrap") {
 
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [
-                    "//src/bringup/bin/paver/meta/paver.bootstrap_shard.cml",
-                    "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml",
-                    "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
-                    "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
-                    "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/bringup/bin/paver/meta/paver.bootstrap_shard.cml",
+            "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml",
+            "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
+            "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
+            "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
+          ]
         },
       ]
     },
@@ -466,13 +464,12 @@ assembly_input_bundle("kernel_debug_broker_userdebug") {
   bootfs_packages = [ "//src/bringup/bin/kernel_debug_broker:pkg" ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker_userdebug.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker_userdebug.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -482,13 +479,12 @@ assembly_input_bundle("kernel_debug_broker_userdebug") {
 assembly_input_bundle("kernel_debug_broker_user") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker_user.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker_user.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -514,13 +510,12 @@ assembly_input_bundle("console") {
   ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/bringup/bin/console/meta/console.shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/bringup/bin/console/meta/console.shard.cml" ]
         },
       ]
     },
@@ -533,13 +528,13 @@ assembly_input_bundle("ptysvc") {
   bootfs_packages = [ "//src/bringup/bin/ptysvc:package" ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/bringup/bin/ptysvc/meta/ptysvc.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/bringup/bin/ptysvc/meta/ptysvc.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -566,13 +561,13 @@ assembly_input_bundle("virtcon") {
   bootfs_packages = [ "//src/bringup/bin/virtcon:package" ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/bringup/bin/virtcon/meta/virtual-console.shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/bringup/bin/virtcon/meta/virtual-console.shard.cml" ]
         },
       ]
     },
@@ -592,13 +587,12 @@ assembly_input_bundle("netsvc") {
   bootfs_packages = [ "//src/bringup/bin/netsvc:package" ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards =
-              rebase_path([ "//src/bringup/bin/netsvc/meta/netsvc.shard.cml" ],
-                          root_build_dir)
+          shards = [ "//src/bringup/bin/netsvc/meta/netsvc.shard.cml" ]
         },
       ]
     },
@@ -685,12 +679,10 @@ assembly_input_bundle("sl4f") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/testing/sl4f/meta/sl4f_assembly.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/testing/sl4f/meta/sl4f_assembly.core_shard.cml" ]
         },
       ]
     },
@@ -735,26 +727,25 @@ assembly_input_bundle("core_realm") {
 
   compiled_packages = [
     {
+      bootfs_package = true
       name = "root"
-      component_shards = [
+      components = [
         {
           component_name = "root"
-          shards = rebase_path([ "//src/sys/core/meta/core.root_shard.cml" ],
-                               root_build_dir)
+          shards = [ "//src/sys/core/meta/core.root_shard.cml" ]
         },
       ]
     },
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [
-                    "//src/devices/bin/driver_framework/meta/package_drivers.bootstrap_shard.cml",
-                    "//src/sys/pkg/bin/pkg-cache/meta/pkg-cache.bootstrap_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/devices/bin/driver_framework/meta/package_drivers.bootstrap_shard.cml",
+            "//src/sys/pkg/bin/pkg-cache/meta/pkg-cache.bootstrap_shard.cml",
+          ]
         },
       ]
     },
@@ -766,7 +757,15 @@ assembly_input_bundle("core_realm") {
           # config.
 
           component_name = "core"
-          shards = rebase_path("//src/sys/core/meta/core.cml", root_build_dir)
+          shards = [
+            "//src/sys/core/meta/core.cml",
+
+            # TODO:  These shards should be folded into the above
+            # `core.cml` file itself as they are never omitted from it.
+            "//src/developer/build_info/meta/build_info.core_shard.cml",
+            "//src/developer/forensics/forensics.core_shard.cml",
+            "//sdk/lib/inspect/offer.shard.cml",
+          ]
         },
       ]
 
@@ -774,13 +773,11 @@ assembly_input_bundle("core_realm") {
       # via other shards.
       component_includes = [
         {
-          source =
-              rebase_path("//sdk/lib/inspect/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/inspect/offer.shard.cml"
           destination = "inspect/offer.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/syslog/offer.shard.cml"
           destination = "syslog/offer.shard.cml"
         },
       ]
@@ -799,28 +796,11 @@ assembly_input_bundle("core_realm") {
           ]) {
         component_includes += [
           {
-            source = rebase_path(include, root_build_dir)
+            source = include
             destination = rebase_path(include, "//")
           },
         ]
       }
-    },
-    {
-      name = "core"
-      component_shards = [
-        {
-          component_name = "core"
-          shards = rebase_path(
-                  [
-                    # TODO:  These shards should be folded into the above
-                    # `core.cml` file itself as they are never omitted from it.
-                    "//src/developer/build_info/meta/build_info.core_shard.cml",
-                    "//src/developer/forensics/forensics.core_shard.cml",
-                    "//sdk/lib/inspect/offer.shard.cml",
-                  ],
-                  root_build_dir)
-        },
-      ]
     },
     {
       name = "system-update-realm"
@@ -828,8 +808,7 @@ assembly_input_bundle("core_realm") {
         {
           component_name = "system-update-realm"
 
-          shards = rebase_path("//src/sys/pkg/meta/system-update-realm.cml",
-                               root_build_dir)
+          shards = [ "//src/sys/pkg/meta/system-update-realm.cml" ]
         },
       ]
     },
@@ -874,25 +853,20 @@ assembly_input_bundle("network_realm") {
       components = [
         {
           component_name = "network"
-          shards =
-              rebase_path("//src/connectivity/network/meta/common.shard.cml",
-                          root_build_dir)
+          shards = [ "//src/connectivity/network/meta/common.shard.cml" ]
         },
       ]
       component_includes = [
         {
-          source =
-              rebase_path("//sdk/lib/inspect/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/inspect/offer.shard.cml"
           destination = "inspect/offer.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/trace/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/trace/offer.shard.cml"
           destination = "trace/offer.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/syslog/offer.shard.cml"
           destination = "syslog/offer.shard.cml"
         },
       ]
@@ -946,12 +920,10 @@ assembly_input_bundle("networking_with_virtualization") {
   compiled_packages = [
     {
       name = "network"
-      component_shards = [
+      components = [
         {
           component_name = "network"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/network-with-virtualization.shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/network/meta/network-with-virtualization.shard.cml" ]
         },
       ]
     },
@@ -969,12 +941,10 @@ assembly_input_bundle("networking_basic") {
   compiled_packages = [
     {
       name = "network"
-      component_shards = [
+      components = [
         {
           component_name = "network"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/network-basic.shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/network/meta/network-basic.shard.cml" ]
         },
       ]
     },
@@ -1007,12 +977,11 @@ assembly_input_bundle("networking_test_collection") {
   compiled_packages = [
     {
       name = "network"
-      component_shards = [
+      components = [
         {
           component_name = "network"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/test-collection.shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/connectivity/network/meta/test-collection.shard.cml" ]
         },
       ]
     },
@@ -1290,36 +1259,34 @@ assembly_input_bundle("core_realm_eng") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    # The process_resolver core shard (either the base-resolver or
-                    # pkg-resolver variant) should only be present in
-                    # the `core_realm_development_access` AIB, but it's required
-                    # here until optional exposes are available, as the
-                    # `fuchsia.process.Resolver` capability is routed to the
-                    # `/bootstrap/console-launcher` component which is currently
-                    # present on all build-types (but is not needed on user, as
-                    # there is no reachable console there).
-                    # Note that the `process-resolver` component itself is not
-                    # present except when the `core_realm_development_access` is
-                    # added to the system.
-                    #
-                    # eng uses the pkg-resolver, as opposed to the base-resolver,
-                    # to support ephemeral resolution of shell packages.
-                    "//src/sys/process-resolver/meta/process_resolver.pkg-resolver.core_shard.cml",
+          shards = [
+            # The process_resolver core shard (either the base-resolver or
+            # pkg-resolver variant) should only be present in
+            # the `core_realm_development_access` AIB, but it's required
+            # here until optional exposes are available, as the
+            # `fuchsia.process.Resolver` capability is routed to the
+            # `/bootstrap/console-launcher` component which is currently
+            # present on all build-types (but is not needed on user, as
+            # there is no reachable console there).
+            # Note that the `process-resolver` component itself is not
+            # present except when the `core_realm_development_access` is
+            # added to the system.
+            #
+            # eng uses the pkg-resolver, as opposed to the base-resolver,
+            # to support ephemeral resolution of shell packages.
+            "//src/sys/process-resolver/meta/process_resolver.pkg-resolver.core_shard.cml",
 
-                    "//src/sys/core/meta/core-env-full-resolver.core_shard.cml",
-                    "//src/sys/core/meta/lavapipe.core_shard.cml",
-                    "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
-                    "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
-                    "//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
-                  ],
-                  root_build_dir)
+            "//src/sys/core/meta/core-env-full-resolver.core_shard.cml",
+            "//src/sys/core/meta/lavapipe.core_shard.cml",
+            "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
+            "//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1336,41 +1303,39 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    # user and userdebug only have the base resolver, not the full
-                    # resolver.
-                    "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
+          shards = [
+            # user and userdebug only have the base resolver, not the full
+            # resolver.
+            "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
 
-                    # The process_resolver core shard (either the base-resolver or
-                    # pkg-resolver variant) should only be present in
-                    # the `core_realm_development_access` AIB, but it's required
-                    # here until optional exposes are available, as the
-                    # `fuchsia.process.Resolver` capability is routed to the
-                    # `/bootstrap/console-launcher` component which is currently
-                    # present on all build-types (but is not needed on user, as
-                    # there is no reachable console there).
-                    # Note that the `process-resolver` component itself is not
-                    # present except when the `core_realm_development_access` is
-                    # added to the system.
-                    #
-                    # user and userdebug only have the base-resolver, not the
-                    # pkg-resolver.
-                    "//src/sys/process-resolver/meta/process_resolver.base-resolver.core_shard.cml",
+            # The process_resolver core shard (either the base-resolver or
+            # pkg-resolver variant) should only be present in
+            # the `core_realm_development_access` AIB, but it's required
+            # here until optional exposes are available, as the
+            # `fuchsia.process.Resolver` capability is routed to the
+            # `/bootstrap/console-launcher` component which is currently
+            # present on all build-types (but is not needed on user, as
+            # there is no reachable console there).
+            # Note that the `process-resolver` component itself is not
+            # present except when the `core_realm_development_access` is
+            # added to the system.
+            #
+            # user and userdebug only have the base-resolver, not the
+            # pkg-resolver.
+            "//src/sys/process-resolver/meta/process_resolver.base-resolver.core_shard.cml",
 
-                    # Lavapipe is only enabled on eng builds.
-                    "//src/sys/core/meta/lavapipe-disabled.core_shard.cml",
+            # Lavapipe is only enabled on eng builds.
+            "//src/sys/core/meta/lavapipe-disabled.core_shard.cml",
 
-                    # user and userdebug restrict access to the Storage capability
-                    # to registered component ids.
-                    "//src/sys/core/meta/restricted-storage.core_shard.cml",
-                  ],
-                  root_build_dir)
+            # user and userdebug restrict access to the Storage capability
+            # to registered component ids.
+            "//src/sys/core/meta/restricted-storage.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1402,21 +1367,19 @@ assembly_input_bundle("core_realm_development_access") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
-                    "//src/developer/meta/default-laboratory-env.core_shard.cml",
-                    "//src/developer/remote-control/meta/laboratory.core_shard.cml",
-                    "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
-                    "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
-                    "//src/developer/toolbox/meta/toolbox.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
+            "//src/developer/meta/default-laboratory-env.core_shard.cml",
+            "//src/developer/remote-control/meta/laboratory.core_shard.cml",
+            "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
+            "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
+            "//src/developer/toolbox/meta/toolbox.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1425,8 +1388,7 @@ assembly_input_bundle("core_realm_development_access") {
       components = [
         {
           component_name = "toolbox"
-          shards = rebase_path("//src/developer/toolbox/meta/toolbox.cml",
-                               root_build_dir)
+          shards = [ "//src/developer/toolbox/meta/toolbox.cml" ]
         },
       ]
     },
@@ -1476,16 +1438,15 @@ assembly_input_bundle("bootstrap_realm_vsock_development_access") {
   ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [
-                    "//src/developer/remote-control/meta/remote-control.bootstrap_shard.cml",
-                    "//src/developer/vsock-sshd-host/meta/vsock-sshd-host.bootstrap_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/developer/remote-control/meta/remote-control.bootstrap_shard.cml",
+            "//src/developer/vsock-sshd-host/meta/vsock-sshd-host.bootstrap_shard.cml",
+          ]
         },
       ]
     },
@@ -1507,14 +1468,12 @@ assembly_input_bundle("core_realm_development_access_rcs_usb") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/developer/remote-control/meta/remote-control-with-usb.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/developer/remote-control/meta/remote-control-with-usb.core_shard.cml" ]
         },
       ]
     },
@@ -1525,14 +1484,14 @@ assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/developer/remote-control/meta/remote-control.core_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/developer/remote-control/meta/remote-control.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1545,12 +1504,10 @@ assembly_input_bundle("radar_proxy_with_injector") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy-with-injector.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy-with-injector.core_shard.cml" ]
         },
       ]
     },
@@ -1563,12 +1520,10 @@ assembly_input_bundle("radar_proxy_without_injector") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy-without-injector.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/devices/radar/bin/radar-proxy/meta/radar-proxy-without-injector.core_shard.cml" ]
         },
       ]
     },
@@ -1604,12 +1559,10 @@ assembly_input_bundle("factory_reset_trigger") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/recovery/factory-reset-trigger/meta/factory-reset-trigger.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/recovery/factory-reset-trigger/meta/factory-reset-trigger.core_shard.cml" ]
         },
       ]
     },
@@ -1734,23 +1687,21 @@ assembly_input_bundle("common_standard") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
-                    "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
-                    "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
-                    "//src/connectivity/network/meta/persistence.core_shard.cml",
-                    "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
-                    "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
-                    "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
-                    "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
+            "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
+            "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
+            "//src/connectivity/network/meta/persistence.core_shard.cml",
+            "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
+            "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
+            "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
+            "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1759,37 +1710,25 @@ assembly_input_bundle("common_standard") {
       components = [
         {
           component_name = "diagnostics"
-          shards =
-              rebase_path("//src/diagnostics/realm/meta/diagnostics_realm.cml",
-                          root_build_dir)
+          shards = [
+            "//src/diagnostics/realm/meta/diagnostics_realm.cml",
+            "//sdk/lib/inspect/offer.shard.cml",
+          ]
         },
       ]
       component_includes = [
         {
-          source =
-              rebase_path("//sdk/lib/inspect/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/inspect/offer.shard.cml"
           destination = "inspect/offer.shard.cml"
         },
       ]
     },
     {
-      name = "diagnostics"
-      component_shards = [
-        {
-          component_name = "diagnostics"
-          shards = rebase_path([ "//sdk/lib/inspect/offer.shard.cml" ],
-                               root_build_dir)
-        },
-      ]
-    },
-    {
       name = "system-update-realm"
-      component_shards = [
+      components = [
         {
           component_name = "system-update-realm"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/system-updater/meta/system_updater.system_update_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/sys/pkg/bin/system-updater/meta/system_updater.system_update_shard.cml" ]
         },
       ]
     },
@@ -1819,14 +1758,14 @@ assembly_input_bundle("standard_user") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1890,17 +1829,15 @@ assembly_input_bundle("standard_eng") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/developer/process_explorer/meta/process_explorer.core_shard.cml",
-                    "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
-                    "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
-                    "//src/power/metrics-logger/meta/metrics-logger.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/developer/process_explorer/meta/process_explorer.core_shard.cml",
+            "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
+            "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
+            "//src/power/metrics-logger/meta/metrics-logger.core_shard.cml",
+          ]
         },
       ]
     },
@@ -1944,39 +1881,36 @@ assembly_input_bundle("standard_userdebug_and_eng") {
   compiled_packages = [
     {
       name = "diagnostics"
-      component_shards = [
+      components = [
         {
           component_name = "diagnostics"
-          shards = rebase_path(
-                  [ "//src/diagnostics/detect/meta/detect.realm_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/diagnostics/detect/meta/detect.realm_shard.cml" ]
         },
       ]
     },
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/diagnostics/detect/meta/detect.core_shard.cml",
-                    "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
-                    "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
-                    "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/diagnostics/detect/meta/detect.core_shard.cml",
+            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+            "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
+            "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
+          ]
         },
       ]
     },
     {
+      bootfs_package = true
       name = "root"
-      component_shards = [
+      components = [
         {
           component_name = "root"
-          shards = rebase_path(
-                  [ "//src/diagnostics/detect/meta/detect_userdebug.root_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/diagnostics/detect/meta/detect_userdebug.root_shard.cml",
+          ]
         },
       ]
     },
@@ -1986,13 +1920,13 @@ assembly_input_bundle("standard_userdebug_and_eng") {
 assembly_input_bundle("detect_user") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "root"
-      component_shards = [
+      components = [
         {
           component_name = "root"
-          shards = rebase_path(
-                  [ "//src/diagnostics/detect/meta/detect_user.root_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/diagnostics/detect/meta/detect_user.root_shard.cml" ]
         },
       ]
     },
@@ -2031,16 +1965,14 @@ assembly_input_bundle("input_group_two") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
-                    "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
-                    "//src/media/sessions/meta/mediasession.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
+            "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
+            "//src/media/sessions/meta/mediasession.core_shard.cml",
+          ]
         },
       ]
     },
@@ -2061,12 +1993,10 @@ assembly_input_bundle("bluetooth_a2dp") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager.core_shard.cml" ]
         },
       ]
     },
@@ -2086,12 +2016,10 @@ assembly_input_bundle("bluetooth_avrcp") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/bluetooth/profiles/bt-avrcp/meta/bt-avrcp.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-avrcp/meta/bt-avrcp.core_shard.cml" ]
         },
       ]
     },
@@ -2113,12 +2041,10 @@ assembly_input_bundle("bluetooth_core") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/bluetooth/core/bt-init/meta/bt-init.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/bluetooth/core/bt-init/meta/bt-init.core_shard.cml" ]
         },
       ]
     },
@@ -2135,12 +2061,10 @@ assembly_input_bundle("bluetooth_hfp_ag") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml" ]
         },
       ]
     },
@@ -2159,12 +2083,10 @@ assembly_input_bundle("bluetooth_snoop_lazy") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop.core_shard.cml" ]
         },
       ]
     },
@@ -2183,12 +2105,10 @@ assembly_input_bundle("bluetooth_snoop_eager") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop-eager.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop-eager.core_shard.cml" ]
         },
       ]
     },
@@ -2204,15 +2124,13 @@ assembly_input_bundle("bluetooth_pandora") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/connectivity/bluetooth/testing/pandora/bt-pandora-server/meta/bt-pandora-server.core_shard.cml",
-                    "//src/connectivity/bluetooth/tools/bt-rootcanal/meta/bt-rootcanal.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/connectivity/bluetooth/testing/pandora/bt-pandora-server/meta/bt-pandora-server.core_shard.cml",
+            "//src/connectivity/bluetooth/tools/bt-rootcanal/meta/bt-rootcanal.core_shard.cml",
+          ]
         },
       ]
     },
@@ -2241,13 +2159,12 @@ assembly_input_bundle("driver_framework") {
   ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -2262,13 +2179,12 @@ assembly_input_bundle("driver_framework") {
 assembly_input_bundle("full_package_drivers") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/devices/bin/driver_framework/meta/full_package_drivers.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/devices/bin/driver_framework/meta/full_package_drivers.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -2289,12 +2205,10 @@ assembly_input_bundle("starnix_support") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/starnix/runner/meta/starnix_runner.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/starnix/runner/meta/starnix_runner.core_shard.cml" ]
         },
       ]
     },
@@ -2360,17 +2274,15 @@ assembly_input_bundle("testing_support") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/performance/experimental/profiler/meta/profiler.core_shard.cml",
-                    "//src/sys/test_manager/meta/test_manager.core_shard.cml",
-                    "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
-                    "//src/sys/testing/meta/test_realm.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/performance/experimental/profiler/meta/profiler.core_shard.cml",
+            "//src/sys/test_manager/meta/test_manager.core_shard.cml",
+            "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
+            "//src/sys/testing/meta/test_realm.core_shard.cml",
+          ]
         },
       ]
     },
@@ -2397,11 +2309,10 @@ assembly_input_bundle("camera") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path([ "//src/camera/meta/camera.core_shard.cml" ],
-                               root_build_dir)
+          shards = [ "//src/camera/meta/camera.core_shard.cml" ]
         },
       ]
     },
@@ -2413,12 +2324,10 @@ assembly_input_bundle("factory_data") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/factory/factory_store_providers/meta/factory_store_providers.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/factory/factory_store_providers/meta/factory_store_providers.core_shard.cml" ]
         },
       ]
     },
@@ -2437,13 +2346,12 @@ assembly_input_bundle("factory_data") {
 assembly_input_bundle("fshost_common") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/storage/fshost/meta/fshost.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/storage/fshost/meta/fshost.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -2453,8 +2361,11 @@ assembly_input_bundle("fshost_common") {
       components = [
         {
           component_name = "fshost"
-          shards = rebase_path("//src/storage/fshost/meta/base_fshost.cml",
-                               root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/base_fshost.cml",
+            "//src/storage/lib/fs_management/client.shard.cml",
+            "//src/storage/fshost/meta/config.cml",
+          ]
         },
       ]
       contents = [
@@ -2517,47 +2428,28 @@ assembly_input_bundle("fshost_common") {
       ]
       component_includes = [
         {
-          source =
-              rebase_path("//sdk/lib/inspect/client.shard.cml", root_build_dir)
+          source = "//sdk/lib/inspect/client.shard.cml"
           destination = "inspect/client.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/inspect/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/inspect/offer.shard.cml"
           destination = "inspect/offer.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/inspect/use.shard.cml", root_build_dir)
+          source = "//sdk/lib/inspect/use.shard.cml"
           destination = "inspect/use.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/syslog/client.shard.cml", root_build_dir)
+          source = "//sdk/lib/syslog/client.shard.cml"
           destination = "syslog/client.shard.cml"
         },
         {
-          source =
-              rebase_path("//sdk/lib/syslog/offer.shard.cml", root_build_dir)
+          source = "//sdk/lib/syslog/offer.shard.cml"
           destination = "syslog/offer.shard.cml"
         },
         {
-          source = rebase_path("//sdk/lib/syslog/use.shard.cml", root_build_dir)
+          source = "//sdk/lib/syslog/use.shard.cml"
           destination = "syslog/use.shard.cml"
-        },
-      ]
-    },
-    {
-      name = "fshost"
-      component_shards = [
-        {
-          component_name = "fshost"
-          shards =
-              rebase_path([
-                            "//src/storage/lib/fs_management/client.shard.cml",
-                            "//src/storage/fshost/meta/config.cml",
-                          ],
-                          root_build_dir)
         },
       ]
     },
@@ -2573,12 +2465,12 @@ assembly_input_bundle("fshost_common") {
 assembly_input_bundle("fshost_storage") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path([ "//src/storage/fshost/meta/core_fshost.cml" ],
-                               root_build_dir)
+          shards = [ "//src/storage/fshost/meta/core_fshost.cml" ]
         },
       ]
     },
@@ -2595,16 +2487,15 @@ assembly_input_bundle("fshost_storage") {
 assembly_input_bundle("fshost_fxfs") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path(
-                  [
-                    "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
-                    "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
+            "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
+          ]
         },
       ]
     },
@@ -2624,16 +2515,15 @@ assembly_input_bundle("fshost_fxfs") {
 assembly_input_bundle("fshost_fvm") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path(
-                  [
-                    "//src/storage/fshost/meta/blobfs_fshost.cml",
-                    "//src/storage/fshost/meta/blobfs_fshost_base.shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/blobfs_fshost.cml",
+            "//src/storage/fshost/meta/blobfs_fshost_base.shard.cml",
+          ]
         },
       ]
     },
@@ -2650,16 +2540,15 @@ assembly_input_bundle("fshost_fvm") {
 assembly_input_bundle("fshost_fvm_fxfs") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path(
-                  [
-                    "//src/storage/fshost/meta/fxfs_fshost.cml",
-                    "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+          ]
         },
       ]
     },
@@ -2679,17 +2568,16 @@ assembly_input_bundle("fshost_fvm_fxfs") {
 assembly_input_bundle("fshost_fvm_minfs") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path(
-                  [
-                    "//src/storage/fshost/meta/minfs_fshost.cml",
-                    "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
-                    "//src/storage/fshost/meta/non_fxfs_fshost.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/minfs_fshost.cml",
+            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+          ]
         },
       ]
     },
@@ -2709,18 +2597,17 @@ assembly_input_bundle("fshost_fvm_minfs") {
 assembly_input_bundle("fshost_fvm_minfs_migration") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path(
-                  [
-                    "//src/storage/fshost/meta/minfs_fshost.cml",
-                    "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
-                    "//src/storage/fshost/meta/fxfs_fshost.cml",
-                    "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/minfs_fshost.cml",
+            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+          ]
         },
       ]
     },
@@ -2741,17 +2628,16 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
 assembly_input_bundle("fshost_fvm_f2fs") {
   compiled_packages = [
     {
+      bootfs_package = true
       name = "fshost"
-      component_shards = [
+      components = [
         {
           component_name = "fshost"
-          shards = rebase_path(
-                  [
-                    "//src/storage/fshost/meta/f2fs_fshost.cml",
-                    "//src/storage/fshost/meta/f2fs_fshost_base.shard.cml",
-                    "//src/storage/fshost/meta/non_fxfs_fshost.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/storage/fshost/meta/f2fs_fshost.cml",
+            "//src/storage/fshost/meta/f2fs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+          ]
         },
       ]
     },
@@ -2765,23 +2651,19 @@ assembly_input_bundle("system_update_checker") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/system-update-checker/meta/system_update_checker.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/sys/pkg/bin/system-update-checker/meta/system_update_checker.core_shard.cml" ]
         },
       ]
     },
     {
       name = "system-update-realm"
-      component_shards = [
+      components = [
         {
           component_name = "system-update-realm"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/system-update-checker/meta/system_update_checker.system_update_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/sys/pkg/bin/system-update-checker/meta/system_update_checker.system_update_shard.cml" ]
         },
       ]
     },
@@ -2793,23 +2675,19 @@ assembly_input_bundle("omaha_client") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.core_shard.cml" ]
         },
       ]
     },
     {
       name = "system-update-realm"
-      component_shards = [
+      components = [
         {
           component_name = "system-update-realm"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.system_update_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/sys/pkg/bin/omaha-client/meta/omaha_client_service.system_update_shard.cml" ]
         },
       ]
     },
@@ -2859,12 +2737,11 @@ assembly_input_bundle("no_update_checker") {
   compiled_packages = [
     {
       name = "system-update-realm"
-      component_shards = [
+      components = [
         {
           component_name = "system-update-realm"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/meta/no_update_checker.system_update_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/sys/pkg/meta/no_update_checker.system_update_shard.cml" ]
         },
       ]
     },
@@ -2877,23 +2754,21 @@ assembly_input_bundle("system_update_configurator") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/system-update-configurator/meta/core-shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/sys/pkg/bin/system-update-configurator/meta/core-shard.cml",
+          ]
         },
       ]
     },
     {
       name = "system-update-realm"
-      component_shards = [
+      components = [
         {
           component_name = "system-update-realm"
-          shards = rebase_path(
-                  [ "//src/sys/pkg/bin/system-update-configurator/meta/system-update-shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/sys/pkg/bin/system-update-configurator/meta/system-update-shard.cml" ]
         },
       ]
     },
@@ -2918,18 +2793,16 @@ assembly_input_bundle("virtualization_support") {
     compiled_packages = [
       {
         name = "core"
-        component_shards = [
+        components = [
           {
             component_name = "core"
-            shards = rebase_path(
-                    [
-                      "//src/connectivity/network/meta/virtualization.core_shard.cml",
-                      "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
-                      "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
-                      "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
-                      "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
-                    ],
-                    root_build_dir)
+            shards = [
+              "//src/connectivity/network/meta/virtualization.core_shard.cml",
+              "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
+              "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
+              "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
+              "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
+            ]
           },
         ]
       },
@@ -2948,12 +2821,12 @@ assembly_input_bundle("paravirtualization_support") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/zircon/bin/vsock_service/meta/vsock_service.core_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/zircon/bin/vsock_service/meta/vsock_service.core_shard.cml",
+          ]
         },
       ]
     },
@@ -2964,13 +2837,12 @@ assembly_input_bundle("paravirtualization_support_bootstrap") {
   bootfs_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path(
-                  [ "//src/zircon/bin/vsock_service/meta/vsock_service.bootstrap_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/zircon/bin/vsock_service/meta/vsock_service.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -2989,12 +2861,10 @@ assembly_input_bundle("netstack2") {
     compiled_packages = [
       {
         name = "network"
-        component_shards = [
+        components = [
           {
             component_name = "network"
-            shards = rebase_path(
-                    [ "//src/connectivity/network/meta/netstack2.shard.cml" ],
-                    root_build_dir)
+            shards = [ "//src/connectivity/network/meta/netstack2.shard.cml" ]
           },
         ]
       },
@@ -3013,12 +2883,10 @@ assembly_input_bundle("netstack3") {
   compiled_packages = [
     {
       name = "network"
-      component_shards = [
+      components = [
         {
           component_name = "network"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/meta/netstack3.shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/network/meta/netstack3.shard.cml" ]
         },
       ]
     },
@@ -3056,23 +2924,21 @@ assembly_input_bundle("netstack_migration") {
     compiled_packages = [
       {
         name = "network"
-        component_shards = [
+        components = [
           {
             component_name = "network"
-            shards = rebase_path(
-                    [ "//src/connectivity/network/meta/netstack-migration.shard.cml" ],
-                    root_build_dir)
+            shards = [
+              "//src/connectivity/network/meta/netstack-migration.shard.cml",
+            ]
           },
         ]
       },
       {
         name = "core"
-        component_shards = [
+        components = [
           {
             component_name = "core"
-            shards = rebase_path(
-                    [ "//src/connectivity/network/meta/netstack-migration.core.shard.cml" ],
-                    root_build_dir)
+            shards = [ "//src/connectivity/network/meta/netstack-migration.core.shard.cml" ]
           },
         ]
       },
@@ -3106,12 +2972,10 @@ assembly_input_bundle("network_tun") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/network/tun/network-tun/meta/network-tun.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/network/tun/network-tun/meta/network-tun.core_shard.cml" ]
         },
       ]
     },
@@ -3127,15 +2991,13 @@ assembly_input_bundle("thread_lowpan") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/connectivity/lowpan/service/meta/lowpanservice.core_shard.cml",
-                    "//src/connectivity/lowpan/drivers/lowpan-ot-driver/meta/lowpan-ot-driver.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/connectivity/lowpan/service/meta/lowpanservice.core_shard.cml",
+            "//src/connectivity/lowpan/drivers/lowpan-ot-driver/meta/lowpan-ot-driver.core_shard.cml",
+          ]
         },
       ]
     },
@@ -3157,12 +3019,11 @@ assembly_input_bundle("wlan_policy") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/wlan/wlancfg/meta/wlancfg.core_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/connectivity/wlan/wlancfg/meta/wlancfg.core_shard.cml" ]
         },
       ]
     },
@@ -3196,12 +3057,10 @@ assembly_input_bundle("wlan_legacy_privacy_support") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/wlan/wlandevicemonitor/meta/wlandevicemonitor.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/wlan/wlandevicemonitor/meta/wlandevicemonitor.core_shard.cml" ]
         },
       ]
     },
@@ -3221,12 +3080,10 @@ assembly_input_bundle("wlan_contemporary_privacy_only_support") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/wlan/wlandevicemonitor/meta/wlandevicemonitor.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/connectivity/wlan/wlandevicemonitor/meta/wlandevicemonitor.core_shard.cml" ]
         },
       ]
     },
@@ -3271,12 +3128,11 @@ assembly_input_bundle("wlan_wlanix") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/connectivity/wlan/wlanix/meta/wlanix.core_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/connectivity/wlan/wlanix/meta/wlanix.core_shard.cml" ]
         },
       ]
     },
@@ -3313,12 +3169,10 @@ assembly_input_bundle("audio_development_support") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/media/audio/services/ffxdaemon/meta/audio_ffx_daemon.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/media/audio/services/ffxdaemon/meta/audio_ffx_daemon.core_shard.cml" ]
         },
       ]
     },
@@ -3394,12 +3248,11 @@ assembly_input_bundle("audio_core_routing") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/media/audio/audio_core/meta/audio_core.core_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/media/audio/audio_core/meta/audio_core.core_shard.cml" ]
         },
       ]
     },
@@ -3410,12 +3263,10 @@ assembly_input_bundle("audio_core_use_adc_device") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/media/audio/audio_core/meta/audio_core.core_shard.use_adc_device.cml" ],
-                  root_build_dir)
+          shards = [ "//src/media/audio/audio_core/meta/audio_core.core_shard.use_adc_device.cml" ]
         },
       ]
     },
@@ -3432,12 +3283,10 @@ assembly_input_bundle("audio_device_registry") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/media/audio/services/device_registry/meta/audio_device_registry.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/media/audio/services/device_registry/meta/audio_device_registry.core_shard.cml" ]
         },
       ]
     },
@@ -3454,12 +3303,12 @@ assembly_input_bundle("soundplayer") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml",
+          ]
         },
       ]
     },
@@ -3470,12 +3319,12 @@ assembly_input_bundle("live_usb") {
   bootfs_packages = [ "//src/sys/live_usb:package" ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path([ "//src/sys/live_usb/meta/live-usb.shard.cml" ],
-                               root_build_dir)
+          shards = [ "//src/sys/live_usb/meta/live-usb.shard.cml" ]
         },
       ]
     },
@@ -3491,14 +3340,12 @@ assembly_input_bundle("session_manager") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/session/bin/session_manager/meta/session_manager.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/session/bin/session_manager/meta/session_manager.core_shard.cml" ]
         },
       ]
     },
@@ -3522,11 +3369,10 @@ assembly_input_bundle("ui") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards =
-              rebase_path([ "//src/ui/meta/ui.core_shard.cml" ], root_build_dir)
+          shards = [ "//src/ui/meta/ui.core_shard.cml" ]
         },
       ]
     },
@@ -3612,12 +3458,10 @@ assembly_input_bundle("fan") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/devices/thermal/bin/fan-controller/meta/fan-controller.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/devices/thermal/bin/fan-controller/meta/fan-controller.core_shard.cml" ]
         },
       ]
     },
@@ -3634,12 +3478,12 @@ assembly_input_bundle("battery_manager") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/power/battery-manager/meta/battery_manager.core_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/power/battery-manager/meta/battery_manager.core_shard.cml",
+          ]
         },
       ]
     },
@@ -3655,12 +3499,10 @@ assembly_input_bundle("power_metrics_recorder") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/power/metrics-logger/meta/metrics-logger-standalone.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/power/metrics-logger/meta/metrics-logger-standalone.core_shard.cml" ]
         },
       ]
     },
@@ -3677,11 +3519,10 @@ assembly_input_bundle("sensors_framework") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path([ "//src/sensors/meta/sensors.core_shard.cml" ],
-                               root_build_dir)
+          shards = [ "//src/sensors/meta/sensors.core_shard.cml" ]
         },
       ]
     },
@@ -3699,12 +3540,11 @@ assembly_input_bundle("sensors_playback") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/sensors/playback/meta/sensors_playback.core_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/sensors/playback/meta/sensors_playback.core_shard.cml" ]
         },
       ]
     },
@@ -3733,12 +3573,12 @@ assembly_input_bundle("legacy_power_framework") {
   ]
   compiled_packages = [
     {
+      bootfs_package = true
       name = "bootstrap"
-      component_shards = [
+      components = [
         {
           component_name = "bootstrap"
-          shards = rebase_path([ "//src/power/meta/power-framework.shard.cml" ],
-                               root_build_dir)
+          shards = [ "//src/power/meta/power-framework.shard.cml" ]
         },
       ]
     },
@@ -3825,24 +3665,19 @@ assembly_input_bundle("example_assembly_bundle") {
       components = [
         {
           component_name = "bar"
-          shards = rebase_path(
-                  "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
-                  root_build_dir)
+          shards = [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml" ]
         },
         {
           component_name = "baz"
-          shards = rebase_path(
-                  "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
-                  root_build_dir)
+          shards = [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml" ]
         },
       ]
 
       # Test that component includes for bootfs packages work
       component_includes = [
         {
-          source = rebase_path(
-                  "//src/tests/assembly/assemble_image/compiled_package/meta/test.include.cml",
-                  root_build_dir)
+          source = "//src/tests/assembly/assemble_image/compiled_package/meta/test.include.cml"
+
           destination = "test/include.cml"
         },
       ]
@@ -3853,18 +3688,15 @@ assembly_input_bundle("example_assembly_bundle") {
       components = [
         {
           component_name = "qux"
-          shards = rebase_path(
-                  "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
-                  root_build_dir)
+          shards = [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml" ]
         },
       ]
 
       # Test that component includes for bootfs packages work
       component_includes = [
         {
-          source = rebase_path(
-                  "//src/tests/assembly/assemble_image/compiled_package/meta/test.include.cml",
-                  root_build_dir)
+          source = "//src/tests/assembly/assemble_image/compiled_package/meta/test.include.cml"
+
           destination = "test/include.cml"
         },
       ]
@@ -3877,14 +3709,12 @@ assembly_input_bundle("example_assembly_bundle") {
     # in the legacy bundle
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           # All paths must be rebased since this is passed directly to the AIB
           # config.
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.core_shard.cml" ]
         },
       ]
     },
@@ -3915,12 +3745,10 @@ icu_assembly_input_bundle("intl_services") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/intl/intl_services/meta/intl.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/intl/intl_services/meta/intl.core_shard.cml" ]
         },
       ]
     },
@@ -3934,15 +3762,13 @@ icu_assembly_input_bundle("intl_services_small") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/intl/intl_services/meta/intl_small_timezones.core_shard.cml",
-                    "//src/intl/intl_services/meta/intl_small.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/intl/intl_services/meta/intl_small_timezones.core_shard.cml",
+            "//src/intl/intl_services/meta/intl_small.core_shard.cml",
+          ]
         },
       ]
     },
@@ -3959,15 +3785,13 @@ icu_assembly_input_bundle("intl_services_small_with_timezone") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [
-                    "//src/intl/intl_services/meta/intl_small.core_shard.cml",
-                    "//src/intl/time_zone_info_service/meta/time-zone-info-service.core_shard.cml",
-                  ],
-                  root_build_dir)
+          shards = [
+            "//src/intl/intl_services/meta/intl_small.core_shard.cml",
+            "//src/intl/time_zone_info_service/meta/time-zone-info-service.core_shard.cml",
+          ]
         },
       ]
     },
@@ -3980,12 +3804,11 @@ icu_assembly_input_bundle("setui") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/settings/service/meta/setui_service.core_shard.cml" ],
-                  root_build_dir)
+          shards =
+              [ "//src/settings/service/meta/setui_service.core_shard.cml" ]
         },
       ]
     },
@@ -3998,12 +3821,10 @@ icu_assembly_input_bundle("setui_with_camera") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/settings/service/meta/setui_service_with_camera.core_shard.cml" ],
-                  root_build_dir)
+          shards = [ "//src/settings/service/meta/setui_service_with_camera.core_shard.cml" ]
         },
       ]
     },
@@ -4105,12 +3926,12 @@ assembly_input_bundle("zoneinfo") {
   compiled_packages = [
     {
       name = "core"
-      component_shards = [
+      components = [
         {
           component_name = "core"
-          shards = rebase_path(
-                  [ "//src/intl/tzdata_provider/meta/zoneinfo_provider.core_shard.cml" ],
-                  root_build_dir)
+          shards = [
+            "//src/intl/tzdata_provider/meta/zoneinfo_provider.core_shard.cml",
+          ]
         },
       ]
     },

@@ -162,24 +162,40 @@ import("//build/python/python_action.gni")
 #     compiled_packages = [
 #       {
 #         name = "core"
-#         component_shards = [
+#         components = [
 #           {
 #             component_name = "core"
-#             shards = rebase_path(
+#             shards = [
 #                     "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
-#                     root_build_dir)
-# .         },
-# .         ...
-#         ]
+#             ]
+#           },
+#           ...
+#         ],
+#         component_includes = [ ... ]
+#         contents = [ {
+#           label = "//some/gn/label"
+#           source = "//som/gn/file/path"
+#           destination = "foo/bar"
+#         } ]
 #       },
 #     ]
 #
-#  component_includes [optional]
-#     [list of FileEntry] List of source/destination pairs related to a compiled
-#     package in the compiled_packages list.
-#     that specifies cml files that can be included by any cml shards in any
-#     platform AIB for the given package. These files will be included
-#     in the Assembly Input Bundle.
+#     shards [optional]
+#       [list of GN file paths] List of CML files to merge together when
+#       compiling the component.
+#
+#     component_includes [optional]
+#       [list of FileEntry] List of source/destination pairs related to a
+#       compiled package in the compiled_packages list that specifies cml files
+#       that can be included by any cml shards in any platform AIB for the given
+#       package. These files will be included in the Assembly Input Bundle.
+#
+#     contents [optional]
+#       [list of GN scopes] List of GN scopes that describe a source/destination
+#       pair for a file to include in the package when it's compiled.  An
+#       optional 'label' field is required when the file is created by the
+#       build, and is the label of the target that creates the file.
+#
 #
 #  create_aib_package (optional; default: true)
 #    [boolean] Set to true to also create a package that contains the contents
@@ -623,38 +639,80 @@ template("assembly_input_bundle") {
       _package = {
       }
       _package = {
-        forward_variables_from(package, "*", [ "contents" ])
+        forward_variables_from(package,
+                               [
+                                 "name",
+                                 "bootfs_package",
+                               ])
       }
-      _contents = []
-      if (defined(package.contents)) {
-        _inputs = []
-        _deps = []
-        foreach(entry, package.contents) {
-          _entry = {
-          }
-          _entry = {
-            forward_variables_from(entry,
-                                   [
-                                     "label",
-                                     "destination",
-                                   ])
-          }
-          _entry.source = rebase_path("${entry.source}", root_build_dir)
-          _contents += [ _entry ]
 
+      # Rebase and create input groups for the contents, component shards, and
+      # component includes for each package in the group.
+      _inputs = []
+      _deps = []
+
+      # Gather the deps and inputs files for the package contents.
+      if (defined(package.contents)) {
+        _contents = []
+        foreach(entry, package.contents) {
           _inputs += [ entry.source ]
           _deps += [ entry.label ]
+
+          _contents += [
+            {
+              destination = entry.destination
+              source = rebase_path("${entry.source}", root_build_dir)
+            },
+          ]
         }
-        group_name = "${target_name}.compiled_package.${package.name}.inputs"
-        group_with_inputs(group_name) {
-          deps = _deps
-          inputs = _inputs
-        }
-        creation_deps += [ ":${group_name}" ]
+        _package.contents = _contents
       }
-      _package.contents = _contents
+
+      # Gather the core shards as input files
+      if (defined(package.components)) {
+        components = []
+        foreach(entry, package.components) {
+          _inputs += entry.shards
+          components += [
+            {
+              forward_variables_from(entry, "*", [ "shards" ])
+              shards = rebase_path(entry.shards, root_build_dir)
+            },
+          ]
+        }
+        _package.components = components
+      }
+
+      # Gather the component includes as input files
+      if (defined(package.component_includes)) {
+        component_includes = []
+        foreach(entry, package.component_includes) {
+          _inputs += [ entry.source ]
+          component_includes += [
+            {
+              source = rebase_path(entry.source, root_build_dir)
+              destination = entry.destination
+            },
+          ]
+        }
+        _package.component_includes = component_includes
+      }
+
+      # Create a group that wraps together all the deps and inputs found above,
+      # to make sure that all input files are either source, or an output that's
+      # accounted for by one of the deps.
+      group_name = "${target_name}.compiled_package.${package.name}.inputs"
+      group_with_inputs(group_name) {
+        deps = _deps
+        inputs = _inputs
+      }
+      creation_deps += [ ":${group_name}" ]
+
       _compiled_packages += [ _package ]
     }
+
+    # Write out the whole compiled_package json file, now that all the inputs
+    # in it have been found, and all GN file paths rebased.
     generated_file(labels.compiled_packages) {
       forward_variables_from(invoker, [ "testonly" ])
       outputs = [ "${files.compiled_packages}" ]
