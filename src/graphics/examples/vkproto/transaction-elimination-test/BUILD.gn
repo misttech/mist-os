@@ -27,7 +27,7 @@ executable("bin") {
   defines = [ "VULKAN_HPP_NO_EXCEPTIONS" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/graphics/examples/vkproto/common:srcs",
     "//src/lib/fxl/test:gtest_main",
