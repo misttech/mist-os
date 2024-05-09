@@ -134,10 +134,9 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
  private:
   enum class BufferCollectionUsage : int32_t;
 
-  zx_status_t SetupDisplayInterface();
+  zx_status_t InitializeCapture();
   int VSyncThread();
   int CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
-  void PopulateAddedDisplayArgs(added_display_args_t* args);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.

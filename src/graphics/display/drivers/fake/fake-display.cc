@@ -69,29 +69,8 @@ constexpr uint32_t kRefreshRateFps = 60;
 // Arbitrary slowdown for testing purposes
 // TODO(payamm): Randomizing the delay value is more value
 constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
-}  // namespace
 
-FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
-                         fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
-                         inspect::Inspector inspector)
-    : display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
-      device_config_(device_config),
-      sysmem_(std::move(sysmem_allocator)),
-      inspector_(std::move(inspector)) {}
-
-FakeDisplay::~FakeDisplay() { Deinitialize(); }
-
-zx_status_t FakeDisplay::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
-  fbl::AutoLock lock(&capture_mutex_);
-
-  clamp_rgb_value_ = minimum_rgb;
-  return ZX_OK;
-}
-
-void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
-  args->display_id = display::ToBanjoDisplayId(kDisplayId);
-  args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
-
+added_display_args_t CreateAddedDisplayArgs() {
   const int32_t pixel_clock_hz = kWidth * kHeight * kRefreshRateFps;
   ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
   ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
@@ -112,9 +91,37 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
       .vblank_alternates = false,
       .pixel_repetition = 0,
   };
-  args->panel.mode = display::ToBanjoDisplayMode(timing);
-  args->pixel_format_list = kSupportedPixelFormats;
-  args->pixel_format_count = std::size(kSupportedPixelFormats);
+
+  added_display_args_t args = {
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
+      .panel =
+          {
+              .mode = display::ToBanjoDisplayMode(timing),
+          },
+      .pixel_format_list = kSupportedPixelFormats,
+      .pixel_format_count = std::size(kSupportedPixelFormats),
+  };
+  return args;
+}
+
+}  // namespace
+
+FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
+                         fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
+                         inspect::Inspector inspector)
+    : display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
+      device_config_(device_config),
+      sysmem_(std::move(sysmem_allocator)),
+      inspector_(std::move(inspector)) {}
+
+FakeDisplay::~FakeDisplay() { Deinitialize(); }
+
+zx_status_t FakeDisplay::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+  fbl::AutoLock lock(&capture_mutex_);
+
+  clamp_rgb_value_ = minimum_rgb;
+  return ZX_OK;
 }
 
 zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
@@ -135,9 +142,8 @@ void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock interface_lock(&interface_mutex_);
   controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
-  added_display_args_t args;
-  PopulateAddedDisplayArgs(&args);
-  controller_interface_client_.OnDisplaysChanged(&args, 1, nullptr, 0);
+  const added_display_args_t added_display_args = CreateAddedDisplayArgs();
+  controller_interface_client_.OnDisplayAdded(&added_display_args);
 }
 
 void FakeDisplay::DisplayControllerImplResetDisplayControllerInterface() {
@@ -653,22 +659,10 @@ bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
   return current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId;
 }
 
-zx_status_t FakeDisplay::SetupDisplayInterface() {
+zx_status_t FakeDisplay::InitializeCapture() {
   {
     fbl::AutoLock image_lock(&image_mutex_);
     current_image_to_capture_id_ = display::kInvalidDriverImageId;
-  }
-
-  {
-    fbl::AutoLock interface_lock(&interface_mutex_);
-    if (controller_interface_client_.is_valid()) {
-      added_display_args_t args;
-      PopulateAddedDisplayArgs(&args);
-
-      controller_interface_client_.OnDisplaysChanged(&args, /*added_display_count=*/1,
-                                                     /*removed_display_list=*/nullptr,
-                                                     /*removed_display_count=*/0);
-    }
   }
 
   if (IsCaptureSupported()) {
@@ -832,10 +826,9 @@ zx_status_t FakeDisplay::Initialize() {
     return status;
   }
 
-  // Setup Display Interface
-  status = SetupDisplayInterface();
+  status = InitializeCapture();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "SetupDisplayInterface() failed: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to initialize display capture: %s", zx_status_get_string(status));
     return status;
   }
 
