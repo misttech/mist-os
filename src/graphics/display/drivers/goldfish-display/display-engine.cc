@@ -133,7 +133,7 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_repetition = 0,
   };
 
-  added_display_args_t display = {
+  const added_display_args_t display = {
       .display_id = display::ToBanjoDisplayId(kPrimaryDisplayId),
       .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
       .panel =
@@ -143,12 +143,11 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_format_list = kPixelFormats,
       .pixel_format_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
   };
-  args.push_back(display);
 
   {
     fbl::AutoLock lock(&flush_lock_);
     dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(interface);
-    dc_intf_.OnDisplaysChanged(args.data(), args.size(), nullptr, 0);
+    dc_intf_.OnDisplayAdded(&display);
   }
 }
 
