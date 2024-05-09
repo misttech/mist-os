@@ -1298,12 +1298,12 @@ mod tests {
 
         const VERSIONS: &[Version] = &[
             Version {
-                api_level: ApiLevel::from_u64(5),
+                api_level: ApiLevel::from_u32(5),
                 abi_revision: UNSUPPORTED_ABI,
                 status: version_history::Status::Unsupported,
             },
             Version {
-                api_level: ApiLevel::from_u64(6),
+                api_level: ApiLevel::from_u32(6),
                 abi_revision: SUPPORTED_ABI,
                 status: version_history::Status::Supported,
             },

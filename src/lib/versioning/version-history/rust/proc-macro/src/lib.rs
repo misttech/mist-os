@@ -14,8 +14,8 @@ pub fn declare_version_history(_tokens: TokenStream) -> TokenStream {
     let mut tokens = String::from("[");
     for version in versions {
         tokens.push_str(&format!(
-            "Version {{ api_level: ApiLevel::from_u64({}), abi_revision: AbiRevision::from_u64({}), status: Status::{:?} }},",
-            version.api_level.as_u64(), version.abi_revision.as_u64(), version.status
+            "Version {{ api_level: ApiLevel::from_u32({}), abi_revision: AbiRevision::from_u64({}), status: Status::{:?} }},",
+            version.api_level.as_u32(), version.abi_revision.as_u64(), version.status
         ));
     }
     tokens.push_str("]");

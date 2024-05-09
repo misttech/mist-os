@@ -197,17 +197,17 @@ mod test {
 
     pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory::new(&[
         Version {
-            api_level: ApiLevel::from_u64(6),
+            api_level: ApiLevel::from_u32(6),
             abi_revision: AbiRevision::from_u64(0x6f3b9f0c4b2a33ff),
             status: Status::Unsupported,
         },
         Version {
-            api_level: ApiLevel::from_u64(7),
+            api_level: ApiLevel::from_u32(7),
             abi_revision: AbiRevision::from_u64(0x481ed4bbfa125507),
             status: Status::Supported,
         },
         Version {
-            api_level: ApiLevel::from_u64(8),
+            api_level: ApiLevel::from_u32(8),
             // Unlike the other levels, this is the real ABI revision for
             // API level 8, to remain compatible with a previous version of
             // these tests.
@@ -215,7 +215,7 @@ mod test {
             status: Status::Supported,
         },
         Version {
-            api_level: ApiLevel::from_u64(9),
+            api_level: ApiLevel::from_u32(9),
             abi_revision: AbiRevision::from_u64(0x2db0661e7832b33d),
             status: Status::Supported,
         },

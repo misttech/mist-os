@@ -351,7 +351,13 @@ async fn init_daemon_proxy(
             _,
             DaemonVersionCheck::CheckApiLevel(ours),
             VersionInfo { api_level: Some(daemon), .. },
-        ) if ours.as_u64() == daemon => true,
+        ) if {
+            #[allow(deprecated)]
+            ours.as_u64()
+        } == daemon =>
+        {
+            true
+        }
         _ => false,
     };
 

@@ -65,7 +65,10 @@ fn build_info_impl(raw_version_info: String, raw_build_version: String) -> Versi
         commit_timestamp: timestamp,
         build_version: Some(raw_build_version.trim().to_string()),
         abi_revision: Some(vh.abi_revision.as_u64()),
-        api_level: Some(vh.api_level.as_u64()),
+        api_level: Some(
+            #[allow(deprecated)]
+            vh.api_level.as_u64(),
+        ),
         exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
         ..Default::default()
     };
@@ -92,7 +95,10 @@ mod test {
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
                 abi_revision: Some(version.abi_revision.as_u64()),
-                api_level: Some(version.api_level.as_u64()),
+                api_level: Some(
+                    #[allow(deprecated)]
+                    version.api_level.as_u64()
+                ),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }
@@ -112,7 +118,10 @@ mod test {
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
                 abi_revision: Some(version.abi_revision.as_u64()),
-                api_level: Some(version.api_level.as_u64()),
+                api_level: Some(
+                    #[allow(deprecated)]
+                    version.api_level.as_u64()
+                ),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }
@@ -165,7 +174,8 @@ mod test {
                 commit_timestamp: Some(TIMESTAMP),
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
                 abi_revision: Some(version.abi_revision.as_u64()),
-                api_level: Some(version.api_level.as_u64()),
+                #[allow(deprecated)]
+                api_level: Some(version.api_level.as_u64()), //
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
                 ..Default::default()
             }

@@ -17,7 +17,7 @@ const VERSION_HISTORY_TYPE: &str = "version_history";
 
 /// An `ApiLevel` represents an API level of the Fuchsia platform.
 #[derive(Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
-pub struct ApiLevel(u64);
+pub struct ApiLevel(u32);
 
 impl ApiLevel {
     /// The `HEAD` pseudo-API level, representing the bleeding edge of
@@ -27,12 +27,17 @@ impl ApiLevel {
     /// The `PLATFORM` pseudo-API level, which is used in platform builds.
     pub const PLATFORM: ApiLevel = ApiLevel(4293918720);
 
-    pub const fn from_u64(value: u64) -> Self {
+    pub const fn from_u32(value: u32) -> Self {
         Self(value)
     }
 
-    pub fn as_u64(&self) -> u64 {
+    pub fn as_u32(&self) -> u32 {
         self.0
+    }
+
+    #[deprecated = "API levels are 32-bits as of RFC-0246"]
+    pub fn as_u64(&self) -> u64 {
+        self.0 as u64
     }
 }
 
@@ -63,25 +68,25 @@ impl std::str::FromStr for ApiLevel {
         match s {
             "HEAD" => Ok(ApiLevel::HEAD),
             "PLATFORM" => Ok(ApiLevel::PLATFORM),
-            s => Ok(ApiLevel::from_u64(s.parse()?)),
+            s => Ok(ApiLevel::from_u32(s.parse()?)),
         }
     }
 }
 
-impl From<u64> for ApiLevel {
-    fn from(api_level: u64) -> ApiLevel {
+impl From<u32> for ApiLevel {
+    fn from(api_level: u32) -> ApiLevel {
         ApiLevel(api_level)
     }
 }
 
-impl From<&u64> for ApiLevel {
-    fn from(api_level: &u64) -> ApiLevel {
+impl From<&u32> for ApiLevel {
+    fn from(api_level: &u32) -> ApiLevel {
         ApiLevel(*api_level)
     }
 }
 
-impl From<ApiLevel> for u64 {
-    fn from(api_level: ApiLevel) -> u64 {
+impl From<ApiLevel> for u32 {
+    fn from(api_level: ApiLevel) -> u32 {
         api_level.0
     }
 }
@@ -655,22 +660,22 @@ mod tests {
     pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory {
         versions: &[
             Version {
-                api_level: ApiLevel::from_u64(4),
+                api_level: ApiLevel::from_u32(4),
                 abi_revision: AbiRevision::from_u64(0x58ea445e942a0004),
                 status: Status::Unsupported,
             },
             Version {
-                api_level: ApiLevel::from_u64(5),
+                api_level: ApiLevel::from_u32(5),
                 abi_revision: AbiRevision::from_u64(0x58ea445e942a0005),
                 status: Status::Supported,
             },
             Version {
-                api_level: ApiLevel::from_u64(6),
+                api_level: ApiLevel::from_u32(6),
                 abi_revision: AbiRevision::from_u64(0x58ea445e942a0006),
                 status: Status::Supported,
             },
             Version {
-                api_level: ApiLevel::from_u64(7),
+                api_level: ApiLevel::from_u32(7),
                 abi_revision: AbiRevision::from_u64(0x58ea445e942a0007),
                 status: Status::InDevelopment,
             },
