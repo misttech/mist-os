@@ -54,6 +54,8 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "kernel_debug_broker_userdebug",
     "netsvc",
     "paravirtualization_support_bootstrap",
+    "power_framework",
+    "power_framework_sag",
     "ptysvc",
 ]
 
@@ -64,6 +66,7 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "embeddable_eng",
     "bootstrap_eng",
     "kernel_pmm_checker_enabled",
+    "power_framework_testing_sag",
 ]
 
 # This is the combined set of valid AIBs for "bringup" builds (which are the
@@ -169,7 +172,6 @@ USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLA
     "core_realm_development_access_rcs_usb",
     "core_realm_development_access_userdebug",
     "omaha_client_empty_eager_config",
-    "power_framework",
     "standard_userdebug",
     "standard_userdebug_and_eng",
     "mdns_fuchsia_device_wired_service",

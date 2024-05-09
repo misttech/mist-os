@@ -94,6 +94,10 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Emulator Support
   "paravirtualization_support_bootstrap",
+
+  # Power Framework
+  "power_framework",
+  "power_framework_sag",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -108,6 +112,9 @@ bootstrap_eng_platform_aib_names = [
 
   # Kernel args
   "kernel_pmm_checker_enabled",
+
+  # Power Framework
+  "power_framework_testing_sag",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -285,7 +292,6 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "standard_userdebug_and_eng",
                          "mdns_fuchsia_device_wired_service",
                          "omaha_client_empty_eager_config",
-                         "power_framework",
                          "radar_proxy_with_injector",
                          "sl4f",
                          "wlan_development",
@@ -368,6 +374,8 @@ experimental_aib_names = [
   "bootstrap_realm_vsock_development_access",
   "paravirtualization_support_bootstrap",
   "power_framework",
+  "power_framework_sag",
+  "power_framework_testing_sag",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

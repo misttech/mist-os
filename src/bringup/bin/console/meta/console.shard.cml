@@ -276,5 +276,21 @@
             to: "#console-launcher",
             source_availability: "unknown",
         },
+        {
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "#system-activity-governor",
+            to: "#console-launcher",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "test.sagcontrol.State",
+            from: "#system-activity-governor",
+            to: "#console-launcher",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }
