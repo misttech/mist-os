@@ -33,7 +33,7 @@ class CollectedLicense:
     ) -> "CollectedLicense":
         assert type(public_name) is str
         assert type(license_files) is tuple
-        GnLabel.check_types_in_list(license_files)
+        GnLabel.check_types_in_list(list(license_files))
         return CollectedLicense(public_name, tuple(sorted(license_files)))
 
     def __str__(self) -> str:
@@ -197,7 +197,7 @@ class Collector:
     def _add_license(
         self,
         public_name: str,
-        license_files: Tuple[GnLabel],
+        license_files: Tuple[GnLabel, ...],
         collection_hint: str,
     ) -> None:
         logging.debug(
