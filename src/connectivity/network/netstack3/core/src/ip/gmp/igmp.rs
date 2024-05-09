@@ -592,8 +592,8 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, FakeEventDispatcherConfig,
-            TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, TestAddrs, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC,
         },
         time::TimerIdInner,
         TimerId,
@@ -1402,13 +1402,8 @@ mod tests {
 
     #[test]
     fn test_igmp_enable_disable_integration() {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac: _,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv4::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv4::TEST_ADDRS;
 
         let mut ctx = crate::testutil::FakeCtx::new_with_builder(StackStateBuilder::default());
 

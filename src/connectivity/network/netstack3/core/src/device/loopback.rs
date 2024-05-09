@@ -601,8 +601,7 @@ mod tests {
         error::NotFoundError,
         ip::device::IpAddressId as _,
         testutil::{
-            CtxPairExt as _, FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt,
-            DEFAULT_INTERFACE_METRIC,
+            CtxPairExt as _, FakeBindingsCtx, TestAddrs, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
     };
 
@@ -655,13 +654,8 @@ mod tests {
             )
         };
 
-        let FakeEventDispatcherConfig {
-            subnet,
-            local_ip,
-            local_mac: _,
-            remote_ip: _,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs { subnet, local_ip, local_mac: _, remote_ip: _, remote_mac: _ } =
+            I::TEST_ADDRS;
         let addr_sub =
             AddrSubnet::from_witness(local_ip, subnet.prefix()).expect("error creating AddrSubnet");
 
@@ -684,7 +678,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn loopback_sends_ethernet<I: Ip + TestIpExt>() {
+    fn loopback_sends_ethernet<I: Ip + TestIpExt + crate::IpExt>() {
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx.core_api().device::<LoopbackDevice>().add_device_with_default_state(
             LoopbackCreationProperties { mtu: MTU },
@@ -693,7 +687,7 @@ mod tests {
         crate::device::testutil::enable_device(&mut ctx, &device.clone().into());
         let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
-        let local_addr = I::FAKE_CONFIG.local_ip;
+        let local_addr = I::TEST_ADDRS.local_ip;
         const BODY: &[u8] = b"IP body".as_slice();
 
         let body = Buf::new(Vec::from(BODY), ..);

@@ -65,6 +65,7 @@ pub mod sync {
 /// Test utilities provided to all crates.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
+    mod addr;
     mod fake_bindings;
     mod fake_core;
     mod fake_network;
@@ -77,6 +78,7 @@ pub mod testutil {
         WithFakeTimerContext,
     };
     pub use crate::trace::testutil::FakeTracingCtx;
+    pub use addr::{TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
     pub use fake_bindings::FakeBindingsCtx;
     pub use fake_core::FakeCoreCtx;
     pub use fake_network::{

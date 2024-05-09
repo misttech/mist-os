@@ -1754,8 +1754,8 @@ mod tests {
     fn drop_real_ids() {
         /// Test with a real `CoreCtx` to assert that IDs aren't dropped in the
         /// wrong order.
-        use crate::testutil::{FakeEventDispatcherBuilder, FAKE_CONFIG_V4};
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4).build();
+        use crate::testutil::{FakeEventDispatcherBuilder, TEST_ADDRS_V4};
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V4).build();
 
         let mut api = ctx.core_api().device_socket();
 

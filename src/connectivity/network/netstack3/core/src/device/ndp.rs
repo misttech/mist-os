@@ -180,7 +180,7 @@ mod tests {
         testutil::{
             assert_empty, set_logger_for_test, Ctx, CtxPairExt as _, DispatchedFrame,
             FakeBindingsCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
-            FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V6,
         },
         time::TimerIdInner,
         BindingsTypes, Instant, TimerId,
@@ -246,11 +246,11 @@ mod tests {
     }
 
     fn local_ip() -> Ipv6DeviceAddr {
-        FAKE_CONFIG_V6.local_ipv6_device_addr()
+        TEST_ADDRS_V6.local_non_mapped_unicast()
     }
 
     fn remote_ip() -> Ipv6DeviceAddr {
-        FAKE_CONFIG_V6.remote_ipv6_device_addr()
+        TEST_ADDRS_V6.remote_non_mapped_unicast()
     }
 
     impl TryFrom<DeviceId<crate::testutil::FakeBindingsCtx>> for EthernetDeviceId<FakeBindingsCtx> {
@@ -1049,14 +1049,14 @@ mod tests {
 
     #[test]
     fn test_receiving_router_solicitation_validity_check() {
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let src_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 10]);
         let src_mac = [10, 11, 12, 13, 14, 15];
         let options = vec![NdpOptionBuilder::SourceLinkLayerAddress(&src_mac[..])];
 
         // Test receiving NDP RS when not a router (should not receive)
 
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config).build();
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         let icmpv6_packet_buf = OptionSequenceBuilder::new(options.iter())
@@ -1111,10 +1111,10 @@ mod tests {
                 .unwrap_b()
         }
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let src_mac = [10, 11, 12, 13, 14, 15];
         let src_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 10]);
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config.clone()).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Test receiving NDP RA where source IP is not a link local address
@@ -1150,7 +1150,7 @@ mod tests {
             device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
             hop_limit: u8,
         ) {
-            let config = Ipv6::FAKE_CONFIG;
+            let config = Ipv6::TEST_ADDRS;
             let src_ip = config.remote_mac.to_ipv6_link_local().addr();
             let src_ip: Ipv6Addr = src_ip.get();
 
@@ -1202,7 +1202,7 @@ mod tests {
         }
 
         let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::from_config(Ipv6::FAKE_CONFIG).build();
+            FakeEventDispatcherBuilder::with_addrs(Ipv6::TEST_ADDRS).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Set hop limit to 100.
@@ -1333,14 +1333,14 @@ mod tests {
             message: RouterSolicitation,
             code: IcmpUnusedCode,
         ) {
-            let fake_config = Ipv6::FAKE_CONFIG;
+            let fake_config = Ipv6::TEST_ADDRS;
             assert_eq!(src_mac, fake_config.local_mac.get());
             assert_eq!(src_ip, fake_config.local_mac.to_ipv6_link_local().addr().get());
             assert_eq!(message, RouterSolicitation::default());
             assert_eq!(code, IcmpUnusedCode);
         }
 
-        let fake_config = Ipv6::FAKE_CONFIG;
+        let fake_config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         let eth_device_id =
@@ -1514,7 +1514,7 @@ mod tests {
         // form router -> host as routers should not send Router Solicitation
         // messages, but hosts should.
 
-        let fake_config = Ipv6::FAKE_CONFIG;
+        let fake_config = Ipv6::TEST_ADDRS;
 
         // If netstack is not set to forward packets, make sure router
         // solicitations do not get cancelled when we enable forwarding on the
@@ -1616,7 +1616,7 @@ mod tests {
         // Solicitations) sent before concluding that an address is not a
         // duplicate.
 
-        let fake_config = Ipv6::FAKE_CONFIG;
+        let fake_config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -1754,7 +1754,7 @@ mod tests {
     fn test_router_stateless_address_autoconfiguration() {
         // Routers should not perform SLAAC for global addresses.
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -1884,7 +1884,7 @@ mod tests {
     ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeBindingsCtx>, SlaacConfiguration)
     {
         set_logger_for_test();
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -1956,7 +1956,7 @@ mod tests {
             preferred_for: 600,
         };
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let src_mac = config.remote_mac;
         let src_ip: Ipv6Addr = src_mac.to_ipv6_link_local().addr().get();
 
@@ -2050,7 +2050,7 @@ mod tests {
 
         let max_valid_lifetime =
             slaac_config.temporary_address_configuration.unwrap().temp_valid_lifetime.get();
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -2119,7 +2119,7 @@ mod tests {
         // figure out the temporary address that is generated. Then, we run the
         // same code with the address already assigned to verify the behavior.
         const RNG_SEED: [u8; 16] = [1; 16];
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
         let subnet = subnet_v6!("0102:0304:0506:0708::/64");
@@ -2195,7 +2195,7 @@ mod tests {
 
     #[test]
     fn test_host_slaac_invalid_prefix_information() {
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2286,7 +2286,7 @@ mod tests {
 
     #[test]
     fn test_host_slaac_address_deprecate_while_tentative() {
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2519,7 +2519,7 @@ mod tests {
             assert_slaac_lifetimes_enforced(ctx, &device, entry, valid_until, preferred_until);
         }
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2622,7 +2622,7 @@ mod tests {
         // Check that when a tentative temporary address is detected as a
         // duplicate, a new address gets created.
         set_logger_for_test();
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2767,7 +2767,7 @@ mod tests {
         // Check that when the chosen tentative temporary addresses are detected
         // as duplicates enough times, the system gives up.
         set_logger_for_test();
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2894,7 +2894,7 @@ mod tests {
         // timer for address A goes off, it is ignored since there is already
         // another preferred address (namely B) for the subnet.
         set_logger_for_test();
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -3074,7 +3074,7 @@ mod tests {
         // for an address is moved earlier than the current time, the address
         // should be regenerated immediately.
         set_logger_for_test();
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let eth_device_id =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
@@ -3258,7 +3258,7 @@ mod tests {
         // Make sure that the preferred and valid lifetimes of the NDP
         // configuration are respected.
 
-        let src_mac = Ipv6::FAKE_CONFIG.remote_mac;
+        let src_mac = Ipv6::TEST_ADDRS.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
         let subnet = subnet_v6!("0102:0304:0506:0708::/64");
         let (mut ctx, device, config) = initialize_with_temporary_addresses_enabled();
@@ -3274,7 +3274,7 @@ mod tests {
 
         let interface_identifier = generate_opaque_interface_identifier(
             subnet,
-            &Ipv6::FAKE_CONFIG.local_mac.to_eui64()[..],
+            &Ipv6::TEST_ADDRS.local_mac.to_eui64()[..],
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
@@ -3436,7 +3436,7 @@ mod tests {
 
     #[test]
     fn test_remove_stable_slaac_address() {
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()

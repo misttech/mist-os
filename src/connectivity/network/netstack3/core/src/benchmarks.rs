@@ -39,7 +39,7 @@ use crate::{
     state::StackStateBuilder,
     testutil::{
         benchmarks::{black_box, Bencher},
-        CtxPairExt as _, FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
+        CtxPairExt as _, FakeEventDispatcherBuilder, TEST_ADDRS_V4,
     },
 };
 
@@ -54,7 +54,7 @@ use crate::{
 // IPv4 packet frame which we expect will be parsed and forwarded without
 // requiring any new buffers to be allocated.
 fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
-    let (mut ctx, idx_to_device_id) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
+    let (mut ctx, idx_to_device_id) = FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V4)
         .build_with(StackStateBuilder::default());
 
     let eth_device = idx_to_device_id[0].clone();
@@ -73,14 +73,14 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         .encapsulate(Ipv4PacketBuilder::new(
             // Use the remote IP as the destination so that we decide to
             // forward.
-            FAKE_CONFIG_V4.remote_ip,
-            FAKE_CONFIG_V4.remote_ip,
+            TEST_ADDRS_V4.remote_ip,
+            TEST_ADDRS_V4.remote_ip,
             TTL,
             IpProto::Udp.into(),
         ))
         .encapsulate(EthernetFrameBuilder::new(
-            FAKE_CONFIG_V4.remote_mac.get(),
-            FAKE_CONFIG_V4.local_mac.get(),
+            TEST_ADDRS_V4.remote_mac.get(),
+            TEST_ADDRS_V4.local_mac.get(),
             EtherType::Ipv4,
             ETHERNET_HDR_LEN_NO_TAG,
         ))
@@ -112,9 +112,9 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         // their original values as efficiently as we can to avoid affecting the
         // results of the benchmark.
         (&mut buf[ETHERNET_SRC_MAC_BYTE_OFFSET..ETHERNET_SRC_MAC_BYTE_OFFSET + 6])
-            .copy_from_slice(&FAKE_CONFIG_V4.remote_mac.bytes()[..]);
+            .copy_from_slice(&TEST_ADDRS_V4.remote_mac.bytes()[..]);
         (&mut buf[ETHERNET_DST_MAC_BYTE_OFFSET..ETHERNET_DST_MAC_BYTE_OFFSET + 6])
-            .copy_from_slice(&FAKE_CONFIG_V4.local_mac.bytes()[..]);
+            .copy_from_slice(&TEST_ADDRS_V4.local_mac.bytes()[..]);
         let ipv4_buf = &mut buf[ETHERNET_HDR_LEN_NO_TAG..];
         ipv4_buf[IPV4_TTL_OFFSET] = TTL;
         ipv4_buf[IPV4_CHECKSUM_OFFSET..IPV4_CHECKSUM_OFFSET + 2]

@@ -1911,7 +1911,7 @@ mod tests {
     fn enable_disable_ipv4() {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
-        let local_mac = Ipv4::FAKE_CONFIG.local_mac;
+        let local_mac = Ipv4::TEST_ADDRS.local_mac;
         let ethernet_device_id =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
                 EthernetCreationProperties {
@@ -2087,7 +2087,7 @@ mod tests {
     fn enable_disable_ipv6() {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let local_mac = Ipv6::TEST_ADDRS.local_mac;
         let ethernet_device_id =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
                 EthernetCreationProperties {
@@ -2382,7 +2382,7 @@ mod tests {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let local_mac = Ipv6::TEST_ADDRS.local_mac;
         let device_id = ctx
             .core_api()
             .device::<EthernetLinkDevice>()
@@ -2527,7 +2527,7 @@ mod tests {
     fn update_ipv4_configuration_return() {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        let local_mac = Ipv4::FAKE_CONFIG.local_mac;
+        let local_mac = Ipv4::TEST_ADDRS.local_mac;
         let device_id = ctx
             .core_api()
             .device::<EthernetLinkDevice>()
@@ -2637,7 +2637,7 @@ mod tests {
     fn update_ipv6_configuration_return() {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let local_mac = Ipv6::TEST_ADDRS.local_mac;
         let device_id = ctx
             .core_api()
             .device::<EthernetLinkDevice>()
@@ -2779,7 +2779,7 @@ mod tests {
     fn configure_link_local_address_generation(enable_stable_addresses: bool) {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        let local_mac = Ipv6::FAKE_CONFIG.local_mac;
+        let local_mac = Ipv6::TEST_ADDRS.local_mac;
         let device_id = ctx
             .core_api()
             .device::<EthernetLinkDevice>()

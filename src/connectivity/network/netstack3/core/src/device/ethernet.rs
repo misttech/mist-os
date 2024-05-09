@@ -1540,7 +1540,7 @@ mod tests {
         },
         testutil::{
             add_arp_or_ndp_table_entry, new_rng, CtxPairExt as _, FakeEventDispatcherBuilder,
-            TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4,
         },
     };
 
@@ -1590,7 +1590,7 @@ mod tests {
                 FakeWeakDeviceId(FakeDeviceId),
             ),
             inner: FakeInnerCtx::with_state(FakeEthernetCtx::new(
-                FAKE_CONFIG_V4.local_mac,
+                TEST_ADDRS_V4.local_mac,
                 IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             )),
         })
@@ -1988,8 +1988,8 @@ mod tests {
             NeighborApi::<Ipv4, EthernetLinkDevice, _>::new(ctx.as_mut())
                 .insert_static_entry(
                     &FakeDeviceId,
-                    FAKE_CONFIG_V4.remote_ip.get(),
-                    FAKE_CONFIG_V4.remote_mac.get(),
+                    TEST_ADDRS_V4.remote_ip.get(),
+                    TEST_ADDRS_V4.remote_mac.get(),
                 )
                 .unwrap();
             let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
@@ -1997,7 +1997,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
-                FAKE_CONFIG_V4.remote_ip,
+                TEST_ADDRS_V4.remote_ip,
                 Buf::new(&mut vec![0; size], ..),
                 None,
             )
@@ -2024,7 +2024,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            FAKE_CONFIG_V4.remote_ip,
+            TEST_ADDRS_V4.remote_ip,
             Buf::new(&mut vec![0; 100], ..),
             /* broadcast */ Some(()),
         )
@@ -2041,10 +2041,10 @@ mod tests {
     #[ip_test]
     #[test_case(true; "enabled")]
     #[test_case(false; "disabled")]
-    fn test_receive_ip_frame<I: Ip + TestIpExt>(enable: bool) {
+    fn test_receive_ip_frame<I: Ip + TestIpExt + crate::IpExt>(enable: bool) {
         // Should only receive a frame if the device is enabled.
 
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let eth_device =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
@@ -2087,7 +2087,7 @@ mod tests {
             .device::<EthernetLinkDevice>()
             .add_device_with_default_state(
                 EthernetCreationProperties {
-                    mac: FAKE_CONFIG_V4.local_mac,
+                    mac: TEST_ADDRS_V4.local_mac,
                     max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                 },
                 DEFAULT_INTERFACE_METRIC,
@@ -2147,7 +2147,7 @@ mod tests {
 
         let src_ip = I::get_other_ip_address(3);
         let src_mac = UnicastAddr::new(Mac::new([10, 11, 12, 13, 14, 15])).unwrap();
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let frame_dst = FrameDestination::Individual { local: true };
         let mut rng = new_rng(70812476915813);
         let mut body: Vec<u8> = core::iter::repeat_with(|| rng.gen()).take(100).collect();
@@ -2165,7 +2165,7 @@ mod tests {
 
         // Test with netstack no forwarding
 
-        let mut builder = FakeEventDispatcherBuilder::from_config(config.clone());
+        let mut builder = FakeEventDispatcherBuilder::with_addrs(config.clone());
         let device_builder_id = 0;
         add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip, src_mac);
         let (mut ctx, device_ids) = builder.build();
@@ -2237,7 +2237,7 @@ mod tests {
     #[ip_test]
     #[test_case(UnicastAddr::new(net_mac!("12:13:14:15:16:17")).unwrap(), true; "unicast")]
     #[test_case(MulticastAddr::new(net_mac!("13:14:15:16:17:18")).unwrap(), false; "multicast")]
-    fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
+    fn test_promiscuous_mode<I: Ip + TestIpExt + crate::IpExt>(
         other_mac: impl Witness<Mac>,
         is_other_host: bool,
     ) {
@@ -2245,8 +2245,8 @@ mod tests {
         // when the device is put into promiscuous mode. In all cases, frames
         // that are destined for a device must always be accepted.
 
-        let config = I::FAKE_CONFIG;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
+        let config = I::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config.clone()).build();
         let eth_device = &device_ids[0];
 
         let buf = Buf::new(Vec::new(), ..)
@@ -2329,7 +2329,7 @@ mod tests {
     #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     #[ip_test]
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt + crate::IpExt>() {
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
 
         let device = ctx
@@ -2416,7 +2416,7 @@ mod tests {
         dst_ip: A,
         expected: u64,
     ) where
-        A::Version: TestIpExt,
+        A::Version: TestIpExt + crate::IpExt,
     {
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(<<A::Version as IpExt>::PacketBuilder as IpPacketBuilder<_>>::new(
@@ -2444,7 +2444,7 @@ mod tests {
     #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     #[ip_test]
     fn test_multiple_ip_addresses<I: Ip + TestIpExt + crate::IpExt>() {
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2511,7 +2511,7 @@ mod tests {
     #[ip_test]
     #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt + crate::IpExt>() {
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
 
         let device = ctx
@@ -2567,7 +2567,7 @@ mod tests {
     #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     #[should_panic(expected = "attempted to leave IP multicast group we were not a member of:")]
     fn test_ip_leave_unjoined_multicast<I: Ip + TestIpExt + crate::IpExt>() {
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2599,7 +2599,7 @@ mod tests {
         // (distinct) IP address that is still assigned uses the same
         // solicited-node multicast address.
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -2663,7 +2663,7 @@ mod tests {
     fn test_add_ip_addr_subnet_link_local() {
         // Test that `add_ip_addr_subnet` allows link-local addresses.
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
 
         let eth_device =

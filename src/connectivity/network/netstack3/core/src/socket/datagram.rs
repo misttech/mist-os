@@ -5009,12 +5009,12 @@ pub(crate) mod testutil {
         let local_ip = unmap_ip(local_ip);
         let remote_ip = unmap_ip(remote_ip.get());
         // If the given local_ip is unspecified, use the default from
-        // `FAKE_CONFIG`. This ensures we always instantiate the
+        // `TEST_ADDRS`. This ensures we always instantiate the
         // FakeDeviceConfig below with at least one local_ip, which is
         // required for connect operations to succeed.
         let local_ip = SpecifiedAddr::new(local_ip).unwrap_or_else(|| match remote_ip {
-            IpAddr::V4(_) => Ipv4::FAKE_CONFIG.local_ip.into(),
-            IpAddr::V6(_) => Ipv6::FAKE_CONFIG.local_ip.into(),
+            IpAddr::V4(_) => Ipv4::TEST_ADDRS.local_ip.into(),
+            IpAddr::V6(_) => Ipv6::TEST_ADDRS.local_ip.into(),
         });
         // If the given remote_ip is unspecified, we won't be able to
         // connect; abort the test.
@@ -5886,8 +5886,8 @@ mod test {
         let mut core_ctx = FakeCoreCtx::<I, FakeDeviceId>::new_with_ip_socket_ctx(
             FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
                 device: FakeDeviceId,
-                local_ips: vec![I::FAKE_CONFIG.local_ip],
-                remote_ips: vec![I::FAKE_CONFIG.remote_ip],
+                local_ips: vec![I::TEST_ADDRS.local_ip],
+                remote_ips: vec![I::TEST_ADDRS.remote_ip],
             }]),
         );
         let mut bindings_ctx = FakeBindingsCtx::default();
@@ -5899,7 +5899,7 @@ mod test {
             &mut core_ctx,
             &mut bindings_ctx,
             &socket,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+            Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
             1234,
             body,
         )
@@ -5916,7 +5916,7 @@ mod test {
             FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
                 FakeDeviceConfig {
                     device: FakeDeviceId,
-                    local_ips: vec![I::FAKE_CONFIG.local_ip],
+                    local_ips: vec![I::TEST_ADDRS.local_ip],
                     remote_ips: vec![],
                 },
             ]));
@@ -5930,7 +5930,7 @@ mod test {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                 1234,
                 body,
             ),
@@ -6064,8 +6064,8 @@ mod test {
     ) {
         connect_reinserts_on_failure_inner::<I>(
             original,
-            I::FAKE_CONFIG.local_ip.get(),
-            I::FAKE_CONFIG.remote_ip,
+            I::TEST_ADDRS.local_ip.get(),
+            I::TEST_ADDRS.remote_ip,
         );
     }
 
@@ -6231,11 +6231,7 @@ mod test {
     fn set_get_device_single_stack<I: Ip + DatagramIpExt<MultipleDevicesId> + IpLayerIpExt>(
         original: OriginalSocketState,
     ) {
-        set_get_device_inner::<I>(
-            original,
-            I::FAKE_CONFIG.local_ip.get(),
-            I::FAKE_CONFIG.remote_ip,
-        );
+        set_get_device_inner::<I>(original, I::TEST_ADDRS.local_ip.get(), I::TEST_ADDRS.remote_ip);
     }
 
     #[test_case(OriginalSocketState::Listener, net_ip_v6!("::FFFF:192.0.2.1"),

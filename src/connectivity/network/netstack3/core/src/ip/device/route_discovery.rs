@@ -298,8 +298,8 @@ mod tests {
             IpLayerEvent, IPV6_DEFAULT_SUBNET,
         },
         testutil::{
-            CtxPairExt as _, DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            CtxPairExt as _, DispatchedEvent, TestAddrs, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
 
@@ -718,18 +718,11 @@ mod tests {
             .unwrap_b()
     }
 
-    fn setup() -> (
-        crate::testutil::FakeCtx,
-        DeviceId<crate::testutil::FakeBindingsCtx>,
-        FakeEventDispatcherConfig<Ipv6Addr>,
-    ) {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac: _,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+    fn setup(
+    ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeBindingsCtx>, TestAddrs<Ipv6Addr>)
+    {
+        let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         let mut ctx = crate::testutil::FakeCtx::default();
         let device_id = ctx
@@ -760,7 +753,7 @@ mod tests {
 
         assert_timers_integration(&mut ctx.core_ctx(), &device_id, []);
 
-        (ctx, device_id, Ipv6::FAKE_CONFIG)
+        (ctx, device_id, Ipv6::TEST_ADDRS)
     }
 
     fn as_secs(d: NonZeroDuration) -> u16 {
@@ -818,13 +811,7 @@ mod tests {
         let (
             mut ctx,
             device_id,
-            FakeEventDispatcherConfig {
-                local_mac: _,
-                remote_mac,
-                local_ip: _,
-                remote_ip: _,
-                subnet,
-            },
+            TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
         ) = setup();
 
         add_link_local_route(&mut ctx, &device_id);
@@ -1000,13 +987,7 @@ mod tests {
         let (
             mut ctx,
             device_id,
-            FakeEventDispatcherConfig {
-                local_mac: _,
-                remote_mac,
-                local_ip: _,
-                remote_ip: _,
-                subnet,
-            },
+            TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
         ) = setup();
 
         add_link_local_route(&mut ctx, &device_id);
@@ -1131,13 +1112,7 @@ mod tests {
         let (
             mut ctx,
             device_id,
-            FakeEventDispatcherConfig {
-                local_mac: _,
-                remote_mac,
-                local_ip: _,
-                remote_ip: _,
-                subnet,
-            },
+            TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
         ) = setup();
         add_link_local_route(&mut ctx, &device_id);
 

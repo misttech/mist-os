@@ -2629,8 +2629,8 @@ mod tests {
         },
         routes::{AddableEntry, AddableMetric},
         testutil::{
-            self, CtxPairExt, DispatchedFrame, FakeEventDispatcherConfig, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            self, CtxPairExt, DispatchedFrame, TestAddrs, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
         UnlockedCoreCtx,
@@ -4994,13 +4994,8 @@ mod tests {
 
     #[test]
     fn router_advertisement_with_source_link_layer_option_should_add_neighbor() {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         let mut ctx = testutil::FakeCtx::default();
         let device_id = ctx
@@ -5082,13 +5077,8 @@ mod tests {
     #[test_case(OTHER_IP, None, false; "targeting other host")]
     #[test_case(MULTICAST_IP, None, false; "targeting multicast address")]
     fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU16>, expect_handle: bool) {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         let mut ctx = testutil::FakeCtx::default();
         let link_device_id =
@@ -5207,13 +5197,8 @@ mod tests {
 
     #[test]
     fn ipv6_integration() {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         let mut ctx = testutil::FakeCtx::default();
         let eth_device_id =
@@ -5384,7 +5369,7 @@ mod tests {
         EthernetDeviceId<testutil::FakeBindingsCtx>,
         EthernetDeviceId<testutil::FakeBindingsCtx>,
     ) {
-        let build_ctx = |config: FakeEventDispatcherConfig<I::Addr>| {
+        let build_ctx = |config: TestAddrs<I::Addr>| {
             let mut builder = testutil::FakeEventDispatcherBuilder::default();
             let device =
                 builder.add_device_with_ip(config.local_mac, config.local_ip.get(), config.subnet);
@@ -5392,8 +5377,8 @@ mod tests {
             (ctx, device_ids[device].clone())
         };
 
-        let (local, local_device) = build_ctx(I::FAKE_CONFIG);
-        let (remote, remote_device) = build_ctx(I::FAKE_CONFIG.swap());
+        let (local, local_device) = build_ctx(I::TEST_ADDRS);
+        let (remote, remote_device) = build_ctx(I::TEST_ADDRS.swap());
         let net = crate::testutil::new_simple_fake_network(
             "local",
             local,
@@ -5429,7 +5414,7 @@ mod tests {
             tcp_api
                 .bind(
                     &socket,
-                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                    Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                     Some(REMOTE_PORT),
                 )
                 .unwrap();
@@ -5442,7 +5427,7 @@ mod tests {
             tcp_api
                 .connect(
                     &socket,
-                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                    Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                     REMOTE_PORT,
                 )
                 .unwrap();
@@ -5461,8 +5446,7 @@ mod tests {
     {
         let (mut net, local_device, remote_device) = new_test_net::<I>();
 
-        let FakeEventDispatcherConfig { local_ip, local_mac, remote_mac, remote_ip, .. } =
-            I::FAKE_CONFIG;
+        let TestAddrs { local_ip, local_mac, remote_mac, remote_ip, .. } = I::TEST_ADDRS;
 
         // Insert a STALE neighbor in each node's neighbor table so that they don't
         // initiate neighbor resolution before performing the TCP handshake.
@@ -5533,7 +5517,7 @@ mod tests {
     {
         let (mut net, local_device, remote_device) = new_test_net::<I>();
 
-        let FakeEventDispatcherConfig { remote_mac, remote_ip, .. } = I::FAKE_CONFIG;
+        let TestAddrs { remote_mac, remote_ip, .. } = I::TEST_ADDRS;
 
         // Initiate a TCP connection, allow the handshake to complete, and wait until
         // the neighbor entry goes STALE due to lack of traffic on the connection.
@@ -5594,9 +5578,9 @@ mod tests {
     >() {
         let mut builder = testutil::FakeEventDispatcherBuilder::default();
         let _device_id = builder.add_device_with_ip(
-            I::FAKE_CONFIG.local_mac,
-            I::FAKE_CONFIG.local_ip.get(),
-            I::FAKE_CONFIG.subnet,
+            I::TEST_ADDRS.local_mac,
+            I::TEST_ADDRS.local_ip.get(),
+            I::TEST_ADDRS.subnet,
         );
         let (mut ctx, _): (_, Vec<EthernetDeviceId<_>>) = builder.build();
 
@@ -5619,7 +5603,7 @@ mod tests {
         tcp_api
             .connect(
                 &socket,
-                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                 REMOTE_PORT,
             )
             .unwrap();
@@ -5642,7 +5626,7 @@ mod tests {
     >() {
         let (mut net, local_device, remote_device) = new_test_net::<I>();
 
-        let FakeEventDispatcherConfig { remote_ip, .. } = I::FAKE_CONFIG;
+        let TestAddrs { remote_ip, .. } = I::TEST_ADDRS;
 
         // These default routes mean that later when local tries to connect to an
         // address not in the subnet on the network, it will send the SYN to remote,
@@ -5705,9 +5689,9 @@ mod tests {
     fn icmp_error_fragment_offset(fragment_offset: u16) {
         let mut builder = testutil::FakeEventDispatcherBuilder::default();
         let _device_id = builder.add_device_with_ip(
-            Ipv4::FAKE_CONFIG.local_mac,
-            Ipv4::FAKE_CONFIG.local_ip.get(),
-            Ipv4::FAKE_CONFIG.subnet,
+            Ipv4::TEST_ADDRS.local_mac,
+            Ipv4::TEST_ADDRS.local_ip.get(),
+            Ipv4::TEST_ADDRS.subnet,
         );
         let (mut ctx, mut device_ids) = builder.build();
         let device_id = device_ids.pop().unwrap();
@@ -5715,10 +5699,10 @@ mod tests {
         // Add a static neighbor entry for `FROM_ADDR` so that NUD trivially
         // succeeds if an ICMP dest unreachable message destined for the address
         // is generated.
-        const FROM_ADDR: SpecifiedAddr<Ipv4Addr> = Ipv4::FAKE_CONFIG.remote_ip;
+        const FROM_ADDR: SpecifiedAddr<Ipv4Addr> = Ipv4::TEST_ADDRS.remote_ip;
         ctx.core_api()
             .neighbor::<Ipv4, _>()
-            .insert_static_entry(&device_id, FROM_ADDR.get(), Ipv4::FAKE_CONFIG.remote_mac.get())
+            .insert_static_entry(&device_id, FROM_ADDR.get(), Ipv4::TEST_ADDRS.remote_mac.get())
             .expect("add static NUD entry for FROM_ADDR");
 
         crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(

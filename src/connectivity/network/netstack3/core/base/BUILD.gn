@@ -21,6 +21,7 @@ rustc_library_with_features("netstack3-base") {
     "src/lib.rs",
     "src/resource_references.rs",
     "src/rng.rs",
+    "src/testutil/addr.rs",
     "src/testutil/fake_bindings.rs",
     "src/testutil/fake_core.rs",
     "src/testutil/fake_network.rs",
@@ -38,6 +39,8 @@ rustc_library_with_features("netstack3-base") {
   ]
 
   _testutils_deps = [
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/packet-formats",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:rand_xorshift",

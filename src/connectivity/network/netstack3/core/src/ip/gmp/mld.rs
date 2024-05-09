@@ -460,8 +460,8 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, FakeEventDispatcherConfig,
-            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, TestAddrs, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         TimerId,
@@ -1266,13 +1266,8 @@ mod tests {
 
     #[test]
     fn test_mld_enable_disable_integration() {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac: _,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         let mut ctx = crate::testutil::FakeCtx::new_with_builder(StackStateBuilder::default());
 

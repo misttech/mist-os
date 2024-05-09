@@ -412,8 +412,8 @@ mod tests {
     fn default_ip_packet<I: Ip + TestIpExt>() -> Buf<Vec<u8>> {
         Buf::new(Vec::new(), ..)
             .encapsulate(I::PacketBuilder::new(
-                I::FAKE_CONFIG.remote_ip.get(),
-                I::FAKE_CONFIG.local_ip.get(),
+                I::TEST_ADDRS.remote_ip.get(),
+                I::TEST_ADDRS.local_ip.get(),
                 TTL,
                 IpProto::Udp.into(),
             ))
@@ -451,7 +451,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn receive_frame<I: Ip + TestIpExt>() {
+    fn receive_frame<I: Ip + TestIpExt + crate::IpExt>() {
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
             PureIpDeviceCreationProperties { mtu: MTU },
@@ -487,7 +487,7 @@ mod tests {
     #[ip_test]
     #[test_case(TransmitQueueConfiguration::None; "no queue")]
     #[test_case(TransmitQueueConfiguration::Fifo; "fifo queue")]
-    fn send_frame<I: Ip + TestIpExt>(tx_queue_config: TransmitQueueConfiguration) {
+    fn send_frame<I: Ip + TestIpExt + crate::IpExt>(tx_queue_config: TransmitQueueConfiguration) {
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
             PureIpDeviceCreationProperties { mtu: MTU },
@@ -576,7 +576,7 @@ mod tests {
         crate::device::testutil::enable_device(&mut ctx, &device);
 
         let prefix = I::Addr::BYTES * 8;
-        let addr = AddrSubnet::new(I::FAKE_CONFIG.local_ip.get(), prefix).unwrap();
+        let addr = AddrSubnet::new(I::TEST_ADDRS.local_ip.get(), prefix).unwrap();
         ctx.core_api()
             .device_ip::<I>()
             .add_ip_addr_subnet(&device, addr)
@@ -585,7 +585,7 @@ mod tests {
         let socket = ctx.core_api().udp::<I>().create();
         ctx.core_api()
             .udp::<I>()
-            .listen(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), None)
+            .listen(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), None)
             .expect("listen should succeed");
     }
 

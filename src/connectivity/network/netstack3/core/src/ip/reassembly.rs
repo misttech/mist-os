@@ -831,7 +831,7 @@ mod tests {
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
             CtxPair,
         },
-        testutil::{assert_empty, FakeEventDispatcherConfig, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
+        testutil::{assert_empty, TestAddrs, TEST_ADDRS_V4, TEST_ADDRS_V6},
     };
 
     struct FakeFragmentContext<I: Ip, BT: FragmentBindingsTypes> {
@@ -903,8 +903,8 @@ mod tests {
     /// Get an IPv4 packet builder.
     fn get_ipv4_builder() -> Ipv4PacketBuilder {
         Ipv4PacketBuilder::new(
-            FAKE_CONFIG_V4.remote_ip,
-            FAKE_CONFIG_V4.local_ip,
+            TEST_ADDRS_V4.remote_ip,
+            TEST_ADDRS_V4.local_ip,
             10,
             IpProto::Tcp.into(),
         )
@@ -913,8 +913,8 @@ mod tests {
     /// Get an IPv6 packet builder.
     fn get_ipv6_builder() -> Ipv6PacketBuilder {
         Ipv6PacketBuilder::new(
-            FAKE_CONFIG_V6.remote_ip,
-            FAKE_CONFIG_V6.local_ip,
+            TEST_ADDRS_V6.remote_ip,
+            TEST_ADDRS_V6.local_ip,
             10,
             IpProto::Tcp.into(),
         )
@@ -983,8 +983,8 @@ mod tests {
             ExpectedResult::Ready { total_body_len } => {
                 let _: (FragmentCacheKey<_>, usize) = assert_frag_proc_state_ready!(
                     FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
-                    FAKE_CONFIG_V4.remote_ip.get(),
-                    FAKE_CONFIG_V4.local_ip.get(),
+                    TEST_ADDRS_V4.remote_ip.get(),
+                    TEST_ADDRS_V4.local_ip.get(),
                     fragment_id,
                     total_body_len + Ipv4::HEADER_LENGTH
                 );
@@ -1025,8 +1025,8 @@ mod tests {
         bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
         bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
+        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         bytes[40] = IpProto::Tcp.into();
         bytes[42] = (fragment_offset >> 5) as u8;
         bytes[43] = ((fragment_offset & 0x1F) << 3) as u8 | if m_flag { 1 } else { 0 };
@@ -1044,8 +1044,8 @@ mod tests {
             ExpectedResult::Ready { total_body_len } => {
                 let _: (FragmentCacheKey<_>, usize) = assert_frag_proc_state_ready!(
                     FragmentHandler::process_fragment::<&[u8]>(core_ctx, bindings_ctx, packet),
-                    FAKE_CONFIG_V6.remote_ip.get(),
-                    FAKE_CONFIG_V6.local_ip.get(),
+                    TEST_ADDRS_V6.remote_ip.get(),
+                    TEST_ADDRS_V6.local_ip.get(),
                     fragment_id,
                     total_body_len + Ipv6::HEADER_LENGTH
                 );
@@ -1129,7 +1129,7 @@ mod tests {
 
     /// Tries to reassemble the packet with the given fragment ID.
     fn try_reassemble_ip_packet<
-        I: TestIpExt,
+        I: TestIpExt + crate::ip::IpExt,
         CC: FragmentContext<I, BC>,
         BC: FragmentBindingsContext,
     >(
@@ -1141,8 +1141,8 @@ mod tests {
         let mut buffer: Vec<u8> = vec![0; total_body_len + I::HEADER_LENGTH];
         let mut buffer = &mut buffer[..];
         let key = FragmentCacheKey::new(
-            I::FAKE_CONFIG.remote_ip.get(),
-            I::FAKE_CONFIG.local_ip.get(),
+            I::TEST_ADDRS.remote_ip.get(),
+            I::TEST_ADDRS.local_ip.get(),
             fragment_id.into(),
         );
         let packet =
@@ -1168,7 +1168,7 @@ mod tests {
     /// Gets a `FragmentCacheKey` with the remote and local IP addresses hard
     /// coded to their test values.
     fn test_key<I: TestIpExt>(id: u32) -> FragmentCacheKey<I::Addr> {
-        FragmentCacheKey::new(I::FAKE_CONFIG.remote_ip.get(), I::FAKE_CONFIG.local_ip.get(), id)
+        FragmentCacheKey::new(I::TEST_ADDRS.remote_ip.get(), I::TEST_ADDRS.local_ip.get(), id)
     }
 
     fn new_context<I: Ip>() -> FakeCtxImpl<I> {
@@ -1216,7 +1216,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_reassembly<I: Ip + TestIpExt>() {
+    fn test_ip_reassembly<I: Ip + TestIpExt + crate::ip::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
@@ -1256,8 +1256,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_reassemble_with_missing_blocks<I: Ip + TestIpExt>() {
-        let fake_config = I::FAKE_CONFIG;
+    fn test_ip_reassemble_with_missing_blocks<I: Ip + TestIpExt + crate::ip::IpExt>() {
+        let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
@@ -1299,8 +1299,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_reassemble_after_timer<I: Ip + TestIpExt>() {
-        let fake_config = I::FAKE_CONFIG;
+    fn test_ip_reassemble_after_timer<I: Ip + TestIpExt + crate::ip::IpExt>() {
+        let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
         let key = test_key::<I>(fragment_id.into());
@@ -1391,7 +1391,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_fragment_cache_oom<I: Ip + TestIpExt>() {
+    fn test_ip_fragment_cache_oom<I: Ip + TestIpExt + crate::ip::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let mut fragment_id = 0;
         const THRESHOLD: usize = 8196usize;
@@ -1562,8 +1562,8 @@ mod tests {
         let packet = buffer.parse::<Ipv4Packet<_>>().unwrap();
         let (key, packet_len) = assert_frag_proc_state_ready!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
-            FAKE_CONFIG_V4.remote_ip.get(),
-            FAKE_CONFIG_V4.local_ip.get(),
+            TEST_ADDRS_V4.remote_ip.get(),
+            TEST_ADDRS_V4.local_ip.get(),
             fragment_id,
             35
         );
@@ -1604,8 +1604,8 @@ mod tests {
         bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
         bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
+        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         bytes[40] = IpProto::Tcp.into();
         bytes[42] = 0;
         bytes[43] = (1 << 3) | 1;
@@ -1627,8 +1627,8 @@ mod tests {
         bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
         bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
+        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         bytes[40] = IpProto::Tcp.into();
         bytes[42] = 0;
         bytes[43] = 1 << 3;
@@ -1640,8 +1640,8 @@ mod tests {
         let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
         let (key, packet_len) = assert_frag_proc_state_ready!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
-            FAKE_CONFIG_V6.remote_ip.get(),
-            FAKE_CONFIG_V6.local_ip.get(),
+            TEST_ADDRS_V6.remote_ip.get(),
+            TEST_ADDRS_V6.local_ip.get(),
             fragment_id,
             55
         );
@@ -1658,7 +1658,9 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_reassembly_with_multiple_intertwined_packets<I: Ip + TestIpExt>() {
+    fn test_ip_reassembly_with_multiple_intertwined_packets<
+        I: Ip + TestIpExt + crate::ip::IpExt,
+    >() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -1732,7 +1734,9 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<I: Ip + TestIpExt>() {
+    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<
+        I: Ip + TestIpExt + crate::ip::IpExt,
+    >() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -1909,13 +1913,7 @@ mod tests {
 
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
-        let FakeEventDispatcherConfig {
-            subnet: _,
-            local_ip,
-            local_mac: _,
-            remote_ip,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs { local_ip, remote_ip, .. } = I::TEST_ADDRS;
         let key = FragmentCacheKey::new(remote_ip.get(), local_ip.get(), FRAGMENT_ID.into());
 
         // Do this a couple times to make sure that new packets matching the

@@ -209,7 +209,7 @@ mod tests {
     use super::*;
     use crate::{
         device::DeviceId,
-        testutil::{Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V6},
+        testutil::{Ctx, FakeEventDispatcherBuilder, TEST_ADDRS_V6},
     };
 
     #[test]
@@ -217,10 +217,10 @@ mod tests {
         // Test that if we have no extension headers, we continue
 
         let (Ctx { core_ctx, bindings_ctx: _ }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
+            FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V6).build();
         let builder = Ipv6PacketBuilder::new(
-            FAKE_CONFIG_V6.remote_ip,
-            FAKE_CONFIG_V6.local_ip,
+            TEST_ADDRS_V6.remote_ip,
+            TEST_ADDRS_V6.local_ip,
             10,
             IpProto::Tcp.into(),
         );

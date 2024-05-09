@@ -1775,12 +1775,11 @@ mod tests {
         }; "new remote to local")]
     #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     fn test_new<I: Ip + IpSocketIpExt + crate::IpExt>(test_case: NewSocketTestCase) {
-        let cfg = I::FAKE_CONFIG;
+        let cfg = I::TEST_ADDRS;
         let proto = I::ICMP_IP_PROTO;
 
-        let FakeEventDispatcherConfig { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } =
-            cfg;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(cfg).build();
+        let TestAddrs { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } = cfg;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(cfg).build();
         let loopback_device_id = ctx
             .core_api()
             .device::<LoopbackDevice>()
@@ -1867,13 +1866,8 @@ mod tests {
 
         use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder};
 
-        let FakeEventDispatcherConfig::<I::Addr> {
-            subnet,
-            local_ip,
-            remote_ip,
-            local_mac,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs::<I::Addr> { subnet, local_ip, remote_ip, local_mac, remote_mac: _ } =
+            I::TEST_ADDRS;
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
@@ -1975,15 +1969,14 @@ mod tests {
         // Test various edge cases of the
         // IpSocketContext::send_ip_packet` method.
 
-        let cfg = I::FAKE_CONFIG;
+        let cfg = I::TEST_ADDRS;
         let proto = I::ICMP_IP_PROTO;
         let socket_options = WithHopLimit(Some(const_unwrap_option(NonZeroU8::new(1))));
 
-        let FakeEventDispatcherConfig::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } =
-            cfg;
+        let TestAddrs::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } = cfg;
 
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(cfg).build();
+            FakeEventDispatcherBuilder::with_addrs(cfg).build();
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut core_ctx.context(),
@@ -2127,13 +2120,8 @@ mod tests {
             }
         }
 
-        let FakeEventDispatcherConfig::<I::Addr> {
-            local_ip,
-            remote_ip: _,
-            local_mac,
-            subnet: _,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
+            I::TEST_ADDRS;
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
@@ -2221,13 +2209,8 @@ mod tests {
     {
         set_logger_for_test();
 
-        let FakeEventDispatcherConfig::<I::Addr> {
-            local_ip,
-            remote_ip: _,
-            local_mac,
-            subnet: _,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
+            I::TEST_ADDRS;
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);

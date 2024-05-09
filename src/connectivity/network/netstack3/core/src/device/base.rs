@@ -1056,7 +1056,7 @@ mod tests {
             .device::<EthernetLinkDevice>()
             .add_device_with_default_state(
                 EthernetCreationProperties {
-                    mac: Ipv6::FAKE_CONFIG.local_mac,
+                    mac: Ipv6::TEST_ADDRS.local_mac,
                     max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                 },
                 DEFAULT_INTERFACE_METRIC,
@@ -1186,7 +1186,7 @@ mod tests {
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt + crate::IpExt>(
         addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
     ) {
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()

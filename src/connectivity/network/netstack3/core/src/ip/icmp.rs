@@ -3107,7 +3107,10 @@ mod tests {
             types::IpTypesIpExt,
         },
         state::StackStateBuilder,
-        testutil::{Ctx, CtxPairExt as _, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
+        testutil::{
+            Ctx, CtxPairExt as _, FakeEventDispatcherBuilder, TestIpExt, TEST_ADDRS_V4,
+            TEST_ADDRS_V6,
+        },
         transport::udp::UdpStateBuilder,
         uninstantiable::UninstantiableWrapper,
     };
@@ -3160,8 +3163,8 @@ mod tests {
                 ip_socket_ctx: InnerIpSocketCtx::with_state(FakeDualStackIpSocketCtx::new(
                     core::iter::once(FakeDeviceConfig {
                         device: FakeDeviceId,
-                        local_ips: vec![I::FAKE_CONFIG.local_ip],
-                        remote_ips: vec![I::FAKE_CONFIG.remote_ip],
+                        local_ips: vec![I::TEST_ADDRS.local_ip],
+                        remote_ips: vec![I::TEST_ADDRS.remote_ip],
                     }),
                 )),
             }
@@ -3365,7 +3368,7 @@ mod tests {
     /// response.
     ///
     /// Test that receiving an IP packet from remote host
-    /// `I::FAKE_CONFIG.remote_ip` to host `dst_ip` with `ttl` and `proto`
+    /// `I::TEST_ADDRS.remote_ip` to host `dst_ip` with `ttl` and `proto`
     /// results in all of the counters in `assert_counters` being triggered at
     /// least once.
     ///
@@ -3380,7 +3383,7 @@ mod tests {
     /// `modify_stack_state_builder` is invoked on the `StackStateBuilder`
     /// before it is used to build the context.
     ///
-    /// The state is initialized to `I::FAKE_CONFIG` when testing.
+    /// The state is initialized to `I::TEST_ADDRS` when testing.
     #[allow(clippy::too_many_arguments)]
     #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     fn test_receive_ip_packet<
@@ -3403,7 +3406,7 @@ mod tests {
     ) {
         crate::testutil::set_logger_for_test();
         let mut pb = <I as packet_formats::ip::IpExt>::PacketBuilder::new(
-            *I::FAKE_CONFIG.remote_ip,
+            *I::TEST_ADDRS.remote_ip,
             dst_ip.get(),
             ttl,
             proto,
@@ -3411,8 +3414,8 @@ mod tests {
         modify_packet_builder(&mut pb);
         let buffer = Buf::new(body, ..).encapsulate(pb).serialize_vec_outer().unwrap();
 
-        let (mut ctx, device_ids) =
-            I::FAKE_CONFIG.into_builder().build_with_modifications(modify_stack_state_builder);
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS)
+            .build_with_modifications(modify_stack_state_builder);
 
         let device: DeviceId<_> = device_ids[0].clone().into();
         set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
@@ -3470,10 +3473,10 @@ mod tests {
                 )
                 .unwrap();
 
-            assert_eq!(src_mac, I::FAKE_CONFIG.local_mac.get());
-            assert_eq!(dst_mac, I::FAKE_CONFIG.remote_mac.get());
-            assert_eq!(src_ip, I::FAKE_CONFIG.local_ip.get());
-            assert_eq!(dst_ip, I::FAKE_CONFIG.remote_ip.get());
+            assert_eq!(src_mac, I::TEST_ADDRS.local_mac.get());
+            assert_eq!(dst_mac, I::TEST_ADDRS.remote_mac.get());
+            assert_eq!(src_ip, I::TEST_ADDRS.local_ip.get());
+            assert_eq!(dst_ip, I::TEST_ADDRS.remote_ip.get());
             assert_eq!(message, expect_message);
             assert_eq!(code, expect_code);
         } else {
@@ -3494,8 +3497,8 @@ mod tests {
             let req_body = &[1, 2, 3, 4];
             let mut buffer = Buf::new(req_body.to_vec(), ..)
                 .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                    I::FAKE_CONFIG.remote_ip.get(),
-                    I::FAKE_CONFIG.local_ip.get(),
+                    I::TEST_ADDRS.remote_ip.get(),
+                    I::TEST_ADDRS.local_ip.get(),
                     IcmpUnusedCode,
                     req,
                 ))
@@ -3505,7 +3508,7 @@ mod tests {
                 |_| {},
                 |_| {},
                 buffer.as_mut(),
-                I::FAKE_CONFIG.local_ip,
+                I::TEST_ADDRS.local_ip,
                 64,
                 I::ICMP_IP_PROTO,
                 assert_counters,
@@ -3525,8 +3528,8 @@ mod tests {
         let req = Icmpv4TimestampRequest::new(1, 2, 3);
         let mut buffer = Buf::new(Vec::new(), ..)
             .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                FAKE_CONFIG_V4.remote_ip,
-                FAKE_CONFIG_V4.local_ip,
+                TEST_ADDRS_V4.remote_ip,
+                TEST_ADDRS_V4.local_ip,
                 IcmpUnusedCode,
                 req,
             ))
@@ -3539,7 +3542,7 @@ mod tests {
                     builder.ipv4_builder().icmpv4_builder().send_timestamp_reply(true);
             },
             buffer.as_mut(),
-            FAKE_CONFIG_V4.local_ip,
+            TEST_ADDRS_V4.local_ip,
             64,
             Ipv4Proto::Icmp,
             &["timestamp_request", "send_ipv4_packet"],
@@ -3566,7 +3569,7 @@ mod tests {
                         |_| {},
                         |_| {},
                         &mut [0u8; 128],
-                        FAKE_CONFIG_V4.local_ip,
+                        TEST_ADDRS_V4.local_ip,
                         64,
                         v4proto,
                         &["protocol_unreachable"],
@@ -3620,8 +3623,8 @@ mod tests {
         {
             let mut buffer = Buf::new(vec![0; 128], ..)
                 .encapsulate(UdpPacketBuilder::new(
-                    I::FAKE_CONFIG.remote_ip.get(),
-                    I::FAKE_CONFIG.local_ip.get(),
+                    I::TEST_ADDRS.remote_ip.get(),
+                    I::TEST_ADDRS.local_ip.get(),
                     None,
                     NonZeroU16::new(1234).unwrap(),
                 ))
@@ -3635,7 +3638,7 @@ mod tests {
                         builder.transport_builder().udp_builder().send_port_unreachable(true);
                 },
                 buffer.as_mut(),
-                I::FAKE_CONFIG.local_ip,
+                I::TEST_ADDRS.local_ip,
                 64,
                 IpProto::Udp.into(),
                 assert_counters,
@@ -3648,7 +3651,7 @@ mod tests {
                 // Leave the `send_port_unreachable` feature disabled.
                 |_: &mut StackStateBuilder| {},
                 buffer.as_mut(),
-                I::FAKE_CONFIG.local_ip,
+                I::TEST_ADDRS.local_ip,
                 64,
                 IpProto::Udp.into(),
                 &[],
@@ -3718,7 +3721,7 @@ mod tests {
             |_| {},
             |_: &mut StackStateBuilder| {},
             &mut [0u8; 128],
-            FAKE_CONFIG_V4.remote_ip,
+            TEST_ADDRS_V4.remote_ip,
             1,
             IpProto::Udp.into(),
             &["ttl_expired"],
@@ -3730,7 +3733,7 @@ mod tests {
             |_| {},
             |_: &mut StackStateBuilder| {},
             &mut [0u8; 128],
-            FAKE_CONFIG_V6.remote_ip,
+            TEST_ADDRS_V6.remote_ip,
             1,
             IpProto::Udp.into(),
             &["ttl_expired"],
@@ -3755,8 +3758,8 @@ mod tests {
 
     #[test]
     fn test_should_send_icmpv4_error() {
-        let src_ip = FAKE_CONFIG_V4.local_ip;
-        let dst_ip = FAKE_CONFIG_V4.remote_ip;
+        let src_ip = TEST_ADDRS_V4.local_ip;
+        let dst_ip = TEST_ADDRS_V4.remote_ip;
         let frame_dst = FrameDestination::Individual { local: true };
         let multicast_ip_1 = SpecifiedAddr::new(Ipv4Addr::new([224, 0, 0, 1])).unwrap();
         let multicast_ip_2 = SpecifiedAddr::new(Ipv4Addr::new([224, 0, 0, 2])).unwrap();
@@ -3877,8 +3880,8 @@ mod tests {
 
     #[test]
     fn test_should_send_icmpv6_error() {
-        let src_ip = FAKE_CONFIG_V6.local_ip;
-        let dst_ip = FAKE_CONFIG_V6.remote_ip;
+        let src_ip = TEST_ADDRS_V6.local_ip;
+        let dst_ip = TEST_ADDRS_V6.remote_ip;
         let frame_dst = FrameDestination::Individual { local: true };
         let multicast_ip_1 =
             SpecifiedAddr::new(Ipv6Addr::new([0xff00, 0, 0, 0, 0, 0, 0, 1])).unwrap();
@@ -4208,8 +4211,8 @@ mod tests {
         /// assertion passes, `f` is called on the context so that the caller
         /// can perform whatever extra validation they want.
         ///
-        /// The error message will be sent from `FAKE_CONFIG_V4.remote_ip` to
-        /// `FAKE_CONFIG_V4.local_ip`. Before the message is sent, an ICMP
+        /// The error message will be sent from `TEST_ADDRS_V4.remote_ip` to
+        /// `TEST_ADDRS_V4.local_ip`. Before the message is sent, an ICMP
         /// socket will be established with the ID `ICMP_ID`, and
         /// `test_receive_icmpv4_error_helper` will assert that its `SocketId`
         /// is 0. This allows the caller to craft the `original_packet` so that
@@ -4233,19 +4236,19 @@ mod tests {
             let conn = socket_api.create();
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
-                .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)), REMOTE_ID)
+                .connect(&conn, Some(ZonedAddr::Unzoned(TEST_ADDRS_V4.remote_ip)), REMOTE_ID)
                 .unwrap();
             let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
-                FAKE_CONFIG_V4.remote_ip.get(),
-                FAKE_CONFIG_V4.local_ip,
+                TEST_ADDRS_V4.remote_ip.get(),
+                TEST_ADDRS_V4.local_ip,
                 Buf::new(original_packet, ..)
                     .encapsulate(IcmpPacketBuilder::new(
-                        FAKE_CONFIG_V4.remote_ip,
-                        FAKE_CONFIG_V4.local_ip,
+                        TEST_ADDRS_V4.remote_ip,
+                        TEST_ADDRS_V4.local_ip,
                         code,
                         msg,
                     ))
@@ -4284,14 +4287,14 @@ mod tests {
         // `test_receive_icmpv4_error_helper`.
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                FAKE_CONFIG_V4.local_ip,
-                FAKE_CONFIG_V4.remote_ip,
+                TEST_ADDRS_V4.local_ip,
+                TEST_ADDRS_V4.remote_ip,
                 IcmpUnusedCode,
                 IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
             ))
             .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                FAKE_CONFIG_V4.local_ip,
-                FAKE_CONFIG_V4.remote_ip,
+                TEST_ADDRS_V4.local_ip,
+                TEST_ADDRS_V4.remote_ip,
                 64,
                 Ipv4Proto::Icmp,
             ))
@@ -4356,8 +4359,8 @@ mod tests {
 
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                FAKE_CONFIG_V4.local_ip,
-                FAKE_CONFIG_V4.remote_ip,
+                TEST_ADDRS_V4.local_ip,
+                TEST_ADDRS_V4.remote_ip,
                 64,
                 Ipv4Proto::Icmp,
             ))
@@ -4420,8 +4423,8 @@ mod tests {
 
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                FAKE_CONFIG_V4.local_ip,
-                FAKE_CONFIG_V4.remote_ip,
+                TEST_ADDRS_V4.local_ip,
+                TEST_ADDRS_V4.remote_ip,
                 64,
                 IpProto::Udp.into(),
             ))
@@ -4493,8 +4496,8 @@ mod tests {
         /// assertion passes, `f` is called on the context so that the caller
         /// can perform whatever extra validation they want.
         ///
-        /// The error message will be sent from `FAKE_CONFIG_V6.remote_ip` to
-        /// `FAKE_CONFIG_V6.local_ip`. Before the message is sent, an ICMP
+        /// The error message will be sent from `TEST_ADDRS_V6.remote_ip` to
+        /// `TEST_ADDRS_V6.local_ip`. Before the message is sent, an ICMP
         /// socket will be established with the ID `ICMP_ID`, and
         /// `test_receive_icmpv6_error_helper` will assert that its `SocketId`
         /// is 0. This allows the caller to craft the `original_packet` so that
@@ -4517,19 +4520,19 @@ mod tests {
             let conn = socket_api.create();
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
-                .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)), REMOTE_ID)
+                .connect(&conn, Some(ZonedAddr::Unzoned(TEST_ADDRS_V6.remote_ip)), REMOTE_ID)
                 .unwrap();
             let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
-                FAKE_CONFIG_V6.remote_ip.get().try_into().unwrap(),
-                FAKE_CONFIG_V6.local_ip,
+                TEST_ADDRS_V6.remote_ip.get().try_into().unwrap(),
+                TEST_ADDRS_V6.local_ip,
                 Buf::new(original_packet, ..)
                     .encapsulate(IcmpPacketBuilder::new(
-                        FAKE_CONFIG_V6.remote_ip,
-                        FAKE_CONFIG_V6.local_ip,
+                        TEST_ADDRS_V6.remote_ip,
+                        TEST_ADDRS_V6.local_ip,
                         code,
                         msg,
                     ))
@@ -4575,14 +4578,14 @@ mod tests {
         // `test_receive_icmpv6_error_helper`.
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
-                FAKE_CONFIG_V6.local_ip,
-                FAKE_CONFIG_V6.remote_ip,
+                TEST_ADDRS_V6.local_ip,
+                TEST_ADDRS_V6.remote_ip,
                 IcmpUnusedCode,
                 IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
             ))
             .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                FAKE_CONFIG_V6.local_ip,
-                FAKE_CONFIG_V6.remote_ip,
+                TEST_ADDRS_V6.local_ip,
+                TEST_ADDRS_V6.remote_ip,
                 64,
                 Ipv6Proto::Icmpv6,
             ))
@@ -4645,8 +4648,8 @@ mod tests {
 
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                FAKE_CONFIG_V6.local_ip,
-                FAKE_CONFIG_V6.remote_ip,
+                TEST_ADDRS_V6.local_ip,
+                TEST_ADDRS_V6.remote_ip,
                 64,
                 Ipv6Proto::Icmpv6,
             ))
@@ -4707,8 +4710,8 @@ mod tests {
 
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                FAKE_CONFIG_V6.local_ip,
-                FAKE_CONFIG_V6.remote_ip,
+                TEST_ADDRS_V6.local_ip,
+                TEST_ADDRS_V6.remote_ip,
                 64,
                 IpProto::Udp.into(),
             ))
@@ -4776,8 +4779,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V4.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V4.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Buf::new(&mut [], ..),
                 0,
@@ -4794,8 +4797,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V4.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V4.local_ip.try_into().unwrap(),
                 Icmpv4ParameterProblemCode::PointerIndicatesError,
                 Icmpv4ParameterProblem::new(0),
                 Buf::new(&mut [], ..),
@@ -4813,8 +4816,8 @@ mod tests {
                 bindings_ctx,
                 Some(&FakeDeviceId),
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V4.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V4.local_ip.try_into().unwrap(),
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 Buf::new(&mut [], ..),
                 0,
@@ -4831,8 +4834,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Buf::new(&mut [], ..),
                 0,
@@ -4848,8 +4851,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Mtu::new(0),
                 Buf::new(&mut [], ..),
@@ -4866,8 +4869,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 Icmpv6ParameterProblemCode::ErroneousHeaderField,
                 Icmpv6ParameterProblem::new(0),
                 Buf::new(&mut [], ..),
@@ -4884,8 +4887,8 @@ mod tests {
                 bindings_ctx,
                 Some(&FakeDeviceId),
                 Some(FrameDestination::Individual { local: true }),
-                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
-                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.remote_ip.try_into().unwrap(),
+                TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 Icmpv6DestUnreachableCode::NoRoute,
                 Buf::new(&mut [], ..),
             );

@@ -5849,9 +5849,9 @@ mod tests {
                     LOCAL,
                     TcpCtx {
                         core_ctx: TcpCoreCtx::new::<I>(
-                            I::FAKE_CONFIG.local_ip,
-                            I::FAKE_CONFIG.remote_ip,
-                            I::FAKE_CONFIG.subnet.prefix(),
+                            I::TEST_ADDRS.local_ip,
+                            I::TEST_ADDRS.remote_ip,
+                            I::TEST_ADDRS.subnet.prefix(),
                         ),
                         bindings_ctx: TcpBindingsCtx::default(),
                     },
@@ -5860,9 +5860,9 @@ mod tests {
                     REMOTE,
                     TcpCtx {
                         core_ctx: TcpCoreCtx::new::<I>(
-                            I::FAKE_CONFIG.remote_ip,
-                            I::FAKE_CONFIG.local_ip,
-                            I::FAKE_CONFIG.subnet.prefix(),
+                            I::TEST_ADDRS.remote_ip,
+                            I::TEST_ADDRS.local_ip,
+                            I::TEST_ADDRS.subnet.prefix(),
                         ),
                         bindings_ctx: TcpBindingsCtx::default(),
                     },
@@ -5996,10 +5996,10 @@ mod tests {
                 api.set_reuseaddr(&socket, true).expect("can set");
             }
             if let Some(port) = client_port {
-                api.bind(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(port))
+                api.bind(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(port))
                     .expect("failed to bind the client socket")
             }
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), server_port)
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), server_port)
                 .expect("failed to connect");
             socket
         });
@@ -6035,10 +6035,10 @@ mod tests {
         if let Some(port) = client_port {
             assert_eq!(
                 addr,
-                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: port }
+                SocketAddr { ip: ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip), port: port }
             );
         } else {
-            assert_eq!(addr.ip, ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip));
+            assert_eq!(addr.ip, ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip));
         }
 
         net.with_context(LOCAL, |ctx| {
@@ -6046,7 +6046,7 @@ mod tests {
             assert_eq!(
                 api.connect(
                     &client,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                     server_port,
                 ),
                 Ok(())
@@ -6172,10 +6172,10 @@ mod tests {
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
-    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
-    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
-    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
-    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::FAKE_CONFIG.remote_ip)]
+    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
     fn bind_listen_connect_accept<I: Ip + TcpTestIpExt>(
         bind_config: BindConfig,
         listen_addr: I::Addr,
@@ -6240,7 +6240,7 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(*<I as TestIpExt>::FAKE_CONFIG.local_ip; "same addr")]
+    #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip; "same addr")]
     #[test_case(I::UNSPECIFIED_ADDRESS; "any addr")]
     fn bind_conflict<I: Ip + TcpTestIpExt>(conflict_addr: I::Addr)
     where
@@ -6249,15 +6249,15 @@ mod tests {
     {
         set_logger_for_test();
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let s1 = api.create(Default::default());
         let s2 = api.create(Default::default());
 
-        api.bind(&s1, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(PORT_1))
+        api.bind(&s1, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1))
             .expect("first bind should succeed");
         assert_matches!(
             api.bind(&s2, SpecifiedAddr::new(conflict_addr).map(ZonedAddr::Unzoned), Some(PORT_1)),
@@ -6279,9 +6279,9 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         for port in 1..=u16::MAX {
@@ -6312,7 +6312,7 @@ mod tests {
         api.close(socket);
         let socket = api.create(Default::default());
         let result =
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), available_port);
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), available_port);
         assert_eq!(result, Err(ConnectError::NoPort));
     }
 
@@ -6323,14 +6323,14 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let unbound = api.create(Default::default());
         assert_matches!(
-            api.bind(&unbound, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), None),
+            api.bind(&unbound, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), None),
             Err(BindError::LocalAddressError(LocalAddressError::AddressMismatch))
         );
 
@@ -6342,9 +6342,9 @@ mod tests {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-            Ipv6::FAKE_CONFIG.local_ip,
-            Ipv6::FAKE_CONFIG.remote_ip,
-            Ipv6::FAKE_CONFIG.subnet.prefix(),
+            Ipv6::TEST_ADDRS.local_ip,
+            Ipv6::TEST_ADDRS.remote_ip,
+            Ipv6::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let unbound = api.create(Default::default());
@@ -6363,9 +6363,9 @@ mod tests {
         let ll_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-            Ipv6::FAKE_CONFIG.local_ip,
-            Ipv6::FAKE_CONFIG.remote_ip,
-            Ipv6::FAKE_CONFIG.subnet.prefix(),
+            Ipv6::TEST_ADDRS.local_ip,
+            Ipv6::TEST_ADDRS.remote_ip,
+            Ipv6::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let socket = api.create(Default::default());
@@ -6558,9 +6558,9 @@ mod tests {
         let client = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let conn = api.create(Default::default());
-            api.bind(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(PORT_1))
+            api.bind(&conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1))
                 .expect("failed to bind the client socket");
-            api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), PORT_1)
+            api.connect(&conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1)
                 .expect("failed to connect");
             conn
         });
@@ -6621,7 +6621,7 @@ mod tests {
             assert_matches!(
                 ctx.tcp_api().connect(
                     &client,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                     PORT_1
                 ),
                 Err(ConnectError::Aborted)
@@ -6739,9 +6739,9 @@ mod tests {
     }
 
     #[ip_test]
-    #[test_case(*<I as TestIpExt>::FAKE_CONFIG.local_ip, true; "specified bound")]
+    #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip, true; "specified bound")]
     #[test_case(I::UNSPECIFIED_ADDRESS, true; "unspecified bound")]
-    #[test_case(*<I as TestIpExt>::FAKE_CONFIG.local_ip, false; "specified listener")]
+    #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip, false; "specified listener")]
     #[test_case(I::UNSPECIFIED_ADDRESS, false; "unspecified listener")]
     fn bound_socket_info<I: Ip + TcpTestIpExt>(ip_addr: I::Addr, listen: bool)
     where
@@ -6749,9 +6749,9 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -6780,13 +6780,13 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
-        let local = SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 };
-        let remote = SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_2 };
+        let local = SocketAddr { ip: ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip), port: PORT_1 };
+        let remote = SocketAddr { ip: ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip), port: PORT_2 };
 
         let socket = api.create(Default::default());
         api.bind(&socket, Some(local.ip), Some(local.port)).expect("bind should succeed");
@@ -7128,9 +7128,9 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let unbound = api.create(Default::default());
@@ -7146,13 +7146,13 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
-        api.bind(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), None)
+        api.bind(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), None)
             .expect("bind should succeed");
         let weak_socket = socket.downgrade();
         api.close(socket);
@@ -7174,7 +7174,7 @@ mod tests {
         let local_listener = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(Default::default());
-            api.bind(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(PORT_1))
+            api.bind(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1))
                 .expect("bind should succeed");
             api.listen(&socket, NonZeroUsize::new(5).unwrap()).expect("can listen");
             socket
@@ -7183,7 +7183,7 @@ mod tests {
         let remote_connection = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(Default::default());
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), PORT_1)
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), PORT_1)
                 .expect("connect should succeed");
             socket
         });
@@ -7199,7 +7199,7 @@ mod tests {
             assert_eq!(
                 ctx.tcp_api().connect(
                     &remote_connection,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                     PORT_1
                 ),
                 Ok(())
@@ -7211,7 +7211,7 @@ mod tests {
         let second_connection = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(Default::default());
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), PORT_1)
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), PORT_1)
                 .expect("connect should succeed");
             socket
         });
@@ -7266,7 +7266,7 @@ mod tests {
             assert_matches!(
                 api.bind(
                     &new_unbound,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip,)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip,)),
                     Some(PORT_1),
                 ),
                 Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
@@ -7278,7 +7278,7 @@ mod tests {
         let new_remote_connection = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(Default::default());
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), PORT_1)
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), PORT_1)
                 .expect("connect should succeed");
             socket
         });
@@ -7301,7 +7301,7 @@ mod tests {
             assert_eq!(
                 ctx.tcp_api().connect(
                     &new_remote_connection,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                     PORT_1,
                 ),
                 Ok(())
@@ -7326,7 +7326,7 @@ mod tests {
             let local_listener = api.create(Default::default());
             api.bind(
                 &local_listener,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                 Some(PORT_1),
             )
             .expect("bind should succeed");
@@ -7343,7 +7343,7 @@ mod tests {
             api.set_receive_buffer_size(&remote_connection, local_sizes.receive);
             api.connect(
                 &remote_connection,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                 PORT_1,
             )
             .expect("connect should succeed");
@@ -7415,9 +7415,9 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7450,9 +7450,9 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7501,14 +7501,14 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let first = api.create(Default::default());
         api.set_reuseaddr(&first, true).expect("can set");
-        api.bind(&first, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(PORT_1)).unwrap();
+        api.bind(&first, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1)).unwrap();
 
         let second = api.create(Default::default());
         api.set_reuseaddr(&second, true).expect("can set");
@@ -7533,7 +7533,7 @@ mod tests {
             let mut api = ctx.tcp_api::<I>();
             let server = api.create(Default::default());
             api.set_reuseaddr(&server, true).expect("can set");
-            api.bind(&server, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(PORT_1))
+            api.bind(&server, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1))
                 .expect("failed to bind the client socket");
             api.listen(&server, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
             server
@@ -7542,7 +7542,7 @@ mod tests {
         let client = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let client = api.create(Default::default());
-            api.connect(&client, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), PORT_1)
+            api.connect(&client, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), PORT_1)
                 .expect("connect should succeed");
             client
         });
@@ -7552,7 +7552,7 @@ mod tests {
             assert_eq!(
                 ctx.tcp_api().connect(
                     &client,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                     PORT_1
                 ),
                 Ok(())
@@ -7593,14 +7593,14 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
         let [first_addr, second_addr] =
-            bind_specified.map(|b| b.then_some(I::FAKE_CONFIG.local_ip).map(ZonedAddr::Unzoned));
+            bind_specified.map(|b| b.then_some(I::TEST_ADDRS.local_ip).map(ZonedAddr::Unzoned));
         let first_bound = {
             let socket = api.create(Default::default());
             api.bind(&socket, first_addr, Some(PORT_1)).expect("bind succeeds");
@@ -7635,9 +7635,9 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7663,7 +7663,7 @@ mod tests {
 
         // We can, however, connect to the listener with the bound socket. Then
         // the unencumbered listener can clear SO_REUSEADDR.
-        api.connect(&bound, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), PORT_1)
+        api.connect(&bound, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1)
             .expect("can connect");
         api.set_reuseaddr(&listener, false).expect("can unset")
     }
@@ -7736,14 +7736,14 @@ mod tests {
             + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
     {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
-            I::FAKE_CONFIG.subnet.prefix(),
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
         let connection = api.create(Default::default());
-        api.connect(&connection, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), PORT_1)
+        api.connect(&connection, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1)
             .expect("failed to create a connection socket");
 
         let (core_ctx, bindings_ctx) = api.contexts();
@@ -7753,14 +7753,14 @@ mod tests {
         deliver_icmp_error::<I, _, _>(
             core_ctx,
             bindings_ctx,
-            I::FAKE_CONFIG.local_ip,
-            I::FAKE_CONFIG.remote_ip,
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
             &frame[0..8],
             icmp_error,
         );
         // The TCP handshake should be aborted.
         assert_eq!(
-            api.connect(&connection, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), PORT_1),
+            api.connect(&connection, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1),
             Err(ConnectError::Aborted)
         );
         api.get_socket_error(&connection).unwrap()
@@ -7840,8 +7840,8 @@ mod tests {
             deliver_icmp_error::<I, _, _>(
                 core_ctx,
                 bindings_ctx,
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
+                I::TEST_ADDRS.local_ip,
+                I::TEST_ADDRS.remote_ip,
                 &original_body[..],
                 icmp_error,
             );
@@ -7889,7 +7889,7 @@ mod tests {
         net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let conn = api.create(Default::default());
-            api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), PORT_1)
+            api.connect(&conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1)
                 .expect("failed to connect");
         });
 
@@ -7926,8 +7926,8 @@ mod tests {
             deliver_icmp_error::<I, _, _>(
                 core_ctx,
                 bindings_ctx,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.local_ip,
+                I::TEST_ADDRS.remote_ip,
+                I::TEST_ADDRS.local_ip,
                 &original_body[..],
                 icmp_error,
             );
@@ -7977,7 +7977,7 @@ mod tests {
             api.set_reuseaddr(&listener, true).expect("can set");
             api.bind(
                 &listener,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                 Some(CLIENT_PORT),
             )
             .expect("failed to bind");
@@ -7988,12 +7988,8 @@ mod tests {
         let extra_conn = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let extra_conn = api.create(Default::default());
-            api.connect(
-                &extra_conn,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
-                CLIENT_PORT,
-            )
-            .expect("failed to connect");
+            api.connect(&extra_conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), CLIENT_PORT)
+                .expect("failed to connect");
             extra_conn
         });
         net.run_until_idle();
@@ -8002,7 +7998,7 @@ mod tests {
             assert_eq!(
                 ctx.tcp_api().connect(
                     &extra_conn,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                     CLIENT_PORT,
                 ),
                 Ok(())
@@ -8048,7 +8044,7 @@ mod tests {
         let conn = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let conn = api.create(Default::default());
-            api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), CLIENT_PORT)
+            api.connect(&conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), CLIENT_PORT)
                 .expect("failed to connect");
             conn
         });
@@ -8077,13 +8073,9 @@ mod tests {
         let conn = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(Default::default());
-            api.bind(
-                &socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
-                Some(SERVER_PORT),
-            )
-            .expect("failed to bind");
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), CLIENT_PORT)
+            api.bind(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), Some(SERVER_PORT))
+                .expect("failed to bind");
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), CLIENT_PORT)
                 .expect("failed to connect");
             socket
         });
@@ -8122,7 +8114,7 @@ mod tests {
             assert_eq!(
                 ctx.tcp_api().connect(
                     &conn,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                    Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                     CLIENT_PORT
                 ),
                 Ok(())
@@ -8153,17 +8145,17 @@ mod tests {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(Default::default());
             api.set_reuseaddr(&socket, true).expect("can set");
-            api.bind(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), Some(PORT_1))
+            api.bind(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1))
                 .expect("failed to bind");
             assert_eq!(
-                api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), PORT_1),
+                api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1),
                 Err(ConnectError::ConnectionExists),
             )
         });
     }
 
     #[test_case::test_matrix(
-        [None, Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped()))],
+        [None, Some(ZonedAddr::Unzoned((*Ipv4::TEST_ADDRS.remote_ip).to_ipv6_mapped()))],
         [None, Some(PORT_1)],
         [true, false]
     )]
@@ -8197,7 +8189,7 @@ mod tests {
             }
             api.connect(
                 &socket,
-                Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped())),
+                Some(ZonedAddr::Unzoned((*Ipv4::TEST_ADDRS.remote_ip).to_ipv6_mapped())),
                 listen_port,
             )
             .expect("failed to connect");
@@ -8208,7 +8200,7 @@ mod tests {
         net.run_until_idle();
         let (accepted, addr, accepted_ends) = net
             .with_context(REMOTE, |ctx| ctx.tcp_api().accept(&server).expect("failed to accept"));
-        assert_eq!(addr.ip, ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.local_ip).to_ipv6_mapped()));
+        assert_eq!(addr.ip, ZonedAddr::Unzoned((*Ipv4::TEST_ADDRS.local_ip).to_ipv6_mapped()));
 
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
             client_ends.0.as_ref().lock().take().unwrap();
@@ -8245,7 +8237,7 @@ mod tests {
                 device: _
             } => (local_ip.addr(), remote_ip.addr(), port)
         );
-        assert_eq!(remote_ip, Ipv4::FAKE_CONFIG.remote_ip.to_ipv6_mapped());
+        assert_eq!(remote_ip, Ipv4::TEST_ADDRS.remote_ip.to_ipv6_mapped());
         assert_matches!(local_ip.to_ipv4_mapped(), Some(_));
         assert_eq!(port, listen_port);
     }
@@ -8263,7 +8255,7 @@ mod tests {
             assert_eq!(
                 api.bind(
                     &socket,
-                    Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.local_ip).to_ipv6_mapped())),
+                    Some(ZonedAddr::Unzoned((*Ipv4::TEST_ADDRS.local_ip).to_ipv6_mapped())),
                     Some(PORT_1),
                 ),
                 Err(BindError::LocalAddressError(LocalAddressError::CannotBindToAddress))
@@ -8271,7 +8263,7 @@ mod tests {
             assert_eq!(
                 api.connect(
                     &socket,
-                    Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped())),
+                    Some(ZonedAddr::Unzoned((*Ipv4::TEST_ADDRS.remote_ip).to_ipv6_mapped())),
                     PORT_1,
                 ),
                 Err(ConnectError::NoRoute)
@@ -8356,7 +8348,7 @@ mod tests {
         let client = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api::<I>();
             let socket = api.create(ProvidedBuffers::Buffers(WriteBackClientBuffers::default()));
-            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), server_port)
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), server_port)
                 .expect("failed to connect");
             socket
         });

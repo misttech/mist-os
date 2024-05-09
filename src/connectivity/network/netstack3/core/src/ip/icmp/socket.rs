@@ -950,7 +950,9 @@ mod tests {
         device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
         socket::StrictlyZonedAddr,
-        testutil::{CtxPairExt as _, TestIpExt, DEFAULT_INTERFACE_METRIC},
+        testutil::{
+            CtxPairExt as _, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
+        },
     };
 
     const REMOTE_ID: u16 = 1;
@@ -983,12 +985,14 @@ mod tests {
     ) {
         crate::testutil::set_logger_for_test();
 
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
 
         const LOCAL_CTX_NAME: &str = "alice";
         const REMOTE_CTX_NAME: &str = "bob";
-        let (local, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
-        let (remote, remote_device_ids) = I::FAKE_CONFIG.swap().into_builder().build();
+        let (local, local_device_ids) =
+            FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (remote, remote_device_ids) =
+            FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS.swap()).build();
         let mut net = crate::testutil::new_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
@@ -1109,12 +1113,12 @@ mod tests {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let conn = api.create();
-        api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), REMOTE_ID).unwrap();
+        api.connect(&conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_ID).unwrap();
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                I::FAKE_CONFIG.local_ip.get(),
-                I::FAKE_CONFIG.remote_ip.get(),
+                I::TEST_ADDRS.local_ip.get(),
+                I::TEST_ADDRS.remote_ip.get(),
                 IcmpUnusedCode,
                 packet_formats::icmp::IcmpEchoReply::new(0, 1),
             ))
@@ -1147,13 +1151,13 @@ mod tests {
             })
         );
 
-        api.connect(&id, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), REMOTE_ID).unwrap();
+        api.connect(&id, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_ID).unwrap();
         assert_eq!(
             api.get_info(&id),
             datagram::SocketInfo::Connected(datagram::ConnInfo {
-                local_ip: StrictlyZonedAddr::new_unzoned_or_panic(I::FAKE_CONFIG.local_ip),
+                local_ip: StrictlyZonedAddr::new_unzoned_or_panic(I::TEST_ADDRS.local_ip),
                 local_identifier: ICMP_ID,
-                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(I::FAKE_CONFIG.remote_ip),
+                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(I::TEST_ADDRS.remote_ip),
                 remote_identifier: REMOTE_ID,
             })
         );

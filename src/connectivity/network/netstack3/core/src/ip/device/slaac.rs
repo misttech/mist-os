@@ -1746,8 +1746,8 @@ mod tests {
             testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
-            assert_empty, CtxPairExt as _, FakeCryptoRng, FakeEventDispatcherConfig,
-            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, CtxPairExt as _, FakeCryptoRng, TestAddrs, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
 
@@ -2799,13 +2799,8 @@ mod tests {
 
     #[test]
     fn integration_remove_all_addresses_on_ipv6_disable() {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         const ONE_HOUR: NonZeroDuration =
             const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));

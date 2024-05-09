@@ -500,7 +500,7 @@ mod tests {
             forwarding::testutil::FakeIpForwardingCtx,
             types::{AddableEntryEither, AddableMetric, Metric},
         },
-        testutil::{CtxPairExt as _, FakeEventDispatcherConfig},
+        testutil::{CtxPairExt as _, TestAddrs},
     };
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
@@ -562,7 +562,7 @@ mod tests {
 
     fn simple_setup<I: Ip + TestIpExt>() -> (
         ForwardingTable<I, MultipleDevicesId>,
-        FakeEventDispatcherConfig<I::Addr>,
+        TestAddrs<I::Addr>,
         SpecifiedAddr<I::Addr>,
         Subnet<I::Addr>,
         MultipleDevicesId,
@@ -570,7 +570,7 @@ mod tests {
     ) {
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
 
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let subnet = config.subnet;
         let device = MultipleDevicesId::A;
         // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
@@ -1426,7 +1426,7 @@ mod tests {
             .device::<EthernetLinkDevice>()
             .add_device_with_default_state(
                 EthernetCreationProperties {
-                    mac: I::FAKE_CONFIG.local_mac,
+                    mac: I::TEST_ADDRS.local_mac,
                     max_frame_size: crate::device::ethernet::MaxEthernetFrameSize::from_mtu(
                         I::MINIMUM_LINK_MTU,
                     )
@@ -1440,7 +1440,7 @@ mod tests {
             // Set the last bit to make it an address inside the fake config's
             // subnet.
             I::map_ip::<_, I::Addr>(
-                I::FAKE_CONFIG.subnet.network(),
+                I::TEST_ADDRS.subnet.network(),
                 |addr| {
                     let mut bytes = addr.ipv4_bytes();
                     bytes[bytes.len() - 1] = 1;
@@ -1462,15 +1462,15 @@ mod tests {
         // Add a route to the gateway.
         let route_to_add = if on_link_route {
             AddableEntryEither::from(AddableEntry::without_gateway(
-                I::FAKE_CONFIG.subnet,
+                I::TEST_ADDRS.subnet,
                 device_id.clone(),
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             ))
         } else {
             AddableEntryEither::from(AddableEntry::with_gateway(
-                I::FAKE_CONFIG.subnet,
+                I::TEST_ADDRS.subnet,
                 device_id.clone(),
-                I::FAKE_CONFIG.remote_ip,
+                I::TEST_ADDRS.remote_ip,
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             ))
         };
@@ -1527,7 +1527,7 @@ mod tests {
             .device::<EthernetLinkDevice>()
             .add_device_with_default_state(
                 EthernetCreationProperties {
-                    mac: I::FAKE_CONFIG.local_mac,
+                    mac: I::TEST_ADDRS.local_mac,
                     max_frame_size: crate::device::ethernet::MaxEthernetFrameSize::from_mtu(
                         I::MINIMUM_LINK_MTU,
                     )
@@ -1544,7 +1544,7 @@ mod tests {
             ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(
                 gateway_subnet,
                 gateway_device.clone(),
-                I::FAKE_CONFIG.remote_ip,
+                I::TEST_ADDRS.remote_ip,
                 AddableMetric::ExplicitMetric(RawMetric(0))
             ))),
             expected_first_result,
@@ -1558,7 +1558,7 @@ mod tests {
         // Then, add a route to the gateway, and try again, expecting success.
         assert_eq!(
             ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::without_gateway(
-                I::FAKE_CONFIG.subnet,
+                I::TEST_ADDRS.subnet,
                 device_id.clone(),
                 AddableMetric::ExplicitMetric(RawMetric(0))
             ))),
@@ -1572,7 +1572,7 @@ mod tests {
             ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(
                 gateway_subnet,
                 gateway_device,
-                I::FAKE_CONFIG.remote_ip,
+                I::TEST_ADDRS.remote_ip,
                 AddableMetric::ExplicitMetric(RawMetric(0))
             ))),
             expected_second_result,
@@ -1590,7 +1590,7 @@ mod tests {
         let device_id =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
                 EthernetCreationProperties {
-                    mac: I::FAKE_CONFIG.local_mac,
+                    mac: I::TEST_ADDRS.local_mac,
                     max_frame_size: crate::device::ethernet::MaxEthernetFrameSize::from_mtu(
                         I::MINIMUM_LINK_MTU,
                     )
@@ -1600,7 +1600,7 @@ mod tests {
             );
         assert_eq!(
             ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::without_gateway(
-                I::FAKE_CONFIG.subnet,
+                I::TEST_ADDRS.subnet,
                 device_id.clone().into(),
                 AddableMetric::MetricTracksInterface
             ))),
@@ -1609,7 +1609,7 @@ mod tests {
         assert_eq!(
             ctx.core_api().routes_any().get_all_routes(),
             &[Entry {
-                subnet: I::FAKE_CONFIG.subnet,
+                subnet: I::TEST_ADDRS.subnet,
                 device: device_id.clone().into(),
                 gateway: None,
                 metric: Metric::MetricTracksInterface(metric)

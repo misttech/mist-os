@@ -34,7 +34,7 @@ use net_types::{
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
 #[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr};
+use net_types::{ip::IpAddr, MulticastAddr};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use tracing::Subscriber;
@@ -48,10 +48,7 @@ use tracing_subscriber::{
 };
 
 #[cfg(test)]
-use crate::{
-    context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec},
-    ip::device::Ipv6DeviceAddr,
-};
+use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
 use crate::{
     context::{
         testutil::{
@@ -99,7 +96,9 @@ use crate::{
     BindingsContext, BindingsTypes,
 };
 
-pub use netstack3_base::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
+pub use netstack3_base::testutil::{
+    new_rng, run_with_many_seeds, FakeCryptoRng, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
+};
 
 /// NDP test utilities.
 pub mod ndp {
@@ -905,161 +904,6 @@ pub(crate) fn set_logger_for_test() {
     })
 }
 
-/// An extension trait for `Ip` providing test-related functionality.
-#[cfg(test)]
-pub(crate) trait TestIpExt:
-    crate::ip::IpExt + crate::ip::IpLayerIpExt + crate::ip::device::IpDeviceIpExt
-{
-    /// Either [`FAKE_CONFIG_V4`] or [`FAKE_CONFIG_V6`].
-    const FAKE_CONFIG: FakeEventDispatcherConfig<Self::Addr>;
-
-    /// Get an IP address in the same subnet as `Self::FAKE_CONFIG`.
-    ///
-    /// `last` is the value to be put in the last octet of the IP address.
-    fn get_other_ip_address(last: u8) -> SpecifiedAddr<Self::Addr>;
-
-    /// Get an IP address in a different subnet from `Self::FAKE_CONFIG`.
-    ///
-    /// `last` is the value to be put in the last octet of the IP address.
-    fn get_other_remote_ip_address(last: u8) -> SpecifiedAddr<Self::Addr>;
-
-    /// Get a multicast IP address.
-    ///
-    /// `last` is the value to be put in the last octet of the IP address.
-    fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr>;
-}
-
-#[cfg(test)]
-impl TestIpExt for Ipv4 {
-    const FAKE_CONFIG: FakeEventDispatcherConfig<Ipv4Addr> = FAKE_CONFIG_V4;
-
-    fn get_other_ip_address(last: u8) -> SpecifiedAddr<Ipv4Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv4_bytes();
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv4Addr::new(bytes)).unwrap()
-    }
-
-    fn get_other_remote_ip_address(last: u8) -> SpecifiedAddr<Self::Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv4_bytes();
-        bytes[bytes.len() - 3] += 1;
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv4Addr::new(bytes)).unwrap()
-    }
-
-    fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr> {
-        assert!(u32::from(Self::Addr::BYTES * 8 - Self::MULTICAST_SUBNET.prefix()) > u8::BITS);
-        let mut bytes = Self::MULTICAST_SUBNET.network().ipv4_bytes();
-        bytes[bytes.len() - 1] = last;
-        MulticastAddr::new(Ipv4Addr::new(bytes)).unwrap()
-    }
-}
-
-#[cfg(test)]
-impl TestIpExt for Ipv6 {
-    const FAKE_CONFIG: FakeEventDispatcherConfig<Ipv6Addr> = FAKE_CONFIG_V6;
-
-    fn get_other_ip_address(last: u8) -> SpecifiedAddr<Ipv6Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv6_bytes();
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv6Addr::from(bytes)).unwrap()
-    }
-
-    fn get_other_remote_ip_address(last: u8) -> SpecifiedAddr<Self::Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv6_bytes();
-        bytes[bytes.len() - 3] += 1;
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv6Addr::from(bytes)).unwrap()
-    }
-
-    fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr> {
-        assert!((Self::Addr::BYTES * 8 - Self::MULTICAST_SUBNET.prefix()) as u32 > u8::BITS);
-        let mut bytes = Self::MULTICAST_SUBNET.network().ipv6_bytes();
-        bytes[bytes.len() - 1] = last;
-        MulticastAddr::new(Ipv6Addr::from_bytes(bytes)).unwrap()
-    }
-}
-
-/// A configuration for a simple network.
-///
-/// `FakeEventDispatcherConfig` describes a simple network with two IP hosts
-/// - one remote and one local - both on the same Ethernet network.
-#[cfg(test)]
-#[derive(Clone, net_types::ip::GenericOverIp)]
-#[generic_over_ip(A, IpAddress)]
-pub(crate) struct FakeEventDispatcherConfig<A: IpAddress> {
-    /// The subnet of the local Ethernet network.
-    pub(crate) subnet: Subnet<A>,
-    /// The IP address of our interface to the local network (must be in
-    /// subnet).
-    pub(crate) local_ip: SpecifiedAddr<A>,
-    /// The MAC address of our interface to the local network.
-    pub(crate) local_mac: UnicastAddr<Mac>,
-    /// The remote host's IP address (must be in subnet if provided).
-    pub(crate) remote_ip: SpecifiedAddr<A>,
-    /// The remote host's MAC address.
-    pub(crate) remote_mac: UnicastAddr<Mac>,
-}
-
-/// A `FakeEventDispatcherConfig` with reasonable values for an IPv4 network.
-#[cfg(test)]
-pub(crate) const FAKE_CONFIG_V4: FakeEventDispatcherConfig<Ipv4Addr> = unsafe {
-    FakeEventDispatcherConfig {
-        subnet: Subnet::new_unchecked(Ipv4Addr::new([192, 168, 0, 0]), 16),
-        local_ip: SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 1])),
-        local_mac: UnicastAddr::new_unchecked(Mac::new([0, 1, 2, 3, 4, 5])),
-        remote_ip: SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 2])),
-        remote_mac: UnicastAddr::new_unchecked(Mac::new([6, 7, 8, 9, 10, 11])),
-    }
-};
-
-/// A `FakeEventDispatcherConfig` with reasonable values for an IPv6 network.
-#[cfg(test)]
-pub(crate) const FAKE_CONFIG_V6: FakeEventDispatcherConfig<Ipv6Addr> = unsafe {
-    FakeEventDispatcherConfig {
-        subnet: Subnet::new_unchecked(
-            Ipv6Addr::from_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 0]),
-            112,
-        ),
-        local_ip: SpecifiedAddr::new_unchecked(Ipv6Addr::from_bytes([
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 1,
-        ])),
-        local_mac: UnicastAddr::new_unchecked(Mac::new([0, 1, 2, 3, 4, 5])),
-        remote_ip: SpecifiedAddr::new_unchecked(Ipv6Addr::from_bytes([
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 2,
-        ])),
-        remote_mac: UnicastAddr::new_unchecked(Mac::new([6, 7, 8, 9, 10, 11])),
-    }
-};
-
-#[cfg(test)]
-impl<A: IpAddress> FakeEventDispatcherConfig<A> {
-    /// Creates a copy of `self` with all the remote and local fields reversed.
-    pub(crate) fn swap(&self) -> Self {
-        Self {
-            subnet: self.subnet,
-            local_ip: self.remote_ip,
-            local_mac: self.remote_mac,
-            remote_ip: self.local_ip,
-            remote_mac: self.local_mac,
-        }
-    }
-
-    /// Shorthand for `FakeEventDispatcherBuilder::from_config(self)`.
-    pub(crate) fn into_builder(self) -> FakeEventDispatcherBuilder {
-        FakeEventDispatcherBuilder::from_config(self)
-    }
-}
-
-#[cfg(test)]
-impl FakeEventDispatcherConfig<Ipv6Addr> {
-    pub(crate) fn local_ipv6_device_addr(&self) -> Ipv6DeviceAddr {
-        NonMappedAddr::new(UnicastAddr::try_from(self.local_ip).unwrap()).unwrap()
-    }
-    pub(crate) fn remote_ipv6_device_addr(&self) -> Ipv6DeviceAddr {
-        NonMappedAddr::new(UnicastAddr::try_from(self.remote_ip).unwrap()).unwrap()
-    }
-}
-
 #[derive(Clone)]
 struct DeviceConfig {
     mac: UnicastAddr<Mac>,
@@ -1086,31 +930,28 @@ pub struct FakeEventDispatcherBuilder {
 }
 
 impl FakeEventDispatcherBuilder {
-    /// Construct a `FakeEventDispatcherBuilder` from a
-    /// `FakeEventDispatcherConfig`.
+    /// Construct a `FakeEventDispatcherBuilder` from a `TestAddrs`.
     #[cfg(test)]
-    pub(crate) fn from_config<A: IpAddress>(
-        cfg: FakeEventDispatcherConfig<A>,
-    ) -> FakeEventDispatcherBuilder {
-        assert!(cfg.subnet.contains(&cfg.local_ip));
-        assert!(cfg.subnet.contains(&cfg.remote_ip));
+    pub(crate) fn with_addrs<A: IpAddress>(addrs: TestAddrs<A>) -> FakeEventDispatcherBuilder {
+        assert!(addrs.subnet.contains(&addrs.local_ip));
+        assert!(addrs.subnet.contains(&addrs.remote_ip));
 
         let mut builder = FakeEventDispatcherBuilder::default();
         builder.devices.push(DeviceConfig {
-            mac: cfg.local_mac,
+            mac: addrs.local_mac,
             addr_subnet: Some(
-                AddrSubnetEither::new(cfg.local_ip.get().into(), cfg.subnet.prefix()).unwrap(),
+                AddrSubnetEither::new(addrs.local_ip.get().into(), addrs.subnet.prefix()).unwrap(),
             ),
             ipv4_config: None,
             ipv6_config: None,
         });
 
-        match cfg.remote_ip.into() {
-            IpAddr::V4(ip) => builder.arp_table_entries.push((0, ip, cfg.remote_mac)),
+        match addrs.remote_ip.into() {
+            IpAddr::V4(ip) => builder.arp_table_entries.push((0, ip, addrs.remote_mac)),
             IpAddr::V6(ip) => builder.ndp_table_entries.push((
                 0,
                 UnicastAddr::new(ip.get()).unwrap(),
-                cfg.remote_mac,
+                addrs.remote_mac,
             )),
         };
 
@@ -1118,11 +959,11 @@ impl FakeEventDispatcherBuilder {
         // pre-cached.
         builder.ndp_table_entries.push((
             0,
-            cfg.remote_mac.to_ipv6_link_local().addr().get(),
-            cfg.remote_mac,
+            addrs.remote_mac.to_ipv6_link_local().addr().get(),
+            addrs.remote_mac,
         ));
 
-        builder.device_routes.push((cfg.subnet.into(), 0));
+        builder.device_routes.push((addrs.subnet.into(), 0));
         builder
     }
 

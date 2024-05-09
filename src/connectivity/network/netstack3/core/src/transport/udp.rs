@@ -2618,7 +2618,9 @@ mod tests {
             ResolveRouteError, SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector, StrictlyZonedAddr},
-        testutil::{set_logger_for_test, CtxPairExt as _, TestIpExt as _},
+        testutil::{
+            set_logger_for_test, CtxPairExt as _, FakeEventDispatcherBuilder, TestIpExt as _,
+        },
         uninstantiable::UninstantiableWrapper,
     };
 
@@ -4245,8 +4247,8 @@ mod tests {
         api.listen(&listener, None, Some(LOCAL_PORT)).expect("listen_udp failed");
 
         let body = [];
-        let (src_ip, src_port) = (I::FAKE_CONFIG.remote_ip.get(), 0u16);
-        let (dst_ip, dst_port) = (I::FAKE_CONFIG.local_ip.get(), LOCAL_PORT);
+        let (src_ip, src_port) = (I::TEST_ADDRS.remote_ip.get(), 0u16);
+        let (dst_ip, dst_port) = (I::TEST_ADDRS.local_ip.get(), LOCAL_PORT);
 
         let (core_ctx, bindings_ctx) = api.contexts();
         receive_udp_packet(
@@ -4289,7 +4291,7 @@ mod tests {
             bindings_ctx,
             FakeDeviceId,
             I::UNSPECIFIED_ADDRESS,
-            I::FAKE_CONFIG.local_ip.get(),
+            I::TEST_ADDRS.local_ip.get(),
             REMOTE_PORT,
             LOCAL_PORT,
             &body[..],
@@ -6412,8 +6414,8 @@ mod tests {
     #[test]
     fn dual_stack_connect_cleans_up_existing_listener() {
         let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-            vec![Ipv6::FAKE_CONFIG.local_ip],
-            vec![Ipv6::FAKE_CONFIG.remote_ip],
+            vec![Ipv6::TEST_ADDRS.local_ip],
+            vec![Ipv6::TEST_ADDRS.remote_ip],
         ));
 
         const DUAL_STACK_ANY_ADDR: Option<ZonedAddr<SpecifiedAddr<Ipv6Addr>, FakeDeviceId>> = None;
@@ -6462,7 +6464,7 @@ mod tests {
         assert_eq!(
             api.connect(
                 &socket,
-                Some(ZonedAddr::Unzoned(Ipv6::FAKE_CONFIG.remote_ip)),
+                Some(ZonedAddr::Unzoned(Ipv6::TEST_ADDRS.remote_ip)),
                 REMOTE_PORT.into(),
             ),
             Ok(())
@@ -7009,7 +7011,8 @@ mod tests {
     ) {
         set_logger_for_test();
         const HELLO: &'static [u8] = b"Hello";
-        let (mut ctx, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
+        let (mut ctx, local_device_ids) =
+            FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
 
         let loopback_device_id: DeviceId<crate::testutil::FakeBindingsCtx> = ctx
             .core_api()
@@ -7028,7 +7031,7 @@ mod tests {
         }
         api.send_to(
             &socket,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+            Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
             LOCAL_PORT.into(),
             Buf::new(HELLO.to_vec(), ..),
         )
@@ -7071,7 +7074,7 @@ mod tests {
                 OriginalSocketState::Listener => {
                     api.listen(
                         &socket,
-                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
+                        Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)),
                         Some(LOCAL_PORT),
                     )
                     .expect("listen should succeed");
@@ -7079,7 +7082,7 @@ mod tests {
                 OriginalSocketState::Connected => {
                     api.connect(
                         &socket,
-                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+                        Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
                         UdpRemotePort::Set(REMOTE_PORT),
                     )
                     .expect("connect should succeed");
@@ -7094,8 +7097,8 @@ mod tests {
     #[test_case(OriginalSocketState::Connected; "connected")]
     fn set_get_dual_stack_enabled_v4(original_state: OriginalSocketState) {
         let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-            vec![Ipv4::FAKE_CONFIG.local_ip],
-            vec![Ipv4::FAKE_CONFIG.remote_ip],
+            vec![Ipv4::TEST_ADDRS.local_ip],
+            vec![Ipv4::TEST_ADDRS.remote_ip],
         ));
         let mut api = UdpApi::<Ipv4, _>::new(ctx.as_mut());
         let socket = original_state.create_socket(&mut api);
@@ -7119,8 +7122,8 @@ mod tests {
         expected_result: Result<(), SetDualStackEnabledError>,
     ) {
         let mut ctx = FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
-            vec![Ipv6::FAKE_CONFIG.local_ip],
-            vec![Ipv6::FAKE_CONFIG.remote_ip],
+            vec![Ipv6::TEST_ADDRS.local_ip],
+            vec![Ipv6::TEST_ADDRS.remote_ip],
         ));
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
         let socket = original_state.create_socket(&mut api);

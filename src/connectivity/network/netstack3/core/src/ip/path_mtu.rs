@@ -453,7 +453,7 @@ mod tests {
     }
 
     /// Get an IPv4 or IPv6 address within the same subnet as that of
-    /// `FAKE_CONFIG_*`, but with the last octet set to `3`.
+    /// `TEST_ADDRS_*`, but with the last octet set to `3`.
     fn get_other_ip_address<I: TestIpExt>() -> SpecifiedAddr<I::Addr> {
         I::get_other_ip_address(3)
     }
@@ -502,7 +502,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_path_mtu_cache_ctx<I: Ip + TestIpExt>() {
-        let fake_config = I::FAKE_CONFIG;
+        let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Nothing in the cache yet
@@ -675,7 +675,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_pmtu_task<I: Ip + TestIpExt>() {
-        let fake_config = I::FAKE_CONFIG;
+        let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Make sure there are no timers.

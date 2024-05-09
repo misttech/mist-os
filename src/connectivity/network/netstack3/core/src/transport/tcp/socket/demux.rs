@@ -1191,16 +1191,16 @@ mod test {
         let serializer = super::tcp_serialize_segment(
             segment,
             ConnIpAddr {
-                local: (SocketIpAddr::try_from(I::FAKE_CONFIG.local_ip).unwrap(), SOURCE_PORT),
-                remote: (SocketIpAddr::try_from(I::FAKE_CONFIG.remote_ip).unwrap(), DEST_PORT),
+                local: (SocketIpAddr::try_from(I::TEST_ADDRS.local_ip).unwrap(), SOURCE_PORT),
+                remote: (SocketIpAddr::try_from(I::TEST_ADDRS.remote_ip).unwrap(), DEST_PORT),
             },
         );
 
         let mut serialized = serializer.serialize_vec_outer().unwrap().unwrap_b();
         let parsed_segment = serialized
             .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
-                *I::FAKE_CONFIG.remote_ip,
-                *I::FAKE_CONFIG.local_ip,
+                *I::TEST_ADDRS.remote_ip,
+                *I::TEST_ADDRS.local_ip,
             ))
             .expect("is valid segment");
 
