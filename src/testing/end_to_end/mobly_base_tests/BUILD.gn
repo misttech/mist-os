@@ -23,7 +23,8 @@ if (is_host) {
       "//src/tests/end_to_end/rtc:*",
     ]
 
-    enable_mypy = true
+    # TODO(https://fxbug.dev/339343263): Enable mypy checks once the mypy flake is fixed.
+    enable_mypy = false
     library_name = "fuchsia_base_test"
     sources = [
       "__init__.py",

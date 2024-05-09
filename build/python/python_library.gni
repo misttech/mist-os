@@ -74,6 +74,10 @@ template("python_library") {
   }
 
   _enable_mypy = defined(invoker.enable_mypy) && invoker.enable_mypy
+  _library_name = target_name
+  if (defined(invoker.library_name)) {
+    _library_name = invoker.library_name
+  }
   group_with_inputs(target_name) {
     forward_variables_from(invoker,
                            [
@@ -81,11 +85,6 @@ template("python_library") {
                              "visibility",
                              "assert_no_deps",
                            ])
-
-    library_name = target_name
-    if (defined(invoker.library_name)) {
-      library_name = invoker.library_name
-    }
 
     # Seed with the library_deps, and then add any other deps as well
     deps = library_deps
@@ -102,7 +101,7 @@ template("python_library") {
     metadata = {
       library_info = [
         {
-          library_name = library_name
+          library_name = _library_name
           source_root = rebase_path(source_root, root_build_dir)
           sources = invoker.sources
           mypy_support = _enable_mypy
@@ -137,18 +136,28 @@ template("python_library") {
       forward_variables_from(invoker, [ "testonly" ])
       inputs = [
                  "//pyproject.toml",
+                 "//build/python/package_python_binary.py",
                  _library_infos_json,
                ] + _full_source_paths
       script = "//build/python/mypy_checker.py"
       outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
+      depfile = "${target_out_dir}/${target_name}.d"
       args =
           # This source list includes only direct library sources, excluding
           # any dependencies.
-          [ "--sources" ] + rebase_path(_full_source_paths, root_build_dir) + [
-            "--output",
-            rebase_path(outputs[0], root_build_dir),
+          [ "--sources" ] + invoker.sources + [
+            "--source_root",
+            rebase_path(_source_root, root_build_dir),
+            "--target_name",
+            _library_name,
             "--library_infos",
             rebase_path(_library_infos_json, root_build_dir),
+            "--gen_dir",
+            rebase_path(target_gen_dir, root_build_dir),
+            "--depfile",
+            rebase_path(depfile, root_build_dir),
+            "--output",
+            rebase_path(outputs[0], root_build_dir),
           ]
       deps = [ ":${_library_infos_target}" ]
 

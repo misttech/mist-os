@@ -82,35 +82,16 @@ def main() -> int:
     os.makedirs(app_dir, exist_ok=True)
 
     # Copy over the sources of this binary.
-    for source in args.sources:
-        basename = os.path.basename(source)
-        if basename == "__main__.py":
-            print(
-                "__main__.py in sources of python_binary is not supported, see https://fxbug.dev/42153163",
-                file=sys.stderr,
-            )
-            return 1
-        dest = os.path.join(app_dir, basename)
-        shutil.copy2(source, dest)
+    if copy_binary_sources(app_dir, args.sources) != 0:
+        return 1
 
-    # For writing a depfile.
-    files_to_copy: list[str] = []
     # Make sub directories for all libraries and copy over their sources.
-    for info in infos:
-        dest_lib_root = os.path.join(app_dir, info["library_name"])
-        os.makedirs(dest_lib_root, exist_ok=True)
+    lib_src_map: dict[str, str] = {}
+    copy_library_sources(app_dir, infos, lib_src_map)
 
-        src_lib_root = info["source_root"]
-        # Sources are relative to library root.
-        for source in info["sources"]:
-            src = os.path.join(src_lib_root, source)
-            dest = os.path.join(dest_lib_root, source)
-            # Make sub directories if necessary.
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            files_to_copy.append(src)
-            shutil.copy2(src, dest)
-
-    args.depfile.write("{}: {}\n".format(args.output, " ".join(files_to_copy)))
+    args.depfile.write(
+        "{}: {}\n".format(args.output, " ".join(lib_src_map.values()))
+    )
 
     # Main module is the main source without its extension.
     main_module = os.path.splitext(os.path.basename(args.main_source))[0]
@@ -137,27 +118,98 @@ sys.exit({args.main_callable}())
     else:
         interpreter = "/usr/bin/env fuchsia-vendored-python"
 
-    zipapp.create_archive(
-        app_dir,
-        target=args.output,
-        interpreter=interpreter,
-        compressed=True,
-    )
+    try:
+        zipapp.create_archive(
+            app_dir,
+            target=args.output,
+            interpreter=interpreter,
+            compressed=True,
+        )
 
-    # Manually remove the temporary app directory and all the files, instead of
-    # using shutil.rmtree. rmtree records reads on directories which throws off
-    # the action tracer.
-    for root, dirs, files in os.walk(app_dir, topdown=False):
-        for file in files:
-            os.remove(os.path.join(root, file))
-        for dir in dirs:
-            os.rmdir(os.path.join(root, dir))
-    os.rmdir(app_dir)
+        # Type check for Python binary sources and their library sources that have "mypy_enable = True"
+        mypy_ret_code = 0
+        if args.enable_mypy:
+            mypy_ret_code = mypy_checker.run_mypy_on_binary_target(
+                args.target_name, args.gen_dir, args.sources, infos
+            )
+    finally:
+        remove_dir(app_dir)
+    return mypy_ret_code
 
-    # Type check for Python binary sources and their library sources that have "mypy_enable = True"
-    if args.enable_mypy:
-        return mypy_checker.run_mypy_checks(args.sources, infos)
+
+def copy_binary_sources(
+    dest_dir: str, sources: list[str], src_map: dict[str, str] = {}
+) -> int:
+    """Copies the sources of this binary into the given destination directory.
+
+    Args:
+        dest_dir: The destination directory to copy the sources to.
+        sources: The list of source file paths relative to the src_root.
+        src_map: The mapping from the tmp dir to the original source paths.
+    """
+    for source in sources:
+        basename = os.path.basename(source)
+        if basename == "__main__.py":
+            print(
+                "__main__.py in sources of python_binary is not supported, see https://fxbug.dev/42153163",
+                file=sys.stderr,
+            )
+            return 1
+        dest = os.path.join(dest_dir, basename)
+        src_map[dest] = source
+        shutil.copy2(source, dest)
     return 0
+
+
+def copy_library_sources(
+    dest_dir: str, lib_infos: list[dict[str, object]], src_map: dict[str, str]
+) -> None:
+    """Copies the sources of all library dependencies of a binary target
+        into the given destination directory.
+
+    Args:
+        dest_dir: The destination directory to copy the sources to.
+        lib_infos: The list of library dependencies to be copied.
+        src_map: The mapping from the temp dir source file paths to the original
+    """
+    for lib_info in lib_infos:
+        src_lib_root = str(lib_info["source_root"])
+        dest_lib_root = os.path.join(dest_dir, str(lib_info["library_name"]))
+        os.makedirs(dest_lib_root, exist_ok=True)
+
+        # Sources are relative to library root.
+        for source in lib_info["sources"]:
+            src = os.path.join(src_lib_root, source)
+            dest = os.path.join(dest_lib_root, source)
+            # Make sub directories if necessary.
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            src_map[dest] = src
+            shutil.copy2(src, dest)
+    return
+
+
+def remove_dir(root_dir_path: str) -> None:
+    """
+    Remove the given directory and all the files within it.
+
+    Instead of using shutil.rmtree, this function manually walks the directory
+    tree and removes files and directories one by one. This is necessary to
+    avoid recording reads on directories, which can throw off the action tracer.
+
+    Args:
+        dir: The  directory to remove
+    """
+    for root, dirs, files in os.walk(root_dir_path, topdown=False):
+        # Remove directories
+        for dir in dirs:
+            remove_dir(os.path.join(root, dir))
+        # Remove files within this directory
+        for file in files:
+            file_path = os.path.join(root, file)
+            os.remove(file_path)
+    # Remove the top level directory
+    os.rmdir(root_dir_path)
+    return
 
 
 if __name__ == "__main__":
