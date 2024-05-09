@@ -88,6 +88,7 @@ executable("msd_arm_mali_lifecycle_tests") {
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-resource",
+    "//src/graphics/drivers/msd-arm-mali:config",
     "//src/graphics/drivers/msd-arm-mali:msd_arm_entry",
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",

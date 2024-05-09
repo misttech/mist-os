@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 #include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
+#include "src/graphics/drivers/msd-arm-mali/config.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_features.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
@@ -149,6 +150,11 @@ TEST(MsdArmDFv2, LoadDriver) {
         static_cast<uint32_t>(registers::CoreReadyState::StatusType::kReady);
     mmio_buffer->Write32(kCoresEnabled, kShaderReadyOffset);
     mmio_buffer->Write<uint32_t>(kCoresEnabled, GpuFeatures::kShaderPresentLowOffset);
+  }
+  {
+    config::Config fake_config;
+    fake_config.enable_suspend() = false;
+    start_args.config(fake_config.ToVmo());
   }
 
   fdf_testing::DriverUnderTest<> driver;

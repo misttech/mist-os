@@ -18,11 +18,13 @@
 #include <memory>
 
 #include "parent_device.h"
+#include "src/graphics/drivers/msd-arm-mali/config.h"
 
 class ParentDeviceDFv2 : public ParentDevice {
  public:
   explicit ParentDeviceDFv2(std::shared_ptr<fdf::Namespace> incoming,
-                            fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev);
+                            fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev,
+                            config::Config config);
 
   ~ParentDeviceDFv2() override { DLOG("ParentDevice dtor"); }
 
@@ -39,11 +41,15 @@ class ParentDeviceDFv2 : public ParentDevice {
   zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>> ConnectToMaliRuntimeProtocol()
       override;
 
-  static std::unique_ptr<ParentDeviceDFv2> Create(std::shared_ptr<fdf::Namespace> incoming);
+  bool suspend_enabled() override { return config_.enable_suspend(); }
+
+  static std::unique_ptr<ParentDeviceDFv2> Create(std::shared_ptr<fdf::Namespace> incoming,
+                                                  config::Config config);
 
  private:
   std::shared_ptr<fdf::Namespace> incoming_;
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  config::Config config_;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_DFV2_H_

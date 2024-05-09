@@ -25,5 +25,10 @@
                 "fuchsia.hardware.platform.device.Service",
             ],
         },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
     ],
 }

@@ -35,6 +35,8 @@ class ParentDevice {
 
   virtual zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>>
   ConnectToMaliRuntimeProtocol() = 0;
+
+  virtual bool suspend_enabled() = 0;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_

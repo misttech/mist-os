@@ -96,6 +96,7 @@ class FakeParentDevice : public ParentDevice {
       override {
     return zx::error(ZX_ERR_INTERNAL);
   }
+  bool suspend_enabled() override { return false; }
 };
 
 class ArmMaliServer : public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali> {

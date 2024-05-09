@@ -13,8 +13,8 @@
 
 ParentDeviceDFv2::ParentDeviceDFv2(
     std::shared_ptr<fdf::Namespace> incoming,
-    fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev)
-    : incoming_(std::move(incoming)), pdev_(std::move(pdev)) {}
+    fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev, config::Config config)
+    : incoming_(std::move(incoming)), pdev_(std::move(pdev)), config_(std::move(config)) {}
 
 bool ParentDeviceDFv2::SetThreadRole(const char* role_name) {
   zx_status_t status = fuchsia_scheduler::SetRoleForThisThread(role_name);
@@ -98,14 +98,14 @@ ParentDeviceDFv2::ConnectToMaliRuntimeProtocol() {
 }
 
 // static
-std::unique_ptr<ParentDeviceDFv2> ParentDeviceDFv2::Create(
-    std::shared_ptr<fdf::Namespace> incoming) {
+std::unique_ptr<ParentDeviceDFv2> ParentDeviceDFv2::Create(std::shared_ptr<fdf::Namespace> incoming,
+                                                           config::Config config) {
   auto platform_device =
       incoming->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
   if (!platform_device.is_ok()) {
     return DRETP(nullptr, "Error requesting platform device service: %s",
                  platform_device.status_string());
   }
-  return std::make_unique<ParentDeviceDFv2>(std::move(incoming),
-                                            fidl::WireSyncClient(std::move(*platform_device)));
+  return std::make_unique<ParentDeviceDFv2>(
+      std::move(incoming), fidl::WireSyncClient(std::move(*platform_device)), std::move(config));
 }
