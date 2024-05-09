@@ -12,7 +12,7 @@ load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "zircon",
     "bootstrap",
-    "console_user",
+    "console",
     "driver_framework",
     "embeddable",
     "emulator_support",
@@ -48,7 +48,6 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "bootstrap_userdebug",
     "bootstrap_realm_vsock_development_access",
     "clock_development_tools",
-    "console_userdebug",
     "embeddable_userdebug",
     "kernel_args_eng",
     "kernel_args_userdebug",

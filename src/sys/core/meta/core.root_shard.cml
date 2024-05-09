@@ -43,7 +43,6 @@
                 "fuchsia.boot.FactoryItems",
                 "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.CpuResource",
