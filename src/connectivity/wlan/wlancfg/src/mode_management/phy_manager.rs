@@ -64,6 +64,9 @@ pub(crate) struct PhyContainer {
     // based on security features (e.g. for WPA3).
     client_ifaces: HashMap<u16, fidl_common::SecuritySupport>,
     ap_ifaces: HashSet<u16>,
+    // It is possible for interface destruction and defect reporting to race.  Keeping a set of
+    // past interface IDs ensures that defects can be associated with the appropriate PHY.
+    destroyed_ifaces: HashSet<u16>,
     defects: EventHistory<Defect>,
     recoveries: EventHistory<recovery::RecoveryAction>,
 }
@@ -174,6 +177,7 @@ impl PhyContainer {
             supported_mac_roles: supported_mac_roles.into_iter().collect(),
             client_ifaces: HashMap::new(),
             ap_ifaces: HashSet::new(),
+            destroyed_ifaces: HashSet::new(),
             defects: EventHistory::<Defect>::new(DEFECT_RETENTION_SECONDS),
             recoveries: EventHistory::<RecoveryAction>::new(DEFECT_RETENTION_SECONDS),
         }
@@ -492,7 +496,9 @@ impl PhyManagerApi for PhyManager {
 
             for (iface_id, security_support) in phy_container.client_ifaces.drain() {
                 match destroy_iface(&self.device_monitor, iface_id, &self.telemetry_sender).await {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        let _ = phy_container.destroyed_ifaces.insert(iface_id);
+                    }
                     Err(e) => {
                         result = Err(e);
                         failing_phys.push(*client_phy);
@@ -601,7 +607,9 @@ impl PhyManagerApi for PhyManager {
         for (phy_id, phy_container) in self.phys.iter_mut() {
             if phy_container.ap_ifaces.remove(&iface_id) {
                 match destroy_iface(&self.device_monitor, iface_id, &self.telemetry_sender).await {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        let _ = phy_container.destroyed_ifaces.insert(iface_id);
+                    }
                     Err(e) => {
                         let _ = phy_container.ap_ifaces.insert(iface_id);
                         result = Err(e);
@@ -635,7 +643,9 @@ impl PhyManagerApi for PhyManager {
             let mut lingering_ifaces = HashSet::new();
             for iface_id in phy_container.ap_ifaces.drain() {
                 match destroy_iface(&self.device_monitor, iface_id, &self.telemetry_sender).await {
-                    Ok(()) => {}
+                    Ok(()) => {
+                        let _ = phy_container.destroyed_ifaces.insert(iface_id);
+                    }
                     Err(e) => {
                         result = Err(e);
                         failing_phys.push(ap_phy);
@@ -725,7 +735,9 @@ impl PhyManagerApi for PhyManager {
             | Defect::Iface(IfaceFailure::EmptyScanResults { iface_id })
             | Defect::Iface(IfaceFailure::ConnectionFailure { iface_id }) => {
                 for (phy_id, phy_info) in self.phys.iter_mut() {
-                    if phy_info.client_ifaces.contains_key(&iface_id) {
+                    if phy_info.client_ifaces.contains_key(&iface_id)
+                        || phy_info.destroyed_ifaces.contains(&iface_id)
+                    {
                         phy_info.defects.add_event(defect);
 
                         recovery_action = (self.recovery_profile)(
@@ -741,7 +753,9 @@ impl PhyManagerApi for PhyManager {
             }
             Defect::Iface(IfaceFailure::ApStartFailure { iface_id }) => {
                 for (phy_id, phy_info) in self.phys.iter_mut() {
-                    if phy_info.ap_ifaces.contains(&iface_id) {
+                    if phy_info.ap_ifaces.contains(&iface_id)
+                        || phy_info.destroyed_ifaces.contains(&iface_id)
+                    {
                         phy_info.defects.add_event(defect);
 
                         recovery_action = (self.recovery_profile)(
@@ -783,6 +797,8 @@ impl PhyManagerApi for PhyManager {
                             .await
                             {
                                 let _ = phy_container.ap_ifaces.insert(iface_id);
+                            } else {
+                                let _ = phy_container.destroyed_ifaces.insert(iface_id);
                             }
 
                             return;
@@ -797,6 +813,8 @@ impl PhyManagerApi for PhyManager {
                             .await
                             {
                                 let _ = phy_container.client_ifaces.insert(iface_id, client_info);
+                            } else {
+                                let _ = phy_container.destroyed_ifaces.insert(iface_id);
                             }
 
                             return;
@@ -2263,6 +2281,9 @@ mod tests {
 
         // Verify that the client_connections_enabled has been set to false.
         assert!(!phy_manager.client_connections_enabled);
+
+        // Verify that the destroyed interface ID was recorded.
+        assert!(phy_container.destroyed_ifaces.contains(&fake_iface_id));
     }
 
     /// Tests the PhyManager's response to destroy_all_client_ifaces when no client ifaces are
@@ -2584,6 +2605,7 @@ mod tests {
         let phy_container = phy_manager.phys.get(&fake_phy_id).unwrap();
         assert!(!phy_container.ap_ifaces.contains(&fake_iface_id));
         assert!(phy_container.defects.events.is_empty());
+        assert!(phy_container.destroyed_ifaces.contains(&fake_iface_id));
     }
 
     /// This test attempts to stop an invalid AP iface ID.  The expectation is that a valid iface
@@ -2735,6 +2757,8 @@ mod tests {
 
         let phy_container = phy_manager.phys.get(&fake_phy_id).unwrap();
         assert!(phy_container.ap_ifaces.is_empty());
+        assert!(phy_container.destroyed_ifaces.contains(&0));
+        assert!(phy_container.destroyed_ifaces.contains(&1));
         assert!(phy_container.defects.events.is_empty());
     }
 
@@ -3142,6 +3166,7 @@ mod tests {
                 supported_mac_roles: HashSet::new(),
                 client_ifaces: HashMap::new(),
                 ap_ifaces: HashSet::new(),
+                destroyed_ifaces: HashSet::new(),
                 defects: EventHistory::new(DEFECT_RETENTION_SECONDS),
                 recoveries: EventHistory::new(DEFECT_RETENTION_SECONDS),
             },
@@ -3152,6 +3177,7 @@ mod tests {
                 supported_mac_roles: HashSet::new(),
                 client_ifaces: HashMap::new(),
                 ap_ifaces: HashSet::new(),
+                destroyed_ifaces: HashSet::new(),
                 defects: EventHistory::new(DEFECT_RETENTION_SECONDS),
                 recoveries: EventHistory::new(DEFECT_RETENTION_SECONDS),
             },
@@ -3238,6 +3264,7 @@ mod tests {
                 supported_mac_roles: HashSet::new(),
                 client_ifaces: HashMap::new(),
                 ap_ifaces: HashSet::new(),
+                destroyed_ifaces: HashSet::new(),
                 defects: EventHistory::new(DEFECT_RETENTION_SECONDS),
                 recoveries: EventHistory::new(DEFECT_RETENTION_SECONDS),
             },
@@ -4262,6 +4289,52 @@ mod tests {
         )
     }
 
+    #[test_case(
+        Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 456 }) ;
+        "recommend AP start recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 456 }) ;
+        "recommend connection failure recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 456 }) ;
+        "recommend empty scan recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::FailedScan { iface_id: 456 }) ;
+        "recommend failed scan recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::CanceledScan { iface_id: 456 }) ;
+        "recommend canceled scan recovery"
+    )]
+    fn log_defect_for_destroyed_iface(defect: Defect) {
+        let _exec = TestExecutor::new();
+        let test_values = test_setup();
+
+        let fake_phy_id = 123;
+        let fake_iface_id = 456;
+
+        // Create a PhyManager and give it a PHY that doesn't have any interfaces but does have a
+        // record of a past interface that was destroyed.
+        let mut phy_manager = PhyManager::new(
+            test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+        let mut phy_container = PhyContainer::new(vec![]);
+        let _ = phy_container.destroyed_ifaces.insert(fake_iface_id);
+        let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
+
+        // Record the defect.
+        phy_manager.record_defect(defect);
+        assert_eq!(phy_manager.phys[&fake_phy_id].defects.events.len(), 1);
+    }
+
     #[fuchsia::test]
     fn test_disconnect_request_fails() {
         let mut exec = TestExecutor::new();
@@ -4599,6 +4672,9 @@ mod tests {
 
         // Verify that the client interface has been removed.
         assert!(!phy_manager.phys[&0].client_ifaces.contains_key(&1));
+
+        // Verify that the destroyed interface ID has been recorded.
+        assert!(phy_manager.phys[&0].destroyed_ifaces.contains(&1));
     }
 
     #[fuchsia::test]
@@ -4666,6 +4742,9 @@ mod tests {
 
         // Verify that the AP interface has been removed.
         assert!(!phy_manager.phys[&0].ap_ifaces.contains(&2));
+
+        // Verify the destroyed iface ID was recorded.
+        assert!(phy_manager.phys[&0].destroyed_ifaces.contains(&2));
     }
 
     #[fuchsia::test]
