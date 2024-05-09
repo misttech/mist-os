@@ -17,7 +17,7 @@ use crate::{
     task::CurrentTask,
     vfs::{FileOps, FsNode, FsStr},
 };
-use starnix_logging::{log_error, track_stub};
+use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::{
     device_type::{DeviceType, DYN_MAJOR},
     errno, error,
@@ -303,7 +303,7 @@ impl DeviceRegistry {
         }
 
         if let Err(err) = devtmpfs_create_device(locked, current_task, metadata.clone()) {
-            log_error!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
+            log_warn!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
         }
 
         let device = device_kobject.ops().as_ref().as_any().downcast_ref::<N>().unwrap().device();
