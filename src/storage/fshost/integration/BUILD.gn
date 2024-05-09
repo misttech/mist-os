@@ -254,6 +254,7 @@ template("fshost_integration_test_package") {
       log_settings = {
         max_severity = "ERROR"
       }
+      parallel = 1
     }
     test_components = [
       ":$_integration_component_target",
