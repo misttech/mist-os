@@ -25,6 +25,7 @@ class DlLoadZirconTestsBase : public DlLoadTestsBase {
   using Base = DlLoadTestsBase;
   using File = elfldltl::VmoFile<Diagnostics>;
   using Loader = elfldltl::LocalVmarLoader;
+  using SystemError = elfldltl::ZirconError;
 
   // `ExpectRootModule` will prime the mock loader with the root module and
   // register an expectation for it. Usually, `ExpectRootModule` is used for the
@@ -48,8 +49,12 @@ class DlLoadZirconTestsBase : public DlLoadTestsBase {
 
   void VerifyAndClearNeeded() { mock_.VerifyAndClearExpectations(); }
 
-  // Retrieve a VMO from the test package.
-  std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
+  // Retrieve a VMO from the test package. If the file is not found, a
+  // fit::error{std::nullopt} is returned to the caller, otherwise a
+  // fit::error{ZirconError} is returned containing information about the
+  // encountered system error.
+  fit::result<std::optional<SystemError>, DlLoadZirconTestsBase::File> RetrieveFile(
+      Diagnostics& diag, std::string_view filename);
 
  private:
   // Calls Base::FileCheck and includes an additional check for Fuchsia-specific

@@ -58,9 +58,22 @@ class RuntimeDynamicLinker {
   // or an error if not found (ie undefined symbol).
   fit::result<Error, void*> LookupSymbol(ModuleHandle* module, const char* ref);
 
+  // TODO(https://fxbug.dev/339037138): Add a test exercising the system error
+  // case and include it as an example for the fit::error{Error} description.
   // Open `file` with the given `mode`, returning a pointer to the loaded module
-  // for the file. The `retrieve_file` argument is a callable to be passed on to
-  // LoadModule::Load to perform the file retrieval.
+  // for the file. The `retrieve_file` argument is passed on to LoadModule.Load
+  // and is called as a
+  // `fit::result<std::optional<Error>, File>(Diagnostics&, std::string_view)`
+  // with the following semantics:
+  //   - fit::error{std::nullopt} is a not found error
+  //   - fit::error{Error} is an error type that can be passed to
+  //     Diagnostics::SystemError (see <lib/elfldltl/diagnostics.h>) to give
+  //     more context to the error message.
+  //   - fit::ok{File} is the found elfldltl File API type for the module
+  //     (see <lib/elfldltl/memory.h>).
+  // The Diagnostics reference passed to `retrieve_file` is not used by the
+  // function itself to report its errors, but is plumbed into the created File
+  // API object that will use it for reporting file read errors.
   template <class Loader, typename RetrieveFile>
   fit::result<Error, void*> Open(const char* file, int mode, RetrieveFile&& retrieve_file) {
     auto already_loaded = CheckOpen(file, mode);
@@ -114,9 +127,8 @@ class RuntimeDynamicLinker {
   // loaded modules. Starting with the main file that was `dlopen`-ed, a
   // LoadModule is created for each file that is to be loaded, decoded, and its
   // dependencies parsed and enqueued to be processed in the same manner.
-  // The `retrieve_file` argument is called as an
-  // `std::optional<File>(Diagnostics&, std::string_view)` where `File` is an
-  // elfldltl File API type (see <lib/elfldltl/memory.h>).
+  // The `retrieve_file` argument is a callable passed down from `Open` and is
+  // invoked to retrieve the module's file from the file system for processing.
   template <class Loader, typename RetrieveFile>
   static ModuleList<LoadModule<Loader>> Load(Diagnostics& diag, Soname soname,
                                              RetrieveFile&& retrieve_file) {
@@ -145,7 +157,7 @@ class RuntimeDynamicLinker {
     // it can eventually be loaded and processed.
     for (auto it = pending_modules.begin(); it != pending_modules.end(); it++) {
       auto file = retrieve_file(diag, it->name().str());
-      if (!file) [[unlikely]] {
+      if (file.is_error()) [[unlikely]] {
         return {};
       }
 

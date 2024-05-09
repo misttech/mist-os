@@ -13,8 +13,8 @@ void DlLoadZirconTestsBase::FileCheck(std::string_view filename) {
   EXPECT_NE(filename, ld::testing::GetVdsoSoname().str());
 }
 
-std::optional<DlLoadZirconTestsBase::File> DlLoadZirconTestsBase::RetrieveFile(
-    Diagnostics& diag, std::string_view filename) {
+fit::result<std::optional<DlLoadZirconTestsBase::SystemError>, DlLoadZirconTestsBase::File>
+DlLoadZirconTestsBase::RetrieveFile(Diagnostics& diag, std::string_view filename) {
   FileCheck(filename);
 
   // Borrow the client channel handle to the mock loader service and make a
@@ -24,18 +24,14 @@ std::optional<DlLoadZirconTestsBase::File> DlLoadZirconTestsBase::RetrieveFile(
   EXPECT_TRUE(result.ok());
   auto load_result = result.Unwrap();
   if (load_result->rv == ZX_OK) {
-    return File{std::move(load_result->object), diag};
+    return fit::ok(File{std::move(load_result->object), diag});
   }
   // The only expected failure is a "not found" error.
   EXPECT_EQ(load_result->rv, ZX_ERR_NOT_FOUND);
-
-  // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages.
-  // Consider amending the signature for RetrieveFile to differentiate between
-  // retrieving the dependency vs root module for the purpose of emitting
-  // diag.MissingDependency for the former and something different for the
-  // latter.
+  // TODO(https://fxbug.dev/336633049): Have the caller responsible for emitting
+  // the error message for root module vs dependency.
   diag.SystemError("cannot open ", filename);
-  return std::nullopt;
+  return fit::error(std::nullopt);
 }
 
 }  // namespace dl::testing

@@ -25,6 +25,7 @@ class DlLoadTestsBase : public DlTestsBase {
  public:
   using File = elfldltl::UniqueFdFile<Diagnostics>;
   using Loader = elfldltl::MmapLoader;
+  using SystemError = elfldltl::PosixError;
 
   // The Expect/Needed API checks that the test files exist in test paths as
   // expected, or are missing if the test files are expected to not be found.
@@ -42,8 +43,12 @@ class DlLoadTestsBase : public DlTestsBase {
   // Check that startup modules are not retrieved from the filesystem.
   static void FileCheck(std::string_view filename);
 
-  // Retrieve a file from the filesystem.
-  std::optional<File> RetrieveFile(Diagnostics& diag, std::string_view filename);
+  // Retrieve a file from the filesystem. If the file is not found, a
+  // fit::error{std::nullopt} is returned to the caller, otherwise a
+  // fit::error{PosixError} is returned containing information about the
+  // encountered system error.
+  fit::result<std::optional<SystemError>, File> RetrieveFile(Diagnostics& diag,
+                                                             std::string_view filename);
 };
 
 }  // namespace dl::testing
