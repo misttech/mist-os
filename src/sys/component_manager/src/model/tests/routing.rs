@@ -3427,7 +3427,7 @@ async fn source_component_stopping_when_routing() {
 
         // Connect to the capability.
         match entry {
-            sandbox::Capability::Sender(s) => {
+            sandbox::Capability::Connector(s) => {
                 s.send(sandbox::Message { channel: server_end }).unwrap()
             }
             e => panic!("{:#?}", e),
@@ -3489,7 +3489,7 @@ async fn source_component_stopped_after_routing_before_open() {
         .await
         .unwrap();
     let sender = match cap {
-        sandbox::Capability::Sender(s) => s,
+        sandbox::Capability::Connector(s) => s,
         c => panic!("{:#?}", c),
     };
 
@@ -3558,7 +3558,7 @@ async fn source_component_shutdown_after_routing_before_open() {
         .await
         .unwrap();
     let sender = match cap {
-        sandbox::Capability::Sender(s) => s,
+        sandbox::Capability::Connector(s) => s,
         c => panic!("{:#?}", c),
     };
 

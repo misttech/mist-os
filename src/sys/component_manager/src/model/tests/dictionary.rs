@@ -1365,8 +1365,8 @@ async fn extend_from_program() {
     let dict = dict.into_proxy().unwrap();
     let (receiver_client, mut receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-    let sender = factory.create_sender(receiver_client).await.unwrap();
-    dict.insert("A", fsandbox::Capability::Sender(sender)).await.unwrap().unwrap();
+    let connector = factory.create_connector(receiver_client).await.unwrap();
+    dict.insert("A", fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
 
     // Serve the Echo protocol from the Receiver.
     let _receiver_task = fasync::Task::spawn(async move {

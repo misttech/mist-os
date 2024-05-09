@@ -505,7 +505,7 @@ impl ResolvedInstanceState {
             .downscope_path(Path::validate_and_split(path).unwrap(), entry_type)
             .expect("get_outgoing must return a directory node");
         let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(_) => sandbox::Sender::new_sendable(open).into(),
+            CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(open).into(),
             _ => open.into(),
         };
         let hook =

@@ -30,10 +30,10 @@ async fn main() {
     // Dynamically add trigger-d to the dictionary
     let (trigger_receiver_client, trigger_receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-    let trigger_sender_client = factory.create_sender(trigger_receiver_client).await.unwrap();
+    let trigger_sender_client = factory.create_connector(trigger_receiver_client).await.unwrap();
     dict.insert(
         "fidl.test.components.Trigger-d",
-        fsandbox::Capability::Sender(trigger_sender_client),
+        fsandbox::Capability::Connector(trigger_sender_client),
     )
     .await
     .unwrap()

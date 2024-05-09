@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},
     moniker::{ExtendedMoniker, Moniker},
-    sandbox::{Receiver, Sender, WeakComponentToken},
+    sandbox::{Connector, Receiver, WeakComponentToken},
     std::{
         collections::HashMap,
         fmt,
@@ -198,7 +198,7 @@ pub struct CapabilityReceiver {
 impl CapabilityReceiver {
     /// Creates a [`CapabilityReceiver`] that receives connection requests sent via the
     /// [`Sender`] capability.
-    pub fn new() -> (Self, Sender) {
+    pub fn new() -> (Self, Connector) {
         let (receiver, sender) = Receiver::new();
         let inner = Arc::new(StdMutex::new(Some(receiver)));
         (Self { inner }, sender)

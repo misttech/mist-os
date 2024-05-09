@@ -367,13 +367,16 @@ pub async fn start_with_dict() {
     });
 
     // Create a sender from our receiver.
-    let sender_client =
-        factory.create_sender(receiver_client).await.expect("failed to call CreateOpen");
+    let connector_client =
+        factory.create_connector(receiver_client).await.expect("failed to call CreateOpen");
 
     let dictionary_client = factory.create_dictionary().await.unwrap();
     let dictionary_client = dictionary_client.into_proxy().unwrap();
     dictionary_client
-        .insert("fidl.examples.routing.echo.Echo", fsandbox::Capability::Sender(sender_client))
+        .insert(
+            "fidl.examples.routing.echo.Echo",
+            fsandbox::Capability::Connector(connector_client),
+        )
         .await
         .unwrap()
         .unwrap();
@@ -527,17 +530,17 @@ pub async fn get_exposed_dictionary() {
 
     controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();
     let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
-    let fsandbox::Capability::Sender(echo_sender_capability) = echo_cap else {
+    let fsandbox::Capability::Connector(echo_connector_capability) = echo_cap else {
         panic!("wrong type")
     };
     let factory =
         instance.root.connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>().unwrap();
-    let (echo_sender_client, echo_sender_server) =
-        fidl::endpoints::create_endpoints::<fsandbox::SenderMarker>();
-    factory.connect_to_sender(echo_sender_capability, echo_sender_server.into()).unwrap();
-    let echo_sender = echo_sender_client.into_proxy().unwrap();
+    let (echo_connector_client, echo_connector_server) =
+        fidl::endpoints::create_endpoints::<fsandbox::ConnectorMarker>();
+    factory.connect_to_connector(echo_connector_capability, echo_connector_server.into()).unwrap();
+    let echo_connector = echo_connector_client.into_proxy().unwrap();
     let (echo_proxy, server_end) = create_proxy::<fecho::EchoMarker>().unwrap();
-    echo_sender.send_(server_end.into_channel().into()).unwrap();
+    echo_connector.open(server_end.into_channel().into()).unwrap();
     let response = echo_proxy.echo_string(Some("hello")).await.unwrap().unwrap();
     assert_eq!(response, "hello");
 }

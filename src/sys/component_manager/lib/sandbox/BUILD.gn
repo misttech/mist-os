@@ -46,6 +46,7 @@ rustc_library("sandbox") {
   sources = [
     "src/capability.rs",
     "src/component.rs",
+    "src/connector.rs",
     "src/data.rs",
     "src/dict.rs",
     "src/directory.rs",
@@ -55,7 +56,6 @@ rustc_library("sandbox") {
     "src/receiver.rs",
     "src/registry.rs",
     "src/router.rs",
-    "src/sender.rs",
     "src/unit.rs",
   ]
 

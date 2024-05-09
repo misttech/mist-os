@@ -48,7 +48,7 @@ impl Explain for RemoteError {
 #[derive(FromEnum, Debug, Clone)]
 pub enum Capability {
     Unit(crate::Unit),
-    Sender(crate::Sender),
+    Connector(crate::Connector),
     Open(crate::Open),
     Dictionary(crate::Dict),
     Data(crate::Data),
@@ -68,7 +68,7 @@ impl Capability {
 
     pub fn into_fidl(self) -> fsandbox::Capability {
         match self {
-            Self::Sender(s) => s.into_fidl(),
+            Self::Connector(s) => s.into_fidl(),
             Self::Open(s) => s.into_fidl(),
             Self::Router(s) => s.into_fidl(),
             Self::Dictionary(s) => s.into_fidl(),
@@ -82,7 +82,7 @@ impl Capability {
 
     pub fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
-            Self::Sender(s) => s.try_into_directory_entry(),
+            Self::Connector(s) => s.try_into_directory_entry(),
             Self::Open(s) => s.try_into_directory_entry(),
             Self::Router(s) => s.try_into_directory_entry(),
             Self::Dictionary(s) => s.try_into_directory_entry(),
@@ -96,7 +96,7 @@ impl Capability {
 
     pub fn debug_typename(&self) -> &'static str {
         match self {
-            Self::Sender(_) => "Sender",
+            Self::Connector(_) => "Sender",
             Self::Open(_) => "Open",
             Self::Router(_) => "Router",
             Self::Dictionary(_) => "Dictionary",
@@ -149,10 +149,10 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 };
                 Ok(any)
             }
-            fsandbox::Capability::Sender(sender) => {
-                let any = try_from_handle_in_registry(sender.token.as_handle_ref())?;
+            fsandbox::Capability::Connector(connector) => {
+                let any = try_from_handle_in_registry(connector.token.as_handle_ref())?;
                 match &any {
-                    Capability::Sender(_) => (),
+                    Capability::Connector(_) => (),
                     _ => panic!("BUG: registry has a non-Sender capability under a Sender koid"),
                 };
                 Ok(any)

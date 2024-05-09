@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{Message, Sender};
+use crate::{Connector, Message};
 use derivative::Derivative;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -30,10 +30,10 @@ impl Clone for Receiver {
 }
 
 impl Receiver {
-    pub fn new() -> (Self, Sender) {
+    pub fn new() -> (Self, Connector) {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = Self { inner: Arc::new(Mutex::new(receiver)) };
-        (receiver, Sender::new(sender))
+        (receiver, Connector::new(sender))
     }
 
     /// Waits to receive a message, or return `None` if there are no more messages and all
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn receive_blocks_while_sender_alive() {
+    fn receive_blocks_while_connector_alive() {
         let mut ex = fasync::TestExecutor::new();
         let (receiver, sender) = Receiver::new();
 

@@ -20,13 +20,13 @@ impl From<fsandbox::ProtocolPayload> for Message {
     }
 }
 
-/// Types that implement [`Sendable`] let the holder send channels
+/// Types that implement [`Connectable`] let the holder send channels
 /// to them.
-pub trait Sendable: Send + Sync + Debug {
+pub trait Connectable: Send + Sync + Debug {
     fn send(&self, message: Message) -> Result<(), ()>;
 }
 
-impl Sendable for mpsc::UnboundedSender<crate::Message> {
+impl Connectable for mpsc::UnboundedSender<crate::Message> {
     fn send(&self, message: Message) -> Result<(), ()> {
         self.unbounded_send(message).map_err(|_| ())
     }
@@ -34,13 +34,13 @@ impl Sendable for mpsc::UnboundedSender<crate::Message> {
 
 /// A capability that transfers another capability to a [Receiver].
 #[derive(Debug, Clone)]
-pub struct Sender {
-    inner: std::sync::Arc<dyn Sendable>,
+pub struct Connector {
+    inner: std::sync::Arc<dyn Connectable>,
 }
 
-impl Sender {
-    pub fn new_sendable(sender: impl Sendable + 'static) -> Self {
-        Self { inner: std::sync::Arc::new(sender) }
+impl Connector {
+    pub fn new_sendable(connector: impl Connectable + 'static) -> Self {
+        Self { inner: std::sync::Arc::new(connector) }
     }
 
     pub(crate) fn new(sender: mpsc::UnboundedSender<Message>) -> Self {
@@ -56,21 +56,21 @@ impl Sender {
     }
 }
 
-impl From<Sender> for Open {
-    fn from(sender: Sender) -> Self {
+impl From<Connector> for Open {
+    fn from(connector: Connector) -> Self {
         Self::new(vfs::service::endpoint(move |_scope, server_end| {
-            let _ = sender.send_channel(server_end.into_zx_channel().into());
+            let _ = connector.send_channel(server_end.into_zx_channel().into());
         }))
     }
 }
 
-impl Sendable for Sender {
+impl Connectable for Connector {
     fn send(&self, message: Message) -> Result<(), ()> {
         self.send(message)
     }
 }
 
-impl CapabilityTrait for Sender {
+impl CapabilityTrait for Connector {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(vfs::service::endpoint(move |_scope, server_end| {
             let _ = self.send_channel(server_end.into_zx_channel().into());
@@ -78,15 +78,15 @@ impl CapabilityTrait for Sender {
     }
 }
 
-impl From<Sender> for fsandbox::SenderCapability {
-    fn from(value: Sender) -> Self {
-        fsandbox::SenderCapability { token: registry::insert_token(value.into()) }
+impl From<Connector> for fsandbox::ConnectorCapability {
+    fn from(value: Connector) -> Self {
+        fsandbox::ConnectorCapability { token: registry::insert_token(value.into()) }
     }
 }
 
-impl From<Sender> for fsandbox::Capability {
-    fn from(sender: Sender) -> Self {
-        fsandbox::Capability::Sender(sender.into())
+impl From<Connector> for fsandbox::Capability {
+    fn from(connector: Connector) -> Self {
+        fsandbox::Capability::Connector(connector.into())
     }
 }
 
@@ -109,28 +109,31 @@ mod tests {
     async fn fidl_clone() {
         let (receiver, sender) = Receiver::new();
 
-        // Send a channel through the Sender.
+        // Send a channel through the Connector.
         let (ch1, _ch2) = zx::Channel::create();
         sender.send_channel(ch1).unwrap();
 
         // Convert the Sender to a FIDL token.
-        let fidl_sender: fsandbox::SenderCapability = sender.into();
+        let connector: fsandbox::ConnectorCapability = sender.into();
 
         // Clone the Sender by cloning the token.
-        let token_clone = fsandbox::SenderCapability {
-            token: fidl_sender.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+        let token_clone = fsandbox::ConnectorCapability {
+            token: connector.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         };
-        let sender_clone =
-            match crate::Capability::try_from(fsandbox::Capability::Sender(token_clone)).unwrap() {
-                crate::Capability::Sender(sender) => sender,
-                capability @ _ => panic!("wrong type {capability:?}"),
-            };
+        let connector_clone = match crate::Capability::try_from(fsandbox::Capability::Connector(
+            token_clone,
+        ))
+        .unwrap()
+        {
+            crate::Capability::Connector(connector) => connector,
+            capability @ _ => panic!("wrong type {capability:?}"),
+        };
 
         // Send a channel through the cloned Sender.
         let (ch1, _ch2) = zx::Channel::create();
-        sender_clone.send_channel(ch1).unwrap();
+        connector_clone.send_channel(ch1).unwrap();
 
-        // The Receiver should receive two channels, one from each sender.
+        // The Receiver should receive two channels, one from each connector.
         for _ in 0..2 {
             let _ch = receiver.receive().await.unwrap();
         }

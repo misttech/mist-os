@@ -97,15 +97,16 @@ impl FactoryCapabilityHost {
                     _ = server_end.close_with_epitaph(err.as_zx_status());
                 }
             },
-            fsandbox::FactoryRequest::ConnectToSender {
+            fsandbox::FactoryRequest::ConnectToConnector {
                 capability,
                 server_end,
                 control_handle: _,
-            } => match sandbox::Capability::try_from(fsandbox::Capability::Sender(capability)) {
+            } => match sandbox::Capability::try_from(fsandbox::Capability::Connector(capability)) {
                 Ok(capability) => match capability {
-                    sandbox::Capability::Sender(sender) => {
-                        let server_end: ServerEnd<fsandbox::SenderMarker> = server_end.into();
-                        self.tasks.spawn(serve_sender(sender, server_end.into_stream().unwrap()));
+                    sandbox::Capability::Connector(connector) => {
+                        let server_end: ServerEnd<fsandbox::ConnectorMarker> = server_end.into();
+                        self.tasks
+                            .spawn(serve_connector(connector, server_end.into_stream().unwrap()));
                     }
                     _ => unreachable!(),
                 },
@@ -114,8 +115,8 @@ impl FactoryCapabilityHost {
                     _ = server_end.close_with_epitaph(err.as_zx_status());
                 }
             },
-            fsandbox::FactoryRequest::CreateSender { receiver, responder } => {
-                let sender = self.create_sender(receiver);
+            fsandbox::FactoryRequest::CreateConnector { receiver, responder } => {
+                let sender = self.create_connector(receiver);
                 responder.send(sender)?;
             }
             fsandbox::FactoryRequest::CreateHandle { handle, responder } => {
@@ -137,15 +138,15 @@ impl FactoryCapabilityHost {
         fsandbox::HandleCapability::from(sandbox::OneShotHandle::new(handle))
     }
 
-    fn create_sender(
+    fn create_connector(
         &self,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
-    ) -> fsandbox::SenderCapability {
+    ) -> fsandbox::ConnectorCapability {
         let (receiver, sender) = Receiver::new();
         self.tasks.spawn(async move {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
         });
-        fsandbox::SenderCapability::from(sender)
+        fsandbox::ConnectorCapability::from(sender)
     }
 
     fn create_dictionary(&self) -> ClientEnd<fsandbox::DictionaryMarker> {
@@ -172,15 +173,15 @@ async fn serve_handle(handle: sandbox::OneShotHandle, mut stream: fsandbox::Hand
     }
 }
 
-async fn serve_sender(sender: sandbox::Sender, mut stream: fsandbox::SenderRequestStream) {
+async fn serve_connector(sender: sandbox::Connector, mut stream: fsandbox::ConnectorRequestStream) {
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            fsandbox::SenderRequest::Send_ { channel, control_handle: _ } => {
+            fsandbox::ConnectorRequest::Open { channel, control_handle: _ } => {
                 if let Err(_err) = sender.send(sandbox::Message { channel }) {
                     return;
                 }
             }
-            fsandbox::SenderRequest::_UnknownMethod { ordinal, .. } => {
+            fsandbox::ConnectorRequest::_UnknownMethod { ordinal, .. } => {
                 warn!("Received unknown Sender request with ordinal {ordinal}");
             }
         }
@@ -309,20 +310,20 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn create_sender() {
+    async fn create_connector() {
         let (_tasks, factory_proxy) = factory();
 
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-        let sender = factory_proxy.create_sender(receiver_client_end).await.unwrap();
-        let (sender_client, sender_server) =
-            fidl::endpoints::create_endpoints::<fsandbox::SenderMarker>();
-        factory_proxy.connect_to_sender(sender, sender_server.into()).unwrap();
-        let sender = sender_client.into_proxy().unwrap();
+        let connector = factory_proxy.create_connector(receiver_client_end).await.unwrap();
+        let (connector_client, connector_server) =
+            fidl::endpoints::create_endpoints::<fsandbox::ConnectorMarker>();
+        factory_proxy.connect_to_connector(connector, connector_server.into()).unwrap();
+        let connector = connector_client.into_proxy().unwrap();
 
         let (ch1, _ch2) = zx::Channel::create();
         let expected_koid = ch1.get_koid().unwrap();
-        sender.send_(ch1).unwrap();
+        connector.open(ch1).unwrap();
 
         let request = receiver_stream.try_next().await.unwrap().unwrap();
         if let fsandbox::ReceiverRequest::Receive { channel, .. } = request {

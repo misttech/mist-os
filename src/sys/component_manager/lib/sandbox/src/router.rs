@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn route_and_use_sender_with_dropped_receiver() {
+    async fn route_and_use_connector_with_dropped_receiver() {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
         let (receiver, sender) = Receiver::new();
@@ -254,7 +254,7 @@ mod tests {
             .await
             .unwrap();
         let sender = match capability {
-            Capability::Sender(c) => c,
+            Capability::Connector(c) => c,
             c => panic!("Bad enum {:#?}", c),
         };
 
@@ -285,7 +285,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_matches!(capability, fsandbox::Capability::Sender(_));
+        assert_matches!(capability, fsandbox::Capability::Connector(_));
     }
 
     #[fuchsia::test]

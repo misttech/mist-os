@@ -37,7 +37,7 @@ type DataCapability = flexible union {
 };
 
 @available(added=HEAD)
-type SenderCapability = resource struct {
+type ConnectorCapability = resource struct {
     token zx.Handle:EVENTPAIR;
 };
 
@@ -47,7 +47,7 @@ type Capability = flexible resource union {
     2: handle HandleCapability;
     3: data DataCapability;
     4: dictionary client_end:Dictionary;
-    5: sender SenderCapability;
+    5: connector ConnectorCapability;
     6: directory client_end:fuchsia.io.Directory;
     7: router client_end:Router;
 };
@@ -173,13 +173,13 @@ open protocol DictionaryIterator {
     });
 };
 
-/// A sender allows a client to send a channel to the framework
+/// A connector allows a client to send a channel to the framework
 /// so that it can be connected.
 @discoverable
 @available(added=HEAD)
-open protocol Sender {
-    /// Sends a channel over this sender.
-    flexible Send(ProtocolPayload);
+open protocol Connector {
+    /// Sends a channel over this connector.
+    flexible Open(ProtocolPayload);
 };
 
 /// This represents a component within the framework.
@@ -239,15 +239,15 @@ type ProtocolPayload = resource struct {
 @discoverable
 @available(added=HEAD)
 open protocol Factory {
-    /// Operate on the provided sender capability.
+    /// Operate on the provided connector capability.
     ///
     /// Consumes a token referencing a bedrock object and serves the
     /// corresponding FIDL representation on `server_end`. The peer of the
     /// `server_end` is another reference to the bedrock object. Dropping the
     /// control channel decreases one reference on the object.
-    flexible ConnectToSender(resource struct {
-        capability SenderCapability;
-        server_end server_end:Sender;
+    flexible ConnectToConnector(resource struct {
+        capability ConnectorCapability;
+        server_end server_end:Connector;
     });
 
     /// Operate on the provided handle capability.
@@ -261,11 +261,11 @@ open protocol Factory {
         server_end server_end:Handle;
     });
 
-    /// Creates a `Sender` from a client served `Receiver`.
-    flexible CreateSender(resource struct {
+    /// Creates a `Connector` from a client served `Receiver`.
+    flexible CreateConnector(resource struct {
         receiver client_end:Receiver;
     }) -> (resource struct {
-        capability SenderCapability;
+        capability ConnectorCapability;
     });
 
     /// Creates a `Handle` from the provided `handle`.

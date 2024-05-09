@@ -518,7 +518,7 @@ impl ComponentInstance {
                 // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once
                 // it exists
                 let router = match value {
-                    Capability::Sender(s) => Router::new_ok(s),
+                    Capability::Connector(s) => Router::new_ok(s),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 

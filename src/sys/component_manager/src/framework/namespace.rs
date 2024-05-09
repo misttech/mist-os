@@ -218,8 +218,11 @@ mod tests {
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
-            dict.insert(fecho::EchoMarker::DEBUG_NAME.parse().unwrap(), Capability::Sender(sender))
-                .expect("dict entry already exists");
+            dict.insert(
+                fecho::EchoMarker::DEBUG_NAME.parse().unwrap(),
+                Capability::Connector(sender),
+            )
+            .expect("dict entry already exists");
 
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
@@ -282,8 +285,11 @@ mod tests {
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
-            dict.insert(fecho::EchoMarker::DEBUG_NAME.parse().unwrap(), Capability::Sender(sender))
-                .expect("dict entry already exists");
+            dict.insert(
+                fecho::EchoMarker::DEBUG_NAME.parse().unwrap(),
+                Capability::Connector(sender),
+            )
+            .expect("dict entry already exists");
 
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();

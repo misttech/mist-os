@@ -181,7 +181,7 @@ mod test_util {
     use {
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        sandbox::{Receiver, Sender},
+        sandbox::{Connector, Receiver},
         std::sync::Arc,
         vfs::{
             directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
@@ -191,7 +191,7 @@ mod test_util {
         },
     };
 
-    pub fn multishot() -> (Sender, Receiver) {
+    pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Receiver::new();
         (sender, receiver)
     }
