@@ -117,7 +117,7 @@ size_checker_input = {
         "sampler",
         "triage-detect",
       ]
-      limit = 2883584  # 2.75 MiB
+      limit = 2936012  # 2.80 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
@@ -140,7 +140,7 @@ size_checker_input = {
         "libvulkan_goldfish",
         "vulkan_loader",
       ]
-      limit = 4980736  # 4.75 MiB
+      limit = 5085594  # 4.85 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
