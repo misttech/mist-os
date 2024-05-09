@@ -17,13 +17,11 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
-    "//sdk/lib/device-watcher/rust",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//src/power/broker/client",
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_rust",
     "//src/power/testing/fake-suspend:test.suspendcontrol_rust",
@@ -44,14 +42,16 @@ fuchsia_component("component") {
     ":bin",
     "//src/devices/misc/drivers/test-parent",
     "//src/power/system-activity-governor:component",
-    "//src/power/system-activity-governor/integration/testing/fake-suspend",
   ]
 }
 
 fuchsia_package("package") {
   testonly = true
   package_name = "fake-system-activity-governor"
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    "//src/power/testing/fake-suspend",
+  ]
 }
 
 group("tests") {

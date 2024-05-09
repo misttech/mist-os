@@ -13,7 +13,6 @@ use {
     },
     fidl_test_sagcontrol as fctrl, fuchsia_async as fasync,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     futures::{channel::mpsc, StreamExt},
     power_broker_client::PowerElementContext,
     tracing::*,
@@ -33,8 +32,6 @@ async fn create_test_env() -> TestEnv {
     info!("building the test env");
 
     let builder = RealmBuilder::new().await.unwrap();
-    builder.driver_test_realm_setup().await.unwrap();
-
     let component_ref = builder
         .add_child(
             "fake-system-activity-governor",
@@ -48,6 +45,11 @@ async fn create_test_env() -> TestEnv {
         .add_child("power-broker", "#meta/power-broker.cm", ChildOptions::new())
         .await
         .expect("Failed to add child: power-broker");
+
+    let fake_suspend_ref = builder
+        .add_child("fake-suspend", "#meta/fake-suspend.cm", ChildOptions::new())
+        .await
+        .expect("Failed to add child: fake-suspend");
 
     // Expose capabilities from power-broker.
     builder
@@ -71,15 +73,13 @@ async fn create_test_env() -> TestEnv {
         .await
         .unwrap();
 
-    // Expose capabilities from driver-test-realm to fake-system-activity-governor.
+    // Expose capabilities from fake-suspend to fake-system-activity-governor.
     builder
         .add_route(
             Route::new()
-                .capability(Capability::directory("dev-class").subdir("test").as_("dev-class-test"))
-                .capability(
-                    Capability::directory("dev-class").subdir("suspend").as_("dev-class-suspend"),
-                )
-                .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
+                .capability(Capability::protocol_by_name("test.suspendcontrol.Device"))
+                .capability(Capability::directory("dev-class-suspend"))
+                .from(&fake_suspend_ref)
                 .to(&component_ref),
         )
         .await
@@ -102,11 +102,6 @@ async fn create_test_env() -> TestEnv {
         .unwrap();
 
     let realm_instance = builder.build().await.expect("Failed to build RealmInstance");
-    realm_instance
-        .driver_test_realm_start(Default::default())
-        .await
-        .expect("Failed to start driver test realm");
-
     TestEnv { realm_instance }
 }
 

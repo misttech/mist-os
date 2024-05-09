@@ -5,15 +5,13 @@
 library test.systemactivitygovernor;
 
 using fuchsia.testing.harness;
-using test.suspendcontrol;
 
 @discoverable
 open protocol RealmFactory {
     /// Creates a new realm and binds the given RealmProxy server end to it.
     flexible CreateRealm(resource struct {
         realm_server server_end:fuchsia.testing.harness.RealmProxy;
-    }) -> (resource struct {
+    }) -> (struct {
         activity_governor_moniker string:MAX;
-        suspend_control client_end:test.suspendcontrol.Device;
     }) error fuchsia.testing.harness.OperationError;
 };

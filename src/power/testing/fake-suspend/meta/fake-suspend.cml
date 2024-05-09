@@ -8,7 +8,7 @@
     ],
     program: {
         runner: "elf",
-        binary: "bin/test-suspend-bin",
+        binary: "bin/fake-suspend-bin",
     },
     capabilities: [
         {
@@ -16,11 +16,7 @@
             rights: [ "r*" ],
             path: "/suspend",
         },
-        {
-            directory: "dev-class-test",
-            rights: [ "r*" ],
-            path: "/controller",
-        },
+        { protocol: "test.suspendcontrol.Device" },
     ],
     expose: [
         {
@@ -28,7 +24,7 @@
             from: "self",
         },
         {
-            directory: "dev-class-test",
+            protocol: "test.suspendcontrol.Device",
             from: "self",
         },
     ],

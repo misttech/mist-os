@@ -14,12 +14,10 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
-    "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
-    "//src/power/broker:component",
     "//src/power/broker/client",
     "//src/power/system-activity-governor/fake:component",
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_rust",
@@ -33,7 +31,11 @@ rustc_test("bin") {
 
 fuchsia_unittest_package("fake-system-activity-governor-test") {
   manifest = "meta/test.cml"
-  deps = [ ":bin" ]
+  deps = [
+    ":bin",
+    "//src/power/broker:component",
+    "//src/power/testing/fake-suspend",
+  ]
   test_specs = {
     environments = basic_envs
   }

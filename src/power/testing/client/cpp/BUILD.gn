@@ -10,12 +10,16 @@ source_set("cpp") {
   public_deps = [
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/power/broker:component",
     "//src/power/system-activity-governor/fake:component",
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
     "//src/power/testing/client:client_includes",
-    "//src/power/testing/client:test-suspend",
+    "//src/power/testing/client:realm_base_manifest",
+    "//src/power/testing/fake-suspend",
     "//src/power/testing/fake-suspend:test.suspendcontrol_cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   deps = [ "//sdk/lib/component/incoming/cpp" ]
 }

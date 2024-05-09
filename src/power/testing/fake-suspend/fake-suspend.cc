@@ -11,21 +11,6 @@
 #include "src/power/testing/fake-suspend/control_server.h"
 #include "src/power/testing/fake-suspend/device_server.h"
 
-class FakeDevfsController : public fidl::testing::TestBase<fuchsia_device::Controller> {
- public:
-  void Serve(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-    bindings_.AddBinding(async_get_default_dispatcher(), std::move(server_end), this,
-                         fidl::kIgnoreBindingClosure);
-  }
-
- private:
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
-    completer.Reply(zx::ok("fake-suspend/control"));
-  }
-  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
-  fidl::ServerBindingGroup<fuchsia_device::Controller> bindings_;
-};
-
 int main() {
   async::Loop loop{&kAsyncLoopConfigAttachToCurrentThread};
   component::OutgoingDirectory outgoing(loop.dispatcher());
@@ -35,8 +20,6 @@ int main() {
   auto device_server = std::make_shared<fake_suspend::DeviceServer>(suspend_states);
   control_server->set_resumable(device_server);
   device_server->set_suspend_observer(control_server);
-
-  auto devfs_controller = std::make_shared<FakeDevfsController>();
 
   auto result = outgoing.AddUnmanagedProtocolAt<fuchsia_hardware_suspend::Suspender>(
       "suspend",
@@ -48,22 +31,10 @@ int main() {
     return -1;
   }
 
-  result = outgoing.AddUnmanagedProtocolAt<test_suspendcontrol::Device>(
-      "controller/instance",
+  result = outgoing.AddUnmanagedProtocol<test_suspendcontrol::Device>(
       [control_server](fidl::ServerEnd<test_suspendcontrol::Device> server_end) {
         control_server->Serve(async_get_default_dispatcher(), std::move(server_end));
-      },
-      "device_protocol");
-  if (result.is_error()) {
-    return -1;
-  }
-
-  result = outgoing.AddUnmanagedProtocolAt<fuchsia_device::Controller>(
-      "controller/instance",
-      [devfs_controller](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-        devfs_controller->Serve(std::move(server_end));
-      },
-      "device_controller");
+      });
   if (result.is_error()) {
     return -1;
   }
