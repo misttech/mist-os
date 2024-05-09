@@ -101,7 +101,6 @@ fuchsia_test_component("vkloop-mali-test-cmp") {
   component_name = "vkloop-mali-test"
   manifest = "meta/vkloop-mali-test.cml"
   test_type = "device"
-  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_test_package("vkloop-mali-pkg") {

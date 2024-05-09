@@ -37,7 +37,6 @@ fuchsia_structured_config_cpp_elf_lib("config_lib") {
 fuchsia_component("child") {
   testonly = true
   manifest = "meta/child.cml"
-  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_component("parent") {

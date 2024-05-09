@@ -145,7 +145,6 @@ fuchsia_test_component("vkext-unprotected-lavapipe-test-component") {
   component_name = "vkext-unprotected-lavapipe"
   manifest = "meta/vkext_unprotected_lavapipe.cml"
   test_type = "vulkan"
-  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_test_package("vkext-unprotected-lavapipe-package") {
@@ -164,7 +163,6 @@ fuchsia_test_component("vkext-protected-test-component") {
   component_name = "vkext-protected-test"
   manifest = "meta/vkext_protected.cml"
   test_type = "vulkan"
-  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_test_package("vkext-protected-package") {

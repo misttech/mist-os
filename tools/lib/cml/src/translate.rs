@@ -2896,7 +2896,7 @@ mod tests {
         },
 
         test_compile_use => {
-            features = FeatureSet::from(vec![Feature::Dictionaries, Feature::ConfigCapabilities]),
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "use": [
                     {
@@ -5037,7 +5037,7 @@ mod tests {
 
 
         test_compile_configuration_capability => {
-            features = FeatureSet::from(vec![Feature::ConfigCapabilities]),
+            features = FeatureSet::from(vec![]),
             input = json!({
                 "capabilities": [
                     {
@@ -5607,8 +5607,7 @@ mod tests {
                     }
             ],
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let actual = compile(&input, options).unwrap();
         let type_ = fdecl::ConfigType {
             layout: fdecl::ConfigTypeLayout::Bool,
@@ -5653,8 +5652,7 @@ mod tests {
             "my_config": { "type": "int8"},
         }
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         assert_matches!(
             compile(&input, options),
             Err(Error::Validate { err, .. })
@@ -5677,8 +5675,7 @@ mod tests {
             "my_config": { "type": "bool"},
         }
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let decl = compile(&input, options).unwrap();
         let config = decl.config.unwrap();
         assert_eq!(
@@ -5698,8 +5695,7 @@ mod tests {
                     }
             ],
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let decl = compile(&input, options).unwrap();
         let config = decl.config.unwrap();
         assert_eq!(
@@ -5723,8 +5719,7 @@ mod tests {
                     }
             ],
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let decl = compile(&input, options).unwrap();
         assert_matches!(
             decl.uses.as_ref().unwrap()[0],
@@ -5748,8 +5743,7 @@ mod tests {
                     }
             ],
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         assert_matches!(compile(&input, options), Err(Error::InvalidArgs(_)));
     }
 

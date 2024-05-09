@@ -407,9 +407,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if capability.resolver.is_some() && capability.path.is_none() {
             return Err(Error::validate("\"path\" should be present with \"resolver\""));
         }
-        if capability.config.is_some() {
-            self.features.check(Feature::ConfigCapabilities)?;
-        }
 
         if let Some(name) = capability.dictionary.as_ref() {
             self.features.check(Feature::Dictionaries)?;
@@ -7329,25 +7326,6 @@ mod tests {
     };
 
     #[test]
-    fn test_cml_missing_config_feature() {
-        let input = must_parse_cml!({
-        "capabilities": [
-            {
-                "config": "fuchsia.config.MyConfig",
-                "type": "bool",
-                "value": true,
-            },
-        ],
-        });
-
-        assert_matches!(
-            compile(&input, CompileOptions::new()),
-            Err(Error::RestrictedFeature(feature))
-            if feature == "config_capabilities"
-        );
-    }
-
-    #[test]
     fn test_cml_use_bad_config_from_self() {
         let input = must_parse_cml!({
         "use": [
@@ -7360,8 +7338,7 @@ mod tests {
         ],
         });
 
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().features(&features);
+        let options = CompileOptions::new();
         assert_matches!(compile(&input, options), Err(Error::Validate { .. }));
     }
 

@@ -20,7 +20,6 @@ fuchsia_component_manifest("manifest") {
   testonly = true
   component_name = "sc_capabilities_same_cml"
   manifest = "meta/test.cml"
-  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_component("sc_capabilities_same_cml") {

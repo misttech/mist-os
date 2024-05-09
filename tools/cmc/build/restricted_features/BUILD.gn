@@ -16,18 +16,6 @@ group("dictionaries") {
   ]
 }
 
-# The allowlist of components that can use config capabilities in CML.
-group("config_capabilities") {
-  visibility = [
-    "//sdk/lib/driver_test_realm/*",
-    "//src/connectivity/policy/http-client/*",
-    "//src/fonts/*",
-    "//src/graphics/tests/vkext:*",
-    "//src/graphics/tests/vkloop:*",
-    "//src/sys/component_manager/tests/*",
-  ]
-}
-
 # The allowlist of components that can customize timing of request delivery in CML.
 group("delivery_type") {
   visibility = [

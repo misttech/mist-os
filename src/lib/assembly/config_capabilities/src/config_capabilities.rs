@@ -122,13 +122,8 @@ pub fn build_config_capability_package(
         capabilities: Some(cml_capabilities),
         ..Default::default()
     };
-    let out_data = cml::compile(
-        &cml,
-        cml::CompileOptions::default().features(&cml::features::FeatureSet::from(vec![
-            cml::features::Feature::ConfigCapabilities,
-        ])),
-    )
-    .with_context(|| format!("compiling config capability CML"))?;
+    let out_data = cml::compile(&cml, cml::CompileOptions::default())
+        .with_context(|| format!("compiling config capability CML"))?;
     let cm_name = format!("config.cm");
     let cm_path = outdir.join(&cm_name);
     let mut cm_file = std::fs::File::create(&cm_path)
