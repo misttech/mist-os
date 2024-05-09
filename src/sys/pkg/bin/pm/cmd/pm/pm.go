@@ -15,7 +15,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/genkey"
 	initcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/init"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
@@ -95,7 +94,8 @@ func doMain() int {
 		err = nil
 
 	case "genkey":
-		err = genkey.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "genkey is deprecated without replacement")
+		err = nil
 
 	case "init":
 		err = initcmd.Run(cfg, flag.Args()[1:])
