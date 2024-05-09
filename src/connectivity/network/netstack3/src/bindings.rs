@@ -77,7 +77,7 @@ use netstack3_core::{
         EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
         PureIpDeviceId, WeakDeviceId,
     },
-    error::NetstackError,
+    error::ExistsError,
     filter::FilterBindingsTypes,
     icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
     inspect::{InspectableValue, Inspector},
@@ -845,7 +845,7 @@ impl BindingsCtx {
 fn add_loopback_ip_addrs(
     ctx: &mut Ctx,
     loopback: &DeviceId<BindingsCtx>,
-) -> Result<(), NetstackError> {
+) -> Result<(), ExistsError> {
     for addr_subnet in [
         AddrSubnetEither::V4(
             AddrSubnet::from_witness(Ipv4::LOOPBACK_ADDRESS, Ipv4::LOOPBACK_SUBNET.prefix())
@@ -858,7 +858,7 @@ fn add_loopback_ip_addrs(
     ] {
         ctx.api().device_ip_any().add_ip_addr_subnet(loopback, addr_subnet).map_err(
             |e| match e {
-                AddIpAddrSubnetError::Exists => NetstackError::Exists,
+                AddIpAddrSubnetError::Exists => ExistsError,
                 AddIpAddrSubnetError::InvalidAddr => {
                     panic!("loopback address should not be invalid")
                 }

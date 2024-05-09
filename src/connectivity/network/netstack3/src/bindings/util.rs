@@ -33,7 +33,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId},
-    error::{ExistsError, NetstackError, NotFoundError},
+    error::{ExistsError, NotFoundError},
     neighbor::{NudUserConfig, NudUserConfigUpdate},
     routes::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
@@ -417,18 +417,6 @@ impl TryIntoFidl<fidl_net_stack::Error> for ExistsError {
 
     fn try_into_fidl(self) -> Result<fidl_net_stack::Error, Never> {
         Ok(fidl_net_stack::Error::AlreadyExists)
-    }
-}
-
-impl TryIntoFidl<fidl_net_stack::Error> for NetstackError {
-    type Error = Never;
-
-    fn try_into_fidl(self) -> Result<fidl_net_stack::Error, Never> {
-        match self {
-            NetstackError::Exists => Ok(fidl_net_stack::Error::AlreadyExists),
-            NetstackError::NotFound => Ok(fidl_net_stack::Error::NotFound),
-            _ => Ok(fidl_net_stack::Error::Internal),
-        }
     }
 }
 

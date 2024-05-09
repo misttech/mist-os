@@ -20,7 +20,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::DeviceId,
-    error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
+    error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{IpSockCreationError, IpSockSendError, ResolveRouteError},
     socket::{
         ConnectError, NotDualStackCapableError, SetDualStackEnabledError,
@@ -641,20 +641,6 @@ impl IntoErrno for tcp::SetDeviceError {
             Self::Conflict => Errno::Eaddrinuse,
             Self::Unroutable => Errno::Ehostunreach,
             Self::ZoneChange => Errno::Einval,
-        }
-    }
-}
-
-impl IntoErrno for NetstackError {
-    fn into_errno(self) -> Errno {
-        match self {
-            NetstackError::Parse(_) => Errno::Einval,
-            NetstackError::Exists => Errno::Ealready,
-            NetstackError::NotFound => Errno::Efault,
-            NetstackError::SendUdp(s) => s.into_errno(),
-            NetstackError::Connect(c) => c.into_errno(),
-            NetstackError::NoRoute => Errno::Ehostunreach,
-            NetstackError::Mtu => Errno::Emsgsize,
         }
     }
 }

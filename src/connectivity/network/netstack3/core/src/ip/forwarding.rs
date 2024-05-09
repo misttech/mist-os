@@ -495,7 +495,6 @@ mod tests {
             testutil::MultipleDevicesId,
             DeviceId,
         },
-        error,
         ip::{
             forwarding::testutil::FakeIpForwardingCtx,
             types::{AddableEntryEither, AddableMetric, Metric},
@@ -1552,7 +1551,7 @@ mod tests {
 
         assert_eq!(
             ctx.test_api().del_routes_to_subnet(gateway_subnet.into()),
-            expected_first_result.map_err(|_: AddRouteError| error::NetstackError::NotFound),
+            expected_first_result.map_err(|_: AddRouteError| crate::error::NotFoundError),
         );
 
         // Then, add a route to the gateway, and try again, expecting success.

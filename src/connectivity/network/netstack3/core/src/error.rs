@@ -5,44 +5,7 @@
 //! Custom error types for the netstack.
 
 use net_types::ip::{GenericOverIp, Ip};
-use packet_formats::error::*;
 use thiserror::Error;
-
-/// Results returned from many functions in the netstack.
-pub type Result<T> = core::result::Result<T, NetstackError>;
-
-/// Top-level error type the netstack.
-#[derive(Error, Debug, PartialEq)]
-pub enum NetstackError {
-    #[error("{}", _0)]
-    /// Errors related to packet parsing.
-    Parse(ParseError),
-
-    /// Error when item already exists.
-    #[error("Item already exists")]
-    Exists,
-
-    /// Error when item is not found.
-    #[error("Item not found")]
-    NotFound,
-
-    /// Errors related to sending UDP frames/packets.
-    #[error("{}", _0)]
-    SendUdp(crate::transport::udp::SendToError),
-
-    /// Errors related to connections.
-    #[error("{}", _0)]
-    Connect(SocketError),
-
-    /// Error when there is no route to an address.
-    #[error("No route to address")]
-    NoRoute,
-
-    /// Error when a maximum transmission unit (MTU) is exceeded.
-    #[error("MTU exceeded")]
-    Mtu,
-    // Add error types here as we add more to the stack.
-}
 
 /// Error when something is not supported.
 #[derive(Debug, PartialEq, Eq, Error, GenericOverIp)]
@@ -55,12 +18,6 @@ pub struct NotSupportedError;
 #[error("Already exists")]
 pub struct ExistsError;
 
-impl From<ExistsError> for NetstackError {
-    fn from(_: ExistsError) -> NetstackError {
-        NetstackError::Exists
-    }
-}
-
 impl From<ExistsError> for SocketError {
     fn from(_: ExistsError) -> SocketError {
         SocketError::Local(LocalAddressError::AddressInUse)
@@ -72,12 +29,6 @@ impl From<ExistsError> for SocketError {
 #[derive(Debug, Error, PartialEq, Eq)]
 #[error("Not found")]
 pub struct NotFoundError;
-
-impl From<NotFoundError> for NetstackError {
-    fn from(_: NotFoundError) -> NetstackError {
-        NetstackError::NotFound
-    }
-}
 
 /// Error type for errors common to local addresses.
 #[derive(Error, Debug, PartialEq, GenericOverIp)]
@@ -124,11 +75,6 @@ pub enum ZonedAddressError {
     DeviceZoneMismatch,
 }
 
-// TODO(joshlf): Once we support a more general model of sockets in which UDP
-// and ICMP connections are special cases of UDP and ICMP sockets, we can
-// introduce a more specialized ListenerError which does not contain the NoRoute
-// variant.
-
 /// An error encountered when attempting to create a UDP, TCP, or ICMP connection.
 #[derive(Error, Debug, PartialEq)]
 pub enum RemoteAddressError {
@@ -149,22 +95,7 @@ pub enum SocketError {
     Remote(RemoteAddressError),
 }
 
-/// Error when no route exists to a remote address.
-#[derive(Debug, PartialEq, Eq)]
-pub struct NoRouteError;
-
-impl From<NoRouteError> for NetstackError {
-    fn from(_: NoRouteError) -> NetstackError {
-        NetstackError::NoRoute
-    }
-}
-
-impl From<NoRouteError> for SocketError {
-    fn from(_: NoRouteError) -> SocketError {
-        SocketError::Remote(RemoteAddressError::NoRoute)
-    }
-}
-
 /// Error when link address resolution failed for a neighbor.
-#[derive(Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq)]
+#[error("Address resolution failed")]
 pub struct AddressResolutionFailed;

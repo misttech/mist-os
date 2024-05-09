@@ -350,7 +350,7 @@ where
     pub fn del_routes_to_subnet(
         &mut self,
         subnet: net_types::ip::SubnetEither,
-    ) -> crate::error::Result<()> {
+    ) -> Result<(), crate::error::NotFoundError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match subnet {
             SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
@@ -364,7 +364,6 @@ where
                 _,
             >(core_ctx, bindings_ctx, subnet),
         }
-        .map_err(From::from)
     }
 
     /// Deletes all routes targeting `device`.
