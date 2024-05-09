@@ -8,7 +8,7 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
     api::CoreApi,
-    context::{ContextProvider, CoreTimerContext, CtxPair},
+    context::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair},
     device::{
         arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
         PureIpDeviceCounters, WeakDeviceId,
@@ -30,7 +30,7 @@ use crate::{
 
 /// A builder for [`StackState`].
 #[derive(Default, Clone)]
-pub(crate) struct StackStateBuilder {
+pub struct StackStateBuilder {
     transport: transport::TransportStateBuilder,
     ipv4: ip::Ipv4StateBuilder,
     ipv6: ip::Ipv6StateBuilder,
@@ -63,6 +63,13 @@ impl StackStateBuilder {
     }
 }
 
+impl<BC: BindingsContext> BuildableCoreContext<BC> for StackState<BC> {
+    type Builder = StackStateBuilder;
+    fn build(bindings_ctx: &mut BC, builder: StackStateBuilder) -> Self {
+        builder.build_with_ctx(bindings_ctx)
+    }
+}
+
 /// The state associated with the network stack.
 pub struct StackState<BT: BindingsTypes> {
     pub(crate) transport: TransportLayerState<BT>,
@@ -80,7 +87,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
     }
 
-    #[cfg(any(test, feature = "testutils"))]
+    #[cfg(test)]
     pub(crate) fn context(&self) -> crate::context::UnlockedCoreCtx<'_, BT> {
         crate::context::UnlockedCoreCtx::new(self)
     }

@@ -991,6 +991,7 @@ mod tests {
             },
             Id,
         },
+        testutil::CtxPairExt as _,
     };
 
     use super::*;

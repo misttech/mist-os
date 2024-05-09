@@ -75,11 +75,70 @@ impl<'a, T: Sized> ContextProvider for &'a mut T {
 /// `CtxPair` provides a [`ContextPair`] implementation when `CC` and `BC` are
 /// [`ContextProvider`] and using their respective targets as the `CoreContext`
 /// and `BindingsContext` associated types.
+#[derive(Clone)]
 pub struct CtxPair<CC, BC> {
     /// The core context.
     pub core_ctx: CC,
     /// The bindings context.
+    // We put `bindings_ctx` after `core_ctx` to make sure that `core_ctx` is
+    // dropped before `bindings_ctx` so that the existence of
+    // strongly-referenced device IDs in `bindings_ctx` causes test failures,
+    // forcing proper cleanup of device IDs in our unit tests.
+    //
+    // Note that if strongly-referenced (device) IDs exist when dropping the
+    // primary reference, the primary reference's drop impl will panic. See
+    // `crate::sync::PrimaryRc::drop` for details.
+    // TODO(https://fxbug.dev/320021524): disallow destructuring to actually
+    // uphold the intent above.
     pub bindings_ctx: BC,
+}
+
+impl<CC, BC> CtxPair<CC, BC> {
+    /// Creates a new `CtxPair` with `core_ctx` and a default bindings context.
+    pub fn with_core_ctx(core_ctx: CC) -> Self
+    where
+        BC: Default,
+    {
+        Self { core_ctx, bindings_ctx: BC::default() }
+    }
+
+    /// Creates a new `CtxPair` with a default bindings context and a core
+    /// context resulting from `builder`.
+    pub fn with_default_bindings_ctx<F: FnOnce(&mut BC) -> CC>(builder: F) -> Self
+    where
+        BC: Default,
+    {
+        let mut bindings_ctx = BC::default();
+        let core_ctx = builder(&mut bindings_ctx);
+        Self { core_ctx, bindings_ctx }
+    }
+
+    /// Creates a new `CtxPair` with a mutable borrow of the contexts.
+    pub fn as_mut(&mut self) -> CtxPair<&mut CC, &mut BC> {
+        let Self { core_ctx, bindings_ctx } = self;
+        CtxPair { core_ctx, bindings_ctx }
+    }
+
+    /// Creates a new `CtxPair` with a default bindings context and the provided
+    /// core context builder.
+    pub fn new_with_builder(builder: CC::Builder) -> Self
+    where
+        CC: BuildableCoreContext<BC>,
+        BC: Default,
+    {
+        Self::with_default_bindings_ctx(|bindings_ctx| CC::build(bindings_ctx, builder))
+    }
+}
+
+impl<CC, BC> Default for CtxPair<CC, BC>
+where
+    CC: BuildableCoreContext<BC>,
+    CC::Builder: Default,
+    BC: Default,
+{
+    fn default() -> Self {
+        Self::new_with_builder(Default::default())
+    }
 }
 
 impl<CC, BC> ContextPair for CtxPair<CC, BC>
@@ -93,5 +152,27 @@ where
     fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
         let Self { core_ctx, bindings_ctx } = self;
         (core_ctx.context(), bindings_ctx.context())
+    }
+}
+
+/// A core context that can be created from some builder type.
+///
+/// This allows `CtxPair` to define its construction methods away from where
+/// core contexts are actually defined.
+pub trait BuildableCoreContext<BC> {
+    /// The builder type that can build this core context.
+    type Builder;
+
+    /// Consumes this builder and returns the context.
+    fn build(bindings_ctx: &mut BC, builder: Self::Builder) -> Self;
+}
+
+impl<O, BC> BuildableCoreContext<BC> for O
+where
+    O: Default,
+{
+    type Builder = ();
+    fn build(_bindings_ctx: &mut BC, (): ()) -> Self {
+        O::default()
     }
 }

@@ -297,8 +297,8 @@ mod tests {
             IpLayerEvent, IPV6_DEFAULT_SUBNET,
         },
         testutil::{
-            DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            CtxPairExt as _, DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
 

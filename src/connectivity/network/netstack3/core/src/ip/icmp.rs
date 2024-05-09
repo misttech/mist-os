@@ -3104,7 +3104,7 @@ mod tests {
             types::IpTypesIpExt,
         },
         state::StackStateBuilder,
-        testutil::{Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
+        testutil::{Ctx, CtxPairExt as _, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
         transport::udp::UdpStateBuilder,
         uninstantiable::UninstantiableWrapper,
     };

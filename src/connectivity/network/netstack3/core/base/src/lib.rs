@@ -23,7 +23,7 @@ mod rng;
 mod time;
 mod trace;
 
-pub use context::{ContextPair, ContextProvider, CtxPair};
+pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
@@ -80,7 +80,6 @@ pub mod testutil {
     pub use fake_bindings::FakeBindingsCtx;
     pub use fake_core::FakeCoreCtx;
     pub use fake_network::{
-        FakeNetwork, FakeNetworkContext, FakeNetworkLinks, PendingFrame, PendingFrameData,
-        StepResult,
+        FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, PendingFrame, PendingFrameData, StepResult,
     };
 }

@@ -178,9 +178,9 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, set_logger_for_test, Ctx, DispatchedFrame, FakeBindingsCtx,
-            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, set_logger_for_test, Ctx, CtxPairExt as _, DispatchedFrame,
+            FakeBindingsCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         BindingsTypes, Instant, TimerId,
@@ -268,8 +268,8 @@ mod tests {
 
     fn setup_net() -> (
         FakeNetwork<
+            crate::testutil::FakeCtxNetworkSpec,
             &'static str,
-            crate::testutil::FakeCtx,
             impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, &'static str>,
         >,
         EthernetDeviceId<FakeBindingsCtx>,

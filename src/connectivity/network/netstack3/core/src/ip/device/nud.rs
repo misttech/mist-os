@@ -2608,8 +2608,7 @@ mod tests {
         context::{
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, FakeNetwork,
-                FakeNetworkContext as _, FakeNetworkLinks, FakeTimerCtxExt as _,
-                WithFakeFrameContext,
+                FakeNetworkLinks, FakeTimerCtxExt as _, WithFakeFrameContext,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
@@ -2630,7 +2629,7 @@ mod tests {
         },
         routes::{AddableEntry, AddableMetric},
         testutil::{
-            self, DispatchedFrame, FakeEventDispatcherConfig, TestIpExt as _,
+            self, CtxPairExt, DispatchedFrame, FakeEventDispatcherConfig, TestIpExt as _,
             DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
@@ -5375,7 +5374,7 @@ mod tests {
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
-    type FakeNudNetwork<L> = FakeNetwork<&'static str, testutil::Ctx<testutil::FakeBindingsCtx>, L>;
+    type FakeNudNetwork<L> = FakeNetwork<testutil::FakeCtxNetworkSpec, &'static str, L>;
 
     fn new_test_net<I: Ip + testutil::TestIpExt>() -> (
         FakeNudNetwork<
@@ -5628,7 +5627,9 @@ mod tests {
             )
             .unwrap();
 
-        while ctx.process_queues() || ctx.trigger_next_timer().is_some() {}
+        while ctx.test_api().handle_queued_rx_packets()
+            || CtxPairExt::trigger_next_timer(&mut ctx).is_some()
+        {}
 
         let mut tcp_api = ctx.core_api().tcp::<I>();
         assert_eq!(
@@ -5757,8 +5758,10 @@ mod tests {
 
         // Should only see ICMP dest unreachable for initial fragments, i.e.
         // fragment offset equal to 0.
-        while ctx.process_queues() || ctx.trigger_next_timer().is_some() {}
-        ctx.with_fake_frame_ctx_mut(|ctx| {
+        while ctx.test_api().handle_queued_rx_packets()
+            || CtxPairExt::trigger_next_timer(&mut ctx).is_some()
+        {}
+        ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
             let found = ctx.take_frames().drain(..).find_map(|(_meta, buf)| {
                 packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
                     Ipv4,

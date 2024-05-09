@@ -1768,7 +1768,7 @@ pub(crate) mod testutil {
 
     use crate::{
         device::DeviceId,
-        testutil::{FakeBindingsCtx, FakeCtx},
+        testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx},
     };
 
     /// Gets the IPv6 address and subnet pairs associated with this device which are
@@ -1900,8 +1900,8 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, Ctx, DispatchedEvent, FakeBindingsCtx, FakeCtx, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx,
+            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         TimerId,

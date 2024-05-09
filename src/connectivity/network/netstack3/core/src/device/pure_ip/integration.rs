@@ -399,7 +399,8 @@ mod tests {
         ip::IpLayerIpExt,
         sync::RemoveResourceResult,
         testutil::{
-            FakeBindingsCtx, PureIpDeviceAndIpVersion, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            CtxPairExt as _, FakeBindingsCtx, PureIpDeviceAndIpVersion, TestIpExt,
+            DEFAULT_INTERFACE_METRIC,
         },
         types::WorkQueueReport,
         StackState,

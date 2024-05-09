@@ -21,7 +21,7 @@ use netstack3_core::{
     sync::Mutex,
     testutil::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        ContextPair, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
+        ContextPair, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
     },
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};

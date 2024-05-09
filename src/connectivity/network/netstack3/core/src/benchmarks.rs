@@ -39,7 +39,7 @@ use crate::{
     state::StackStateBuilder,
     testutil::{
         benchmarks::{black_box, Bencher},
-        FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
+        CtxPairExt as _, FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
     },
 };
 

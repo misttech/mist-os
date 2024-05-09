@@ -43,11 +43,11 @@ use crate::{
 };
 
 pub use netstack3_base::{
-    ContextPair, ContextProvider, CoreEventContext, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
-    InstantContext, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext,
-    ReferenceNotifiers, ResourceCounterContext, RngContext, SendFrameContext, SendableFrameMeta,
-    TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    BuildableCoreContext, ContextPair, ContextProvider, CoreEventContext, CoreTimerContext,
+    CounterContext, CtxPair, DeferredResourceRemovalContext, EventContext, HandleableTimer,
+    InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReceivableFrameMeta,
+    RecvFrameContext, ReferenceNotifiers, ResourceCounterContext, RngContext, SendFrameContext,
+    SendableFrameMeta, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
 };
 
 // Enable all blanket implementations on CoreCtx.
@@ -193,7 +193,7 @@ pub(crate) mod testutil {
 
     pub use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
-        FakeInstantCtx, FakeNetwork, FakeNetworkContext, FakeNetworkLinks, FakeTimerCtx,
+        FakeInstantCtx, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeTimerCtx,
         FakeTimerCtxExt, FakeTracingCtx, InstantAndData, PendingFrame, PendingFrameData,
         StepResult, WithFakeFrameContext, WithFakeTimerContext,
     };
@@ -228,78 +228,12 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<CC, TimerId, Event: Debug, State> WithFakeTimerContext<TimerId>
-        for FakeCtxWithCoreCtx<CC, TimerId, Event, State>
-    {
-        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
-            let Self { core_ctx: _, bindings_ctx } = self;
-            f(&bindings_ctx.timers)
-        }
-
-        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O {
-            let Self { core_ctx: _, bindings_ctx } = self;
-            f(&mut bindings_ctx.timers)
-        }
-    }
-
-    #[cfg(test)]
     pub(crate) type FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> =
         crate::testutil::ContextPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>>;
 
     #[cfg(test)]
     pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, BindingsCtxState> =
         FakeCtxWithCoreCtx<FakeCoreCtx<S, Meta, DeviceId>, TimerId, Event, BindingsCtxState>;
-
-    #[cfg(test)]
-    impl<CC, Id, Event: Debug, BindingsCtxState> AsRef<FakeInstantCtx>
-        for FakeCtxWithCoreCtx<CC, Id, Event, BindingsCtxState>
-    {
-        fn as_ref(&self) -> &FakeInstantCtx {
-            &self.bindings_ctx.timers.instant
-        }
-    }
-
-    #[cfg(test)]
-    impl<CC, Id, Event: Debug, BindingsCtxState> AsRef<FakeTimerCtx<Id>>
-        for FakeCtxWithCoreCtx<CC, Id, Event, BindingsCtxState>
-    {
-        fn as_ref(&self) -> &FakeTimerCtx<Id> {
-            &self.bindings_ctx.timers
-        }
-    }
-
-    #[cfg(test)]
-    impl<CC, Id, Event: Debug, BindingsCtxState> AsMut<FakeTimerCtx<Id>>
-        for FakeCtxWithCoreCtx<CC, Id, Event, BindingsCtxState>
-    {
-        fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
-            &mut self.bindings_ctx.timers
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState> AsMut<FakeFrameCtx<Meta>>
-        for FakeCtx<S, Id, Meta, Event, DeviceId, BindingsCtxState>
-    {
-        fn as_mut(&mut self) -> &mut FakeFrameCtx<Meta> {
-            &mut self.core_ctx.frames
-        }
-    }
-
-    #[cfg(test)]
-    impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState> WithFakeFrameContext<Meta>
-        for FakeCtx<S, Id, Meta, Event, DeviceId, BindingsCtxState>
-    {
-        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<Meta>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O {
-            f(&mut self.core_ctx.frames)
-        }
-    }
 
     #[cfg(test)]
     impl<I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>

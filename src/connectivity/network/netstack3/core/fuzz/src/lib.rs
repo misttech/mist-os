@@ -18,7 +18,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::{EthernetDeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
-    testutil::{FakeBindingsCtx, FakeCtx},
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx},
     TimerId,
 };
 use packet::{

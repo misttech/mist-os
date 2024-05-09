@@ -592,8 +592,8 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC,
+            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, FakeEventDispatcherConfig,
+            TestIpExt as _, DEFAULT_INTERFACE_METRIC,
         },
         time::TimerIdInner,
         TimerId,

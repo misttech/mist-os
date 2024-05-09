@@ -2615,7 +2615,7 @@ mod tests {
             ResolveRouteError, SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector, StrictlyZonedAddr},
-        testutil::{set_logger_for_test, TestIpExt as _},
+        testutil::{set_logger_for_test, CtxPairExt as _, TestIpExt as _},
         uninstantiable::UninstantiableWrapper,
     };
 
@@ -7039,7 +7039,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(crate::testutil::handle_queued_rx_packets(&mut ctx));
+        assert!(ctx.test_api().handle_queued_rx_packets());
 
         // TODO(https://fxbug.dev/42084713): They should both be non-empty. The
         // socket map should allow a looped back packet to be delivered despite

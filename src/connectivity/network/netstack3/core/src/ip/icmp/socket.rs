@@ -950,7 +950,7 @@ mod tests {
         device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
         socket::StrictlyZonedAddr,
-        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
+        testutil::{CtxPairExt as _, TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
     const REMOTE_ID: u16 = 1;

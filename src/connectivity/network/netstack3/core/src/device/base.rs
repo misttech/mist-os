@@ -609,11 +609,15 @@ pub(crate) mod testutil {
     #[cfg(test)]
     use core::sync::atomic::AtomicBool;
 
-    use crate::ip::device::config::{
-        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    };
     #[cfg(test)]
     use crate::testutil::Ctx;
+    use crate::{
+        ip::device::config::{
+            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate,
+        },
+        testutil::CtxPairExt as _,
+    };
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub struct FakeWeakDeviceId<D>(pub(crate) D);
@@ -928,7 +932,9 @@ mod tests {
             slaac::SlaacConfiguration,
             state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
         },
-        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+        testutil::{
+            CtxPairExt as _, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
         work_queue::WorkQueueReport,
     };
 

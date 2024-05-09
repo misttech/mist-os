@@ -601,7 +601,8 @@ mod tests {
         error::NotFoundError,
         ip::device::IpAddressId as _,
         testutil::{
-            FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            CtxPairExt as _, FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt,
+            DEFAULT_INTERFACE_METRIC,
         },
     };
 

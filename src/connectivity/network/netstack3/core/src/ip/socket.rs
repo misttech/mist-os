@@ -1957,7 +1957,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(handle_queued_rx_packets(&mut ctx));
+        assert!(ctx.test_api().handle_queued_rx_packets());
 
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 

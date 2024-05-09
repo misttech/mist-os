@@ -21,17 +21,14 @@ use crate::{
 ///
 /// Provides a utility to have many contexts keyed by `CtxId` that can
 /// exchange frames.
-pub struct FakeNetwork<CtxId, Ctx: FakeNetworkContext, Links>
-where
-    Links: FakeNetworkLinks<Ctx::SendMeta, Ctx::RecvMeta, CtxId>,
-{
+pub struct FakeNetwork<Spec: FakeNetworkSpec, CtxId, Links> {
     links: Links,
     current_time: FakeInstant,
-    pending_frames: BinaryHeap<PendingFrame<CtxId, Ctx::RecvMeta>>,
+    pending_frames: BinaryHeap<PendingFrame<CtxId, Spec::RecvMeta>>,
     // Declare `contexts` last to ensure that it is dropped last. See
     // https://doc.rust-lang.org/std/ops/trait.Drop.html#drop-order for
     // details.
-    contexts: HashMap<CtxId, Ctx>,
+    contexts: HashMap<CtxId, Spec::Context>,
 }
 
 /// The data associated with a [`FakeNetwork`]'s pending frame.
@@ -48,26 +45,42 @@ pub struct PendingFrameData<CtxId, Meta> {
 /// A [`PendingFrameData`] and the instant it was sent.
 pub type PendingFrame<CtxId, Meta> = InstantAndData<PendingFrameData<CtxId, Meta>>;
 
-/// A context which can be used with a [`FakeNetwork`].
-pub trait FakeNetworkContext {
-    /// The type of timer IDs installed by this context.
-    type TimerId;
-    /// The type of metadata associated with frames sent by this context.
+/// A network spec that defines a [`FakeNetwork`].
+pub trait FakeNetworkSpec: Sized {
+    /// The context type, which represents a node in the network.
+    type Context: WithFakeTimerContext<Self::TimerId>;
+    /// The type of timer IDs handled by [`Self::Context`].
+    type TimerId: Clone;
+    /// The type of metadata associated with frames sent by this nodes in the
+    /// network.
     type SendMeta;
-    /// The type of metadata associated with frames received by this
-    /// context.
+    /// The type of metadata associated with frames received by nodes in the
+    /// network.
     type RecvMeta;
 
-    /// Handles a single received frame in this context.
-    fn handle_frame(&mut self, recv: Self::RecvMeta, data: Buf<Vec<u8>>);
-    /// Handles a single timer id in this context.
-    fn handle_timer(&mut self, timer: Self::TimerId);
+    /// Handles a single received frame by `ctx`.
+    fn handle_frame(ctx: &mut Self::Context, recv: Self::RecvMeta, data: Buf<Vec<u8>>);
+    /// Handles a single timer id in `ctx`.
+    fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId);
     /// Processes any context-internal queues, returning `true` if any work
     /// was done.
     ///
     /// This is used to drive queued frames that may be sitting inside the
     /// context and invisible to the [`FakeNetwork`].
-    fn process_queues(&mut self) -> bool;
+    fn process_queues(ctx: &mut Self::Context) -> bool;
+
+    /// Extracts accesses to fake frames from [`Self::Context`].
+    fn fake_frames(ctx: &mut Self::Context) -> &mut impl WithFakeFrameContext<Self::SendMeta>;
+
+    /// Creates a new fake network from this spec.
+    fn new_network<CtxId, Links, I>(contexts: I, links: Links) -> FakeNetwork<Self, CtxId, Links>
+    where
+        CtxId: Eq + Hash + Copy + Debug,
+        I: IntoIterator<Item = (CtxId, Self::Context)>,
+        Links: FakeNetworkLinks<Self::SendMeta, Self::RecvMeta, CtxId>,
+    {
+        FakeNetwork::new(contexts, links)
+    }
 }
 
 /// A set of links in a `FakeNetwork`.
@@ -119,19 +132,18 @@ impl StepResult {
     }
 }
 
-impl<CtxId, Ctx, Links> FakeNetwork<CtxId, Ctx, Links>
+impl<Spec, CtxId, Links> FakeNetwork<Spec, CtxId, Links>
 where
-    CtxId: Eq + Hash + Copy + Debug,
-    Ctx: FakeNetworkContext,
-    Links: FakeNetworkLinks<Ctx::SendMeta, Ctx::RecvMeta, CtxId>,
+    CtxId: Eq + Hash,
+    Spec: FakeNetworkSpec,
 {
     /// Retrieves a context named `context`.
-    pub fn context<K: Into<CtxId>>(&mut self, context: K) -> &mut Ctx {
+    pub fn context<K: Into<CtxId>>(&mut self, context: K) -> &mut Spec::Context {
         self.contexts.get_mut(&context.into()).unwrap()
     }
 
     /// Calls `f` with a mutable reference to the context named `context`.
-    pub fn with_context<K: Into<CtxId>, O, F: FnOnce(&mut Ctx) -> O>(
+    pub fn with_context<K: Into<CtxId>, O, F: FnOnce(&mut Spec::Context) -> O>(
         &mut self,
         context: K,
         f: F,
@@ -140,14 +152,11 @@ where
     }
 }
 
-impl<CtxId, Ctx, Links> FakeNetwork<CtxId, Ctx, Links>
+impl<Spec, CtxId, Links> FakeNetwork<Spec, CtxId, Links>
 where
+    Spec: FakeNetworkSpec,
     CtxId: Eq + Hash + Copy + Debug,
-    Ctx: FakeNetworkContext
-        + WithFakeTimerContext<Ctx::TimerId>
-        + WithFakeFrameContext<Ctx::SendMeta>,
-    Ctx::TimerId: Clone,
-    Links: FakeNetworkLinks<Ctx::SendMeta, Ctx::RecvMeta, CtxId>,
+    Links: FakeNetworkLinks<Spec::SendMeta, Spec::RecvMeta, CtxId>,
 {
     /// Creates a new `FakeNetwork`.
     ///
@@ -161,7 +170,7 @@ where
     /// events already attached to them, because `FakeNetwork` maintains
     /// all the internal timers in dispatchers in sync to enable synchronous
     /// simulation steps.
-    pub fn new<I: IntoIterator<Item = (CtxId, Ctx)>>(contexts: I, links: Links) -> Self {
+    pub fn new<I: IntoIterator<Item = (CtxId, Spec::Context)>>(contexts: I, links: Links) -> Self {
         let mut contexts = contexts.into_iter().collect::<HashMap<_, _>>();
         // Take the current time to be the latest of the times of any of the
         // contexts. This ensures that no context has state which is based
@@ -198,7 +207,9 @@ where
     }
 
     /// Iterates over pending frames in an arbitrary order.
-    pub fn iter_pending_frames(&self) -> impl Iterator<Item = &PendingFrame<CtxId, Ctx::RecvMeta>> {
+    pub fn iter_pending_frames(
+        &self,
+    ) -> impl Iterator<Item = &PendingFrame<CtxId, Spec::RecvMeta>> {
         self.pending_frames.iter()
     }
 
@@ -206,7 +217,7 @@ where
     #[track_caller]
     pub fn assert_no_pending_frames(&self)
     where
-        Ctx::RecvMeta: Debug,
+        Spec::RecvMeta: Debug,
     {
         assert!(self.pending_frames.is_empty(), "pending frames: {:?}", self.pending_frames);
     }
@@ -250,7 +261,7 @@ where
     /// destinations.
     pub fn step(&mut self) -> StepResult
     where
-        Ctx::TimerId: core::fmt::Debug,
+        Spec::TimerId: Debug,
     {
         self.step_with(|_, meta, buf| Some((meta, buf)))
     }
@@ -259,19 +270,23 @@ where
     /// `filter_map_frame` that can modify the an inbound frame before
     /// delivery or drop it altogether by returning `None`.
     pub fn step_with<
-        F: FnMut(&mut Ctx, Ctx::RecvMeta, Buf<Vec<u8>>) -> Option<(Ctx::RecvMeta, Buf<Vec<u8>>)>,
+        F: FnMut(
+            &mut Spec::Context,
+            Spec::RecvMeta,
+            Buf<Vec<u8>>,
+        ) -> Option<(Spec::RecvMeta, Buf<Vec<u8>>)>,
     >(
         &mut self,
         mut filter_map_frame: F,
     ) -> StepResult
     where
-        Ctx::TimerId: core::fmt::Debug,
+        Spec::TimerId: Debug,
     {
         let mut ret = StepResult::new_idle();
         // Drive all queues before checking for the network and time
         // simulation.
         for (_, ctx) in self.contexts.iter_mut() {
-            if ctx.process_queues() {
+            if Spec::process_queues(ctx) {
                 ret.contexts_with_queued_frames += 1;
             }
         }
@@ -306,7 +321,7 @@ where
                 self.pending_frames.pop().unwrap().1;
             let dst_context = self.context(dst_context);
             if let Some((meta, frame)) = filter_map_frame(dst_context, meta, Buf::new(frame, ..)) {
-                dst_context.handle_frame(meta, frame)
+                Spec::handle_frame(dst_context, meta, frame)
             }
             ret.frames_sent += 1;
         }
@@ -316,7 +331,7 @@ where
             // We have to collect the timers before dispatching them, to
             // avoid an infinite loop in case handle_timer schedules another
             // timer for the same or older FakeInstant.
-            let mut timers = Vec::<Ctx::TimerId>::new();
+            let mut timers = Vec::<Spec::TimerId>::new();
             ctx.with_fake_timer_ctx_mut(|ctx| {
                 while let Some(InstantAndData(t, timer)) = ctx.timers.peek() {
                     // TODO(https://github.com/rust-lang/rust/issues/53667):
@@ -330,7 +345,7 @@ where
             });
 
             for t in timers {
-                ctx.handle_timer(t);
+                Spec::handle_timer(ctx, t);
                 ret.timers_fired += 1;
             }
         }
@@ -345,7 +360,7 @@ where
     /// Also panics under the same conditions as [`step`].
     pub fn run_until_idle(&mut self)
     where
-        Ctx::TimerId: core::fmt::Debug,
+        Spec::TimerId: Debug,
     {
         self.run_until_idle_with(|_, meta, frame| Some((meta, frame)))
     }
@@ -354,12 +369,16 @@ where
     /// `filter_map_frame` that can modify the an inbound frame before
     /// delivery or drop it altogether by returning `None`.
     pub fn run_until_idle_with<
-        F: FnMut(&mut Ctx, Ctx::RecvMeta, Buf<Vec<u8>>) -> Option<(Ctx::RecvMeta, Buf<Vec<u8>>)>,
+        F: FnMut(
+            &mut Spec::Context,
+            Spec::RecvMeta,
+            Buf<Vec<u8>>,
+        ) -> Option<(Spec::RecvMeta, Buf<Vec<u8>>)>,
     >(
         &mut self,
         mut filter_map_frame: F,
     ) where
-        Ctx::TimerId: core::fmt::Debug,
+        Spec::TimerId: Debug,
     {
         for _ in 0..1_000_000 {
             if self.step_with(&mut filter_map_frame).is_idle() {
@@ -377,11 +396,11 @@ where
     /// ordered by their scheduled delivery time given by the latency result
     /// provided by `links`.
     pub fn collect_frames(&mut self) {
-        let all_frames: Vec<(CtxId, Vec<(Ctx::SendMeta, Vec<u8>)>)> = self
+        let all_frames: Vec<(CtxId, Vec<(Spec::SendMeta, Vec<u8>)>)> = self
             .contexts
             .iter_mut()
             .filter_map(|(n, ctx)| {
-                ctx.with_fake_frame_ctx_mut(|ctx| {
+                Spec::fake_frames(ctx).with_fake_frame_ctx_mut(|ctx| {
                     let frames = ctx.take_frames();
                     if frames.is_empty() {
                         None
@@ -477,26 +496,31 @@ mod tests {
         }
     }
 
-    impl FakeNetworkContext for FakeNetworkTestCtx {
+    impl FakeNetworkSpec for FakeNetworkTestCtx {
+        type Context = Self;
         type TimerId = u32;
         type SendMeta = ();
         type RecvMeta = ();
 
-        fn handle_frame(&mut self, _recv: (), data: Buf<Vec<u8>>) {
-            self.frames_received += 1;
+        fn handle_frame(ctx: &mut Self, _recv: (), data: Buf<Vec<u8>>) {
+            ctx.frames_received += 1;
             // If data is a request, generate a response. This mimics ICMP echo
             // behavior.
             if data.into_inner() == Self::request() {
-                self.frame_ctx.push((), Self::response())
+                ctx.frame_ctx.push((), Self::response())
             }
         }
 
-        fn handle_timer(&mut self, timer: u32) {
-            *self.fired_timers.entry(timer).or_insert(0) += 1;
+        fn handle_timer(ctx: &mut Self, timer: u32) {
+            *ctx.fired_timers.entry(timer).or_insert(0) += 1;
         }
 
-        fn process_queues(&mut self) -> bool {
+        fn process_queues(_ctx: &mut Self) -> bool {
             false
+        }
+
+        fn fake_frames(ctx: &mut Self) -> &mut impl WithFakeFrameContext<Self::SendMeta> {
+            ctx
         }
     }
 
@@ -521,7 +545,7 @@ mod tests {
 
     fn new_fake_network_with_latency(
         latency: Option<Duration>,
-    ) -> FakeNetwork<i32, FakeNetworkTestCtx, impl FakeNetworkLinks<(), (), i32>> {
+    ) -> FakeNetwork<FakeNetworkTestCtx, i32, impl FakeNetworkLinks<(), (), i32>> {
         FakeNetwork::new(
             [(1, FakeNetworkTestCtx::default()), (2, FakeNetworkTestCtx::default())],
             move |id, ()| {
@@ -648,7 +672,7 @@ mod tests {
         // - ctx2's timer expires at t = 7
         // - ctx1 receives ctx2's response and ctx2's last timer fires at t = 10
 
-        let assert_full_state = |net: &mut FakeNetwork<_, FakeNetworkTestCtx, _>,
+        let assert_full_state = |net: &mut FakeNetwork<FakeNetworkTestCtx, _, _>,
                                  ctx1_timers,
                                  ctx2_timers,
                                  ctx2_frames,
@@ -695,7 +719,7 @@ mod tests {
 
     #[test]
     fn send_to_many() {
-        let mut net = FakeNetwork::new(
+        let mut net = FakeNetworkTestCtx::new_network(
             [
                 (1, FakeNetworkTestCtx::default()),
                 (2, FakeNetworkTestCtx::default()),

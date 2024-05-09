@@ -1539,8 +1539,8 @@ mod tests {
             IpAddressId as _,
         },
         testutil::{
-            add_arp_or_ndp_table_entry, new_rng, FakeEventDispatcherBuilder, TestIpExt,
-            DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            add_arp_or_ndp_table_entry, new_rng, CtxPairExt as _, FakeEventDispatcherBuilder,
+            TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
 

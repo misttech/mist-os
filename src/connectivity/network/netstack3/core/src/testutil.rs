@@ -49,17 +49,18 @@ use tracing_subscriber::{
 
 #[cfg(test)]
 use crate::{
-    context::testutil::{
-        FakeFrameCtx, FakeNetwork, FakeNetworkContext, FakeNetworkLinks, WithFakeFrameContext,
-    },
+    context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec},
     ip::device::Ipv6DeviceAddr,
 };
 use crate::{
     context::{
-        testutil::{FakeInstant, FakeTimerCtx, FakeTimerCtxExt, WithFakeTimerContext},
-        DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-        ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
-        TracingContext, UnlockedCoreCtx,
+        testutil::{
+            FakeFrameCtx, FakeInstant, FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext,
+            WithFakeTimerContext,
+        },
+        CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+        InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
+        TimerHandler, TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -95,7 +96,7 @@ use crate::{
         },
         udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     },
-    BindingsTypes,
+    BindingsContext, BindingsTypes,
 };
 
 pub use netstack3_base::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
@@ -112,111 +113,93 @@ pub mod context {
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
-/// A structure holding a core and a bindings context.
-#[derive(Default, Clone)]
-pub struct ContextPair<CC, BT> {
-    /// The core context.
-    pub core_ctx: CC,
-    /// The bindings context.
-    // We put `bindings_ctx` after `core_ctx` to make sure that `core_ctx` is
-    // dropped before `bindings_ctx` so that the existence of
-    // strongly-referenced device IDs in `bindings_ctx` causes test failures,
-    // forcing proper cleanup of device IDs in our unit tests.
-    //
-    // Note that if strongly-referenced (device) IDs exist when dropping the
-    // primary reference, the primary reference's drop impl will panic. See
-    // `crate::sync::PrimaryRc::drop` for details.
-    // TODO(https://fxbug.dev/320021524): disallow destructuring to actually
-    // uphold the intent above.
-    pub bindings_ctx: BT,
-}
-
-impl<CC, BC> ContextPair<CC, BC> {
-    #[cfg(test)]
-    pub(crate) fn with_core_ctx(core_ctx: CC) -> Self
-    where
-        BC: Default,
-    {
-        Self { core_ctx, bindings_ctx: BC::default() }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_default_bindings_ctx<F: FnOnce(&mut BC) -> CC>(builder: F) -> Self
-    where
-        BC: Default,
-    {
-        let mut bindings_ctx = BC::default();
-        let core_ctx = builder(&mut bindings_ctx);
-        Self { core_ctx, bindings_ctx }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn as_mut(&mut self) -> ContextPair<&mut CC, &mut BC> {
-        let Self { core_ctx, bindings_ctx } = self;
-        ContextPair { core_ctx, bindings_ctx }
-    }
-}
-
-impl<CC, BC> crate::context::ContextPair for ContextPair<CC, BC>
-where
-    CC: crate::context::ContextProvider,
-    BC: crate::context::ContextProvider,
-{
-    type CoreContext = CC::Context;
-    type BindingsContext = BC::Context;
-
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
-        let Self { core_ctx, bindings_ctx } = self;
-        (core_ctx.context(), bindings_ctx.context())
-    }
-}
+/// A pair of contexts.
+// TODO(https://fxbug.dev/338448790): Delete this alias.
+pub type ContextPair<CC, BC> = CtxPair<CC, BC>;
 
 /// Context available during the execution of the netstack.
 pub type Ctx<BT> = ContextPair<StackState<BT>, BT>;
 
-impl<BC: crate::BindingsContext + Default> Default for Ctx<BC> {
-    fn default() -> Self {
-        Self::new_with_builder(StackStateBuilder::default())
-    }
-}
-
-impl<BC: crate::BindingsContext + Default> Ctx<BC> {
-    pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
-        let mut bindings_ctx = Default::default();
-        let state = builder.build_with_ctx(&mut bindings_ctx);
-        Self { core_ctx: state, bindings_ctx }
-    }
-}
-
-impl<CC, BC> ContextPair<CC, BC>
-where
-    CC: Borrow<StackState<BC>>,
-    BC: BindingsTypes,
-{
-    /// Retrieves a [`crate::api::CoreApi`] from this [`Ctx`].
-    pub fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
-        let Self { core_ctx, bindings_ctx } = self;
-        CC::borrow(core_ctx).api(bindings_ctx)
-    }
-
+/// Extensions to [`CtxPair`] when it holds a full stack state.
+pub trait CtxPairExt<BC: BindingsContext> {
     /// Retrieves the core and bindings context, respectively.
     ///
     /// This function can be used to call into non-api core functions that want
     /// a core context.
-    pub fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC) {
-        let Self { core_ctx, bindings_ctx } = self;
-        (UnlockedCoreCtx::new(&CC::borrow(core_ctx)), bindings_ctx)
+    fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC);
+
+    /// Retrieves a [`crate::api::CoreApi`] from this context pair.
+    fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        crate::api::CoreApi::new(CtxPair { core_ctx, bindings_ctx })
     }
 
-    /// Like [`ContextPair::contexts`], but retrieves only the core context.
-    pub fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
-        UnlockedCoreCtx::new(&CC::borrow(&self.core_ctx))
+    /// Like [`CtxPairExt::contexts`], but retrieves only the core context.
+    fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC>;
+
+    /// Retrieves a [`TestApi`] from this context pair.
+    fn test_api(&mut self) -> TestApi<'_, BC> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        TestApi(core_ctx, bindings_ctx)
     }
 
-    /// Retrieves a [`TestApi`] from this [`Ctx`].
-    pub fn test_api(&mut self) -> TestApi<'_, BC> {
+    /// Shortcut for [`FakeTimerCtxExt::trigger_next_timer`].
+    fn trigger_next_timer<Id>(&mut self) -> Option<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_next_timer(&mut core_ctx)
+    }
+
+    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_for`].
+    fn trigger_timers_for<Id>(&mut self, duration: Duration) -> Vec<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_timers_for(duration, &mut core_ctx)
+    }
+
+    /// Shortcut for [`FaketimerCtx::trigger_timers_until_instant`].
+    fn trigger_timers_until_instant<Id>(&mut self, instant: FakeInstant) -> Vec<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_timers_until_instant(instant, &mut core_ctx)
+    }
+
+    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_until_and_expect_unordered`].
+    fn trigger_timers_until_and_expect_unordered<Id, I: IntoIterator<Item = Id>>(
+        &mut self,
+        instant: FakeInstant,
+        timers: I,
+    ) where
+        Id: Debug + Hash + Eq,
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_timers_until_and_expect_unordered(instant, timers, &mut core_ctx)
+    }
+}
+
+impl<CC, BC> CtxPairExt<BC> for CtxPair<CC, BC>
+where
+    CC: Borrow<StackState<BC>>,
+    BC: BindingsContext,
+{
+    fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC) {
         let Self { core_ctx, bindings_ctx } = self;
-        TestApi(UnlockedCoreCtx::new(&CC::borrow(core_ctx)), bindings_ctx)
+        (UnlockedCoreCtx::new(CC::borrow(core_ctx)), bindings_ctx)
+    }
+
+    fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
+        UnlockedCoreCtx::new(CC::borrow(&self.core_ctx))
     }
 }
 
@@ -422,54 +405,27 @@ where
     }
 }
 
-/// Helper functions for dealing with fake timers.
-impl<BC: BindingsTypes> Ctx<BC> {
-    /// Shortcut for [`FakeTimerCtxExt::trigger_next_timer`].
-    pub fn trigger_next_timer<Id>(&mut self) -> Option<Id>
-    where
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_next_timer(&mut core_ctx.context())
-    }
-
-    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_for`].
-    pub fn trigger_timers_for<Id>(&mut self, duration: Duration) -> Vec<Id>
-    where
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_for(duration, &mut core_ctx.context())
-    }
-
-    /// Shortcut for [`FaketimerCtx::trigger_timers_until_instant`].
-    pub fn trigger_timers_until_instant<Id>(&mut self, instant: FakeInstant) -> Vec<Id>
-    where
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_until_instant(instant, &mut core_ctx.context())
-    }
-
-    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_until_and_expect_unordered`].
-    pub fn trigger_timers_until_and_expect_unordered<Id, I: IntoIterator<Item = Id>>(
-        &mut self,
-        instant: FakeInstant,
-        timers: I,
-    ) where
-        Id: Debug + Hash + Eq,
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_until_and_expect_unordered(
-            instant,
-            timers,
-            &mut core_ctx.context(),
-        )
+impl<'a> TestApi<'a, FakeBindingsCtx> {
+    /// Handles any pending frames and returns true if any frames that were in
+    /// the RX queue were processed.
+    pub fn handle_queued_rx_packets(&mut self) -> bool {
+        let mut handled = false;
+        loop {
+            let (_, bindings_ctx) = self.contexts();
+            let rx_available = core::mem::take(&mut bindings_ctx.state_mut().rx_available);
+            if rx_available.len() == 0 {
+                break handled;
+            }
+            handled = true;
+            for id in rx_available.into_iter() {
+                loop {
+                    match self.core_api().receive_queue().handle_queued_frames(&id) {
+                        crate::work_queue::WorkQueueReport::AllDone => break,
+                        crate::work_queue::WorkQueueReport::Pending => (),
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -764,35 +720,6 @@ impl DeviceClassMatcher<()> for () {
     }
 }
 
-impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {
-    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
-        &self,
-        f: F,
-    ) -> O {
-        let Self { core_ctx: _, bindings_ctx } = self;
-        bindings_ctx.with_inner(|ctx| f(&ctx.timers))
-    }
-
-    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
-        &mut self,
-        f: F,
-    ) -> O {
-        let Self { core_ctx: _, bindings_ctx } = self;
-        bindings_ctx.with_inner_mut(|ctx| f(&mut ctx.timers))
-    }
-}
-
-#[cfg(test)]
-impl WithFakeFrameContext<DispatchedFrame> for FakeCtx {
-    fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<DispatchedFrame>) -> O>(
-        &mut self,
-        f: F,
-    ) -> O {
-        let Self { core_ctx: _, bindings_ctx } = self;
-        bindings_ctx.with_inner_mut(|ctx| f(&mut ctx.frames))
-    }
-}
-
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
     fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &self,
@@ -806,6 +733,15 @@ impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
         f: F,
     ) -> O {
         self.with_inner_mut(|ctx| f(&mut ctx.timers))
+    }
+}
+
+impl WithFakeFrameContext<DispatchedFrame> for FakeBindingsCtx {
+    fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<DispatchedFrame>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        self.with_inner_mut(|ctx| f(&mut ctx.frames))
     }
 }
 
@@ -1423,20 +1359,27 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
 }
 
 #[cfg(test)]
-impl FakeNetworkContext for FakeCtx {
+pub(crate) enum FakeCtxNetworkSpec {}
+
+#[cfg(test)]
+impl FakeNetworkSpec for FakeCtxNetworkSpec {
+    type Context = FakeCtx;
     type TimerId = TimerId<FakeBindingsCtx>;
     type SendMeta = DispatchedFrame;
     type RecvMeta = EthernetDeviceId<FakeBindingsCtx>;
-    fn handle_frame(&mut self, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
-        self.core_api()
+    fn handle_frame(ctx: &mut FakeCtx, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
+        ctx.core_api()
             .device::<crate::device::ethernet::EthernetLinkDevice>()
             .receive_frame(crate::device::ethernet::RecvEthernetFrameMeta { device_id }, data)
     }
-    fn handle_timer(&mut self, timer: Self::TimerId) {
-        self.core_api().handle_timer(timer)
+    fn handle_timer(ctx: &mut FakeCtx, timer: Self::TimerId) {
+        ctx.core_api().handle_timer(timer)
     }
-    fn process_queues(&mut self) -> bool {
-        handle_queued_rx_packets(self)
+    fn process_queues(ctx: &mut FakeCtx) -> bool {
+        ctx.test_api().handle_queued_rx_packets()
+    }
+    fn fake_frames(ctx: &mut FakeCtx) -> &mut impl WithFakeFrameContext<Self::SendMeta> {
+        &mut ctx.bindings_ctx
     }
 }
 
@@ -1542,28 +1485,6 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         });
         self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, packet.into_inner()));
         Ok(())
-    }
-}
-
-/// Handles any pending frames and returns true if any frames that were in the
-/// RX queue were processed.
-#[cfg(test)]
-pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) -> bool {
-    let mut handled = false;
-    loop {
-        let rx_available = core::mem::take(&mut ctx.bindings_ctx.state_mut().rx_available);
-        if rx_available.len() == 0 {
-            break handled;
-        }
-        handled = true;
-        for id in rx_available.into_iter() {
-            loop {
-                match ctx.core_api().receive_queue().handle_queued_frames(&id) {
-                    crate::work_queue::WorkQueueReport::AllDone => break,
-                    crate::work_queue::WorkQueueReport::Pending => (),
-                }
-            }
-        }
     }
 }
 
@@ -1753,15 +1674,15 @@ impl DeviceIdAndNameMatcher for MonotonicIdentifier {
 #[cfg(test)]
 pub(crate) fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
     a_id: CtxId,
-    a: crate::testutil::FakeCtx,
-    a_device_id: EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>,
+    a: FakeCtx,
+    a_device_id: EthernetWeakDeviceId<FakeBindingsCtx>,
     b_id: CtxId,
-    b: crate::testutil::FakeCtx,
-    b_device_id: EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>,
+    b: FakeCtx,
+    b_device_id: EthernetWeakDeviceId<FakeBindingsCtx>,
 ) -> FakeNetwork<
+    FakeCtxNetworkSpec,
     CtxId,
-    crate::testutil::FakeCtx,
-    impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<crate::testutil::FakeBindingsCtx>, CtxId>,
+    impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, CtxId>,
 > {
     let contexts = vec![(a_id, a), (b_id, b)].into_iter();
     FakeNetwork::new(contexts, move |net, _frame: DispatchedFrame| {

@@ -5024,9 +5024,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeCoreCtx, FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
-                FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
-                WithFakeFrameContext, WithFakeTimerContext,
+                FakeCoreCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkSpec,
+                FakeTimerCtx, InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
+                WithFakeTimerContext,
             },
             ContextProvider, InstantContext, ReferenceNotifiers,
         },
@@ -5204,25 +5204,14 @@ mod tests {
 
     type TcpCtx<D> = ContextPair<TcpCoreCtx<D, TcpBindingsCtx<D>>, TcpBindingsCtx<D>>;
 
-    /// Delegate implementation to internal thing.
-    impl<D: FakeStrongDeviceId> WithFakeFrameContext<DualStackSendIpPacketMeta<D>> for TcpCtx<D> {
-        fn with_fake_frame_ctx_mut<
-            O,
-            F: FnOnce(&mut FakeFrameCtx<DualStackSendIpPacketMeta<D>>) -> O,
-        >(
-            &mut self,
-            f: F,
-        ) -> O {
-            f(&mut self.core_ctx.ip_socket_ctx.frames)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> FakeNetworkContext for TcpCtx<D> {
+    struct FakeTcpNetworkSpec<D: FakeStrongDeviceId>(PhantomData<D>, Never);
+    impl<D: FakeStrongDeviceId> FakeNetworkSpec for FakeTcpNetworkSpec<D> {
+        type Context = TcpCtx<D>;
         type TimerId = TimerId<D::Weak, TcpBindingsCtx<D>>;
         type SendMeta = DualStackSendIpPacketMeta<D>;
         type RecvMeta = DualStackSendIpPacketMeta<D>;
-        fn handle_frame(&mut self, meta: Self::RecvMeta, buffer: Buf<Vec<u8>>) {
-            let Self { core_ctx, bindings_ctx } = self;
+        fn handle_frame(ctx: &mut Self::Context, meta: Self::RecvMeta, buffer: Buf<Vec<u8>>) {
+            let TcpCtx { core_ctx, bindings_ctx } = ctx;
             match meta {
                 DualStackSendIpPacketMeta::V4(meta) => {
                     <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
@@ -5250,14 +5239,17 @@ mod tests {
                 }
             }
         }
-        fn handle_timer(&mut self, timer: Self::TimerId) {
+        fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
             match timer {
-                TimerId::V4(id) => self.tcp_api().handle_timer(id),
-                TimerId::V6(id) => self.tcp_api().handle_timer(id),
+                TimerId::V4(id) => ctx.tcp_api().handle_timer(id),
+                TimerId::V6(id) => ctx.tcp_api().handle_timer(id),
             }
         }
-        fn process_queues(&mut self) -> bool {
+        fn process_queues(_ctx: &mut Self::Context) -> bool {
             false
+        }
+        fn fake_frames(ctx: &mut Self::Context) -> &mut impl WithFakeFrameContext<Self::SendMeta> {
+            &mut ctx.core_ctx.ip_socket_ctx.frames
         }
     }
 
@@ -5839,8 +5831,8 @@ mod tests {
     }
 
     type TcpTestNetwork = FakeNetwork<
+        FakeTcpNetworkSpec<FakeDeviceId>,
         &'static str,
-        TcpCtx<FakeDeviceId>,
         fn(
             &'static str,
             DualStackSendIpPacketMeta<FakeDeviceId>,
@@ -5852,7 +5844,7 @@ mod tests {
     >;
 
     fn new_test_net<I: TcpTestIpExt>() -> TcpTestNetwork {
-        FakeNetwork::new(
+        FakeTcpNetworkSpec::new_network(
             [
                 (
                     LOCAL,
@@ -6392,7 +6384,7 @@ mod tests {
         set_logger_for_test();
         let client_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
         let server_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
-        let mut net = FakeNetwork::new(
+        let mut net = FakeTcpNetworkSpec::new_network(
             [
                 (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
                 (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
@@ -6466,7 +6458,7 @@ mod tests {
         set_logger_for_test();
         let server_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
         let client_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
-        let mut net = FakeNetwork::new(
+        let mut net = FakeTcpNetworkSpec::new_network(
             [
                 (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
                 (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
@@ -6818,7 +6810,7 @@ mod tests {
         set_logger_for_test();
         let client_ip = SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap();
         let server_ip = SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap();
-        let mut net = FakeNetwork::new(
+        let mut net = FakeTcpNetworkSpec::new_network(
             [
                 (
                     LOCAL,

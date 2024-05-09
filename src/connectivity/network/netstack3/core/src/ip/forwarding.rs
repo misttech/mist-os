@@ -500,7 +500,7 @@ mod tests {
             forwarding::testutil::FakeIpForwardingCtx,
             types::{AddableEntryEither, AddableMetric, Metric},
         },
-        testutil::FakeEventDispatcherConfig,
+        testutil::{CtxPairExt as _, FakeEventDispatcherConfig},
     };
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;

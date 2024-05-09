@@ -1745,8 +1745,8 @@ mod tests {
             testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
-            assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, CtxPairExt as _, FakeCryptoRng, FakeEventDispatcherConfig,
+            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
 

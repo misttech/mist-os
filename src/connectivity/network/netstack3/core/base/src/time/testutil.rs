@@ -20,6 +20,7 @@ use core::{
 use assert_matches::assert_matches;
 
 use crate::{
+    context::CtxPair,
     ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
     time::{
         Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
@@ -420,6 +421,22 @@ impl<TimerId> WithFakeTimerContext<TimerId> for FakeTimerCtx<TimerId> {
         f: F,
     ) -> O {
         f(self)
+    }
+}
+
+impl<TimerId, CC, BC> WithFakeTimerContext<TimerId> for CtxPair<CC, BC>
+where
+    BC: WithFakeTimerContext<TimerId>,
+{
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
+        self.bindings_ctx.with_fake_timer_ctx(f)
+    }
+
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        self.bindings_ctx.with_fake_timer_ctx_mut(f)
     }
 }
 

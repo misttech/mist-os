@@ -658,7 +658,8 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
+                FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetworkSpec,
+                WithFakeFrameContext,
             },
             InstantContext as _, TimerHandler,
         },
@@ -675,7 +676,7 @@ mod tests {
             DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
         },
         socket::address::SocketIpAddr,
-        testutil::assert_empty,
+        testutil::{assert_empty, ContextPair},
     };
 
     const TEST_LOCAL_IPV4: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
@@ -733,23 +734,25 @@ mod tests {
         FakeDeviceId,
     >;
 
-    fn new_context() -> crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+    fn new_context() -> ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
         FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeArpCtx::new(bindings_ctx))
         })
     }
 
-    impl FakeNetworkContext for crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+    enum ArpNetworkSpec {}
+    impl FakeNetworkSpec for ArpNetworkSpec {
+        type Context = ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
         type TimerId = ArpTimerId<EthernetLinkDevice, FakeWeakDeviceId<FakeLinkDeviceId>>;
         type SendMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
         type RecvMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
 
         fn handle_frame(
-            &mut self,
+            ctx: &mut Self::Context,
             ArpFrameMetadata { device_id, .. }: Self::RecvMeta,
             data: Buf<Vec<u8>>,
         ) {
-            let Self { core_ctx, bindings_ctx } = self;
+            let ContextPair { core_ctx, bindings_ctx } = ctx;
             handle_packet(
                 core_ctx,
                 bindings_ctx,
@@ -758,12 +761,17 @@ mod tests {
                 data,
             )
         }
-        fn handle_timer(&mut self, timer: Self::TimerId) {
-            let Self { core_ctx, bindings_ctx } = self;
+        fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
+            let ContextPair { core_ctx, bindings_ctx } = ctx;
             TimerHandler::handle_timer(core_ctx, bindings_ctx, timer)
         }
-        fn process_queues(&mut self) -> bool {
+
+        fn process_queues(_ctx: &mut Self::Context) -> bool {
             false
+        }
+
+        fn fake_frames(ctx: &mut Self::Context) -> &mut impl WithFakeFrameContext<Self::SendMeta> {
+            &mut ctx.core_ctx
         }
     }
 
@@ -1134,7 +1142,7 @@ mod tests {
             .chain(iter::once(&requested_remote_cfg))
             .chain(iter::once(&LOCAL_HOST_CFG));
 
-        let mut network = FakeNetwork::new(
+        let mut network = ArpNetworkSpec::new_network(
             {
                 host_iter.clone().map(|cfg| {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
