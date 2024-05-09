@@ -21,8 +21,9 @@ use netstack3_core::{
     sync::Mutex,
     testutil::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        ContextPair, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
+        CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
     },
+    CtxPair,
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::{
@@ -83,7 +84,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
         let dev_indexes =
             [(); 2].map(|()| builder.add_device(UnicastAddr::new(DEVICE_MAC).unwrap()));
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
-        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
+        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
         let devs = dev_indexes.map(|i| indexes_to_device_ids[i].clone());
         drop(indexes_to_device_ids);
@@ -283,7 +284,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         );
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
-        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
+        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
         ctx.test_api()
             .add_route(
@@ -402,7 +403,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
             I::DEVICE_SUBNET,
         );
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
-        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
+        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
 
         ctx.test_api()

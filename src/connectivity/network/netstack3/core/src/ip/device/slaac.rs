@@ -1728,8 +1728,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _,
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _},
+            CtxPair,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -1910,7 +1911,7 @@ mod tests {
         slaac_addrs: FakeSlaacAddrs,
         dad_transmits: Option<NonZeroU16>,
         retrans_timer: Duration,
-    ) -> crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+    ) -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
         FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config,

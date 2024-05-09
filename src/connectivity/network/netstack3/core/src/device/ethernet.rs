@@ -1523,7 +1523,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::FakeInstant,
+        context::{testutil::FakeInstant, CtxPair},
         device::{
             arp::ArpCounters,
             socket::Frame,
@@ -1583,8 +1583,8 @@ mod tests {
         inner: FakeInnerCtx,
     }
 
-    fn new_context() -> crate::testutil::ContextPair<FakeCoreCtx, FakeBindingsCtx> {
-        crate::testutil::ContextPair::with_default_bindings_ctx(|bindings_ctx| FakeCoreCtx {
+    fn new_context() -> CtxPair<FakeCoreCtx, FakeBindingsCtx> {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| FakeCoreCtx {
             arp_state: ArpState::new::<_, IntoCoreTimerCtx>(
                 bindings_ctx,
                 FakeWeakDeviceId(FakeDeviceId),
@@ -1992,7 +1992,7 @@ mod tests {
                     FAKE_CONFIG_V4.remote_mac.get(),
                 )
                 .unwrap();
-            let crate::testutil::ContextPair { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             let result = send_ip_frame(
                 core_ctx,
                 bindings_ctx,
@@ -2019,7 +2019,7 @@ mod tests {
     #[test]
     fn broadcast() {
         let mut ctx = new_context();
-        let crate::testutil::ContextPair { core_ctx, bindings_ctx } = &mut ctx;
+        let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         send_ip_frame(
             core_ctx,
             bindings_ctx,

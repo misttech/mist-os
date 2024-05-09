@@ -2598,7 +2598,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx},
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx},
+            CtxPair,
+        },
         device::{
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::{
@@ -2685,7 +2688,7 @@ mod tests {
     }
 
     /// UDP tests context pair.
-    type FakeUdpCtx<D> = crate::testutil::ContextPair<FakeUdpCoreCtx<D>, FakeUdpBindingsCtx<D>>;
+    type FakeUdpCtx<D> = CtxPair<FakeUdpCoreCtx<D>, FakeUdpBindingsCtx<D>>;
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]

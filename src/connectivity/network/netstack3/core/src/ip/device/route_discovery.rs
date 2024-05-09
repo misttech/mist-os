@@ -279,8 +279,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _,
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _},
+            CtxPair,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -403,7 +404,7 @@ mod tests {
     const THREE_SECONDS: NonZeroDuration =
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(3));
 
-    fn new_context() -> crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+    fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
         FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeIpv6RouteDiscoveryContext {
                 state: Ipv6RouteDiscoveryState::new::<_, IntoCoreTimerCtx>(

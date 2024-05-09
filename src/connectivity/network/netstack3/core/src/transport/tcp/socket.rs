@@ -5048,7 +5048,6 @@ mod tests {
             HopLimits, IpTransportContext,
         },
         sync::{DynDebugReferences, Mutex},
-        testutil::ContextPair,
         testutil::{
             new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
             TestIpExt,
@@ -5202,7 +5201,7 @@ mod tests {
         type WeakDeviceId = FakeWeakDeviceId<D>;
     }
 
-    type TcpCtx<D> = ContextPair<TcpCoreCtx<D, TcpBindingsCtx<D>>, TcpBindingsCtx<D>>;
+    type TcpCtx<D> = CtxPair<TcpCoreCtx<D, TcpBindingsCtx<D>>, TcpBindingsCtx<D>>;
 
     struct FakeTcpNetworkSpec<D: FakeStrongDeviceId>(PhantomData<D>, Never);
     impl<D: FakeStrongDeviceId> FakeNetworkSpec for FakeTcpNetworkSpec<D> {
@@ -5913,13 +5912,13 @@ mod tests {
     }
 
     /// A trait providing a shortcut to instantiate a [`TcpApi`] from a context.
-    trait TcpApiExt: crate::context::ContextPair + Sized {
+    trait TcpApiExt: ContextPair + Sized {
         fn tcp_api<I: Ip>(&mut self) -> TcpApi<I, &mut Self> {
             TcpApi::new(self)
         }
     }
 
-    impl<O> TcpApiExt for O where O: crate::context::ContextPair + Sized {}
+    impl<O> TcpApiExt for O where O: ContextPair + Sized {}
 
     /// How to bind the client socket in `bind_listen_connect_accept_inner`.
     struct BindConfig {
@@ -8313,7 +8312,7 @@ mod tests {
         );
         // Assert that the sockets are bound in the socketmap.
         for ctx_name in [LOCAL, REMOTE] {
-            net.with_context(ctx_name, |ContextPair { core_ctx, bindings_ctx: _ }| {
+            net.with_context(ctx_name, |CtxPair { core_ctx, bindings_ctx: _ }| {
                 TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
                     assert_eq!(socketmap.len(), 1);
                 })
@@ -8329,7 +8328,7 @@ mod tests {
         // never called `close` on them, but they should not be in the demuxer
         // regardless.
         for ctx_name in [LOCAL, REMOTE] {
-            net.with_context(ctx_name, |ContextPair { core_ctx, bindings_ctx: _ }| {
+            net.with_context(ctx_name, |CtxPair { core_ctx, bindings_ctx: _ }| {
                 TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
                     assert_eq!(socketmap.len(), 0);
                 })

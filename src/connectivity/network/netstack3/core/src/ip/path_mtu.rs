@@ -422,7 +422,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
-            InstantContext,
+            CtxPair, InstantContext,
         },
         testutil::{assert_empty, TestIpExt},
     };
@@ -431,7 +431,7 @@ mod tests {
         cache: PmtuCache<I, FakeBindingsCtxImpl<I>>,
     }
 
-    type FakeCtxImpl<I> = crate::testutil::ContextPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
+    type FakeCtxImpl<I> = CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
     type FakeCoreCtxImpl<I> = FakeCoreCtx<FakePmtuContext<I>, (), ()>;
     type FakeBindingsCtxImpl<I> = FakeBindingsCtx<PmtuTimerId<I>, (), (), ()>;
 

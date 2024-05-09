@@ -827,7 +827,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
+            CtxPair,
+        },
         testutil::{assert_empty, FakeEventDispatcherConfig, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
     };
 
@@ -844,7 +847,7 @@ mod tests {
         }
     }
 
-    type FakeCtxImpl<I> = crate::testutil::ContextPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
+    type FakeCtxImpl<I> = CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
     type FakeBindingsCtxImpl<I> = FakeBindingsCtx<FragmentTimerId<I>, (), (), ()>;
     type FakeCoreCtxImpl<I> = FakeCoreCtx<FakeFragmentContext<I, FakeBindingsCtxImpl<I>>, (), ()>;
 

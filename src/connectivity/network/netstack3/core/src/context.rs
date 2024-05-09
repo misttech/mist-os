@@ -184,7 +184,10 @@ pub(crate) mod testutil {
     use core::fmt::Debug;
 
     #[cfg(test)]
-    use crate::filter::{FilterBindingsTypes, FilterHandlerProvider};
+    use crate::{
+        context::CtxPair,
+        filter::{FilterBindingsTypes, FilterHandlerProvider},
+    };
     use crate::{
         device::link::LinkDevice,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
@@ -229,7 +232,7 @@ pub(crate) mod testutil {
 
     #[cfg(test)]
     pub(crate) type FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> =
-        crate::testutil::ContextPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>>;
+        CtxPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>>;
 
     #[cfg(test)]
     pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, BindingsCtxState> =

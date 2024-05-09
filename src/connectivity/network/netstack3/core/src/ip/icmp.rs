@@ -3086,7 +3086,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant},
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant},
+            CtxPair,
+        },
         device::{
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
@@ -3128,8 +3131,7 @@ mod tests {
     /// A fake ICMP bindings and core contexts.
     ///
     /// This is exposed to super so it can be shared with the socket tests.
-    pub(super) type FakeIcmpCtx<I> =
-        crate::testutil::ContextPair<FakeIcmpCoreCtx<I>, FakeIcmpBindingsCtx<I>>;
+    pub(super) type FakeIcmpCtx<I> = CtxPair<FakeIcmpCoreCtx<I>, FakeIcmpBindingsCtx<I>>;
 
     pub(super) struct FakeIcmpCoreCtxState<I: socket::IpExt, D: device::WeakId> {
         bound_socket_map_and_allocator: BoundSockets<I, D, FakeIcmpBindingsCtx<I>>,

@@ -113,12 +113,8 @@ pub mod context {
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
-/// A pair of contexts.
-// TODO(https://fxbug.dev/338448790): Delete this alias.
-pub type ContextPair<CC, BC> = CtxPair<CC, BC>;
-
 /// Context available during the execution of the netstack.
-pub type Ctx<BT> = ContextPair<StackState<BT>, BT>;
+pub type Ctx<BT> = CtxPair<StackState<BT>, BT>;
 
 /// Extensions to [`CtxPair`] when it holds a full stack state.
 pub trait CtxPairExt<BC: BindingsContext> {

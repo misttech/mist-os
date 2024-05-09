@@ -263,9 +263,9 @@ pub mod udp {
 
 pub use api::CoreApi;
 pub use context::{
-    CoreCtx, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
-    UnlockedCoreCtx,
+    CoreCtx, CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+    InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
+    TracingContext, UnlockedCoreCtx,
 };
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};

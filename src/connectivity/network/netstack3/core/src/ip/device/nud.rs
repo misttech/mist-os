@@ -2700,8 +2700,7 @@ mod tests {
         }
     }
 
-    fn new_context<I: Ip>(
-    ) -> crate::testutil::ContextPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>> {
+    fn new_context<I: Ip>() -> CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>> {
         FakeCtxWithCoreCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::<I>::new(bindings_ctx)
         })

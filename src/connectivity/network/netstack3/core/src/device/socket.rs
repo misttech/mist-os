@@ -984,7 +984,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        context::ContextProvider,
+        context::{ContextProvider, CtxPair},
         device::{
             testutil::{
                 FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
@@ -1038,7 +1038,7 @@ mod tests {
     }
 
     type FakeCoreCtx<D> = crate::context::testutil::FakeCoreCtx<FakeSockets<D>, (), D>;
-    type FakeCtx<D> = crate::testutil::ContextPair<FakeCoreCtx<D>, FakeBindingsCtx<D>>;
+    type FakeCtx<D> = CtxPair<FakeCoreCtx<D>, FakeBindingsCtx<D>>;
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeBindingsCtx<D>(core::marker::PhantomData<D>);
@@ -1073,13 +1073,13 @@ mod tests {
 
     /// A trait providing a shortcut to instantiate a [`DeviceSocketApi`] from a
     /// context.
-    trait DeviceSocketApiExt: crate::context::ContextPair + Sized {
+    trait DeviceSocketApiExt: ContextPair + Sized {
         fn device_socket_api(&mut self) -> DeviceSocketApi<&mut Self> {
             DeviceSocketApi::new(self)
         }
     }
 
-    impl<O> DeviceSocketApiExt for O where O: crate::context::ContextPair + Sized {}
+    impl<O> DeviceSocketApiExt for O where O: ContextPair + Sized {}
 
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]

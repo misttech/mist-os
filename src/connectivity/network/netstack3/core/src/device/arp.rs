@@ -661,7 +661,7 @@ mod tests {
                 FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetworkSpec,
                 WithFakeFrameContext,
             },
-            InstantContext as _, TimerHandler,
+            CtxPair, InstantContext as _, TimerHandler,
         },
         device::{
             ethernet::EthernetLinkDevice,
@@ -676,7 +676,7 @@ mod tests {
             DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
         },
         socket::address::SocketIpAddr,
-        testutil::{assert_empty, ContextPair},
+        testutil::assert_empty,
     };
 
     const TEST_LOCAL_IPV4: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
@@ -734,7 +734,7 @@ mod tests {
         FakeDeviceId,
     >;
 
-    fn new_context() -> ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+    fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
         FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeArpCtx::new(bindings_ctx))
         })
@@ -742,7 +742,7 @@ mod tests {
 
     enum ArpNetworkSpec {}
     impl FakeNetworkSpec for ArpNetworkSpec {
-        type Context = ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
+        type Context = CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
         type TimerId = ArpTimerId<EthernetLinkDevice, FakeWeakDeviceId<FakeLinkDeviceId>>;
         type SendMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
         type RecvMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
@@ -752,7 +752,7 @@ mod tests {
             ArpFrameMetadata { device_id, .. }: Self::RecvMeta,
             data: Buf<Vec<u8>>,
         ) {
-            let ContextPair { core_ctx, bindings_ctx } = ctx;
+            let CtxPair { core_ctx, bindings_ctx } = ctx;
             handle_packet(
                 core_ctx,
                 bindings_ctx,
@@ -762,7 +762,7 @@ mod tests {
             )
         }
         fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
-            let ContextPair { core_ctx, bindings_ctx } = ctx;
+            let CtxPair { core_ctx, bindings_ctx } = ctx;
             TimerHandler::handle_timer(core_ctx, bindings_ctx, timer)
         }
 
