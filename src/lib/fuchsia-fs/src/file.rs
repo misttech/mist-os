@@ -31,10 +31,10 @@ use {
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum ReadError {
-    #[error("while opening the file: {0}")]
+    #[error("while opening the file: {0:?}")]
     Open(#[from] OpenError),
 
-    #[error("read call failed: {0}")]
+    #[error("read call failed: {0:?}")]
     Fidl(#[from] fidl::Error),
 
     #[error("read failed with status: {0}")]
