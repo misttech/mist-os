@@ -196,27 +196,16 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   // responsibility for managing its lifetime and unmapping.
   std::unique_ptr<ModuleHandle> take_module() && { return std::move(module_); }
 
-  // Retrieve the file and load it into the system image, then decode the phdrs
-  // to metadata to attach to the ABI module and store the information needed
-  // for dependency parsing. Decode the module's dependencies (if any), and
+  // Load `file` into the system image, decode phdrs and save the metadata in
+  // the the ABI module. Decode the module's dependencies (if any), and
   // return a vector their so names.
-  // The `retrieve_file` argument is called as an
-  // `std::optional<File>(Diagnostics&, std::string_view)` where `File` is an
-  // elfldltl File API type (see <lib/elfldltl/memory.h>).
-  template <typename RetrieveFile>
-  std::optional<Vector<Soname>> Load(Diagnostics& diag, RetrieveFile&& retrieve_file) {
-    static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
-
-    auto file = retrieve_file(diag, module_->name().str());
-    if (!file) [[unlikely]] {
-      return std::nullopt;
-    }
-
+  template <class File>
+  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file) {
     // Read the file header and program headers into stack buffers and map in
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.
     Loader loader;
-    auto headers = decoded().LoadFromFile(diag, loader, *std::move(file));
+    auto headers = decoded().LoadFromFile(diag, loader, std::move(file));
     if (!headers) [[unlikely]] {
       return std::nullopt;
     }

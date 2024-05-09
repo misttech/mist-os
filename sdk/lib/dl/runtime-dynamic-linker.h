@@ -114,9 +114,14 @@ class RuntimeDynamicLinker {
   // loaded modules. Starting with the main file that was `dlopen`-ed, a
   // LoadModule is created for each file that is to be loaded, decoded, and its
   // dependencies parsed and enqueued to be processed in the same manner.
+  // The `retrieve_file` argument is called as an
+  // `std::optional<File>(Diagnostics&, std::string_view)` where `File` is an
+  // elfldltl File API type (see <lib/elfldltl/memory.h>).
   template <class Loader, typename RetrieveFile>
   static ModuleList<LoadModule<Loader>> Load(Diagnostics& diag, Soname soname,
                                              RetrieveFile&& retrieve_file) {
+    static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
+
     // This is the list of modules to load and process. The first module of this
     // list will always be the main file that was `dlopen`-ed.
     ModuleList<LoadModule<Loader>> pending_modules;
@@ -139,11 +144,13 @@ class RuntimeDynamicLinker {
     // enqueued, appending each new dependency to the pending_modules list so
     // it can eventually be loaded and processed.
     for (auto it = pending_modules.begin(); it != pending_modules.end(); it++) {
-      // TODO(caslyn): support scoped module diagnostics.
-      // ld::ScopedModuleDiagnostics module_diag{diag, module_->name().str()};
+      auto file = retrieve_file(diag, it->name().str());
+      if (!file) [[unlikely]] {
+        return {};
+      }
 
-      auto result = it->Load(diag, retrieve_file);
-      if (!result) {
+      auto result = it->Load(diag, *std::move(file));
+      if (!result) [[unlikely]] {
         return {};
       }
 
