@@ -23,10 +23,8 @@ const OBJECT_WRITABLE: zx::Signals = zx::Signals::OBJECT_WRITABLE;
 pub enum ReadableState {
     /// Received `OBJECT_READABLE`, or optimistically assuming the object is readable.
     Readable,
-    /// Received `OBJECT_PEER_CLOSED`.
-    Closed,
-    /// Both `Readable` and `Closed` apply.
-    ReadableAndClosed,
+    /// Received `OBJECT_PEER_CLOSED`.  The object might also be readable.
+    MaybeReadableAndClosed,
 }
 
 /// State of an object when it is ready for writing.
@@ -286,8 +284,7 @@ where
             let signals = self.receiver().0.lock().unwrap().signals;
             match (signals.contains(OBJECT_READABLE), signals.contains(OBJECT_PEER_CLOSED)) {
                 (true, false) => return Poll::Ready(Ok(ReadableState::Readable)),
-                (false, true) => return Poll::Ready(Ok(ReadableState::Closed)),
-                (true, true) => return Poll::Ready(Ok(ReadableState::ReadableAndClosed)),
+                (_, true) => return Poll::Ready(Ok(ReadableState::MaybeReadableAndClosed)),
                 (false, false) => {
                     ready!(self.need_signal(cx, true, OBJECT_READABLE)?)
                 }
@@ -354,7 +351,7 @@ mod tests {
         // And now it is updated, so we observe Closed
         assert_eq!(
             rx_rw_handle.poll_readable(&mut noop_ctx),
-            Poll::Ready(Ok(ReadableState::Closed))
+            Poll::Ready(Ok(ReadableState::MaybeReadableAndClosed))
         );
         // And is_closed should still be true, of course.
         assert_eq!(rx_rw_handle.is_closed(), true);

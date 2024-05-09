@@ -383,7 +383,7 @@ mod tests {
         let mut rx_fut = poll_fn(|cx| async_s2.poll_readable(cx));
 
         if let Poll::Ready(Ok(state)) = executor.run_until_stalled(&mut rx_fut) {
-            assert_eq!(state, ReadableState::Closed);
+            assert_eq!(state, ReadableState::MaybeReadableAndClosed);
         } else {
             panic!("Expected future to be ready and Ok");
         }
