@@ -7,6 +7,13 @@
 	interrupt-parent = <0x01>;
 	model = "Khadas Vim3";
 
+	backlight {
+		gpio-names = "LCD_BACKLIGHT_ENABLE";
+		gpios = <0x1e 0x01 0x00>;
+		pwm-names = "LCD_BRIGHTNESS";
+		pwms = <0x0d 0x08 0x00 0x00>;
+	};
+
 	canvas@ff638000 {
 		compatible = "amlogic,canvas";
 		iommus = <0x03 0x02>;
@@ -111,6 +118,14 @@
 					gpio-names = "USB_POWER_DELIVERY";
 					gpios = <0x04 0x5d 0x00>;
 					reg = <0x22>;
+				};
+
+				gpio-controller@20 {
+					#gpio-cells = <0x02>;
+					compatible = "ti,tca6408a";
+					gpio-controller;
+					phandle = <0x1e>;
+					reg = <0x20>;
 				};
 
 				khadas-mcu@18 {

@@ -7,6 +7,8 @@
 /include/ "meson-g12-common.dtsi"
 
 #include <soc/aml-a311d/a311d-gpio.h>
+#include <soc/aml-a311d/a311d-hw.h>
+#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
 
 / {
 	compatible = "amlogic,a311d";

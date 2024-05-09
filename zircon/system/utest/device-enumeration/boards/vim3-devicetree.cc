@@ -27,6 +27,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/i2c-5000",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-32/gpio-controller-20_group/ti-tca6408a/gpio",
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
 

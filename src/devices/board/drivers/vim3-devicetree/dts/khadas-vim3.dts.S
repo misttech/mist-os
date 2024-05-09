@@ -29,7 +29,7 @@
 		#size-cells = <0x02>;
 		ranges;
 
-		fuchsia,contiguous {
+		sysmem: fuchsia,contiguous {
 			compatible = "sysmem";
 			iommus = <&dummy_iommu 1>;
 			pid = <PDEV_PID_AMLOGIC_A311D>;
@@ -49,6 +49,13 @@
 			size = <0x00 (200*1024*1024)>;
 		};
 	};
+
+	backlight {
+		gpios = <&gpio_expander 1 0>;
+		gpio-names = "LCD_BACKLIGHT_ENABLE";
+		pwms = <&pwm 8 0 0>; //PWM_AO_C
+		pwm-names = "LCD_BRIGHTNESS";
+	};
 };
 
 &gpio {
@@ -65,6 +72,13 @@
 
 &i2c_AO {
 	pinctrl-0 = <&i2c_AO_pins>;
+
+	gpio_expander: gpio-controller@20 {
+		compatible = "ti,tca6408a";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
 
 	khadas-mcu@18 {
 		compatible = "khadas,vim3-mcu";
