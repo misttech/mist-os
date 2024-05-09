@@ -39,7 +39,7 @@ use crate::{
     state::StackStateBuilder,
     testutil::{
         benchmarks::{black_box, Bencher},
-        CtxPairExt as _, FakeEventDispatcherBuilder, TEST_ADDRS_V4,
+        CtxPairExt as _, FakeCtxBuilder, TEST_ADDRS_V4,
     },
 };
 
@@ -54,8 +54,8 @@ use crate::{
 // IPv4 packet frame which we expect will be parsed and forwarded without
 // requiring any new buffers to be allocated.
 fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
-    let (mut ctx, idx_to_device_id) = FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V4)
-        .build_with(StackStateBuilder::default());
+    let (mut ctx, idx_to_device_id) =
+        FakeCtxBuilder::with_addrs(TEST_ADDRS_V4).build_with(StackStateBuilder::default());
 
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();

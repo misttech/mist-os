@@ -415,7 +415,7 @@ fn dispatch(ctx: &mut FakeCtx, device_id: &EthernetDeviceId<FakeBindingsCtx>, ac
 pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
     print_on_panic::initialize_logging();
 
-    let mut builder = netstack3_core::testutil::FakeEventDispatcherBuilder::default();
+    let mut builder = netstack3_core::testutil::FakeCtxBuilder::default();
     let device_index = builder.add_device(UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap());
 
     let (mut ctx, ethernet_devices) = builder.build();

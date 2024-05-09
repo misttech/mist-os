@@ -3107,10 +3107,7 @@ mod tests {
             types::IpTypesIpExt,
         },
         state::StackStateBuilder,
-        testutil::{
-            Ctx, CtxPairExt as _, FakeEventDispatcherBuilder, TestIpExt, TEST_ADDRS_V4,
-            TEST_ADDRS_V6,
-        },
+        testutil::{Ctx, CtxPairExt as _, FakeCtxBuilder, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6},
         transport::udp::UdpStateBuilder,
         uninstantiable::UninstantiableWrapper,
     };
@@ -3414,7 +3411,7 @@ mod tests {
         modify_packet_builder(&mut pb);
         let buffer = Buf::new(body, ..).encapsulate(pb).serialize_vec_outer().unwrap();
 
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS)
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS)
             .build_with_modifications(modify_stack_state_builder);
 
         let device: DeviceId<_> = device_ids[0].clone().into();

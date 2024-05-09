@@ -912,15 +912,14 @@ struct DeviceConfig {
     ipv6_config: Option<Ipv6DeviceConfigurationUpdate>,
 }
 
-/// A builder for `FakeEventDispatcher`s.
+/// A builder for `FakeCtx`s.
 ///
-/// A `FakeEventDispatcherBuilder` is capable of storing the configuration of a
-/// network stack including forwarding table entries, devices and their assigned
+/// A `FakeCtxBuilder` is capable of storing the configuration of a network
+/// stack including forwarding table entries, devices and their assigned
 /// addresses and configurations, ARP table entries, etc. It can be built using
-/// `build`, producing a `Context<FakeEventDispatcher>` with all of the
-/// appropriate state configured.
+/// `build`, producing a `FakeCtx` with all of the appropriate state configured.
 #[derive(Clone, Default)]
-pub struct FakeEventDispatcherBuilder {
+pub struct FakeCtxBuilder {
     devices: Vec<DeviceConfig>,
     // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
     arp_table_entries: Vec<(usize, SpecifiedAddr<Ipv4Addr>, UnicastAddr<Mac>)>,
@@ -929,14 +928,14 @@ pub struct FakeEventDispatcherBuilder {
     device_routes: Vec<(SubnetEither, usize)>,
 }
 
-impl FakeEventDispatcherBuilder {
-    /// Construct a `FakeEventDispatcherBuilder` from a `TestAddrs`.
+impl FakeCtxBuilder {
+    /// Construct a `FakeCtxBuilder` from a `TestAddrs`.
     #[cfg(test)]
-    pub(crate) fn with_addrs<A: IpAddress>(addrs: TestAddrs<A>) -> FakeEventDispatcherBuilder {
+    pub(crate) fn with_addrs<A: IpAddress>(addrs: TestAddrs<A>) -> FakeCtxBuilder {
         assert!(addrs.subnet.contains(&addrs.local_ip));
         assert!(addrs.subnet.contains(&addrs.remote_ip));
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         builder.devices.push(DeviceConfig {
             mac: addrs.local_mac,
             addr_subnet: Some(
@@ -1105,12 +1104,7 @@ impl FakeEventDispatcherBuilder {
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
 
-        let FakeEventDispatcherBuilder {
-            devices,
-            arp_table_entries,
-            ndp_table_entries,
-            device_routes,
-        } = self;
+        let FakeCtxBuilder { devices, arp_table_entries, ndp_table_entries, device_routes } = self;
         let idx_to_device_id: Vec<_> = devices
             .into_iter()
             .map(|DeviceConfig { mac, addr_subnet: ip_and_subnet, ipv4_config, ipv6_config }| {
@@ -1178,10 +1172,10 @@ impl FakeEventDispatcherBuilder {
 }
 
 /// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
-/// `FakeEventDispatcherBuilder`.
+/// `FakeCtxBuilder`.
 #[cfg(test)]
 pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
-    builder: &mut FakeEventDispatcherBuilder,
+    builder: &mut FakeCtxBuilder,
     device: usize,
     // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
     ip: SpecifiedAddr<A>,

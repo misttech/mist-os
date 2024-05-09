@@ -548,8 +548,6 @@ impl<
 }
 
 /// An event dispatcher for the device layer.
-///
-/// See the `EventDispatcher` trait in the crate root for more details.
 pub trait DeviceLayerEventDispatcher: DeviceLayerTypes + Sized {
     /// Signals to the dispatcher that RX frames are available and ready to be
     /// handled by [`handle_queued_rx_packets`].

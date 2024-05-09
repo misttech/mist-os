@@ -179,7 +179,7 @@ mod tests {
         },
         testutil::{
             assert_empty, set_logger_for_test, Ctx, CtxPairExt as _, DispatchedFrame,
-            FakeBindingsCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            FakeBindingsCtx, FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V6,
         },
         time::TimerIdInner,
@@ -275,7 +275,7 @@ mod tests {
         EthernetDeviceId<FakeBindingsCtx>,
         EthernetDeviceId<FakeBindingsCtx>,
     ) {
-        let mut local = FakeEventDispatcherBuilder::default();
+        let mut local = FakeCtxBuilder::default();
         let local_dev_idx = local.add_device_with_config(
             local_mac(),
             Ipv4DeviceConfigurationUpdate::default(),
@@ -287,7 +287,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let mut remote = FakeEventDispatcherBuilder::default();
+        let mut remote = FakeCtxBuilder::default();
         let remote_dev_idx = remote.add_device_with_config(
             remote_mac(),
             Ipv4DeviceConfigurationUpdate::default(),
@@ -1056,7 +1056,7 @@ mod tests {
 
         // Test receiving NDP RS when not a router (should not receive)
 
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         let icmpv6_packet_buf = OptionSequenceBuilder::new(options.iter())
@@ -1114,7 +1114,7 @@ mod tests {
         let config = Ipv6::TEST_ADDRS;
         let src_mac = [10, 11, 12, 13, 14, 15];
         let src_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 10]);
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config.clone()).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Test receiving NDP RA where source IP is not a link local address
@@ -1201,8 +1201,7 @@ mod tests {
             assert_eq!(buf[7], hop_limit);
         }
 
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(Ipv6::TEST_ADDRS).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(Ipv6::TEST_ADDRS).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Set hop limit to 100.
@@ -1634,7 +1633,7 @@ mod tests {
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         // Updating the IP should resolve immediately since DAD is turned off by
-        // `FakeEventDispatcherBuilder::build`.
+        // `FakeCtxBuilder::build`.
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device, AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap())

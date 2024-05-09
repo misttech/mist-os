@@ -1779,7 +1779,7 @@ mod tests {
         let proto = I::ICMP_IP_PROTO;
 
         let TestAddrs { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } = cfg;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(cfg).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(cfg).build();
         let loopback_device_id = ctx
             .core_api()
             .device::<LoopbackDevice>()
@@ -1869,7 +1869,7 @@ mod tests {
         let TestAddrs::<I::Addr> { subnet, local_ip, remote_ip, local_mac, remote_mac: _ } =
             I::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
@@ -1976,7 +1976,7 @@ mod tests {
         let TestAddrs::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } = cfg;
 
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(cfg).build();
+            FakeCtxBuilder::with_addrs(cfg).build();
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut core_ctx.context(),
@@ -2123,7 +2123,7 @@ mod tests {
         let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
             I::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
@@ -2212,7 +2212,7 @@ mod tests {
         let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
             I::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let eth_device_id = device_ids[device_idx].clone();

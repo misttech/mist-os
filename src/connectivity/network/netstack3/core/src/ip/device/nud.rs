@@ -5370,7 +5370,7 @@ mod tests {
         EthernetDeviceId<testutil::FakeBindingsCtx>,
     ) {
         let build_ctx = |config: TestAddrs<I::Addr>| {
-            let mut builder = testutil::FakeEventDispatcherBuilder::default();
+            let mut builder = testutil::FakeCtxBuilder::default();
             let device =
                 builder.add_device_with_ip(config.local_mac, config.local_ip.get(), config.subnet);
             let (ctx, device_ids) = builder.build();
@@ -5576,7 +5576,7 @@ mod tests {
     fn icmp_error_on_address_resolution_failure_tcp_local<
         I: Ip + testutil::TestIpExt + crate::IpExt,
     >() {
-        let mut builder = testutil::FakeEventDispatcherBuilder::default();
+        let mut builder = testutil::FakeCtxBuilder::default();
         let _device_id = builder.add_device_with_ip(
             I::TEST_ADDRS.local_mac,
             I::TEST_ADDRS.local_ip.get(),
@@ -5687,7 +5687,7 @@ mod tests {
     #[test_case(1; "non_initial_fragment")]
     #[test_case(0; "initial_fragment")]
     fn icmp_error_fragment_offset(fragment_offset: u16) {
-        let mut builder = testutil::FakeEventDispatcherBuilder::default();
+        let mut builder = testutil::FakeCtxBuilder::default();
         let _device_id = builder.add_device_with_ip(
             Ipv4::TEST_ADDRS.local_mac,
             Ipv4::TEST_ADDRS.local_ip.get(),

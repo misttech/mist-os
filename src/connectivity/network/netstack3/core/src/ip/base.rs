@@ -3734,8 +3734,8 @@ mod tests {
         },
         testutil::{
             new_rng, set_logger_for_test, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtx,
-            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4, TEST_ADDRS_V6,
+            FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            TEST_ADDRS_V4, TEST_ADDRS_V6,
         },
         UnlockedCoreCtx,
     };
@@ -3922,7 +3922,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_icmp_parameter_problem_non_must() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V6).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
 
         // Test parsing an IPv6 packet with invalid next header value which
@@ -3961,7 +3961,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_icmp_parameter_problem_must() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V6).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
 
         // Test parsing an IPv6 packet where we MUST send an ICMP parameter problem
@@ -4010,7 +4010,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_unrecognized_ext_hdr_option() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(TEST_ADDRS_V6).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let mut expected_icmps = 0;
         let mut bytes = [0; 64];
@@ -4146,7 +4146,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt + crate::IpExt>() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -4162,7 +4162,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_packet_reassembly<I: Ip + TestIpExt + crate::IpExt>() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -4190,7 +4190,7 @@ mod tests {
     fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<
         I: Ip + TestIpExt + crate::IpExt,
     >() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -4243,7 +4243,7 @@ mod tests {
     where
         IpLayerTimerId: From<FragmentTimerId<I>>,
     {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -4288,12 +4288,11 @@ mod tests {
         let a = "alice";
         let b = "bob";
         let fake_config = I::TEST_ADDRS;
-        let (mut alice, alice_device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(fake_config.swap()).build();
+        let (mut alice, alice_device_ids) = FakeCtxBuilder::with_addrs(fake_config.swap()).build();
         {
             set_forwarding_enabled::<_, I>(&mut alice, &alice_device_ids[0].clone().into(), true);
         }
-        let (bob, bob_device_ids) = FakeEventDispatcherBuilder::with_addrs(fake_config).build();
+        let (bob, bob_device_ids) = FakeCtxBuilder::with_addrs(fake_config).build();
         let mut net = crate::testutil::new_simple_fake_network(
             a,
             alice,
@@ -4366,7 +4365,7 @@ mod tests {
         // it arrived at.
 
         let fake_config = Ipv6::TEST_ADDRS;
-        let mut dispatcher_builder = FakeEventDispatcherBuilder::with_addrs(fake_config.clone());
+        let mut dispatcher_builder = FakeCtxBuilder::with_addrs(fake_config.clone());
         let extra_ip = UnicastAddr::new(Ipv6::get_other_ip_address(7).get()).unwrap();
         let extra_mac = UnicastAddr::new(Mac::new([12, 13, 14, 15, 16, 17])).unwrap();
         dispatcher_builder.add_ndp_table_entry(0, extra_ip, extra_mac);
@@ -4508,8 +4507,7 @@ mod tests {
         // less than the current value.
 
         let fake_config = I::TEST_ADDRS;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(fake_config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(fake_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4597,8 +4595,7 @@ mod tests {
         // is less than the min MTU.
 
         let fake_config = I::TEST_ADDRS;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(fake_config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(fake_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4642,8 +4639,7 @@ mod tests {
         // Required from a node that does not implement RFC 1191.
 
         let fake_config = Ipv4::TEST_ADDRS;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(fake_config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(fake_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4755,8 +4751,7 @@ mod tests {
     #[test]
     fn test_invalid_icmpv4_in_ipv6() {
         let ip_config = Ipv6::TEST_ADDRS;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(ip_config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(ip_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4799,8 +4794,7 @@ mod tests {
     #[test]
     fn test_invalid_icmpv6_in_ipv4() {
         let ip_config = Ipv4::TEST_ADDRS;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(ip_config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(ip_config.clone()).build();
         // First possible device id.
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
@@ -4850,7 +4844,7 @@ mod tests {
         // multicast MAC).
 
         let config = I::TEST_ADDRS;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config.clone()).build();
         let eth_device = &device_ids[0];
         let device: DeviceId<_> = eth_device.clone().into();
         let multi_addr = I::get_multicast_addr(3).get();
@@ -5038,7 +5032,7 @@ mod tests {
         // Test that an inbound IPv6 packet with a non-unicast source address is
         // dropped.
         let cfg = TEST_ADDRS_V6;
-        let (mut ctx, _device_ids) = FakeEventDispatcherBuilder::with_addrs(cfg.clone()).build();
+        let (mut ctx, _device_ids) = FakeCtxBuilder::with_addrs(cfg.clone()).build();
         let device = ctx
             .core_api()
             .device::<EthernetLinkDevice>()
@@ -5077,7 +5071,7 @@ mod tests {
         let v4_config = Ipv4::TEST_ADDRS;
         let v6_config = Ipv6::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         // Both devices have the same MAC address, which is a bit weird, but not
         // a problem for this test.
         let v4_subnet = AddrSubnet::from_witness(v4_config.local_ip, 16).unwrap().subnet();
@@ -5386,7 +5380,7 @@ mod tests {
     #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     fn make_test_ctx<I: Ip + TestIpExt + crate::IpExt>(
     ) -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>) {
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         for device in [Device::First, Device::Second] {
             let ip: SpecifiedAddr<I::Addr> = device.ip_address().into();
             let subnet =

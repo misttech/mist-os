@@ -1539,8 +1539,8 @@ mod tests {
             IpAddressId as _,
         },
         testutil::{
-            add_arp_or_ndp_table_entry, new_rng, CtxPairExt as _, FakeEventDispatcherBuilder,
-            TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4,
+            add_arp_or_ndp_table_entry, new_rng, CtxPairExt as _, FakeCtxBuilder, TestIpExt,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4,
         },
     };
 
@@ -2165,7 +2165,7 @@ mod tests {
 
         // Test with netstack no forwarding
 
-        let mut builder = FakeEventDispatcherBuilder::with_addrs(config.clone());
+        let mut builder = FakeCtxBuilder::with_addrs(config.clone());
         let device_builder_id = 0;
         add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip, src_mac);
         let (mut ctx, device_ids) = builder.build();
@@ -2246,7 +2246,7 @@ mod tests {
         // that are destined for a device must always be accepted.
 
         let config = I::TEST_ADDRS;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::with_addrs(config.clone()).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config.clone()).build();
         let eth_device = &device_ids[0];
 
         let buf = Buf::new(Vec::new(), ..)

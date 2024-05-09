@@ -2618,9 +2618,7 @@ mod tests {
             ResolveRouteError, SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector, StrictlyZonedAddr},
-        testutil::{
-            set_logger_for_test, CtxPairExt as _, FakeEventDispatcherBuilder, TestIpExt as _,
-        },
+        testutil::{set_logger_for_test, CtxPairExt as _, FakeCtxBuilder, TestIpExt as _},
         uninstantiable::UninstantiableWrapper,
     };
 
@@ -7011,8 +7009,7 @@ mod tests {
     ) {
         set_logger_for_test();
         const HELLO: &'static [u8] = b"Hello";
-        let (mut ctx, local_device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (mut ctx, local_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
 
         let loopback_device_id: DeviceId<crate::testutil::FakeBindingsCtx> = ctx
             .core_api()

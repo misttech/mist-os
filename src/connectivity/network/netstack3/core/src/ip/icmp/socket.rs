@@ -950,9 +950,7 @@ mod tests {
         device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
         socket::StrictlyZonedAddr,
-        testutil::{
-            CtxPairExt as _, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
-        },
+        testutil::{CtxPairExt as _, FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
     const REMOTE_ID: u16 = 1;
@@ -989,10 +987,8 @@ mod tests {
 
         const LOCAL_CTX_NAME: &str = "alice";
         const REMOTE_CTX_NAME: &str = "bob";
-        let (local, local_device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS).build();
-        let (remote, remote_device_ids) =
-            FakeEventDispatcherBuilder::with_addrs(I::TEST_ADDRS.swap()).build();
+        let (local, local_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
+        let (remote, remote_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS.swap()).build();
         let mut net = crate::testutil::new_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
