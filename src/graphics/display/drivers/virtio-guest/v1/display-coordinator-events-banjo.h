@@ -34,8 +34,8 @@ class DisplayCoordinatorEventsBanjo final : public DisplayCoordinatorEventsInter
       const display_controller_interface_protocol_t* display_controller_interface);
 
   // DisplayCoordinatorEventsInterface:
-  void OnDisplaysChanged(cpp20::span<const added_display_args_t> added_displays,
-                         cpp20::span<const display::DisplayId> removed_display_ids) override;
+  void OnDisplayAdded(const added_display_args_t& added_display_args) override;
+  void OnDisplayRemoved(display::DisplayId display_id) override;
   void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
                       display::ConfigStamp config_stamp) override;
   void OnCaptureComplete() override;

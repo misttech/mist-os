@@ -32,32 +32,23 @@ void DisplayCoordinatorEventsBanjo::SetDisplayControllerInterface(
   display_controller_interface_ = *display_controller_interface;
 }
 
-void DisplayCoordinatorEventsBanjo::OnDisplaysChanged(
-    cpp20::span<const added_display_args_t> added_displays,
-    cpp20::span<const display::DisplayId> removed_display_ids) {
-  fbl::Vector<uint64_t> banjo_removed_display_ids;
-
-  fbl::AllocChecker alloc_checker;
-  banjo_removed_display_ids.reserve(removed_display_ids.size(), &alloc_checker);
-  if (!alloc_checker.check()) {
+void DisplayCoordinatorEventsBanjo::OnDisplayAdded(const added_display_args_t& added_display_args) {
+  fbl::AutoLock event_lock(&event_mutex_);
+  if (display_controller_interface_.ops == nullptr) {
     return;
   }
+  display_controller_interface_on_display_added(&display_controller_interface_,
+                                                &added_display_args);
+}
 
-  for (display::DisplayId removed_display_id : removed_display_ids) {
-    banjo_removed_display_ids.push_back(display::ToBanjoDisplayId(removed_display_id),
-                                        &alloc_checker);
-    ZX_DEBUG_ASSERT(banjo_removed_display_ids.size() <= removed_display_ids.size());
-    ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
-                        "push_back() failed despite having the required capacity reserve()d");
-  }
+void DisplayCoordinatorEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
+  const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
 
   fbl::AutoLock event_lock(&event_mutex_);
   if (display_controller_interface_.ops == nullptr) {
     return;
   }
-  display_controller_interface_on_displays_changed(
-      &display_controller_interface_, added_displays.data(), added_displays.size(),
-      banjo_removed_display_ids.data(), banjo_removed_display_ids.size());
+  display_controller_interface_on_display_removed(&display_controller_interface_, banjo_display_id);
 }
 
 void DisplayCoordinatorEventsBanjo::OnDisplayVsync(display::DisplayId display_id,

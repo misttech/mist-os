@@ -89,7 +89,7 @@ void DisplayEngine::OnCoordinatorConnected() {
       .pixel_repetition = 0,
   };
 
-  added_display_args_t args = {
+  const added_display_args_t added_display_args = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
       .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
       .panel =
@@ -100,9 +100,7 @@ void DisplayEngine::OnCoordinatorConnected() {
       .pixel_format_count = kSupportedFormats.size(),
   };
 
-  cpp20::span<const added_display_args_t> added_displays(&args, 1);
-  cpp20::span<const display::DisplayId> removed_display_ids;
-  coordinator_events_.OnDisplaysChanged(added_displays, removed_display_ids);
+  coordinator_events_.OnDisplayAdded(added_display_args);
 }
 
 zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(
