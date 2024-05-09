@@ -168,6 +168,9 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
+  zx::result<> AddDisplay(const added_display_args_t& banjo_added_display_args);
+  zx::result<> RemoveDisplay(DisplayId display_id);
+
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
