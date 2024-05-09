@@ -21,3 +21,6 @@ toc:
   - include: /docs/development/components/configuration/_toc.yaml
 - title: "Component ID index"
   path: /docs/development/components/component_id_index.md
+- title: "Stop idle components"
+  path: /docs/development/components/stop_idle.md
+  status: experimental
