@@ -165,3 +165,14 @@ closed protocol Device {
 service Service {
     device client_end:Device;
 };
+
+/// A driver transport variant of the `Device` protocol.
+@discoverable
+@transport("Driver")
+closed protocol DriverDevice {
+    compose Device;
+};
+
+service DriverService {
+    device client_end:DriverDevice;
+};

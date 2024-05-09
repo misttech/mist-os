@@ -11,4 +11,5 @@ fidl("fuchsia.hardware.sdio") {
     "//sdk/fidl/fuchsia.hardware.sdmmc",
     "//zircon/vdso/zx",
   ]
+  contains_drivers = true
 }
