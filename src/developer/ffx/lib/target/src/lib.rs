@@ -377,7 +377,13 @@ pub enum KnockError {
     NonCriticalError(#[from] anyhow::Error),
 }
 
-const RCS_TIMEOUT: Duration = Duration::from_secs(3);
+// Derive from rcs knock timeout as this is the minimum amount of time to knock.
+// Uses nanos to ensure that if RCS_KNOCK_TIMEOUT changes it is using the smallest unit possible.
+//
+// This is written as such due to some inconsistencies with Duration::from_nanos where `as_nanos()`
+// returns a u128 but `from_nanos()` takes a u64.
+pub const DEFAULT_RCS_KNOCK_TIMEOUT: Duration =
+    Duration::new(rcs::RCS_KNOCK_TIMEOUT.as_secs() * 3, rcs::RCS_KNOCK_TIMEOUT.subsec_nanos() * 3);
 
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS.
 ///
@@ -385,7 +391,7 @@ const RCS_TIMEOUT: Duration = Duration::from_secs(3);
 /// should call again, and a critical error implying the caller should raise the error
 /// and no longer loop.
 pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
-    knock_target_with_timeout(target, RCS_TIMEOUT).await
+    knock_target_with_timeout(target, DEFAULT_RCS_KNOCK_TIMEOUT).await
 }
 
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS, within
@@ -394,10 +400,18 @@ pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
 /// This is intended to be run in a loop, with a non-critical error implying the caller
 /// should call again, and a critical error implying the caller should raise the error
 /// and no longer loop.
+///
+/// The timeout must be longer than `rcs::RCS_KNOCK_TIMEOUT`
 pub async fn knock_target_with_timeout(
     target: &TargetProxy,
     rcs_timeout: Duration,
 ) -> Result<(), KnockError> {
+    if rcs_timeout <= rcs::RCS_KNOCK_TIMEOUT {
+        return Err(KnockError::CriticalError(anyhow::anyhow!(
+            "rcs_timeout must be greater than {:?}",
+            rcs::RCS_KNOCK_TIMEOUT
+        )));
+    }
     let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()
         .map_err(|e| KnockError::NonCriticalError(e.into()))?;
     timeout(rcs_timeout, target.open_remote_control(remote_server_end))
@@ -631,7 +645,7 @@ mod test {
     use crate::overnet_connector::{OvernetConnection, OvernetConnector};
     use async_channel::Receiver;
     use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
-    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
     use fuchsia_async::Task;
 
     fn create_overnet_circuit(router: Arc<overnet_core::Router>) -> fidl::AsyncSocket {
@@ -671,6 +685,19 @@ mod test {
         .detach();
 
         local_socket
+    }
+
+    #[fuchsia::test]
+    async fn test_target_wait_too_short_timeout() {
+        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+        let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
+        assert!(res.is_err());
+        let res = knock_target_with_timeout(
+            &proxy,
+            rcs::RCS_KNOCK_TIMEOUT.checked_sub(Duration::new(0, 1)).unwrap(),
+        )
+        .await;
+        assert!(res.is_err());
     }
 
     #[fuchsia::test]
@@ -758,17 +785,21 @@ mod test {
 
     impl FakeOvernet {
         async fn handle_transaction(
-            req: rcs::RemoteControlRequest,
+            req: rcs_fidl::RemoteControlRequest,
             behavior: &FakeOvernetBehavior,
         ) {
             match req {
-                rcs::RemoteControlRequest::OpenCapability { server_channel, responder, .. } => {
+                rcs_fidl::RemoteControlRequest::OpenCapability {
+                    server_channel,
+                    responder,
+                    ..
+                } => {
                     match behavior {
                         FakeOvernetBehavior::KeepRcsOpen => {
                             // We're just going to assume this capability is always going to be
                             // RCS, and avoid string matching for the sake of avoiding changes
                             // to monikers and/or capability connecting.
-                            let mut stream = rcs::RemoteControlRequestStream::from_channel(
+                            let mut stream = rcs_fidl::RemoteControlRequestStream::from_channel(
                                 fidl::AsyncChannel::from_channel(server_channel),
                             );
                             // This task is here to ensure the channel stays open, but won't
@@ -786,7 +817,7 @@ mod test {
                     }
                     responder.send(Ok(())).unwrap();
                 }
-                rcs::RemoteControlRequest::EchoString { value, responder } => {
+                rcs_fidl::RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(&value).unwrap()
                 }
                 _ => panic!("Received an unexpected request: {req:?}"),
@@ -800,7 +831,7 @@ mod test {
             let (rcs_sender, rcs_receiver) = async_channel::unbounded();
             self.circuit_node
                 .register_service(
-                    rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
+                    rcs_fidl::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
                     move |channel| {
                         let _ = rcs_sender.try_send(channel).unwrap();
                         Ok(())
@@ -811,7 +842,7 @@ mod test {
             let behavior = self.behavior.clone();
             let rcs_task = Task::local(async move {
                 while let Ok(channel) = rcs_receiver.recv().await {
-                    let mut stream = rcs::RemoteControlRequestStream::from_channel(
+                    let mut stream = rcs_fidl::RemoteControlRequestStream::from_channel(
                         fidl::AsyncChannel::from_channel(channel),
                     );
                     while let Ok(Some(req)) = stream.try_next().await {

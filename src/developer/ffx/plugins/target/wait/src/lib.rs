@@ -14,8 +14,7 @@ use futures::future::Either;
 use std::time::Duration;
 
 const DOWN_REPOLL_DELAY_MS: u64 = 500;
-const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
-const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
+const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(1000);
 
 #[derive(FfxTool)]
 pub struct WaitTool {
@@ -45,7 +44,7 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
                 &default_target,
                 &target_collection,
                 OPEN_TARGET_TIMEOUT,
-                KNOCK_TARGET_TIMEOUT,
+                ffx_target::DEFAULT_RCS_KNOCK_TIMEOUT,
             )
             .await
             {
@@ -202,7 +201,7 @@ mod tests {
             &ffx.target().await.unwrap(),
             &tc_proxy,
             OPEN_TARGET_TIMEOUT,
-            KNOCK_TARGET_TIMEOUT,
+            ffx_target::DEFAULT_RCS_KNOCK_TIMEOUT,
         )
         .await
         .unwrap_err()
@@ -230,7 +229,7 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
             setup_fake_target_collection_server([true, true], false),
-            WaitCommand { timeout: 1, down: false }
+            WaitCommand { timeout: 2, down: false }
         )
         .await
         .is_err());
@@ -241,7 +240,7 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
             setup_fake_target_collection_server_auto_close(),
-            WaitCommand { timeout: 1, down: true }
+            WaitCommand { timeout: 2, down: true }
         )
         .await
         .is_err());
@@ -252,7 +251,7 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
             setup_fake_target_collection_server([true, true], false),
-            WaitCommand { timeout: 1, down: true }
+            WaitCommand { timeout: 10, down: true }
         )
         .await
         .is_ok());
@@ -263,7 +262,7 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
             setup_fake_target_collection_server([false, false], false),
-            WaitCommand { timeout: 1, down: true }
+            WaitCommand { timeout: 2, down: true }
         )
         .await
         .is_ok());
@@ -279,7 +278,7 @@ mod tests {
             // we also wait for 500me in the wait_for_device() loop.
             // Any shorter a time and we're just going to hit the
             // timeout.
-            WaitCommand { timeout: 3, down: true }
+            WaitCommand { timeout: 10, down: true }
         )
         .await
         .is_ok());
@@ -290,7 +289,7 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
             setup_fake_target_collection_server([true, true], true),
-            WaitCommand { timeout: 3, down: true }
+            WaitCommand { timeout: 2, down: true }
         )
         .await
         .is_err());

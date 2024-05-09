@@ -147,7 +147,7 @@ impl std::fmt::Display for RcsConnectionError {
     }
 }
 
-const KNOCK_TIMEOUT: Duration = Duration::from_secs(1);
+pub const RCS_KNOCK_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[derive(thiserror::Error, Debug)]
 pub enum KnockRcsError {
@@ -198,7 +198,7 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
         .await?
         .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
     let mut event_receiver = knock_client.take_event_receiver();
-    let res = timeout(KNOCK_TIMEOUT, event_receiver.next()).await;
+    let res = timeout(RCS_KNOCK_TIMEOUT, event_receiver.next()).await;
     match res {
         // no events are expected -- the only reason we'll get an event is if
         // channel closes. So the only valid response here is a timeout.
