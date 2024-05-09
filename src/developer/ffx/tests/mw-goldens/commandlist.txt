@@ -1,4 +1,6 @@
 ffx component show
+ffx emu start
+ffx emu stop
 ffx product download
 ffx product lookup
 ffx target add

@@ -1,4 +1,6 @@
 component_show.json
+emu_start.json
+emu_stop.json
 product_download.json
 product_lookup.json
 target_add.json
