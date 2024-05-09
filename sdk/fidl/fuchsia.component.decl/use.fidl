@@ -19,7 +19,7 @@ type Use = flexible union {
     7: event_stream UseEventStream;
     @available(added=HEAD)
     8: runner UseRunner;
-    @available(added=HEAD)
+    @available(added=20)
     9: config UseConfiguration;
 };
 
@@ -279,7 +279,7 @@ type UseRunner = table {
     3: source_dictionary dictionary_path;
 };
 
-@available(added=HEAD)
+@available(added=20)
 type UseConfiguration = table {
     /// (Required) The provider of the configuration relative to the component
     /// itself. Must be `parent`, `self`, `child`.

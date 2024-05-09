@@ -19,7 +19,7 @@ type Capability = flexible union {
     8: event_stream EventStream;
     @available(added=HEAD)
     9: dictionary Dictionary;
-    @available(added=HEAD)
+    @available(added=20)
     10: config Configuration;
 };
 
@@ -197,7 +197,7 @@ type Dictionary = table {
 /// https://fuchsia.dev/fuchsia-src/glossary#configuration-capability
 /// or:
 /// https://fuchsia.dev/fuchsia-src/docs/concepts/components/v2/capabilities/configuration
-@available(added=HEAD)
+@available(added=20)
 type Configuration = table {
     /// (Required) The name of this configuration
     1: name name;

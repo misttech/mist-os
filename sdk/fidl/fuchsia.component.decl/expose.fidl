@@ -18,7 +18,7 @@ type Expose = flexible union {
     6: event_stream ExposeEventStream;
     @available(added=HEAD)
     7: dictionary ExposeDictionary;
-    @available(added=HEAD)
+    @available(added=20)
     8: config ExposeConfiguration;
 };
 
@@ -282,7 +282,7 @@ type ExposeDictionary = table {
 
 /// Declares a configuration capability exposed to a component's containing realm, such as
 /// a capability exposed by the component or one of its children at runtime.
-@available(added=HEAD)
+@available(added=20)
 type ExposeConfiguration = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
