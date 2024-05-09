@@ -159,26 +159,37 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(display::Namespace& incom
   return zx::ok(std::move(vout));
 }
 
-void Vout::PopulateAddedDisplayArgs(
-    added_display_args_t* args, display::DisplayId display_id,
+added_display_args_t Vout::CreateAddedDisplayArgs(
+    display::DisplayId display_id,
     cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {
   switch (type_) {
     case VoutType::kDsi: {
-      args->display_id = display::ToBanjoDisplayId(display_id);
-      args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
-      args->panel.mode = display::ToBanjoDisplayMode(dsi_.panel_config.display_timing);
-      args->pixel_format_list = pixel_formats.data();
-      args->pixel_format_count = pixel_formats.size();
-      return;
+      return {
+          .display_id = display::ToBanjoDisplayId(display_id),
+          .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
+          .panel =
+              {
+                  .mode = display::ToBanjoDisplayMode(dsi_.panel_config.display_timing),
+              },
+          .pixel_format_list = pixel_formats.data(),
+          .pixel_format_count = pixel_formats.size(),
+      };
     }
     case VoutType::kHdmi:
-      args->display_id = display::ToBanjoDisplayId(display_id);
-      args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_I2C;
-      args->panel.i2c.ops = &i2c_impl_protocol_ops_;
-      args->panel.i2c.ctx = this;
-      args->pixel_format_list = pixel_formats.data();
-      args->pixel_format_count = pixel_formats.size();
-      return;
+      return {
+          .display_id = display::ToBanjoDisplayId(display_id),
+          .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_I2C,
+          .panel =
+              {
+                  .i2c =
+                      {
+                          .ops = &i2c_impl_protocol_ops_,
+                          .ctx = this,
+                      },
+              },
+          .pixel_format_list = pixel_formats.data(),
+          .pixel_format_count = pixel_formats.size(),
+      };
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
