@@ -7,7 +7,8 @@
 //! types will be directly deserializable from the PBM, and converted into engine-specific types at
 //! runtime.
 
-use emulator_instance::{EmulatorConfiguration, FlagData, NetworkingMode, PortMapping};
+use emulator_instance::{FlagData, NetworkingMode, PortMapping};
+use schemars::JsonSchema;
 use sdk_metadata::{display_impl, VirtualDeviceV1};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display, path::PathBuf};
@@ -37,10 +38,65 @@ impl Default for EngineConsoleType {
 
 display_impl!(EngineConsoleType);
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct VirtualDeviceInfo {
+    /// A unique name identifying the virtual device specification.
+    pub name: String,
+
+    /// An optional human readable description.
+    pub description: Option<String>,
+
+    /// Details of the Central Processing Unit (CPU).
+    pub cpu: String,
+
+    /// Details about any audio devices included in the virtual device.
+    pub audio: String,
+
+    /// The size of the disk image for the virtual device, equivalent to virtual
+    /// storage capacity.
+    pub storage_bytes: u64,
+
+    /// Details about any input devices, such as a mouse or touchscreen.
+    pub pointing_device: String,
+
+    /// Amount of memory in the virtual device.
+    pub memory_bytes: u64,
+
+    /// A map of names to port numbers. These are the ports that need to be
+    /// available to the virtual device, though a given use case may not require
+    /// all of them. When emulating with user-mode networking, these must be
+    /// mapped to host-side ports to allow communication into the emulator from
+    /// external tools (such as ssh and mDNS). When emulating with Tun/Tap mode
+    /// networking port mapping is superfluous, so we expect this field to be
+    /// ignored.
+    pub ports: Option<HashMap<String, u16>>,
+
+    /// The height of the virtual device's screen, measured in pixels.
+    pub window_height: usize,
+
+    /// The width of the virtual device's screen, measured in pixels.
+    pub window_width: usize,
+}
+
+impl From<VirtualDeviceV1> for VirtualDeviceInfo {
+    fn from(value: VirtualDeviceV1) -> Self {
+        VirtualDeviceInfo {
+            name: value.name.clone(),
+            description: value.description.clone(),
+            cpu: value.hardware.cpu.arch.to_string(),
+            audio: value.hardware.audio.model.to_string(),
+            storage_bytes: value.hardware.storage.as_bytes().unwrap_or(0),
+            pointing_device: value.hardware.inputs.pointing_device.to_string(),
+            memory_bytes: value.hardware.memory.as_bytes().unwrap_or(0),
+            window_height: value.hardware.window_size.height,
+            window_width: value.hardware.window_size.width,
+            ports: value.ports.clone(),
+        }
+    }
+}
+
 /// Indicates which details the "show" command should return.
-// TODO(https://fxbug.dev/324167674): fix.
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub enum ShowDetail {
     All,
     Cmd {
@@ -52,16 +108,13 @@ pub enum ShowDetail {
         flags: Option<FlagData>,
     },
     Device {
-        device: Option<VirtualDeviceV1>,
+        device: Option<VirtualDeviceInfo>,
     },
     Net {
         mode: Option<NetworkingMode>,
         mac_address: Option<String>,
         upscript: Option<PathBuf>,
         ports: Option<HashMap<String, PortMapping>>,
-    },
-    Raw {
-        config: Option<EmulatorConfiguration>,
     },
 }
 
@@ -131,15 +184,6 @@ impl Display for ShowDetail {
                     for (k, v) in portdata {
                         writeln!(f, "\t\t{:10}{:<10}{:<10}", k, v.guest, v.host.unwrap_or(0))?;
                     }
-                }
-            }
-            ShowDetail::Raw { config } => {
-                if let Some(config_data) = config {
-                    let s = serde_json::to_string_pretty(&config_data)
-                        .expect("serialization error for config_data");
-                    writeln!(f, "\t{s}")?;
-                } else {
-                    writeln!(f, "None")?;
                 }
             }
         }

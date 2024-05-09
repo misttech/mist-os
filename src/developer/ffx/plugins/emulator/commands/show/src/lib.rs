@@ -10,7 +10,8 @@ use ffx_config::EnvironmentContext;
 use ffx_emulator_config::ShowDetail;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_show_args::ShowCommand;
-use fho::{bug, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{bug, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use itertools::Itertools;
 use std::path::PathBuf;
 
 /// Sub-sub tool for `emu show`
@@ -23,9 +24,6 @@ pub struct EmuShowTool {
 
 fn which_details(cmd: &ShowCommand) -> Vec<ShowDetail> {
     let mut details = vec![];
-    if cmd.raw {
-        details = vec![ShowDetail::Raw { config: None }]
-    }
     if cmd.cmd || cmd.all {
         details.push(ShowDetail::Cmd { program: None, args: None, env: None })
     }
@@ -58,9 +56,8 @@ fho::embedded_plugin!(EmuShowTool);
 
 #[async_trait(?Send)]
 impl FfxMain for EmuShowTool {
-    type Writer = MachineWriter<ShowDetail>;
-    async fn main(self, writer: MachineWriter<ShowDetail>) -> fho::Result<()> {
-        // implementation here
+    type Writer = VerifiedMachineWriter<Vec<ShowDetail>>;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let instance_dir: PathBuf = self
             .context
             .get(emulator_instance::EMU_INSTANCE_ROOT_DIR)
@@ -75,7 +72,7 @@ impl EmuShowTool {
     pub async fn show(
         &self,
         emu_instances: &EmulatorInstances,
-        mut writer: MachineWriter<ShowDetail>,
+        mut writer: <Self as FfxMain>::Writer,
     ) -> Result<()> {
         let mut instance_name = self.cmd.name.clone();
         let builder = EngineBuilder::new(emu_instances.clone());
@@ -91,9 +88,9 @@ impl EmuShowTool {
                 to review the emulator flags directly."
             )?;
                 }
-                for d in info {
-                    writer.machine_or(&d, &d)?;
-                }
+                writer.machine_or_else(&info, || {
+                    info.clone().into_iter().map(|i| i.to_string()).join("\n")
+                })?
             }
             Ok(None) => {
                 if let Some(name) = instance_name {
@@ -111,8 +108,12 @@ impl EmuShowTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use emulator_instance::{write_to_disk, EmulatorInstanceData, EngineState};
+    use emulator_instance::NetworkingMode;
+    use emulator_instance::{write_to_disk, EmulatorInstanceData, EngineState, FlagData};
+    use ffx_config::ConfigLevel;
+    use ffx_emulator_config::VirtualDeviceInfo;
     use ffx_writer::{Format, TestBuffers};
+    use std::collections::HashMap;
 
     #[fuchsia::test]
     async fn test_show() -> Result<()> {
@@ -121,11 +122,11 @@ mod tests {
         let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<ShowDetail> = MachineWriter::new_test(None, &test_buffers);
+        let writer = <EmuShowTool as FfxMain>::Writer::new_test(None, &test_buffers);
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<ShowDetail> =
-            MachineWriter::new_test(Some(Format::JsonPretty), &machine_buffers);
+        let machine_writer =
+            <EmuShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &machine_buffers);
 
         let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
         let instance_dir = emu_instances.get_instance_dir("one_instance", true)?;
@@ -141,10 +142,57 @@ mod tests {
         assert!(stderr.is_empty());
 
         let (stdout, stderr) = machine_buffers.into_strings();
-        let stdout_expected = include_str!("../test_data/test_show_expected.json_pretty");
 
-        assert_eq!(stdout, stdout_expected);
+        let got_data: Vec<ShowDetail> = serde_json::from_str(&stdout).expect("json details");
+        let want_data = vec![
+            ShowDetail::Cmd {
+                program: Some("".into()),
+                args: Some(vec!["-fuchsia".to_string()]),
+                env: Some(HashMap::<String, String>::new()),
+            },
+            ShowDetail::Config {
+                flags: Some(FlagData {
+                    args: vec![],
+                    envs: HashMap::<String, String>::new(),
+                    features: vec![],
+                    kernel_args: vec![],
+                    options: vec![],
+                }),
+            },
+            ShowDetail::Device {
+                device: Some(VirtualDeviceInfo {
+                    name: "one_instance_device".into(),
+                    description: Some(
+                        "The virtual device used to launch the one_instance emulator.".into(),
+                    ),
+                    cpu: "x64".into(),
+                    audio: "none".into(),
+                    storage_bytes: 0,
+                    pointing_device: "none".into(),
+                    memory_bytes: 0,
+                    ports: None,
+                    window_height: 0,
+                    window_width: 0,
+                }),
+            },
+            ShowDetail::Net {
+                mode: Some(NetworkingMode::Auto),
+                mac_address: None,
+                upscript: None,
+                ports: None,
+            },
+        ];
+
+        assert_eq!(got_data, want_data);
         assert!(stderr.is_empty());
+
+        let machine_writer2 = <EmuShowTool as FfxMain>::Writer::new_test(
+            Some(Format::JsonPretty),
+            &TestBuffers::default(),
+        );
+
+        let value = serde_json::to_value(&got_data).expect("value from data");
+        machine_writer2.verify_schema(&value).expect("schema OK");
 
         Ok(())
     }
@@ -154,13 +202,17 @@ mod tests {
 
         let mut tool = EmuShowTool { cmd: ShowCommand::default(), context: env.context.clone() };
         let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
+        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        let instance_dir = emu_instances.get_instance_dir("one_instance", true)?;
+        write_to_disk(&data, &instance_dir)?;
+        tool.cmd.name = Some("one_instance".to_string());
 
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<ShowDetail> = MachineWriter::new_test(None, &test_buffers);
+        let writer = <EmuShowTool as FfxMain>::Writer::new_test(None, &test_buffers);
 
         let machine_buffers = TestBuffers::default();
-        let machine_writer: MachineWriter<ShowDetail> =
-            MachineWriter::new_test(Some(Format::Json), &machine_buffers);
+        let machine_writer =
+            <EmuShowTool as FfxMain>::Writer::new_test(Some(Format::Json), &machine_buffers);
 
         tool.cmd.name = Some("unknown_instance".to_string());
 
@@ -179,5 +231,69 @@ mod tests {
         assert!(stderr.is_empty());
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_show_part() {
+        let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("setting test config");
+        let tool = EmuShowTool {
+            cmd: ShowCommand { device: true, ..Default::default() },
+            context: env.context.clone(),
+        };
+
+        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
+        let instance_dir = emu_instances
+            .get_instance_dir("one_instance", true)
+            .expect("test instance dir created");
+        write_to_disk(&data, &instance_dir).expect("test data written");
+
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <EmuShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+
+        let result = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+
+        if !result.is_ok() {
+            panic!("Expected OK result got {stdout} {stderr}")
+        }
+
+        let got_data: Vec<ShowDetail> = match serde_json::from_str(&stdout) {
+            Ok(data) => data,
+            Err(e) => panic!("Error {e} parsing json  from {stdout} {stderr}"),
+        };
+
+        let want_data: Vec<ShowDetail> = vec![ShowDetail::Device {
+            device: Some(VirtualDeviceInfo {
+                name: "one_instance_device".into(),
+                description: Some(
+                    "The virtual device used to launch the one_instance emulator.".into(),
+                ),
+                cpu: "x64".into(),
+                audio: "none".into(),
+                storage_bytes: 0,
+                pointing_device: "none".into(),
+                memory_bytes: 0,
+                ports: None,
+                window_height: 0,
+                window_width: 0,
+            }),
+        }];
+        assert_eq!(got_data, want_data);
+
+        let machine_writer2 = <EmuShowTool as FfxMain>::Writer::new_test(
+            Some(Format::JsonPretty),
+            &TestBuffers::default(),
+        );
+
+        let value = serde_json::to_value(&got_data).expect("value from data");
+        machine_writer2.verify_schema(&value).expect("schema OK");
     }
 }

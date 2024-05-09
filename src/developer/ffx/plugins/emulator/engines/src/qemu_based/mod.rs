@@ -618,9 +618,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let mut results: Vec<ShowDetail> = vec![];
         for segment in details {
             match segment {
-                ShowDetail::Raw { .. } => {
-                    results.push(ShowDetail::Raw { config: Some(self.emu_config().clone()) })
-                }
                 ShowDetail::Cmd { .. } => {
                     results.push(show_output::command(&self.build_emulator_cmd()))
                 }

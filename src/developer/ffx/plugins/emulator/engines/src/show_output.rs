@@ -83,5 +83,5 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) -> ShowDetail {
         device.ports = Some(ports.clone());
     }
 
-    ShowDetail::Device { device: Some(device) }
+    ShowDetail::Device { device: Some(device.into()) }
 }

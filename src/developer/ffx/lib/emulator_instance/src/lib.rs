@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
 pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -29,7 +30,7 @@ pub use targets::{
 };
 
 /// Holds a single mapping from a host port to the guest.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, JsonSchema)]
 pub struct PortMapping {
     pub guest: u16,
     pub host: Option<u16>,
@@ -57,7 +58,7 @@ pub trait EmulatorInstanceInfo {
     fn get_ssh_port(&self) -> Option<u16>;
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize, JsonSchema)]
 pub struct FlagData {
     /// Arguments. The set of flags which follow the "-fuchsia" option. These are not processed by
     /// Femu, but are passed through to Qemu.
