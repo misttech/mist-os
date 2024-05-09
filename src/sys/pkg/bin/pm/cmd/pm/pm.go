@@ -15,7 +15,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/expand"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/genkey"
 	initcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/init"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
@@ -42,7 +41,6 @@ Package Commands:
 Repository Commands:
     publish  - publish a package to a local repository
     serve    - serve a local repository
-    expand   - (deprecated) expand an archive
 
 For help with individual commands run "pm <command> --help"
 `
@@ -93,7 +91,8 @@ func doMain() int {
 		err = nil
 
 	case "expand":
-		err = expand.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx package archive extract' instead")
+		err = nil
 
 	case "genkey":
 		err = genkey.Run(cfg, flag.Args()[1:])
