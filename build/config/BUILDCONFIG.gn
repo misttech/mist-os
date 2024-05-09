@@ -1574,6 +1574,19 @@ _fuzzer_remove_common_configs = [ "//build/config:icf" ]
 # Disable warnings about symbols that will be provided by compiler runtimes.
 _fuzzer_remove_shared_configs = [ "//build/config:symbol_no_undefined" ]
 
+# The vptr instrumentation requires RTTI.  If -fno-rtti is passed then
+# this checking is implicitly disabled.  However, another translation
+# unit built without -fno-rtti will have the checking enabled.  The
+# -fno-rtti vtables are not compatible with the checking at runtime, so a
+# vtable from a -fno-rtti TU used by code from a -frtti TU gets false
+# positive failures.  Since the vtables are emitted in multiple TUs in
+# COMDAT and one implementation chosen randomly at link time, there's no
+# way to be sure the checking code requiring RTTI uses its own
+# RTTI-enabled vtables rather than other non-RTTI vtables.  So just let
+# RTTI be enabled everywhere, and then get the vptr checking everywhere
+# too.
+_ubsan_remove_common_configs = [ "//build/config:no_rtti" ]
+
 declare_args() {
   # List of variants that will form the basis for variant toolchains.
   # To make use of a variant, set [`select_variant`](#select_variant).
@@ -1712,24 +1725,13 @@ declare_args() {
       # This is the hwasan-ubsan variant.
       forward_variables_from(_hwasan_variant, "*")
       configs += [ "//build/config/sanitizers:ubsan" ]
+      remove_common_configs = _ubsan_remove_common_configs
       tags += [ "ubsan" ]
     },
 
     {
       configs = [ "//build/config/sanitizers:ubsan" ]
-
-      # The vptr instrumentation requires RTTI.  If -fno-rtti is passed then
-      # this checking is implicitly disabled.  However, another translation
-      # unit built without -fno-rtti will have the checking enabled.  The
-      # -fno-rtti vtables are not compatible with the checking at runtime, so a
-      # vtable from a -fno-rtti TU used by code from a -frtti TU gets false
-      # positive failures.  Since the vtables are emitted in multiple TUs in
-      # COMDAT and one implementation chosen randomly at link time, there's no
-      # way to be sure the checking code requiring RTTI uses its own
-      # RTTI-enabled vtables rather than other non-RTTI vtables.  So just let
-      # RTTI be enabled everywhere, and then get the vptr checking everywhere
-      # too.
-      remove_common_configs = [ "//build/config:no_rtti" ]
+      remove_common_configs = _ubsan_remove_common_configs
       tags = [
         "instrumented",
         "instrumentation-runtime",
@@ -1743,7 +1745,7 @@ declare_args() {
         "//build/config/sanitizers:ubsan",
         "//build/config/sanitizers:sancov",
       ]
-      remove_common_configs = [ "//build/config:no_rtti" ]  # See above.
+      remove_common_configs = _ubsan_remove_common_configs
       tags = [
         "instrumented",
         "instrumentation-runtime",
@@ -1759,7 +1761,7 @@ declare_args() {
     {
       forward_variables_from(_asan_variant, "*")
       configs += [ "//build/config/sanitizers:ubsan" ]
-      remove_common_configs += [ "//build/config:no_rtti" ]  # See above.
+      remove_common_configs += _ubsan_remove_common_configs
       tags += [ "ubsan" ]
     },
     {
@@ -1804,9 +1806,9 @@ declare_args() {
         "//build/config/sanitizers:ubsan",
       ]
       configs += _fuzzer_remove_common_configs  # Ensure present when removing.
-      remove_common_configs = _fuzzer_remove_common_configs
+      remove_common_configs =
+          _fuzzer_remove_common_configs + _ubsan_remove_common_configs
       remove_shared_configs = _fuzzer_remove_shared_configs
-      remove_common_configs += [ "//build/config:no_rtti" ]  # See above.
       tags = [
         "fuzzer",
         "instrumented",
