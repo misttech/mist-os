@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
+
 use std::num::NonZeroU16;
 
 use assert_matches::assert_matches;

@@ -5,6 +5,9 @@
 //! A networking stack.
 
 #![no_std]
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
@@ -156,6 +159,7 @@ pub mod ip {
 
     mod integration;
     mod ipv6;
+    mod raw;
 
     pub(crate) use base::*;
 

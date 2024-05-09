@@ -174,6 +174,10 @@ pub struct IpState<I>(PhantomData<I>, Never);
 pub struct IpStatePmtuCache<I>(PhantomData<I>, Never);
 pub struct IpStateFragmentCache<I>(PhantomData<I>, Never);
 pub struct IpStateRoutingTable<I>(PhantomData<I>, Never);
+// Lock level attributed to the state of an individual raw IP sockets.
+pub struct RawIpSocketState<I>(PhantomData<I>, Never);
+// Lock level attributed to the collection of all raw IP sockets.
+pub struct AllRawIpSockets<I>(PhantomData<I>, Never);
 
 pub enum DeviceLayerStateOrigin {}
 pub enum DeviceLayerState {}
@@ -227,7 +231,11 @@ impl_lock_after!(IcmpBoundMap<Ipv4> => IcmpTokenBucket<Ipv4>);
 impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSocketState<Ipv6>);
 impl_lock_after!(IcmpSocketState<Ipv6> => IcmpBoundMap<Ipv6>);
 impl_lock_after!(IcmpBoundMap<Ipv6> => IcmpTokenBucket<Ipv6>);
-impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpAllSocketsSet<Ipv4>);
+impl_lock_after!(IcmpTokenBucket<Ipv6> => AllRawIpSockets<Ipv4>);
+impl_lock_after!(AllRawIpSockets<Ipv4> => AllRawIpSockets<Ipv6>);
+impl_lock_after!(AllRawIpSockets<Ipv6> => RawIpSocketState<Ipv4>);
+impl_lock_after!(RawIpSocketState<Ipv4> => RawIpSocketState<Ipv6>);
+impl_lock_after!(RawIpSocketState<Ipv6> => TcpAllSocketsSet<Ipv4>);
 
 // Ideally we'd have separate impls `LoopbackRxDequeue =>
 // TcpAllSocketsSet<Ipv4>` and for `Ipv6`, but that doesn't play well with the

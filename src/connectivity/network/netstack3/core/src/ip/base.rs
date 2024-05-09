@@ -70,6 +70,7 @@ use crate::{
         ipv6,
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
+        raw::RawIpSocketMap,
         reassembly::{
             FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
             IpPacketFragmentCache,
@@ -1518,6 +1519,24 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPack
     }
 }
 
+impl<I: IpLayerIpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::AllRawIpSockets<I>>
+    for StackState<BT>
+{
+    type Data = RawIpSocketMap<I>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data>
+        where Self: 'l;
+    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data>
+        where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.inner_ip_state().raw_sockets.read()
+    }
+
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.inner_ip_state().raw_sockets.write()
+    }
+}
+
 /// Ip layer counters.
 #[derive(Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -1639,6 +1658,7 @@ pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
+    raw_sockets: RwLock<RawIpSocketMap<I>>,
 }
 
 impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, DeviceId, BT> {
@@ -1658,6 +1678,7 @@ impl<I: IpLayerIpExt, DeviceId, BC: TimerContext + IpStateBindingsTypes>
             ),
             pmtu_cache: Mutex::new(PmtuCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
             counters: Default::default(),
+            raw_sockets: Default::default(),
         }
     }
 }

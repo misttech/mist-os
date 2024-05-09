@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 #![warn(dead_code, unused_imports, unused_macros)]
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
 
 use core::{
     convert::{Infallible as Never, TryInto as _},
