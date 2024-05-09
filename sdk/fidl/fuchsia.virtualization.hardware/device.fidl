@@ -4,7 +4,7 @@
 library fuchsia.virtualization.hardware;
 
 using fuchsia.net;
-using fuchsia.sysmem;
+using fuchsia.sysmem2;
 using fuchsia.ui.composition;
 using fuchsia.ui.input3;
 using fuchsia.ui.pointer;
@@ -264,7 +264,7 @@ closed protocol VirtioWayland {
     strict Start(resource struct {
         start_info StartInfo;
         vmar zx.Handle:VMAR;
-        sysmem_allocator client_end:fuchsia.sysmem.Allocator;
+        sysmem_allocator client_end:fuchsia.sysmem2.Allocator;
         scenic_allocator client_end:fuchsia.ui.composition.Allocator;
     }) -> ();
 
@@ -273,7 +273,7 @@ closed protocol VirtioWayland {
         start_info StartInfo;
         vmar zx.Handle:VMAR;
         wayland_server client_end:<fuchsia.wayland.Server, optional>;
-        sysmem_allocator client_end:fuchsia.sysmem.Allocator;
+        sysmem_allocator client_end:fuchsia.sysmem2.Allocator;
         scenic_allocator client_end:fuchsia.ui.composition.Allocator;
     }) -> ();
 

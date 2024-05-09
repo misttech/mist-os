@@ -93,7 +93,9 @@ executable("virtio_wl_bin") {
 
   deps = [
     ":virtio",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/lib/fsl",
     "//src/lib/ui/wayland/server/cpp",

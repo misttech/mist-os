@@ -105,13 +105,13 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
 
   // |fuchsia::virtualization::hardware::VirtioWayland|
   void Start(fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
-             fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+             fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
              fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
              StartCallback callback) override;
   void StartWithWaylandServer(
       fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
       fidl::InterfaceHandle<fuchsia::wayland::Server> wayland_server,
-      fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+      fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
       fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
       StartCallback callback) override;
   void GetImporter(fidl::InterfaceRequest<fuchsia::virtualization::hardware::VirtioWaylandImporter>
@@ -143,12 +143,12 @@ class VirtioWl : public DeviceBase<VirtioWl, fuchsia::virtualization::hardware::
   bool CreatePendingVfds();
 
   void StartDevice(fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
-                   fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+                   fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
                    fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator);
 
   std::array<VirtioQueue, VIRTWL_QUEUE_COUNT> queues_;
   zx::vmar vmar_;
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
+  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorPtr scenic_allocator_;
   VirtioChain out_chain_;
   uint32_t bytes_written_for_send_request_ = 0;
