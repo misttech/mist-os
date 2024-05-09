@@ -442,6 +442,15 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			&stringInLogCheck{String: "double fault, halting", Type: lt},
 			// This string can show up in some boot tests.
 			&stringInLogCheck{String: "entering panic shell loop", Type: lt, ExceptStrings: []string{"Boot-test-successful!"}},
+			// For https://fxbug.dev/42067738. This should track all boot test failures
+			// where either the success string shows up in one of the logs but we fail
+			// to read it, or the test times out before the success string gets written.
+			&stringInLogCheck{
+				String:             "Boot-test-successful!",
+				Type:               lt,
+				SkipAllPassedTests: true,
+				AlwaysFlake:        true,
+			},
 		}...)
 	}
 
