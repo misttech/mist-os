@@ -390,6 +390,12 @@
         {
             name: "driver-host-env",
             extends: "realm",
+            runners: [
+                {
+                    runner: "driver-host2",
+                    from: "#driver_manager",
+                },
+            ],
 
             // 2 seconds
             __stop_timeout_ms: 2000,

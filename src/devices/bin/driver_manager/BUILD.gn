@@ -74,6 +74,8 @@ source_set("driver_runner") {
     "controller_allowlist_passthrough.h",
     "driver_host.cc",
     "driver_host.h",
+    "driver_host_runner.cc",
+    "driver_host_runner.h",
     "driver_runner.cc",
     "driver_runner.h",
     "node.cc",
