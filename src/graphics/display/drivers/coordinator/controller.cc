@@ -148,6 +148,17 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   }
 }
 
+void Controller::DisplayControllerInterfaceOnDisplayAdded(
+    const added_display_args_t* added_display) {
+  // TODO(https://fxbug.dev/339311596): Implement this method.
+  ZX_PANIC("Not implemented");
+}
+
+void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t display_id) {
+  // TODO(https://fxbug.dev/339311596): Implement this method.
+  ZX_PANIC("Not implemented");
+}
+
 void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
     const uint64_t* removed_banjo_display_id_list, size_t removed_banjo_display_id_count) {

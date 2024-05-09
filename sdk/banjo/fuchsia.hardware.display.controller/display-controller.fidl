@@ -117,6 +117,26 @@ type AddedDisplayArgs = resource struct {
 @transport("Banjo")
 @banjo_layout("ddk-interface")
 closed protocol DisplayControllerInterface {
+    /// Emitted when a display is connected.
+    ///
+    /// Display Engine drivers must emit this event for all displays connected
+    /// prior to initialization.
+    strict OnDisplayAdded(resource struct {
+        added_display AddedDisplayArgs;
+    });
+
+    /// Emitted when a display is removed.
+    ///
+    /// `display_id` must be a valid display ID that occurred in a previous
+    /// `OnDisplayAdded()` event.
+    ///
+    /// Display Engine drivers must have finished accessing all images which
+    /// were on the removed display before emitting the `OnDisplayRemoved()`
+    /// event.
+    strict OnDisplayRemoved(struct {
+        display_id uint64;
+    });
+
     /// Callbacks which are invoked when displays are added or removed. |added_display_list| and
     /// |removed_display_list| point to arrays of the display ids which were added and removed. If
     /// |added_display_count| or |removed_display_count| is 0, the corresponding array can be NULL.
@@ -125,6 +145,10 @@ closed protocol DisplayControllerInterface {
     ///
     /// The driver should call this function when the callback is registered if any displays
     /// are present.
+    ///
+    /// This event is deprecated in favor of `OnDisplayAdded` and `OnDisplayRemoved`.
+    //
+    // TODO(https://fxbug.dev/339311596): Delete this event.
     strict OnDisplaysChanged(resource struct {
         added_displays vector<AddedDisplayArgs>:MAX;
         removed_display_ids vector<uint64>:MAX;

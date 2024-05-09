@@ -89,14 +89,16 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void PrepareStop();
   void Stop();
 
+  // fuchsia.hardware.display.controller/DisplayControllerInterface:
+  void DisplayControllerInterfaceOnDisplayAdded(const added_display_args_t* added_display);
+  void DisplayControllerInterfaceOnDisplayRemoved(uint64_t display_id);
   void DisplayControllerInterfaceOnDisplaysChanged(
       const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
       const uint64_t* removed_banjo_display_id_list, size_t removed_banjo_display_id_count);
-
   void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
-
   void DisplayControllerInterfaceOnCaptureComplete();
+
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();

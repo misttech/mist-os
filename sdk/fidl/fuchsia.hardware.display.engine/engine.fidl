@@ -308,15 +308,24 @@ open protocol Engine {
     /// [`IsCaptureSupported`] returns `true`.
     flexible -> OnCaptureComplete();
 
-    /// Called when displays are added or removed.
+    /// Emitted when a display is connected.
     ///
-    /// The driver must be done accessing any images which were on the removed
-    /// displays.
+    /// Display Engine drivers must emit this event for all displays connected
+    /// prior to initialization.
+    flexible -> OnDisplayAdded(resource struct {
+        added_display AddedDisplayArgs;
+    });
+
+    /// Emitted when a display is removed.
     ///
-    /// The driver should emit this event if any displays are present.
-    flexible -> OnDisplaysChanged(resource struct {
-        added_displays vector<AddedDisplayArgs>:MAX;
-        removed_display_ids vector<uint64>:MAX;
+    /// `display_id` must be a valid display ID that occurred in a previous
+    /// `OnDisplayAdded()` event.
+    ///
+    /// Display Engine drivers must have finished accessing all images which
+    /// were on the removed display before emitting the `OnDisplayRemoved()`
+    /// event.
+    flexible -> OnDisplayRemoved(struct {
+        display_id uint64;
     });
 
     /// Events which are invoked when display vsync occurs.
