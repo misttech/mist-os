@@ -179,6 +179,8 @@ type Capability = flexible union {
     6: event_stream EventStream;
     @available(added=HEAD)
     7: config Config;
+    @available(added=HEAD)
+    8: dictionary Dictionary;
 };
 
 /// A protocol capability
@@ -344,6 +346,27 @@ type Config = table {
     /// component.
     3: availability fuchsia.component.decl.Availability;
 };
+
+/// A dictionary capability
+@available(added=HEAD)
+type Dictionary = table {
+    /// The name of the dictionary.
+    1: name fuchsia.component.name;
+
+    /// A rename of the dictionary, which can be set when routing to another
+    /// component. This field is optional.
+    2: as fuchsia.component.name;
+
+    /// For information on this type, see
+    /// https://fuchsia.dev/go/components/declaration#DependencyType.
+    /// This field is optional and defaults to `STRONG`.
+    3: type fuchsia.component.decl.DependencyType;
+
+    /// Optional. Cannot be set to `SameAsTarget` if `to` contains a local
+    /// component.
+    4: availability fuchsia.component.decl.Availability;
+};
+
 
 /// Properties that may be set on a child when it is added to a realm.
 // TODO(https://fxbug.dev/42078374): Consider deprecating this type.

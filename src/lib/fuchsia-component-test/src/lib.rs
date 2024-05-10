@@ -293,6 +293,11 @@ impl Capability {
     pub fn event_stream(name: impl Into<String>) -> EventStream {
         EventStream { name: name.into(), rename: None, path: None, scope: None }
     }
+
+    /// Creates a new dictionary capability.
+    pub fn dictionary(name: impl Into<String>) -> DictionaryCapability {
+        DictionaryCapability { name: name.into(), as_: None, availability: None }
+    }
 }
 
 /// A protocol capability, which may be routed between components. Created by
@@ -570,6 +575,48 @@ impl Into<ftest::Capability> for EventStream {
             as_: self.rename,
             scope: self.scope.map(|scopes| scopes.into_iter().map(|scope| scope.into()).collect()),
             path: self.path,
+            ..Default::default()
+        })
+    }
+}
+
+/// A dictionary capability, which may be routed between components. Created by
+/// `Capability::dictionary`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictionaryCapability {
+    name: String,
+    as_: Option<String>,
+    availability: Option<fdecl::Availability>,
+}
+
+impl DictionaryCapability {
+    /// The name the targets will see the dictionary capability as.
+    pub fn as_(mut self, as_: impl Into<String>) -> Self {
+        self.as_ = Some(as_.into());
+        self
+    }
+
+    /// Marks the availability of this capability as "optional", which allows either this or a
+    /// parent offer to have a source of `void`.
+    pub fn optional(mut self) -> Self {
+        self.availability = Some(fdecl::Availability::Optional);
+        self
+    }
+
+    /// Marks the availability of this capability to be the same as the availability expectations
+    /// set in the target.
+    pub fn availability_same_as_target(mut self) -> Self {
+        self.availability = Some(fdecl::Availability::SameAsTarget);
+        self
+    }
+}
+
+impl Into<ftest::Capability> for DictionaryCapability {
+    fn into(self) -> ftest::Capability {
+        ftest::Capability::Dictionary(ftest::Dictionary {
+            name: Some(self.name),
+            as_: self.as_,
+            availability: self.availability,
             ..Default::default()
         })
     }
@@ -2467,6 +2514,38 @@ mod tests {
                 name: "test".to_string(),
                 as_: None,
                 path: None,
+                availability: Some(fdecl::Availability::SameAsTarget),
+            },
+        );
+    }
+
+    #[fuchsia::test]
+    async fn dictionary_capability_construction() {
+        assert_eq!(
+            Capability::dictionary("test"),
+            DictionaryCapability { name: "test".to_string(), as_: None, availability: None },
+        );
+        assert_eq!(
+            Capability::dictionary("test").as_("test2"),
+            DictionaryCapability {
+                name: "test".to_string(),
+                as_: Some("test2".to_string()),
+                availability: None,
+            },
+        );
+        assert_eq!(
+            Capability::dictionary("test").optional(),
+            DictionaryCapability {
+                name: "test".to_string(),
+                as_: None,
+                availability: Some(fdecl::Availability::Optional),
+            },
+        );
+        assert_eq!(
+            Capability::dictionary("test").availability_same_as_target(),
+            DictionaryCapability {
+                name: "test".to_string(),
+                as_: None,
                 availability: Some(fdecl::Availability::SameAsTarget),
             },
         );
