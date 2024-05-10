@@ -1,0 +1,305 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Array_of_ShowDetail",
+  "type": "array",
+  "items": {
+    "$ref": "#/definitions/ShowDetail"
+  },
+  "definitions": {
+    "ShowDetail": {
+      "description": "Indicates which details the \"show\" command should return.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "All"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "Cmd"
+          ],
+          "properties": {
+            "Cmd": {
+              "type": "object",
+              "properties": {
+                "program": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "args": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "env": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Config"
+          ],
+          "properties": {
+            "Config": {
+              "type": "object",
+              "properties": {
+                "flags": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/FlagData"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Device"
+          ],
+          "properties": {
+            "Device": {
+              "type": "object",
+              "properties": {
+                "device": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/VirtualDeviceInfo"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Net"
+          ],
+          "properties": {
+            "Net": {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/NetworkingMode"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "mac_address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "upscript": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ports": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": {
+                    "$ref": "#/definitions/PortMapping"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "FlagData": {
+      "type": "object",
+      "required": [
+        "args",
+        "envs",
+        "features",
+        "kernel_args",
+        "options"
+      ],
+      "properties": {
+        "args": {
+          "description": "Arguments. The set of flags which follow the \"-fuchsia\" option. These are not processed by Femu, but are passed through to Qemu.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "envs": {
+          "description": "Environment Variables. These are not passed on the command line, but are set in the process's environment before execution.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "features": {
+          "description": "Features. A Femu-only field. Features are the first set of command line flags passed to the Femu binary. These are single words, capitalized, comma-separated, and immediately follow the flag \"-feature\".",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kernel_args": {
+          "description": "Kernel Arguments. The last part of the command line. A set of text values that are passed through the emulator executable directly to the guest system's kernel.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "options": {
+          "description": "Options. A Femu-only field. Options come immediately after features. Options may be boolean flags (e.g. -no-hidpi-scaling) or have associated values (e.g. -window-size 1280x800).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "VirtualDeviceInfo": {
+      "type": "object",
+      "required": [
+        "audio",
+        "cpu",
+        "memory_bytes",
+        "name",
+        "pointing_device",
+        "storage_bytes",
+        "window_height",
+        "window_width"
+      ],
+      "properties": {
+        "name": {
+          "description": "A unique name identifying the virtual device specification.",
+          "type": "string"
+        },
+        "description": {
+          "description": "An optional human readable description.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cpu": {
+          "description": "Details of the Central Processing Unit (CPU).",
+          "type": "string"
+        },
+        "audio": {
+          "description": "Details about any audio devices included in the virtual device.",
+          "type": "string"
+        },
+        "storage_bytes": {
+          "description": "The size of the disk image for the virtual device, equivalent to virtual storage capacity.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "pointing_device": {
+          "description": "Details about any input devices, such as a mouse or touchscreen.",
+          "type": "string"
+        },
+        "memory_bytes": {
+          "description": "Amount of memory in the virtual device.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "ports": {
+          "description": "A map of names to port numbers. These are the ports that need to be available to the virtual device, though a given use case may not require all of them. When emulating with user-mode networking, these must be mapped to host-side ports to allow communication into the emulator from external tools (such as ssh and mDNS). When emulating with Tun/Tap mode networking port mapping is superfluous, so we expect this field to be ignored.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0.0
+          }
+        },
+        "window_height": {
+          "description": "The height of the virtual device's screen, measured in pixels.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "window_width": {
+          "description": "The width of the virtual device's screen, measured in pixels.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "NetworkingMode": {
+      "description": "Selector for the mode of networking to enable between the guest and host systems.",
+      "type": "string",
+      "enum": [
+        "auto",
+        "tap",
+        "user",
+        "none"
+      ]
+    },
+    "PortMapping": {
+      "description": "Holds a single mapping from a host port to the guest.",
+      "type": "object",
+      "required": [
+        "guest"
+      ],
+      "properties": {
+        "guest": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "host": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,5 @@
 ffx component show
+ffx emu show
 ffx emu start
 ffx emu stop
 ffx product download

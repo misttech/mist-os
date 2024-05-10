@@ -1,4 +1,5 @@
 component_show.json
+emu_show.json
 emu_start.json
 emu_stop.json
 product_download.json
