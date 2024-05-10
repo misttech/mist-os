@@ -169,7 +169,7 @@ impl DataType {
             let error_message =
                 format!("Failed to generate docs for complex {} enum: b/332348955", &rust_type);
             description = format!("{}\n\n{}", &error_message, description);
-            println!("{}", error_message);
+            // println!("{}", error_message);
             DataTypeInner::Enum(EnumDataType { variants: BTreeSet::new() })
         }
         // A struct.
