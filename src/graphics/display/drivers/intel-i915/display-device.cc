@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/display-device.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/function.h>
@@ -32,17 +31,6 @@
 namespace i915 {
 
 namespace {
-
-// Must match `kPixelFormatTypes` defined in intel-i915.cc.
-constexpr fuchsia_images2_pixel_format_enum_value_t kBanjoSupportedPixelFormatsArray[] = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-};
-
-constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSupportedPixelFormats(
-    kBanjoSupportedPixelFormatsArray);
 
 void backlight_message(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
   DisplayDevice* ptr;
@@ -263,26 +251,6 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
           return controller->GetImportedImagePixelFormat(image_id);
         });
   }
-}
-
-added_display_args_t DisplayDevice::CreateAddedDisplayArgs() {
-  i2c_impl_protocol_t i2c_protocol;
-  i2c().GetProto(&i2c_protocol);
-
-  return added_display_args_t{
-      .display_id = display::ToBanjoDisplayId(id()),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_I2C,
-      .panel =
-          {
-              .i2c = i2c_protocol,
-          },
-      .pixel_format_list = kBanjoSupportedPixelFormats.data(),
-      .pixel_format_count = kBanjoSupportedPixelFormats.size(),
-  };
-
-  // TODO(b/317914671): After the display coordinator provides display metadata
-  // to the drivers, each display's type should potentially be adjusted from
-  // HDMI to DVI, based on EDID information.
 }
 
 void DisplayDevice::GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) {

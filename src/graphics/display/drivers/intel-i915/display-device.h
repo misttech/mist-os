@@ -60,11 +60,11 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   void ApplyConfiguration(const display_config_t* banjo_display_config,
                           display::ConfigStamp config_stamp);
 
-  // TODO(https://fxbug.dev/42167004): Initialization-related interactions between the Controller
-  // class and DisplayDevice can currently take different paths, with Init() being called
-  // conditionally in some cases (e.g. if the display has already been configured and powered up by
-  // the bootloader), which means a DisplayDevice can hold many states before being considered
-  // fully-initialized. It would be good to simplify this by:
+  // TODO(https://fxbug.dev/42167004): Initialization-related interactions between the Controller class and
+  // DisplayDevice can currently take different paths, with Init() being called conditionally in
+  // some cases (e.g. if the display has already been configured and powered up by the bootloader),
+  // which means a DisplayDevice can hold many states before being considered fully-initialized.
+  // It would be good to simplify this by:
   // 1. Eliminating the "partially initialized" DisplayDevice state from the point of its owner.
   // 2. Having a single Init factory function with options, such as the current DPLL state, which is
   // always called to construct a DisplayDevice, possibly merging Query, Init,
@@ -114,8 +114,6 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   }
 
   virtual bool CheckPixelRate(int64_t pixel_rate_hz) = 0;
-
-  added_display_args_t CreateAddedDisplayArgs();
 
   // FIDL calls
   void GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) override;
