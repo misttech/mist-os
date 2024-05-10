@@ -221,10 +221,6 @@ class Controller : public DeviceType,
   void InitDisplayBuffers();
   DisplayDevice* FindDevice(display::DisplayId display_id) __TA_REQUIRES(display_lock_);
 
-  void CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
-                             cpp20::span<const display::DisplayId> removed)
-      __TA_REQUIRES(display_lock_);
-
   // Gets the layer_t* config for the given pipe/plane. Return false if there is no layer.
   bool GetPlaneLayer(Pipe* pipe, uint32_t plane,
                      cpp20::span<const display_config_t> banjo_display_configs,
@@ -281,7 +277,10 @@ class Controller : public DeviceType,
       buffer_collections_;
 
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
-  bool ready_for_callback_ __TA_GUARDED(display_lock_) = false;
+
+  // True iff the driver initialization (Bind() and DdkInit()) is fully
+  // completed.
+  bool driver_initialized_ __TA_GUARDED(display_lock_) = false;
 
   Gtt gtt_ __TA_GUARDED(gtt_lock_);
   mutable mtx_t gtt_lock_;

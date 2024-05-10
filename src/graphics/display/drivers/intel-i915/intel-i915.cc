@@ -71,13 +71,6 @@ namespace i915 {
 
 namespace {
 
-constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedFormats[] = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
-};
-
 constexpr uint32_t kImageTilingTypes[4] = {
     IMAGE_TILING_TYPE_LINEAR,
     IMAGE_TILING_TYPE_X_TILED,
@@ -164,12 +157,9 @@ zx::result<FramebufferInfo> GetFramebufferInfo(zx_device_t* parent) {
 
 void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
   zxlogf(TRACE, "Hotplug detected on ddi %d (long_pulse=%d)", ddi_id, long_pulse);
-  std::unique_ptr<DisplayDevice> device = nullptr;
-  DisplayDevice* added_device = nullptr;
-  display::DisplayId removed_display_id = display::kInvalidDisplayId;
-
   fbl::AutoLock lock(&display_lock_);
 
+  std::unique_ptr<DisplayDevice> device = nullptr;
   for (size_t i = 0; i < display_devices_.size(); i++) {
     if (display_devices_[i]->ddi_id() == ddi_id) {
       if (display_devices_[i]->HandleHotplug(long_pulse)) {
@@ -180,29 +170,36 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
       break;
     }
   }
-  if (device) {  // Existing device was unplugged
-    zxlogf(INFO, "Display %ld unplugged", device->id().value());
-    removed_display_id = device->id();
+
+  // An existing display device was unplugged.
+  if (device != nullptr) {
+    zxlogf(INFO, "Display %" PRIu64 " unplugged", device->id().value());
+    display::DisplayId removed_display_id = device->id();
     RemoveDisplay(std::move(device));
-  } else {  // New device was plugged in
-    std::unique_ptr<DisplayDevice> device = QueryDisplay(ddi_id, next_id_);
-    if (!device || !device->Init()) {
-      zxlogf(INFO, "failed to init hotplug display");
-    } else {
-      DisplayDevice* device_ptr = device.get();
-      if (AddDisplay(std::move(device)) == ZX_OK) {
-        added_device = device_ptr;
-      }
+
+    if (dc_intf_.is_valid()) {
+      dc_intf_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
     }
+    return;
   }
 
-  if (dc_intf_.is_valid() && (added_device || removed_display_id != display::kInvalidDisplayId)) {
-    const bool display_added = added_device != nullptr;
-    cpp20::span<DisplayDevice*> added = cpp20::span(&added_device, /*count=*/display_added ? 1 : 0);
-    const bool display_removed = removed_display_id != display::kInvalidDisplayId;
-    cpp20::span<const display::DisplayId> removed =
-        cpp20::span(&removed_display_id, /*count=*/display_removed ? 1 : 0);
-    CallOnDisplaysChanged(added, removed);
+  // A new display device was plugged in.
+  std::unique_ptr<DisplayDevice> new_device = QueryDisplay(ddi_id, next_id_);
+  if (!new_device || !new_device->Init()) {
+    zxlogf(ERROR, "Failed to initialize hotplug display");
+    return;
+  }
+
+  DisplayDevice* new_device_ptr = new_device.get();
+  zx_status_t add_display_status = AddDisplay(std::move(new_device));
+  if (add_display_status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add a new display: %s", zx_status_get_string(add_display_status));
+    return;
+  }
+
+  if (dc_intf_.is_valid()) {
+    const added_display_args_t added_display_args = new_device_ptr->CreateAddedDisplayArgs();
+    dc_intf_.OnDisplayAdded(&added_display_args);
   }
 }
 
@@ -787,31 +784,9 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zxlogf(INFO, "Display %ld connected", display_id.value());
+  zxlogf(INFO, "Display %" PRIu64 " connected", display_id.value());
   next_id_++;
   return ZX_OK;
-}
-
-void Controller::CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
-                                       cpp20::span<const display::DisplayId> removed) {
-  added_display_args_t added_args[std::max(static_cast<size_t>(1), added.size())];
-  for (unsigned i = 0; i < added.size(); i++) {
-    added_args[i].display_id = display::ToBanjoDisplayId(added[i]->id());
-    added_args[i].panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_I2C;
-    added[i]->i2c().GetProto(&added_args[i].panel.i2c);
-    added_args[i].pixel_format_list = kSupportedFormats;
-    added_args[i].pixel_format_count = static_cast<uint32_t>(std::size(kSupportedFormats));
-  }
-
-  uint64_t banjo_removed_display_ids[std::max(static_cast<size_t>(1), removed.size())];
-  for (unsigned i = 0; i < removed.size(); i++) {
-    banjo_removed_display_ids[i] = display::ToBanjoDisplayId(removed[i]);
-  }
-  dc_intf_.OnDisplaysChanged(added_args, added.size(), banjo_removed_display_ids, removed.size());
-
-  // TODO(b/317914671): After the display coordinator provides display metadata
-  // to the drivers, each display's type should potentially be adjusted from
-  // HDMI to DVI, based on EDID information.
 }
 
 // DisplayControllerImpl methods
@@ -821,15 +796,18 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
   fbl::AutoLock lock(&display_lock_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
-  if (ready_for_callback_ && !display_devices_.is_empty()) {
-    const size_t size = display_devices_.size();
-    DisplayDevice* added_displays[size];
-    for (size_t i = 0; i < size; i++) {
-      added_displays[i] = display_devices_[i].get();
+  // If `SetDisplayControllerInterface` occurs **after** driver initialization
+  // (i.e. `driver_initialized_` is true), `SetDisplayControllerInterface`
+  // should be responsible for notifying the coordinator of existing display
+  // devices.
+  //
+  // Otherwise, the driver initialization logic (`DdkInit()`) should be
+  // responsible for notifying the coordinator of existing display devices.
+  if (driver_initialized_ && !display_devices_.is_empty()) {
+    for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
+      const added_display_args_t added_display_args = display_device->CreateAddedDisplayArgs();
+      dc_intf_.OnDisplayAdded(&added_display_args);
     }
-    cpp20::span<DisplayDevice*> added(added_displays, size);
-    cpp20::span<const display::DisplayId> removed{};
-    CallOnDisplaysChanged(added, removed);
   }
 }
 
@@ -2145,18 +2123,21 @@ void Controller::DdkInit(ddk::InitTxn txn) {
 
   {
     fbl::AutoLock lock(&display_lock_);
+
+    // If `SetDisplayControllerInterface` occurs **before** driver
+    // initialization (i.e. `dc_intf_` is valid), `DdkInit()` should be
+    // responsible for notifying the coordinator of existing display devices.
+    //
+    // Otherwise, `SetDisplayControllerInterface` should be responsible for
+    // notifying the coordinator of existing display devices.
     if ((!display_devices_.is_empty()) && dc_intf_.is_valid()) {
-      const size_t size = display_devices_.size();
-      DisplayDevice* added_displays[size];
-      for (size_t i = 0; i < size; i++) {
-        added_displays[i] = display_devices_[i].get();
+      for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
+        const added_display_args_t added_display_args = display_device->CreateAddedDisplayArgs();
+        dc_intf_.OnDisplayAdded(&added_display_args);
       }
-      cpp20::span<DisplayDevice*> added(added_displays, size);
-      cpp20::span<const display::DisplayId> removed{};
-      CallOnDisplaysChanged(added, removed);
     }
 
-    ready_for_callback_ = true;
+    driver_initialized_ = true;
   }
 
   interrupts_.FinishInit();
