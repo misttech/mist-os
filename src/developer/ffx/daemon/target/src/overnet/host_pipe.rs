@@ -9,7 +9,7 @@ use compat_info::CompatibilityInfo;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::parse::{
-    parse_ssh_output, read_ssh_line, HostAddr, ParseSshConnectionError, PipeError,
+    parse_ssh_output, read_ssh_line, write_ssh_log, HostAddr, ParseSshConnectionError, PipeError,
 };
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
@@ -25,7 +25,6 @@ use std::{
     cell::RefCell,
     collections::VecDeque,
     io,
-    io::Write,
     net::SocketAddr,
     process::Stdio,
     rc::{Rc, Weak},
@@ -160,25 +159,6 @@ fn setup_watchdogs() {
             std::process::abort();
         }
     });
-}
-
-async fn write_ssh_log(prefix: &str, line: &String) {
-    // Skip keepalives, which will show up in the steady-state
-    if line.contains("keepalive") {
-        return;
-    }
-    let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
-    let mut f = match ffx_config::logging::log_file_with_info(&ctx, "ssh", true).await {
-        Ok((f, _)) => f,
-        Err(e) => {
-            tracing::warn!("Couldn't open ssh log file: {e:?}");
-            return;
-        }
-    };
-    const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
-    let timestamp = chrono::Local::now().format(TIME_FORMAT);
-    write!(&mut f, "{timestamp}: {prefix} {line}")
-        .unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
 }
 
 impl HostPipeChild {

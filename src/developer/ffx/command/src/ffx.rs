@@ -6,6 +6,7 @@ use crate::{user_error, Error, FfxContext, MetricsSession, Result};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;
+use ffx_config::logging::LogDestination;
 use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
 use ffx_writer::Format;
 use std::os::unix::process::ExitStatusExt;
@@ -237,6 +238,12 @@ pub struct Ffx {
 
     #[argh(positional, greedy)]
     pub subcommand: Vec<String>,
+
+    #[argh(option, short = 'o', long = "log-output")]
+    /// specify destination of log output. "-" or "stdout" for stdout, "stderr"
+    /// for stderr. If no destination is specified, log.dir will be used. If a
+    /// destination is specified, then log.dir will be ignored.
+    pub log_destination: Option<LogDestination>,
 }
 
 impl Ffx {
@@ -325,6 +332,7 @@ impl Ffx {
             isolate_dir: None,
             verbose: false,
             subcommand: vec![],
+            log_destination: None,
         };
 
         let mut argv_iter = argv.iter();
@@ -382,6 +390,12 @@ impl Ffx {
                 }
                 "-v" | "--verbose" => {
                     return_val.verbose = true;
+                }
+                "-o" | "--output-file" => {
+                    if let Some(val) = argv_iter.next() {
+                        // Unwrap is okay because LogDestination::Err is `Infallible`
+                        return_val.log_destination = Some(LogDestination::from_str(val).unwrap());
+                    }
                 }
                 _ => {
                     return_val.subcommand.push(opt.to_string());

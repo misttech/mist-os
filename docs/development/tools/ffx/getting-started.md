@@ -46,6 +46,7 @@ Options:
   -c, --config      override default configuration
   -e, --env         override default environment settings
   -t, --target      apply operations across single or multiple targets
+  -o, --log-output  specify destination of log output
   --help            display usage information
 
 Commands:
@@ -154,6 +155,57 @@ TODO: fill this out.
 
 You can use the `target off` and `target reboot` subcommands to power-off or
 reboot a device, respectively.
+
+## `ffx` logs
+
+### Destination
+
+Logs normally go to a cache directory (on Linux, usually
+`$HOME/.local/share/Fuchsia/ffx/cache/logs`).
+The location can be found by running
+
+```posix-terminal
+fx ffx config get log.dir
+```
+
+However, the location can be overridden with `-o/--log-output <destination>`,
+where `<destination>` can be a filename, or stdout (by specifying `stdout`
+or `-`), or stderr (by specifying `stderr`).
+
+### Log Level
+
+The debugging level can be specified with `-l/--log-level <level>`,
+where `<level>` is one of `off`, `error`, `warn`, `info`, `debug`, or `trace`.
+The default is `info`.
+
+It can also be permanently set by configuring `log.level`, e.g.:
+
+```posix-terminal
+fx ffx config set log.level debug
+```
+
+### Interactive Use
+
+A common use of the above options is to see debugging for a specific command:
+
+```posix-terminal
+fx ffx -l debug -o - target echo
+```
+
+The above command will produce debugging logs on the command line as part
+of the invocation.
+
+#### Target Levels
+
+Specific log "targets" can have a different level, by specifying
+configuration entries under `log.target_levels`. For instance, to
+see debug logs only for `analytics`:
+
+```posix-terminal
+fx ffx config set log.target_levels.analytics debug
+```
+
+Log "targets" are simply prefixes to a log line.
 
 ## Configuration
 

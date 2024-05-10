@@ -4,9 +4,11 @@
 
 use anyhow::{Context as _, Result};
 use compat_info::{CompatibilityInfo, ConnectionInfo};
+use ffx_config::logging::LogDirHandling;
 use fuchsia_async::TimeoutExt;
 use std::fmt;
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncReadExt, BufReader};
 use tokio::process::{ChildStderr, ChildStdout};
@@ -317,13 +319,19 @@ fn parse_ssh_connection_with_info(
     }
 }
 
-async fn write_ssh_log(prefix: &str, line: &String) {
+pub async fn write_ssh_log(prefix: &str, line: &String) {
     // Skip keepalives, which will show up in the steady-state
     if line.contains("keepalive") {
         return;
     }
     let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
-    let mut f = match ffx_config::logging::log_file_with_info(&ctx, "ssh", true).await {
+    let mut f = match ffx_config::logging::log_file_with_info(
+        &ctx,
+        &PathBuf::from("ssh.log"),
+        LogDirHandling::WithDirWithRotate,
+    )
+    .await
+    {
         Ok((f, _)) => f,
         Err(e) => {
             tracing::warn!("Couldn't open ssh log file: {e:?}");
