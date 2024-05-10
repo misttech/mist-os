@@ -15,6 +15,7 @@ use alloc::vec;
 use assert_matches::assert_matches;
 
 use net_types::{ip::Ipv4, Witness as _};
+use netstack3_base::{bench, testutil::Bencher};
 use packet::{Buf, InnerPacketBuilder, Serializer};
 use packet_formats::{
     ethernet::{
@@ -37,10 +38,7 @@ use crate::{
         DeviceId,
     },
     state::StackStateBuilder,
-    testutil::{
-        benchmarks::{black_box, Bencher},
-        CtxPairExt as _, FakeCtxBuilder, TEST_ADDRS_V4,
-    },
+    testutil::{CtxPairExt as _, FakeCtxBuilder, TEST_ADDRS_V4},
 };
 
 // NOTE: Extra tests that are too expensive to run during benchmarks can be
@@ -97,9 +95,9 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
     ];
 
     b.iter(|| {
-        black_box(ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
-            black_box(RecvEthernetFrameMeta { device_id: eth_device.clone() }),
-            black_box(Buf::new(&mut buf[..], range.clone())),
+        B::black_box(ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
+            B::black_box(RecvEthernetFrameMeta { device_id: eth_device.clone() }),
+            B::black_box(Buf::new(&mut buf[..], range.clone())),
         ));
 
         #[cfg(debug_assertions)]

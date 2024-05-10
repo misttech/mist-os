@@ -177,10 +177,10 @@ impl<I: crate::Instant> TokenBucket<I> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::{
-        context::testutil::{FakeInstant, FakeInstantCtx},
-        testutil::benchmarks::{black_box, Bencher},
-    };
+
+    use netstack3_base::{bench, testutil::Bencher};
+
+    use crate::context::testutil::{FakeInstant, FakeInstantCtx};
 
     impl<I: crate::Instant> TokenBucket<I> {
         /// Call `try_take` `n` times, and assert that it succeeds every time.
@@ -341,7 +341,7 @@ pub(crate) mod tests {
         let mut bucket = TokenBucket::new(enforced_rate);
         b.iter(|| {
             ctx.sleep(sleep);
-            let _: bool = black_box(bucket.try_take(black_box(&ctx)));
+            let _: bool = B::black_box(bucket.try_take(B::black_box(&ctx)));
         });
     }
 

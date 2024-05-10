@@ -72,6 +72,7 @@ pub mod sync {
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     mod addr;
+    mod benchmarks;
     mod fake_bindings;
     mod fake_core;
     mod fake_network;
@@ -85,6 +86,7 @@ pub mod testutil {
     };
     pub use crate::trace::testutil::FakeTracingCtx;
     pub use addr::{TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
+    pub use benchmarks::{Bencher, RealBencher, TestBencher};
     pub use fake_bindings::FakeBindingsCtx;
     pub use fake_core::FakeCoreCtx;
     pub use fake_network::{

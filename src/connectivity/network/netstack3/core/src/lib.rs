@@ -25,9 +25,6 @@ extern crate fakealloc as alloc;
 // TODO(https://github.com/dtolnay/thiserror/pull/64): remove this module.
 extern crate fakestd as std;
 
-#[macro_use]
-mod macros;
-
 mod algorithm;
 mod api;
 mod context;

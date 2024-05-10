@@ -2868,7 +2868,7 @@ mod tests {
         let unique_addresses = attempted_addresses.iter().collect::<HashSet<_>>();
         assert_eq!(
             unique_addresses.len(),
-            (1 + idgen_retries).into(),
+            usize::from(1 + idgen_retries),
             "not all addresses are unique: {attempted_addresses:?}"
         );
     }

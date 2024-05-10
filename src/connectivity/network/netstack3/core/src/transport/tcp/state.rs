@@ -4143,7 +4143,8 @@ mod test {
         );
         assert_eq!(
             established.read_with(|available| {
-                assert_eq!(available, &[&[][..]]);
+                let empty: &[u8] = &[];
+                assert_eq!(available, &[empty]);
                 0
             }),
             0

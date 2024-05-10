@@ -440,53 +440,6 @@ where
     assert!(vec.is_empty(), "vec={vec:?}");
 }
 
-/// Utilities to allow running benchmarks as tests.
-///
-/// Our benchmarks rely on the unstable `test` feature, which is disallowed in
-/// Fuchsia's build system. In order to ensure that our benchmarks are always
-/// compiled and tested, this module provides fakes that allow us to run our
-/// benchmarks as normal tests when the `benchmark` feature is disabled.
-///
-/// See the `bench!` macro for details on how this module is used.
-#[cfg(test)]
-pub(crate) mod benchmarks {
-    /// A trait to allow faking of the `test::Bencher` type.
-    pub(crate) trait Bencher {
-        fn iter<T, F: FnMut() -> T>(&mut self, inner: F);
-    }
-
-    #[cfg(benchmark)]
-    impl Bencher for criterion::Bencher {
-        fn iter<T, F: FnMut() -> T>(&mut self, inner: F) {
-            criterion::Bencher::iter(self, inner)
-        }
-    }
-
-    /// A `Bencher` whose `iter` method runs the provided argument a small,
-    /// fixed number of times.
-    #[cfg(not(benchmark))]
-    pub(crate) struct TestBencher;
-
-    #[cfg(not(benchmark))]
-    impl Bencher for TestBencher {
-        fn iter<T, F: FnMut() -> T>(&mut self, mut inner: F) {
-            const NUM_TEST_ITERS: u32 = 256;
-            super::set_logger_for_test();
-            for _ in 0..NUM_TEST_ITERS {
-                let _: T = inner();
-            }
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn black_box<T>(placeholder: T) -> T {
-        #[cfg(benchmark)]
-        return criterion::black_box(placeholder);
-        #[cfg(not(benchmark))]
-        return placeholder;
-    }
-}
-
 #[derive(Default)]
 /// Bindings context state held by [`FakeBindingsCtx`].
 pub struct FakeBindingsCtxState {

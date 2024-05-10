@@ -92,7 +92,6 @@ rustc_library_with_features("netstack3-core") {
     "src/ip/types.rs",
     "src/lib.rs",
     "src/lock_ordering.rs",
-    "src/macros.rs",
     "src/marker.rs",
     "src/socket/address.rs",
     "src/socket/base.rs",
