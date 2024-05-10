@@ -9,7 +9,7 @@ use {
             DeviceMode,
         },
         fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo},
-        mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags},
+        mm::{MemoryAccessor, MemoryAccessorExt},
         task::CurrentTask,
         vfs::{
             buffers::VecOutputBuffer, default_ioctl, fileops_impl_dataless, fileops_impl_seekable,
@@ -609,6 +609,23 @@ fn open_device(
     }
 }
 
+fn size_of_merkle_tree_preceding_leaf_nodes(
+    leaf_nodes_size: u64,
+    hash_size: u64,
+    base_args: &VerityTargetBaseArgs,
+) -> u64 {
+    let mut total_size = 0;
+    let mut data_size = leaf_nodes_size;
+    while data_size > base_args.hash_block_size {
+        let num_hashes = data_size.div_ceil(base_args.hash_block_size);
+        let hashes_per_block = base_args.hash_block_size.div_ceil(hash_size);
+        let hash_blocks = num_hashes.div_ceil(hashes_per_block);
+        data_size = hash_blocks * base_args.hash_block_size;
+        total_size += data_size;
+    }
+    total_size
+}
+
 // Parse the parameter string into a TargetType.
 fn parse_parameter_string(
     locked: &mut Locked<'_, Unlocked>,
@@ -671,12 +688,6 @@ fn parse_parameter_string(
                 _ => return Err(errno!(ENOTSUP)),
             };
 
-            let hash_device_vmo = hash_device
-                .get_vmo(current_task, None, ProtectionFlags::READ)
-                .map_err(|e| errno!(EINVAL, e))?;
-
-            let hash_device_size = hash_device_vmo.get_size().map_err(|e| errno!(EINVAL, e))?;
-
             debug_assert!(base_args.hash_block_size > 0);
             let data_size = base_args.num_data_blocks * base_args.data_block_size;
             let num_hashes = data_size.div_ceil(base_args.hash_block_size);
@@ -684,13 +695,10 @@ fn parse_parameter_string(
             let hash_blocks = num_hashes.div_ceil(hashes_per_block);
             let leaf_nodes_size = hash_blocks * base_args.hash_block_size;
             let mut buffer = VecOutputBuffer::new(leaf_nodes_size as usize);
-
-            let bytes_read = hash_device.read_at(
-                locked,
-                current_task,
-                (hash_device_size - leaf_nodes_size) as usize,
-                &mut buffer,
-            )?;
+            let offset = base_args.hash_start_block * base_args.hash_block_size
+                + size_of_merkle_tree_preceding_leaf_nodes(leaf_nodes_size, hash_size, &base_args);
+            let bytes_read =
+                hash_device.read_at(locked, current_task, offset as usize, &mut buffer)?;
             debug_assert!(bytes_read == leaf_nodes_size as usize);
 
             Ok(TargetType::Verity(VerityTargetParams {
