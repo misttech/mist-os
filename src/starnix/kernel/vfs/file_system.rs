@@ -287,18 +287,6 @@ impl FileSystem {
         Arc::downgrade(node)
     }
 
-    /// Get or create an FsNode for this file system.
-    ///
-    /// If node_id is Some, then this function checks the node cache to
-    /// determine whether this node is already open. If so, the function
-    /// returns the existing FsNode. If not, the function calls the given
-    /// create_fn function to create the FsNode.
-    ///
-    /// If node_id is None, then this function assigns a new identifier number
-    /// and calls the given create_fn function to create the FsNode with the
-    /// assigned number.
-    ///
-    /// Returns Err only if create_fn returns Err.
     pub fn get_or_create_node<F>(
         &self,
         current_task: &CurrentTask,
@@ -307,6 +295,34 @@ impl FileSystem {
     ) -> Result<FsNodeHandle, Errno>
     where
         F: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
+    {
+        self.get_and_validate_or_create_node(current_task, node_id, |_| true, create_fn)
+    }
+
+    /// Get a node that is validated with the callback, or create an FsNode for
+    /// this file system.
+    ///
+    /// If node_id is Some, then this function checks the node cache to
+    /// determine whether this node is already open. If so, the function
+    /// returns the existing FsNode if it passes the validation check. If no
+    /// node exists, or a node does but fails the validation check, the function
+    /// calls the given create_fn function to create the FsNode.
+    ///
+    /// If node_id is None, then this function assigns a new identifier number
+    /// and calls the given create_fn function to create the FsNode with the
+    /// assigned number.
+    ///
+    /// Returns Err only if create_fn returns Err.
+    pub fn get_and_validate_or_create_node<V, C>(
+        &self,
+        current_task: &CurrentTask,
+        node_id: Option<ino_t>,
+        validate_fn: V,
+        create_fn: C,
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        V: FnOnce(&FsNodeHandle) -> bool,
+        C: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
     {
         let node_id = node_id.unwrap_or_else(|| self.next_node_id());
         let mut nodes = self.nodes.lock();
@@ -318,7 +334,9 @@ impl FileSystem {
             }
             Entry::Occupied(mut entry) => {
                 if let Some(node) = entry.get().upgrade() {
-                    return Ok(node);
+                    if validate_fn(&node) {
+                        return Ok(node);
+                    }
                 }
                 let node = create_fn(node_id)?;
                 entry.insert(self.prepare_node_for_insertion(current_task, &node));
