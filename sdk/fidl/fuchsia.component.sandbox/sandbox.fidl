@@ -245,7 +245,7 @@ open protocol Factory {
     /// corresponding FIDL representation on `server_end`. The peer of the
     /// `server_end` is another reference to the bedrock object. Dropping the
     /// control channel decreases one reference on the object.
-    flexible ConnectToConnector(resource struct {
+    flexible OpenConnector(resource struct {
         capability ConnectorCapability;
         server_end server_end:Connector;
     });
@@ -256,7 +256,7 @@ open protocol Factory {
     /// corresponding FIDL representation on `server_end`. The peer of the
     /// `server_end` is another reference to the bedrock object. Dropping the
     /// control channel decreases one reference on the object.
-    flexible ConnectToHandle(resource struct {
+    flexible OpenHandle(resource struct {
         capability HandleCapability;
         server_end server_end:Handle;
     });

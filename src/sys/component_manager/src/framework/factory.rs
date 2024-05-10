@@ -80,24 +80,23 @@ impl FactoryCapabilityHost {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
-            fsandbox::FactoryRequest::ConnectToHandle {
-                capability,
-                server_end,
-                control_handle: _,
-            } => match sandbox::Capability::try_from(fsandbox::Capability::Handle(capability)) {
-                Ok(capability) => match capability {
-                    sandbox::Capability::OneShotHandle(handle) => {
-                        let server_end: ServerEnd<fsandbox::HandleMarker> = server_end.into();
-                        self.tasks.spawn(serve_handle(handle, server_end.into_stream().unwrap()));
+            fsandbox::FactoryRequest::OpenHandle { capability, server_end, control_handle: _ } => {
+                match sandbox::Capability::try_from(fsandbox::Capability::Handle(capability)) {
+                    Ok(capability) => match capability {
+                        sandbox::Capability::OneShotHandle(handle) => {
+                            let server_end: ServerEnd<fsandbox::HandleMarker> = server_end.into();
+                            self.tasks
+                                .spawn(serve_handle(handle, server_end.into_stream().unwrap()));
+                        }
+                        _ => unreachable!(),
+                    },
+                    Err(err) => {
+                        warn!("Error converting token to capability: {err:?}");
+                        _ = server_end.close_with_epitaph(err.as_zx_status());
                     }
-                    _ => unreachable!(),
-                },
-                Err(err) => {
-                    warn!("Error converting token to capability: {err:?}");
-                    _ = server_end.close_with_epitaph(err.as_zx_status());
                 }
-            },
-            fsandbox::FactoryRequest::ConnectToConnector {
+            }
+            fsandbox::FactoryRequest::OpenConnector {
                 capability,
                 server_end,
                 control_handle: _,
@@ -242,7 +241,7 @@ mod tests {
 
         let one_shot = factory_proxy.create_handle(event.into()).await.unwrap();
         let (handle_client, handle_server) = create_endpoints::<fsandbox::HandleMarker>();
-        factory_proxy.connect_to_handle(one_shot, handle_server.into()).unwrap();
+        factory_proxy.open_handle(one_shot, handle_server.into()).unwrap();
         let handle_proxy = handle_client.into_proxy().unwrap();
         let event_back = handle_proxy.get_handle().await.unwrap().unwrap();
         assert!(event_back.get_koid().unwrap() == expected_koid);
@@ -266,7 +265,7 @@ mod tests {
         let fidl_one_shot: fsandbox::HandleCapability = one_shot.into();
 
         let (handle_client, handle_server) = create_endpoints::<fsandbox::HandleMarker>();
-        factory_proxy.connect_to_handle(fidl_one_shot, handle_server).unwrap();
+        factory_proxy.open_handle(fidl_one_shot, handle_server).unwrap();
         let handle_proxy = handle_client.into_proxy().unwrap();
 
         let client = async move {
@@ -294,7 +293,7 @@ mod tests {
         let fidl_one_shot: fsandbox::HandleCapability = one_shot.into();
 
         let (handle_client, handle_server) = create_endpoints::<fsandbox::HandleMarker>();
-        factory_proxy.connect_to_handle(fidl_one_shot, handle_server).unwrap();
+        factory_proxy.open_handle(fidl_one_shot, handle_server).unwrap();
         let handle_proxy = handle_client.into_proxy().unwrap();
 
         let client = async move {
@@ -318,7 +317,7 @@ mod tests {
         let connector = factory_proxy.create_connector(receiver_client_end).await.unwrap();
         let (connector_client, connector_server) =
             fidl::endpoints::create_endpoints::<fsandbox::ConnectorMarker>();
-        factory_proxy.connect_to_connector(connector, connector_server.into()).unwrap();
+        factory_proxy.open_connector(connector, connector_server.into()).unwrap();
         let connector = connector_client.into_proxy().unwrap();
 
         let (ch1, _ch2) = zx::Channel::create();
