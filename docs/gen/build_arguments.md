@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2102
+From //build/config/BUILDCONFIG.gn:2104
 
 ### allowed_test_device_types
 
@@ -3245,7 +3245,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1837
+From //build/config/BUILDCONFIG.gn:1839
 
 ### extra_vbmeta_descriptors
 
@@ -4288,6 +4288,7 @@ Each element of the list is one variant, which is a scope defining:
   tags = ["hwasan", "instrumentation-runtime", "instrumented", "lsan", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only"]
 }, {
   configs = ["//build/config/sanitizers:hwasan", "//build/config/sanitizers:ubsan"]
+  remove_common_configs = ["//build/config:no_rtti"]
   tags = ["hwasan", "instrumentation-runtime", "instrumented", "lsan", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only", "ubsan"]
 }, {
   configs = ["//build/config/sanitizers:ubsan"]
@@ -4368,7 +4369,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1638
+From //build/config/BUILDCONFIG.gn:1651
 
 ### legacy_base_package_labels
 
@@ -5239,7 +5240,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 * `profile`: optimized for coverage/profile data collection
 * `coverage`: optimized for coverage data collection
 
-**Current value (from the default):** `"size"`
+**Current value (from the default):** `"size_lto"`
 
 From //build/config/compiler.gni:23
 
@@ -7534,7 +7535,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2092
+From //build/config/BUILDCONFIG.gn:2094
 
 ### select_variant_canonical
 
@@ -7544,7 +7545,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2097
+From //build/config/BUILDCONFIG.gn:2099
 
 ### select_variant_shortcuts
 
@@ -7602,7 +7603,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1883
+From //build/config/BUILDCONFIG.gn:1885
 
 ### size_checker_input
 
@@ -8088,7 +8089,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1867
+From //build/config/BUILDCONFIG.gn:1869
 
 ### universe_package_labels
 
