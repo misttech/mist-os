@@ -56,7 +56,14 @@ import("//build/group_with_inputs.gni")
 #     Empty for stopping metadata walks.
 template("python_library") {
   assert(defined(invoker.sources), "sources is required")
-
+  _labels = {
+    input_group = "${target_name}_input_group"
+    mypy_checker = "${target_name}_mypy_checker"
+    library_infos = "${target_name}_library_infos"
+  }
+  _files = {
+    library_infos = "${target_gen_dir}/${target_name}_library_infos.json"
+  }
   library_deps = []
   if (defined(invoker.library_deps)) {
     library_deps = invoker.library_deps
@@ -78,7 +85,7 @@ template("python_library") {
   if (defined(invoker.library_name)) {
     _library_name = invoker.library_name
   }
-  group_with_inputs(target_name) {
+  group_with_inputs(_labels.input_group) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -91,12 +98,6 @@ template("python_library") {
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
-
-    # Run python type checks using Mypy if enable_mypy flag is set
-    if (_enable_mypy) {
-      deps += [ ":${target_name}_mypy_checker" ]
-    }
-
     source_root = _source_root
     metadata = {
       library_info = [
@@ -114,58 +115,57 @@ template("python_library") {
     sources = _full_source_paths
   }
 
-  if (_enable_mypy) {
-    # Generate library_info.json file with all the library dependencies info
-    _library_infos_target = "${target_name}_library_infos"
-    _library_infos_json = "${target_gen_dir}/${target_name}_library_infos.json"
-    generated_file(_library_infos_target) {
-      forward_variables_from(invoker, [ "testonly" ])
-      visibility = [ ":*" ]
+  # Generate library_info.json file with all the library dependencies info
+  generated_file(_labels.library_infos) {
+    forward_variables_from(invoker, [ "testonly" ])
+    visibility = [ ":*" ]
+    public_deps = [ ":${_labels.input_group}" ]
+    outputs = [ _files.library_infos ]
+    output_conversion = "json"
+    data_keys = [ "library_info" ]
+    walk_keys = [ "library_info_barrier" ]
+  }
 
-      if (defined(invoker.library_deps)) {
-        public_deps = invoker.library_deps
-      }
+  action(_labels.mypy_checker) {
+    forward_variables_from(invoker, [ "testonly" ])
+    inputs = [
+               "//pyproject.toml",
+               "//build/python/package_python_binary.py",
+               _files.library_infos,
+             ] + _full_source_paths
+    script = "//build/python/mypy_checker.py"
+    outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
+    depfile = "${target_out_dir}/${target_name}.d"
+    args =
+    # This source list includes only direct library sources, excluding
+    # any dependencies.
+    [
+      "--target_name",
+      _library_name,
+      "--library_infos",
+      rebase_path(_files.library_infos, root_build_dir),
+      "--gen_dir",
+      rebase_path(target_gen_dir, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+    deps = [ ":${_labels.library_infos}" ]
 
-      outputs = [ _library_infos_json ]
-      output_conversion = "json"
-      data_keys = [ "library_info" ]
-      walk_keys = [ "library_info_barrier" ]
+    # Required for generated sources like C extension wrappers.
+    deps += library_deps
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
     }
+  }
 
-    action(target_name + "_mypy_checker") {
-      forward_variables_from(invoker, [ "testonly" ])
-      inputs = [
-                 "//pyproject.toml",
-                 "//build/python/package_python_binary.py",
-                 _library_infos_json,
-               ] + _full_source_paths
-      script = "//build/python/mypy_checker.py"
-      outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
-      depfile = "${target_out_dir}/${target_name}.d"
-      args =
-          # This source list includes only direct library sources, excluding
-          # any dependencies.
-          [ "--sources" ] + invoker.sources + [
-            "--source_root",
-            rebase_path(_source_root, root_build_dir),
-            "--target_name",
-            _library_name,
-            "--library_infos",
-            rebase_path(_library_infos_json, root_build_dir),
-            "--gen_dir",
-            rebase_path(target_gen_dir, root_build_dir),
-            "--depfile",
-            rebase_path(depfile, root_build_dir),
-            "--output",
-            rebase_path(outputs[0], root_build_dir),
-          ]
-      deps = [ ":${_library_infos_target}" ]
-
-      # Required for generated sources like C extension wrappers.
-      deps += library_deps
-      if (defined(invoker.deps)) {
-        deps += invoker.deps
-      }
+  group(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
+    deps = [ ":${_labels.input_group}" ]
+    if (_enable_mypy) {
+      # Run python type checks using Mypy if enable_mypy flag is set.
+      deps += [ ":${_labels.mypy_checker}" ]
     }
   }
 }

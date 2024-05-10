@@ -24,17 +24,6 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
-        "--sources",
-        help="Sources of this target, including main source",
-        nargs="*",
-    )
-    parser.add_argument(
-        "--source_root",
-        help="Path to root of the package",
-        type=Path,
-        required=True,
-    )
-    parser.add_argument(
         "--library_infos",
         help="Path to the library infos JSON file",
         type=argparse.FileType("r"),
@@ -66,8 +55,6 @@ def main() -> int:
     return run_mypy_on_library_target(
         args.target_name,
         args.gen_dir,
-        args.source_root,
-        args.sources,
         lib_infos,
         args.depfile,
     )
@@ -103,9 +90,10 @@ def run_mypy_on_binary_target(
     # Copy over the sources of this target to the tmp directory.
     package_python_binary.copy_binary_sources(tmp_dir, src_files, src_map)
 
-    # Copy over the python sources of mypy enabled library dependencies
-    copy_library_sources(tmp_dir, lib_infos, src_map)
-
+    # Copy mypy enabled library sources to the tmp directory.
+    package_python_binary.copy_library_sources(
+        tmp_dir, [info for info in lib_infos if info["mypy_support"]], src_map
+    )
     try:
         ret = run_mypy_checks(target_name, tmp_dir, src_map)
     finally:
@@ -116,8 +104,6 @@ def run_mypy_on_binary_target(
 def run_mypy_on_library_target(
     target_name: str,
     gen_dir: Path,
-    source_root: Path,
-    src_files: list[str],
     lib_infos: list[dict[str, object]],
     depfile: Path,
 ) -> int:
@@ -128,8 +114,6 @@ def run_mypy_on_library_target(
     Args:
         target_name: The name of the target being built.
         gen_dir: The path to the generated directory
-        source_root: The root directory of the library target
-        src_files: The list of sources of the library target
         lib_infos: The list of library dependencies of the library target
         depfile: The path to the depfile to generate
 
@@ -144,21 +128,10 @@ def run_mypy_on_library_target(
     # Mapping from the temp dir source file paths to the original source file paths
     src_map: dict[str, str] = {}
 
-    # Copy over the sources of this target to the tmp library directory.
-    target_dir = tmp_dir / target_name
-    os.makedirs(os.path.dirname(target_dir), exist_ok=True)
-
-    # TODO(https://fxbug.dev/339525678): Add current library sources to lib_infos
-    for source in src_files:
-        src = str(source_root / source)
-        dest = str(target_dir / source)
-        # Make sub directories if necessary.
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        src_map[dest] = src
-        shutil.copy2(src, dest)
-
-    copy_library_sources(tmp_dir, lib_infos, src_map)
-
+    # Copy mypy enabled library sources to the tmp directory.
+    package_python_binary.copy_library_sources(
+        tmp_dir, [info for info in lib_infos if info["mypy_support"]], src_map
+    )
     # Write the depfile
     depfile.write_text(
         "{}: {}\n".format(tmp_dir, " ".join(list(src_map.values())))
@@ -229,28 +202,6 @@ def run_mypy_checks(
                     file=sys.stderr,
                 )
         return e.returncode
-
-
-def copy_library_sources(
-    tmp_dir: str, lib_infos: list[dict[str, object]], src_map: dict[str, str]
-) -> None:
-    """Copies the Python source files of mypy enabled library dependencies of a
-        target into the given destination directory.
-
-    Args:
-        tmp_dir: The destination directory to copy the sources to.
-        lib_infos: The list of library dependencies to be copied.
-        src_map: The mapping from the temp dir source file paths to the original
-    """
-    mypy_enabled_libs: list[dict[str, object]] = []
-    for lib_info in lib_infos:
-        if not lib_info["mypy_support"]:
-            continue
-        mypy_enabled_libs.append(lib_info)
-
-    package_python_binary.copy_library_sources(
-        tmp_dir, mypy_enabled_libs, src_map
-    )
 
 
 def convert_mypy_output(output: str, src_map: dict[str, str]) -> str:
