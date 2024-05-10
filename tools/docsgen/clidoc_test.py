@@ -45,7 +45,11 @@ class CliDocTest(unittest.TestCase):
 
     def test_tarball_exists(self):
         tarball = clidoc_tarfile
-        self.assertTrue(os.path.exists(tarball), f"{tarball} does not exist")
+        parents = os.listdir(os.path.dirname(clidoc_tarfile))
+        parents += os.listdir(os.path.dirname(os.path.dirname(clidoc_tarfile)))
+        self.assertTrue(
+            os.path.exists(tarball), f"{tarball} does not exist in {parents}"
+        )
 
     def test_tarball_contents(self):
         tarball = clidoc_tarfile
