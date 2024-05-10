@@ -235,6 +235,10 @@ class DisplayCaptureCompletion {
         kDisplayControllerInterfaceProtocolOps = {
             .on_display_added = [](void* ctx, const added_display_args_t* added_display) {},
             .on_display_removed = [](void* ctx, uint64_t display_id) {},
+            .on_displays_changed = [](void* ctx, const added_display_args_t* added_displays_list,
+                                      size_t added_displays_count,
+                                      const uint64_t* removed_display_ids_list,
+                                      size_t removed_display_ids_count) {},
             .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
                                    const config_stamp_t* config_stamp) {},
             .on_capture_complete =
