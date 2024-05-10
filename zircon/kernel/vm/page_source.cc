@@ -181,6 +181,7 @@ void PageSource::OnPagesFailed(uint64_t offset, uint64_t len, zx_status_t error_
       // external caller is working under the assumption that the request in Unbatched (single page
       // request), so a failure for a portion of the batch that does not include the first page
       // cannot be propagated to the external caller.
+      zx_status_t complete_status = error_status;
       if (cur->batch_state_ == PageRequest::BatchState::Internal) {
         // We only use Internal batches for READ and DIRTY requests.
         DEBUG_ASSERT(type == page_request_type::DIRTY || type == page_request_type::READ);
@@ -188,12 +189,12 @@ void PageSource::OnPagesFailed(uint64_t offset, uint64_t len, zx_status_t error_
         // page, we cannot treat failures for other pages we added to the request as fatal. Pretend
         // that this is not a failure and let the caller retry.
         if (offset > cur->offset_) {
-          error_status = ZX_OK;
+          complete_status = ZX_OK;
         }
       }
 
       // Notify anything waiting on this page.
-      CompleteRequestLocked(outstanding_requests_[type].erase(cur), error_status);
+      CompleteRequestLocked(outstanding_requests_[type].erase(cur), complete_status);
     }
   }
 }

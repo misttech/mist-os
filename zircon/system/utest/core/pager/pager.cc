@@ -2177,8 +2177,8 @@ TEST(Pager, FailMultipleVmos) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo2, 0, &offset, &length));
 }
 
-// Tests failing a range overlapping with a page request.
-TEST(Pager, FailOverlappingRange) {
+// Tests failing a range overlapping with a page request when using commit.
+TEST(Pager, FailOverlappingRangeCommit) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2188,9 +2188,9 @@ TEST(Pager, FailOverlappingRange) {
 
   // End of the request range overlaps with the failed range.
   TestThread t1([vmo]() -> bool { return vmo->Commit(0, 2); });
-  // The entire request range overlaps with the failed range.
-  TestThread t2([vmo]() -> bool { return vmo->Commit(9, 2); });
   // The start of the request range overlaps with the failed range.
+  TestThread t2([vmo]() -> bool { return vmo->Commit(9, 2); });
+  // The entire request range overlaps with the failed range.
   TestThread t3([vmo]() -> bool { return vmo->Commit(5, 2); });
 
   ASSERT_TRUE(t1.Start());
@@ -2207,6 +2207,69 @@ TEST(Pager, FailOverlappingRange) {
   ASSERT_TRUE(t1.WaitForFailure());
   ASSERT_TRUE(t2.WaitForFailure());
   ASSERT_TRUE(t3.WaitForFailure());
+
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+}
+
+// Tests failing a range overlapping with a page request when using vmo_read.
+TEST(Pager, FailOverlappingRangeRead) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr uint64_t kNumPages = 11;
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+
+  auto read_helper = [vmo](uint64_t page_offset, uint64_t page_count) -> bool {
+    uint8_t data[page_count * zx_system_get_page_size()];
+    return vmo->vmo().read(data, page_offset * zx_system_get_page_size(),
+                           page_count * zx_system_get_page_size()) == ZX_OK;
+  };
+
+  // End of the request range overlaps with the failed range.
+  TestThread t1([read_helper]() -> bool { return read_helper(0, 2); });
+  // The start of the request range overlaps with the failed range.
+  TestThread t2([read_helper]() -> bool { return read_helper(9, 2); });
+  // The entire request range overlaps with the failed range.
+  TestThread t3([read_helper]() -> bool { return read_helper(5, 2); });
+
+  ASSERT_TRUE(t1.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 2, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(t2.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 9, 2, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(t3.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 5, 2, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
+
+  ASSERT_TRUE(t2.WaitForFailure());
+  ASSERT_TRUE(t3.WaitForFailure());
+
+  // Thread 1 will not have aborted since the failure happened part way into its range, rather it
+  // will have retried its request.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 2, ZX_TIME_INFINITE));
+
+  // Supply the first page that we were not failing.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // Will still be blocked due to the failed portion not being tracked.
+  ASSERT_TRUE(t1.WaitForBlocked());
+
+  // Fail the range again.
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
+
+  // Thread 1 still not aborted since the failure was still part way into the original requested
+  // range. A new request will have been generated for the part we didn't supply.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 1, 1, ZX_TIME_INFINITE));
+
+  // Fail the range a third time. As this failure is at the start of the range being waited on it
+  // will trigger the overall operation to fail.
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
+
+  ASSERT_TRUE(t1.WaitForFailure());
 
   uint64_t offset, length;
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
