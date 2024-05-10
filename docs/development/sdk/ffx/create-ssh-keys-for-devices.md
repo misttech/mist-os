@@ -4,12 +4,6 @@ To make an SSH connection to a Fuchsia device, some `ffx` commands
 (such as [`ffx target show`][ffx-target-show] and [`ffx log`][ffx-log])
 require Fuchsia-specific SSH keys to be present on the host machine.
 
-Note: With the version `9.20220727.0.1` or higher, some `ffx` commands
-(such as `ffx target flash` and `ffx emu start`) will automatically generate
-Fuchsia-specific SSH keys on the host machine if they are not found in the
-`$HOME/.ssh` directory. (To check the `ffx` version on your host machine,
-run `ffx sdk version`.)
-
 ## Concepts
 
 During development, one or more public SSH keys
@@ -19,6 +13,11 @@ Once the device is loaded with these public SSH keys, the `ffx` commands
 (running from the host machine where a matching private SSH key is stored)
 can establish an SSH connection to the device.
 
+Commands that initialize the Fuchsia device, such as `ffx target flash`
+and `ffx emu start` will generate ssh keys if they are not found.
+The location for the ssh key files is configured using `ffx config set ssh.pub`
+and `ffx config set ssh.priv`.
+
 By default, Fuchsia-specific SSH keys are stored in the
 `$HOME/.ssh` directory of the host machine, as shown below:
 
@@ -27,7 +26,11 @@ $HOME/.ssh/fuchsia_ed25519
 $HOME/.ssh/fuchsia_authorized_keys
 ```
 
-These files are created by `ffx` if they do not exist.
+You can check the configuatrion and consistencty of the ssh keys by running
+`ffx config check-ssh-keys` which will also generate the keys if they are missing,
+or update the public key file to include the public key matching the private key
+if missing.
+
 
 Note: These keys are not password protected. Don't use these keys for
 non-development devices.
