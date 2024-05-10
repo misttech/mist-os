@@ -144,6 +144,11 @@ impl Into<fpb::ModifyDependencyError> for ModifyDependencyError {
 }
 
 #[derive(Debug)]
+pub enum InspectError {
+    NotFound,
+}
+
+#[derive(Debug)]
 pub struct Topology {
     elements: HashMap<ElementID, Element>,
     active_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
@@ -397,6 +402,13 @@ impl Topology {
         let inspect = dp_edges.get_mut(rq_id).ok_or(ModifyDependencyError::Invalid)?;
         inspect.meta().remove(&dep.dependent.level.to_string());
         Ok(())
+    }
+
+    pub fn inspect_for_element<'a>(
+        &self,
+        element_id: &'a ElementID,
+    ) -> Result<Rc<RefCell<IGraphVertex<ElementID>>>, InspectError> {
+        Ok(Rc::clone(&self.elements.get(element_id).ok_or(InspectError::NotFound)?.inspect_vertex))
     }
 }
 
