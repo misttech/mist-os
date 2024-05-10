@@ -4,15 +4,13 @@
 
 use {
     crate::{
-        bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
+        bedrock::{
+            program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
+            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
+        },
         framework::controller,
         model::{
-            actions::{
-                resolve::sandbox_construction::{
-                    self, build_component_sandbox, extend_dict_with_offers,
-                },
-                shutdown, ActionsManager, DiscoverAction, StopAction,
-            },
+            actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
                 Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
                 WeakExtendedInstance,
