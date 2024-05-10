@@ -599,7 +599,9 @@ class RustActionTests(unittest.TestCase):
                 "../foo/lib.rs",
                 "-o",
                 "foo.rlib",
-                # no --emit added. See function documentation for explanation.
+                f"--emit=dep-info={new_depfile}",
+                "-Z",
+                "binary-dep-depinfo",
             ],
         )
         self.assertEqual(aux_rspfiles, [])
