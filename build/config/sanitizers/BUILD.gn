@@ -192,14 +192,20 @@ variant("lsan") {
 }
 
 variant("ubsan") {
+  _prebuilt_runtime = toolchain_variant.tags + [ "standalone" ] -
+                      [ "standalone" ] == toolchain_variant.tags
+
   common_flags = []
-  if (toolchain_environment == "kernel") {
+  if (!_prebuilt_runtime) {
+    # If not using the prebuilt runtime, then enable options appropriate for a
+    # custom runtime.  There are no deps injected to get the custom runtime
+    # because how it's defined depends on the particular environment.
     configs = [ "//src/lib/ubsan-custom:ubsan" ]
   } else {
     common_flags = [ "-fsanitize=undefined" ]
   }
 
-  if (is_fuchsia && !is_kernel) {
+  if (is_fuchsia && _prebuilt_runtime) {
     dynamic_linker_flags =
         "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
     ldflags = [ "-Wl,$dynamic_linker_flags" ]
@@ -220,8 +226,8 @@ variant("ubsan") {
   }
 
   # If asan is also in use, it handles ubsan_default_options indirectly.
-  if (toolchain_variant.tags + [ "asan" ] - [ "asan" ] ==
-      toolchain_variant.tags) {
+  if (_prebuilt_runtime && toolchain_variant.tags + [ "asan" ] - [ "asan" ] ==
+                           toolchain_variant.tags) {
     deps = [ ":ubsan_default_options" ]
   }
 }

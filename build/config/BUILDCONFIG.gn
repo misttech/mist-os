@@ -1733,10 +1733,10 @@ declare_args() {
       configs = [ "//build/config/sanitizers:ubsan" ]
       remove_common_configs = _ubsan_remove_common_configs
       tags = [
+        # This doesn't have "instrumentation-runtime" et al because while it
+        # requires some kind of runtime, every special environment that avoids
+        # the toolchain prebuilt libraries can use a custom runtime of its own.
         "instrumented",
-        "instrumentation-runtime",
-        "needs-compiler-abi",
-        "needs-writable-globals",
         "ubsan",
       ]
     },
@@ -1947,14 +1947,27 @@ declare_args() {
       ]
     },
     {
-      # This is the ubsan variant that applies only to the kernel.
-      # phys uses ubsan-trap, without a runtime.
+      # This requests the ubsan variant only for kernel-related things.
       name = "kubsan"
       select_variant = []
       select_variant = [
         {
           variant = "ubsan"
-          dir = [ "//zircon/kernel" ]
+          if (current_cpu == "x64") {
+            _zircon_cpu = "x86"
+          } else {
+            _zircon_cpu = current_cpu
+          }
+          dir = [
+            "//zircon/kernel",
+            "//zircon/kernel/arch/$_zircon_cpu/phys",
+            "//zircon/kernel/arch/$_zircon_cpu/phys/boot-shim",
+            "//zircon/kernel/arch/$_zircon_cpu/phys/efi",
+            "//zircon/kernel/phys",
+            "//zircon/kernel/phys/boot-shim",
+            "//zircon/kernel/phys/efi",
+            "//zircon/kernel/phys/test",
+          ]
         },
       ]
     },

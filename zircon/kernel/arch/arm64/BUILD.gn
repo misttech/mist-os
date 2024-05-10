@@ -19,6 +19,7 @@ if (current_toolchain == default_toolchain) {
     toolchain_tags = [
       "kernel",
       "no-floating-point",
+      "standalone",
       "strict-align",
     ]
     exclude_variant_tags = [ "instrumented" ]

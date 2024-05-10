@@ -23,6 +23,7 @@ if (current_toolchain == default_toolchain) {
     toolchain_tags = [
       "kernel",
       "no-floating-point",
+      "standalone",
     ]
 
     configs = [ "//zircon/kernel/arch/x86/phys:phys32_config" ]
@@ -84,7 +85,7 @@ if (current_toolchain == default_toolchain) {
     }
 
     group("phys32_config_deps") {
-      deps = [ "//src/lib/trivial-allocator:panic-delete" ]
+      public_deps = [ "//zircon/kernel/phys:phys_config_deps" ]
     }
 
     # phys32 code is 32-bit (i686) and loaded at a fixed address.

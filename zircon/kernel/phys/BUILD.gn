@@ -44,6 +44,7 @@ if (current_toolchain == default_toolchain) {
       toolchain_tags = [
         "kernel",
         "no-floating-point",
+        "standalone",
       ]
 
       configs = [ "//zircon/kernel/phys:phys_config" ]
@@ -71,16 +72,11 @@ if (current_toolchain == default_toolchain) {
     }
   }
 } else if (toolchain_environment == "kernel.phys") {
-  kernel_cpu = current_cpu
-  if (current_cpu == "x64") {
-    kernel_cpu = "x86"
-  }
-
   config("phys_config") {
     configs = [
       "//zircon/kernel:standalone",
       "//zircon/kernel:warnings",
-      "//zircon/kernel/arch/$kernel_cpu:abi",
+      "//zircon/kernel/arch/$zircon_cpu:abi",
       ":defines",
 
       "//build/config:no-finite-loops",
@@ -98,16 +94,19 @@ if (current_toolchain == default_toolchain) {
     # Always enable frame pointers.
     configs += [ "//build/config:frame_pointers" ]
   }
-
-  group("phys_config_deps") {
-    deps = [ "//src/lib/trivial-allocator:panic-delete" ]
-  }
 }
 
 if (toolchain_environment == "kernel.phys" ||
     toolchain_environment == "kernel.phys32" ||
     toolchain_environment == "kernel.efi") {
   # All the code gets built here in the phys environment.
+
+  group("phys_config_deps") {
+    deps = [
+      ":ubsan-runtime",
+      "//src/lib/trivial-allocator:panic-delete",
+    ]
+  }
 
   source_set("trampoline-boot") {
     visibility = [
@@ -624,6 +623,25 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     sources = [ "log.cc" ]
     deps = [ "//zircon/kernel/lib/boot-options" ]
+  }
+
+  # This is always in phys_config_deps, but it only does anything in a
+  # toolchain that enables ubsan, which will be via ubsan-custom since phys
+  # environments are standalone.
+  source_set("ubsan-runtime") {
+    visibility = [
+      ":phys_config_deps",
+      "efi:efi_config_deps",
+    ]
+    if (is_ubsan) {
+      sources = [ "ubsan-runtime.cc" ]
+      deps = [
+        ":main",
+        "//src/lib/ubsan-custom:handlers",
+        "//zircon/kernel/lib/ktl",
+        "//zircon/kernel/lib/libc",
+      ]
+    }
   }
 }
 

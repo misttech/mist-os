@@ -548,6 +548,9 @@ if (current_toolchain != default_toolchain) {
       "//zircon/kernel/lib/code-patching:self-test",
       "//zircon/system/ulib/uart",
     ]
+
+    # This can't use even the phys printf, which the custom ubsan runtime uses.
+    exclude_toolchain_tags = [ "ubsan" ]
   }
 
   kernel_package("physboot-elf-kernel-test-data") {

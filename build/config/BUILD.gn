@@ -888,6 +888,13 @@ config("Wno-vla-cxx-extension") {
 config("Wno-conversion") {
   cflags = [ "-Wno-conversion" ]
 
+  # Don't enable extra ubsan checks that will cite issues for the same code
+  # that -Wconversion would complain about.  If the code's not warning-clean,
+  # then it's not likely to avoid implicit truncation behavior at runtime.
+  # (The casts that would prevent the warnings also prevent these checks
+  # firing, since an explicit cast counts as an explicit intended truncation.)
+  configs = [ "//src/lib/ubsan-custom:allow-implicit-integer-truncation" ]
+
   # To trim this list:
   # $ scripts/gn/trim_visibility.py --target="//build/config:Wno-conversion"
   visibility = [
