@@ -24,6 +24,9 @@ use crate::topology::*;
 /// If true, use non-random IDs for ease of debugging.
 const ID_DEBUG_MODE: bool = false;
 
+/// Max value for inspect event history.
+const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 512;
+
 pub struct Broker {
     catalog: Catalog,
     credentials: Registry,
@@ -897,7 +900,10 @@ struct Catalog {
 impl Catalog {
     fn new(inspect_parent: &INode) -> Self {
         Catalog {
-            topology: Topology::new(inspect_parent.create_child("topology")),
+            topology: Topology::new(
+                inspect_parent.create_child("topology"),
+                INSPECT_GRAPH_EVENT_BUFFER_SIZE,
+            ),
             leases: HashMap::new(),
             lease_status: SubscribeMap::new(Some(inspect_parent.create_child("leases"))),
             active_claims: ClaimActivationTracker::new(),
@@ -1476,7 +1482,33 @@ mod tests {
                                 },
                                 relationships: {},
                             },
-        }}}}});
+                        },
+                        "events": {
+                            "0": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "add_vertex",
+                                "meta": {
+                                    "current_level": "unset",
+                                    "required_level": "unset",
+                                },
+                            },
+                            "1": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "update_key",
+                                "key": "current_level",
+                                "update": 7u64,
+                            },
+                            "2": {
+                                "@time": AnyProperty,
+                                "vertex_id": latinum.to_string(),
+                                "event": "update_key",
+                                "key": "required_level",
+                                "update": 2u64,
+                            },
+                        },
+        }}}});
     }
 
     #[fuchsia::test]
@@ -1515,7 +1547,11 @@ mod tests {
                                 },
                                 relationships: {},
                             },
-        }}}}});
+                        },
+                        "events": contains {},
+                    },
+                },
+        }});
 
         // This should fail, because the token was never registered.
         let add_element_not_authorized_res = broker.add_element(
@@ -1582,7 +1618,9 @@ mod tests {
                                     },
                                 },
                             },
-        }}}}});
+                        },
+                        "events": contains {},
+        }}}});
 
         // Unregister token_mithril, then try to add again, which should fail.
         broker
@@ -1643,7 +1681,34 @@ mod tests {
                                 },
                                 relationships: {},
                             },
-        }}}}});
+                        },
+                        "events": {
+                            "0": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "add_vertex",
+                                "meta": {
+                                    "current_level": "unset",
+                                    "required_level": "unset",
+                                },
+                            },
+                            "1": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "update_key",
+                                "key": "current_level",
+                                "update": BinaryPowerLevel::Off.into_primitive() as u64,
+                            },
+                            "2": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "update_key",
+                                "key": "required_level",
+                                "update": BinaryPowerLevel::Off.into_primitive() as u64,
+                            },
+                        },
+                    },
+        }}});
 
         broker.remove_element(&unobtanium);
         assert_eq!(broker.element_exists(&unobtanium), false);
@@ -1653,6 +1718,36 @@ mod tests {
                 topology: {
                     "fuchsia.inspect.Graph": {
                         topology: {},
+                        "events": {
+                            "0": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "add_vertex",
+                                "meta": {
+                                    "current_level": "unset",
+                                    "required_level": "unset",
+                                },
+                            },
+                            "1": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "update_key",
+                                "key": "current_level",
+                                "update": BinaryPowerLevel::Off.into_primitive() as u64,
+                            },
+                            "2": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "update_key",
+                                "key": "required_level",
+                                "update": BinaryPowerLevel::Off.into_primitive() as u64,
+                            },
+                            "3": {
+                                "@time": AnyProperty,
+                                "vertex_id": unobtanium.to_string(),
+                                "event": "remove_vertex",
+                            },
+                        },
         }}}});
     }
 
@@ -1776,7 +1871,10 @@ mod tests {
                                     },
                                 },
                             },
-        }}}}});
+                        },
+                        "events": contains {},
+                    },
+        }}});
 
         // Acquire the lease, which should result in two claims, one
         // for each dependency.
@@ -1884,7 +1982,9 @@ mod tests {
                                     },
                                 },
                             },
-        }}}}});
+                        },
+                        "events": contains {},
+        }}}});
 
         // Update Child's current level to ON.
         broker.update_current_level(&child, BinaryPowerLevel::On.into_primitive());
@@ -2673,7 +2773,9 @@ mod tests {
                                     },
                                 },
                             },
-        }}}}});
+                        },
+                        "events": contains {},
+        }}}});
 
         // Drop Lease on B.
         // A's required level should remain ON.
@@ -2776,7 +2878,9 @@ mod tests {
                                     },
                                 },
                             },
-        }}}}});
+                        },
+                        "events": contains {},
+        }}}});
     }
 
     #[fuchsia::test]

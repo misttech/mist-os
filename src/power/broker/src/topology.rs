@@ -158,12 +158,15 @@ pub struct Topology {
 }
 
 impl Topology {
-    pub fn new(inspect_node: INode) -> Self {
+    pub fn new(inspect_node: INode, inspect_max_event: usize) -> Self {
         Topology {
             elements: HashMap::new(),
             active_dependencies: HashMap::new(),
             passive_dependencies: HashMap::new(),
-            inspect_graph: IGraph::new(&inspect_node, IGraphOpts::default()),
+            inspect_graph: IGraph::new(
+                &inspect_node,
+                IGraphOpts::default().track_events(inspect_max_event),
+            ),
             _inspect_node: inspect_node,
         }
     }
@@ -180,7 +183,12 @@ impl Topology {
         };
         let inspect_vertex = self.inspect_graph.add_vertex(
             id.clone(),
-            &[IGraphMeta::new("name", name), IGraphMeta::new("valid_levels", valid_levels.clone())],
+            &[
+                IGraphMeta::new("name", name),
+                IGraphMeta::new("valid_levels", valid_levels.clone()),
+                IGraphMeta::new("current_level", "unset").track_events(),
+                IGraphMeta::new("required_level", "unset").track_events(),
+            ],
         );
         self.elements.insert(
             id.clone(),
@@ -384,7 +392,10 @@ impl Topology {
             .or_insert_with(|| {
                 let dp_vertex = dp.inspect_vertex.borrow();
                 let mut rq_vertex = rq.inspect_vertex.borrow_mut();
-                dp_vertex.add_edge(&mut rq_vertex, &[])
+                dp_vertex.add_edge(
+                    &mut rq_vertex,
+                    &[IGraphMeta::new(dp_level.to_string(), "unset").track_events()],
+                )
             })
             .meta()
             .set(dp_level.to_string(), format!("{}{}", rq_level, if is_active { "" } else { "p" }));
@@ -423,7 +434,7 @@ mod tests {
     fn test_add_remove_elements() {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node);
+        let mut t = Topology::new(inspect_node, 0);
         let water =
             t.add_element("Water", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         let earth =
@@ -431,15 +442,46 @@ mod tests {
         let fire = t.add_element("Fire", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         let air = t.add_element("Air", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            water.to_string() =>
-                { meta: { name: "Water", valid_levels: v01.clone()}, relationships: {}},
-            earth.to_string() =>
-                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
-            fire.to_string() =>
-                { meta: { name: "Fire", valid_levels: v01.clone()}, relationships: {}},
-            air.to_string() =>
-                { meta: { name: "Air", valid_levels: v01.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+            test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        water.to_string() => {
+                            meta: {
+                                name: "Water",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        earth.to_string() => {
+                            meta: {
+                                name: "Earth",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        fire.to_string() => {
+                            meta: {
+                                name: "Fire",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        air.to_string() => {
+                            meta: {
+                                name: "Air",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         t.add_active_dependency(&Dependency {
@@ -453,16 +495,51 @@ mod tests {
             },
         })
         .expect("add_active_dependency failed");
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            water.to_string() =>
-                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
-                    { earth.to_string() => { edge_id: AnyProperty, "meta": { "1": "1" }}}},
-            earth.to_string() =>
-                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
-            fire.to_string() =>
-                { meta: { name: "Fire", valid_levels: v01.clone()}, relationships: {}},
-            air.to_string() =>
-                { meta: { name: "Air", valid_levels: v01.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+           test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        water.to_string() => {
+                            meta: {
+                                name: "Water",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {
+                                earth.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "1" },
+                                },
+                            },
+                        },
+                        earth.to_string() => {
+                            meta: {
+                                name: "Earth",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        fire.to_string() => {
+                            meta: {
+                                name: "Fire",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        air.to_string() => {
+                            meta: {
+                                name: "Air",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         let extra_add_dep_res = t.add_active_dependency(&Dependency {
@@ -488,16 +565,51 @@ mod tests {
             },
         })
         .expect("remove_active_dependency failed");
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            water.to_string() =>
-                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
-                    { earth.to_string() => { edge_id: AnyProperty, "meta": {}}}},
-            earth.to_string() =>
-                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
-            fire.to_string() =>
-                { meta: { name: "Fire", valid_levels: v01.clone()}, relationships: {}},
-            air.to_string() =>
-                { meta: { name: "Air", valid_levels: v01.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+           test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        water.to_string() => {
+                            meta: {
+                                name: "Water",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {
+                                earth.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: {},
+                                },
+                            },
+                        },
+                        earth.to_string() => {
+                            meta: {
+                                name: "Earth",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        fire.to_string() => {
+                            meta: {
+                                name: "Fire",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        air.to_string() => {
+                            meta: {
+                                name: "Air",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         let extra_remove_dep_res = t.remove_active_dependency(&Dependency {
@@ -518,12 +630,33 @@ mod tests {
         assert_eq!(t.element_exists(&air), true);
         t.remove_element(&air);
         assert_eq!(t.element_exists(&air), false);
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            water.to_string() =>
-                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
-                    { earth.to_string() => { edge_id: AnyProperty, "meta": {}}}},
-            earth.to_string() =>
-                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+           test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        water.to_string() => {
+                            meta: {
+                                name: "Water",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {
+                                earth.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: {},
+                                },
+                            },
+                        },
+                        earth.to_string() => {
+                            meta: {
+                                name: "Earth",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         let element_not_found_res = t.add_active_dependency(&Dependency {
@@ -550,12 +683,33 @@ mod tests {
         });
         assert!(matches!(req_element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            water.to_string() =>
-                { meta: { name: "Water", valid_levels: v01.clone()}, relationships:
-                    { earth.to_string() => { edge_id: AnyProperty, "meta": {}}}},
-            earth.to_string() =>
-                { meta: { name: "Earth", valid_levels: v01.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+           test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        water.to_string() => {
+                            meta: {
+                                name: "Water",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {
+                                earth.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: {},
+                                },
+                            },
+                        },
+                        earth.to_string() => {
+                            meta: {
+                                name: "Earth",
+                                valid_levels: v01.clone(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
     }
 
@@ -563,7 +717,7 @@ mod tests {
     fn test_add_remove_direct_deps() {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node);
+        let mut t = Topology::new(inspect_node, 0);
 
         let v012_u8: Vec<u8> = vec![0, 1, 2];
         let v012: Vec<u64> = v012_u8.iter().map(|&v| v as u64).collect();
@@ -593,14 +747,60 @@ mod tests {
             requires: ElementLevel { element_id: d.clone(), level: 2 },
         };
         t.add_active_dependency(&cd2).expect("add_active_dependency failed");
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            a.to_string() => { meta: { name: "A", valid_levels: v012.clone()}, relationships: {}},
-            b.to_string() => { meta: { name: "B", valid_levels: v012.clone()}, relationships: {
-                a.to_string() => { edge_id: AnyProperty, "meta": { "1": "1" }}}},
-            c.to_string() => { meta: { name: "C", valid_levels: v012.clone()}, relationships: {
-                b.to_string() => { edge_id: AnyProperty, "meta": { "1": "1" }},
-                d.to_string() => { edge_id: AnyProperty, "meta": { "1": "1", "2": "2" }}}},
-            d.to_string() => { meta: { name: "D", valid_levels: v012.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+            test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        a.to_string() => {
+                            meta: {
+                                name: "A",
+                                valid_levels: v012.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        b.to_string() => {
+                            meta: {
+                                name: "B",
+                                valid_levels: v012.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {
+                                a.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "1" },
+                                },
+                            },
+                        },
+                        c.to_string() => {
+                            meta: {
+                                name: "C",
+                                valid_levels: v012.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {
+                                b.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "1" },
+                                },
+                                d.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "1", "2": "2" },
+                                },
+                            },
+                        },
+                        d.to_string() => {
+                            meta: {
+                                name: "D",
+                                valid_levels: v012.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         let mut a_deps =
@@ -625,7 +825,7 @@ mod tests {
     fn test_all_active_and_passive_dependencies() {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node);
+        let mut t = Topology::new(inspect_node, 0);
 
         let (v023_u8, v015_u8, v01_u8, v03_u8): (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) =
             (vec![0, 2, 3], vec![0, 1, 5], vec![0, 1], vec![0, 3]);
@@ -640,11 +840,46 @@ mod tests {
         let b = t.add_element("B", vec![0, 1, 5]).expect("add_element failed");
         let c = t.add_element("C", vec![0, 1]).expect("add_element failed");
         let d = t.add_element("D", vec![0, 3]).expect("add_element failed");
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            a.to_string() => { meta: { name: "A", valid_levels: v023.clone()}, relationships: {}},
-            b.to_string() => { meta: { name: "B", valid_levels: v015.clone()}, relationships: {}},
-            c.to_string() => { meta: { name: "C", valid_levels: v01.clone()}, relationships: {}},
-            d.to_string() => { meta: { name: "D", valid_levels: v03.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+            test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        a.to_string() => {
+                            meta: {
+                                name: "A",
+                                valid_levels: v023.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        b.to_string() => {
+                            meta: {
+                                name: "B",
+                                valid_levels: v015.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        c.to_string() => {
+                            meta: {
+                                name: "C",
+                                valid_levels: v01.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        d.to_string() => {
+                            meta: {
+                                name: "D",
+                                valid_levels: v03.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         // C has direct active dependencies on B and D.
@@ -673,14 +908,63 @@ mod tests {
             requires: ElementLevel { element_id: d.clone(), level: 3 },
         };
         t.add_active_dependency(&c1_d3).expect("add_active_dependency failed");
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
-            a.to_string() => { meta: { name: "A", valid_levels: v023.clone()}, relationships: {}},
-            b.to_string() => { meta: { name: "B", valid_levels: v015.clone()}, relationships: {
-                a.to_string() => { edge_id: AnyProperty, "meta": { "1": "2p", "5": "3p" }}}},
-            c.to_string() => { meta: { name: "C", valid_levels: v01.clone()}, relationships: {
-                b.to_string() => { edge_id: AnyProperty, "meta": { "1": "5" }},
-                d.to_string() => { edge_id: AnyProperty, "meta": { "1": "3" }}}},
-            d.to_string() => { meta: { name: "D", valid_levels: v03.clone()}, relationships: {}},
+        assert_data_tree!(inspect, root: {
+            test: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        a.to_string() => {
+                            meta: {
+                                name: "A",
+                                valid_levels: v023.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        b.to_string() => {
+                            meta: {
+                                name: "B",
+                                valid_levels: v015.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {
+                                a.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: {
+                                        "1": "2p",
+                                        "5": "3p",
+                                    },
+                                },
+                            },
+                        },
+                        c.to_string() => {
+                            meta: {
+                                name: "C",
+                                valid_levels: v01.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {
+                                b.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "5" },
+                                },
+                                d.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "3" },
+                                },
+                            },
+                        },
+                        d.to_string() => {
+                            meta: {
+                                name: "D",
+                                valid_levels: v03.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
         }}}});
 
         let (a_active_deps, a_passive_deps) = t
