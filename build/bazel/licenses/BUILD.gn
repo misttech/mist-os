@@ -31,6 +31,9 @@ _excluded_bazel_inputs = [
 
   # This is only used for `//tools/devshell:fx_publish_test`.
   "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
+
+  # These are testonly bazel inputs for power system integration tests.
+  "//src/power/testing/system-integration:bazel_test_inputs",
 ]
 
 # Remove all non-user platform aibs

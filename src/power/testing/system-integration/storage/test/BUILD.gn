@@ -1,0 +1,25 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+import("//build/testing/bootfs_test.gni")
+
+test("test") {
+  output_name = "power-system-integration-storage-test"
+  sources = [ "test.cc" ]
+  deps = [
+    "//sdk/lib/component/incoming/cpp",
+    "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+bootfs_test("bootfs_test") {
+  name = "power-system-integration-storage-test"
+  deps = [ ":test" ]
+  environments = [ vim3_env ]
+  isolated = true
+  product_bundle = "power_testing_storage.power_testing_storage_vim3"
+}

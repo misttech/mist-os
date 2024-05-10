@@ -1,0 +1,32 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# These are included from //bundles/buildbot/bringup:tests
+group("tests") {
+  testonly = true
+  deps = []
+  if (current_cpu == "arm64") {
+    deps += [ "storage:tests" ]
+  }
+}
+
+# These will be included in the list of gn_labels_for_bazel_inputs inside of
+# build/bazel/legacy_ninja_build_outputs.gni
+group("bazel_inputs") {
+  deps = []
+  if (current_cpu == "arm64") {
+    deps += [ "storage:bazel_inputs" ]
+  }
+}
+
+# These will be included in the list of gn_labels_for_bazel_inputs inside of
+# build/bazel/legacy_ninja_build_outputs.gni.
+# These are also excluded through _excluded_bazel_inputs inside of build/bazel/licenses/BUILD.gn
+group("bazel_test_inputs") {
+  testonly = true
+  deps = []
+  if (current_cpu == "arm64") {
+    deps += [ "storage:bazel_test_inputs" ]
+  }
+}

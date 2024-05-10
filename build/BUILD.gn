@@ -185,6 +185,7 @@ group("non_hermetic_deps") {
     "//products/microfuchsia:*",
     "//products/minimal:*",
     "//products/workbench:*",
+    "//src/power/testing/system-integration/*",
   ]
 
   # FIXME(https://fxbug.dev/42072939): //build/packages/prebuilt_packages.gni

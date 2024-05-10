@@ -49,6 +49,11 @@ gn_labels_for_bazel_inputs = [
                                "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
                              ] + eng_platform_aib_labels
 
+gn_labels_for_bazel_inputs += [
+  "//src/power/testing/system-integration:bazel_inputs",
+  "//src/power/testing/system-integration:bazel_test_inputs",
+]
+
 # If a board_configuration_label is defined, then add it's bazel input target.
 if (board_configuration_label != false) {
   gn_labels_for_bazel_inputs +=

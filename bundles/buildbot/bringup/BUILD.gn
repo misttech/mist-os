@@ -20,3 +20,8 @@ group("bringup") {
     "//src/testing/runtests",
   ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ "//src/power/testing/system-integration:tests" ]
+}

@@ -1,0 +1,182 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/board_configuration.gni")
+import("//build/assembly/board_input_bundle.gni")
+
+assert(
+    current_toolchain == default_toolchain,
+    "The power_testing_storage_vim3 board can only be defined in the default toolchain.")
+assert(
+    current_cpu == "arm64",
+    "The power_testing_storage_vim3 board can only be defined in an arm64 toolchain.")
+
+board_configuration("power_testing_storage_vim3") {
+  provided_features = [
+    "fuchsia::driver_framework_v2_support",
+    "fuchsia::pmm_checker",
+  ]
+  input_bundles = [
+    ":drivers",
+    ":board_driver",
+  ]
+  filesystems = {
+    vbmeta = {
+      key = "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
+      key_metadata =
+          "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
+    }
+    zbi = {
+      compression = "zstd.max"
+    }
+  }
+
+  kernel = {
+    contiguous_physical_pages = true
+  }
+
+  platform = {
+    development_support = {
+      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+      enable_debug_access_port_for_soc = "amlogic-a311d"
+    }
+  }
+}
+
+board_input_bundle("drivers") {
+  drivers = [
+    {
+      package_target = "//src/devices/block/drivers/aml-sdmmc:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-sdmmc.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/bootpart:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bootpart.cm" ]
+    },
+    {
+      package_target = "//src/devices/clock/drivers/vim3-clk:bazel_package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-clk.cm" ]
+    },
+    {
+      package_target = "//src/devices/cpu/drivers/aml-cpu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-cpu.cm" ]
+    },
+    {
+      package_target = "//src/devices/gpio/drivers/aml-gpio:bazel_package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-gpio.cm" ]
+    },
+    {
+      package_target = "//src/devices/gpio/drivers/ti-tca6408a:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/ti-tca6408a.cm" ]
+    },
+    {
+      package_target = "//src/devices/i2c/drivers/aml-i2c:bazel_package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-i2c.cm" ]
+    },
+    {
+      package_target = "//src/devices/mcu/drivers/vim3-mcu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-mcu.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/aml-meson-power:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-meson-power.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/aml-pwm-regulator:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-pwm-regulator.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/fusb302:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/fusb302.cm" ]
+    },
+    {
+      package_target = "//src/devices/pwm/drivers/aml-pwm:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-pwm.cm" ]
+    },
+    {
+      package_target = "//src/devices/pwm/drivers/aml-pwm-init:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-pwm-init.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/aml-uart:package-dfv2"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-uart-dfv2.cm" ]
+    },
+    {
+      package_target = "//src/devices/thermal/drivers/aml-thermal:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-thermal.cm" ]
+    },
+    {
+      package_target = "//src/devices/temperature/drivers/aml-trip:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-trip.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/dwc2:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/dwc2.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-usb-phy.cm" ]
+    },
+    {
+      package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-pwm-backlight.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
+      package_set = "bootfs"
+      driver_components = [ "meta/adc-buttons.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/focaltech:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/focaltech.cm" ]
+    },
+
+    # arm64 common drivers
+    {
+      package_target = "//src/devices/bus/drivers/pci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bus-pci.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/xhci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/xhci.cm" ]
+    },
+  ]
+}
+
+board_input_bundle("board_driver") {
+  configuration = {
+    power_manager =
+        "//src/power/power-manager/node_config/vim3_node_config.json5"
+    thermal = "//src/power/power-manager/thermal_config/vim3.json5"
+  }
+  drivers = [
+    {
+      package_target = "//src/devices/board/drivers/vim3:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3.cm" ]
+    },
+  ]
+}

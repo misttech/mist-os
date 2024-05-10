@@ -1539,6 +1539,7 @@ build_api_module("product_bundles") {
   # Product bundles are not built in SDK-only builds.
   if (has_board) {
     deps = [
+      ":tests",
       "//build/images:default-images",
       "//bundles/boot_tests",
     ]

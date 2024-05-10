@@ -1,0 +1,24 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+assert(
+    current_cpu == "arm64",
+    "The storage system integration tests can only be defined in an arm64 toolchain.")
+
+group("tests") {
+  testonly = true
+  deps = [
+    "custom-product:product_bundle",
+    "test:bootfs_test",
+  ]
+}
+
+group("bazel_inputs") {
+  deps = [ "custom-board:power_testing_storage_vim3.bazel_input" ]
+}
+
+group("bazel_test_inputs") {
+  testonly = true
+  deps = [ "custom-product:test_wrapped" ]
+}
