@@ -579,7 +579,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     #[serial]
     fn remove_dm_device_in_scope() {
         let Some(dm_control) = open_dm_control() else {
@@ -642,6 +641,80 @@ mod tests {
         assert!(ret != 0, "dm dev remove ioctl failed: {:?}", std::io::Error::last_os_error());
 
         drop(dm_device);
+        let mut io: dm_ioctl = linux_uapi::dm_ioctl { ..Default::default() };
+        init_io(&mut io, name_slice.clone());
+        let ret =
+            unsafe { libc::ioctl(dm_control.as_raw_fd(), DM_DEV_REMOVE.try_into().unwrap(), &io) };
+        assert!(ret == 0, "dm dev remove ioctl failed: {:?}", std::io::Error::last_os_error());
+    }
+
+    #[test]
+    #[serial]
+    fn remove_dm_device_cached_handle_in_scope() {
+        let Some(dm_control) = open_dm_control() else {
+            return;
+        };
+        let mut io = linux_uapi::dm_ioctl { ..Default::default() };
+
+        let name = std::ffi::CString::new("test-device-1").unwrap();
+        let name_slice = name
+            .as_bytes_with_nul()
+            .iter()
+            .map(|v| *v as std::ffi::c_char)
+            .collect::<Vec<std::ffi::c_char>>();
+        let uuid = std::ffi::CString::new(vec![b'a'; 37]).unwrap();
+        let uuid_slice = uuid
+            .as_bytes_with_nul()
+            .iter()
+            .map(|v| *v as std::ffi::c_char)
+            .collect::<Vec<std::ffi::c_char>>();
+
+        init_io(&mut io, name_slice.clone());
+        io.uuid[0..uuid_slice.len()].copy_from_slice(&uuid_slice);
+
+        let ret =
+            unsafe { libc::ioctl(dm_control.as_raw_fd(), DM_DEV_CREATE.try_into().unwrap(), &io) };
+        assert!(ret == 0, "dm dev create ioctl failed: {:?}", std::io::Error::last_os_error());
+        let dm_minor = ((io.dev >> 12 & 0xffffff00) | (io.dev & 0xff)) as u32;
+
+        let (_, _, target_vec) = create_verity_target_two_loop_devices(false);
+
+        let mut io = linux_uapi::dm_ioctl { ..Default::default() };
+        init_io(&mut io, name_slice.clone());
+        io.target_count = 1;
+        io.flags |= DM_READONLY_FLAG;
+        io.data_start = std::mem::size_of::<linux_uapi::dm_ioctl>() as u32;
+        io.data_size = (std::mem::size_of::<linux_uapi::dm_ioctl>() + target_vec.len()) as u32;
+
+        let mut io_vec = io.as_bytes().to_vec();
+        io_vec.extend(target_vec);
+
+        let ret = unsafe {
+            libc::ioctl(dm_control.as_raw_fd(), DM_TABLE_LOAD.try_into().unwrap(), io_vec.as_ptr())
+        };
+        assert!(ret == 0, "dm table load ioctl failed: {:?}", std::io::Error::last_os_error());
+
+        let mut io = linux_uapi::dm_ioctl { ..Default::default() };
+        init_io(&mut io, name_slice.clone());
+        let ret =
+            unsafe { libc::ioctl(dm_control.as_raw_fd(), DM_DEV_SUSPEND.try_into().unwrap(), &io) };
+        assert!(ret == 0, "dm dev suspend ioctl failed: {:?}", std::io::Error::last_os_error());
+
+        let dm_device =
+            OpenOptions::new().read(true).open(&format!("/dev/dm-{:?}", dm_minor)).unwrap();
+
+        let dm_device_2 =
+            OpenOptions::new().read(true).open(&format!("/dev/dm-{:?}", dm_minor)).unwrap();
+        drop(dm_device);
+
+        // DM_DEV_REMOVE fails with an open device handle.
+        let mut io: dm_ioctl = linux_uapi::dm_ioctl { ..Default::default() };
+        init_io(&mut io, name_slice.clone());
+        let ret =
+            unsafe { libc::ioctl(dm_control.as_raw_fd(), DM_DEV_REMOVE.try_into().unwrap(), &io) };
+        assert!(ret != 0, "dm dev remove ioctl failed: {:?}", std::io::Error::last_os_error());
+
+        drop(dm_device_2);
         let mut io: dm_ioctl = linux_uapi::dm_ioctl { ..Default::default() };
         init_io(&mut io, name_slice.clone());
         let ret =

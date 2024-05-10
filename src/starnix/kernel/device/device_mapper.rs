@@ -186,20 +186,20 @@ impl DeviceMapperRegistry {
         &self,
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-        device: &DmDevice,
+        devices: &mut BTreeMap<u32, Arc<DmDevice>>,
+        minor: u32,
+        k_device: &Option<Device>,
     ) -> Result<(), Errno>
     where
         L: LockBefore<FileOpsCore>,
     {
-        let mut devices = self.devices.lock();
-        let state = device.state.lock();
-        match devices.entry(device.number.minor()) {
+        match devices.entry(minor) {
             Entry::Vacant(_) => Err(errno!(ENODEV)),
             Entry::Occupied(e) => {
                 e.remove();
                 let kernel = current_task.kernel();
                 let registry = &kernel.device_registry;
-                if let Some(dev) = &state.k_device {
+                if let Some(dev) = &k_device {
                     registry.remove_device(locked, current_task, dev.clone());
                 } else {
                     return Err(errno!(EINVAL));
@@ -250,6 +250,8 @@ impl DmDevice {
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
+        let mut state = self.state.lock();
+        state.open_count += 1;
         Box::new(DmDeviceFile { device: self.clone() })
     }
 }
@@ -374,12 +376,17 @@ impl FileOps for DmDeviceFile {
             Ok(0)
         }
     }
+
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+        let mut state = self.device.state.lock();
+        state.open_count -= 1;
+    }
 }
 #[derive(Debug)]
 struct DmDeviceState {
     version: [u32; 3],
     target_count: u32,
-    _open_count: u64,
+    open_count: u64,
     name: [std::ffi::c_char; 128],
     uuid: [std::ffi::c_char; 129],
     active_table: Option<DmDeviceTable>,
@@ -396,7 +403,7 @@ impl Default for DmDeviceState {
             name: [0 as std::ffi::c_char; 128],
             uuid: [0 as std::ffi::c_char; 129],
             target_count: 0,
-            _open_count: 0,
+            open_count: 0,
             active_table: None,
             inactive_table: None,
             flags: DeviceMapperFlags::empty(),
@@ -868,12 +875,18 @@ impl FileOps for DeviceMapper {
             }
             DM_DEV_REMOVE => {
                 let dm_device = self.registry.get(&info)?;
-                track_stub!(
-                    TODO("https://fxbug.dev/338261179"),
-                    "Use open count to ensure no user handles are open"
-                );
-                self.registry.remove(locked, current_task, &dm_device)?;
+                let mut devices = self.registry.devices.lock();
                 let mut state = dm_device.state.lock();
+                if state.open_count > 0 {
+                    return error!(ENOTSUP);
+                }
+                self.registry.remove(
+                    locked,
+                    current_task,
+                    &mut devices,
+                    dm_device.number.minor(),
+                    &state.k_device,
+                )?;
                 state.remove();
                 let i = uapi::dm_ioctl {
                     name: state.name,
