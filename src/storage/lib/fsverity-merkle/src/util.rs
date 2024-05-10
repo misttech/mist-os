@@ -13,11 +13,16 @@ use std::fmt;
 pub struct FsVerityHasherOptions {
     salt: Vec<u8>,
     block_size: usize,
+    fsverity: bool,
 }
 
 impl FsVerityHasherOptions {
     pub fn new(salt: Vec<u8>, block_size: usize) -> Self {
-        FsVerityHasherOptions { salt, block_size }
+        FsVerityHasherOptions { salt, block_size, fsverity: true }
+    }
+
+    pub fn new_dmverity(salt: Vec<u8>, block_size: usize) -> Self {
+        FsVerityHasherOptions { salt, block_size, fsverity: false }
     }
 }
 
@@ -61,6 +66,13 @@ impl FsVerityHasher {
         }
     }
 
+    pub fn fsverity(&self) -> bool {
+        match &self {
+            FsVerityHasher::Sha256(metadata) => metadata.fsverity,
+            FsVerityHasher::Sha512(metadata) => metadata.fsverity,
+        }
+    }
+
     /// Computes the MerkleTree digest from a `block` of data.
     ///
     /// A MerkleTree digest is a hash of a block of data. The block will be zero filled if its
@@ -84,7 +96,7 @@ impl FsVerityHasher {
 
                 if salt_size > 0 {
                     hasher.update(&metadata.salt);
-                    if salt_size % SHA256_SALT_PADDING != 0 {
+                    if metadata.fsverity && salt_size % SHA256_SALT_PADDING != 0 {
                         hasher.update(&vec![
                             0;
                             (SHA256_SALT_PADDING - salt_size % SHA256_SALT_PADDING)
@@ -112,7 +124,7 @@ impl FsVerityHasher {
 
                 if salt_size > 0 {
                     hasher.update(&metadata.salt);
-                    if salt_size % SHA512_SALT_PADDING != 0 {
+                    if metadata.fsverity && salt_size % SHA512_SALT_PADDING != 0 {
                         hasher.update(&vec![
                             0;
                             (SHA512_SALT_PADDING - salt_size % SHA512_SALT_PADDING)
@@ -153,7 +165,7 @@ impl FsVerityHasher {
                 let salt_size = metadata.salt.len() as u8;
                 if salt_size > 0 {
                     hasher.update(&metadata.salt);
-                    if salt_size % SHA256_SALT_PADDING != 0 {
+                    if metadata.fsverity && salt_size % SHA256_SALT_PADDING != 0 {
                         hasher.update(&vec![
                             0;
                             (SHA256_SALT_PADDING - salt_size % SHA256_SALT_PADDING)
@@ -182,7 +194,7 @@ impl FsVerityHasher {
                 let salt_size = metadata.salt.len() as u8;
                 if salt_size > 0 {
                     hasher.update(&metadata.salt);
-                    if salt_size % SHA512_SALT_PADDING != 0 {
+                    if metadata.fsverity && salt_size % SHA512_SALT_PADDING != 0 {
                         hasher.update(&vec![
                             0;
                             (SHA512_SALT_PADDING - salt_size % SHA512_SALT_PADDING)

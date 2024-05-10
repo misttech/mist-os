@@ -4,6 +4,7 @@
 
 use crate::{
     device::{
+        device_mapper::DeviceMapperRegistry,
         framebuffer::{AspectRatio, Framebuffer},
         loop_device::LoopDeviceRegistry,
         sync_fence_registry::SyncFenceRegistry,
@@ -131,6 +132,9 @@ pub struct Kernel {
     ///
     /// See <https://man7.org/linux/man-pages/man4/loop.4.html>
     pub loop_device_registry: Arc<LoopDeviceRegistry>,
+
+    /// The registry of active device mapper devices.
+    pub device_mapper_registry: Arc<DeviceMapperRegistry>,
 
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
@@ -317,6 +321,7 @@ impl Kernel {
             container_svc,
             container_data_dir,
             loop_device_registry: Default::default(),
+            device_mapper_registry: Default::default(),
             framebuffer,
             sync_fence_registry: SyncFenceRegistry::new(),
             binders: Default::default(),

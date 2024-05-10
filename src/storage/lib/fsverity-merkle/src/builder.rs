@@ -97,6 +97,11 @@ impl MerkleTreeBuilder {
         let first_hash = if len % hashes_per_block == 0 {
             len - hashes_per_block
         } else {
+            if !self.hasher.fsverity() {
+                for _ in 0..(hashes_per_block - (len % hashes_per_block)) {
+                    self.levels[level].push(self.hasher.hash_block(&[]))
+                }
+            }
             len - (len % hashes_per_block)
         };
 

@@ -18,6 +18,9 @@ pub const DYN_MAJOR: u32 = 234;
 // once for /dev/block/zram0.
 pub const ZRAM_MAJOR: u32 = 252;
 
+// This value is observed from dmsetup.
+pub const DEVICE_MAPPER_MAJOR: u32 = 254;
+
 #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct DeviceType(u64);
 

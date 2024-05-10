@@ -13,6 +13,7 @@ pub use device_init::*;
 pub use registry::*;
 
 pub mod ashmem;
+pub mod device_mapper;
 pub mod framebuffer;
 pub mod kobject;
 pub mod loop_device;

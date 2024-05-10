@@ -4,16 +4,18 @@
 
 use crate::{
     device::{
-        kobject::DeviceMetadata, loop_device::create_loop_control_device, mem::DevRandom,
-        simple_device_ops, DeviceMode,
+        device_mapper::create_device_mapper, kobject::DeviceMetadata,
+        loop_device::create_loop_control_device, mem::DevRandom, simple_device_ops, DeviceMode,
     },
-    device::{loop_device::loop_device_init, mem::mem_device_init, zram::zram_device_init},
+    device::{
+        device_mapper::device_mapper_init, loop_device::loop_device_init, mem::mem_device_init,
+        zram::zram_device_init,
+    },
     fs::devpts::tty_device_init,
     fs::sysfs::DeviceDirectory,
     task::CurrentTask,
-    vfs::{create_stub_device_with_bug, fuse::open_fuse_device},
+    vfs::fuse::open_fuse_device,
 };
-use starnix_logging::bug_ref;
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 
@@ -50,10 +52,7 @@ where
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
         misc_class.clone(),
         DeviceDirectory::new,
-        create_stub_device_with_bug(
-            "device mapper control",
-            bug_ref!("https://fxbug.dev/297432471"),
-        ),
+        create_device_mapper,
     );
     registry.add_and_register_device(
         locked,
@@ -76,5 +75,6 @@ pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &Curr
     mem_device_init(locked, system_task);
     tty_device_init(locked, system_task);
     loop_device_init(locked, system_task);
+    device_mapper_init(system_task);
     zram_device_init(locked, system_task);
 }
