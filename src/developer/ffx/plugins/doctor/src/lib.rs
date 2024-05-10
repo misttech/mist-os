@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants::*, doctor_ledger::*, ledger_view::*};
+use crate::{doctor_ledger::*, ledger_view::*};
 use anyhow::{anyhow, Context, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
@@ -34,7 +34,6 @@ use std::{
 use termion::{color, style};
 use timeout::timeout;
 
-mod constants;
 mod doctor_ledger;
 mod ledger_view;
 
@@ -60,7 +59,7 @@ enum StepResult {
 impl std::fmt::Display for StepResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            StepResult::Success => SUCCESS.to_string(),
+            StepResult::Success => "success".to_string(),
         };
 
         write!(f, "{}", s)
@@ -288,7 +287,11 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
                     "Record mode requires configuration and will be turned off for this run."
                 )?;
             }
-            writeln!(&mut writer, "If this issue persists, please file a bug here: {}", BUG_URL)?;
+            writeln!(
+                &mut writer,
+                "If this issue persists, please file a bug here: {}",
+                errors::BUG_REPORT_URL
+            )?;
             fuchsia_async::Timer::new(Duration::from_millis(10000)).await;
 
             record = false;

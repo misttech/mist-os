@@ -18,6 +18,9 @@ pub mod macro_deps {
     pub use anyhow;
 }
 
+pub const BUG_REPORT_URL: &str =
+    "https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957";
+
 /// The ffx main function expects a anyhow::Result from ffx plugins. If the Result is an Err it be
 /// downcast to FfxError, and if successful this error is presented as a user-readable error. All
 /// other error types are printed with full context and a BUG prefix, guiding the user to file bugs
@@ -65,10 +68,10 @@ pub enum FfxError {
         TargetConnectionError::NoRouteToHost => format!("Could not establish SSH connection to the target {}: No route to host.", target_string(.target)),
         TargetConnectionError::NetworkUnreachable => format!("Could not establish SSH connection to the target {}: Network unreachable.", target_string(.target)),
         TargetConnectionError::InvalidArgument => format!("Could not establish SSH connection to the target {}: Invalid argument. Please check the address of the target you are attempting to add.", target_string(.target)),
-        TargetConnectionError::UnknownError => format!("Could not establish SSH connection to the target {}. {}. Report the error to the FFX team at https://fxbug.dev/new/ffx+User+Bug", target_string(.target), .logs.as_ref().map(|s| s.as_str()).unwrap_or("As-yet unknown error. Please refer to the logs at `ffx config get log.dir` and look for 'Unknown host-pipe error received'")),
-        TargetConnectionError::FidlCommunicationError => format!("Connection was established to {}, but FIDL communication to the Remote Control Service failed. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target)),
-        TargetConnectionError::RcsConnectionError => format!("Connection was established to {}, but the Remote Control Service failed initiating a test connection. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target)),
-        TargetConnectionError::FailedToKnockService => format!("Connection was established to {}, but the Remote Control Service test connection was dropped prematurely. It may help to try running the command again. If this problem persists, please open a bug at https://fxbug.dev/new/ffx+Users+Bug", target_string(.target)),
+        TargetConnectionError::UnknownError => format!("Could not establish SSH connection to the target {}. {}. Report the error to the FFX team at {BUG_REPORT_URL}", target_string(.target), .logs.as_ref().map(|s| s.as_str()).unwrap_or("As-yet unknown error. Please refer to the logs at `ffx config get log.dir` and look for 'Unknown host-pipe error received'")),
+        TargetConnectionError::FidlCommunicationError => format!("Connection was established to {}, but FIDL communication to the Remote Control Service failed. It may help to try running the command again. If this problem persists, please open a bug at {BUG_REPORT_URL}", target_string(.target)),
+        TargetConnectionError::RcsConnectionError => format!("Connection was established to {}, but the Remote Control Service failed initiating a test connection. It may help to try running the command again. If this problem persists, please open a bug at {BUG_REPORT_URL}", target_string(.target)),
+        TargetConnectionError::FailedToKnockService => format!("Connection was established to {}, but the Remote Control Service test connection was dropped prematurely. It may help to try running the command again. If this problem persists, please open a bug at {BUG_REPORT_URL}", target_string(.target)),
         TargetConnectionError::TargetIncompatible => format!("{}.", .logs.as_ref().map(|s| s.as_str()).unwrap_or(format!("ffx revision {:#X} is not compatible with the target. Unable to determine target ABI revision", version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64()).as_str())),
     })]
     TargetConnectionError {

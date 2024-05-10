@@ -42,7 +42,6 @@ ffx_plugin("ffx_doctor") {
   args_sources = [ "src/args.rs" ]
 
   sources = [
-    "src/constants.rs",
     "src/doctor_ledger.rs",
     "src/ledger_view.rs",
     "src/lib.rs",
