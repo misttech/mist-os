@@ -15,11 +15,10 @@ use core::{
     borrow::Borrow,
     convert::Infallible as Never,
     ffi::CStr,
-    fmt::{self, Debug, Display},
+    fmt::Debug,
     hash::Hash,
     num::NonZeroU64,
     ops::{Deref, DerefMut},
-    sync::atomic::AtomicUsize,
     time::Duration,
 };
 
@@ -97,7 +96,8 @@ use crate::{
 };
 
 pub use netstack3_base::testutil::{
-    new_rng, run_with_many_seeds, FakeCryptoRng, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
+    new_rng, run_with_many_seeds, FakeCryptoRng, MonotonicIdentifier, TestAddrs, TestIpExt,
+    TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
 
 /// NDP test utilities.
@@ -1403,41 +1403,6 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
     const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
-
-/// A convenient monotonically increasing identifier to use as the bindings'
-/// `DeviceIdentifier` in tests.
-pub struct MonotonicIdentifier(usize);
-
-impl Debug for MonotonicIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NB: This type is used as part of the debug implementation in device
-        // IDs which should provide enough context themselves on the type. For
-        // brevity we omit the type name.
-        let Self(id) = self;
-        Debug::fmt(id, f)
-    }
-}
-
-impl Display for MonotonicIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(self, f)
-    }
-}
-
-static MONOTONIC_COUNTER: AtomicUsize = AtomicUsize::new(1);
-
-impl MonotonicIdentifier {
-    /// Creates a new identifier with the next value.
-    pub fn new() -> Self {
-        Self(MONOTONIC_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
-    }
-}
-
-impl Default for MonotonicIdentifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl DeviceIdAndNameMatcher for MonotonicIdentifier {
     fn id_matches(&self, _id: &NonZeroU64) -> bool {

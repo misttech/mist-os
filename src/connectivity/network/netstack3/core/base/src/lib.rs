@@ -76,6 +76,7 @@ pub mod testutil {
     mod fake_bindings;
     mod fake_core;
     mod fake_network;
+    mod monotonic_id;
 
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
@@ -92,4 +93,5 @@ pub mod testutil {
     pub use fake_network::{
         FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, PendingFrame, PendingFrameData, StepResult,
     };
+    pub use monotonic_id::MonotonicIdentifier;
 }
