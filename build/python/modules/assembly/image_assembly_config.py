@@ -8,7 +8,7 @@ schema as `//src/developer/ffx/plugins/assembly`.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Set, TypeVar
+from typing import Dict, List, Optional, Set, TypeVar
 
 import serialization
 
@@ -30,6 +30,14 @@ class KernelInfo:
 
 
 @dataclass
+class BoardDriverArguments:
+    vendor_id: int
+    product_id: int
+    name: str
+    revision: int
+
+
+@dataclass
 @serialization.serialize_json
 class ImageAssemblyConfig:
     """The input configuration for the Image Assembly Operation
@@ -40,13 +48,18 @@ class ImageAssemblyConfig:
 
     base: Set[FilePath] = field(default_factory=set)
     cache: Set[FilePath] = field(default_factory=set)
+    on_demand: Set[FilePath] = field(default_factory=set)
     system: Set[FilePath] = field(default_factory=set)
     kernel: KernelInfo = field(default_factory=KernelInfo)
     qemu_kernel: Optional[FilePath] = None
     boot_args: Set[str] = field(default_factory=set)
     bootfs_files: Set[FileEntry] = field(default_factory=set)
     bootfs_packages: Set[FilePath] = field(default_factory=set)
+    board_driver_arguments: Optional[BoardDriverArguments] = None
     devicetree: Optional[FilePath] = None
+
+    # TODO:  Flesh out the images_config with the actual types, if it's needed.
+    images_config: Dict[str, List[str]] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""

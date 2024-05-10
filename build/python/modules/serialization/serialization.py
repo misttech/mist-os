@@ -152,12 +152,24 @@ def instance_from_dict(cls: Type[C], a_dict: Dict[str, Any]) -> C:
         if name not in init_param_types
     }
 
+    # Get the values to create the instance with.
+    named_values = _get_named_values_from(a_dict, fields_to_read, cls)
+
+    # Now, validate that the dict doesn't contain anything extraneous by taking
+    # the set of keys in the supplied dictionary, and removing from it the names
+    # of all the fields, and if any keys are left, then error out.
+    supplied_names = set(a_dict.keys())
+    for key in field_types.keys():
+        supplied_names.discard(key)
+    if len(supplied_names) != 0:
+        raise KeyError(
+            f"Unknown fields found when deserializing {cls.__name__}: {', '.join(supplied_names)}"
+        )
+
     # If any fields weren't set via the constructor, set those attributes on the
     # class directly.  For classes that use @dataclass, this is likely to be
     # empty.
-    for field_name, value in _get_named_values_from(
-        a_dict, fields_to_read, cls
-    ):
+    for field_name, value in named_values:
         setattr(instance, field_name, value)
 
     return instance
