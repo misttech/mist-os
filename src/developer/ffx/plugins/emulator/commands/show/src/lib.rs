@@ -185,15 +185,8 @@ mod tests {
 
         assert_eq!(got_data, want_data);
         assert!(stderr.is_empty());
-
-        let machine_writer2 = <EmuShowTool as FfxMain>::Writer::new_test(
-            Some(Format::JsonPretty),
-            &TestBuffers::default(),
-        );
-
         let value = serde_json::to_value(&got_data).expect("value from data");
-        machine_writer2.verify_schema(&value).expect("schema OK");
-
+        <EmuShowTool as FfxMain>::Writer::verify_schema(&value).expect("schema OK");
         Ok(())
     }
     #[fuchsia::test]
@@ -287,13 +280,7 @@ mod tests {
             }),
         }];
         assert_eq!(got_data, want_data);
-
-        let machine_writer2 = <EmuShowTool as FfxMain>::Writer::new_test(
-            Some(Format::JsonPretty),
-            &TestBuffers::default(),
-        );
-
         let value = serde_json::to_value(&got_data).expect("value from data");
-        machine_writer2.verify_schema(&value).expect("schema OK");
+        <EmuShowTool as FfxMain>::Writer::verify_schema(&value).expect("schema OK");
     }
 }

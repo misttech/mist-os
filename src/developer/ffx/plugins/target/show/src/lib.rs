@@ -503,7 +503,7 @@ mod tests {
     async fn test_verify_machine_schema() {
         let buffers = TestBuffers::default();
         let mut output =
-            VerifiedMachineWriter::<TargetShowInfo>::new_test(Some(Format::JsonPretty), &buffers);
+            <ShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &buffers);
         let tool = ShowTool {
             cmd: args::TargetShow { ..Default::default() },
             target_proxy: setup_fake_target_server(),
@@ -518,7 +518,7 @@ mod tests {
         tool.show_cmd(&mut output).await.expect("main");
         let (stdout, _stderr) = buffers.into_strings();
         let data: Value = serde_json::from_str(&stdout).expect("Valid JSON");
-        match output.verify_schema(&data) {
+        match <ShowTool as FfxMain>::Writer::verify_schema(&data) {
             Ok(_) => (),
             Err(e) => {
                 println!("Error verifying schema: {e}");

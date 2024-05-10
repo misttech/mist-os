@@ -328,7 +328,7 @@ mod test {
         show_targets(cmd, infos, &mut writer, &env.context).await.expect("show_targets");
         let data_str = test_buffers.into_stdout_str();
         let data = serde_json::from_str(&data_str).expect("json value");
-        match writer.verify_schema(&data) {
+        match VerifiedMachineWriter::<Vec<JsonTarget>>::verify_schema(&data) {
             Ok(_) => (),
             Err(e) => {
                 println!("Error verifying schema: {e}");

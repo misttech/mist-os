@@ -574,15 +574,8 @@ mod tests {
         };
 
         assert_eq!(got, want);
-        let test_buffers2 = TestBuffers::default();
         let data: serde_json::Value = serde_json::from_str(&stdout).expect("serde value");
-        let writer2: <PbGetArtifactsTool as FfxMain>::Writer =
-            <PbGetArtifactsTool as FfxMain>::Writer::new_test(
-                Some(Format::JsonPretty),
-                &test_buffers2,
-            );
-
-        match writer2.verify_schema(&data) {
+        match <PbGetArtifactsTool as FfxMain>::Writer::verify_schema(&data) {
             Ok(_) => (),
             Err(e) => {
                 assert_eq!("", format!("Error verifying schema: {e:?}\n{data:?}"));
