@@ -310,6 +310,9 @@ class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware
   // Execution State), and thus resuming power.
   zx_status_t ActivateWakeOnRequest() TA_REQ(lock_);
 
+  // Serves requests that were delayed because they were received during suspended state.
+  void ServeDelayedRequests() TA_REQ(tuning_lock_, lock_);
+
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
 
   aml_sdmmc_config::Config config_;

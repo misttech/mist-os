@@ -448,54 +448,7 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
 
             // Serve delayed requests that were received during power suspension, if any.
             if (delayed_requests_.size()) {
-              for (auto& request : delayed_requests_) {
-                SdmmcRequestInfo* request_info = std::get_if<SdmmcRequestInfo>(&request);
-                if (request_info != nullptr) {
-                  DoRequestAndComplete(request_info->request, request_info->arena,
-                                       request_info->completer);
-                  continue;
-                }
-                SdmmcTaskInfo* task_info = std::get_if<SdmmcTaskInfo>(&request);
-                if (task_info != nullptr) {
-                  auto* set_bus_width_completer =
-                      std::get_if<SetBusWidthCompleter::Async>(&task_info->completer);
-                  if (set_bus_width_completer != nullptr) {
-                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
-                                      *set_bus_width_completer);
-                    continue;
-                  }
-                  auto* set_bus_freq_completer =
-                      std::get_if<SetBusFreqCompleter::Async>(&task_info->completer);
-                  if (set_bus_freq_completer != nullptr) {
-                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
-                                      *set_bus_freq_completer);
-                    continue;
-                  }
-                  auto* set_timing_completer =
-                      std::get_if<SetTimingCompleter::Async>(&task_info->completer);
-                  if (set_timing_completer != nullptr) {
-                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
-                                      *set_timing_completer);
-                    continue;
-                  }
-                  auto* hw_reset_completer =
-                      std::get_if<HwResetCompleter::Async>(&task_info->completer);
-                  if (hw_reset_completer != nullptr) {
-                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
-                                      *hw_reset_completer);
-                    continue;
-                  }
-                  auto* perform_tuning_completer =
-                      std::get_if<PerformTuningCompleter::Async>(&task_info->completer);
-                  if (perform_tuning_completer != nullptr) {
-                    lock_.unlock();  // Tuning acquires lock_.
-                    DoTaskAndComplete(std::move(task_info->task), task_info->arena,
-                                      *perform_tuning_completer);
-                    lock_.lock();
-                    continue;
-                  }
-                }
-              }
+              ServeDelayedRequests();
               delayed_requests_.clear();
 
               // Drop lease on wake-on-request power element. This lets the hardware power element's
@@ -530,6 +483,48 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
             return;
         }
       });
+}
+
+void AmlSdmmc::ServeDelayedRequests() {
+  for (auto& request : delayed_requests_) {
+    SdmmcRequestInfo* request_info = std::get_if<SdmmcRequestInfo>(&request);
+    if (request_info != nullptr) {
+      DoRequestAndComplete(request_info->request, request_info->arena, request_info->completer);
+      continue;
+    }
+    SdmmcTaskInfo* task_info = std::get_if<SdmmcTaskInfo>(&request);
+    if (task_info != nullptr) {
+      auto* set_bus_width_completer =
+          std::get_if<SetBusWidthCompleter::Async>(&task_info->completer);
+      if (set_bus_width_completer != nullptr) {
+        DoTaskAndComplete(std::move(task_info->task), task_info->arena, *set_bus_width_completer);
+        continue;
+      }
+      auto* set_bus_freq_completer = std::get_if<SetBusFreqCompleter::Async>(&task_info->completer);
+      if (set_bus_freq_completer != nullptr) {
+        DoTaskAndComplete(std::move(task_info->task), task_info->arena, *set_bus_freq_completer);
+        continue;
+      }
+      auto* set_timing_completer = std::get_if<SetTimingCompleter::Async>(&task_info->completer);
+      if (set_timing_completer != nullptr) {
+        DoTaskAndComplete(std::move(task_info->task), task_info->arena, *set_timing_completer);
+        continue;
+      }
+      auto* hw_reset_completer = std::get_if<HwResetCompleter::Async>(&task_info->completer);
+      if (hw_reset_completer != nullptr) {
+        DoTaskAndComplete(std::move(task_info->task), task_info->arena, *hw_reset_completer);
+        continue;
+      }
+      auto* perform_tuning_completer =
+          std::get_if<PerformTuningCompleter::Async>(&task_info->completer);
+      if (perform_tuning_completer != nullptr) {
+        lock_.unlock();  // Tuning acquires lock_.
+        DoTaskAndComplete(std::move(task_info->task), task_info->arena, *perform_tuning_completer);
+        lock_.lock();
+        continue;
+      }
+    }
+  }
 }
 
 void AmlSdmmc::WatchWakeOnRequestRequiredLevel() {
