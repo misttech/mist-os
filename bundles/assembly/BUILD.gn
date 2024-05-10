@@ -3563,8 +3563,8 @@ assembly_input_bundle("brightness_manager") {
 
 # Legacy Power Framework support. Avoids including more modern power framework components.
 #
-# feature_set_levels: utility, minimal
-# build-types: eng
+# feature_set_levels: all
+# build-types: all
 #
 assembly_input_bundle("legacy_power_framework") {
   bootfs_packages = [
@@ -3585,11 +3585,59 @@ assembly_input_bundle("legacy_power_framework") {
   ]
 }
 
-assembly_input_bundle("power_framework") {
-  bootfs_packages = [
-    "//src/power/broker:package",
-    "//src/power/system-activity-governor:package",
+# Power Framework System Activity Governor.
+#
+# feature_set_levels: all
+# build-types: eng, userdebug
+#
+assembly_input_bundle("power_framework_sag") {
+  bootfs_packages = [ "//src/power/system-activity-governor:package" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/power/meta/sag.shard.cml" ]
+        },
+      ]
+    },
   ]
+}
+
+# Power Framework System Activity Governor for testing. This provides extra controls over the
+# internal state that should only happen for testing.
+#
+# feature_set_levels: all
+# build-types: eng
+#
+assembly_input_bundle("power_framework_testing_sag") {
+  bootfs_packages = [
+    "//src/power/system-activity-governor/fake:package",
+    "//src/power/testing/fake-suspend:fake-suspend-pkg",
+  ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/power/meta/testing-sag.shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Power Framework Support.
+#
+# feature_set_levels: all
+# build-types: eng, userdebug
+#
+assembly_input_bundle("power_framework") {
+  bootfs_packages = [ "//src/power/broker:package" ]
   base_packages = [ "//src/devices/hrtimer/bin:hrtimer-ctl" ]
 
   # When power framework becomes available on user builds,

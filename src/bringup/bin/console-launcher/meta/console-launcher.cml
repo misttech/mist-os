@@ -169,5 +169,17 @@
             // may not be available on all products.
             availability: "optional",
         },
+        {
+            // Used by power integration tests running against the testing variant of the
+            // system-activity-governor.
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+                "test.sagcontrol.State",
+            ],
+
+            // The source of this protocol may not be available on all products.
+            availability: "optional",
+        },
     ],
 }
