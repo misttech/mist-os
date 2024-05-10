@@ -307,32 +307,6 @@ void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t banjo_displ
   }
 }
 
-void Controller::DisplayControllerInterfaceOnDisplaysChanged(
-    const added_display_args_t* added_banjo_display_list, size_t added_banjo_display_count,
-    const uint64_t* removed_banjo_display_id_list, size_t removed_banjo_display_id_count) {
-  cpp20::span<const added_display_args_t> added_banjo_displays(added_banjo_display_list,
-                                                               added_banjo_display_count);
-
-  for (const added_display_args_t& added_banjo_display : added_banjo_displays) {
-    zx::result<> add_display_result = AddDisplay(added_banjo_display);
-    if (add_display_result.is_error()) {
-      zxlogf(WARNING, "Failed to add display %" PRIu64 ": %s", added_banjo_display.display_id,
-             add_display_result.status_string());
-    }
-  }
-
-  cpp20::span<const uint64_t> removed_banjo_display_ids(removed_banjo_display_id_list,
-                                                        removed_banjo_display_id_count);
-
-  for (const uint64_t banjo_display_id : removed_banjo_display_ids) {
-    DisplayId display_id = ToDisplayId(banjo_display_id);
-    zx::result<> remove_display_result = RemoveDisplay(display_id);
-    if (remove_display_result.is_error()) {
-      zxlogf(WARNING, "Failed to remove a display: %s", remove_display_result.status_string());
-    }
-  }
-}
-
 void Controller::DisplayControllerInterfaceOnCaptureComplete() {
   if (!supports_capture_) {
     zxlogf(ERROR,
