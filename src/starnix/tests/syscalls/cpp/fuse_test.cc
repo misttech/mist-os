@@ -139,6 +139,11 @@ class Node {
  public:
   virtual ~Node() {}
 
+  void SetPermissions(uint32_t perms) {
+    std::lock_guard guard(mtx_);
+    perms_ = perms;
+  }
+
   void SetEntryValidDuration(uint64_t secs) {
     std::lock_guard guard(mtx_);
     entry_valid_secs_ = secs;
@@ -158,7 +163,7 @@ class Node {
   void PopulateAttrLocked(fuse_attr& attr) __TA_REQUIRES(mtx_) {
     attr = {
         .ino = id_,
-        .mode = type_ | S_IRWXU | S_IRWXG | S_IRWXO,
+        .mode = type_ | perms_,
     };
   }
 
@@ -187,6 +192,7 @@ class Node {
   uint64_t id_ __TA_GUARDED(mtx_);
   uint64_t generation_ __TA_GUARDED(mtx_) = 1;
   uint64_t entry_valid_secs_ __TA_GUARDED(mtx_) = 0;
+  uint32_t perms_ __TA_GUARDED(mtx_) = S_IRWXU | S_IRWXG | S_IRWXO;
 };
 
 class Directory : public Node {
@@ -1595,4 +1601,54 @@ INSTANTIATE_TEST_SUITE_P(FusePathWalkRefreshDirEntryTest, FusePathWalkRefreshDir
                                  .modify_generation = true,
                                  .entry_valid_forever = true,
                                  .expected_extra_lookups = 0,
+                             }));
+
+struct DirPermissionCheckTestCase {
+  uint32_t want_init_flags;
+  uint32_t perms;
+  bool expect_open;
+};
+
+class FuseDirPermissionCheck : public FuseServerTest,
+                               public ::testing::WithParamInterface<DirPermissionCheckTestCase> {};
+
+TEST_P(FuseDirPermissionCheck, DirPermissionCheck) {
+  const DirPermissionCheckTestCase& test_case = GetParam();
+
+  std::shared_ptr<FuseServer> server(new FuseServer(test_case.want_init_flags));
+  FileSystem& fs = server->fs();
+  std::shared_ptr<Directory> dir = fs.AddDirAtRoot("dir");
+  ASSERT_TRUE(fs.AddFileAt(dir, "node"));
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+
+  std::string path = GetMountDir() + "/dir/node";
+  dir->SetPermissions(test_case.perms);
+  InThreadWithoutCapDacOverride([&]() {
+    test_helper::ScopedFD fd(open(path.c_str(), O_RDONLY));
+    EXPECT_EQ(fd.is_valid(), test_case.expect_open);
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(FuseDirPermissionCheck, FuseDirPermissionCheck,
+                         testing::Values(
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                                 .expect_open = true,
+                             },
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .perms = 0,
+                                 .expect_open = true,
+                             },
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                                 .expect_open = true,
+                             },
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .perms = 0,
+                                 .expect_open = false,
                              }));
