@@ -6,7 +6,7 @@
 #define SRC_CAMERA_BIN_FACTORY_STREAMER_H_
 
 #include <fuchsia/camera3/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/sys/cpp/component_context.h>
 
@@ -24,7 +24,7 @@ class Streamer {
 
   // Make a streamer and start its thread
   static fpromise::result<std::unique_ptr<Streamer>, zx_status_t> Create(
-      fuchsia::sysmem::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
+      fuchsia::sysmem2::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
       fit::closure stop_callback = nullptr);
 
   // once connected to device, return the number of available configs
@@ -55,14 +55,15 @@ class Streamer {
   void OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo frame_info);
   void DisconnectStream(uint32_t stream_index);
   void WatchBufferCollectionCallback(uint32_t config_index, uint32_t stream_index,
-                                     fuchsia::sysmem::BufferCollectionTokenHandle token_back);
-  void SyncCallback(uint32_t stream_index, fuchsia::sysmem::BufferCollectionTokenHandle token_back);
+                                     fuchsia::sysmem2::BufferCollectionTokenHandle token_back);
+  void SyncCallback(uint32_t stream_index,
+                    fuchsia::sysmem2::BufferCollectionTokenHandle token_back);
   void WaitForBuffersAllocatedCallback(uint32_t stream_index, zx_status_t status,
-                                       fuchsia::sysmem::BufferCollectionInfo_2 buffers);
+                                       fuchsia::sysmem2::BufferCollectionInfo buffers);
 
   async::Loop loop_;
   fit::closure stop_callback_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   fuchsia::camera3::DeviceWatcherPtr watcher_;
   fuchsia::camera3::DevicePtr device_;
   std::vector<fuchsia::camera3::Configuration> configurations_;
@@ -73,9 +74,9 @@ class Streamer {
   uint32_t frame_count_ = 0;
 
   struct StreamInfo {
-    fuchsia::sysmem::BufferCollectionTokenPtr token_ptr;
-    fuchsia::sysmem::BufferCollectionPtr collection;
-    fuchsia::sysmem::BufferCollectionInfo_2 collection_info;
+    fuchsia::sysmem2::BufferCollectionTokenPtr token_ptr;
+    fuchsia::sysmem2::BufferCollectionPtr collection;
+    fuchsia::sysmem2::BufferCollectionInfo collection_info;
     fuchsia::camera3::StreamPtr stream;
   };
   // stream_infos_ uses the same index as the corresponding stream index in configurations_.
