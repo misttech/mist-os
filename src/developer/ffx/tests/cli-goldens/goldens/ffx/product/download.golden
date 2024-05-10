@@ -66,7 +66,7 @@
       "optionality": "optional",
       "long": "--branch",
       "short": null,
-      "description": "filter on products of <branch>. The branch is either in the form of f<N> (e.g. f18). This option is exclusive with version option.",
+      "description": "filter on products of <branch>. The branch is either in the form of f<N> (e.g. f18) or `LATEST`. This option is exclusive with version option.",
       "hidden": false
     }
   ],

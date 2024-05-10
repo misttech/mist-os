@@ -31,13 +31,16 @@ const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";
 
 lazy_static! {
     static ref BRANCH_TO_PREFIX_MAPPING: HashMap<&'static str, &'static str> = hashmap! {
-    "f12" => "12.20230611.1",
-    "f13" => "13.20230724.3",
-    "f14" => "14.202308",
-    "f15" => "15.20231018.3",
-    "f16" => "16.20231130.3",
-    "f17" => "17.20240122.0",
-    "f18" => "18.20240225.3"};
+        "f12" => "12.20230611.1",
+        "f13" => "13.20230724.3",
+        "f14" => "14.202308",
+        "f15" => "15.20231018.3",
+        "f16" => "16.20231130.3",
+        "f17" => "17.20240122.0",
+        "f18" => "18.20240225.3",
+        "f19" => "19.20240327.3",
+        "LATEST" => "20",
+    };
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]

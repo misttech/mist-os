@@ -50,7 +50,7 @@ pub struct ListCommand {
     pub version: Option<String>,
 
     /// filter on products of <branch>. The branch is either in the form of f<N>
-    /// (e.g. f18). This option is exclusive with version option.
+    /// (e.g. f18) or `LATEST`. This option is exclusive with version option.
     #[argh(option)]
     pub branch: Option<String>,
 }
