@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2104
+From //build/config/BUILDCONFIG.gn:2117
 
 ### allowed_test_device_types
 
@@ -329,7 +329,7 @@ to save about 3 minutes of build time when they are not needed.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_fuchsia_sdk.gni:11
+From //build/bazel/bazel_fuchsia_sdk.gni:10
 
 ### bazel_product_bundle_board
 
@@ -864,12 +864,6 @@ An action that accesses undeclared inputs or outputs will fail the build.
 
 From //build/tracer/tracer.gni:12
 
-### build_time_supported_api_levels
-
-**Current value (from the default):** `[15, 16, 17, 18, 19, 20]`
-
-From //build/bazel/bazel_fuchsia_sdk.gni:18
-
 ### build_uefi_disk
 
 Generate a UEFI disk image
@@ -952,7 +946,7 @@ Include the vulkan validation layers in carnelian examples.
 
 **Current value (from the default):** `false`
 
-From //src/lib/ui/carnelian/BUILD.gn:14
+From //src/lib/ui/carnelian/BUILD.gn:13
 
 ### carnelian_static_images_extras
 
@@ -960,7 +954,7 @@ Point this to the location of external image files to be included as extras
 
 **Current value (from the default):** `[]`
 
-From //src/lib/ui/carnelian/BUILD.gn:17
+From //src/lib/ui/carnelian/BUILD.gn:16
 
 ### carnelian_static_rives_extras
 
@@ -968,7 +962,7 @@ Point this to the location of external rive files to be included as extras
 
 **Current value (from the default):** `[]`
 
-From //src/lib/ui/carnelian/BUILD.gn:20
+From //src/lib/ui/carnelian/BUILD.gn:19
 
 ### carnelian_static_txts_extras
 
@@ -976,7 +970,7 @@ Point this to the location of external txt files to be included as extras
 
 **Current value (from the default):** `[]`
 
-From //src/lib/ui/carnelian/BUILD.gn:23
+From //src/lib/ui/carnelian/BUILD.gn:22
 
 ### check_output_dir_leaks
 
@@ -2867,7 +2861,7 @@ From //build/images/args.gni:89
 
 **Current value (from the default):** `false`
 
-From //src/connectivity/network/BUILD.gn:10
+From //src/connectivity/network/BUILD.gn:9
 
 ### enable_perfetto_benchmarks
 
@@ -3230,7 +3224,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:123
+From //build/bazel/legacy_ninja_build_outputs.gni:128
 
 ### extra_package_labels
 
@@ -4293,7 +4287,7 @@ Each element of the list is one variant, which is a scope defining:
 }, {
   configs = ["//build/config/sanitizers:ubsan"]
   remove_common_configs = ["//build/config:no_rtti"]
-  tags = ["instrumented", "instrumentation-runtime", "needs-compiler-abi", "needs-writable-globals", "ubsan"]
+  tags = ["instrumented", "ubsan"]
 }, {
   configs = ["//build/config/sanitizers:ubsan", "//build/config/sanitizers:sancov"]
   remove_common_configs = ["//build/config:no_rtti"]
@@ -5240,7 +5234,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 * `profile`: optimized for coverage/profile data collection
 * `coverage`: optimized for coverage data collection
 
-**Current value (from the default):** `"size_lto"`
+**Current value (from the default):** `"size"`
 
 From //build/config/compiler.gni:23
 
@@ -5259,6 +5253,22 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 **Current value (from the default):** `false`
 
 From //build/config/BUILDCONFIG.gn:32
+
+### override_build_time_supported_api_levels
+
+Valid values are either false (Default), or a list contains only `supported`
+or `in development` API levels listed in //sdk/version_history.json file.
+By default, all supported and in development API levels defined in
+//sdk/version_history.json will be built. If you only want to build
+artifacts targeting API level PLATFORM, override this with `[]`.
+
+This will help reduce the overall build time of any product/driver that uses
+Bazel SDK, or final_fuchsia_idk. For example, a vim3 build can be shorten
+from 16 mins to 10 mins.
+
+**Current value (from the default):** `false`
+
+From //build/config/fuchsia/platform_version.gni:48
 
 ### override_target_api_level
 
@@ -7535,7 +7545,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2094
+From //build/config/BUILDCONFIG.gn:2107
 
 ### select_variant_canonical
 
@@ -7545,7 +7555,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2099
+From //build/config/BUILDCONFIG.gn:2112
 
 ### select_variant_shortcuts
 
@@ -7597,7 +7607,8 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }, {
   name = "kubsan"
   select_variant = [{
-  dir = ["//zircon/kernel"]
+  _zircon_cpu = "arm64"
+  dir = ["//zircon/kernel", "//zircon/kernel/arch/arm64/phys", "//zircon/kernel/arch/arm64/phys/boot-shim", "//zircon/kernel/arch/arm64/phys/efi", "//zircon/kernel/phys", "//zircon/kernel/phys/boot-shim", "//zircon/kernel/phys/efi", "//zircon/kernel/phys/test"]
   variant = "ubsan"
 }]
 }]
@@ -8221,7 +8232,7 @@ direct.
 
 **Current value (from the default):** `false`
 
-From //src/lib/ui/carnelian/BUILD.gn:30
+From //src/lib/ui/carnelian/BUILD.gn:29
 
 ### use_elf_kernel
 
@@ -8349,7 +8360,7 @@ Include a config in the example packages to attempt to use Spinel
 
 **Current value (from the default):** `false`
 
-From //src/lib/ui/carnelian/BUILD.gn:26
+From //src/lib/ui/carnelian/BUILD.gn:25
 
 ### use_swiftshader_vulkan_icd_on_host
 
