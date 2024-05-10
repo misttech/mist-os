@@ -35,7 +35,6 @@ mod lock_ordering;
 mod marker;
 mod state;
 mod time;
-mod trace;
 mod transport;
 mod uninstantiable;
 mod work_queue;
@@ -277,5 +276,5 @@ pub use state::StackState;
 pub use time::{Instant, TimerId};
 
 // Re-export useful macros.
+pub(crate) use netstack3_base::trace_duration;
 pub use netstack3_macros::context_ip_bounds;
-pub(crate) use trace::trace_duration;
