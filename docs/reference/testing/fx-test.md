@@ -424,3 +424,60 @@ Protocol][build-event-protocol]{:.external}).
 [trf-docs]: /docs/development/testing/components/test_runner_framework.md
 [zxdb-docs]: /docs/development/debugger/commands.md
 [zxdb-testing-docs]: /docs/development/debugger/tests.md
+
+## Common Issues
+
+### `fx test` does not work with emacs
+
+The emacs compilation window does not emulate an xterm-compatible terminal,
+resulting in an error like:
+
+```bash {:.devsite-disable-click-to-copy}
+in _make_progress_bar raise ValueError("Width must be at least 3")
+```
+
+To solve this problem, run `fx test` with the `--no-status` option to disable
+the status bar.
+
+### Escape sequences appear in `fx test` output
+
+Your terminal may not support ANSI color codes, and `fx test` failed
+to detect this fact.
+
+Pass the `--no-style` option to `fx test` to disable color output
+or the `--no-status` option to disable the updating status bar.
+
+Passing the `--simple` option to `fx test` is equivalent to `--no-style
+--no-status`.
+
+### I don't know where my log file is
+
+You can set the location of the log by passing `--logpath` to `fx test`, though
+this is recommended only for non-interactive use.
+
+Your logs are stored in your Fuchsia output directory by default as timestamped
+files.
+
+Print the path to the previous log using `fx test -pr path`.
+
+### Printing the log file dumps garbage into my terminal
+
+`fx test` logs are gzipped by default. Use the following command to pretty
+print the most recent log to your terminal:
+
+```bash
+cat `fx test -pr path` | gunzip | jq -C | less -R
+```
+
+This does the following:
+
+- Find the most recent log path (`fx test -pr path`).
+- Pipe the log to `gunzip` to decompress the log.
+- Pipe the decompressed log to `jq` to pretty-print it with color output (`-C`).
+- Pipe the color output to `less` configured to display color (`-R`).
+
+For convenience you can add an alias for this command in your .bashrc:
+
+```bash
+alias testlog='cat `fx test -pr path` | gunzip | jq -C | less -R'
+```
