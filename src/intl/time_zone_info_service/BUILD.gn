@@ -7,7 +7,6 @@ import("//build/config.gni")
 import("//build/icu/icu_executable.gni")
 import("//build/icu/icu_fuchsia_component.gni")
 import("//build/icu/icu_fuchsia_package.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("time_zone_info_service") {
   testonly = true
@@ -50,13 +49,4 @@ icu_fuchsia_package("pkg") {
     ":component",
     "//src/lib/icu:icudtl",
   ]
-}
-
-core_shard("time-zone-info-service-core-shard") {
-  shard_file = "meta/time-zone-info-service.core_shard.cml"
-}
-
-# Alias
-group("core-shard") {
-  deps = [ ":time-zone-info-service-core-shard" ]
 }

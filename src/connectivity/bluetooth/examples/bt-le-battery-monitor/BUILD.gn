@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -44,11 +43,6 @@ fuchsia_component("component") {
 
 fuchsia_package("bt-le-battery-monitor") {
   deps = [ ":component" ]
-}
-
-# The core realm shard to be used by product integrators.
-core_shard("core-shard") {
-  shard_file = "meta/bt-le-battery-monitor.core_shard.cml"
 }
 
 fuchsia_unittest_package("bt-le-battery-monitor-tests") {

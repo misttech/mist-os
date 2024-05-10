@@ -71,6 +71,7 @@
             protocol: "fuchsia.memorypressure.Provider",
             from: "#memory_monitor",
             to: "#sl4f",
+            source_availability: "unknown",
         },
         {
             protocol: [

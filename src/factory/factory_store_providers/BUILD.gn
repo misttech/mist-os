@@ -8,7 +8,6 @@ import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/zbi/zbi.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   name = "factory_store_providers"
@@ -49,10 +48,6 @@ rustc_binary("bin") {
     "src/validators/size.rs",
     "src/validators/text.rs",
   ]
-}
-
-core_shard("factory_store_providers_shard") {
-  shard_file = "meta/factory_store_providers.core_shard.cml"
 }
 
 fuchsia_component("factory_store_providers_comp") {

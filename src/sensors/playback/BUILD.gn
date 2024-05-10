@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
   testonly = true
@@ -135,8 +134,4 @@ fuchsia_component("playback_integration_test_component") {
 fuchsia_test_package("playback_integration_test") {
   test_components = [ ":playback_integration_test_component" ]
   deps = [ ":sensors_playback_component" ]
-}
-
-core_shard("sensors-playback-core-shard") {
-  shard_file = "meta/sensors_playback.core_shard.cml"
 }

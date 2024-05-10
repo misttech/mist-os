@@ -7,7 +7,6 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/lib/vulkan/layers.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
   # Include the vulkan validation layers in carnelian examples.
@@ -664,10 +663,6 @@ foreach(carnelian_example_details, carnelian_examples) {
   }
   carnelian_examples_deps +=
       [ "//src/lib/ui/carnelian:" + carnelian_example_package_name ]
-}
-
-core_shard("carnelian_examples_shard") {
-  shard_file = "meta/carnelian_examples.core_shard.cml"
 }
 
 group("examples") {

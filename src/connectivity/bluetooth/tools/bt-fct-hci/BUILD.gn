@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -40,10 +39,6 @@ fuchsia_package_with_single_component("bt-fct-hci") {
 
 fuchsia_unittest_package("bt-fct-hci-unittests") {
   deps = [ ":bin_test" ]
-}
-
-core_shard("core-shard") {
-  shard_file = "meta/bt-fct-hci.core_shard.cml"
 }
 
 group("tests") {

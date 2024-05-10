@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   output_name = "factory_reset_trigger"
@@ -24,8 +23,4 @@ rustc_binary("bin") {
 fuchsia_package_with_single_component("factory-reset-trigger") {
   manifest = "meta/factory-reset-trigger.cml"
   deps = [ ":bin" ]
-}
-
-core_shard("factory-reset-trigger-core-shard") {
-  shard_file = "meta/factory-reset-trigger.core_shard.cml"
 }

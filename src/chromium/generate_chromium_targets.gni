@@ -4,7 +4,6 @@
 
 import("//build/packages/prebuilt_test_manifest.gni")
 import("//src/chromium/generate_pkg.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 prebuilt_archive_root_path = "//prebuilt/third_party"
 build_output_gen_base_path = "/gen"
@@ -78,13 +77,6 @@ template("generate_fuchsia_web_targets") {
 
     prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
     custom_package_path = "${build_output_gen_base_path}/fuchsia_web/webengine/${target_name}/${target_name}.far"
-  }
-
-  # TODO(crbug.com/1385930): Templatize the shard file to allow specification of
-  # the `repo-hostname` and replace all other instances of similar build rules.
-  core_shard("web_context_provider_core_shard") {
-    visibility += [ ":web_engine_PKG" ]
-    shard_file = "config/web_context_provider.core_shard.cml"
   }
 }
 

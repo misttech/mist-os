@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_library("lib") {
   name = "persistence"
@@ -93,10 +92,6 @@ fuchsia_package("diagnostics-persistence") {
 fuchsia_unittest_package("diagnostics-persistence-unittests") {
   manifest = "meta/diagnostics-persistence-unittests.cml"
   deps = [ ":lib_test" ]
-}
-
-core_shard("core_shard") {
-  shard_file = "meta/diagnostics-persistence.core_shard.cml"
 }
 
 group("tests") {

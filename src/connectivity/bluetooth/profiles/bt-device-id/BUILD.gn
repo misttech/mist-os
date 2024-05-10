@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -60,11 +59,6 @@ fuchsia_package("bt-device-id") {
 
 fuchsia_unittest_package("bt-device-id-tests") {
   deps = [ ":bin_test" ]
-}
-
-# The core realm shard to be used by product integrators.
-core_shard("bt-device-id-core-shard") {
-  shard_file = "meta/bt-device-id.core_shard.cml"
 }
 
 group("tests") {

@@ -72,16 +72,18 @@ group("tests") {
   ]
 }
 
-core_shard("system_recovery_core_shard") {
-  shard_file = "meta/core_shards/system_recovery.core_shard.cml"
-}
+if (current_toolchain == default_toolchain) {
+  core_shard("system_recovery_core_shard") {
+    shard_file = "meta/core_shards/system_recovery.core_shard.cml"
+  }
 
-core_shard("system_recovery_fdr_core_shard") {
-  shard_file = "meta/core_shards/system_recovery_fdr.core_shard.cml"
-}
+  core_shard("system_recovery_fdr_core_shard") {
+    shard_file = "meta/core_shards/system_recovery_fdr.core_shard.cml"
+  }
 
-core_shard("system_recovery_installer_core_shard") {
-  shard_file = "meta/core_shards/system_recovery_installer.core_shard.cml"
+  core_shard("system_recovery_installer_core_shard") {
+    shard_file = "meta/core_shards/system_recovery_installer.core_shard.cml"
+  }
 }
 
 resource("recovery_logo") {

@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -45,12 +44,6 @@ fuchsia_component("component") {
 
 fuchsia_package("bt-map-mce") {
   deps = [ ":component" ]
-}
-
-# The core realm shard to be used by product integrators.
-# This shard should be included in configurations in which MAP MCE support is desired.
-core_shard("bt-map-mce-core-shard") {
-  shard_file = "meta/bt-map-mce.core_shard.cml"
 }
 
 fuchsia_unittest_package("bt-map-mce-unittests") {

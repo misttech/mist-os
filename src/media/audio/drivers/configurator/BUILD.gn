@@ -4,11 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
-
-core_shard("configurator_provider_shard") {
-  shard_file = "meta/component.core_shard.cml"
-}
 
 group("configurator") {
   testonly = true

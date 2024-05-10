@@ -463,3 +463,57 @@ group("config_data_template_allowlist") {
     "//zircon/kernel/lib/userabi/userboot/tests:*",
   ]
 }
+
+# All entries in this group MUST specify where the targets in question are used,
+# as justification for their existence.
+group("core_realm_shards_allowlist") {
+  visibility = []
+
+  # Used by SL4F and infra
+  visibility += [ "//src/testing/sl4f:sl4f_core_shard" ]
+
+  # Used by terminal.gni
+  visibility += [
+    "//products/terminal:tiles_flatland_core_shard",
+    "//src/media/codec:codec_factory_shard",
+    "//src/session/bin/session_manager:terminal_core_shard",
+  ]
+
+  # //bundles/assembly_input_groups/BUILD.gn
+  visibility += [
+    "//src/media/audio/audio_core:core_shard",
+    "//src/media/sounds/soundplayer:core_shard",
+  ]
+
+  # Used by boards
+  visibility += [
+    "//src/security/bin/tee_manager:core_shard",
+    "//src/storage/ext4/server:ext4_readonly_shard",
+  ]
+
+  # Used by recovery images
+  visibility += [
+    "//src/diagnostics/realm:core_shard",
+    "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
+    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
+    "//src/recovery/factory_reset:factory_reset_core_shard",
+    "//src/recovery/system:system_recovery_core_shard",
+    "//src/recovery/system:system_recovery_fdr_core_shard",
+    "//src/recovery/system:system_recovery_installer_core_shard",
+    "//src/settings/service:setui_service_core_shard_migration",
+    "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
+  ]
+
+  # Used by scrutiny test images
+  visibility +=
+      [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
+
+  # Targets in vendor repos
+  visibility += [ "//vendor/*" ]
+
+  # Targets used by vendor images
+  visibility += [
+    "//src/connectivity/lowpan/drivers/lowpan-ot-driver:lowpan_ot_driver_core_shard",
+    "//src/connectivity/lowpan/service:lowpanservice_shard",
+  ]
+}

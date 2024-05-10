@@ -14,10 +14,6 @@ core_shard("core_shard") {
   shard_file = "meta/audio_core.core_shard.cml"
 }
 
-core_shard("core_shard_use_adc_device") {
-  shard_file = "meta/audio_core.core_shard.use_adc_device.cml"
-}
-
 executable("audio_core_bin") {
   output_name = "audio_core"
   deps = [

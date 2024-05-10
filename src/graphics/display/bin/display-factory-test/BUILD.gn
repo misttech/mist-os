@@ -3,11 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
-
-core_shard("display_detect_shard") {
-  shard_file = "meta/display-detect.core_shard.cml"
-}
 
 executable("display_detect") {
   sources = [ "display-detect.cc" ]

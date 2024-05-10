@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 fuchsia_component_manifest("manifest") {
   component_name = "adb-file-sync"
@@ -20,10 +19,6 @@ fuchsia_structured_config_values("adb-file-sync-config-default-values") {
   values = {
     filesync_moniker = ""
   }
-}
-
-core_shard("adb-file-sync-shard") {
-  shard_file = "meta/adb-file-sync.core_shard.cml"
 }
 
 executable("adb-file-sync") {

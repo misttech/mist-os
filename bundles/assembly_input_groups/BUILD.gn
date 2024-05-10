@@ -24,12 +24,3 @@ assembly_input_groups("network") {
   visibility = [ "*" ]
   base_packages = [ "//src/connectivity/network:for_transition" ]
 }
-
-assembly_input_groups("test") {
-  visibility = [ "*" ]
-
-  core_realm_shards = [
-    "//src/media/audio/audio_core:core_shard",
-    "//src/media/sounds/soundplayer:core_shard",
-  ]
-}

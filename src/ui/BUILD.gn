@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("ui") {
   testonly = true
@@ -35,10 +34,6 @@ group("tests") {
     "tools:tests",
     "wayland:tests",
   ]
-}
-
-core_shard("ui_core_shard") {
-  shard_file = "meta/ui.core_shard.cml"
 }
 
 fuchsia_component("ui_component") {

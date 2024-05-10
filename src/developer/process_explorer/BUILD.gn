@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("process_explorer") {
   testonly = true
@@ -62,10 +61,6 @@ fuchsia_package("process_explorer_package") {
     ":process_explorer_component",
     "//build/validate:non_production_tag",
   ]
-}
-
-core_shard("process_explorer_core_shard") {
-  shard_file = "meta/process_explorer.core_shard.cml"
 }
 
 group("tests") {

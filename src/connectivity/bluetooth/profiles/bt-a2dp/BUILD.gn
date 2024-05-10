@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 shared_deps = [
   ":a2dp_profile_config",
@@ -128,20 +127,6 @@ fuchsia_package("source-only") {
     ":component",
     ":source_only_config",
   ]
-}
-
-# TODO(https://fxbug.dev/42160254): eliminate this when the core_shard above can eagerly start
-# A2DP when it is available at startup.
-# "eager_core_shard" should be used when the A2DP profile should be available from
-# startup.
-core_shard("eager_core_shard") {
-  shard_file = "meta/bt-a2dp-eager.core_shard.cml"
-}
-
-# This version of the core shard offers fuchsia.media.SessionAudioConsumerFactory from audio_consumer component
-# which is a child component of core in only some product configurations.
-core_shard("eager_with_audio_consumer_core_shard") {
-  shard_file = "meta/bt-a2dp-eager-with-audio-consumer.core_shard.cml"
 }
 
 fuchsia_unittest_package("bt-a2dp-tests") {

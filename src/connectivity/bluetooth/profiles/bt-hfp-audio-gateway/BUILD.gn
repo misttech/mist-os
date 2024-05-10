@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -161,12 +160,6 @@ fuchsia_package("bt-hfp-audio-gateway-default") {
     ":component",
     ":default_config_values",
   ]
-}
-
-# The core realm shard to be used by product integrators.
-# This shard should be included in configurations in which HFP-AG support is desired.
-core_shard("bt-hfp-audio-gateway-core-shard") {
-  shard_file = "meta/bt-hfp-audio-gateway.core_shard.cml"
 }
 
 group("bt-hfp-audio-gateway") {
