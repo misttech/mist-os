@@ -5,6 +5,7 @@
 
 import tempfile
 import unittest
+import shlex
 import sys
 from unittest import mock
 from pathlib import Path
@@ -565,8 +566,11 @@ class RustActionTests(unittest.TestCase):
                 + ["../foo/lib.rs", "-o", "foo.rlib"]
             )
             self.assertFalse(r.emit_metadata)
+            dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+                new_depfile
+            )
             self.assertEqual(
-                list(r.dep_only_command(new_depfile)),
+                dep_command,
                 [
                     "../tools/rustc",
                     f"--emit=dep-info={new_depfile}",
@@ -577,23 +581,28 @@ class RustActionTests(unittest.TestCase):
                     "foo.rlib",
                 ],
             )
+            self.assertEqual(aux_rspfiles, [])
 
-        r2 = rustc.RustAction(
+    def test_dep_only_command_without_emit(self):
+        new_depfile = "some/where/new-foo.rlib.d.other-2"
+        r = rustc.RustAction(
             ["../tools/rustc", "../foo/lib.rs", "-o", "foo.rlib"]
         )
-        self.assertFalse(r2.emit_metadata)
+        self.assertFalse(r.emit_metadata)
+        dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+            new_depfile
+        )
         self.assertEqual(
-            list(r2.dep_only_command(new_depfile)),
+            dep_command,
             [
                 "../tools/rustc",
                 "../foo/lib.rs",
                 "-o",
                 "foo.rlib",
-                f"--emit=dep-info={new_depfile}",
-                "-Z",
-                "binary-dep-depinfo",
+                # no --emit added. See function documentation for explanation.
             ],
         )
+        self.assertEqual(aux_rspfiles, [])
 
     def test_dep_only_command_with_metadata(self):
         new_depfile = "some/where/new-foo.rlib.d.other"
@@ -619,8 +628,11 @@ class RustActionTests(unittest.TestCase):
                 + ["../foo/lib.rs", "-o", "foo34.rlib"]
             )
             self.assertTrue(r.emit_metadata)
+            dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+                new_depfile
+            )
             self.assertEqual(
-                list(r.dep_only_command(new_depfile)),
+                dep_command,
                 [
                     "../tools/rustc",
                     f"--emit=metadata,dep-info={new_depfile}",
@@ -631,6 +643,7 @@ class RustActionTests(unittest.TestCase):
                     rmeta_output,
                 ],
             )
+            self.assertEqual(aux_rspfiles, [])
 
     def test_dep_only_command_no_metadata_with_externs(self):
         new_depfile = "some/where/new-foo.rlib.d.other"
@@ -643,8 +656,11 @@ class RustActionTests(unittest.TestCase):
             + ["../foo/lib.rs", "-o", "foo35.rlib", "--extern", "extdep"]
         )
         self.assertTrue(r.emit_metadata)
+        dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+            new_depfile
+        )
         self.assertEqual(
-            list(r.dep_only_command(new_depfile)),
+            dep_command,
             [
                 "../tools/rustc",
                 f"--emit=dep-info={new_depfile}",
@@ -657,6 +673,7 @@ class RustActionTests(unittest.TestCase):
                 "extdep",
             ],
         )
+        self.assertEqual(aux_rspfiles, [])
 
     def test_dep_only_command_no_metadata_with_externs(self):
         new_depfile = "some/where/new-foo.rlib.d.other"
@@ -670,8 +687,11 @@ class RustActionTests(unittest.TestCase):
             + ["../foo/lib.rs", "-o", "foo36.rlib", "--extern", "extdep"]
         )
         self.assertTrue(r.emit_metadata)
+        dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+            new_depfile
+        )
         self.assertEqual(
-            list(r.dep_only_command(new_depfile)),
+            dep_command,
             [
                 "../tools/rustc",
                 f"--emit=metadata,dep-info={new_depfile}",
@@ -684,6 +704,7 @@ class RustActionTests(unittest.TestCase):
                 "extdep",
             ],
         )
+        self.assertEqual(aux_rspfiles, [])
 
     def test_dep_only_command_no_metadata_with_extern_rlib(self):
         new_depfile = "some/where/new-foo.rlib.d.other"
@@ -706,7 +727,9 @@ class RustActionTests(unittest.TestCase):
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_rlib_exists:
-            dep_only_command = list(r.dep_only_command(new_depfile))
+            dep_only_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+                new_depfile
+            )
         mock_rlib_exists.assert_called_once_with()
         self.assertEqual(
             dep_only_command,
@@ -722,6 +745,7 @@ class RustActionTests(unittest.TestCase):
                 "extdep=build/extdep.rmeta",  # transformed to .rmeta
             ],
         )
+        self.assertEqual(aux_rspfiles, [])
 
     def test_dep_only_command_no_metadata_with_extern_proc_macro(self):
         new_depfile = "some/where/new-foo.rlib.d.other"
@@ -741,7 +765,9 @@ class RustActionTests(unittest.TestCase):
             ]
         )
         self.assertTrue(r.emit_metadata)
-        dep_only_command = list(r.dep_only_command(new_depfile))
+        dep_only_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
+            new_depfile
+        )
         self.assertEqual(
             dep_only_command,
             [
@@ -756,6 +782,111 @@ class RustActionTests(unittest.TestCase):
                 "extdep=build/extdep.so",  # preserved as .so
             ],
         )
+        self.assertEqual(aux_rspfiles, [])
+
+    def test_dep_only_command_emit_metadata_with_extern_rlib_inside_rspfile(
+        self,
+    ):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        rmeta_output = "foo39.rmeta"
+        emit_opts = ["--emit=link,metadata=unused.rmeta"]
+        extern_opts = [
+            "--extern",
+            "extdep=build/extdep.rlib",
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rspfile = tdp / "compile.rsp"
+            rspfile.write_text(shlex.join(extern_opts) + "\n")
+            r = rustc.RustAction(
+                [
+                    "../tools/rustc",
+                ]
+                + emit_opts
+                + [
+                    "../foo/lib.rs",
+                    "-o",
+                    "foo39.rlib",
+                    "-Zshell-argfiles",
+                    f"@shell:{rspfile}",
+                ]
+            )
+            self.assertTrue(r.emit_metadata)
+            with mock.patch.object(
+                Path, "exists", return_value=True
+            ) as mock_rlib_exists:
+                (
+                    dep_only_command,
+                    aux_rspfiles,
+                ) = r.dep_only_command_with_rspfiles(new_depfile)
+            mock_rlib_exists.assert_called_once_with()
+            # Expect one new rspfile to have been written by transformation.
+            self.assertEqual(len(aux_rspfiles), 1)
+            new_rspfile = aux_rspfiles[0]
+            self.assertEqual(
+                dep_only_command,
+                [
+                    "../tools/rustc",
+                    f"--emit=metadata,dep-info={new_depfile}",
+                    "-Z",
+                    "binary-dep-depinfo",
+                    "../foo/lib.rs",
+                    "-o",
+                    rmeta_output,
+                    "-Zshell-argfiles",
+                    f"@shell:{new_rspfile}",
+                ],
+            )
+            new_externs = new_rspfile.read_text()
+            # Rewritten rspfile references .rmeta instead of .rlib
+            self.assertEqual(
+                new_externs, "--extern extdep=build/extdep.rmeta\n"
+            )
+
+    def test_dep_only_command_emit_metadata_with_empty_rspfile(
+        self,
+    ):
+        new_depfile = "some/where/new-foo.rlib.d.other"
+        rmeta_output = "foo40.rmeta"
+        emit_opts = ["--emit=link,metadata=unused.rmeta"]
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rspfile = tdp / "compile.rsp"
+            rspfile.write_text("")
+            r = rustc.RustAction(
+                [
+                    "../tools/rustc",
+                ]
+                + emit_opts
+                + [
+                    "../foo/lib.rs",
+                    "-o",
+                    "foo40.rlib",
+                    "-Zshell-argfiles",
+                    f"@shell:{rspfile}",
+                ]
+            )
+            self.assertTrue(r.emit_metadata)
+            (
+                dep_only_command,
+                aux_rspfiles,
+            ) = r.dep_only_command_with_rspfiles(new_depfile)
+            # Empty rspfile is left untouched.
+            self.assertEqual(aux_rspfiles, [])
+            self.assertEqual(
+                dep_only_command,
+                [
+                    "../tools/rustc",
+                    f"--emit=metadata,dep-info={new_depfile}",
+                    "-Z",
+                    "binary-dep-depinfo",
+                    "../foo/lib.rs",
+                    "-o",
+                    rmeta_output,
+                    "-Zshell-argfiles",
+                    f"@shell:{rspfile}",
+                ],
+            )
 
 
 if __name__ == "__main__":
