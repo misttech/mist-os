@@ -83,21 +83,45 @@ group("tests") {
   deps = test_targets
 }
 
-group("host_test_component") {
-  testonly = true
-  deps = [ ":host_test_component_runner" ]
-}
-
-# Rename the resulting .pyz for the host tool
+# Copy the resulting .pyz for the host tool
 copy("copy") {
   testonly = true
   deps = [ ":host_test_component_runner" ]
   sources = [ "${target_out_dir}/host_test_component_runner.pyz" ]
-  outputs = [ "${root_out_dir}/host_test_component" ]
+  outputs = [ "${root_out_dir}/host_test_component_runner.pyz" ]
+}
+
+# create a wrapper script to run python archive using prebuilt python.
+action("host_test_component_script") {
+  testonly = true
+  script = "//build/testing/create_test.sh"
+  _script_file = "${root_out_dir}/host_test_component"
+  args = [
+    rebase_path(_script_file, root_build_dir),
+    rebase_path(python_exe_src, root_build_dir),
+    rebase_path("${root_out_dir}/host_test_component_runner.pyz",
+                root_build_dir),
+  ]
+  outputs = [ _script_file ]
+  visibility = [ ":*" ]
+}
+
+group("host_test_component") {
+  testonly = true
+  deps = [
+    ":copy",
+    ":host_test_component_script",
+  ]
 }
 
 host_test_data("test_deps") {
   testonly = true
-  deps = [ ":copy" ]
-  sources = [ "${root_out_dir}/host_test_component" ]
+  deps = [
+    ":copy",
+    ":host_test_component_script",
+  ]
+  sources = [
+    "${root_out_dir}/host_test_component",
+    "${root_out_dir}/host_test_component_runner.pyz",
+  ]
 }
