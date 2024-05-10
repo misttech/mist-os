@@ -10,3 +10,4 @@ target_remove.json
 target_snapshot.json
 target_screenshot.json
 target_show.json
+target_wait.json

@@ -10,3 +10,4 @@ ffx target remove
 ffx target snapshot
 ffx target screenshot
 ffx target show
+ffx target wait
