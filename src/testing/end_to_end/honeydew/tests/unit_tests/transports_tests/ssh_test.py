@@ -64,18 +64,36 @@ class SshTests(unittest.TestCase):
 
         self.ffx_obj = mock.MagicMock(spec=ffx.FFX)
 
-        self.ssh_obj_wo_ip = ssh.SSH(
-            device_name=_INPUT_ARGS["device_name"],
-            private_key=_INPUT_ARGS["ssh_private_key"],
-            ffx_transport=self.ffx_obj,
-        )
+        with (
+            mock.patch.object(
+                ssh.SSH,
+                "check_connection",
+                autospec=True,
+            ) as mock_ssh_check_connection,
+        ):
+            self.ssh_obj_wo_ip = ssh.SSH(
+                device_name=_INPUT_ARGS["device_name"],
+                private_key=_INPUT_ARGS["ssh_private_key"],
+                ffx_transport=self.ffx_obj,
+            )
+        mock_ssh_check_connection.assert_called()
 
-        self.ssh_obj_with_ip = ssh.SSH(
-            device_name=_INPUT_ARGS["device_name"],
-            private_key=_INPUT_ARGS["ssh_private_key"],
-            ip_port=_INPUT_ARGS["device_ssh_ipv4_no_port"],
-            ffx_transport=self.ffx_obj,
-        )
+        mock_ssh_check_connection.reset_mock()
+
+        with (
+            mock.patch.object(
+                ssh.SSH,
+                "check_connection",
+                autospec=True,
+            ) as mock_ssh_check_connection,
+        ):
+            self.ssh_obj_with_ip = ssh.SSH(
+                device_name=_INPUT_ARGS["device_name"],
+                private_key=_INPUT_ARGS["ssh_private_key"],
+                ip_port=_INPUT_ARGS["device_ssh_ipv4_no_port"],
+                ffx_transport=self.ffx_obj,
+            )
+        mock_ssh_check_connection.assert_called()
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(

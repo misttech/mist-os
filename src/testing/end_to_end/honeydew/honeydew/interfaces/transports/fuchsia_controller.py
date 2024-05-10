@@ -22,11 +22,10 @@ class FuchsiaController(abc.ABC):
 
     @abc.abstractmethod
     def create_context(self) -> None:
-        """Creates the fuchsia-controller context and waits for the target to
-        be ready.
+        """Creates the fuchsia-controller context.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            errors.FuchsiaControllerError: Failed to create FuchsiaController Context.
             errors.FuchsiaControllerConnectionError: If target is not ready.
         """
 
@@ -58,4 +57,15 @@ class FuchsiaController(abc.ABC):
 
         Returns:
             FIDL channel to proxy.
+        """
+
+    @abc.abstractmethod
+    def add_target(
+        self,
+    ) -> None:
+        """Adds a target to the ffx daemon manually and wait for the target to
+           connect to RCS.
+
+        Raises:
+            errors.FuchsiaControllerError: Failed to add target
         """

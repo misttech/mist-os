@@ -303,7 +303,7 @@ class FuchsiaDevice(
         ) = fuchsia_controller_transport.FuchsiaController(
             device_name=self.device_name,
             device_ip=self._ip_address,
-            ffx_transport=self.ffx,
+            config=self._ffx_config,
         )
         return fuchsia_controller_obj
 
@@ -465,6 +465,8 @@ class FuchsiaDevice(
         """
         if self._ssh_private_key:
             self.ssh.check_connection()
+
+        # Note - FFX need to be invoked first before FC as FC depends on the daemon that will be created by FFX
         self.ffx.check_connection()
         self.fuchsia_controller.check_connection()
 

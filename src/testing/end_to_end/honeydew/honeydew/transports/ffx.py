@@ -43,6 +43,10 @@ _FFX_CONFIG_CMDS: dict[str, list[str]] = {
         "set",
         "ffx.subtool-search-paths",
     ],
+    "DAEMON_ECHO": [
+        "daemon",
+        "echo",
+    ],
 }
 
 _FFX_CMDS: dict[str, list[str]] = {
@@ -129,6 +133,8 @@ class FfxConfig:
             self._run(
                 _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"] + [self.subtools_search_path]
             )
+
+        self._run(_FFX_CONFIG_CMDS["DAEMON_ECHO"])
 
         self._setup_done = True
 
@@ -221,10 +227,16 @@ class FFX(ffx_interface.FFX):
 
     Args:
         target_name: Fuchsia device name.
+        config: Configuration associated with FFX and FFX daemon.
         target_ip_port: Fuchsia device IP address and port.
 
         Note: When target_ip is provided, it will be used instead of target_name
         while running ffx commands (ex: `ffx -t <target_ip> <command>`).
+
+    Raises:
+        errors.FfxConnectionError: In case of failed to check FFX connection.
+        errors.FfxTimeoutError: In case of FFX commands timeout.
+        errors.FfxCommandError: In case of failure.
     """
 
     def __init__(
@@ -255,6 +267,10 @@ class FFX(ffx_interface.FFX):
             self._target = self._target_ip_port.ip
         else:
             self._target = self._target_name
+
+        if self._target_ip_port:
+            self.add_target()
+        self.check_connection()
 
     @properties.PersistentProperty
     def config(self) -> custom_types.FFXConfig:

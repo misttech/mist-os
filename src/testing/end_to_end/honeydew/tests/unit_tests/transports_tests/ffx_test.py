@@ -341,15 +341,40 @@ class FfxTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.ffx_obj_with_ip = ffx.FFX(
-            target_name=_INPUT_ARGS["target_name"],
-            target_ip_port=_INPUT_ARGS["target_ip_port"],
-            config=_INPUT_ARGS["ffx_config"],
-        )
-        self.ffx_obj_wo_ip = ffx.FFX(
-            target_name=_INPUT_ARGS["target_name"],
-            config=_INPUT_ARGS["ffx_config"],
-        )
+        with (
+            mock.patch.object(
+                ffx.FFX,
+                "check_connection",
+                autospec=True,
+            ) as mock_ffx_check_connection,
+        ):
+            self.ffx_obj_wo_ip = ffx.FFX(
+                target_name=_INPUT_ARGS["target_name"],
+                config=_INPUT_ARGS["ffx_config"],
+            )
+        mock_ffx_check_connection.assert_called()
+
+        mock_ffx_check_connection.reset_mock()
+
+        with (
+            mock.patch.object(
+                ffx.FFX,
+                "check_connection",
+                autospec=True,
+            ) as mock_ffx_check_connection,
+            mock.patch.object(
+                ffx.FFX,
+                "add_target",
+                autospec=True,
+            ) as mock_ffx_add_target,
+        ):
+            self.ffx_obj_with_ip = ffx.FFX(
+                target_name=_INPUT_ARGS["target_name"],
+                target_ip_port=_INPUT_ARGS["target_ip_port"],
+                config=_INPUT_ARGS["ffx_config"],
+            )
+        mock_ffx_check_connection.assert_called()
+        mock_ffx_add_target.assert_called()
 
     def test_ffx_init_with_ip_as_target_name(self) -> None:
         """Test case for ffx.FFX() when called with target_name=<ip>."""

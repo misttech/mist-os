@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.__init__.py."""
 
-import subprocess
 import unittest
 from typing import Any
 from unittest import mock
@@ -46,13 +45,13 @@ class InitTests(unittest.TestCase):
         "check_connection",
         autospec=True,
     )
+    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
+    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
         "check_connection",
         autospec=True,
     )
-    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
-    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
     @mock.patch("fuchsia_controller_py.Context", autospec=True)
     def test_create_device_return_fc_device(
         self,
@@ -83,34 +82,40 @@ class InitTests(unittest.TestCase):
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
             target="fuchsia-emulator",
         )
+        mock_fc_check_connection.assert_called()
 
-        mock_ssh_check_connection.assert_called()
         mock_ffx_check_connection.assert_called()
 
-        mock_fc_check_connection.assert_called()
+        mock_ssh_check_connection.assert_called()
 
         mock_sl4f_check_connection.assert_not_called()
 
+    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
+    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "add_target",
+        autospec=True,
+    )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
         "check_connection",
         autospec=True,
     )
-    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
-    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
-    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     @mock.patch.object(
-        honeydew.ffx.FFX,
+        fuchsia_controller_transport.FuchsiaController,
         "add_target",
         autospec=True,
     )
+    @mock.patch("fuchsia_controller_py.Context", autospec=True)
     def test_create_device_using_device_ip_port(
         self,
-        mock_ffx_add_target: mock.Mock,
         mock_fc_context: mock.Mock,
-        mock_ssh_check_connection: mock.Mock,
-        mock_ffx_check_connection: mock.Mock,
+        mock_fc_add_target: mock.Mock,
         mock_fc_check_connection: mock.Mock,
+        mock_ffx_add_target: mock.Mock,
+        mock_ffx_check_connection: mock.Mock,
+        mock_ssh_check_connection: mock.Mock,
     ) -> None:
         """Test case for honeydew.create_device() where it returns a device
         from an IpPort."""
@@ -136,38 +141,25 @@ class InitTests(unittest.TestCase):
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
             target="::1",
         )
-
-        mock_ffx_add_target.assert_called()
-
-        mock_ssh_check_connection.assert_called()
-        mock_ffx_check_connection.assert_called()
-
+        mock_fc_add_target.assert_called()
         mock_fc_check_connection.assert_called()
 
+        mock_ffx_add_target.assert_called()
+        mock_ffx_check_connection.assert_called()
+
+        mock_ssh_check_connection.assert_called()
+
     @mock.patch.object(
-        fuchsia_controller_transport.FuchsiaController,
-        "check_connection",
+        fc_fuchsia_device.FuchsiaDevice,
+        "__init__",
+        side_effect=errors.FuchsiaControllerConnectionError("Error"),
         autospec=True,
     )
-    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
-    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
-    @mock.patch("fuchsia_controller_py.Context", autospec=True)
-    @mock.patch.object(
-        honeydew.ffx.FFX,
-        "add_target",
-        side_effect=subprocess.TimeoutExpired(cmd="foo", timeout=10),
-        autospec=True,
-    )
-    def test_create_device_using_device_ip_port_throws_on_add_error(
+    def test_create_device_using_device_ip_port_throws_error(
         self,
-        mock_ffx_add_target: mock.Mock,
-        mock_fc_context: mock.Mock,
-        mock_ssh_check_connection: mock.Mock,
-        mock_ffx_check_connection: mock.Mock,
-        mock_fc_check_connection: mock.Mock,
+        mock_fc_fuchsia_device: mock.Mock,
     ) -> None:
-        """Test case for honeydew.create_device() where it raises an error due
-        to an exception in add_target."""
+        """Test case for honeydew.create_device() where it raises an error."""
         with self.assertRaises(errors.FuchsiaDeviceError):
             honeydew.create_device(
                 device_name="fuchsia-1234",
@@ -179,11 +171,7 @@ class InitTests(unittest.TestCase):
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 
-        mock_ffx_add_target.assert_called()
-        mock_ffx_check_connection.assert_not_called()
-        mock_ssh_check_connection.assert_not_called()
-        mock_fc_context.assert_not_called()
-        mock_fc_check_connection.assert_not_called()
+        mock_fc_fuchsia_device.assert_called()
 
 
 if __name__ == "__main__":
