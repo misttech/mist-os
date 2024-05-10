@@ -35,4 +35,20 @@ declare_args() {
   # platform-version-roller when the API level is incremented.
   include_next_api_level = bump_api_level
   api_compatibility_testing = !bump_api_level
+
+  # Valid values are either false (Default), or a list contains only `supported`
+  # or `in development` API levels listed in //sdk/version_history.json file.
+  # By default, all supported and in development API levels defined in
+  # //sdk/version_history.json will be built. If you only want to build
+  # artifacts targeting API level PLATFORM, override this with `[]`.
+  #
+  # This will help reduce the overall build time of any product/driver that uses
+  # Bazel SDK, or final_fuchsia_idk. For example, a vim3 build can be shorten
+  # from 16 mins to 10 mins.
+  override_build_time_supported_api_levels = false
+}
+
+if (override_build_time_supported_api_levels != false) {
+  platform_version.build_time_supported_api_levels =
+      override_build_time_supported_api_levels
 }
