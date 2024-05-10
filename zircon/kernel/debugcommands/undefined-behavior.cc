@@ -29,6 +29,31 @@ T Launder(T x) {
   return x;
 }
 
+void array_oob() {
+  // Out of bounds array indexing, in cases where the array bound can be
+  // statically determined
+  uint32_t buf[] = {0, 1, 2};
+  size_t index = Launder(3);
+
+  printf("array read out of bounds: buf[%zu]\n", index);
+  uint32_t val = buf[index];
+  printf("result: %u\n", val);
+}
+
+void invalid_builtin_clz() {
+  int zero = Launder(0);
+  printf("__builtin_clz(0)\n");
+  int result = __builtin_clz(zero);
+  printf("result: %d\n", result);
+}
+
+void invalid_builtin_ctz() {
+  int zero = Launder(0);
+  printf("__builtin_ctz(0)\n");
+  int result = __builtin_ctz(zero);
+  printf("result: %d\n", result);
+}
+
 void overflow_signed_int_add() {
   // Signed integer overflow, where the result of a signed integer computation
   // cannot be represented in its type.
@@ -38,6 +63,20 @@ void overflow_signed_int_add() {
   printf("integer overflow: %d + %d\n", x, y);
   int32_t res = x + y;
   printf("result: %d\n", res);
+}
+
+[[gnu::returns_nonnull]] void* nonnull_return_helper() { return Launder<void*>(nullptr); }
+
+void nonnull_return() {
+  printf("function declared [[gnu::returns_nonnull]] returns nullptr\n");
+  printf("result: %p\n", nonnull_return_helper());
+}
+
+void* _Nonnull nullability_return_helper() { return Launder<void*>(nullptr); }
+
+void nullability_return() {
+  printf("function declared `T* _Nonnull` returns nullptr\n");
+  printf("result: %p\n", nullability_return_helper());
 }
 
 void overflow_signed_int_shift() {
@@ -83,17 +122,6 @@ void unaligned_assumption() {
   printf("assuming that %p is aligned to 256 bytes.\n", addr);
   uint32_t* __attribute__((align_value(256))) p = addr;
   printf("p: %x\n", *p);
-}
-
-void array_oob() {
-  // Out of bounds array indexing, in cases where the array bound can be
-  // statically determined
-  uint32_t buf[] = {0, 1, 2};
-  size_t index = Launder(3);
-
-  printf("array read out of bounds: buf[%zu]\n", index);
-  uint32_t val = buf[index];
-  printf("result: %u\n", val);
 }
 
 void undefined_bool() {
@@ -146,7 +174,11 @@ STATIC_COMMAND_END(mem)
 static int cmd_usage(const char* cmd_name) {
   printf("usage:\n");
   printf("%s array_oob                : array out of bounds access\n", cmd_name);
+  printf("%s invalid_builtin_clz      : call __builtin_clz with 0\n", cmd_name);
+  printf("%s invalid_builtin_ctz      : call __builtin_ctz with 0\n", cmd_name);
   printf("%s misaligned_ptr           : use a misaligned pointer\n", cmd_name);
+  printf("%s nonnull_return           : return nullptr from returns_nonnull function\n", cmd_name);
+  printf("%s nullability_return       : return nullptr from _Nonnull function\n", cmd_name);
   printf("%s overflow_ptr             : pointer arithmetic that overflows\n", cmd_name);
   printf("%s overflow_signed_int_add  : signed integer addition that overflows\n", cmd_name);
   printf("%s overflow_signed_int_shift: signed integer shift that overflows\n", cmd_name);
@@ -167,8 +199,16 @@ static int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
 
   if (!strcmp(argv[1].str, "array_oob")) {
     array_oob();
+  } else if (!strcmp(argv[1].str, "invalid_builtin_clz")) {
+    invalid_builtin_clz();
+  } else if (!strcmp(argv[1].str, "invalid_builtin_ctz")) {
+    invalid_builtin_ctz();
   } else if (!strcmp(argv[1].str, "misaligned_ptr")) {
     misaligned_ptr();
+  } else if (!strcmp(argv[1].str, "nonnull_return")) {
+    nonnull_return();
+  } else if (!strcmp(argv[1].str, "nullability_return")) {
+    nullability_return();
   } else if (!strcmp(argv[1].str, "overflow_ptr")) {
     overflow_ptr();
   } else if (!strcmp(argv[1].str, "overflow_signed_int_add")) {

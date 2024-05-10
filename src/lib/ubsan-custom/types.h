@@ -181,6 +181,20 @@ struct PointerOverflowData {
   SourceLocation Loc;
 };
 
+enum BuiltinCheckKind : uint8_t {
+  BCK_CTZPassedZero,
+  BCK_CLZPassedZero,
+};
+
+struct InvalidBuiltinData {
+  SourceLocation Loc;
+  BuiltinCheckKind Kind;
+};
+
+struct NonNullReturnData {
+  SourceLocation AttrLoc;
+};
+
 }  // namespace ubsan
 
 #endif  // SRC_LIB_UBSAN_CUSTOM_TYPES_H_

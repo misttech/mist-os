@@ -35,6 +35,23 @@ inline void PrintTypeDescriptor(const TypeDescriptor& type, const char* prefix =
          prefix ? ":" : "", type.TypeKind, type.TypeInfo, type.TypeName);
 }
 
+// This is a helper used below.  It's always inlined so that Report is
+// constructed in the frame of the actual handler entrypoint and records as its
+// caller PC the call site in the failing instrumented code.
+[[gnu::always_inline]] void HandleNonnullReturn(NonNullReturnData& data, SourceLocation& loc,
+                                                const char* annotation) {
+  Report failure{
+      "null pointer returned from function declared to never return null",
+      loc,
+  };
+  if (data.AttrLoc.column == 0) {
+    Printf("%s:%u: %s specified here\n", data.AttrLoc.filename, data.AttrLoc.line, annotation);
+  } else {
+    Printf("%s:%u:%u: %s specified here\n", data.AttrLoc.filename, data.AttrLoc.line,
+           data.AttrLoc.column, annotation);
+  }
+}
+
 // All the runtime handlers have unmangled C-style external linkage names.
 extern "C" {
 
@@ -168,10 +185,21 @@ UBSAN_HANDLER __ubsan_handle_alignment_assumption(AlignmentAssumptionData* Data,
   Printf("Offset: 0x%016lx\n", Offset);
 }
 
+UBSAN_HANDLER __ubsan_handle_invalid_builtin(InvalidBuiltinData& Data) {
+  Report failure("invalid builtin use", Data.Loc);
+  Printf("passing zero to %s, which is not a valid argument\n",
+         Data.Kind == BCK_CTZPassedZero ? "ctz()" : "clz()");
+}
+
+UBSAN_HANDLER __ubsan_handle_nonnull_return_v1(NonNullReturnData& Data, SourceLocation& Loc) {
+  HandleNonnullReturn(Data, Loc, "returns_nonnull attribute");
+}
+
+UBSAN_HANDLER __ubsan_handle_nullability_return_v1(NonNullReturnData& Data, SourceLocation& Loc) {
+  HandleNonnullReturn(Data, Loc, "_Nonnull return type annotation");
+}
+
 // TODO(https://fxbug.dev/42056251): Add missing handlers:
-// * invalid_builtin
-// * nonnull_return_v1
-// * nullability_return_v1
 // * nullability_arg
 // * cfi_check_fail
 // * cfi_bad_type
