@@ -10,7 +10,7 @@
 /// related types. It has two blanket implementations: `()` for identity
 /// conversions, i.e. `Input=Output`, and [`UninstantiableConverter`] as an
 /// uninstantiable type that implements the trait for any input and output.
-pub(crate) trait BidirectionalConverter<Input, Output> {
+pub trait BidirectionalConverter<Input, Output> {
     /// Converts an instance of `Input` into an instance of `Output`.
     fn convert(&self, a: Input) -> Output;
 

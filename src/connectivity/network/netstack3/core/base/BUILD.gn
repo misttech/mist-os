@@ -12,6 +12,7 @@ rustc_library_with_features("netstack3-base") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
     "src/context.rs",
+    "src/convert.rs",
     "src/counters.rs",
     "src/data_structures.rs",
     "src/data_structures/ref_counted_hash_map.rs",
@@ -33,6 +34,7 @@ rustc_library_with_features("netstack3-base") {
     "src/time/local_timer_heap.rs",
     "src/time/testutil.rs",
     "src/trace.rs",
+    "src/work_queue.rs",
   ]
   deps = [
     "//src/connectivity/lib/net-types",

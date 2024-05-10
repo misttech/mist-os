@@ -82,6 +82,7 @@ use crate::{
         },
         udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     },
+    types::WorkQueueReport,
     BindingsContext, BindingsTypes,
 };
 
@@ -404,8 +405,8 @@ impl<'a> TestApi<'a, FakeBindingsCtx> {
             for id in rx_available.into_iter() {
                 loop {
                     match self.core_api().receive_queue().handle_queued_frames(&id) {
-                        crate::work_queue::WorkQueueReport::AllDone => break,
-                        crate::work_queue::WorkQueueReport::Pending => (),
+                        WorkQueueReport::AllDone => break,
+                        WorkQueueReport::Pending => (),
                     }
                 }
             }

@@ -24,7 +24,7 @@ use crate::{
         socket::DeviceSocketHandler,
         Device, DeviceIdContext, DeviceSendFrameError,
     },
-    work_queue::WorkQueueReport,
+    types::WorkQueueReport,
 };
 
 /// An API to interact with device `D` transmit queues.

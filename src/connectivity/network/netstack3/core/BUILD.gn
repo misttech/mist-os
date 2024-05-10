@@ -38,7 +38,6 @@ rustc_library_with_features("netstack3-core") {
     "src/api.rs",
     "src/benchmarks.rs",
     "src/context.rs",
-    "src/convert.rs",
     "src/counters.rs",
     "src/data_structures.rs",
     "src/data_structures/socketmap.rs",
@@ -115,7 +114,6 @@ rustc_library_with_features("netstack3-core") {
     "src/transport/tcp/state.rs",
     "src/transport/udp.rs",
     "src/uninstantiable.rs",
-    "src/work_queue.rs",
   ]
   deps = [
     # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):

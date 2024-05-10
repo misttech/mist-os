@@ -14,6 +14,7 @@ extern crate fakealloc as alloc;
 extern crate fakestd as std;
 
 mod context;
+mod convert;
 mod counters;
 mod data_structures;
 mod error;
@@ -24,8 +25,10 @@ mod resource_references;
 mod rng;
 mod time;
 mod trace;
+mod work_queue;
 
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
+pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use error::{
     AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
@@ -45,6 +48,7 @@ pub use time::{
     TimerBindingsTypes, TimerContext, TimerHandler,
 };
 pub use trace::TracingContext;
+pub use work_queue::WorkQueueReport;
 
 /// Reference counted hash map data structure.
 pub mod ref_counted_hash_map {

@@ -933,7 +933,7 @@ mod tests {
         testutil::{
             CtxPairExt as _, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        work_queue::WorkQueueReport,
+        types::WorkQueueReport,
     };
 
     #[test]

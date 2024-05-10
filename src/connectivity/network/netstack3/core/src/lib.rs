@@ -28,7 +28,6 @@ extern crate fakestd as std;
 mod algorithm;
 mod api;
 mod context;
-mod convert;
 mod counters;
 mod data_structures;
 mod lock_ordering;
@@ -37,12 +36,15 @@ mod state;
 mod time;
 mod transport;
 mod uninstantiable;
-mod work_queue;
 
 #[cfg(test)]
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
+
+pub(crate) mod convert {
+    pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
+}
 
 /// The device layer.
 pub mod device {
@@ -253,7 +255,7 @@ pub mod tcp {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use crate::work_queue::WorkQueueReport;
+    pub use netstack3_base::WorkQueueReport;
 }
 
 /// Methods for dealing with UDP sockets.

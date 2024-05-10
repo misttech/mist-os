@@ -172,7 +172,7 @@ mod tests {
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
             queue::{api::ReceiveQueueApi, MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN},
         },
-        work_queue::WorkQueueReport,
+        types::WorkQueueReport,
     };
 
     #[derive(Default)]

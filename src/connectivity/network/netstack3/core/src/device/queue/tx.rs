@@ -254,7 +254,7 @@ mod tests {
             queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
             socket::{EthernetFrame, Frame},
         },
-        work_queue::WorkQueueReport,
+        types::WorkQueueReport,
     };
 
     #[derive(Default)]
