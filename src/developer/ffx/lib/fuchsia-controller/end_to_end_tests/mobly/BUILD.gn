@@ -10,6 +10,7 @@ assert(is_host)
 group("fuchsia_controller_tests") {
   testonly = true
   deps = [
+    ":echo_stress_test",
     ":nuc_target_identity_tests",
     ":reboot_test",
     ":tracing_test",
@@ -20,7 +21,7 @@ group("fuchsia_controller_tests") {
 
 group("fuchsia_controller_tests_staging") {
   testonly = true
-  deps = [ ":echo_stress_test" ]
+  deps = []
 }
 
 target_identity_deps = [
