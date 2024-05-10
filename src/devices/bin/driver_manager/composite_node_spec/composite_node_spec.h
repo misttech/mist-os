@@ -20,7 +20,7 @@ using RemoveCompositeNodeCallback = fit::callback<void(zx::result<>)>;
 
 struct CompositeNodeSpecCreateInfo {
   std::string name;
-  size_t size;
+  std::vector<fuchsia_driver_framework::ParentSpec> parents;
 };
 
 // This partially abstract class represents a composite node spec and is responsible for managing
@@ -47,8 +47,12 @@ class CompositeNodeSpec {
   // rebind.
   void Remove(RemoveCompositeNodeCallback callback);
 
+  const std::vector<fuchsia_driver_framework::ParentSpec>& parent_specs() const {
+    return parent_specs_;
+  }
+
   // Exposed for testing.
-  const std::vector<std::optional<DeviceOrNode>>& parent_specs() const { return parent_specs_; }
+  const std::vector<std::optional<DeviceOrNode>>& parent_nodes() const { return parent_nodes_; }
 
   const std::string& name() const { return name_; }
 
@@ -66,11 +70,12 @@ class CompositeNodeSpec {
   // composite node and unmatch all of the parents from it.
   virtual void RemoveImpl(RemoveCompositeNodeCallback callback) = 0;
 
-  size_t size() const { return parent_specs_.size(); }
+  size_t size() const { return parent_nodes_.size(); }
 
  private:
   std::string name_;
-  std::vector<std::optional<DeviceOrNode>> parent_specs_;
+  std::vector<std::optional<DeviceOrNode>> parent_nodes_;
+  std::vector<fuchsia_driver_framework::ParentSpec> parent_specs_;
 };
 
 }  // namespace driver_manager

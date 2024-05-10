@@ -16,10 +16,11 @@ class CompositeNodeSpecV2Test : public DriverManagerTestBase {
   driver_manager::NodeManager* GetNodeManager() override { return &node_manager; }
 
   driver_manager::CompositeNodeSpecV2 CreateCompositeNodeSpec(std::string name, size_t size) {
+    std::vector<fuchsia_driver_framework::ParentSpec> parents(size);
     return driver_manager::CompositeNodeSpecV2(
         driver_manager::CompositeNodeSpecCreateInfo{
-            .name = name,
-            .size = size,
+            .name = std::move(name),
+            .parents = std::move(parents),
         },
         dispatcher(), &node_manager);
   }

@@ -26,7 +26,6 @@
 #include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
-#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -277,7 +276,7 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
   auto spec = std::make_unique<CompositeNodeSpecV2>(
       CompositeNodeSpecCreateInfo{
           .name = std::string(request->name().get()),
-          .size = request->parents().count(),
+          .parents = fidl::ToNatural(request->parents()).value(),
       },
       dispatcher_, this);
   completer.Reply(composite_node_spec_manager_.AddSpec(*request, std::move(spec)));

@@ -39,12 +39,11 @@ constexpr bool kEnableCompositeNodeSpecRebind = false;
 // Return a clone of `node_properties`. The data referenced by the clone is owned by `arena`.
 std::vector<fuchsia_driver_framework::wire::NodeProperty> CloneNodeProperties(
     fidl::AnyArena& arena,
-    cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> node_properties) {
+    const std::vector<::fuchsia_driver_framework::NodeProperty>& node_properties) {
   std::vector<fuchsia_driver_framework::wire::NodeProperty> clone;
   clone.reserve(node_properties.size());
   for (const auto& node_property : node_properties) {
-    auto natural = fidl::ToNatural(node_property);
-    clone.emplace_back(fidl::ToWire(arena, natural));
+    clone.emplace_back(fidl::ToWire(arena, node_property));
   }
   return clone;
 }
@@ -52,28 +51,16 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CloneNodeProperties(
 // Return a clone of the node properties of `parents`. The data referenced by the clone is owned by
 // `arena`.
 std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> GetParentNodePropertyEntries(
-    fidl::AnyArena& arena, cpp20::span<const std::weak_ptr<Node>> parents) {
+    fidl::AnyArena& arena,
+    const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties) {
   std::vector<fuchsia_driver_framework::wire::NodePropertyEntry> entries;
-  for (const auto& weak_parent : parents) {
-    const auto parent = weak_parent.lock();
-    if (!parent) {
-      continue;
-    }
-    std::vector<fuchsia_driver_framework::wire::NodeProperty> parent_properties_clone;
-
-    // Composite node's "default" node properties are its primary parent's node properties which
-    // should not be used.
-    if (parent->type() == NodeType::kNormal) {
-      auto parent_properties = parent->GetNodeProperties();
-      if (parent_properties.has_value()) {
-        parent_properties_clone = CloneNodeProperties(arena, parent_properties.value());
-      }
-    }
+  for (const auto& parent : parent_properties) {
+    std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_clone =
+        CloneNodeProperties(arena, parent.properties());
 
     entries.emplace_back(fuchsia_driver_framework::wire::NodePropertyEntry{
-        .name = fidl::StringView(arena, parent->name()),
-        .properties =
-            fuchsia_driver_framework::wire::NodePropertyVector(arena, parent_properties_clone)});
+        .name = fidl::StringView(arena, parent.name()),
+        .properties = fuchsia_driver_framework::wire::NodePropertyVector(arena, properties_clone)});
   }
   return entries;
 }
@@ -335,10 +322,18 @@ Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
     std::vector<std::string> parents_names,
-    cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> properties,
+    const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
     NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
     uint32_t primary_index) {
   ZX_ASSERT(!parents.empty());
+
+  if (parents.size() != parent_properties.size()) {
+    LOGF(ERROR,
+         "Missing parent properties. Expected %d entries, equal to the number of parents %d.",
+         parents.size(), parent_properties.size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   if (primary_index >= parents.size()) {
     LOGF(ERROR, "Primary node index is out of bounds");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -356,11 +351,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
       is_legacy ? NodeType::kLegacyComposite : NodeType::kComposite);
   composite->parents_names_ = std::move(parents_names);
 
-  if (!properties.empty()) {
-    LOGF(ERROR, "Composite nodes cannot have properties");
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-  composite->SetCompositeParentProperties();
+  composite->SetCompositeParentProperties(parent_properties);
   composite->SetAndPublishInspect();
 
   Node* primary = composite->GetPrimaryParent();
@@ -724,8 +715,9 @@ void Node::SetNonCompositeProperties(
   SynchronizePropertiesDict();
 }
 
-void Node::SetCompositeParentProperties() {
-  auto entries = GetParentNodePropertyEntries(arena_, parents_);
+void Node::SetCompositeParentProperties(
+    const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties) {
+  auto entries = GetParentNodePropertyEntries(arena_, parent_properties);
 
   ZX_ASSERT(primary_index_ < parents_.size());
   const auto default_node_properties = entries[primary_index_].properties.get();

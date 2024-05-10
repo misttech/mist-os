@@ -5,7 +5,10 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_PARENT_SET_COLLECTOR_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_PARENT_SET_COLLECTOR_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
+
+#include <vector>
 
 #include "src/devices/bin/driver_manager/node.h"
 
@@ -21,12 +24,15 @@ class ParentSetCollector {
       : composite_name_(std::move(composite_name)),
         parents_(parent_names.size()),
         parent_names_(std::move(parent_names)),
+        parent_properties_(parent_names_.size()),
         primary_index_(primary_index) {}
 
   // Add a node to the parent set at the specified index.
   // Caller should check that |ContainsNode| is false for the index before calling this.
   // Only a weak_ptr of the node is stored by this class (until collection in GetIfComplete).
-  zx::result<> AddNode(uint32_t index, std::weak_ptr<Node> node);
+  zx::result<> AddNode(uint32_t index,
+                       const std::vector<fuchsia_driver_framework::NodeProperty>& node_properties,
+                       std::weak_ptr<Node> node);
 
   // Check if all parents are found. If so, then create and return the composite node. If the
   // node is already created, return ZX_ERR_ALREADY_EXISTS.
@@ -51,6 +57,8 @@ class ParentSetCollector {
   std::vector<std::weak_ptr<Node>> parents_;
 
   std::vector<std::string> parent_names_;
+
+  std::vector<fuchsia_driver_framework::NodePropertyEntry> parent_properties_;
 
   uint32_t primary_index_;
 

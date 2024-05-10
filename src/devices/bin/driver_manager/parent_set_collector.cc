@@ -4,16 +4,25 @@
 
 #include "src/devices/bin/driver_manager/parent_set_collector.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+
 #include "src/devices/lib/log/log.h"
 
 namespace driver_manager {
 
-zx::result<> ParentSetCollector::AddNode(uint32_t index, std::weak_ptr<Node> node) {
+zx::result<> ParentSetCollector::AddNode(
+    uint32_t index, const std::vector<fuchsia_driver_framework::NodeProperty>& node_properties,
+    std::weak_ptr<Node> node) {
   ZX_ASSERT(index < parents_.size());
+
   if (!parents_[index].expired()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
   parents_[index] = std::move(node);
+
+  parent_properties_[index] =
+      fuchsia_driver_framework::NodePropertyEntry(parent_names_[index], node_properties);
+
   return zx::ok();
 }
 
@@ -31,8 +40,8 @@ zx::result<std::shared_ptr<Node>> ParentSetCollector::TryToAssemble(
   }
 
   auto result =
-      Node::CreateCompositeNode(composite_name_, parents_, parent_names_, {}, node_manager,
-                                dispatcher, /* is_legacy */ false, primary_index_);
+      Node::CreateCompositeNode(composite_name_, parents_, parent_names_, parent_properties_,
+                                node_manager, dispatcher, /* is_legacy */ false, primary_index_);
   if (result.is_error()) {
     return result.take_error();
   }
