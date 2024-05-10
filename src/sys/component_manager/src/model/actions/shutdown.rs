@@ -637,6 +637,7 @@ fn get_dependency_from_offer(
             target,
             ..
         })
+        | OfferDecl::Service(OfferServiceDecl { source, target, .. })
         | OfferDecl::Config(OfferConfigurationDecl { source, target, .. })
         | OfferDecl::Runner(OfferRunnerDecl { source, target, .. })
         | OfferDecl::Resolver(OfferResolverDecl { source, target, .. })
@@ -648,11 +649,6 @@ fn get_dependency_from_offer(
             ..
         }) => Some((
             find_offer_sources(offer_decl, instance, source),
-            find_offer_targets(instance, target),
-        )),
-
-        OfferDecl::Service(OfferServiceDecl { source, target, .. }) => Some((
-            find_service_offer_sources(offer_decl, instance, source),
             find_offer_targets(instance, target),
         )),
 
@@ -675,33 +671,6 @@ fn get_dependency_from_offer(
             // Event streams aren't tracked as dependencies for shutdown.
             None
         }
-    }
-}
-
-fn find_service_offer_sources(
-    offer: &OfferDecl,
-    instance: &impl Component,
-    source: &OfferSource,
-) -> Vec<ComponentRef> {
-    // if the offer source is a collection, collect all children in the
-    // collection, otherwise defer to the "regular" method for this
-    match source {
-        OfferSource::Collection(collection_name) => instance
-            .children()
-            .into_iter()
-            .filter_map(|child| {
-                if let Some(child_collection) = child.moniker.collection() {
-                    if child_collection == collection_name {
-                        Some(child.moniker.clone().into())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect(),
-        _ => find_offer_sources(offer, instance, source),
     }
 }
 
@@ -737,11 +706,21 @@ fn find_offer_sources(
                 vec![ComponentRef::Self_]
             }
         }
-        OfferSource::Collection(_) => {
-            // TODO(https://fxbug.dev/42165590): Consider services routed from collections
-            // in shutdown order.
-            vec![]
-        }
+        OfferSource::Collection(collection_name) => instance
+            .children()
+            .into_iter()
+            .filter_map(|child| {
+                if let Some(child_collection) = child.moniker.collection() {
+                    if child_collection == collection_name {
+                        Some(child.moniker.clone().into())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect(),
         OfferSource::Parent | OfferSource::Framework => {
             // Capabilities offered by the parent or provided by the framework
             // (based on some other capability) are not relevant.

@@ -46,6 +46,7 @@ use {
     async_utils::async_once::Once,
     clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
+    cm_fidl_validator::error::Error as ValidatorError,
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName},
     cm_rust::{
@@ -55,7 +56,7 @@ use {
     cm_types::Name,
     config_encoder::ConfigFields,
     errors::{
-        AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicOfferError,
+        AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
         OpenOutgoingDirError, ResolveActionError, StopError,
     },
     fidl::endpoints::ServerEnd,
@@ -906,7 +907,7 @@ impl ResolvedInstanceState {
         mut dynamic_offers: Vec<fdecl::Offer>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-    ) -> Result<Vec<fdecl::Offer>, DynamicOfferError> {
+    ) -> Result<Vec<fdecl::Offer>, DynamicCapabilityError> {
         for offer in dynamic_offers.iter_mut() {
             match offer {
                 fdecl::Offer::Service(fdecl::OfferService { target, .. })
@@ -918,7 +919,7 @@ impl ResolvedInstanceState {
                 | fdecl::Offer::Config(fdecl::OfferConfiguration { target, .. })
                 | fdecl::Offer::EventStream(fdecl::OfferEventStream { target, .. }) => {
                     if target.is_some() {
-                        return Err(DynamicOfferError::OfferInvalid {
+                        return Err(DynamicCapabilityError::Invalid {
                             err: cm_fidl_validator::error::ErrorList {
                                 errs: vec![cm_fidl_validator::error::Error::extraneous_field(
                                     DeclType::Offer,
@@ -929,7 +930,7 @@ impl ResolvedInstanceState {
                     }
                 }
                 _ => {
-                    return Err(DynamicOfferError::UnknownOfferType);
+                    return Err(DynamicCapabilityError::UnknownOfferType);
                 }
             }
             *offer_target_mut(offer).expect("validation should have found unknown enum type") =
@@ -943,6 +944,7 @@ impl ResolvedInstanceState {
 
     fn validate_dynamic_component(
         &self,
+        all_dynamic_children: Vec<(&str, &str)>,
         dynamic_offers: Vec<fdecl::Offer>,
         dynamic_capabilities: Vec<fdecl::Capability>,
     ) -> Result<(), AddChildError> {
@@ -961,7 +963,18 @@ impl ResolvedInstanceState {
         }
 
         // Validate!
-        cm_fidl_validator::validate_dynamic_offers(&all_dynamic_offers, &decl)?;
+        cm_fidl_validator::validate_dynamic_offers(
+            all_dynamic_children,
+            &all_dynamic_offers,
+            &decl,
+        )
+        .map_err(|err| {
+            if err.errs.iter().all(|e| matches!(e, ValidatorError::DependencyCycle(_))) {
+                DynamicCapabilityError::Cycle { err }
+            } else {
+                DynamicCapabilityError::Invalid { err }
+            }
+        })?;
 
         // Manifest validation is not informed of the contents of collections, and is thus unable
         // to confirm the source exists if it's in a collection. Let's check that here.
@@ -969,7 +982,7 @@ impl ResolvedInstanceState {
             dynamic_offers.into_iter().map(FidlIntoNative::fidl_into_native).collect();
         for offer in &dynamic_offers {
             if !self.offer_source_exists(offer.source()) {
-                return Err(DynamicOfferError::SourceNotFound { offer: offer.clone() }.into());
+                return Err(DynamicCapabilityError::SourceNotFound { offer: offer.clone() }.into());
             }
         }
         Ok(())
@@ -987,7 +1000,28 @@ impl ResolvedInstanceState {
 
         let dynamic_offers = self.add_target_dynamic_offers(dynamic_offers, child, collection)?;
         if !dynamic_offers.is_empty() || !dynamic_capabilities.is_empty() {
-            self.validate_dynamic_component(dynamic_offers.clone(), dynamic_capabilities.clone())?;
+            let mut all_dynamic_children: Vec<_> = self
+                .children()
+                .filter_map(|(n, _)| {
+                    if let Some(collection) = n.collection() {
+                        Some((n.name().as_str(), collection.as_str()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            all_dynamic_children.push((
+                child.name.as_str(),
+                collection
+                    .expect("child must be dynamic if there were dynamic offers")
+                    .name
+                    .as_str(),
+            ));
+            self.validate_dynamic_component(
+                all_dynamic_children,
+                dynamic_offers.clone(),
+                dynamic_capabilities.clone(),
+            )?;
         }
         let dynamic_offers = dynamic_offers.into_iter().map(|o| o.fidl_into_native()).collect();
         let dynamic_capabilities =

@@ -298,11 +298,14 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::InvalidDictionary { .. } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::StaticRouteConflict { .. } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::NameTooLong { .. } => fcomponent::Error::InvalidArguments,
+            // TODO(https://fxbug.dev/297403341): This should become its own error in fidl once
+            // we can introduce it without breaking compatibility.
             AddDynamicChildError::AddChildError {
-                err: AddChildError::DynamicOfferError { .. },
+                err:
+                    AddChildError::DynamicCapabilityError { err: DynamicCapabilityError::Cycle { .. } },
             } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::AddChildError {
-                err: AddChildError::DynamicConfigError { .. },
+                err: AddChildError::DynamicCapabilityError { .. },
             } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
                 fcomponent::Error::InvalidArguments
@@ -330,10 +333,7 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::StaticRouteConflict { .. } => fsys::CreateError::Internal,
             AddDynamicChildError::NameTooLong { .. } => fsys::CreateError::BadChildDecl,
             AddDynamicChildError::AddChildError {
-                err: AddChildError::DynamicOfferError { .. },
-            } => fsys::CreateError::BadDynamicOffer,
-            AddDynamicChildError::AddChildError {
-                err: AddChildError::DynamicConfigError { .. },
+                err: AddChildError::DynamicCapabilityError { .. },
             } => fsys::CreateError::BadDynamicOffer,
             AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
                 fsys::CreateError::BadMoniker
@@ -350,14 +350,9 @@ pub enum AddChildError {
     #[error("component instance {} in realm {} already exists", child, moniker)]
     InstanceAlreadyExists { moniker: Moniker, child: ChildName },
     #[error("dynamic offer error: {}", err)]
-    DynamicOfferError {
+    DynamicCapabilityError {
         #[from]
-        err: DynamicOfferError,
-    },
-    #[error("dynamic config error: {}", err)]
-    DynamicConfigError {
-        #[from]
-        err: cm_fidl_validator::error::ErrorList,
+        err: DynamicCapabilityError,
     },
     #[error("child moniker not valid: {}", err)]
     ChildNameInvalid {
@@ -367,10 +362,15 @@ pub enum AddChildError {
 }
 
 #[derive(Debug, Error, Clone, PartialEq)]
-pub enum DynamicOfferError {
-    #[error("dynamic offer not valid: {}", err)]
-    OfferInvalid {
-        #[from]
+pub enum DynamicCapabilityError {
+    #[error("a dynamic capability was not valid: {}", err)]
+    Invalid {
+        #[source]
+        err: cm_fidl_validator::error::ErrorList,
+    },
+    #[error("dynamic offer would create a cycle: {err}")]
+    Cycle {
+        #[source]
         err: cm_fidl_validator::error::ErrorList,
     },
     #[error("source for dynamic offer not found: {:?}", offer)]

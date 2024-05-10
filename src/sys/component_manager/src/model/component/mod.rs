@@ -1407,7 +1407,7 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::*,
-        errors::{AddChildError, DynamicOfferError},
+        errors::{AddChildError, DynamicCapabilityError},
         fasync::TestExecutor,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
@@ -1931,16 +1931,8 @@ pub mod tests {
         }
     }
 
-    // TODO(https://fxbug.dev/42066274)
-    #[ignore]
     #[fuchsia::test]
     async fn creating_dynamic_child_with_offer_cycle_fails() {
-        let example_offer = OfferBuilder::service()
-            .name("foo")
-            .source(OfferSource::Collection("coll".parse().unwrap()))
-            .target_static_child("static_child")
-            .build();
-
         let components = vec![
             (
                 "root",
@@ -1951,7 +1943,12 @@ pub mod tests {
                             .name("coll")
                             .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                     )
-                    .offer(example_offer.clone())
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::Collection("coll".parse().unwrap()))
+                            .target_static_child("static_child"),
+                    )
                     .build(),
             ),
             ("static_child", component_decl_with_test_runner()),
@@ -1981,16 +1978,8 @@ pub mod tests {
         assert_matches!(res, Err(fcomponent::Error::InvalidArguments));
     }
 
-    // TODO(https://fxbug.dev/42066274)
-    #[ignore]
     #[fuchsia::test]
     async fn creating_cycle_between_collections_fails() {
-        let static_collection_offer = OfferBuilder::service()
-            .name("foo")
-            .source(OfferSource::Collection("coll1".parse().unwrap()))
-            .target(OfferTarget::Collection("coll2".parse().unwrap()))
-            .build();
-
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
@@ -2004,7 +1993,12 @@ pub mod tests {
                         .name("coll2")
                         .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
-                .offer(static_collection_offer.clone())
+                .offer(
+                    OfferBuilder::service()
+                        .name("foo")
+                        .source(OfferSource::Collection("coll1".parse().unwrap()))
+                        .target(OfferTarget::Collection("coll2".parse().unwrap())),
+                )
                 .build(),
         )];
 
@@ -2358,8 +2352,8 @@ pub mod tests {
                 ])
                 .await
                 .expect_err("unexpected succeess in validate/convert dynamic offers"),
-                AddChildError::DynamicOfferError { err }
-            if err == DynamicOfferError::SourceNotFound {
+                AddChildError::DynamicCapabilityError { err }
+            if err == DynamicCapabilityError::SourceNotFound {
                 offer: OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "doesnt-exist".parse().unwrap(),
@@ -2400,6 +2394,18 @@ pub mod tests {
             .expect("failed to start root");
         test.runner.wait_for_urls(&["test:///root_resolved"]).await;
 
+        let collection_decl = root
+            .lock_resolved_state()
+            .await
+            .unwrap()
+            .resolved_component
+            .decl
+            .collections
+            .iter()
+            .find(|c| c.name.as_str() == "col")
+            .unwrap()
+            .clone();
+
         let validate_and_convert = |capabilities: Vec<fdecl::Capability>| async {
             root.lock_resolved_state()
                 .await
@@ -2415,7 +2421,7 @@ pub mod tests {
                         environment: None,
                         config_overrides: None,
                     },
-                    None,
+                    Some(&collection_decl),
                 )
         };
 
@@ -2450,12 +2456,11 @@ pub mod tests {
             }),
         ])
             .await.unwrap_err(),
-            AddChildError::DynamicConfigError { err}
+            AddChildError::DynamicCapabilityError { err: DynamicCapabilityError::Invalid { err } }
             if err ==
-            cm_fidl_validator::error::ErrorList {
-
-                                errs: vec![cm_fidl_validator::error::Error::duplicate_field(DeclType::Configuration, "name", "dupe")],
-             }
+                cm_fidl_validator::error::ErrorList {
+                    errs: vec![cm_fidl_validator::error::Error::duplicate_field(DeclType::Configuration, "name", "dupe")],
+                }
         );
     }
 
