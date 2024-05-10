@@ -5504,7 +5504,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:190
+From //build/assembly/developer_overrides.gni:284
 
 ### product_bootfs_labels
 
