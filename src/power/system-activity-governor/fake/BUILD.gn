@@ -46,6 +46,7 @@ fuchsia_component("component") {
 }
 
 fuchsia_package("package") {
+  testonly = true
   package_name = "fake-system-activity-governor"
   deps = [
     ":component",

@@ -44,7 +44,3 @@ fuchsia_component("fake-suspend") {
   manifest = "meta/fake-suspend.cml"
   deps = [ ":fake-suspend-bin" ]
 }
-
-fuchsia_package("fake-suspend-pkg") {
-  deps = [ ":fake-suspend" ]
-}

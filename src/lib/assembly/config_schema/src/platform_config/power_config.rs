@@ -12,11 +12,4 @@ pub struct PowerConfig {
     /// Whether power suspend/resume is supported.
     #[serde(default)]
     pub suspend_enabled: bool,
-
-    /// Whether the testing SAG with testing based controls
-    /// should be used. This will only work when |suspend_enabled|
-    /// is also true, as there is no SAG when suspend support is disabled.
-    /// TODO(https://fxbug.dev/335526423): Remove when no longer needed.
-    #[serde(default)]
-    pub testing_sag_enabled: bool,
 }

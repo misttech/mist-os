@@ -49,16 +49,13 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         if *context.feature_set_level != FeatureSupportLevel::Embeddable {
             builder.platform_bundle("legacy_power_framework");
             if config.suspend_enabled {
-                ensure!(*context.build_type != BuildType::User);
+                ensure!(
+                    matches!(
+                        context.feature_set_level,
+                        FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
+                    ) && *context.build_type != BuildType::User
+                );
                 builder.platform_bundle("power_framework");
-                match config.testing_sag_enabled {
-                    true => {
-                        builder.platform_bundle("power_framework_testing_sag");
-                    }
-                    false => {
-                        builder.platform_bundle("power_framework_sag");
-                    }
-                }
             }
         }
         builder.set_config_capability(

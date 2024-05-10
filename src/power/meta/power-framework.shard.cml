@@ -12,6 +12,10 @@
             url: "fuchsia-boot:///power-broker#meta/power-broker.cm",
         },
         {
+            name: "system-activity-governor",
+            url: "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
+        },
+        {
             name: "cpu_manager",
             url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
             on_terminate: "reboot",
@@ -88,6 +92,13 @@
             dependency: "weak",
         },
         {
+            directory: "dev-class",
+            from: "#devfs",
+            as: "dev-class-suspend",
+            to: "#system-activity-governor",
+            subdir: "suspend",
+        },
+        {
             protocol: [ "fuchsia.sys2.SystemController" ],
             from: "parent",
             to: "#power_manager",
@@ -117,7 +128,13 @@
                 "#cpu_manager",
                 "#power-broker",
                 "#power_manager",
+                "#system-activity-governor",
             ],
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#system-activity-governor",
         },
     ],
     expose: [
@@ -142,7 +159,6 @@
                 "fuchsia.power.system.ActivityGovernor",
             ],
             from: "#system-activity-governor",
-            source_availability: "unknown",
         },
     ],
 }

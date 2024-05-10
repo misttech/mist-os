@@ -18,12 +18,9 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.sys2.SystemController",
             ],
-        },
-        {
-            protocol: "fuchsia.power.system.ActivityGovernor",
-            availability: "optional",
         },
     ],
     expose: [
