@@ -41,7 +41,7 @@ import("//build/testing/golden_files.gni")
 #    - Type: list(path)
 #
 #  * api, available, excluded_checks, experimental_checks, experimental_flags,
-#    goldens_dir, non_fidl_deps, sdk_category, sdk_area, stable, versioned
+#    goldens_dir, non_fidl_deps, sdk_category, sdk_area, versioned, stable
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
 #  * testonly, visibility, public_deps, applicable_licenses
@@ -55,8 +55,6 @@ template("fidl_library") {
   assert(defined(invoker.sources), "sources is required")
   assert(defined(invoker.library_name), "library_name is required")
   assert(defined(invoker.fidl_ir_json), "fidl_ir_json is required")
-  assert(!(defined(invoker.stable) && defined(invoker.versioned)),
-         "stable and versioned are mutually exclusive")
   if (defined(invoker.available)) {
     assert(defined(invoker.testonly) && invoker.testonly,
            "the `available` parameter is only allowed on testonly libraries")
@@ -73,9 +71,7 @@ template("fidl_library") {
   requires_compatibility_tests = is_sdk_included_publishable ||
                                  (defined(invoker.sdk_category) &&
                                   invoker.sdk_category == "partner_internal")
-
   stable = defined(invoker.stable) && invoker.stable
-
   in_fuchsia_namespace =
       invoker.library_name ==
       "fuchsia." + string_replace(invoker.library_name, "fuchsia.", "", 1)
@@ -134,13 +130,11 @@ template("fidl_library") {
       available = [ "fuchsia:$target_api_level" ]
     }
     if (!defined(versioned)) {
-      if (defined(invoker.testonly) && invoker.testonly) {
-        versioned = "unversioned"
-      } else if (stable) {
+      # TODO(https://fxbug.dev/325669391): Always set a default `versioned`.
+      if (requires_compatibility_tests && in_fuchsia_namespace) {
         versioned = "fuchsia"
-      } else if (in_fuchsia_namespace && requires_compatibility_tests) {
-        # Temporarily we only enable this check for partner and partner_internal.
-        versioned = "fuchsia:HEAD"
+      } else if (defined(invoker.testonly) && invoker.testonly) {
+        versioned = "unversioned"
       }
     }
   }

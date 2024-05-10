@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.overnet.protocol") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
-  stable = true
 
   sources = [
     "labels.fidl",

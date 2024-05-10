@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.net.name") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
-  stable = true
   sources = [
     "dns.fidl",
     "lookup.fidl",
