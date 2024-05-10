@@ -7,6 +7,59 @@
 
 namespace kconcurrent {
 
+// Notes on the use of templates in the AcquireInternal and AcquireUnconditionallyInternal methods:
+//
+// Both of these methods (in addition to TryAcquireInternal) make use of
+// AcquireInternalSingleAttempt, but only in the case that Trace Accounting is
+// enabled.  We never want anyone to be calling this method unless the compile
+// time feature is enabled, and we want to give anyone who accidentally calls
+// this method when the feature is disabled a clean error message at compile
+// time.  IOW - We'd rather they didn't have to discover the mistake until
+// runtime, and we also don't want their error message to be a bunch of
+// incomprehensible C++ template expansion errors.
+//
+// So, we have a static_assert in AcquireInternalSingleAttempt, and the method
+// is templated (even though we make no use of the template argument), meaning
+// that someone has to actually try to expand the templated method in order for
+// the static_assert to be evaluated (and potentially fail).
+//
+// Everywhere we make use of the function, we always use the following pattern:
+//
+// ```
+// void Func() {
+//   // stuff
+//   if constexpr (kCltTraceAccountingEnabled) {
+//     AcquireInternalSingleAttempt(clt);
+//   }
+//   // stuff
+// }
+// ```
+//
+// If accounting is disabled, then the predicate of the constexpr is false, and
+// the body is checked for basic stuff like syntax, but none of the types inside
+// are evaluated or expanded.
+//
+// Unfortunately, this is not 100% true.  This behavior of `if constexpr` only
+// holds when the statement is evaluated in a "templated entity", such as a
+// templated class, or a templated function/method.  If there is no template,
+// then both halves of the `if constexpr` are fully checked. So, `Func` from the
+// example above is not templated, which means that the body of the `if` is
+// evaluated even with Trace Accounting disabled, triggering the static assert.
+//
+// To work around this unfortunate behavior, we have actually made
+// AcquireInternal and AcquireUnconditionallyInternal templated entities
+// (TryAcquireInternal was already) in order to prevent the compiler from fully
+// checking the false half of any `if constexprs` inside of them.  A few points
+// on this:
+// 1) The templates are all on private methods; none of this hot garbage is
+//    exposed to users.
+// 2) The template arguments are actually never used.  They are just there to
+//    make `if constexpr` behave the way we want.
+// 3) The templated typename is always void, and only the void version are
+//    expanded at compile time.  No one should ever try to do anything but call
+//    the default version of the method (which specifies void), but if they do,
+//    they should fail to link because of the limited explicit expansions.
+//
 template <typename>
 inline ChainLock::LockResult ChainLock::AcquireInternalSingleAttempt(ChainLockTransaction& clt) {
   static_assert(kCltTraceAccountingEnabled,
@@ -35,6 +88,7 @@ inline ChainLock::LockResult ChainLock::AcquireInternalSingleAttempt(ChainLockTr
   return result.result;
 }
 
+template <typename>
 void ChainLock::AcquireUnconditionallyInternal() {
   ChainLockTransaction& clt = ChainLockTransaction::ActiveRef();
   clt.AssertNotFinalized();
@@ -215,7 +269,8 @@ bool ChainLock::MarkNeedsReleaseIfHeldInternal() const {
   return Base::MarkNeedsReleaseIfHeld(ChainLockTransaction::ActiveRef().active_token());
 }
 
-ChainLock::LockResult ChainLock::Acquire() {
+template <typename>
+ChainLock::LockResult ChainLock::AcquireInternal() {
   ChainLockTransaction& clt = ChainLockTransaction::ActiveRef();
   clt.AssertNotFinalized();
 
@@ -235,6 +290,7 @@ ChainLock::LockResult ChainLock::Acquire() {
 
     return result.result;
   }
+  return LockResult::kOk;
 }
 
 void ChainLock::AssertHeld() const {
@@ -244,5 +300,10 @@ void ChainLock::AssertHeld() const {
 bool ChainLock::is_held() const {
   return Base::is_held(ChainLockTransaction::ActiveRef().active_token());
 }
+
+// Force expansion.  These are the only versions of this template which will
+// ever be allowed.
+template ChainLock::LockResult ChainLock::AcquireInternal<void>();
+template void ChainLock::AcquireUnconditionallyInternal<void>();
 
 }  // namespace kconcurrent

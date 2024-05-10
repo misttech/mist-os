@@ -137,9 +137,13 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
     return MarkNeedsReleaseIfHeldInternal();
   }
 
+  // Acquire does not take a direct stance on ACQUIRE/TRY_ACQUIRE/RELEASE
+  // annotations, but bounces to an internal implementation in order to hide
+  // some gross template stuff from users.
+  LockResult Acquire() TA_REQ(chainlock_transaction_token) { return AcquireInternal(); }
+
   // Routines which do not need an internal implementation as they take no
   // direct stance on ACQUIRE/TRY_ACQUIRE/RELEASE annotations.
-  LockResult Acquire() TA_REQ(chainlock_transaction_token);
   void AssertHeld() const TA_REQ(chainlock_transaction_token) TA_ASSERT();
   bool is_held() const TA_REQ(chainlock_transaction_token);
 
@@ -224,8 +228,15 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   friend struct SchedulerUtils;
   friend class ChainLockTransaction;
 
+  // See the implementation of AcquireInternalSingleAttempt for why these
+  // template statements are here.
+  template <typename = void>
   void AcquireUnconditionallyInternal() TA_REQ(chainlock_transaction_token)
       TA_ACQ(static_cast<Base*>(this));
+
+  template <typename = void>
+  LockResult AcquireInternal() TA_REQ(chainlock_transaction_token);
+
   template <FinalizedTransactionAllowed FTAllowed>
   bool TryAcquireInternal() TA_REQ(chainlock_transaction_token)
       TA_TRY_ACQ(true, static_cast<Base*>(this));
