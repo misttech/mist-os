@@ -27,6 +27,7 @@ rustc_library_with_features("netstack3-base") {
     "src/testutil/fake_bindings.rs",
     "src/testutil/fake_core.rs",
     "src/testutil/fake_network.rs",
+    "src/testutil/misc.rs",
     "src/testutil/monotonic_id.rs",
     "src/time.rs",
     "src/time/local_timer_heap.rs",
@@ -52,6 +53,8 @@ rustc_library_with_features("netstack3-base") {
     "//third_party/rust_crates:criterion",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:rand_xorshift",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   if (!is_host) {

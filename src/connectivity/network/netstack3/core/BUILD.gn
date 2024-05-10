@@ -157,7 +157,6 @@ rustc_library_with_features("netstack3-core") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   feature_sets = [

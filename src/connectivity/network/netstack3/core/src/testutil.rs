@@ -35,16 +35,6 @@ use net_types::{
 #[cfg(test)]
 use net_types::{ip::IpAddr, MulticastAddr};
 use packet::{Buf, BufferMut};
-#[cfg(test)]
-use tracing::Subscriber;
-#[cfg(test)]
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    registry::LookupSpan,
-};
 
 #[cfg(test)]
 use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
@@ -96,8 +86,8 @@ use crate::{
 };
 
 pub use netstack3_base::testutil::{
-    new_rng, run_with_many_seeds, FakeCryptoRng, MonotonicIdentifier, TestAddrs, TestIpExt,
-    TEST_ADDRS_V4, TEST_ADDRS_V6,
+    assert_empty, new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng,
+    MonotonicIdentifier, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
 
 /// NDP test utilities.
@@ -421,23 +411,6 @@ impl<'a> TestApi<'a, FakeBindingsCtx> {
             }
         }
     }
-}
-
-/// Asserts that an iterable object produces zero items.
-///
-/// `assert_empty` drains `into_iter.into_iter()` and asserts that zero
-/// items are produced. It panics with a message which includes the produced
-/// items if this assertion fails.
-#[cfg(test)]
-#[track_caller]
-pub(crate) fn assert_empty<I: IntoIterator>(into_iter: I)
-where
-    I::Item: Debug,
-{
-    // NOTE: Collecting into a `Vec` is cheap in the happy path because
-    // zero-capacity vectors are guaranteed not to allocate.
-    let vec = into_iter.into_iter().collect::<Vec<_>>();
-    assert!(vec.is_empty(), "vec={vec:?}");
 }
 
 #[derive(Default)]
@@ -814,46 +787,6 @@ impl<D: LinkDevice> LinkResolutionNotifier<D> for () {
     }
 
     fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
-}
-
-#[cfg(test)]
-struct SimpleFormatter;
-
-#[cfg(test)]
-impl<S, N> FormatEvent<S, N> for SimpleFormatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: format::Writer<'_>,
-        event: &tracing::Event<'_>,
-    ) -> std::fmt::Result {
-        ctx.format_fields(writer.by_ref(), event)?;
-        writeln!(writer)
-    }
-}
-
-/// Install a logger for tests.
-///
-/// Call this method at the beginning of the test for which logging is desired.
-/// This function sets global program state, so all tests that run after this
-/// function is called will use the logger.
-#[cfg(test)]
-pub(crate) fn set_logger_for_test() {
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::fmt()
-            .event_format(SimpleFormatter)
-            .with_max_level(tracing::Level::TRACE)
-            .with_test_writer()
-            .finish(),
-    )
-    .unwrap_or({
-        // Ignore errors caused by some other test invocation having already set
-        // the global default subscriber.
-    })
 }
 
 #[derive(Clone)]
