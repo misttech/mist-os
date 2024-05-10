@@ -1079,6 +1079,12 @@ where
             detailed_logging_enabled: Some(detailed_logging_enabled),
             detailed_logging_level: Some(detailed_logging_level.into()),
             dhcpv6_pd_enabled: Some(driver_state.is_dhcpv6_pd_enabled()),
+            dns_upstream_query_enabled: Some(
+                driver_state.ot_instance.dnssd_upstream_query_is_enabled(),
+            ),
+            link_metrics_manager_enabled: Some(
+                driver_state.ot_instance.link_metrics_manager_is_enabled(),
+            ),
             ..Default::default()
         })
     }
@@ -1102,6 +1108,10 @@ where
 
         if let Some(dns_upstream_query_enabled) = config.dns_upstream_query_enabled {
             driver_state.ot_instance.dnssd_upstream_query_set_enabled(dns_upstream_query_enabled);
+        }
+
+        if let Some(link_metrics_manager_enabled) = config.link_metrics_manager_enabled {
+            driver_state.ot_instance.link_metrics_manager_set_enabled(link_metrics_manager_enabled);
         }
 
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(
