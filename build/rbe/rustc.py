@@ -163,6 +163,7 @@ class _ScanDepsCommandTransformer(object):
         self._emit_metadata = emit_metadata
         self._depfile_name = depfile_name
         self._replaced_emit = False
+        self._aux_rspfiles = []
 
     @property
     def emit_metadata(self) -> bool:
@@ -192,14 +193,14 @@ class _ScanDepsCommandTransformer(object):
 
     def _rustc_dep_only_command_impl(
         self, command_tokens: Iterable[str]
-    ) -> Iterable[Tuple[str, Sequence[Path]]]:
+    ) -> Iterable[str]:
         """Generate a command that only produces a depfile.
 
+        This also accumulates a set of temporary transformed rspfiles
+        that the caller is responsible for cleaning up.
+
         Yields:
-          * possibly transformed command token
-          * paths to a temporary response files (containing
-            possibly transformed command tokens), that the caller should
-            clean up automatically.
+          possibly transformed command token
         """
 
         handle_optarg = None
@@ -214,35 +215,35 @@ class _ScanDepsCommandTransformer(object):
             if handle_optarg == "--extern":
                 handle_optarg = None
                 if not self.emit_metadata:
-                    yield tok, None
+                    yield tok
                     continue
 
                 lib, sep, path = tok.partition("=")
                 if sep != "=":  # --extern foo (without path)
-                    yield tok, None
+                    yield tok
                     continue
 
                 # Assume .so files are proc_macros, which are needed for
                 # dep scanning; rmeta alone won't suffice.
                 if path.endswith(".so"):
-                    yield tok, None
+                    yield tok
                     continue
 
                 rmeta = Path(path).with_suffix(".rmeta")
                 # evaluating metadata only requires other .rmeta files
                 if rmeta.exists():
-                    yield f"{lib}={rmeta}", None
+                    yield f"{lib}={rmeta}"
                 else:
-                    yield tok, None
+                    yield tok
 
                 continue
 
             if handle_optarg == "-o":
                 handle_optarg = None
                 if self.emit_metadata:
-                    yield str(Path(tok).with_suffix(".rmeta")), None
+                    yield str(Path(tok).with_suffix(".rmeta"))
                 else:
-                    yield tok, None
+                    yield tok
                 continue
 
             # Replace the first --emit encountered in the original command tokens
@@ -252,12 +253,12 @@ class _ScanDepsCommandTransformer(object):
                 else:
                     self._replaced_emit = True
                     for arg in self._replacement_emit_args:
-                        yield arg, None
+                        yield arg
                 continue
 
             if tok in {"--extern", "-o"}:
                 handle_optarg = tok
-                yield tok, None
+                yield tok
                 continue
 
             # Check for response files, recursively descend into them.
@@ -271,92 +272,79 @@ class _ScanDepsCommandTransformer(object):
                     # into new copies as needed.
                     orig_rspfile = Path(tok.removeprefix(prefix))
 
-                    rspfile_contents = orig_rspfile.read_text()
-                    if not rspfile_contents:
-                        # Don't bother changing empty files.
-                        # This also avoids accidentally adding a blank line
-                        # which the compiler may interpret as ''.
-                        yield tok, None
-                        break
-
-                    (
-                        new_rspfile_lines,
-                        aux_paths,
-                    ) = self._rustc_dep_only_command_rspfile_lines(
-                        rspfile_lines=rspfile_contents.splitlines()
-                    )
-
-                    # Use a temporary file with a random suffix, in case
-                    # multiple concurrent invocations reference the same rspfile.
-                    # It is the caller's responsibility to clean up each of these
-                    # tempfiles.
-                    _, new_rspfile = tempfile.mkstemp(
-                        dir=str(orig_rspfile.parent),
-                        prefix=orig_rspfile.name + ".aux.",
-                        text=True,
-                    )
-
-                    # Keep absolute/relative path consistent with original.
-                    new_rspfile_path = Path(new_rspfile)
-                    if not orig_rspfile.is_absolute():
-                        new_rspfile_path = cl_utils.relpath(
-                            new_rspfile_path, Path(".")
-                        )
-                    new_rspfile_path.write_text(
-                        "\n".join(new_rspfile_lines) + "\n"
-                    )
-
-                    yield f"{prefix}{new_rspfile_path}", [
-                        new_rspfile_path
-                    ] + aux_paths
+                    yield self._transform_rspfile_arg(prefix, orig_rspfile)
                     break
 
             if prefix_matched:
                 continue
 
             # else
-            yield tok, None
+            yield tok
+
+    def _transform_rspfile_arg(self, prefix: str, orig_rspfile: Path) -> str:
+        """Transform the contents of a @rspfile into a new one.
+
+        Args:
+          prefix: either "@" or "@shell:" part of the response file argument.
+          orig_rspfile: the original response file referenced.
+
+        Returns:
+          Possibly modified command-line argument for a response file.
+        """
+        rspfile_contents = orig_rspfile.read_text()
+        if not rspfile_contents:
+            # Don't bother changing empty files.
+            # This also avoids accidentally adding a blank line
+            # which the compiler may interpret as ''.
+            return f"{prefix}{orig_rspfile}"
+
+        new_rspfile_lines = list(
+            self._rustc_dep_only_command_rspfile_lines(
+                rspfile_contents.splitlines()
+            )
+        )
+
+        # Use a temporary file with a random suffix, in case
+        # multiple concurrent invocations reference the same rspfile.
+        # It is the caller's responsibility to clean up each of these
+        # tempfiles.
+        _, new_rspfile = tempfile.mkstemp(
+            dir=str(orig_rspfile.parent),
+            prefix=orig_rspfile.name + ".aux.",
+            text=True,
+        )
+
+        # Keep absolute/relative path consistent with original.
+        new_rspfile_path = Path(new_rspfile)
+        if not orig_rspfile.is_absolute():
+            new_rspfile_path = cl_utils.relpath(new_rspfile_path, Path("."))
+        new_rspfile_path.write_text("\n".join(new_rspfile_lines) + "\n")
+
+        # Tell the caller to clean-up this transformed rspfile.
+        self._aux_rspfiles.append(new_rspfile_path)
+        return f"{prefix}{new_rspfile_path}"
 
     def _rustc_dep_only_command_rspfile_lines(
         self,
-        rspfile_lines: Sequence[str],
-    ) -> Tuple[Sequence[str], Sequence[Path]]:
+        rspfile_lines: Iterable[str],
+    ) -> Iterable[str]:
         new_lines = []
-        aux_paths = []
         # transform rspfile one line at a time
         for line in rspfile_lines:
-            new_line, paths = self._rustc_dep_only_command_rspfile_line(line)
-            new_lines.append(new_line)
-            aux_paths.extend(paths)
-
-        return new_lines, aux_paths
+            yield self._rustc_dep_only_command_rspfile_line(line)
 
     def _rustc_dep_only_command_rspfile_line(
         self,
         rspfile_line: str,
-    ) -> Tuple[str, Sequence[Path]]:
+    ) -> str:
         """Transforms a single line of a rspfile for a dep-scanning command."""
         # Note: use space split instead of shlex.split because quotes
         # are to be interpreted literally.
-        toks, paths = self._rustc_dep_only_command(
-            command_tokens=rspfile_line.split(" ")
+        return " ".join(
+            self._rustc_dep_only_command_impl(
+                command_tokens=rspfile_line.split(" ")
+            )
         )
-        return " ".join(toks), paths
-
-    def _rustc_dep_only_command(
-        self,
-        command_tokens: Iterable[str],
-    ) -> Tuple[Sequence[str], Sequence[Path]]:
-        aux_toks = []
-        aux_paths = []
-        for tok, paths in self._rustc_dep_only_command_impl(
-            command_tokens=command_tokens,
-        ):
-            aux_toks.append(tok)
-            if paths:
-                aux_paths.extend(paths)
-
-        return aux_toks, aux_paths
 
 
 def rustc_dep_only_command(
@@ -387,12 +375,13 @@ def rustc_dep_only_command(
         emit_metadata=emit_metadata,
         depfile_name=depfile_name,
     )
-    aux_toks, aux_paths = transformer._rustc_dep_only_command(command_tokens)
+    aux_toks = list(transformer._rustc_dep_only_command_impl(command_tokens))
+    aux_rspfiles = transformer._aux_rspfiles
 
     if not transformer._replaced_emit:
-        return aux_toks + transformer._replacement_emit_args, aux_paths
+        return aux_toks + transformer._replacement_emit_args, aux_rspfiles
 
-    return aux_toks, aux_paths
+    return aux_toks, aux_rspfiles
 
 
 class RustAction(object):
