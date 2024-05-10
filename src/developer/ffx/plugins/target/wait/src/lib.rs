@@ -2,19 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_target::KnockError;
 use ffx_wait_args::WaitCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
+use fho::{daemon_protocol, Error, FfxContext, FfxMain, FfxTool, Result, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy};
 use fuchsia_async::WakeupTime;
 use futures::future::Either;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const DOWN_REPOLL_DELAY_MS: u64 = 500;
 const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(1000);
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandStatus {
+    /// Successfully waited for the target (either to come up or shut down).
+    Ok {},
+    /// Unexpected error with string denoting error message.
+    UnexpectedError { message: String },
+    /// A known error that can be reported to the user.
+    UserError { message: String },
+}
 
 #[derive(FfxTool)]
 pub struct WaitTool {
@@ -28,16 +40,28 @@ fho::embedded_plugin!(WaitTool);
 
 #[async_trait(?Send)]
 impl FfxMain for WaitTool {
-    type Writer = SimpleWriter;
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        wait_for_device(self.target_collection_proxy, self.cmd).await?;
-        Ok(())
+    type Writer = VerifiedMachineWriter<CommandStatus>;
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
+        match wait_for_device(self.target_collection_proxy, self.cmd).await {
+            Ok(()) => {
+                writer.machine(&CommandStatus::Ok {})?;
+                Ok(())
+            }
+            Err(e @ Error::User(_)) => {
+                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
+                Err(e)
+            }
+            Err(e) => {
+                writer.machine(&CommandStatus::UnexpectedError { message: e.to_string() })?;
+                Err(e)
+            }
+        }
     }
 }
 
 async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitCommand) -> Result<()> {
     let ffx: ffx_command::Ffx = argh::from_env();
-    let default_target = ffx.target().await?;
+    let default_target = ffx.target().await.bug()?;
     let knock_fut = async {
         loop {
             break match ffx_target::knock_target_by_name(
@@ -76,18 +100,18 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
         0 => async_io::Timer::never(),
         _ => async_io::Timer::at(Duration::from_secs(cmd.timeout as u64).into_time()),
     };
-
     let timeout_err =
         FfxError::DaemonError { err: DaemonError::Timeout, target: ffx.target.clone() };
     match futures::future::select(knock_fut, timeout_fut).await {
-        Either::Left((left, _)) => left,
-        Either::Right(_) => Err(timeout_err.into()),
+        Either::Left((left, _)) => Ok(left.bug()?),
+        Either::Right(_) => Err(Error::User(timeout_err.into())),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fho::{Format, TestBuffers};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_developer_ffx::{
         TargetCollectionMarker, TargetCollectionRequest, TargetRequest, TargetRequestStream,
@@ -181,18 +205,30 @@ mod tests {
         proxy
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn peer_closed_to_target_collection_causes_top_level_error() {
-        let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server_auto_close(),
-            WaitCommand { timeout: 1000, down: false }
-        )
-        .await
-        .is_err())
+        let _env = ffx_config::test_init().await.expect("test env");
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server_auto_close(),
+            cmd: WaitCommand { timeout: 1000, down: false },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_err(), "expected error {stdout} {stderr}");
+        assert!(
+            matches!(res, Err(Error::Unexpected(_))),
+            "expected 'unexpected error' {stdout} {stderr}"
+        );
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn peer_closed_to_target_collection_causes_knock_error() {
         let _env = ffx_config::test_init().await.unwrap();
         let ffx: ffx_command::Ffx = argh::from_env();
@@ -213,85 +249,141 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn able_to_connect_to_device() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server([true, true], true),
-            WaitCommand { timeout: 5, down: false }
-        )
-        .await
-        .is_ok());
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server([true, true], true),
+            cmd: WaitCommand { timeout: 5, down: false },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn unable_to_connect_to_device() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server([true, true], false),
-            WaitCommand { timeout: 2, down: false }
-        )
-        .await
-        .is_err());
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server([true, true], false),
+            cmd: WaitCommand { timeout: 2, down: false },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_err(), "expected error: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn peer_closed_causes_down_error() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server_auto_close(),
-            WaitCommand { timeout: 2, down: true }
-        )
-        .await
-        .is_err());
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server_auto_close(),
+            cmd: WaitCommand { timeout: 2, down: true },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_err(), "expected error: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn wait_for_down() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server([true, true], false),
-            WaitCommand { timeout: 10, down: true }
-        )
-        .await
-        .is_ok());
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server([true, true], false),
+            cmd: WaitCommand { timeout: 10, down: true },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn wait_for_down_when_never_up() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server([false, false], false),
-            WaitCommand { timeout: 2, down: true }
-        )
-        .await
-        .is_ok());
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server([false, false], false),
+            cmd: WaitCommand { timeout: 2, down: true },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn wait_for_down_when_after_up() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server([true, false], true),
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server([true, false], true),
             // We actually _have_ to wait for a few seconds, because
             // knock_rcs_impl will take 1 second before returning, and
             // we also wait for 500me in the wait_for_device() loop.
             // Any shorter a time and we're just going to hit the
             // timeout.
-            WaitCommand { timeout: 10, down: true }
-        )
-        .await
-        .is_ok());
+            cmd: WaitCommand { timeout: 10, down: true },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn wait_for_down_when_able_to_connect_to_device() {
         let _env = ffx_config::test_init().await.unwrap();
-        assert!(wait_for_device(
-            setup_fake_target_collection_server([true, true], true),
-            WaitCommand { timeout: 2, down: true }
-        )
-        .await
-        .is_err());
+        let tool = WaitTool {
+            target_collection_proxy: setup_fake_target_collection_server([true, true], true),
+            cmd: WaitCommand { timeout: 3, down: true },
+        };
+        let test_buffers = TestBuffers::default();
+        let writer =
+            <WaitTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &test_buffers);
+        let res = tool.main(writer).await;
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert!(res.is_err(), "expected error: {stdout} {stderr}");
+        let err = format!("schema not valid {stdout}");
+        let json = serde_json::from_str(&stdout).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <WaitTool as FfxMain>::Writer::verify_schema(&json).expect(&err)
     }
 }
