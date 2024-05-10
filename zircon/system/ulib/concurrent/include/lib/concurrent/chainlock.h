@@ -371,6 +371,7 @@ class __TA_CAPABILITY("mutex") ChainLock {
   }
 
   static constexpr Token kUnlockedToken{Token::kUnlockedTokenValue};
+  static constexpr Token kMaxToken{std::numeric_limits<decltype(Token::token_)>::max()};
 
   static_assert(std::atomic<Token>::is_always_lock_free,
                 "Error!  atomic ChainLock tokens must always be lock free!");
