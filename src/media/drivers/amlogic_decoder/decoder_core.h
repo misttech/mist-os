@@ -72,7 +72,7 @@ class DecoderCore {
 
     [[nodiscard]] virtual DeviceType device_type() = 0;
 
-    [[nodiscard]] virtual fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() = 0;
+    [[nodiscard]] virtual fidl::SyncClient<fuchsia_sysmem2::Allocator>& SysmemAllocatorSync() = 0;
   };
 
   virtual ~DecoderCore() {}

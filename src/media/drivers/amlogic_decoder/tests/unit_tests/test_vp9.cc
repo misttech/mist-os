@@ -113,8 +113,8 @@ class FakeOwner : public VideoDecoder::Owner {
     }
     return ZX_OK;
   }
-  fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() override {
-    return video_->SysmemAllocatorSyncPtr();
+  fidl::SyncClient<fuchsia_sysmem2::Allocator>& SysmemAllocatorSync() override {
+    return video_->SysmemAllocatorSync();
   }
 
   bool IsDecoderCurrent(VideoDecoder* decoder) override { return true; }

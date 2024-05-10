@@ -58,8 +58,8 @@ namespace amlogic_decoder {
 //  search_pattern_ - HW only reads this
 //  parser_input_ - not used when secure)
 
-// TODO(https://fxbug.dev/42118114): bti::release_quarantine() or zx_bti_release_quarantine() somewhere
-// during startup, after HW is known idle, before we allocate anything from sysmem.
+// TODO(https://fxbug.dev/42118114): bti::release_quarantine() or zx_bti_release_quarantine()
+// somewhere during startup, after HW is known idle, before we allocate anything from sysmem.
 
 namespace {
 
@@ -256,7 +256,7 @@ zx_status_t AmlogicVideo::AllocateStreamBuffer(StreamBuffer* buffer, uint32_t si
     stream_buffer = std::move(saved_stream_buffer);
   } else {
     auto create_result = InternalBuffer::Create(
-        "AMLStreamBuffer", &sysmem_sync_ptr_, zx::unowned_bti(bti_), size, is_secure,
+        "AMLStreamBuffer", &sysmem_sync_, zx::unowned_bti(bti_), size, is_secure,
         /*is_writable=*/kStreamBufferIsWritable, /*is_mapping_needed=*/!use_parser);
     if (!create_result.is_ok()) {
       DECODE_ERROR("Failed to make video fifo: %d", create_result.error());
@@ -427,8 +427,8 @@ zx_status_t AmlogicVideo::AllocateIoBuffer(io_buffer_t* buffer, size_t size,
   return ZX_OK;
 }
 
-fuchsia::sysmem::AllocatorSyncPtr& AmlogicVideo::SysmemAllocatorSyncPtr() {
-  return sysmem_sync_ptr_;
+fidl::SyncClient<fuchsia_sysmem2::Allocator>& AmlogicVideo::SysmemAllocatorSync() {
+  return sysmem_sync_;
 }
 
 // This parser handles MPEG elementary streams.
@@ -674,9 +674,9 @@ void AmlogicVideo::SwapInCurrentInstance() {
   video_decoder_->SwappedIn();
 }
 
-zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> AmlogicVideo::ConnectToSysmem() {
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> AmlogicVideo::ConnectToSysmem() {
   auto sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_, "sysmem");
+      fuchsia_hardware_sysmem::Service::AllocatorV2>(parent_, "sysmem");
   if (sysmem_result.is_error()) {
     LOG(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol: %s",
         sysmem_result.status_string());
@@ -888,7 +888,7 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
         sysmem_result.status_string());
     return sysmem_result.status_value();
   }
-  sysmem_sync_ptr_.Bind(sysmem_result->TakeChannel());
+  sysmem_sync_.Bind(std::move(*sysmem_result));
 
   zx::result canvas_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
       fuchsia_hardware_amlogiccanvas::Service::Device>(parent_, "canvas");
@@ -937,12 +937,12 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   if (is_tee_available_) {
     tee_proto_client_.Bind(std::move(endpoints->client));
-    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via video_firmware
-    // TA
+    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via
+    // video_firmware TA
     LOG(INFO, "Got ZX_PROTOCOL_TEE");
   } else {
-    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via video_firmware
-    // TA
+    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via
+    // video_firmware TA
     LOG(INFO, "Skipped ZX_PROTOCOL_TEE");
   }
 
@@ -1061,7 +1061,11 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   fidl::Arena arena;
   fidl::StringView process_name(arena, name);
-  auto set_debug_client_info_result = sysmem_->SetDebugClientInfo(std::move(process_name), pid);
+  auto set_debug_request =
+      fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena);
+  set_debug_request.name(std::move(process_name));
+  set_debug_request.id(pid);
+  auto set_debug_client_info_result = sysmem_->SetDebugClientInfo(set_debug_request.Build());
   if (!set_debug_client_info_result.ok()) {
     DECODE_ERROR("sending SetDebugClientInfo failed: %s",
                  set_debug_client_info_result.status_string());

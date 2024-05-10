@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fdio/directory.h>
 #include <lib/mmio-ptr/fake.h>
@@ -21,12 +22,10 @@ namespace amlogic_decoder {
 namespace test {
 namespace {
 
-fuchsia::sysmem::AllocatorSyncPtr ConnectToSysmem() {
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
-                                            sysmem_allocator.NewRequest().TakeChannel().release());
-  EXPECT_EQ(ZX_OK, status);
-  return sysmem_allocator;
+fidl::SyncClient<fuchsia_sysmem2::Allocator> ConnectToSysmem() {
+  auto connect_result = component::Connect<fuchsia_sysmem2::Allocator>();
+  ZX_ASSERT(connect_result.is_ok());
+  return fidl::SyncClient(std::move(*connect_result));
 }
 
 class FakeOwner : public DecoderCore::Owner {
@@ -50,7 +49,9 @@ class FakeOwner : public DecoderCore::Owner {
   }
   zx::unowned_bti bti() override { return zx::unowned_bti(bti_); }
   DeviceType device_type() override { return device_type_; }
-  fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() override { return allocator_; }
+  fidl::SyncClient<fuchsia_sysmem2::Allocator>& SysmemAllocatorSync() override {
+    return allocator_;
+  }
   zx_status_t ToggleClock(ClockType type, bool enable) override {
     enable_clock_state_[static_cast<int>(type)] = enable;
     return ZX_OK;
@@ -64,7 +65,7 @@ class FakeOwner : public DecoderCore::Owner {
  private:
   zx::bti bti_;
   bool clocks_gated_ = true;
-  fuchsia::sysmem::AllocatorSyncPtr allocator_;
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> allocator_;
   MmioRegisters* mmio_;
   std::array<bool, static_cast<int>(ClockType::kMax)> enable_clock_state_{};
   DeviceType device_type_ = DeviceType::kG12B;

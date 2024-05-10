@@ -33,7 +33,7 @@ class TestAmlogicVideo {
     // Try to force the second buffer to be misaligned.
     constexpr uint32_t kFirstAlignment = 1u << 13;
     auto internal_buffer = InternalBuffer::CreateAligned(
-        "TestBuffer1", &video->SysmemAllocatorSyncPtr(), video->bti(), kBufferSize, kFirstAlignment,
+        "TestBuffer1", &video->SysmemAllocatorSync(), video->bti(), kBufferSize, kFirstAlignment,
         /*is_secure*/ false, /*is_writable=*/true, /*is_mapping_needed=*/false);
     ASSERT_TRUE(internal_buffer.is_ok());
     EXPECT_EQ(fbl::round_up(internal_buffer.value().phys_base(), kFirstAlignment),
@@ -42,8 +42,8 @@ class TestAmlogicVideo {
     // Should be larger than first.
     constexpr uint32_t kSecondAlignment = 1u << 16;
     auto internal_buffer2 = InternalBuffer::CreateAligned(
-        "TestBuffer2", &video->SysmemAllocatorSyncPtr(), video->bti(), kBufferSize,
-        kSecondAlignment, /*is_secure*/ false, /*is_writable=*/true, /*is_mapping_needed=*/false);
+        "TestBuffer2", &video->SysmemAllocatorSync(), video->bti(), kBufferSize, kSecondAlignment,
+        /*is_secure*/ false, /*is_writable=*/true, /*is_mapping_needed=*/false);
     ASSERT_TRUE(internal_buffer2.is_ok());
     EXPECT_EQ(fbl::round_up(internal_buffer2.value().phys_base(), kSecondAlignment),
               internal_buffer2.value().phys_base());

@@ -91,7 +91,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   [[nodiscard]] zx_status_t AllocateIoBuffer(io_buffer_t* buffer, size_t size,
                                              uint32_t alignment_log2, uint32_t flags,
                                              const char* name) override;
-  [[nodiscard]] fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() override;
+  [[nodiscard]] fidl::SyncClient<fuchsia_sysmem2::Allocator>& SysmemAllocatorSync() override;
 
   [[nodiscard]] bool IsDecoderCurrent(VideoDecoder* decoder) override {
     AssertVideoDecoderLockHeld();
@@ -193,7 +193,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
                                                  std::optional<InternalBuffer> saved_stream_buffer,
                                                  bool use_parser, bool is_secure);
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> ConnectToSysmem();
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> ConnectToSysmem();
 
  private:
   friend class test::TestH264;
@@ -222,7 +222,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   Owner* owner_ = nullptr;
   zx_device_t* parent_ = nullptr;
   ddk::PDevFidl pdev_;
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
 
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clocks_[static_cast<int>(ClockType::kMax)];
@@ -252,9 +252,9 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   std::unique_ptr<FirmwareBlob> firmware_;
 
   // Private for use by AmlogicVideo, when creating InternalBuffer(s).  Decoders
-  // can create their own separate InterfaceHandle<Allocator>(s) by calling
+  // can create their own separate fidl::SyncClient<Allocator>(s) by calling
   // ConnectToSysmem().
-  fuchsia::sysmem::AllocatorSyncPtr sysmem_sync_ptr_;
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_sync_;
 
   zx::bti bti_;
 

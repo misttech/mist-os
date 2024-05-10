@@ -377,12 +377,11 @@ void LocalCodecFactory::CreateDecoder(
           return;
         }
 
-        zx::result allocator_client = device_->video()->ConnectToSysmem();
-        if (allocator_client.is_error()) {
+        zx::result allocator_client_result = device_->video()->ConnectToSysmem();
+        if (allocator_client_result.is_error()) {
           return;
         }
-        fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem =
-            fidl::InterfaceHandle<fuchsia::sysmem::Allocator>(allocator_client->TakeChannel());
+        auto sysmem = std::move(*allocator_client_result);
         if (!sysmem) {
           return;
         }
