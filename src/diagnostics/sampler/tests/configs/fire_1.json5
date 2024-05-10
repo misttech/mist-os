@@ -10,7 +10,7 @@
             selector: "single_counter:root/samples:{MONIKER}",
         },
         {
-            // We don't need event_codes if the only code is the component ID
+            // We don't need event_codes if the only code will be the Cobalt-FIRE component ID
             metric_id: 3,
             metric_type: "Integer",
             selector: "single_counter:root/samples:{MONIKER}",

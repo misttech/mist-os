@@ -16,13 +16,16 @@ use {
     std::path::{Path, PathBuf},
     std::sync::{Arc, Mutex},
     string_list::StringList,
+    tracing::warn,
 };
 
 pub use selector_list::{ParsedSelector, SelectorList};
 
 const MONIKER_INTERPOLATION: &str = "{MONIKER}";
+const INSTANCE_ID_INTERPOLATION: &str = "{INSTANCE_ID}";
 const METRICS_INSPECT_SIZE_BYTES: usize = 1024 * 1024; // 1MiB
 const DEFAULT_MIN_SAMPLE_RATE_SEC: i64 = 10;
+const INSTANCE_IDS_PATH: &str = "component_id_index";
 
 /// Configuration for a single project to map Inspect data to its Cobalt metrics.
 #[derive(Deserialize, Debug, PartialEq)]
@@ -173,9 +176,14 @@ pub struct ComponentIdInfoList(Vec<ComponentIdInfo>);
 
 #[derive(Deserialize, Debug)]
 pub struct ComponentIdInfo {
+    /// The component's moniker
     moniker: String,
-    id: u32,
-    /// Not used by Sampler, but we need to validate it
+    /// The Component Instance ID - may not be available
+    instance_id: Option<String>,
+    /// The ID sent to Cobalt as an event code
+    #[serde(alias = "id")]
+    event_id: u32,
+    /// Human-readable label, not used by Sampler, but we need to validate it
     #[allow(unused)]
     label: String,
 }
@@ -340,7 +348,7 @@ impl MetricConfig {
             selectors
                 .iter_mut()
                 .map::<Result<_, anyhow::Error>, _>(|s| {
-                    let filled_template = Self::insert_moniker(s, &component.moniker)?;
+                    let filled_template = Self::interpolate_template(s, &component)?;
                     Ok(match selector_list::parse_selector::<serde::de::value::Error>(
                         &filled_template,
                     ) {
@@ -351,32 +359,55 @@ impl MetricConfig {
                 .collect::<Result<Vec<Option<_>>, _>>()?,
         );
         let event_codes = match event_codes {
-            None => vec![component.id],
+            None => vec![component.event_id],
             Some(mut codes) => {
-                codes.insert(0, component.id);
+                codes.insert(0, component.event_id);
                 codes
             }
         };
         Ok(MetricConfig { event_codes, selectors, metric_id, metric_type, upload_once, project_id })
     }
 
-    fn insert_moniker(template: &str, moniker: &str) -> Result<String, Error> {
-        let interpolate_position = template.find(MONIKER_INTERPOLATION);
+    fn interpolate_template(
+        template: &str,
+        component_info: &ComponentIdInfo,
+    ) -> Result<String, Error> {
+        let moniker_position = template.find(MONIKER_INTERPOLATION);
+        let instance_id_position = template.find(INSTANCE_ID_INTERPOLATION);
         let separator_position = template.find(":");
         // If the insert position is before the first colon, it's the selector's moniker and
         // slashes should not be escaped.
         // Otherwise, treat the moniker string as a single Node or Property name,
         // and escape the appropriate characters.
-        match (interpolate_position, separator_position) {
-            (Some(i), Some(s)) if i < s => Ok(template.replace(MONIKER_INTERPOLATION, moniker)),
-            (Some(_), Some(_)) => Ok(template.replace(
-                MONIKER_INTERPOLATION,
-                &selectors::sanitize_string_for_selectors(moniker),
-            )),
-            (None, _) => {
-                bail!("{} not found in selector template {}", MONIKER_INTERPOLATION, template)
+        // Instance IDs have no special characters and don't need escaping.
+        match (
+            moniker_position,
+            separator_position,
+            instance_id_position,
+            &component_info.instance_id,
+        ) {
+            (Some(i), Some(s), _, _) if i < s => {
+                Ok(template.replace(MONIKER_INTERPOLATION, &component_info.moniker))
             }
-            _ => bail!("Separator ':' not found in selector template {}", template),
+            (Some(_), Some(_), _, _) => Ok(template.replace(
+                MONIKER_INTERPOLATION,
+                &selectors::sanitize_string_for_selectors(&component_info.moniker),
+            )),
+            (_, _, Some(_), Some(id)) => Ok(template.replace(INSTANCE_ID_INTERPOLATION, &id)),
+            (_, _, Some(_), None) => {
+                bail!("Component ID not available for {}", component_info.moniker)
+            }
+            (None, _, None, _) => {
+                bail!(
+                    "{} and {} not found in selector template {}",
+                    MONIKER_INTERPOLATION,
+                    INSTANCE_ID_INTERPOLATION,
+                    template
+                )
+            }
+            (Some(_), None, _, _) => {
+                bail!("Separator ':' not found in selector template {}", template)
+            }
         }
     }
 }
@@ -401,6 +432,14 @@ impl ProjectConfig {
             poll_rate_sec,
             source_name,
         })
+    }
+}
+
+fn add_instance_ids(ids: component_id_index::Index, fire_components: &mut Vec<ComponentIdInfo>) {
+    for component in fire_components {
+        if let Ok(moniker) = moniker::Moniker::try_from(component.moniker.as_str()) {
+            component.instance_id = ids.id_for_moniker(&moniker).map(|h| format!("{h}"));
+        }
     }
 }
 
@@ -434,8 +473,14 @@ impl SamplerConfig {
             let fire_component_paths = paths_matching_name(&fire_dir, "*/components.json5")?;
             let fire_project_templates = load_many(fire_project_paths)?;
             let fire_components = load_many::<ComponentIdInfoList>(fire_component_paths)?;
-            let fire_components =
+            let mut fire_components =
                 fire_components.into_iter().flatten().collect::<Vec<ComponentIdInfo>>();
+            match component_id_index::Index::from_fidl_file(INSTANCE_IDS_PATH.into()) {
+                Ok(ids) => add_instance_ids(ids, &mut fire_components),
+                Err(error) => {
+                    warn!("Unable to read component ID file; FIRE selectors with instance IDs won't work: {error:?}");
+                }
+            };
             project_configs
                 .append(&mut expand_fire_projects(fire_project_templates, fire_components)?);
         }
@@ -510,7 +555,10 @@ impl SamplerConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::SamplerConfigBuilder;
+    use super::{MetricConfig, SamplerConfigBuilder};
+    use crate::ComponentIdInfo;
+    use component_id_index::InstanceId;
+    use moniker::{Moniker, MonikerBase};
     use std::fs;
 
     #[fuchsia::test]
@@ -865,6 +913,57 @@ mod tests {
                 "foo/bar:root/bar43:leaf3",
                 "asdf/qwer:root/path4:pre-bar43-post",
             ]
+        );
+    }
+
+    #[fuchsia::test]
+    fn index_substitution_works() {
+        let mut ids = component_id_index::Index::default();
+        let foo_bar_moniker = Moniker::parse_str("foo/bar").unwrap();
+        let qwer_asdf_moniker = Moniker::parse_str("qwer/asdf").unwrap();
+        ids.insert(
+            foo_bar_moniker,
+            "1234123412341234123412341234123412341234123412341234123412341234"
+                .parse::<InstanceId>()
+                .unwrap(),
+        )
+        .unwrap();
+        ids.insert(
+            qwer_asdf_moniker,
+            "1234abcd1234abcd123412341234123412341234123412341234123412341234"
+                .parse::<InstanceId>()
+                .unwrap(),
+        )
+        .unwrap();
+        let mut components = vec![
+            ComponentIdInfo {
+                moniker: "baz/quux".to_string(),
+                event_id: 101,
+                label: "bq".into(),
+                instance_id: None,
+            },
+            ComponentIdInfo {
+                moniker: "foo/bar".to_string(),
+                event_id: 102,
+                label: "fb".into(),
+                instance_id: None,
+            },
+        ];
+        super::add_instance_ids(ids, &mut components);
+        let moniker_template = "fizz/buzz:root/info/{MONIKER}/data";
+        let id_template = "fizz/buzz:root/info/{INSTANCE_ID}/data";
+        assert_eq!(
+            MetricConfig::interpolate_template(moniker_template, &components[0]).unwrap(),
+            "fizz/buzz:root/info/baz\\/quux/data".to_string()
+        );
+        assert_eq!(
+            MetricConfig::interpolate_template(moniker_template, &components[1]).unwrap(),
+            "fizz/buzz:root/info/foo\\/bar/data".to_string()
+        );
+        assert!(MetricConfig::interpolate_template(id_template, &components[0]).is_err());
+        assert_eq!(
+            MetricConfig::interpolate_template(id_template, &components[1]).unwrap(),
+            "fizz/buzz:root/info/1234123412341234123412341234123412341234123412341234123412341234/data".to_string()
         );
     }
 }
