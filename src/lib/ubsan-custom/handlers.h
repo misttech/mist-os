@@ -7,6 +7,7 @@
 #ifndef SRC_LIB_UBSAN_CUSTOM_HANDLERS_H_
 #define SRC_LIB_UBSAN_CUSTOM_HANDLERS_H_
 
+#include <inttypes.h>
 #include <stdint.h>
 
 #include "report.h"
@@ -35,11 +36,22 @@ inline void PrintTypeDescriptor(const TypeDescriptor& type, const char* prefix =
          prefix ? ":" : "", type.TypeKind, type.TypeInfo, type.TypeName);
 }
 
+// UBSAN_FMT_PRIxPTR is a string literal fragment for a printf format that goes
+// with an intptr_t or uintptr_t argument.  It prints "0x..." with a fixed
+// number of digits for any value, always 8 for ILP32 and always 16 for LP64.
+#if __INTPTR_WIDTH__ == 32
+#define UBSAN_FMT_PRIxPTR "0x%08" PRIxPTR
+#elif __INTPTR_WIDTH__ == 64
+#define UBSAN_FMT_PRIxPTR "0x%016" PRIxPTR
+#else
+#error "__INTPTR_WIDTH__ not predefined?"
+#endif
+
 // This is a helper used below.  It's always inlined so that Report is
 // constructed in the frame of the actual handler entrypoint and records as its
 // caller PC the call site in the failing instrumented code.
-[[gnu::always_inline]] void HandleNonnullReturn(NonNullReturnData& data, SourceLocation& loc,
-                                                const char* annotation) {
+[[gnu::always_inline]] inline void HandleNonnullReturn(  //
+    NonNullReturnData& data, SourceLocation& loc, const char* annotation) {
   Report failure{
       "null pointer returned from function declared to never return null",
       loc,
@@ -82,14 +94,15 @@ UBSAN_HANDLER __ubsan_handle_nonnull_arg(NonNullArgData* Data) {
 UBSAN_HANDLER __ubsan_handle_type_mismatch_v1(TypeMismatchData* Data, ValueHandle Pointer) {
   Report failure("Type Mismatch", Data->Loc);
 
-  const uintptr_t Alignment = (uintptr_t)1 << Data->LogAlignment;
+  const uintptr_t Alignment = uintptr_t{1} << Data->LogAlignment;
   const uintptr_t AlignmentMask = Alignment - 1;
 
-  Printf("Pointer: 0x%016lx\n", Pointer);
-  Printf("Alignment: 0x%lx bytes\n", Alignment);
+  Printf("Pointer: " UBSAN_FMT_PRIxPTR "\n", Pointer);
+  Printf("Alignment: 0x%" PRIxPTR " bytes\n", Alignment);
 
   if (Pointer & AlignmentMask) {
-    Printf("%s misaligned address 0x%016lx\n", TypeCheckKindMsg(Data->TypeCheckKind), Pointer);
+    Printf("%s misaligned address " UBSAN_FMT_PRIxPTR "\n", TypeCheckKindMsg(Data->TypeCheckKind),
+           Pointer);
   } else {
     Printf("TypeCheck Kind: %s (0x%hhx)\n", TypeCheckKindMsg(Data->TypeCheckKind),
            Data->TypeCheckKind);
@@ -108,8 +121,8 @@ UBSAN_HANDLER __ubsan_handle_function_type_mismatch(FunctionTypeMismatchData* Da
 #define UBSAN_OVERFLOW_HANDLER(handler_name, op)                                     \
   UBSAN_HANDLER handler_name(OverflowData* Data, ValueHandle LHS, ValueHandle RHS) { \
     Report failure("Integer " op " overflow\n", Data->Loc);                          \
-    Printf("LHS: 0x%016lx\n", LHS);                                                  \
-    Printf("RHS: 0x%016lx\n", RHS);                                                  \
+    Printf("LHS: " UBSAN_FMT_PRIxPTR "\n", LHS);                                     \
+    Printf("RHS: " UBSAN_FMT_PRIxPTR "\n", RHS);                                     \
     PrintTypeDescriptor(Data->Type);                                                 \
   }
 
@@ -122,35 +135,35 @@ UBSAN_OVERFLOW_HANDLER(__ubsan_handle_sub_overflow, "SUB")
 UBSAN_HANDLER __ubsan_handle_divrem_overflow(OverflowData* Data, ValueHandle LHS, ValueHandle RHS,
                                              ReportOptions Opts) {
   Report failure("Integer DIVREM overflow", Data->Loc);
-  Printf("LHS: 0x%016lx\n", LHS);
-  Printf("RHS: 0x%016lx\n", RHS);
+  Printf("LHS: " UBSAN_FMT_PRIxPTR "\n", LHS);
+  Printf("RHS: " UBSAN_FMT_PRIxPTR "\n", RHS);
   PrintTypeDescriptor(Data->Type);
 }
 
 UBSAN_HANDLER __ubsan_handle_negate_overflow(OverflowData* Data, ValueHandle OldVal) {
   Report failure("Integer NEGATE overflow", Data->Loc);
-  Printf("old value: 0x%016lx\n", OldVal);
+  Printf("old value: " UBSAN_FMT_PRIxPTR "\n", OldVal);
   PrintTypeDescriptor(Data->Type);
 }
 
 UBSAN_HANDLER __ubsan_handle_load_invalid_value(InvalidValueData* Data, ValueHandle Val) {
   Report failure("Load invalid value into enum/bool", Data->Loc);
-  Printf("Val: 0x%016lx\n", Val);
+  Printf("Val: " UBSAN_FMT_PRIxPTR "\n", Val);
   PrintTypeDescriptor(Data->Type);
 }
 
 UBSAN_HANDLER __ubsan_handle_implicit_conversion(ImplicitConversionData* Data, ValueHandle Src,
                                                  ValueHandle Dst) {
   Report failure("Implicit Conversion", Data->Loc);
-  Printf("Src: 0x%016lx\n", Src);
-  Printf("Dst: 0x%016lx\n", Dst);
+  Printf("Src: " UBSAN_FMT_PRIxPTR "\n", Src);
+  Printf("Dst: " UBSAN_FMT_PRIxPTR "\n", Dst);
   PrintTypeDescriptor(Data->FromType, "From");
   PrintTypeDescriptor(Data->ToType, "To");
 }
 
 UBSAN_HANDLER __ubsan_handle_out_of_bounds(OutOfBoundsData* Data, ValueHandle Index) {
   Report failure("Out of bounds access", Data->Loc);
-  Printf("Index: 0x%016lx\n", Index);
+  Printf("Index: " UBSAN_FMT_PRIxPTR "\n", Index);
   PrintTypeDescriptor(Data->ArrayType, "Array");
   PrintTypeDescriptor(Data->IndexType, "Index");
 }
@@ -158,8 +171,8 @@ UBSAN_HANDLER __ubsan_handle_out_of_bounds(OutOfBoundsData* Data, ValueHandle In
 UBSAN_HANDLER __ubsan_handle_shift_out_of_bounds(ShiftOutOfBoundsData* Data, ValueHandle LHS,
                                                  ValueHandle RHS) {
   Report failure("SHIFT overflow", Data->Loc);
-  Printf("LHS: 0x%016lx\n", LHS);
-  Printf("RHS: 0x%016lx\n", RHS);
+  Printf("LHS: " UBSAN_FMT_PRIxPTR "\n", LHS);
+  Printf("RHS: " UBSAN_FMT_PRIxPTR "\n", RHS);
   PrintTypeDescriptor(Data->LHSType, "LHS");
   PrintTypeDescriptor(Data->RHSType, "RHS");
 }
@@ -167,8 +180,8 @@ UBSAN_HANDLER __ubsan_handle_shift_out_of_bounds(ShiftOutOfBoundsData* Data, Val
 UBSAN_HANDLER __ubsan_handle_pointer_overflow(PointerOverflowData* Data, ValueHandle Base,
                                               ValueHandle Result) {
   Report failure("POINTER overflow", Data->Loc);
-  Printf("Base: 0x%016lx\n", Base);
-  Printf("Result: 0x%016lx\n", Result);
+  Printf("Base: " UBSAN_FMT_PRIxPTR "\n", Base);
+  Printf("Result: " UBSAN_FMT_PRIxPTR "\n", Result);
 }
 
 UBSAN_HANDLER __ubsan_handle_builtin_unreachable(UnreachableData* Data) {
@@ -180,9 +193,9 @@ UBSAN_HANDLER __ubsan_handle_alignment_assumption(AlignmentAssumptionData* Data,
                                                   ValueHandle Offset) {
   Report failure("Alignment Assumption violation", Data->Loc);
   PrintTypeDescriptor(Data->Type);
-  Printf("Pointer: 0x%016lx\n", Pointer);
-  Printf("Alignment: 0x%016lx\n", Alignment);
-  Printf("Offset: 0x%016lx\n", Offset);
+  Printf("Pointer: " UBSAN_FMT_PRIxPTR "\n", Pointer);
+  Printf("Alignment: " UBSAN_FMT_PRIxPTR "\n", Alignment);
+  Printf("Offset: " UBSAN_FMT_PRIxPTR "\n", Offset);
 }
 
 UBSAN_HANDLER __ubsan_handle_invalid_builtin(InvalidBuiltinData& Data) {
