@@ -94,18 +94,23 @@ async fn handle_trigger(event: ftest::TriggerRequest) {
             "/read_exec",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         ),
+        RightsTestCase::new(
+            "/nested/read_exec",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        ),
         RightsTestCase::new("/read_only_after_scoped", fio::OpenFlags::RIGHT_READABLE),
     ];
+    let mut responses = vec![];
     for test_case in tests.iter() {
         if let Err(test_failure) = test_case.verify() {
-            responder
-                .send(&format!(
-                    "Directory rights test failed: {} - {}",
-                    test_case.path, test_failure,
-                ))
-                .expect("failed to send trigger response");
-            return;
+            responses.push(format!(
+                "Directory rights test failed: {} - {}",
+                test_case.path, test_failure
+            ));
         }
     }
-    responder.send("All tests passed").expect("failed to send trigger response");
+    if responses.is_empty() {
+        responses.push("All tests passed".into());
+    }
+    responder.send(&responses.join("\n")).expect("failed to send trigger response");
 }

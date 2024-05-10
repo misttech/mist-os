@@ -272,6 +272,9 @@ pub enum EntryError {
     #[error("directory is not set")]
     MissingDirectory,
 
+    #[error("entry type is not supported (must be directory or dictionary")]
+    UnsupportedType,
+
     #[error("path is invalid for a namespace entry: `{0}`")]
     InvalidPath(#[from] cm_types::ParseError),
 }

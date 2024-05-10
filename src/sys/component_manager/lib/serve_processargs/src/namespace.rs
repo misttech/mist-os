@@ -1,4 +1,3 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,7 +5,7 @@ use cm_types::{NamespacePath, Path};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
-use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Tree};
+use namespace::{Entry as NamespaceEntry, EntryError, Namespace, NamespaceError, Tree};
 use sandbox::{Capability, Dict};
 use thiserror::Error;
 use vfs::{directory::entry::serve_directory, execution_scope::ExecutionScope};
@@ -91,6 +90,10 @@ impl NamespaceBuilder {
         cap: Capability,
         path: &NamespacePath,
     ) -> Result<(), BuildNamespaceError> {
+        match &cap {
+            Capability::Directory(_) | Capability::Dictionary(_) => {}
+            _ => return Err(NamespaceError::EntryError(EntryError::UnsupportedType).into()),
+        }
         self.entries.add(path, cap)?;
         Ok(())
     }
@@ -103,7 +106,7 @@ impl NamespaceBuilder {
             .map(|(path, cap)| -> Result<NamespaceEntry, BuildNamespaceError> {
                 let directory = match cap {
                     Capability::Directory(d) => d,
-                    cap => {
+                    cap @ Capability::Dictionary(_) => {
                         let entry = cap.try_into_directory_entry().map_err(|err| {
                             BuildNamespaceError::Conversion { path: path.clone(), err }
                         })?;
@@ -117,13 +120,17 @@ impl NamespaceBuilder {
                             serve_directory(
                                 entry,
                                 &self.scope,
-                                fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                                fio::OpenFlags::DIRECTORY
+                                    | fio::OpenFlags::RIGHT_READABLE
+                                    | fio::OpenFlags::POSIX_EXECUTABLE
+                                    | fio::OpenFlags::POSIX_WRITABLE,
                             )
                             .map_err(|err| {
                                 BuildNamespaceError::Serve { path: path.clone(), err }
                             })?,
                         )
                     }
+                    _ => return Err(NamespaceError::EntryError(EntryError::UnsupportedType).into()),
                 };
                 let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
                 Ok(NamespaceEntry { path, directory: client_end.into() })
@@ -168,17 +175,36 @@ mod tests {
         crate::test_util::multishot,
         anyhow::Result,
         assert_matches::assert_matches,
-        fidl::{endpoints::Proxy, Peered},
+        fidl::{
+            endpoints::{self, Proxy, ServerEnd},
+            Peered,
+        },
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
         fuchsia_zircon::AsHandleRef,
-        futures::StreamExt,
+        futures::{channel::mpsc, StreamExt, TryStreamExt},
+        sandbox::Directory,
+        std::sync::Arc,
+        test_case::test_case,
+        vfs::{
+            directory::{
+                entry::{DirectoryEntry, EntryInfo, OpenRequest},
+                entry_container::Directory as VfsDirectory,
+            },
+            path, pseudo_directory,
+            remote::RemoteLike,
+        },
     };
 
     fn connector_cap() -> Capability {
         let (sender, _receiver) = multishot();
         Capability::Connector(sender)
+    }
+
+    fn directory_cap() -> Capability {
+        let (client, _server) = endpoints::create_endpoints();
+        Capability::Directory(Directory::new(client))
     }
 
     fn ns_path(str: &str) -> NamespacePath {
@@ -210,9 +236,9 @@ mod tests {
         shadow.add_object(connector_cap(), &path("/svc/foo")).unwrap();
         assert_matches!(shadow.add_object(connector_cap(), &path("/svc/foo/bar")), Err(_));
 
-        let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        shadow.add_object(connector_cap(), &path("/svc/foo")).unwrap();
-        assert_matches!(shadow.add_entry(connector_cap(), &ns_path("/svc2")), Ok(_));
+        let mut not_shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
+        not_shadow.add_object(connector_cap(), &path("/svc/foo")).unwrap();
+        assert_matches!(not_shadow.add_entry(directory_cap(), &ns_path("/svc2")), Ok(_));
     }
 
     #[fuchsia::test]
@@ -230,10 +256,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_entry() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_entry(connector_cap(), &ns_path("/svc/a")).expect("");
+        namespace.add_entry(directory_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
-            namespace.add_entry(connector_cap(), &ns_path("/svc/a")),
+            namespace.add_entry(directory_cap(), &ns_path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
             if path.to_string() == "/svc/a"
         );
@@ -244,7 +270,7 @@ mod tests {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(connector_cap(), &path("/svc/a")).expect("");
         assert_matches!(
-            namespace.add_entry(connector_cap(), &ns_path("/svc/a")),
+            namespace.add_entry(directory_cap(), &ns_path("/svc/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Shadow(path)))
             if path.to_string() == "/svc/a"
         );
@@ -257,7 +283,7 @@ mod tests {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(connector_cap(), &path("/foo/bar")).expect("");
         assert_matches!(
-            namespace.add_entry(connector_cap(), &ns_path("/foo")),
+            namespace.add_entry(directory_cap(), &ns_path("/foo")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
             if path.to_string() == "/foo"
         );
@@ -269,7 +295,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_object_parent_at_entry() {
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
-        namespace.add_entry(connector_cap(), &ns_path("/foo")).expect("");
+        namespace.add_entry(directory_cap(), &ns_path("/foo")).expect("");
         assert_matches!(
             namespace.add_object(connector_cap(), &path("/foo/bar")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::Duplicate(path)))
@@ -408,7 +434,169 @@ mod tests {
         let (not_found_sender, _) = unbounded();
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found_sender);
         let (_, sender) = sandbox::Receiver::new();
-        namespace.add_entry(sender.into(), &ns_path("/a")).unwrap();
-        assert_matches!(namespace.serve(), Err(BuildNamespaceError::Conversion { .. }));
+        assert_matches!(
+            namespace.add_entry(sender.into(), &ns_path("/a")),
+            Err(BuildNamespaceError::NamespaceError(NamespaceError::EntryError(
+                EntryError::UnsupportedType
+            )))
+        );
+    }
+
+    #[test_case(fio::OpenFlags::RIGHT_READABLE)]
+    #[test_case(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)]
+    #[test_case(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)]
+    #[test_case(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE)]
+    #[fuchsia::test]
+    async fn test_directory_rights(rights: fio::OpenFlags) {
+        fn serve_vfs_dir(
+            root: Arc<impl VfsDirectory>,
+            rights: fio::OpenFlags,
+        ) -> ClientEnd<fio::DirectoryMarker> {
+            let scope = ExecutionScope::new();
+            let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
+            root.open(
+                scope.clone(),
+                rights,
+                vfs::path::Path::dot(),
+                ServerEnd::new(server.into_channel()),
+            );
+            client
+        }
+
+        let (open_tx, mut open_rx) = mpsc::channel::<()>(1);
+
+        struct MockDir {
+            tx: mpsc::Sender<()>,
+            rights: fio::OpenFlags,
+        }
+        impl DirectoryEntry for MockDir {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+            }
+
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+                request.open_remote(self)
+            }
+        }
+        impl RemoteLike for MockDir {
+            fn open(
+                self: Arc<Self>,
+                _scope: ExecutionScope,
+                flags: fio::OpenFlags,
+                relative_path: path::Path,
+                _server_end: ServerEnd<fio::NodeMarker>,
+            ) {
+                assert_eq!(relative_path.into_string(), "");
+                assert_eq!(flags, fio::OpenFlags::DIRECTORY | self.rights);
+                self.tx.clone().try_send(()).unwrap();
+            }
+        }
+
+        let mock = Arc::new(MockDir { tx: open_tx, rights });
+
+        let fs = pseudo_directory! {
+            "foo" => mock,
+        };
+        let dir = Directory::from(serve_vfs_dir(fs, rights));
+
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
+        namespace.add_object(dir.into(), &path("/dir/a")).unwrap();
+        let mut ns = namespace.serve().unwrap();
+        let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
+        let dir_proxy = dir_proxy.into_proxy().unwrap();
+        let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
+        dir_proxy
+            .open(fio::OpenFlags::DIRECTORY | rights, fio::ModeType::empty(), "a/foo", server_end)
+            .unwrap();
+
+        // The MockDir should receive the Open request.
+        open_rx.next().await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_directory_non_executable() {
+        fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
+            let scope = ExecutionScope::new();
+            let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
+            root.open(
+                scope.clone(),
+                fio::OpenFlags::RIGHT_READABLE,
+                vfs::path::Path::dot(),
+                ServerEnd::new(server.into_channel()),
+            );
+            client
+        }
+
+        let (open_tx, mut open_rx) = mpsc::channel::<()>(1);
+
+        struct MockDir(mpsc::Sender<()>);
+        impl DirectoryEntry for MockDir {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+            }
+
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+                request.open_remote(self)
+            }
+        }
+        impl RemoteLike for MockDir {
+            fn open(
+                self: Arc<Self>,
+                _scope: ExecutionScope,
+                flags: fio::OpenFlags,
+                relative_path: path::Path,
+                _server_end: ServerEnd<fio::NodeMarker>,
+            ) {
+                assert_eq!(relative_path.into_string(), "");
+                assert_eq!(flags, fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE);
+                self.0.clone().try_send(()).unwrap();
+            }
+        }
+
+        let mock = Arc::new(MockDir(open_tx));
+
+        let fs = pseudo_directory! {
+            "foo" => mock,
+        };
+        let dir = Directory::from(serve_vfs_dir(fs));
+
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
+        namespace.add_object(dir.into(), &path("/dir/a")).unwrap();
+        let mut ns = namespace.serve().unwrap();
+        let dir_proxy = ns.remove(&"/dir".parse().unwrap()).unwrap();
+        let dir_proxy = dir_proxy.into_proxy().unwrap();
+
+        // Try to open as executable. Should fail (ACCESS_DENIED)
+        let (node, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
+        dir_proxy
+            .open(
+                fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_EXECUTABLE,
+                fio::ModeType::empty(),
+                "a/foo",
+                server_end,
+            )
+            .unwrap();
+        let node = node.into_proxy().unwrap();
+        let mut node = node.take_event_stream();
+        assert_matches!(
+            node.try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
+        );
+
+        // Try to open as read-only. Should succeed.
+        let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
+        dir_proxy
+            .open(
+                fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                fio::ModeType::empty(),
+                "a/foo",
+                server_end,
+            )
+            .unwrap();
+
+        // The MockDir should receive the Open request.
+        open_rx.next().await.unwrap();
     }
 }
