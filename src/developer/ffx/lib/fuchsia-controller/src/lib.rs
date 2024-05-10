@@ -36,7 +36,7 @@ pub unsafe extern "C" fn create_ffx_lib_context(
     error_scratch: *mut u8,
     len: u64,
 ) {
-    let buf = ExtBuffer::new(error_scratch, len as usize);
+    let buf = unsafe { ExtBuffer::new(error_scratch, len as usize) };
     let ctx_out = LibContext::new(buf);
     let ptr = Arc::into_raw(Arc::new(ctx_out));
 
@@ -259,8 +259,8 @@ pub unsafe extern "C" fn ffx_channel_write(
     let channel = fidl::Channel::from_handle(handle);
     ctx.run(LibraryCommand::ChannelWrite {
         channel,
-        buf: ExtBuffer::new(out_buf, out_len as usize),
-        handles: ExtBuffer::new(hdls as *mut fidl::Handle, hdls_len as usize),
+        buf: unsafe { ExtBuffer::new(out_buf, out_len as usize) },
+        handles: unsafe { ExtBuffer::new(hdls as *mut fidl::Handle, hdls_len as usize) },
         responder,
     });
     rx.recv().unwrap()
@@ -281,10 +281,10 @@ pub unsafe extern "C" fn ffx_channel_write_etc(
     let channel = fidl::Channel::from_handle(handle);
     ctx.run(LibraryCommand::ChannelWriteEtc {
         channel,
-        buf: ExtBuffer::new(out_buf, out_len as usize),
+        buf: unsafe { ExtBuffer::new(out_buf, out_len as usize) },
         // Construction of HandleDisposition structs has to happen in the main thread, as it
         // contains a lifetime bound.
-        handles: ExtBuffer::new(hdls, hdls_len as usize),
+        handles: unsafe { ExtBuffer::new(hdls, hdls_len as usize) },
         responder,
     });
     rx.recv().unwrap()
@@ -308,8 +308,10 @@ pub unsafe extern "C" fn ffx_channel_read(
     ctx.run(LibraryCommand::ChannelRead {
         lib: ctx.clone(),
         channel,
-        out_buf: ExtBuffer::new(out_buf, out_len as usize),
-        out_handles: ExtBuffer::new(hdls as *mut MaybeUninit<fidl::Handle>, hdls_len as usize),
+        out_buf: unsafe { ExtBuffer::new(out_buf, out_len as usize) },
+        out_handles: unsafe {
+            ExtBuffer::new(hdls as *mut MaybeUninit<fidl::Handle>, hdls_len as usize)
+        },
         responder,
     });
     let ReadResponse {
@@ -356,7 +358,7 @@ pub unsafe extern "C" fn ffx_socket_write(
     let socket = fidl::Socket::from_handle(handle);
     ctx.run(LibraryCommand::SocketWrite {
         socket,
-        buf: ExtBuffer::new(buf, buf_len as usize),
+        buf: unsafe { ExtBuffer::new(buf, buf_len as usize) },
         responder,
     });
     rx.recv().unwrap()
@@ -377,7 +379,7 @@ pub unsafe extern "C" fn ffx_socket_read(
     ctx.run(LibraryCommand::SocketRead {
         lib: ctx.clone(),
         socket,
-        out_buf: ExtBuffer::new(out_buf, out_len as usize),
+        out_buf: unsafe { ExtBuffer::new(out_buf, out_len as usize) },
         responder,
     });
     let ReadResponse { actual_bytes_count: bytes_count_recv, result, .. } = rx.recv().unwrap();
@@ -532,11 +534,12 @@ pub unsafe extern "C" fn ffx_config_get_string(
             return zx_status::Status::INTERNAL;
         }
     };
+    let out_buf_size = unsafe { *out_buf_len as usize };
     ctx.lib_ctx().run(LibraryCommand::ConfigGetString {
         responder: tx,
         env_ctx: ctx.clone(),
         config_key: config_key_str,
-        out_buf: ExtBuffer::new(out_buf, unsafe { *out_buf_len } as usize),
+        out_buf: unsafe { ExtBuffer::new(out_buf, out_buf_size) },
     });
     match rx.recv().unwrap() {
         Ok(size) => {
