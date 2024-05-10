@@ -5,7 +5,7 @@
 use {
     anyhow::{anyhow, Context as _},
     async_trait::async_trait,
-    camino::Utf8Path,
+    camino::{Utf8Path, Utf8PathBuf},
     errors::ffx_bail,
     ffx_config::EnvironmentContext,
     ffx_repository_serve_args::ServeCommand,
@@ -30,16 +30,15 @@ use {
         repository::{PmRepository, RepoProvider},
         server::RepositoryServer,
     },
-    futures::executor::block_on,
-    futures::SinkExt,
-    futures::StreamExt,
-    futures::TryStreamExt as _,
+    futures::{executor::block_on, SinkExt, StreamExt, TryStreamExt as _},
     pkg::repo::register_target_with_fidl_proxies,
     signal_hook::{
-        consts::signal::SIGHUP, consts::signal::SIGINT, consts::signal::SIGTERM, iterator::Signals,
+        consts::signal::{SIGHUP, SIGINT, SIGTERM},
+        iterator::Signals,
     },
     std::{fs, io::Write, path::Path, sync::Arc, time::Duration},
     timeout::timeout,
+    tuf::metadata::RawSignedMetadata,
 };
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
@@ -193,6 +192,33 @@ async fn connect_to_target(
     Ok(target.nodename.clone())
 }
 
+// Constructs a repo client with an explicitly passed trusted
+// root, or defaults to the trusted root of the repository if
+// none is provided.
+async fn repo_client_from_optional_trusted_root(
+    trusted_root: Option<Utf8PathBuf>,
+    repository: impl RepoProvider + 'static,
+) -> Result<RepoClient<Box<dyn RepoProvider>>, anyhow::Error> {
+    let repo_client = if let Some(ref trusted_root_path) = trusted_root {
+        let buf = async_fs::read(&trusted_root_path)
+            .await
+            .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
+
+        let trusted_root = RawSignedMetadata::new(buf);
+
+        RepoClient::from_trusted_root(&trusted_root, Box::new(repository) as Box<_>)
+            .await
+            .with_context(|| {
+                format!("Creating repo client using trusted root {trusted_root_path}")
+            })?
+    } else {
+        RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
+            .await
+            .with_context(|| format!("Creating repo client using default trusted root"))?
+    };
+    Ok(repo_client)
+}
+
 #[async_trait(?Send)]
 impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
@@ -262,13 +288,16 @@ $ ffx doctor --restart-daemon"#,
             let repo_path = repo_path
                 .canonicalize_utf8()
                 .with_context(|| format!("canonicalizing repo path {:?}", repo_path))?;
-            let pm_backend = PmRepository::new(repo_path.clone());
-            let pm_repo_client = RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>)
-                .await
-                .with_context(|| format!("creating repo client"))?;
+            let repository = PmRepository::new(repo_path.clone());
+
+            let mut repo_client =
+                repo_client_from_optional_trusted_root(cmd.trusted_root.clone(), repository)
+                    .await?;
+
+            repo_client.update().await.context("updating the repository metadata")?;
 
             let repo_name = cmd.repository.unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
-            repo_manager.add(repo_name, pm_repo_client);
+            repo_manager.add(repo_name, repo_client);
             repo_path
         }
     };
@@ -411,9 +440,12 @@ mod test {
         },
         fidl_fuchsia_pkg_rewrite_ext::Rule,
         frcs::RemoteControlMarker,
-        fuchsia_repo::repository::HttpRepository,
+        fuchsia_repo::{
+            repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::HttpRepository, test_utils,
+        },
         futures::channel::mpsc::{self, Receiver},
         std::{collections::BTreeSet, sync::Mutex, time},
+        tuf::{crypto::Ed25519PrivateKey, metadata::Metadata},
         url::Url,
     };
 
@@ -854,6 +886,7 @@ mod test {
         let serve_tool = ServeTool {
             cmd: ServeCommand {
                 repository: Some(REPO_NAME.to_string()),
+                trusted_root: None,
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: Some(EMPTY_REPO_PATH.into()),
                 product_bundle: None,
@@ -984,6 +1017,7 @@ mod test {
         let serve_tool = ServeTool {
             cmd: ServeCommand {
                 repository: Some(REPO_NAME.to_string()),
+                trusted_root: None,
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: Some(EMPTY_REPO_PATH.into()),
                 product_bundle: None,
@@ -1112,6 +1146,7 @@ mod test {
         let serve_tool = ServeTool {
             cmd: ServeCommand {
                 repository: Some(REPO_NAME.to_string()),
+                trusted_root: None,
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: Some(EMPTY_REPO_PATH.into()),
                 product_bundle: None,
@@ -1277,6 +1312,7 @@ mod test {
         let serve_tool = ServeTool {
             cmd: ServeCommand {
                 repository: None,
+                trusted_root: None,
                 address: (REPO_IPV4_ADDR, REPO_PORT).into(),
                 repo_path: None,
                 product_bundle: Some(pb_dir),
@@ -1343,5 +1379,149 @@ mod test {
 
             assert_matches!(repo_client.update().await, Ok(true));
         }
+    }
+
+    fn generate_ed25519_private_key() -> Ed25519PrivateKey {
+        Ed25519PrivateKey::from_pkcs8(&Ed25519PrivateKey::pkcs8().unwrap()).unwrap()
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_trusted_root_file() {
+        let test_env = get_test_env().await;
+
+        let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+
+        // Set up a simple test repository
+        let tmp_repo = tempfile::tempdir().unwrap();
+        let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+        let tmp_pm_repo = test_utils::make_pm_repository(tmp_repo_path).await;
+        let mut tmp_repo_client = RepoClient::from_trusted_remote(&tmp_pm_repo).await.unwrap();
+        tmp_repo_client.update().await.unwrap();
+
+        // Generate a newer set of keys.
+        let repo_keys_new = RepoKeys::builder()
+            .add_root_key(Box::new(generate_ed25519_private_key()))
+            .add_targets_key(Box::new(generate_ed25519_private_key()))
+            .add_snapshot_key(Box::new(generate_ed25519_private_key()))
+            .add_timestamp_key(Box::new(generate_ed25519_private_key()))
+            .build();
+
+        // Generate new metadata that trusts the new keys, but signs it with the old keys.
+        let repo_signing_keys = tmp_pm_repo.repo_keys().unwrap();
+        RepoBuilder::from_database(
+            tmp_repo_client.remote_repo(),
+            &repo_keys_new,
+            tmp_repo_client.database(),
+        )
+        .signing_repo_keys(&repo_signing_keys)
+        .commit()
+        .await
+        .unwrap();
+
+        assert_eq!(tmp_repo_client.database().trusted_timestamp().unwrap().version(), 1);
+
+        // Delete 1.root.json to ensure it can't be accessed when initializing
+        // root of trust with 2.root.json
+        std::fs::remove_file(tmp_repo_path.join("repository").join("1.root.json")).unwrap();
+        // Move root.json and 2.root.json out of the repository/ dir, to verify
+        // we can pass the root of trust file from anywhere to a repo constructor
+        let tmp_root = tempfile::tempdir().unwrap();
+        let tmp_root_dir = Utf8Path::from_path(tmp_root.path()).unwrap();
+        let trusted_root_path = tmp_root_dir.join("2.root.json");
+        std::fs::rename(
+            tmp_repo_path.join("repository").join("root.json"),
+            tmp_root_dir.join("root.json"),
+        )
+        .unwrap();
+        std::fs::rename(tmp_repo_path.join("repository").join("2.root.json"), &trusted_root_path)
+            .unwrap();
+
+        let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
+        let (fake_engine, _fake_engine_rx) = FakeEngine::new();
+
+        let (_, target_collection_proxy, _) =
+            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
+
+        // Prepare serving the repo without passing the trusted root, and
+        // passing of the trusted root 2.root.json explicitly
+        let serve_cmd_without_root = ServeCommand {
+            repository: Some(REPO_NAME.to_string()),
+            trusted_root: None,
+            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            repo_path: Some(tmp_repo_path.into()),
+            product_bundle: None,
+            alias: vec![],
+            storage_type: None,
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+            port_path: Some(tmp_port_file.path().to_owned()),
+            no_device: true,
+        };
+        let mut serve_cmd_with_root = serve_cmd_without_root.clone();
+        serve_cmd_with_root.trusted_root = trusted_root_path.clone().into();
+
+        // Serving the repo should error out since it does not find root.json and
+        // and can't initialize root of trust 1.root.json.
+        assert_eq!(
+            serve_impl(
+                target_collection_proxy.clone(),
+                serve_cmd_without_root,
+                test_env.context.clone(),
+                SimpleWriter::new()
+            )
+            .await
+            .is_err(),
+            true
+        );
+
+        let test_stdout = TestBuffer::default();
+        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+
+        // Run main in background
+        let _task = fasync::Task::local(async move {
+            serve_impl(
+                target_collection_proxy,
+                serve_cmd_with_root,
+                test_env.context.clone(),
+                writer,
+            )
+            .await
+            .unwrap()
+        });
+
+        // Wait for the "Serving repository ..." output
+        for _ in 0..10 {
+            if !test_stdout.clone().into_string().is_empty() {
+                break;
+            }
+            fasync::Timer::new(time::Duration::from_millis(100)).await;
+        }
+
+        // Get dynamic port
+        let dynamic_repo_port =
+            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
+        tmp_port_file.close().unwrap();
+
+        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
+
+        // Check repository state.
+        let http_repo = HttpRepository::new(
+            fuchsia_hyper::new_client(),
+            Url::parse(&repo_url).unwrap(),
+            Url::parse(&format!("{repo_url}/blobs")).unwrap(),
+            BTreeSet::new(),
+        );
+
+        // As there was no key rotation since we created 2.root.json above,
+        // and we removed root.json out of the repo, creating a repo client via
+        // RepoClient::from_trusted_remote would error out trying to find root.json.
+        // Hence we need to initialize the http client with 2.root.json, too.
+        let mut repo_client =
+            repo_client_from_optional_trusted_root(Some(trusted_root_path), http_repo)
+                .await
+                .unwrap();
+
+        // The repo metadata should be at version 2
+        assert_matches!(repo_client.update().await, Ok(true));
+        assert_eq!(repo_client.database().trusted_timestamp().unwrap().version(), 2);
     }
 }

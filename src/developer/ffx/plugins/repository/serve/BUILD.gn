@@ -35,11 +35,13 @@ ffx_plugin("ffx_repository_serve") {
     "//src/lib/fuchsia-async",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:signal-hook",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tuf",
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",

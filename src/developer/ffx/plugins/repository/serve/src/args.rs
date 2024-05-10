@@ -13,7 +13,7 @@ use std::{
 
 // TODO(b/295560556): Expand to handle multiple repositories.
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, Clone, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "serve",
@@ -24,6 +24,15 @@ pub struct ServeCommand {
     /// register this repository.
     /// Default is `devhost`.
     pub repository: Option<String>,
+
+    /// path to the root metadata that was used to sign the
+    /// repository TUF metadata. This establishes the root of
+    /// trust for this repository. If the TUF metadata was not
+    /// signed by this root metadata, running this command
+    /// will result in an error.
+    /// Default is to use 1.root.json from the repository.
+    #[argh(option)]
+    pub trusted_root: Option<Utf8PathBuf>,
 
     /// address on which to serve the repository.
     /// Note that this can be either IPV4 or IPV6.
