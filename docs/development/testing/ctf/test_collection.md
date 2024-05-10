@@ -1,5 +1,9 @@
 # The CTF Test Collection
 
+Note: Compatibility testing documents are being overhauled in Q2
+2024.  Some information in this document is out of date. See
+https://fxbug.dev/339893257 for details.
+
 [CTF] tests run in a special collection which is meant to isolate any capabilities
 that are required only for CTF testing. CTF tests must declare the following facet
 so they run in this collection:

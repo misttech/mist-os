@@ -1,5 +1,9 @@
 # Compatibility Tests for Fuchsia
 
+Note: Compatibility testing documents are being overhauled in Q2
+2024.  Some information in this document is out of date. See
+https://fxbug.dev/339893257 for details.
+
 The Compatibility Tests for Fuchsia (CTF) are a set of tests designed to provide
 coverage for Application Programming Interface (API) and Application Binary
 Interface (ABI) elements (e.g., headers, FIDL files) made available to

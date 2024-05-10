@@ -1,5 +1,9 @@
 # Diagnosing CTF Test Failures
 
+Note: Compatibility testing documents are being overhauled in Q2
+2024.  Some information in this document is out of date. See
+https://fxbug.dev/339893257 for details.
+
 The Fuchsia Platform Surface Area (PlaSA) is defined as the set of ABIs and
 APIs exposed by the Fuchsia SDK.  It is critical to maintain compatibility
 between subsequent releases of the Fuchsia Platform in order to ensure existing

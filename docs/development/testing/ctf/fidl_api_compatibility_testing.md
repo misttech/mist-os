@@ -1,5 +1,9 @@
 # FIDL API compatibility testing
 
+Note: Compatibility testing documents are being overhauled in Q2
+2024.  Some information in this document is out of date. See
+https://fxbug.dev/339893257 for details.
+
 We use API compatibility tests to ensure that SDK Users targeting supported platform
 API levels aren't broken by changes to FIDL APIs at tip of tree. All FIDL APIs published in
 the [partner Fuchsia SDKs][SDK Categories] should be automatically tested for backward API
