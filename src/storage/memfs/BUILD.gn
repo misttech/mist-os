@@ -64,7 +64,6 @@ source_set("cpp") {
   # tests instead of running their own memfs instances.
   visibility = [
     ":*",
-    "//src/developer/forensics/testing:scoped_memfs_manager",
     "//src/developer/memory/monitor/tests:memory_monitor_unittests",
     "//src/storage/lib/vfs/cpp:fs-connection-test",
     "//src/storage/memfs/test/*",
