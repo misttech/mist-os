@@ -5,7 +5,6 @@ library fuchsia.hardware.block;
 
 /// Stats captured for specific block requests. Unless specified otherwise, time units are in
 /// nanoseconds and data transferred is in bytes
-@available(added=15)
 type RequestStats = struct {
     /// Minimum time taken by a request to be served.
     minimum_latency uint64;
@@ -33,7 +32,6 @@ type RequestStats = struct {
 };
 
 /// Helper struct to track device requests grouped by successful versus failed requests.
-@available(added=15)
 type OperationStats = struct {
     /// Stats for successful requests.
     success RequestStats;
@@ -43,7 +41,6 @@ type OperationStats = struct {
 
 /// Returns stats about the block device on the provided buffer. If `clear` is true, the
 /// operation counters will be cleared.
-@available(added=15)
 type BlockStats = struct {
     /// Stats about block read operations from the device.
     read OperationStats;

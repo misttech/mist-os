@@ -23,7 +23,6 @@ const VMOID_INVALID uint16 = 0;
 /// - Observing a closure of the server end indicates the object no longer exists.
 ///
 /// The object can be destroyed synchronously using [`fuchsia.unknown/Closeable.Close`].
-@available(added=9)
 closed protocol Session {
     compose fuchsia.unknown.Closeable;
 
@@ -87,7 +86,6 @@ closed protocol Block {
     }) error zx.Status;
 
     /// Returns stats about block device operations. Setting `clear` will reset stats counters.
-    @available(added=15)
     strict GetStats(struct {
         clear bool;
     }) -> (struct {
@@ -96,7 +94,6 @@ closed protocol Block {
 
 
     /// Opens a new FIFO-based session on the block device.
-    @available(added=9)
     strict OpenSession(resource struct {
         session server_end:Session;
     });
