@@ -498,11 +498,13 @@ impl FallocMode {
     }
 }
 
+#[derive(Debug)]
 pub enum CheckAccessReason {
     Access,
     Chdir,
     Chroot,
     Open,
+    Lookup,
     InternalPermissionChecks,
 }
 
@@ -1249,12 +1251,7 @@ impl FsNode {
         mount: &MountInfo,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.check_access(
-            current_task,
-            mount,
-            Access::EXEC,
-            CheckAccessReason::InternalPermissionChecks,
-        )?;
+        self.check_access(current_task, mount, Access::EXEC, CheckAccessReason::Lookup)?;
         self.ops().lookup(self, current_task, name)
     }
 

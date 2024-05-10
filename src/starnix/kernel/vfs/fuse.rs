@@ -1034,15 +1034,14 @@ impl FsNodeOps for Arc<FuseNode> {
                     error!(EINVAL)
                 }
             }
-            CheckAccessReason::Open => {
+            CheckAccessReason::Open | CheckAccessReason::Lookup => {
                 // Don't perform any access checks when this access check is being
-                // performed for an open. `FUSE_OPEN` handlers are expected to validate
-                // that the open request is valid for the given node being opened,
+                // performed for an open/lookup. Their handlers are expected to validate
+                // that the request is valid for the given node being operated on,
                 // including the flags which hold the requested access permissions
                 // like read/write (e.g. `O_RDONLY`/`O_RDWR`).
                 //
-                // For more details, see fuse(4) and `libfuse`'s low-level `FUSE_OPEN`
-                // handler.
+                // For more details, see fuse(4) and `libfuse`'s low-level handlers.
                 Ok(())
             }
             CheckAccessReason::InternalPermissionChecks => {

@@ -424,7 +424,7 @@ impl CurrentTask {
             if !dir.entry.node.is_dir() {
                 return error!(ENOTDIR);
             }
-            dir.check_access(self, Access::EXEC, CheckAccessReason::InternalPermissionChecks)?;
+            dir.check_access(self, Access::EXEC, CheckAccessReason::Lookup)?;
         }
         Ok((dir, path.into()))
     }
