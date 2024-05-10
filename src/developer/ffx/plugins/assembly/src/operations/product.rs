@@ -173,6 +173,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
                 developer_overrides.developer_only_options,
                 developer_overrides.kernel,
                 developer_overrides.packages,
+                developer_overrides.packages_to_compile,
             )
             .context("Setting developer overrides")?;
     }
@@ -369,6 +370,26 @@ fn print_developer_overrides_banner(
         println!("  Additional packages:");
         for details in &overrides.packages {
             println!("    {} -> {}", details.set, details.package);
+        }
+    }
+
+    if !overrides.packages_to_compile.is_empty() {
+        println!();
+        println!("  Additions to compiled packages:");
+        for package in &overrides.packages_to_compile {
+            println!("    package: \"{}\"", package.name);
+            for component in &package.components {
+                println!("      component: \"meta/{}.cm\"", component.component_name);
+                for shard in &component.shards {
+                    println!("        {shard}");
+                }
+            }
+            if !package.contents.is_empty() {
+                println!("      contents:");
+                for content in &package.contents {
+                    println!("        {}  (from: {})", content.destination, content.source);
+                }
+            }
         }
     }
     println!();

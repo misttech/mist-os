@@ -115,6 +115,7 @@ impl ImageAssemblyConfigBuilder {
         developer_only_options: DeveloperOnlyOptions,
         kernel_options: KernelOptions,
         packages: Vec<PackageDetails>,
+        packages_to_compile: Vec<CompiledPackageDefinition>,
     ) -> Result<()> {
         // Set the developer-only options for the buidler to use.
         self.developer_only_options = Some(developer_only_options);
@@ -127,6 +128,15 @@ impl ImageAssemblyConfigBuilder {
             let set = self.map_package_set(&package_details.set);
             self.add_package_from_path(package_details.package, PackageOrigin::Developer, &set)
                 .context("Adding developer-specified package")?;
+        }
+
+        for compiled_package_def in packages_to_compile {
+            self.add_compiled_package(&compiled_package_def, "".into()).with_context(|| {
+                format!(
+                    "Adding developer-specified compiled package: {}",
+                    compiled_package_def.name
+                )
+            })?;
         }
 
         Ok(())
