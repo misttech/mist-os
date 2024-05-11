@@ -95,9 +95,8 @@ pub async fn unlock_data_volume<'a>(
     )
     .await
     .context("Failed to open keys dir")?;
-    let keybag_dir_fd = fdio::create_fd::<std::os::fd::OwnedFd>(
-        keybag_dir.into_channel().unwrap().into_zx_channel().into(),
-    )?;
+    let keybag_dir_fd =
+        fdio::create_fd(keybag_dir.into_channel().unwrap().into_zx_channel().into())?;
     let keybag = match KeyBagManager::open(keybag_dir_fd, Path::new("fxfs-data"))? {
         Some(keybag) => keybag,
         None => return Ok(None),
@@ -142,9 +141,8 @@ pub async fn init_data_volume<'a>(
     )
     .await
     .context("Failed to create keys dir")?;
-    let keybag_dir_fd = fdio::create_fd::<std::os::fd::OwnedFd>(
-        keybag_dir.into_channel().unwrap().into_zx_channel().into(),
-    )?;
+    let keybag_dir_fd =
+        fdio::create_fd(keybag_dir.into_channel().unwrap().into_zx_channel().into())?;
     let keybag = KeyBagManager::create(keybag_dir_fd, Path::new("fxfs-data"))?;
 
     let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, true).await?;

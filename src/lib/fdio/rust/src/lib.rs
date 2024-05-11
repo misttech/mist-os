@@ -22,6 +22,7 @@ use {
         mem::{self, MaybeUninit},
         num::TryFromIntError,
         os::{
+            fd::{AsFd, BorrowedFd, OwnedFd},
             raw,
             unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd},
         },
@@ -147,13 +148,16 @@ pub fn open_fd_at(dir: &File, path: &str, flags: fio::OpenFlags) -> Result<File,
 }
 
 /// Clones an object's underlying handle.
-pub fn clone_fd(f: &impl AsRawFd) -> Result<zx::Handle, zx::Status> {
-    let fd = f.as_raw_fd();
+pub fn clone_fd(f: impl AsFd) -> Result<zx::Handle, zx::Status> {
+    clone_fd_inner(f.as_fd())
+}
+
+fn clone_fd_inner<'a>(fd: BorrowedFd<'a>) -> Result<zx::Handle, zx::Status> {
     // we expect fdio to initialize this to a legal value.
     let mut handle = MaybeUninit::new(zx::Handle::invalid().raw_handle());
     let status = {
         let handle = handle.as_mut_ptr();
-        unsafe { fdio_sys::fdio_fd_clone(fd, handle) }
+        unsafe { fdio_sys::fdio_fd_clone(fd.as_raw_fd(), handle) }
     };
     let () = zx::Status::ok(status)?;
     let handle = unsafe { handle.assume_init() };
@@ -163,13 +167,17 @@ pub fn clone_fd(f: &impl AsRawFd) -> Result<zx::Handle, zx::Status> {
 }
 
 /// Removes an object from the file descriptor table and returns its underlying handle.
-pub fn transfer_fd(f: impl AsRawFd) -> Result<zx::Handle, zx::Status> {
-    let fd = f.as_raw_fd();
+pub fn transfer_fd(f: impl Into<OwnedFd>) -> Result<zx::Handle, zx::Status> {
+    transfer_fd_inner(f.into())
+}
+
+fn transfer_fd_inner(fd: OwnedFd) -> Result<zx::Handle, zx::Status> {
+    let fd = fd.into_raw_fd();
     // we expect fdio to initialize this to a legal value.
     let mut handle = MaybeUninit::new(zx::Handle::invalid().raw_handle());
     let status = {
         let handle = handle.as_mut_ptr();
-        unsafe { fdio_sys::fdio_fd_transfer(fd, handle) }
+        unsafe { fdio_sys::fdio_fd_transfer(fd.as_raw_fd(), handle) }
     };
     let () = zx::Status::ok(status)?;
     let handle = unsafe { handle.assume_init() };
@@ -180,9 +188,9 @@ pub fn transfer_fd(f: impl AsRawFd) -> Result<zx::Handle, zx::Status> {
 
 /// Create an object from a handle.
 ///
-/// Afterward, the handle is owned by fdio, and will close with `F`.
+/// Afterward, the handle is owned by fdio, and will close with `OwnedFd`.
 /// See `transfer_fd` for a way to get it back.
-pub fn create_fd<F: FromRawFd>(handle: zx::Handle) -> Result<F, zx::Status> {
+pub fn create_fd(handle: zx::Handle) -> Result<OwnedFd, zx::Status> {
     let handle = handle.into_raw();
     // file descriptors are always positive; we expect fdio to initialize this to a legal value.
     let mut fd = MaybeUninit::new(-1);
@@ -193,7 +201,8 @@ pub fn create_fd<F: FromRawFd>(handle: zx::Handle) -> Result<F, zx::Status> {
     let () = zx::Status::ok(status)?;
     let fd = unsafe { fd.assume_init() };
     debug_assert!(fd >= 0, "{} >= 0", fd);
-    let f = unsafe { F::from_raw_fd(fd) };
+    // Safety: The handle is now owned by fdio, so it does not require any other cleanup.
+    let f = unsafe { OwnedFd::from_raw_fd(fd) };
     Ok(f)
 }
 
@@ -229,8 +238,12 @@ pub fn bind_to_fd(handle: zx::Handle, fd: RawFd) -> Result<(), zx::Status> {
 }
 
 /// Clones an object's underlying handle and checks that it is a channel.
-pub fn clone_channel(f: &impl AsRawFd) -> Result<zx::Channel, zx::Status> {
-    let handle = clone_fd(f)?;
+pub fn clone_channel(f: impl AsFd) -> Result<zx::Channel, zx::Status> {
+    clone_channel_inner(f.as_fd())
+}
+
+fn clone_channel_inner<'a>(fd: BorrowedFd<'a>) -> Result<zx::Channel, zx::Status> {
+    let handle = clone_fd(fd)?;
     let zx::HandleBasicInfo { object_type, .. } = handle.basic_info()?;
     if object_type == zx::ObjectType::CHANNEL {
         Ok(handle.into())
@@ -350,7 +363,8 @@ impl<'a> SpawnAction<'a> {
     ///
     /// `local_fd`: File descriptor within the current process.
     /// `target_fd`: File descriptor within the new process that will receive the clone.
-    pub fn clone_fd(local_fd: &'a impl AsRawFd, target_fd: i32) -> Self {
+    pub fn clone_fd(local_fd: BorrowedFd<'a>, target_fd: i32) -> Self {
+        let local_fd = local_fd.as_fd();
         // Safety: `local_fd` is a valid file descriptor so long as we're inside the
         // 'a lifetime.
         Self(
@@ -368,7 +382,7 @@ impl<'a> SpawnAction<'a> {
     ///
     /// `local_fd`: File descriptor within the current process.
     /// `target_fd`: File descriptor within the new process that will receive the transfer.
-    pub fn transfer_fd(local_fd: impl IntoRawFd, target_fd: i32) -> Self {
+    pub fn transfer_fd(local_fd: OwnedFd, target_fd: i32) -> Self {
         // Safety: ownership of `local_fd` is consumed, so `Self` can live arbitrarily long.
         // When the action is executed, the fd will be transferred.
         Self(
@@ -815,7 +829,7 @@ mod tests {
         let job = zx::Job::from(zx::Handle::invalid());
         let cpath = cstr("/pkg/bin/spawn_test_target");
         let (stdout_file, stdout_sock) = pipe_half().expect("Failed to make pipe");
-        let mut spawn_actions = [SpawnAction::clone_fd(&stdout_file, 1)];
+        let mut spawn_actions = [SpawnAction::clone_fd(stdout_file.as_fd(), 1)];
 
         let cstrags: Vec<CString> = vec![cstr("test_arg")];
         let mut cargs: Vec<&CStr> = cstrags.iter().map(|x| x.as_c_str()).collect();

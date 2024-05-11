@@ -77,7 +77,8 @@ impl RemoteBundle {
             )
             .source_context("open metadata file")?;
             let mut file: std::fs::File = fdio::create_fd(file.into_channel().into_handle())
-                .source_context("create fd from metadata file (wrong mount path?)")?;
+                .source_context("create fd from metadata file (wrong mount path?)")?
+                .into();
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).source_context("read metadata file")?;
             Metadata::deserialize(&buf).source_context("deserialize metadata file")?

@@ -17,7 +17,7 @@ pub struct QcowBackend {
 
 impl QcowBackend {
     pub fn new(channel: zx::Channel) -> Result<Self, Error> {
-        Self::from_file(fdio::create_fd(channel.into())?)
+        Self::from_file(fdio::create_fd(channel.into())?.into())
     }
 
     pub fn from_file(mut file: std::fs::File) -> Result<Self, Error> {

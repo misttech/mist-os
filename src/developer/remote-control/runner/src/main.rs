@@ -11,6 +11,7 @@ use {
     futures::future::select,
     futures::io::BufReader,
     futures::prelude::*,
+    std::os::fd::{AsRawFd, FromRawFd, OwnedFd},
     version_history::{AbiRevision, HISTORY},
 };
 
@@ -23,11 +24,6 @@ where
 {
     let mut buf_from = BufReader::with_capacity(buffer_size, &mut from);
     futures::io::copy_buf(&mut buf_from, &mut to).await
-}
-
-fn zx_socket_from_fd<F: std::os::fd::AsRawFd>(fd: F) -> Result<fidl::AsyncSocket> {
-    let handle = fdio::transfer_fd(fd)?;
-    Ok(fidl::AsyncSocket::from_socket(fidl::Socket::from(handle)))
 }
 
 fn print_prelude_info(
@@ -115,8 +111,23 @@ async fn main() -> Result<()> {
     let local_socket = fidl::AsyncSocket::from_socket(local_socket);
     let (mut rx_socket, mut tx_socket) = futures::AsyncReadExt::split(local_socket);
 
-    let mut stdin = zx_socket_from_fd(std::io::stdin())?;
-    let mut stdout = zx_socket_from_fd(std::io::stdout())?;
+    let stdin = std::io::stdin().lock();
+    let stdout = std::io::stdout().lock();
+
+    // SAFETY: In order to remove the overhead of FDIO, we want to extract out the underlying
+    // handles of STDIN and STDOUT and forward them to our sockets. That requires us to transfer
+    // the sockets out of fdio, but unfortunately Rust doesn't allow us to take ownership from
+    // `std::io::stdin()` and `std::io::stdout()`. To work around that, we grab the STDIN and
+    // STDOUT locks to prevent any other thread from accessing them while we're streaming traffic.
+    let (stdin_fd, stdout_fd) = unsafe {
+        (OwnedFd::from_raw_fd(stdin.as_raw_fd()), OwnedFd::from_raw_fd(stdout.as_raw_fd()))
+    };
+
+    let stdin = fdio::transfer_fd(stdin_fd)?;
+    let stdout = fdio::transfer_fd(stdout_fd)?;
+
+    let mut stdin = fidl::AsyncSocket::from_socket(fidl::Socket::from(stdin));
+    let mut stdout = fidl::AsyncSocket::from_socket(fidl::Socket::from(stdout));
 
     let in_fut = buffered_copy(&mut stdin, &mut tx_socket, BUFFER_SIZE);
     let out_fut = buffered_copy(&mut rx_socket, &mut stdout, BUFFER_SIZE);

@@ -496,7 +496,7 @@ impl<'a> TestRealm<'a> {
             .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
             .context("failed to create socket")?;
 
-        Ok(fdio::create_fd(sock.into()).context("failed to create fd")?)
+        Ok(fdio::create_fd(sock.into()).context("failed to create fd")?.into())
     }
 
     /// Creates a [`socket2::Socket`] backed by the implementation of
@@ -531,7 +531,7 @@ impl<'a> TestRealm<'a> {
             .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
             .context("failed to create socket")?;
 
-        Ok(fdio::create_fd(sock.into()).context("failed to create fd")?)
+        Ok(fdio::create_fd(sock.into()).context("failed to create fd")?.into())
     }
 
     /// Shuts down the realm.

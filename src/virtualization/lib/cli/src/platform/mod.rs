@@ -11,7 +11,7 @@ use {
     guest_cli_args::GuestType,
     std::{
         io::{Read, Write},
-        os::fd::{AsRawFd, FromRawFd, IntoRawFd, RawFd},
+        os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd},
     },
 };
 
@@ -61,6 +61,12 @@ impl UnbufferedStdio {
 impl AsRawFd for UnbufferedStdio {
     fn as_raw_fd(&self) -> RawFd {
         self.0.as_ref().unwrap().as_raw_fd()
+    }
+}
+
+impl AsFd for UnbufferedStdio {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_ref().unwrap().as_fd()
     }
 }
 

@@ -81,7 +81,7 @@ use packet_formats::{
 };
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::SockRef;
-use std::{num::NonZeroU64, pin::pin};
+use std::{num::NonZeroU64, os::fd::AsFd, pin::pin};
 use test_case::test_case;
 
 async fn run_udp_socket_test(
@@ -2545,8 +2545,9 @@ async fn socket_clone_bind<N: Netstack>(name: &str, socket_type: SocketType) {
     // explicitly clone the underlying FD to get a new handle and transmogrify
     // that into a new Socket.
     let other_socket: socket2::Socket =
-        fdio::create_fd(fdio::clone_fd(&socket).expect("clone_fd failed"))
-            .expect("create_fd failed");
+        fdio::create_fd(fdio::clone_fd(socket.as_fd()).expect("clone_fd failed"))
+            .expect("create_fd failed")
+            .into();
 
     // Since both sockets refer to the same resource, binding one will affect
     // the other's bound address.
