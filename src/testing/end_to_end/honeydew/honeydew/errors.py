@@ -95,6 +95,10 @@ class HoneydewRtcError(HoneydewError):
     """Raised by rtc.Rtc class."""
 
 
+class HoneydewDataResourceError(HoneydewError):
+    """Raised when Honeydew fails to fetch its data resources."""
+
+
 class FuchsiaStateError(HoneydewError):
     """Exception for state errors."""
 

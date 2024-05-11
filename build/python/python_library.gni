@@ -34,6 +34,23 @@ import("//build/group_with_inputs.gni")
 #     List of sources for this python library, relative to source_root.
 #     Type: list(path)
 #
+#   data_sources (optional)
+#     List of data sources for this python library. The sources are accessible
+#     at runtime as below:
+#     ```python
+#     from importlib.resources import files
+#     from <library_name> import <data_package_name>
+#
+#     with files(<data_package_name>).joinpath(<source_name>).open("rb"):
+#       ...
+#     ```
+#     Type: list(path)
+#
+#   data_package_name (required if |data_sources| is provided, else optional)
+#     Name of the data package to store |data_sources| in.
+#     See "data_sources" above for more detail.
+#     Type: string
+#
 #   library_deps (optional)
 #    List of targets for other python_library()s that this library depends on
 #    Type: list(target)
@@ -50,23 +67,35 @@ import("//build/group_with_inputs.gni")
 #
 #   library_info
 #     Exactly one scope including name of this library, path to its root and all
-#     of its sources (relative to root).
+#     of its sources (relative to root) and data_sources.
 #
 #   library_info_barrier
 #     Empty for stopping metadata walks.
 template("python_library") {
   assert(defined(invoker.sources), "sources is required")
+
   _labels = {
     input_group = "${target_name}_input_group"
     mypy_checker = "${target_name}_mypy_checker"
     library_infos = "${target_name}_library_infos"
   }
+
   _files = {
     library_infos = "${target_gen_dir}/${target_name}_library_infos.json"
   }
+
   library_deps = []
   if (defined(invoker.library_deps)) {
     library_deps = invoker.library_deps
+  }
+
+  _data_sources = []
+  _data_package_name = ""
+  if (defined(invoker.data_sources)) {
+    assert(defined(invoker.data_package_name),
+           "data_package_name is required if data_sources are provided")
+    _data_sources = invoker.data_sources
+    _data_package_name = invoker.data_package_name
   }
 
   # Add the sources from the invoker
@@ -78,6 +107,11 @@ template("python_library") {
   _full_source_paths = []
   foreach(source, invoker.sources) {
     _full_source_paths += [ _source_root + "/" + source ]
+  }
+
+  _full_data_source_paths = []
+  foreach(data_source, _data_sources) {
+    _full_data_source_paths += [ rebase_path(data_source, root_build_dir) ]
   }
 
   _enable_mypy = defined(invoker.enable_mypy) && invoker.enable_mypy
@@ -98,6 +132,7 @@ template("python_library") {
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
+
     source_root = _source_root
     metadata = {
       library_info = [
@@ -105,6 +140,8 @@ template("python_library") {
           library_name = _library_name
           source_root = rebase_path(source_root, root_build_dir)
           sources = invoker.sources
+          data_package_name = _data_package_name
+          data_sources = _full_data_source_paths
           mypy_support = _enable_mypy
         },
       ]

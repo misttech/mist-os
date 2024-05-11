@@ -36,6 +36,14 @@ Honeydew and add more and more interactions that others can also benefit.
 * Follow [instructions on how to submit contributions to the Fuchsia project]
   for the Gerrit developer work flow
 
+### Data dependencies
+
+Honeydew, as packaged by the GN build system, comes bundled with some of its
+data dependencies. However, if Honeydew is run outside of the build system, or
+if users wish to override with custom data dependencies, the following
+environment variables can be specified:
+*  `HONEYDEW_FASTBOOT_OVERRIDE`: Absolute path to `fastboot` binary.
+
 ### Best Practices
 
 Here are some of the best practices that should be followed while contributing

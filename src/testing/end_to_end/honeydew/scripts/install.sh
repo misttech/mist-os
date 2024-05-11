@@ -8,6 +8,7 @@
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"
 BUILD_DIR=$(cat "$FUCHSIA_DIR"/.fx-build-dir)
+FASTBOOT_PATH="$FUCHSIA_DIR/prebuilt/third_party/fastboot/fastboot"
 
 VENV_ROOT_PATH="$LACEWING_SRC/.venvs"
 VENV_NAME="fuchsia_python_venv"
@@ -52,6 +53,7 @@ OLD_PYTHONPATH=$PYTHONPATH
 PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
 # Set FIDL_IR_PATH inorder to successfully imoport Fuchsia-Controller
 export FIDL_IR_PATH="$(fx get-build-dir)/fidling/gen/ir_root"
+export HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH
 
 python -c "import honeydew"
 if [ $? -eq 0 ]; then
@@ -70,7 +72,8 @@ cd $STARTING_DIR
 
 echo -e "Installation successful...\n"
 echo "To experiment with Honeydew locally in a Python interpreter, run:"
-echo "$ source $VENV_PATH/bin/activate"
-echo "$ export FIDL_IR_PATH=\"$(fx get-build-dir)/fidling/gen/ir_root\""
-echo "$ PYTHONPATH=$HD_PYTHONPATH python"
+echo "  source $VENV_PATH/bin/activate &&"
+echo "  export FIDL_IR_PATH=\"$(fx get-build-dir)/fidling/gen/ir_root\" &&"
+echo "  export HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH &&"
+echo "  PYTHONPATH=$HD_PYTHONPATH python"
 echo -e ">>> import honeydew\n"

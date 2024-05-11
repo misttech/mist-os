@@ -24,6 +24,7 @@ COVERAGE_THRESHOLD=70
 
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"
+FASTBOOT_PATH="$FUCHSIA_DIR/prebuilt/third_party/fastboot/fastboot"
 BUILD_DIR=$(cat "$FUCHSIA_DIR"/.fx-build-dir)
 
 VENV_ROOT_PATH="$LACEWING_SRC/.venvs"
@@ -46,7 +47,7 @@ PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/f
 export FIDL_IR_PATH="$(fx get-build-dir)/fidling/gen/ir_root"
 
 echo "Running coverage tool..."
-coverage \
+HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH coverage \
     run -m unittest discover \
     --top-level-directory $HONEYDEW_SRC \
     --start-directory $HONEYDEW_SRC/tests/unit_tests \

@@ -132,6 +132,7 @@ def run_mypy_on_library_target(
     package_python_binary.copy_library_sources(
         tmp_dir, [info for info in lib_infos if info["mypy_support"]], src_map
     )
+
     # Write the depfile
     depfile.write_text(
         "{}: {}\n".format(tmp_dir, " ".join(list(src_map.values())))

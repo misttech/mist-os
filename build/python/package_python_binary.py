@@ -12,6 +12,7 @@ import os
 import shutil
 import sys
 import zipapp
+from pathlib import Path
 
 import mypy_checker
 
@@ -88,7 +89,6 @@ def main() -> int:
     # Make sub directories for all libraries and copy over their sources.
     lib_src_map: dict[str, str] = {}
     copy_library_sources(app_dir, infos, lib_src_map)
-
     args.depfile.write(
         "{}: {}\n".format(args.output, " ".join(lib_src_map.values()))
     )
@@ -185,6 +185,22 @@ def copy_library_sources(
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             src_map[dest] = src
             shutil.copy2(src, dest)
+
+        if lib_info["data_sources"]:
+            # Data sources are copied from their original location to the
+            # "data_package_name" directory relative to the library_root.
+            dest_data_root = os.path.join(
+                dest_lib_root, lib_info["data_package_name"]
+            )
+            os.makedirs(dest_data_root, exist_ok=True)
+            # Create __init__.py to make the data package importable.
+            data_init_path = os.path.join(dest_data_root, "__init__.py")
+            Path(data_init_path).touch()
+            for data_src in lib_info["data_sources"]:
+                src = data_src
+                dest = os.path.join(dest_data_root, os.path.basename(data_src))
+                src_map[dest] = src
+                shutil.copy2(src, dest)
     return
 
 
