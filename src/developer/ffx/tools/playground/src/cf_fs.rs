@@ -99,6 +99,56 @@ impl DotFile {
     }
 }
 
+/// Trait for dealing with flags and protocol lists in Open/Open2.
+trait OpenArgs: vfs::ProtocolsExt + Send + Sync {
+    fn send_error(self, object_request: vfs::ObjectRequestRef<'_>, e: Status);
+    fn open_subdir(
+        &self,
+        proxy: &fio::DirectoryProxy,
+        path: &str,
+        object_request: vfs::ObjectRequestRef<'_>,
+    );
+}
+
+impl OpenArgs for fio::OpenFlags {
+    fn send_error(self, object_request: vfs::ObjectRequestRef<'_>, e: Status) {
+        vfs::common::send_on_open_with_error(
+            self.contains(fio::OpenFlags::DESCRIBE),
+            object_request.take().into_server_end(),
+            e,
+        );
+    }
+
+    fn open_subdir(
+        &self,
+        proxy: &fio::DirectoryProxy,
+        path: &str,
+        object_request: vfs::ObjectRequestRef<'_>,
+    ) {
+        let _ = proxy.open(
+            *self,
+            fio::ModeType::empty(),
+            path,
+            object_request.take().into_server_end(),
+        );
+    }
+}
+
+impl OpenArgs for fio::ConnectionProtocols {
+    fn send_error(self, object_request: vfs::ObjectRequestRef<'_>, e: Status) {
+        vfs::common::send_on_open_with_error(false, object_request.take().into_server_end(), e);
+    }
+
+    fn open_subdir(
+        &self,
+        proxy: &fio::DirectoryProxy,
+        path: &str,
+        object_request: vfs::ObjectRequestRef<'_>,
+    ) {
+        let _ = proxy.open2(path, self, object_request.take().into_channel());
+    }
+}
+
 /// A directory exposing the component topology. Paths are essentially monikers,
 /// and there are some hidden/extra files for getting at metadata and the
 /// component's namespaces.
@@ -203,6 +253,130 @@ impl CFDirectory {
             }
         }
     }
+
+    /// Common implementation for open and open2
+    fn do_open<P: OpenArgs>(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        protocols: P,
+        mut path: vfs::path::Path,
+        object_request: vfs::ObjectRequestRef<'_>,
+    ) {
+        // Pop the next component to visit off of the path. If there is none, we
+        // are opening the directory itself.
+        let Some(next_component) = path.next() else {
+            {
+                let mut inner = self.inner.lock().unwrap();
+                if matches!(inner.cache, CacheState::Here(_)) {
+                    let CacheState::Here(got) =
+                        std::mem::replace(&mut inner.cache, CacheState::NeedsRefresh(None))
+                    else {
+                        unreachable!();
+                    };
+                    inner.cache = CacheState::NeedsRefresh(Some(got));
+                }
+            }
+            object_request.take().handle(|request| {
+                request.spawn_connection(scope, self, protocols, ImmutableConnection::create)
+            });
+            return;
+        };
+
+        if let Some(dotfile) = Self::DOTFILES.iter().find(|x| x.name() == next_component) {
+            let mut object_request = object_request.take();
+            scope.clone().spawn(async move {
+                /// We need the cache to determine how to service a dotfile, but
+                /// we don't want to lock the cache while performing that
+                /// service. So we take the cache, generate one of these
+                /// actions, drop the cache, then perform the action.
+                enum Action {
+                    InfoFile(String),
+                    EnvDir(sys2::OpenDirType),
+                    None,
+                }
+                let Ok(action) = self
+                    .with_cache(|cache| {
+                        let Some((instance, _)) = cache.get(&self.path) else {
+                            return Action::None;
+                        };
+                        match dotfile {
+                            DotFile::EnvDir(_, dir) => Action::EnvDir(*dir),
+                            DotFile::InfoFile(_, f) => {
+                                f(instance).map(Action::InfoFile).unwrap_or(Action::None)
+                            }
+                        }
+                    })
+                    .await
+                else {
+                    protocols.send_error(&mut object_request, Status::INTERNAL);
+                    return;
+                };
+
+                match action {
+                    Action::InfoFile(x) => {
+                        let _ = object_request.handle(|object_request| {
+                            vfs::file::serve(
+                                vfs::file::read_only(x),
+                                scope,
+                                &protocols,
+                                object_request,
+                            )
+                        });
+                    }
+                    Action::EnvDir(ty) => {
+                        let Ok(local_path) = self.path.as_str().try_into() else {
+                            protocols.send_error(&mut object_request, Status::INTERNAL);
+                            return;
+                        };
+                        let proxy = self.inner.lock().unwrap().proxy.clone();
+                        let Ok(dir) = component_debug::dirs::open_instance_dir_root_readable(
+                            &local_path,
+                            ty.into(),
+                            &proxy,
+                        )
+                        .await
+                        else {
+                            protocols.send_error(&mut object_request, Status::INTERNAL);
+                            return;
+                        };
+                        protocols.open_subdir(&dir, path.as_ref(), &mut object_request);
+                    }
+                    Action::None => (),
+                }
+            });
+        } else {
+            let path_to_here = if &self.path == "." {
+                next_component.to_owned()
+            } else {
+                format!("{}/{next_component}", self.path)
+            };
+
+            let mut object_request = object_request.take();
+            scope.clone().spawn(async move {
+                match self
+                    .with_cache(|cache| {
+                        if let Some((_, node)) = cache.get_mut(&path_to_here) {
+                            let node = node.get_or_insert_with(|| {
+                                Arc::new(CFDirectory {
+                                    inner: Arc::clone(&self.inner),
+                                    path: path_to_here,
+                                })
+                            });
+                            Ok(Arc::clone(node))
+                        } else {
+                            Err(Status::NOT_FOUND)
+                        }
+                    })
+                    .await
+                    .map_err(|_| Status::INTERNAL)
+                    .and_then(|x| x)
+                {
+                    Ok(x) => x.do_open(scope, protocols, path, &mut object_request),
+                    Err(e) => protocols.send_error(&mut object_request, e),
+                }
+            });
+        }
+    }
 }
 
 #[async_trait]
@@ -243,136 +417,25 @@ impl Node for CFDirectory {
 
 #[async_trait]
 impl Directory for CFDirectory {
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: vfs::path::Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: vfs::ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        self.do_open(scope, protocols, path, object_request);
+        Ok(())
+    }
+
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mut path: vfs::path::Path,
+        path: vfs::path::Path,
         server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
     ) {
-        // Pop the next component to visit off of the path. If there is none, we
-        // are opening the directory itself.
-        let Some(next_component) = path.next() else {
-            {
-                let mut inner = self.inner.lock().unwrap();
-                if matches!(inner.cache, CacheState::Here(_)) {
-                    let CacheState::Here(got) =
-                        std::mem::replace(&mut inner.cache, CacheState::NeedsRefresh(None))
-                    else {
-                        unreachable!();
-                    };
-                    inner.cache = CacheState::NeedsRefresh(Some(got));
-                }
-            }
-            flags.to_object_request(server_end).handle(|request| {
-                request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
-            return;
-        };
-
-        if let Some(dotfile) = Self::DOTFILES.iter().find(|x| x.name() == next_component) {
-            scope.clone().spawn(async move {
-                /// We need the cache to determine how to service a dotfile, but
-                /// we don't want to lock the cache while performing that
-                /// service. So we take the cache, generate one of these
-                /// actions, drop the cache, then perform the action.
-                enum Action {
-                    InfoFile(String),
-                    EnvDir(sys2::OpenDirType),
-                    None,
-                }
-                let Ok(action) = self
-                    .with_cache(|cache| {
-                        let Some((instance, _)) = cache.get(&self.path) else {
-                            return Action::None;
-                        };
-                        match dotfile {
-                            DotFile::EnvDir(_, dir) => Action::EnvDir(*dir),
-                            DotFile::InfoFile(_, f) => {
-                                f(instance).map(Action::InfoFile).unwrap_or(Action::None)
-                            }
-                        }
-                    })
-                    .await
-                else {
-                    vfs::common::send_on_open_with_error(
-                        flags.contains(fio::OpenFlags::DESCRIBE),
-                        server_end,
-                        Status::INTERNAL,
-                    );
-                    return;
-                };
-
-                match action {
-                    Action::InfoFile(x) => {
-                        let _ = flags.to_object_request(server_end).handle(|object_request| {
-                            vfs::file::serve(vfs::file::read_only(x), scope, &flags, object_request)
-                        });
-                    }
-                    Action::EnvDir(ty) => {
-                        let Ok(local_path) = self.path.as_str().try_into() else {
-                            vfs::common::send_on_open_with_error(
-                                flags.contains(fio::OpenFlags::DESCRIBE),
-                                server_end,
-                                Status::INTERNAL,
-                            );
-                            return;
-                        };
-                        let proxy = self.inner.lock().unwrap().proxy.clone();
-                        let Ok(dir) = component_debug::dirs::open_instance_dir_root_readable(
-                            &local_path,
-                            ty.into(),
-                            &proxy,
-                        )
-                        .await
-                        else {
-                            vfs::common::send_on_open_with_error(
-                                flags.contains(fio::OpenFlags::DESCRIBE),
-                                server_end,
-                                Status::INTERNAL,
-                            );
-                            return;
-                        };
-                        let _ = dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
-                    }
-                    Action::None => (),
-                }
-            });
-        } else {
-            let path_to_here = if &self.path == "." {
-                next_component.to_owned()
-            } else {
-                format!("{}/{next_component}", self.path)
-            };
-
-            scope.clone().spawn(async move {
-                match self
-                    .with_cache(|cache| {
-                        if let Some((_, node)) = cache.get_mut(&path_to_here) {
-                            let node = node.get_or_insert_with(|| {
-                                Arc::new(CFDirectory {
-                                    inner: Arc::clone(&self.inner),
-                                    path: path_to_here,
-                                })
-                            });
-                            Ok(Arc::clone(node))
-                        } else {
-                            Err(Status::NOT_FOUND)
-                        }
-                    })
-                    .await
-                    .map_err(|_| Status::INTERNAL)
-                    .and_then(|x| x)
-                {
-                    Ok(x) => x.open(scope, flags, path, server_end),
-                    Err(e) => vfs::common::send_on_open_with_error(
-                        flags.contains(fio::OpenFlags::DESCRIBE),
-                        server_end,
-                        e,
-                    ),
-                }
-            });
-        }
+        self.do_open(scope, flags, path, &mut flags.to_object_request(server_end))
     }
 
     async fn read_dirents<'a>(
