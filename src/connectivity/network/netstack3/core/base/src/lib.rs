@@ -25,6 +25,7 @@ mod resource_references;
 mod rng;
 mod time;
 mod trace;
+mod uninstantiable;
 mod work_queue;
 
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
@@ -48,6 +49,7 @@ pub use time::{
     TimerBindingsTypes, TimerContext, TimerHandler,
 };
 pub use trace::TracingContext;
+pub use uninstantiable::{Uninstantiable, UninstantiableWrapper};
 pub use work_queue::WorkQueueReport;
 
 /// Reference counted hash map data structure.
