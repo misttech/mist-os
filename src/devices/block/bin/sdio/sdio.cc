@@ -127,6 +127,7 @@ int Info(SdioClient client) {
 
   const SdioHwInfo& info = result.value()->hw_info;
   const SdioDeviceHwInfo& dev_info = info.dev_hw_info;
+  const uint32_t caps(dev_info.caps);
   printf("Host:\n    Max transfer size: %u\n\n", info.host_max_transfer_size);
   printf("Card:\n");
   printf(
@@ -134,10 +135,10 @@ int Info(SdioClient client) {
       "    CCCR version: %u\n"
       "    Functions:    %u\n"
       "    Capabilities: 0x%08x\n",
-      dev_info.sdio_vsn, dev_info.cccr_vsn, dev_info.num_funcs, dev_info.caps);
+      dev_info.sdio_vsn, dev_info.cccr_vsn, dev_info.num_funcs, caps);
 
   for (size_t i = 0; i < std::size(kCapabilityStrings); i++) {
-    if (dev_info.caps & static_cast<uint32_t>(kCapabilityStrings[i].capability)) {
+    if (dev_info.caps & kCapabilityStrings[i].capability) {
       printf("        %s\n", kCapabilityStrings[i].string);
     }
   }

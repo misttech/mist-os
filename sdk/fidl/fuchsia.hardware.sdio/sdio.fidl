@@ -6,6 +6,8 @@ library fuchsia.hardware.sdio;
 using fuchsia.hardware.sdmmc;
 using zx;
 
+const SDIO_MAX_FUNCS uint8 = 8;
+
 type SdioFuncHwInfo = struct {
     manufacturer_id uint32;
     product_id uint32;
@@ -14,7 +16,7 @@ type SdioFuncHwInfo = struct {
     fn_intf_code uint8;
 };
 
-type SdioDeviceCapabilities = strict enum : uint32 {
+type SdioDeviceCapabilities = strict bits : uint32 {
     MULTI_BLOCK = 0x1;
     SRW = 0x2;
     DIRECT_COMMAND = 0x4;
@@ -39,7 +41,7 @@ type SdioDeviceHwInfo = struct {
     num_funcs uint32;
     sdio_vsn uint32;
     cccr_vsn uint32;
-    caps uint32;
+    caps SdioDeviceCapabilities;
 };
 
 type SdioHwInfo = struct {
