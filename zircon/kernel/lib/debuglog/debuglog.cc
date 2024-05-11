@@ -9,6 +9,7 @@
 #include <lib/debuglog.h>
 #include <lib/fit/defer.h>
 #include <lib/io.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/version.h>
@@ -216,6 +217,7 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     hdr.tid = 0;
   }
 
+  bool do_signal = true;
   {
     Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
 
@@ -223,6 +225,28 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
 
     if (lifecycle_.load(ktl::memory_order_acquire) != Lifecycle::Running) {
       return ZX_ERR_BAD_STATE;
+    }
+
+    // We're about to place a log record in the buffer.  Once we've done that
+    // we'll need to signal the notifier thread.  Ideally we'd just call
+    // Event::Signal after dropping our spinlock, however, Event::Signal might
+    // start a new chainlock transaction and we might have been called in a
+    // context where there's *already* an active transaction.  If there's an
+    // active transaction we must instead defer calling signal to a point at
+    // which there is no active transaction.  We use a Timer for this because
+    // Timers only fire when interrupts are enabled and it would be an error to
+    // have an active chainlock transaction with interrupts enabled.
+    if (ChainLockTransaction::Active() != nullptr) {
+      do_signal = false;
+      // As an optimization, we track whether or not there's a pending timer.
+      // This is check may race with the timer firing (and clearing the bool),
+      // but that's OK.  The worst case is that we observed false and set an
+      // "extra" timer.
+      if (!pending_deferred_signal_.load()) {
+        pending_deferred_signal_.store(true);
+        deferred_signal_timer_.Set(Deadline::no_slack(ZX_TIME_INFINITE_PAST), DLog::DeferredSignal,
+                                   this);
+      }
     }
 
     // Discard records at tail until there is enough
@@ -256,7 +280,9 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     sequence_count_++;
   }
 
-  notifier_state_.event.Signal();
+  if (do_signal) {
+    notifier_state_.event.Signal();
+  }
 
   return ZX_OK;
 }
@@ -418,6 +444,11 @@ int DLog::DumperThread() {
   }
 
   return 0;
+}
+
+void DLog::DeferredSignal() {
+  notifier_state_.event.Signal();
+  pending_deferred_signal_.store(false);
 }
 
 // TODO: support reading multiple messages at a time

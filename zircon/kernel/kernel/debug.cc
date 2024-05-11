@@ -241,16 +241,12 @@ RecurringCallback g_threadq_callback([]() {
 
 }  // anonymous namespace
 static int cmd_threadload(int argc, const cmd_args* argv, uint32_t flags) {
-  // TODO(https://fxbug.dev/339440805): Re-enable this command once we've resolved scheduler
-  // re-entrancy issues related to printing.
-  printf("threadload is disabled, see https://fxbug.dev/339440805.\n");
+  g_threadload_callback.Toggle();
   return 0;
 }
 
 static int cmd_threadq(int argc, const cmd_args* argv, uint32_t flags) {
-  // TODO(https://fxbug.dev/339440805): Re-enable this command once we've resolved scheduler
-  // re-entrancy issues related to printing.
-  printf("threadq is disabled, see https://fxbug.dev/339440805.\n");
+  g_threadq_callback.Toggle();
   return 0;
 }
 

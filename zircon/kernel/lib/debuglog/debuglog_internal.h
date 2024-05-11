@@ -14,6 +14,7 @@
 #include <kernel/event.h>
 #include <kernel/mutex.h>
 #include <kernel/spinlock.h>
+#include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <ktl/limits.h>
 #include <ktl/span.h>
@@ -39,7 +40,10 @@ class DLog {
  public:
   explicit constexpr DLog() {}
 
-  virtual ~DLog() = default;
+  virtual ~DLog() {
+    // Be sure to cancel any pending timer to avoid a potential use-after-free.
+    deferred_signal_timer_.Cancel();
+  }
 
   void StartThreads() TA_EXCL(lock_);
 
@@ -219,6 +223,11 @@ class DLog {
   int NotifierThread();
   int DumperThread();
 
+  static void DeferredSignal(Timer* timer, zx_time_t now, void* arg) {
+    reinterpret_cast<DLog*>(arg)->DeferredSignal();
+  }
+  void DeferredSignal();
+
   ThreadState notifier_state_;
   ThreadState dumper_state_;
 
@@ -230,6 +239,13 @@ class DLog {
   size_t head_ TA_GUARDED(lock_) = 0;
   size_t tail_ TA_GUARDED(lock_) = 0;
 
+  // Used to signal an event from a "safe" context.  See |Write| for details.
+  Timer deferred_signal_timer_ TA_GUARDED(lock_);
+
+  // Indicates there is a pending |deferred_signal_timer_|.  Used to reduce the
+  // number of unnecessary timers.
+  RelaxedAtomic<bool> pending_deferred_signal_ = false;
+
   // Indicates that the system has begun to panic.  When true, |write| will
   // immediately return an error.
   //
@@ -237,12 +253,6 @@ class DLog {
   // accessed from multiple threads.  When/if it becomes an atomic, think
   // carefully about whether it needs acquire/release semantics.
   bool panic_ = false;
-
-  // The list of our current readers.
-  fbl::DoublyLinkedList<DlogReader*> readers TA_GUARDED(readers_lock_);
-
-  // A counter incremented for each log message that enters the debuglog.
-  uint64_t sequence_count_ TA_GUARDED(lock_) = 0;
 
   // The lifecycle state of this |DLog| object.
   enum class Lifecycle : uint32_t {
@@ -253,6 +263,12 @@ class DLog {
     ShutdownFinished,  // Shutdown has completed.  |dlog_serial_write| will drop data.
   };
   ktl::atomic<Lifecycle> lifecycle_{Lifecycle::Running};
+
+  // The list of our current readers.
+  fbl::DoublyLinkedList<DlogReader*> readers TA_GUARDED(readers_lock_);
+
+  // A counter incremented for each log message that enters the debuglog.
+  uint64_t sequence_count_ TA_GUARDED(lock_) = 0;
 
   // Signaled when shutdown has completed.
   Event shutdown_finished_;
