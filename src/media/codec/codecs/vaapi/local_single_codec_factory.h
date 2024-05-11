@@ -27,7 +27,7 @@ template <typename DecoderAdapter, typename EncoderAdapter>
 class LocalSingleCodecFactory : public fuchsia::mediacodec::CodecFactory {
  public:
   LocalSingleCodecFactory(async_dispatcher_t* fidl_dispatcher,
-                          fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem,
+                          fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                           fidl::InterfaceRequest<CodecFactory> request,
                           fit::function<void(std::unique_ptr<CodecImpl>)> factory_done_callback,
                           CodecAdmissionControl* codec_admission_control,
@@ -148,7 +148,7 @@ class LocalSingleCodecFactory : public fuchsia::mediacodec::CodecFactory {
   }
 
   async_dispatcher_t* fidl_dispatcher_;
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_;
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_;
   fidl::Binding<CodecFactory, LocalSingleCodecFactory*> binding_;
   // Returns the codec implementation and requests drop of self.
   fit::function<void(std::unique_ptr<CodecImpl>)> factory_done_callback_;
