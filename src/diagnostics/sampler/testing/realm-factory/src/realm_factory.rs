@@ -8,6 +8,7 @@ use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
 use fidl_fuchsia_inspect as finspect;
+use fidl_fuchsia_io::R_STAR_DIR;
 use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_metrics as fmetrics;
 use fidl_fuchsia_metrics_test as fmetrics_test;
@@ -26,6 +27,7 @@ const SINGLE_COUNTER_URL: &str = "#meta/single_counter_test_component.cm";
 const SAMPLER_URL: &str = "#meta/sampler.cm";
 const ARCHIVIST_URL: &str = "#meta/archivist-for-embedding.cm";
 const SAMPLER_BINDER_ALIAS: &str = "fuchsia.component.SamplerBinder";
+const INSTANCE_ID_INDEX_NAME: &str = "component_id_index";
 
 pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
     let sampler_component_name =
@@ -97,6 +99,9 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fpower::RebootMethodsWatcherRegisterMarker>())
+                .capability(
+                    Capability::directory("config-data").path("/config/data").rights(R_STAR_DIR),
+                )
                 .from(&mocks_server)
                 .to(&wrapper_realm),
         )
@@ -105,6 +110,9 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fpower::RebootMethodsWatcherRegisterMarker>())
+                .capability(
+                    Capability::directory("config-data").path("/config/data").rights(R_STAR_DIR),
+                )
                 .from(Ref::parent())
                 .to(&sampler),
         )
@@ -242,6 +250,12 @@ async fn serve_mocks(handles: LocalComponentHandles) -> Result<(), Error> {
         .add_fidl_service(move |stream| {
             mocks::serve_reboot_controller(stream, rcv.clone());
         });
+
+    // Add the ID <-> moniker file for test.
+    let mut config_dir = fs.dir("config");
+    let mut config_data_dir = config_dir.dir("data");
+    config_data_dir.add_vmo_file_at(INSTANCE_ID_INDEX_NAME, mocks::id_file_vmo());
+
     fs.serve_connection(handles.outgoing_dir)?;
     fs.collect::<()>().await;
     Ok(())

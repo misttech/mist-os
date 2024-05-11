@@ -25,7 +25,7 @@ const MONIKER_INTERPOLATION: &str = "{MONIKER}";
 const INSTANCE_ID_INTERPOLATION: &str = "{INSTANCE_ID}";
 const METRICS_INSPECT_SIZE_BYTES: usize = 1024 * 1024; // 1MiB
 const DEFAULT_MIN_SAMPLE_RATE_SEC: i64 = 10;
-const INSTANCE_IDS_PATH: &str = "component_id_index";
+const INSTANCE_IDS_PATH: &str = "config/data/component_id_index";
 
 /// Configuration for a single project to map Inspect data to its Cobalt metrics.
 #[derive(Deserialize, Debug, PartialEq)]
@@ -348,13 +348,19 @@ impl MetricConfig {
             selectors
                 .iter_mut()
                 .map::<Result<_, anyhow::Error>, _>(|s| {
-                    let filled_template = Self::interpolate_template(s, &component)?;
-                    Ok(match selector_list::parse_selector::<serde::de::value::Error>(
-                        &filled_template,
-                    ) {
-                        Ok(selector) => Ok(Some(selector)),
-                        Err(err) => Err(err),
-                    }?)
+                    match Self::interpolate_template(s, &component) {
+                        Ok(filled_template) => Ok(match selector_list::parse_selector::<
+                            serde::de::value::Error,
+                        >(&filled_template)
+                        {
+                            Ok(selector) => Ok(Some(selector)),
+                            Err(err) => Err(err),
+                        }?),
+                        Err(err) => {
+                            warn!(?err, "Couldn't fill selector template");
+                            Ok(None)
+                        }
+                    }
                 })
                 .collect::<Result<Vec<Option<_>>, _>>()?,
         );
@@ -478,7 +484,10 @@ impl SamplerConfig {
             match component_id_index::Index::from_fidl_file(INSTANCE_IDS_PATH.into()) {
                 Ok(ids) => add_instance_ids(ids, &mut fire_components),
                 Err(error) => {
-                    warn!("Unable to read component ID file; FIRE selectors with instance IDs won't work: {error:?}");
+                    warn!(
+                        ?error,
+                        "Unable to read ID file; FIRE selectors with instance IDs won't work"
+                    );
                 }
             };
             project_configs

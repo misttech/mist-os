@@ -2,12 +2,11 @@
     metrics: [
         {
             event_codes: [
-                14,
-                15,
+                99,
             ],
-            metric_id: 4,
+            metric_id: 5,
             metric_type: "Integer",
-            selector: "single_counter:root/samples:{MONIKER}",
+            selector: "single_counter:root/samples:{INSTANCE_ID}",
         },
     ],
     poll_rate_sec: 3,
