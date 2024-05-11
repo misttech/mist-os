@@ -5,15 +5,6 @@
 import("//build/config/lto/config.gni")
 import("//build/toolchain/variant.gni")
 
-if (target_cpu == "riscv64") {
-  riscv64_extra_mattr = [
-    "+c",
-    "+f",
-    "+d",
-    "+relax",
-  ]
-}
-
 config("lto-clang") {
   cflags = [ "-flto" ]
 
@@ -38,9 +29,10 @@ config("lto-clang") {
     # generation bugs during LTO. They can be removed once LTO properly handles
     # target features
     if (target_cpu == "riscv64") {
-      foreach(attr, riscv64_extra_mattr) {
-        ldflags += [ "-Wl,-mllvm,-mattr=$attr" ]
-      }
+      ldflags += [
+        "-Wl,-mllvm,-mattr=+c",
+        "-Wl,-mllvm,-mattr=+relax",
+      ]
     }
   }
 }
@@ -74,12 +66,6 @@ config("lto-rust") {
     "-Clinker-plugin-lto",
     "-Zsplit-lto-unit",
   ]
-
-  if (target_cpu == "riscv64") {
-    foreach(attr, riscv64_extra_mattr) {
-      rustflags += [ "-Clink-args=--mllvm=-mattr=$attr" ]
-    }
-  }
 }
 
 # This can be appended with:
@@ -138,9 +124,10 @@ config("thinlto-clang") {
   # generation bugs during LTO. They can be removed once LTO properly handles
   # target features
   if (target_cpu == "riscv64") {
-    foreach(attr, riscv64_extra_mattr) {
-      ldflags += [ "-Wl,-mllvm,-mattr=$attr" ]
-    }
+    ldflags += [
+      "-Wl,-mllvm,-mattr=+c",
+      "-Wl,-mllvm,-mattr=+relax",
+    ]
   }
 }
 
@@ -167,11 +154,6 @@ config("thinlto-rust") {
   }
 
   rustflags += [ "${rust_linkarg}=${_cache_dir}$thinlto_cache_dir" ]
-  if (target_cpu == "riscv64") {
-    foreach(attr, riscv64_extra_mattr) {
-      rustflags += [ "${rust_linkarg}=--mllvm=-mattr=$attr" ]
-    }
-  }
 }
 
 variant("thinlto") {
