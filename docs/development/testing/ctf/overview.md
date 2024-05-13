@@ -4,10 +4,15 @@ Note: Compatibility testing documents are being overhauled in Q2
 2024.  Some information in this document is out of date. See
 https://fxbug.dev/339893257 for details.
 
-The Compatibility Tests for Fuchsia (CTF) is a suite of tests designed
-to detect compatibility changes between two different versions of the
-Fuchsia platform surface.  To learn how it works, and to get started on adding
-CTF tests for your area, please see the links below.
+Compatibility Testing for Fuchsia is a mechanism to freeze artifacts on release
+branches and then thaw those artifacts for testing in CI/CQ.
+
+This is commonly used to detect compatibility changes between the Fuchsia
+platform surface represented by the release branch and that represented by
+the current state of the Fuchsia source repository.
+
+To learn how it works, and to get started on adding CTF tests for
+your area, please see the links below.
 
 ## Contributing to CTF
 
