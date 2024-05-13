@@ -115,48 +115,17 @@ static const std::vector<fpbus::Smc> kDisplaySmcs{
     }},
 };
 
-zx_status_t AddDisplayDetect(
-    fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  fpbus::Node display_detect_dev;
-  display_detect_dev.name() = "display-detect";
-  display_detect_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  display_detect_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
-  display_detect_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DISPLAY_DETECT;
+const ddk::BindRule kGpioLcdResetRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_LCD_RESET)),
+};
 
-  std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_LCD_RESET)),
-  };
-
-  std::vector<fuchsia_driver_framework::NodeProperty> gpio_lcd_reset_properties{
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
-  };
-
-  std::vector<fuchsia_driver_framework::ParentSpec> parents{
-      {{
-          .bind_rules = gpio_lcd_reset_bind_rules,
-          .properties = gpio_lcd_reset_properties,
-      }},
-  };
-
-  fuchsia_driver_framework::CompositeNodeSpec spec{{.name = "display-detect", .parents = parents}};
-
-  fidl::Arena<> fidl_arena;
-  fdf::Arena arena('DISP');
-  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
-      fidl::ToWire(fidl_arena, display_detect_dev), fidl::ToWire(fidl_arena, spec));
-  if (!result.ok() || result->is_error()) {
-    zx_status_t status = result.ok() ? result->error_value() : result.status();
-    zxlogf(ERROR, "AddCompositeSpec Display(display_detect) request failed: %s",
-           zx_status_get_string(status));
-    return status;
-  }
-
-  return ZX_OK;
-}
+const device_bind_prop_t kGpioLcdReserProperties[] = {
+    ddk::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+};
 
 std::vector<fuchsia_driver_framework::ParentSpec> GetDisplayCommonParents() {
   std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{
@@ -329,8 +298,11 @@ zx_status_t CreateMipiDsiDisplay(
 }
 
 zx_status_t Vim3::DisplayInit() {
-  zx_status_t status = AddDisplayDetect(pbus_);
+  zx_status_t status = DdkAddCompositeNodeSpec(
+      "display-detect", ddk::CompositeNodeSpec(kGpioLcdResetRules, kGpioLcdReserProperties));
   if (status != ZX_OK) {
+    zxlogf(ERROR, "DdkAddCompositeNodeSpec display-detect failed: %s",
+           zx_status_get_string(status));
     return status;
   }
 

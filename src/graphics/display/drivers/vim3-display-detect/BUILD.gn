@@ -11,9 +11,7 @@ driver_bind_rules("vim3-display-detect-bind") {
   tests = "vim3-display-detect-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
-    "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.platform",
   ]
 }
 
