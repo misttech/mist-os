@@ -513,24 +513,22 @@ TEST_F(EfiDevicePartitionerTests, InitializeWithoutGptFails) {
 TEST_F(EfiDevicePartitionerTests, InitializeWithoutFvmSucceeds) {
   std::unique_ptr<BlockDevice> gpt_dev;
   // 64GiB disk.
-  constexpr uint64_t kBlockCount = (64LU << 30) / kBlockSize;
-  ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, kBlockCount, &gpt_dev));
+  ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt_dev));
 
-  // Set up a valid GPT.
-  zx::result new_connection = GetNewConnections(gpt_dev->block_controller_interface());
-  ASSERT_OK(new_connection);
-  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(std::move(new_connection->device));
-  zx::result remote_device = block_client::RemoteBlockDevice::Create(
-      std::move(volume), std::move(new_connection->controller));
-  ASSERT_OK(remote_device);
-  zx::result gpt_result =
-      gpt::GptDevice::Create(std::move(remote_device.value()), kBlockSize, kBlockCount);
-  ASSERT_OK(gpt_result);
-  gpt::GptDevice& gpt = *gpt_result.value();
-  ASSERT_OK(gpt.Sync());
+  {
+    // Pause the block watcher while we write partitions to the disk.
+    // This is to avoid the block watcher seeing an intermediate state of the partition table
+    // and incorrectly treating it as an MBR.
+    // The watcher is automatically resumed when this goes out of scope.
+    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
+    ASSERT_OK(pauser);
 
-  ASSERT_OK(CreatePartitioner({}));
+    // Set up a valid GPT.
+    std::unique_ptr<gpt::GptDevice> gpt;
+    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
+
+    ASSERT_OK(CreatePartitioner({}));
+  }
 }
 
 TEST_F(EfiDevicePartitionerTests, InitializeTwoCandidatesWithoutFvmFails) {
