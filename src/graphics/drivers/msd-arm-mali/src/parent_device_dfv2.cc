@@ -97,6 +97,11 @@ ParentDeviceDFv2::ConnectToMaliRuntimeProtocol() {
   return mali_protocol;
 }
 
+fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
+ParentDeviceDFv2::GetPowerConfiguration() {
+  return pdev_->GetPowerConfiguration();
+}
+
 // static
 std::unique_ptr<ParentDeviceDFv2> ParentDeviceDFv2::Create(std::shared_ptr<fdf::Namespace> incoming,
                                                            config::Config config) {

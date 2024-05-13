@@ -28,6 +28,7 @@
 #include "parent_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/device_request.h"
+#include "src/graphics/drivers/msd-arm-mali/src/fuchsia_power_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_features.h"
 #include "src/graphics/drivers/msd-arm-mali/src/job_scheduler.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
@@ -39,7 +40,8 @@ class MsdArmDevice : public msd::Device,
                      public MsdArmConnection::Owner,
                      public AddressManager::Owner,
                      public PerformanceCounters::Owner,
-                     public PowerManager::Owner {
+                     public PowerManager::Owner,
+                     public FuchsiaPowerManager::Owner {
  public:
   // Creates a device for the given |device_handle| and returns ownership.
   // If |start_device_thread| is false, then StartDeviceThread should be called
@@ -130,7 +132,7 @@ class MsdArmDevice : public msd::Device,
   magma::Status ProcessTimestampRequest(std::shared_ptr<magma::PlatformBuffer> buffer);
 
   // Called from the device framework threadpool.
-  void SetPowerState(bool enabled, fit::closure completer);
+  void SetPowerState(bool enabled, PowerStateCallback completer) override;
 
   void RefCycleCounter();
   void DerefCycleCounter();
@@ -155,7 +157,7 @@ class MsdArmDevice : public msd::Device,
   }
 
   // PowerManager::Owner implementation
-  void ReportPowerChangeComplete(bool success) override;
+  void ReportPowerChangeComplete(bool powered_on, bool success) override;
 
   magma_status_t QueryInfo(uint64_t id, uint64_t* value_out);
   magma_status_t QueryReturnsBuffer(uint64_t id, uint32_t* buffer_out);
@@ -278,6 +280,7 @@ class MsdArmDevice : public msd::Device,
   // Flag is set to true if reset completion should trigger FinishExitProtectedMode.
   std::atomic_bool exiting_protected_mode_flag_{false};
 
+  std::unique_ptr<FuchsiaPowerManager> fuchsia_power_manager_;
   std::thread device_thread_;
   std::unique_ptr<magma::PlatformThreadId> device_thread_id_;
   std::atomic_bool device_thread_quit_flag_{false};
@@ -331,7 +334,7 @@ class MsdArmDevice : public msd::Device,
   uint64_t cycle_counter_refcount_ = 0;
 
   // Collects all callbacks to be called when the power change completes.
-  std::vector<fit::closure> callbacks_on_power_change_complete_;
+  std::vector<PowerStateCallback> callbacks_on_power_change_complete_;
 
   std::unique_ptr<PerformanceCounters> perf_counters_;
 

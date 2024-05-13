@@ -19,6 +19,7 @@ DriverLoggerHarness::~DriverLoggerHarness() {}
 class DriverLoggerHarnessDFv2 : public DriverLoggerHarness {
  public:
   void Initialize();
+  fdf_testing::DriverRuntime& runtime() override { return runtime_; }
 
  private:
   fdf_testing::DriverRuntime runtime_;

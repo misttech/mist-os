@@ -97,6 +97,15 @@ class FakeParentDevice : public ParentDevice {
     return zx::error(ZX_ERR_INTERNAL);
   }
   bool suspend_enabled() override { return false; }
+  std::shared_ptr<fdf::Namespace> incoming() override { return nullptr; }
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
+  GetPowerConfiguration() override {
+    return fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>(
+        fidl::Status::UnknownMethod());
+  }
+
+ private:
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
 };
 
 class ArmMaliServer : public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali> {

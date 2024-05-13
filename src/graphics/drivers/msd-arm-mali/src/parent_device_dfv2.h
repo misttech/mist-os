@@ -43,6 +43,10 @@ class ParentDeviceDFv2 : public ParentDevice {
 
   bool suspend_enabled() override { return config_.enable_suspend(); }
 
+  std::shared_ptr<fdf::Namespace> incoming() override { return incoming_; }
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
+  GetPowerConfiguration() override;
+
   static std::unique_ptr<ParentDeviceDFv2> Create(std::shared_ptr<fdf::Namespace> incoming,
                                                   config::Config config);
 

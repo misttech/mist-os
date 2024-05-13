@@ -6,6 +6,8 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_mmio.h>
 #include <lib/magma/util/dlog.h>
@@ -15,6 +17,8 @@
 
 #include <chrono>
 #include <memory>
+
+#include "fidl/fuchsia.hardware.power/cpp/natural_types.h"
 
 class ParentDevice {
  public:
@@ -35,8 +39,12 @@ class ParentDevice {
 
   virtual zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>>
   ConnectToMaliRuntimeProtocol() = 0;
-
   virtual bool suspend_enabled() = 0;
+
+  virtual std::shared_ptr<fdf::Namespace> incoming() = 0;
+
+  virtual fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
+  GetPowerConfiguration() = 0;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_

@@ -292,6 +292,13 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
 
   // Start interrupt thread so ResetDevice can wait for the reset interrupt.
   StartGpuInterruptThread();
+  if (parent_device_->suspend_enabled()) {
+    fuchsia_power_manager_ = std::make_unique<FuchsiaPowerManager>(this);
+    if (!fuchsia_power_manager_->Initialize(parent_device_)) {
+      MAGMA_LOG(ERROR, "Failed to initialize fuchsia power manager");
+      return false;
+    }
+  }
 
   return ResetDevice();
 }
@@ -1711,7 +1718,7 @@ magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
   return status;
 }
 
-void MsdArmDevice::ReportPowerChangeComplete(bool success) {
+void MsdArmDevice::ReportPowerChangeComplete(bool powered_on, bool success) {
   if (!success) {
     // Post a task to dump status because the GPU active lock may be held at this point.
     DumpStatusToLog();
@@ -1719,11 +1726,11 @@ void MsdArmDevice::ReportPowerChangeComplete(bool success) {
   auto complete_callbacks = std::move(callbacks_on_power_change_complete_);
   callbacks_on_power_change_complete_.clear();
   for (auto& callback : complete_callbacks) {
-    callback();
+    callback(powered_on);
   }
 }
 
-void MsdArmDevice::SetPowerState(bool enabled, fit::closure completer) {
+void MsdArmDevice::SetPowerState(bool enabled, PowerStateCallback completer) {
   EnqueueDeviceRequest(std::make_unique<TaskRequest>(
       [this, enabled, completer = std::move(completer)](MsdArmDevice* device) mutable {
         callbacks_on_power_change_complete_.emplace_back(std::move(completer));

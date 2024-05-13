@@ -9,6 +9,7 @@
 DriverLoggerHarness::~DriverLoggerHarness() {}
 
 class DriverLoggerHarnessStub : public DriverLoggerHarness {
+  fdf_testing::DriverRuntime& runtime() override { return runtime_; }
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher test_env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 };

@@ -113,7 +113,7 @@ class MaliDriver : public MagmaDriverBaseType,
 
     static_cast<MsdArmDevice*>(dev)->SetPowerState(
         request->enabled,
-        [completer = completer.ToAsync()]() mutable { completer.ReplySuccess(); });
+        [completer = completer.ToAsync()](bool powered_on) mutable { completer.ReplySuccess(); });
   }
 
  private:
