@@ -90,8 +90,10 @@ impl Display for Type {
             Type::ServerEnd(_, protocol, _, _, _) => write!(f, "server_end:TODO({protocol})"),
             Type::Array(_, _, _) => f.write_str("array:TODO"),
             Type::Vector(_, _, _, _) => f.write_str("vector:TODO"),
-            Type::Struct(_, _) => f.write_str("struct:TODO"),
-            Type::Table(_, _) => f.write_str("table:TODO"),
+            Type::Struct(_, members) => {
+                write!(f, "struct {{ {} }}", members.iter().map(|m| format!("{}", m)).join(", "))
+            }
+            Type::Table(_, members) => write!(f, "table {{ {} }}", member_list(members)),
             Type::Union(_, flex, members) => {
                 write!(f, "{flex} union {{ {} }}", member_list(members))
             }
@@ -435,6 +437,8 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
                 problems.type_error(send_path, recv_path, format!("Cycle length differs between sender(@{send_level}):{send_cycle} and receiver(@{recv_level}):{recv_cycle}"))
             }
         }
+
+        (Box(_, send), Box(_, recv)) => problems.append(compare_types(send, recv)),
 
         (send, recv) => {
             let send_level = send.path().api_level();
