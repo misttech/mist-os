@@ -23,7 +23,6 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
-#include <ddk/metadata/gpio.h>
 
 namespace gpio_impl_dt {
 
@@ -409,9 +408,12 @@ zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   FDF_LOG(DEBUG, "Gpio pin added - pin 0x%x name '%s' to controller '%s'", cells.pin(),
           reference_name.c_str(), parent.name().c_str());
 
-  controller.gpio_pins_metadata.insert(controller.gpio_pins_metadata.end(),
-                                       reinterpret_cast<const uint8_t*>(&pin),
-                                       reinterpret_cast<const uint8_t*>(&pin) + sizeof(gpio_pin_t));
+  // Insert if the pin is not already present.
+  auto it = std::find_if(controller.gpio_pins_metadata.begin(), controller.gpio_pins_metadata.end(),
+                         [&pin](const gpio_pin_t& entry) { return entry.pin == pin.pin; });
+  if (it == controller.gpio_pins_metadata.end()) {
+    controller.gpio_pins_metadata.push_back(pin);
+  }
 
   return AddChildNodeSpec(child, pin.pin, parent.id(), reference_name);
 }
@@ -465,7 +467,10 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   if (!controller->second.gpio_pins_metadata.empty()) {
     fuchsia_hardware_platform_bus::Metadata pin_metadata = {{
         .type = DEVICE_METADATA_GPIO_PINS,
-        .data = controller->second.gpio_pins_metadata,
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(controller->second.gpio_pins_metadata.data()),
+            reinterpret_cast<const uint8_t*>(controller->second.gpio_pins_metadata.data()) +
+                (controller->second.gpio_pins_metadata.size() * sizeof(gpio_pin_t))),
     }};
     node.AddMetadata(std::move(pin_metadata));
     FDF_LOG(DEBUG, "Gpio pins metadata added to node '%s'", node.name().c_str());
