@@ -115,7 +115,7 @@ struct MappingBackingVmo {
   // The offset in the VMO that corresponds to the base address.
   uint64_t vmo_offset;
 
-  fit::result<Errno> write_memory(UserAddress addr, ktl::span<const std::byte> bytes);
+  fit::result<Errno> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes);
 
   // Converts a `UserAddress` to an offset in this mapping's VMO.
   uint64_t address_to_offset(UserAddress addr);
@@ -243,9 +243,9 @@ class MemoryManagerState {
   fit::result<Errno> update_after_unmap(UserAddress addr, size_t length,
                                         std::vector<fbl::RefPtr<Mapping>>& released_mappings);
 
-  fit::result<Errno, size_t> write_memory(UserAddress addr, ktl::span<const std::byte> bytes);
+  fit::result<Errno, size_t> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes);
   fit::result<Errno> write_mapping_memory(UserAddress addr, fbl::RefPtr<Mapping>& mapping,
-                                          ktl::span<const std::byte> bytes);
+                                          const ktl::span<const uint8_t>& bytes);
 
   // The VMAR in which userspace mappings occur.
   //
@@ -287,7 +287,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   fit::result<Errno> unmap(UserAddress, size_t length);
 
   fit::result<Errno, size_t> unified_write_memory(const CurrentTask& current_task, UserAddress addr,
-                                                  ktl::span<const std::byte> bytes);
+                                                  const ktl::span<const uint8_t>& bytes);
 
   fit::result<Errno, UserAddress> map_anonymous(DesiredAddress addr, size_t length,
                                                 ProtectionFlags prot_flags,
@@ -300,7 +300,8 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   MemoryManagerState& state() TA_REQ(mm_state_rw_lock_) { return state_; }
   const MemoryManagerState& state() const TA_REQ_SHARED(mm_state_rw_lock_) { return state_; }
 
-  fit::result<Errno, size_t> vmo_write_memory(UserAddress addr, ktl::span<const std::byte> bytes);
+  fit::result<Errno, size_t> vmo_write_memory(UserAddress addr,
+                                              const ktl::span<const uint8_t>& bytes);
 
  private:
   ZXTEST_FRIEND_TEST(MemoryManager, test_get_contiguous_mappings_at);

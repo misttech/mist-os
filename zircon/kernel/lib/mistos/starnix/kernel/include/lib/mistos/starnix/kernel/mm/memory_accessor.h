@@ -23,8 +23,8 @@ class MemoryAccessor {
   //     UserAddress addr, std::vector<std::byte>& bytes) = 0;
   // virtual std::vector<uint8_t>* read_memory_partial(UserAddress addr,
   //                                                   std::vector<std::byte>& bytes) = 0;
-  virtual fit::result<Errno, size_t> write_memory(
-      UserAddress addr, const ktl::span<const ktl::byte>& bytes) const = 0;
+  virtual fit::result<Errno, size_t> write_memory(UserAddress addr,
+                                                  const ktl::span<const uint8_t>& bytes) const = 0;
   // virtual size_t write_memory_partial(UserAddress addr, const std::vector<std::byte>& bytes) = 0;
   // virtual size_t zero(UserAddress addr, size_t length) = 0;
   virtual ~MemoryAccessor() = default;

@@ -677,8 +677,8 @@ fit::result<Errno, NamespaceNode> CurrentTask::lookup_path_from_root(const FsStr
   return lookup_path(context, (*this)->fs()->root(), path);
 }
 
-fit::result<Errno, size_t> CurrentTask::write_memory(
-    UserAddress addr, const ktl::span<const ktl::byte>& bytes) const {
+fit::result<Errno, size_t> CurrentTask::write_memory(UserAddress addr,
+                                                     const ktl::span<const uint8_t>& bytes) const {
   return task_->mm()->unified_write_memory(*this, addr, bytes);
 }
 

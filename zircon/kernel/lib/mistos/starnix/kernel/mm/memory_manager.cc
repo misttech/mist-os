@@ -457,7 +457,7 @@ fit::result<Errno> MemoryManagerState::protect(UserAddress addr, size_t length,
 // - `addr`: The address to write to.
 // - `bytes`: The bytes to write.
 fit::result<Errno, size_t> MemoryManagerState::write_memory(UserAddress addr,
-                                                            ktl::span<const std::byte> bytes) {
+                                                            const ktl::span<const uint8_t>& bytes) {
   size_t bytes_written = 0;
   auto vec = get_contiguous_mappings_at(addr, bytes.size());
   if (vec.is_error())
@@ -486,7 +486,7 @@ fit::result<Errno, size_t> MemoryManagerState::write_memory(UserAddress addr,
 // - `bytes`: The bytes to write to the VMO.
 fit::result<Errno> MemoryManagerState::write_mapping_memory(UserAddress addr,
                                                             fbl::RefPtr<Mapping>& mapping,
-                                                            ktl::span<const std::byte> bytes) {
+                                                            const ktl::span<const uint8_t>& bytes) {
   if (!mapping->can_write()) {
     return fit::error(errno(EFAULT));
   }
@@ -500,7 +500,7 @@ fit::result<Errno> MemoryManagerState::write_mapping_memory(UserAddress addr,
 }
 
 fit::result<Errno> MappingBackingVmo::write_memory(UserAddress addr,
-                                                   ktl::span<const std::byte> bytes) {
+                                                   const ktl::span<const uint8_t>& bytes) {
   if (zx_status_t status = vmo->as_ref().write(bytes.data(), address_to_offset(addr), bytes.size());
       status != ZX_OK) {
     return fit::error(errno(EFAULT));
@@ -738,16 +738,15 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
   return fit::ok();
 }
 
-fit::result<Errno, size_t> MemoryManager::unified_write_memory(const CurrentTask& current_task,
-                                                               UserAddress addr,
-                                                               ktl::span<const std::byte> bytes) {
+fit::result<Errno, size_t> MemoryManager::unified_write_memory(
+    const CurrentTask& current_task, UserAddress addr, const ktl::span<const uint8_t>& bytes) {
   DEBUG_ASSERT(has_same_address_space(current_task->mm()));
   // TODO (Herrera) Use usercopy
   return vmo_write_memory(addr, bytes);
 }
 
 fit::result<Errno, size_t> MemoryManager::vmo_write_memory(UserAddress addr,
-                                                           ktl::span<const std::byte> bytes) {
+                                                           const ktl::span<const uint8_t>& bytes) {
   Guard<Mutex> lock(&mm_state_rw_lock_);
   return state_.write_memory(addr, bytes);
 }

@@ -97,7 +97,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   LTRACE;
   auto stack_pointer = original_stack_start_addr;
 
-  auto write_stack = [&](ktl::span<const ktl::byte> data,
+  auto write_stack = [&](const ktl::span<const uint8_t>& data,
                          UserAddress addr) -> fit::result<Errno, size_t> {
     LTRACEF("write [%lx] - %p - %zu\n", addr.ptr(), data.data(), data.size());
     return ma.write_memory(addr, data);
@@ -105,8 +105,8 @@ fit::result<Errno, StackResult> populate_initial_stack(
 
   auto argv_end = stack_pointer;
   for (auto iter = argv.rbegin(); iter != argv.rend(); ++iter) {
-    ktl::span<const ktl::byte> arg{reinterpret_cast<const ktl::byte*>(iter->data()),
-                                   iter->length() + 1};
+    ktl::span<const uint8_t> arg{reinterpret_cast<const uint8_t*>(iter->data()),
+                                 iter->length() + 1};
 
     stack_pointer -= arg.size();
     auto result = write_stack(arg, stack_pointer);
@@ -117,8 +117,8 @@ fit::result<Errno, StackResult> populate_initial_stack(
 
   auto environ_end = stack_pointer;
   for (auto iter = envp.rbegin(); iter != envp.rend(); ++iter) {
-    ktl::span<const ktl::byte> env{reinterpret_cast<const ktl::byte*>(iter->data()),
-                                   iter->length() + 1};
+    ktl::span<const uint8_t> env{reinterpret_cast<const uint8_t*>(iter->data()),
+                                 iter->length() + 1};
     stack_pointer -= env.size();
     auto result = write_stack(env, stack_pointer);
     if (result.is_error())
@@ -129,13 +129,13 @@ fit::result<Errno, StackResult> populate_initial_stack(
   // Write the path used with execve.
   stack_pointer -= path.length() + 1;
   auto execfn_addr = stack_pointer;
-  auto result = write_stack({reinterpret_cast<const ktl::byte*>(path.data()), path.length() + 1},
-                            execfn_addr);
+  auto result =
+      write_stack({reinterpret_cast<const uint8_t*>(path.data()), path.length() + 1}, execfn_addr);
   if (result.is_error())
     return result.take_error();
 
-  ktl::array<ktl::byte, kRandomSeedBytes> random_seed{};
-  cprng_draw((uint8_t*)random_seed.data(), random_seed.size());
+  ktl::array<uint8_t, kRandomSeedBytes> random_seed{};
+  cprng_draw(random_seed.data(), random_seed.size());
   stack_pointer -= random_seed.size();
   auto random_seed_addr = stack_pointer;
   result = write_stack({random_seed.data(), random_seed.size()}, random_seed_addr);
@@ -156,17 +156,17 @@ fit::result<Errno, StackResult> populate_initial_stack(
   // operations. But this can't be done after it's pushed, since it has to be right at the top of
   // the stack. So we collect it all, align the stack appropriately now that we know the size,
   // and push it all at once.
-  fbl::Vector<ktl::byte> main_data;
+  fbl::Vector<uint8_t> main_data;
   // argc
   uint64_t argc = argv.size();
-  ktl::span<ktl::byte> argc_data(reinterpret_cast<ktl::byte*>(&argc), sizeof(argc));
+  ktl::span<uint8_t> argc_data(reinterpret_cast<uint8_t*>(&argc), sizeof(argc));
   ktl::copy_n(argc_data.data(), argc_data.size(), util::back_inserter(main_data));
 
   // argv
-  constexpr fbl::static_vector<ktl::byte, 8> kZero(8, ktl::byte{0});
+  constexpr fbl::static_vector<uint8_t, 8> kZero(8, 0u);
   auto next_arg_addr = argv_start;
   for (auto arg : argv) {
-    ktl::span<ktl::byte> ptr(reinterpret_cast<ktl::byte*>(&next_arg_addr), sizeof(next_arg_addr));
+    ktl::span<uint8_t> ptr(reinterpret_cast<uint8_t*>(&next_arg_addr), sizeof(next_arg_addr));
     ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_arg_addr += arg.length() + 1;
   }
@@ -174,7 +174,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   // environ
   auto next_env_addr = environ_start;
   for (auto env : envp) {
-    ktl::span<ktl::byte> ptr(reinterpret_cast<ktl::byte*>(&next_env_addr), sizeof(next_env_addr));
+    ktl::span<uint8_t> ptr(reinterpret_cast<uint8_t*>(&next_env_addr), sizeof(next_env_addr));
     ktl::copy_n(ptr.data(), ptr.size(), util::back_inserter(main_data));
     next_env_addr += env.length() + 1;
   }
@@ -183,8 +183,8 @@ fit::result<Errno, StackResult> populate_initial_stack(
   size_t auxv_start_offset = main_data.size();
   for (auto kv : auxv) {
     uint64_t key = static_cast<uint64_t>(kv.first);
-    ktl::span<ktl::byte> key_span(reinterpret_cast<ktl::byte*>(&key), sizeof(key));
-    ktl::span<ktl::byte> value_span(reinterpret_cast<ktl::byte*>(&kv.second), sizeof(kv.second));
+    ktl::span<uint8_t> key_span(reinterpret_cast<uint8_t*>(&key), sizeof(key));
+    ktl::span<uint8_t> value_span(reinterpret_cast<uint8_t*>(&kv.second), sizeof(kv.second));
 
     ktl::copy_n(key_span.data(), key_span.size(), util::back_inserter(main_data));
     ktl::copy_n(value_span.data(), value_span.size(), util::back_inserter(main_data));

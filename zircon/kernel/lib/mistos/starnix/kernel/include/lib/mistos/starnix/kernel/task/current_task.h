@@ -218,7 +218,7 @@ class CurrentTask : public MemoryAccessor {
   Task* operator->() const;
 
   fit::result<Errno, size_t> write_memory(UserAddress addr,
-                                          const ktl::span<const ktl::byte>& bytes) const final;
+                                          const ktl::span<const uint8_t>& bytes) const final;
 
   const ThreadState& thread_state() const { return thread_state_; }
 
