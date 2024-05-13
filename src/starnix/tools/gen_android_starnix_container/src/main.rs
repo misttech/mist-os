@@ -51,6 +51,10 @@ struct Command {
     /// path to fstab, will go in /odm which overrides the one in /vendor
     #[argh(option)]
     fstab: Option<Utf8PathBuf>,
+
+    /// path to extra init scripts, will go in /odm/etc/init. Can be passed more than once.
+    #[argh(option)]
+    init: Vec<Utf8PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -206,6 +210,19 @@ fn generate(cmd: Command) -> Result<()> {
         }
     }
 
+    // Add any extra init files provided.
+    for init in cmd.init {
+        if let Some(file_name) = init.file_name() {
+            let mut init_file =
+                File::open(&init).with_context(|| format!("opening init from {init}"))?;
+            odm_writer
+                .add_file(&["etc", "init", file_name], &mut init_file)
+                .context("adding init to /odm/etc/init")?;
+        } else {
+            bail!("{init} doesn't have a filename");
+        }
+    }
+
     // Put all the ODM files into the container.
     let odm_files = odm_writer.inner.export().context("Exporting ODM files")?;
     for (dst, src) in &odm_files {
@@ -286,6 +303,7 @@ mod tests {
             hal: vec![hal_manifest_path],
             depfile: None,
             fstab: None,
+            init: vec![],
         };
         generate(cmd).unwrap();
 
@@ -374,6 +392,7 @@ mod tests {
             depfile: None,
             vendor: None,
             fstab: None,
+            init: vec![],
         };
         generate(cmd).unwrap();
 
@@ -447,6 +466,7 @@ mod tests {
             depfile: None,
             vendor: None,
             fstab: None,
+            init: vec![],
         };
         generate(cmd).unwrap();
 
@@ -513,6 +533,7 @@ tmpfs   /data       tmpfs   defaults            wait
             depfile: None,
             vendor: None,
             fstab: Some(fstab_path),
+            init: vec![],
         };
         generate(cmd).unwrap();
 
@@ -546,5 +567,62 @@ tmpfs   /data       tmpfs   defaults            wait
         let fstab = m.lookup(etc, "fstab.foo").expect("fstab not found");
         let fstab = m.get(fstab).expect("fstab not found");
         assert_matches!(fstab.info(), NodeInfo::File(_));
+    }
+
+    #[test]
+    fn test_init() {
+        const INIT: &str = "on boot\n  setprop foo.bar 1";
+        let tmp = TempDir::new().unwrap();
+        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+        let base_manifest_path = fake_base(outdir);
+
+        let init_path = outdir.join("test.rc");
+        std::fs::write(&init_path, INIT).unwrap();
+
+        // Run the generator.
+        let cmd = Command {
+            name: "test-name".into(),
+            outdir: outdir.to_owned(),
+            base: base_manifest_path,
+            system: Utf8PathBuf::from_str(EXT4_IMAGE_PATH).unwrap(),
+            hal: vec![],
+            depfile: None,
+            vendor: None,
+            fstab: None,
+            init: vec![init_path],
+        };
+        generate(cmd).unwrap();
+
+        // Read the package manifest, and ensure the correct files are present as blobs, and
+        // there is an additional `.xml` file corresponding to `test-hal`.
+        let manifest_path = outdir.join("package_manifest.json");
+        let manifest = PackageManifest::try_load_from(manifest_path).unwrap();
+        assert_eq!(manifest.name().as_ref(), "test-name");
+        let (blobs, _subpackages) = manifest.into_blobs_and_subpackages();
+        assert_eq!(blobs.len(), 6);
+        let blob_filenames: Vec<String> = blobs.iter().map(|b| b.path.clone()).collect();
+        assert_eq!(
+            blob_filenames,
+            vec![
+                "meta/".to_string(),
+                "data/odm/7".to_string(),
+                "data/odm/metadata.v1".to_string(),
+                "data/system/13".to_string(),
+                "data/system/metadata.v1".to_string(),
+                "data/test".to_string(),
+            ]
+        );
+
+        let odm_metadata_path =
+            &blobs.iter().find(|b| b.path == "data/odm/metadata.v1").unwrap().source_path;
+        let m = Metadata::deserialize(
+            &std::fs::read(odm_metadata_path).expect("Failed to read metadata"),
+        )
+        .expect("Failed to deserialize metadata");
+        let etc = m.lookup(ROOT_INODE_NUM, "etc").expect("etc not found");
+        let etc_init = m.lookup(etc, "init").expect("init dir not found");
+        let init = m.lookup(etc_init, "test.rc").expect("test.rc not found");
+        let init = m.get(init).expect("test.rc not found");
+        assert_matches!(init.info(), NodeInfo::File(_));
     }
 }
