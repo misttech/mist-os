@@ -1214,6 +1214,31 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                 }
                             });
                         }
+                        if let Some(x) = telemetry_data.link_metrics_entries {
+                            inspector.root().record_child(
+                                "link_metrics_entries",
+                                |link_metrics_entries_child| {
+                                    for (index, link_metrics_entry) in x.iter().enumerate() {
+                                        link_metrics_entries_child.record_child(
+                                            format!("link_metrics_entry_{}", index),
+                                            |link_metrics_entry_node| {
+                                                link_metrics_entry_node.record_uint(
+                                                    "link_margin",
+                                                    link_metrics_entry
+                                                        .link_margin
+                                                        .unwrap_or(0)
+                                                        .into(),
+                                                );
+                                                link_metrics_entry_node.record_int(
+                                                    "rssi",
+                                                    link_metrics_entry.rssi.unwrap_or(0).into(),
+                                                );
+                                            },
+                                        );
+                                    }
+                                },
+                            )
+                        }
                     }
                     Err(e) => {
                         warn!("Error in logging telemetry. Error: {}", e);

@@ -1015,6 +1015,26 @@ where
             ..Default::default()
         };
 
+        // Get link metrics manager related fields
+        let neighbor_ext_addrs =
+            ot.iter_neighbor_info().map(|x| x.ext_address()).collect::<Vec<_>>();
+
+        let link_metrics_entries: Vec<fidl_fuchsia_lowpan_experimental::LinkMetricsEntry> =
+            neighbor_ext_addrs
+                .iter()
+                .filter_map(|x| {
+                    if let Ok(y) = ot.link_metrics_manager_get_metrics_value_by_ext_addr(x) {
+                        Some(fidl_fuchsia_lowpan_experimental::LinkMetricsEntry {
+                            link_margin: Some(y.link_margin()),
+                            rssi: Some(y.rssi()),
+                            ..Default::default()
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
         Ok(Telemetry {
             rssi: Some(ot.get_rssi()),
             partition_id: Some(ot.get_partition_id()),
@@ -1064,6 +1084,7 @@ where
                 hashed_pd_prefix: None,
                 ..Default::default()
             }),
+            link_metrics_entries: Some(link_metrics_entries),
             ..Default::default()
         })
     }
