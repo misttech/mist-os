@@ -137,23 +137,6 @@ closed protocol DisplayControllerInterface {
         display_id uint64;
     });
 
-    /// Callbacks which are invoked when displays are added or removed. |added_display_list| and
-    /// |removed_display_list| point to arrays of the display ids which were added and removed. If
-    /// |added_display_count| or |removed_display_count| is 0, the corresponding array can be NULL.
-    ///
-    /// The driver must be done accessing any images which were on the removed displays.
-    ///
-    /// The driver should call this function when the callback is registered if any displays
-    /// are present.
-    ///
-    /// This event is deprecated in favor of `OnDisplayAdded` and `OnDisplayRemoved`.
-    //
-    // TODO(https://fxbug.dev/339311596): Delete this event.
-    strict OnDisplaysChanged(resource struct {
-        added_displays vector<AddedDisplayArgs>:MAX;
-        removed_display_ids vector<uint64>:MAX;
-    });
-
     /// Events which are invoked when display vsync occurs.
     ///
     /// Arguments
