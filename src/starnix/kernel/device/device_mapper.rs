@@ -349,24 +349,31 @@ impl FileOps for DmDeviceFile {
                 active_table.size().checked_sub(offset).ok_or_else(|| errno!(EINVAL))?,
             );
             let mut buffer = VecOutputBuffer::new(to_read);
-            for target in &mut active_table.targets {
-                let start = (target.sector_start * SECTOR_SIZE) as usize;
-                let size = (target.length * SECTOR_SIZE) as usize;
-                if offset >= start && offset < start + size {
-                    match &mut target.target_type {
-                        TargetType::Verity(args) => {
-                            if to_read % args.base_args.hash_block_size as usize != 0 {
-                                return error!(EINVAL);
-                            }
-                            let read = args.block_device.read_at(
-                                locked,
-                                current_task,
-                                offset - start,
-                                &mut buffer,
-                            )?;
-                            bytes_read += read;
-                            verify_read(&buffer, args, offset - start)?;
+            if active_table.targets.len() > 1 {
+                track_stub!(
+                    TODO("https://fxbug.dev/339701082"),
+                    "Support reads for multiple targets."
+                );
+                return Err(errno!(ENOTSUP));
+            }
+            let target = &mut active_table.targets[0];
+            let start = (target.sector_start * SECTOR_SIZE) as usize;
+            debug_assert!(start == 0);
+            let size = (target.length * SECTOR_SIZE) as usize;
+            if offset >= start && offset < start + size {
+                match &mut target.target_type {
+                    TargetType::Verity(args) => {
+                        if to_read % args.base_args.hash_block_size as usize != 0 {
+                            return error!(EINVAL);
                         }
+                        let read = args.block_device.read_at(
+                            locked,
+                            current_task,
+                            offset - start,
+                            &mut buffer,
+                        )?;
+                        bytes_read += read;
+                        verify_read(&buffer, args, offset - start)?;
                     }
                 }
             }
@@ -804,7 +811,10 @@ impl FileOps for DeviceMapper {
                     table.readonly = true;
                     state.add_flags(DeviceMapperFlags::READONLY);
                 }
-
+                if info.target_count > 1 {
+                    track_stub!(TODO("https://fxbug.dev/339701082"), "Support multiple targets.");
+                    return Err(errno!(ENOTSUP));
+                }
                 track_stub!(
                     TODO("https://fxbug.dev/338245544"),
                     "Make sure targets are contiguous and non-overlapping"
