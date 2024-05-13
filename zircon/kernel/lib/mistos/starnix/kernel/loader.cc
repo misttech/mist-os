@@ -26,7 +26,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/math.h>
 #include <lib/mistos/util/back_insert_iterator.h>
-#include <lib/mistos/util/random.h>
+#include <lib/mistos/util/cprng.h>
 #include <lib/mistos/zx/vmo.h>
 #include <lib/zbi-format/internal/bootfs.h>
 #include <trace.h>
@@ -135,7 +135,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
     return result.take_error();
 
   ktl::array<ktl::byte, kRandomSeedBytes> random_seed{};
-  zx_cprng_draw(random_seed.data(), random_seed.size());
+  cprng_draw((uint8_t*)random_seed.data(), random_seed.size());
   stack_pointer -= random_seed.size();
   auto random_seed_addr = stack_pointer;
   result = write_stack({random_seed.data(), random_seed.size()}, random_seed_addr);

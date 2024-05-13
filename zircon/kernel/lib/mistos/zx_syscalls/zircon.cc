@@ -47,8 +47,8 @@
 // KCOUNTER(syscalls_zx_nanosleep, "syscalls.zx_nanosleep")
 // KCOUNTER(syscalls_zx_nanosleep_zero_duration, "syscalls.zx_nanosleep_zero_duration")
 
-// constexpr size_t kMaxCPRNGDraw = ZX_CPRNG_DRAW_MAX_LEN;
-// constexpr size_t kMaxCPRNGSeed = ZX_CPRNG_ADD_ENTROPY_MAX_LEN;
+constexpr size_t kMaxCPRNGDraw = ZX_CPRNG_DRAW_MAX_LEN;
+constexpr size_t kMaxCPRNGSeed = ZX_CPRNG_ADD_ENTROPY_MAX_LEN;
 
 zx_status_t zx_nanosleep(zx_time_t deadline) {
   LTRACEF("nseconds %" PRIi64 "\n", deadline);
@@ -285,9 +285,9 @@ zx_status_t sys_debuglog_read(zx_handle_t log_handle, uint32_t options, user_out
 
   return static_cast<zx_status_t>(result.value());
 }
+#endif
 
-// zx_status_t zx_cprng_draw_once
-zx_status_t sys_cprng_draw_once(user_out_ptr<void> buffer, size_t len) {
+zx_status_t zx_cprng_draw_once(void* buffer, size_t len) {
   if (len > kMaxCPRNGDraw)
     return ZX_ERR_INVALID_ARGS;
 
@@ -299,13 +299,11 @@ zx_status_t sys_cprng_draw_once(user_out_ptr<void> buffer, size_t len) {
   ASSERT(prng->is_thread_safe());
   prng->Draw(kernel_buf, len);
 
-  if (buffer.reinterpret<uint8_t>().copy_array_to_user(kernel_buf, len) != ZX_OK)
-    return ZX_ERR_INVALID_ARGS;
+  memcpy(buffer, kernel_buf, len);
   return ZX_OK;
 }
 
-// zx_status_t zx_cprng_add_entropy
-zx_status_t sys_cprng_add_entropy(user_in_ptr<const void> buffer, size_t buffer_size) {
+zx_status_t zx_cprng_add_entropy(const void* buffer, size_t buffer_size) {
   if (buffer_size > kMaxCPRNGSeed)
     return ZX_ERR_INVALID_ARGS;
 
@@ -314,8 +312,7 @@ zx_status_t sys_cprng_add_entropy(user_in_ptr<const void> buffer, size_t buffer_
   // returns.
   explicit_memory::ZeroDtor<uint8_t> zero_guard(kernel_buf, sizeof(kernel_buf));
 
-  if (buffer.reinterpret<const uint8_t>().copy_array_from_user(kernel_buf, buffer_size) != ZX_OK)
-    return ZX_ERR_INVALID_ARGS;
+  memcpy(kernel_buf, buffer, buffer_size);
 
   auto prng = crypto::global_prng::GetInstance();
   ASSERT(prng->is_thread_safe());
@@ -323,4 +320,3 @@ zx_status_t sys_cprng_add_entropy(user_in_ptr<const void> buffer, size_t buffer_
 
   return ZX_OK;
 }
-#endif
