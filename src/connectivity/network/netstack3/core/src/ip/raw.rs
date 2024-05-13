@@ -41,12 +41,12 @@ struct RawIpSocketId<I: IpLayerIpExt>(StrongRc<RawIpSocketState<I>>);
 trait RawIpSocketStateContext<I: IpLayerIpExt> {
     fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I>) -> O>(
         &mut self,
-        id: RawIpSocketId<I>,
+        id: &RawIpSocketId<I>,
         cb: F,
     ) -> O;
     fn with_locked_state_mut<O, F: FnOnce(&mut RawIpSocketLockedState<I>) -> O>(
         &mut self,
-        id: RawIpSocketId<I>,
+        id: &RawIpSocketId<I>,
         cb: F,
     ) -> O;
 }
