@@ -90,12 +90,17 @@ zx::result<> SmcVisitor::Visit(Node& node, const devicetree::PropertyDecoder& de
     fuchsia_hardware_platform_bus::Smc metadata;
     metadata.service_call_num_base(smc_array[index].service_call_num_base());
     metadata.count(smc_array[index].service_call_count());
+
     if (smc_array[index].smc_flags() == 0x1) {
       metadata.exclusive() = true;
+    } else {
+      metadata.exclusive() = false;
     }
+
     if (smc_names[index]) {
       metadata.name(smc_names[index]);
     }
+
     FDF_LOG(DEBUG, "SMC (0x%0x, 0x%0x) added to node '%s'.", *metadata.service_call_num_base(),
             *metadata.count(), node.name().c_str());
     node.AddSmc(metadata);
