@@ -4,6 +4,7 @@
 {
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
+        "//src/testing/realm_client/meta/realm_client.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
