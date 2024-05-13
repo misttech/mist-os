@@ -5,7 +5,7 @@
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
-use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
+use discovery::{TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
@@ -220,11 +220,8 @@ pub async fn resolve_target_query(
         TargetInfoQuery::Addr(ref a) => (None, Some(a.clone())),
         _ => (None, None),
     };
-    let sources = DiscoverySources::MDNS
-        | DiscoverySources::USB
-        | DiscoverySources::MANUAL
-        | DiscoverySources::EMULATOR;
 
+    let sources = query.discovery_sources();
     let filter = move |handle: &TargetHandle| {
         let description = handle_to_description(handle);
         query.match_description(&description)

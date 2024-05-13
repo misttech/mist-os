@@ -180,6 +180,7 @@ where
 }
 
 bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct DiscoverySources: u8 {
         const MDNS = 1 << 0;
         const USB = 1 << 1;
