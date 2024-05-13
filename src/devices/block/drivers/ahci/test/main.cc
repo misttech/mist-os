@@ -476,12 +476,6 @@ class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam
     // Start dut_.
     ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
 
-    Port* port = dut_->port(FakeBus::kTestPortNumber);
-    while (port->SlotBusyLocked(0)) {
-      // Wait until IDENTIFY DEVICE command has been fully processed.
-      zx::nanosleep(zx::deadline_after(zx::msec(1)));
-    }
-
     fake_bus_ = static_cast<FakeBus*>(dut_->bus());
     ASSERT_NOT_NULL(fake_bus_);
 
@@ -576,40 +570,40 @@ TEST_P(AhciTest, SataDeviceRead) {
 }
 
 TEST_P(AhciTest, ShutdownWaitsForTransactionsInFlight) {
-  Port* port = dut_->port(FakeBus::kTestPortNumber);
+  block_info_t info;
+  uint64_t op_size;
+  sata_device_->BlockImplQuery(&info, &op_size);
+  EXPECT_EQ(info.block_size, 512);
+  EXPECT_EQ(info.block_count, TestController::kTestLogicalBlockCount);
 
-  // Set up a transaction that will timeout in 5 seconds.
+  sync_completion_t done;
+  auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
+    EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+    sync_completion_signal(static_cast<sync_completion_t*>(ctx));
+  };
 
-  zx_status_t status = ZX_OK;  // Value to be overwritten by callback.
-
-  SataTransaction txn = {};
-  txn.timeout = zx::clock::get_monotonic() + zx::sec(5);
-  txn.completion_cb = cb_status;
-  txn.cookie = &status;
-
-  uint32_t slot = 0;
-
-  // Set txn as running.
-  port->TestSetRunning(&txn, slot);
-  // Set the running bit in the bus.
-  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortSataActive, (1u << slot));
-  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortCommandIssue, (1u << slot));
-
-  // Set interrupt for successful transfer completion.
-  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortInterruptStatus, AHCI_PORT_INT_DP);
-
-  // True means there are running command(s).
-  EXPECT_TRUE(port->Complete());
+  // Set up a transaction that will timeout (in 5 seconds by default).
+  zx::vmo read_vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &read_vmo));
+  auto block_op = std::make_unique<uint8_t[]>(op_size);
+  auto op = reinterpret_cast<block_op_t*>(block_op.get());
+  *op = {.rw = {
+             .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
+             .vmo = read_vmo.get(),
+             .length = 1,
+             .offset_dev = 0,
+             .offset_vmo = 0,
+         }};
+  sata_device_->BlockImplQueue(op, callback, &done);
 
   zx::time time = zx::clock::get_monotonic();
   dut_->Shutdown();
   zx::duration shutdown_duration = zx::clock::get_monotonic() - time;
 
   // The shutdown duration should be around 5 seconds (+/-). Conservatively check for > 2.5 seconds.
-  EXPECT_GT(shutdown_duration, zx::msec(2500));
+  EXPECT_GT(shutdown_duration, Port::kTransactionTimeout / 2);
 
-  // Set by completion callback.
-  EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+  sync_completion_wait(&done, ZX_TIME_INFINITE);
 }
 
 INSTANTIATE_TEST_SUITE_P(NativeCommandQueuingSupportTest, AhciTest, zxtest::Bool());

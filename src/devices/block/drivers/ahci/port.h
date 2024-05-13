@@ -36,6 +36,8 @@ class Controller;
 
 class Port {
  public:
+  static constexpr zx::duration kTransactionTimeout = zx::sec(5);
+
   Port();
   ~Port();
 
@@ -81,9 +83,6 @@ class Port {
 
   bool paused_cmd_issuing() const { return paused_cmd_issuing_; }
 
-  // Visible for testing.
-  bool SlotBusyLocked(uint32_t slot);
-
   // Test functions
 
   // Mark transaction as running without going through the Queue path.
@@ -94,6 +93,7 @@ class Port {
   const SataTransaction* TestGetRunning(uint32_t slot) const { return commands_[slot]; }
 
  private:
+  bool SlotBusyLocked(uint32_t slot);
   zx_status_t TxnBeginLocked(uint32_t slot, SataTransaction* txn);
   void TxnComplete(zx_status_t status);
 

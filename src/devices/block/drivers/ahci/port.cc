@@ -19,8 +19,6 @@
 
 namespace ahci {
 
-constexpr zx::duration kTransactionTimeout(ZX_SEC(5));
-
 constexpr uint32_t hi32(uint64_t val) { return static_cast<uint32_t>(val >> 32); }
 constexpr uint32_t lo32(uint64_t val) { return static_cast<uint32_t>(val); }
 
