@@ -4,7 +4,9 @@
 
 use {
     crate::{
-        filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem},
+        filesystem::{
+            FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
+        },
         fsck::{
             errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
             fsck_volume_with_options, fsck_with_options, FsckOptions,
@@ -16,7 +18,7 @@ use {
         object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             allocator::{AllocatorKey, AllocatorValue, CoalescingIterator},
-            directory::Directory,
+            directory::{self, Directory},
             transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
             AttributeKey, ChildValue, EncryptionKeys, ExtentValue, FsverityMetadata, HandleOptions,
@@ -2436,4 +2438,60 @@ async fn test_zombie_symlink() {
             FsckIssue::Error(FsckError::ZombieSymlink(_, object_id_1, root_oid)),
         ] if object_id == *object_id_1 && root_oid == &[root_object_id]
     );
+}
+
+#[fuchsia::test]
+async fn test_empty_volume() {
+    let mut test = FsckTest::new().await;
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let object_id = {
+            let file;
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        root_directory.object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            file = root_directory
+                .create_child_file(&mut transaction, "child_file", None)
+                .await
+                .expect("create_child_file failed");
+            let buffer = file.allocate_buffer(1).await;
+            file.txn_write(&mut transaction, 0, buffer.as_ref()).await.expect("write failed");
+            transaction.commit().await.expect("commit failed");
+            file.object_id()
+        };
+        let mut transaction = root_directory
+            .acquire_context_for_replace(None, "child_file", true)
+            .await
+            .expect("acquire_context_for_replace failed")
+            .transaction;
+
+        directory::replace_child(&mut transaction, None, (&root_directory, "child_file"))
+            .await
+            .expect("failed to unlink");
+        transaction.commit().await.expect("commit failed");
+        fs.graveyard().queue_tombstone_object(store.store_object_id(), object_id);
+        // Make sure the graveyard processes the message so the bytes are deallocated.
+        fs.graveyard().flush().await;
+        fs.sync(SyncOptions { flush_device: true, ..Default::default() })
+            .await
+            .expect("sync failed");
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect("Fsck should succeed");
 }

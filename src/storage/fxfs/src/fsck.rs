@@ -585,8 +585,16 @@ impl<'a> Fsck<'a> {
         if !extra_allocations.is_empty() {
             self.error(FsckError::ExtraAllocations(extra_allocations))?;
         }
-        let owner_allocated_bytes = allocator.get_owner_allocated_bytes();
+        // NB: If the allocator returns a value of 0 for a store, it just means the store has no
+        // data that it owns.  Fsck wouldn't have observed any allocations for these, so filter them
+        // out.
+        let owner_allocated_bytes = allocator
+            .get_owner_allocated_bytes()
+            .into_iter()
+            .filter(|(_, v)| *v > 0)
+            .collect::<BTreeMap<_, _>>();
         if expected_allocated_bytes != allocator.get_allocated_bytes()
+            || observed_owner_allocated_bytes.len() != owner_allocated_bytes.len()
             || zip(observed_owner_allocated_bytes.iter(), owner_allocated_bytes.iter())
                 .filter(|((k1, v1), (k2, v2))| (*k1, *v1) != (*k2, *v2))
                 .count()
