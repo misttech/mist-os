@@ -11,7 +11,10 @@ use {
     async_trait::async_trait,
     cm_types::Name,
     cm_util::TaskGroup,
-    fidl::endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd},
+    fidl::{
+        endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd},
+        epitaph::ChannelEpitaphExt,
+    },
     fidl_fuchsia_component_sandbox as fsandbox,
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::prelude::*,
@@ -103,9 +106,7 @@ impl FactoryCapabilityHost {
             } => match sandbox::Capability::try_from(fsandbox::Capability::Connector(capability)) {
                 Ok(capability) => match capability {
                     sandbox::Capability::Connector(connector) => {
-                        let server_end: ServerEnd<fsandbox::ConnectorMarker> = server_end.into();
-                        self.tasks
-                            .spawn(serve_connector(connector, server_end.into_stream().unwrap()));
+                        let _ = connector.send(sandbox::Message { channel: server_end });
                     }
                     _ => unreachable!(),
                 },
@@ -140,12 +141,12 @@ impl FactoryCapabilityHost {
     fn create_connector(
         &self,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
-    ) -> fsandbox::ConnectorCapability {
+    ) -> fsandbox::Connector {
         let (receiver, sender) = Receiver::new();
         self.tasks.spawn(async move {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
         });
-        fsandbox::ConnectorCapability::from(sender)
+        fsandbox::Connector::from(sender)
     }
 
     fn create_dictionary(&self) -> ClientEnd<fsandbox::DictionaryMarker> {
@@ -167,21 +168,6 @@ async fn serve_handle(handle: sandbox::OneShotHandle, mut stream: fsandbox::Hand
             }
             fsandbox::HandleRequest::_UnknownMethod { ordinal, .. } => {
                 warn!("Received unknown Handle request with ordinal {ordinal}");
-            }
-        }
-    }
-}
-
-async fn serve_connector(sender: sandbox::Connector, mut stream: fsandbox::ConnectorRequestStream) {
-    while let Ok(Some(request)) = stream.try_next().await {
-        match request {
-            fsandbox::ConnectorRequest::Open { channel, control_handle: _ } => {
-                if let Err(_err) = sender.send(sandbox::Message { channel }) {
-                    return;
-                }
-            }
-            fsandbox::ConnectorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!("Received unknown Sender request with ordinal {ordinal}");
             }
         }
     }
@@ -315,14 +301,9 @@ mod tests {
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
         let connector = factory_proxy.create_connector(receiver_client_end).await.unwrap();
-        let (connector_client, connector_server) =
-            fidl::endpoints::create_endpoints::<fsandbox::ConnectorMarker>();
-        factory_proxy.open_connector(connector, connector_server.into()).unwrap();
-        let connector = connector_client.into_proxy().unwrap();
-
         let (ch1, _ch2) = zx::Channel::create();
         let expected_koid = ch1.get_koid().unwrap();
-        connector.open(ch1).unwrap();
+        factory_proxy.open_connector(connector, ch1).unwrap();
 
         let request = receiver_stream.try_next().await.unwrap().unwrap();
         if let fsandbox::ReceiverRequest::Receive { channel, .. } = request {

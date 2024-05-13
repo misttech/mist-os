@@ -78,9 +78,9 @@ impl CapabilityTrait for Connector {
     }
 }
 
-impl From<Connector> for fsandbox::ConnectorCapability {
+impl From<Connector> for fsandbox::Connector {
     fn from(value: Connector) -> Self {
-        fsandbox::ConnectorCapability { token: registry::insert_token(value.into()) }
+        fsandbox::Connector { token: registry::insert_token(value.into()) }
     }
 }
 
@@ -114,10 +114,10 @@ mod tests {
         sender.send_channel(ch1).unwrap();
 
         // Convert the Sender to a FIDL token.
-        let connector: fsandbox::ConnectorCapability = sender.into();
+        let connector: fsandbox::Connector = sender.into();
 
         // Clone the Sender by cloning the token.
-        let token_clone = fsandbox::ConnectorCapability {
+        let token_clone = fsandbox::Connector {
             token: connector.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         };
         let connector_clone = match crate::Capability::try_from(fsandbox::Capability::Connector(

@@ -535,12 +535,8 @@ pub async fn get_exposed_dictionary() {
     };
     let factory =
         instance.root.connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>().unwrap();
-    let (echo_connector_client, echo_connector_server) =
-        fidl::endpoints::create_endpoints::<fsandbox::ConnectorMarker>();
-    factory.open_connector(echo_connector_capability, echo_connector_server.into()).unwrap();
-    let echo_connector = echo_connector_client.into_proxy().unwrap();
     let (echo_proxy, server_end) = create_proxy::<fecho::EchoMarker>().unwrap();
-    echo_connector.open(server_end.into_channel().into()).unwrap();
+    factory.open_connector(echo_connector_capability, server_end.into_channel()).unwrap();
     let response = echo_proxy.echo_string(Some("hello")).await.unwrap().unwrap();
     assert_eq!(response, "hello");
 }
