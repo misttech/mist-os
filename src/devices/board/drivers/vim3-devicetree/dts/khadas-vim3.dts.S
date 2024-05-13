@@ -51,6 +51,11 @@
 		};
 	};
 
+	display_detect: display-detect {
+		gpios = <&gpio_expander 0 0>;
+		gpio-names = "LCD_RESET";
+	};
+
 	backlight {
 		gpios = <&gpio_expander 1 0>;
 		gpio-names = "LCD_BACKLIGHT_ENABLE";
