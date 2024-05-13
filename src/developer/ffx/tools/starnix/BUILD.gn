@@ -23,6 +23,7 @@ rustc_library("lib") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
+    "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -53,6 +54,7 @@ rustc_library("lib") {
     "src/common.rs",
     "src/console.rs",
     "src/lib.rs",
+    "src/suspend.rs",
     "src/vmo.rs",
   ]
 

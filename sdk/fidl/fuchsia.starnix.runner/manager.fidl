@@ -1,0 +1,14 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.starnix.runner;
+
+@discoverable
+open protocol Manager {
+    /// Suspends all the running Starnix kernels.
+    flexible Suspend(table {});
+
+    /// Resumes all suspended Starnix kernels.
+    flexible Resume(table {});
+};

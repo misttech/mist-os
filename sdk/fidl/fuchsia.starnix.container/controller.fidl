@@ -58,6 +58,12 @@ open protocol Controller {
     }) -> (table {
         1: references vector<VmoReference>:MAX;
     });
+
+    /// Returns the job handle of the container.
+    @available(added=HEAD)
+    flexible GetJobHandle() -> (resource table {
+        1: job zx.Handle:JOB;
+    });
 };
 
 type SpawnConsoleError = flexible enum {

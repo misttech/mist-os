@@ -104,7 +104,10 @@
             from: "self",
         },
         {
-            protocol: [ "fuchsia.starnix.container.Runner" ],
+            protocol: [
+                "fuchsia.starnix.container.Controller",
+                "fuchsia.starnix.container.Runner",
+            ],
             from: "self",
         },
         {

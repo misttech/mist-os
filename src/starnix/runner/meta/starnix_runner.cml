@@ -27,7 +27,10 @@
             path: "/svc/fuchsia.component.runner.ComponentRunner",
         },
         {
-            protocol: [ "fuchsia.component.runner.ComponentRunner" ],
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.runner.Manager",
+            ],
         },
     ],
     use: [
@@ -89,6 +92,11 @@
             availability: "optional",
         },
         {
+            protocol: [ "fuchsia.starnix.runner.Manager" ],
+            from: "self",
+            to: [ "#kernels" ],
+        },
+        {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: "#playground",
@@ -107,6 +115,10 @@
     expose: [
         {
             runner: "starnix",
+            from: "self",
+        },
+        {
+            protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "self",
         },
     ],
