@@ -9,7 +9,7 @@ use {
             DeviceMode,
         },
         fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo},
-        mm::{MemoryAccessor, MemoryAccessorExt},
+        mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags},
         task::CurrentTask,
         vfs::{
             buffers::VecOutputBuffer, default_ioctl, fileops_impl_dataless, fileops_impl_seekable,
@@ -18,6 +18,7 @@ use {
     },
     bitflags::bitflags,
     fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions},
+    fuchsia_zircon::Vmo,
     linux_uapi::DM_UUID_LEN,
     mundane::hash::{Digest, Hasher, Sha256, Sha512},
     starnix_logging::{log_trace, track_stub},
@@ -374,6 +375,35 @@ impl FileOps for DmDeviceFile {
             Ok(bytes_read)
         } else {
             Ok(0)
+        }
+    }
+
+    fn get_vmo(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<Vmo>, Errno> {
+        let device = &self.device;
+        let state = device.state.lock();
+        if state.suspended {
+            track_stub!(TODO("https://fxbug.dev/338241090"), "Defer io for suspended devices.");
+            return Err(errno!(EINVAL));
+        }
+        if let Some(active_table) = &state.active_table {
+            if active_table.targets.len() > 1 {
+                track_stub!(
+                    TODO("https://fxbug.dev/339701082"),
+                    "Support pager-backed vmos for multiple targets."
+                );
+                return Err(errno!(ENOTSUP));
+            }
+            match &active_table.targets[0].target_type {
+                TargetType::Verity(args) => args.block_device.get_vmo(current_task, length, prot),
+            }
+        } else {
+            Err(errno!(EINVAL))
         }
     }
 
