@@ -84,7 +84,9 @@ impl Display for CompatibilityScope {
 
 impl PartialOrd for CompatibilityScope {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.path().partial_cmp(&other.path())
+        let a: String = self.path().into();
+        let b: String = other.path().into();
+        Some(cmp_prefixes_later(&a, &b))
     }
 }
 
@@ -95,6 +97,39 @@ impl Ord for CompatibilityScope {
             None => self.scope_type().cmp(&other.scope_type()),
         }
     }
+}
+
+fn cmp_prefixes_later(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering::*;
+    // Doing a string comparison, but sorting longer strings before their prefixes.
+    // This way more specific errors show up before more general ones.
+    match a.cmp(b) {
+        Equal => Equal,
+        Less => {
+            if b.starts_with(a) {
+                Greater
+            } else {
+                Less
+            }
+        }
+        Greater => {
+            if a.starts_with(b) {
+                Less
+            } else {
+                Greater
+            }
+        }
+    }
+}
+
+#[test]
+fn test_cmp_prefixes_later() {
+    use std::cmp::Ordering::*;
+    assert_eq!(Equal, cmp_prefixes_later("foo", "foo"));
+    assert_eq!(Greater, cmp_prefixes_later("foo", "bar"));
+    assert_eq!(Less, cmp_prefixes_later("bar", "foo"));
+    assert_eq!(Greater, cmp_prefixes_later("foo", "foo.bar"));
+    assert_eq!(Less, cmp_prefixes_later("foo.bar", "foo"));
 }
 
 #[derive(Clone, PartialEq, Eq)]
