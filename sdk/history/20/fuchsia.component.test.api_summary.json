@@ -38,6 +38,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.component.test/Capability.config",
+        "ordinal": "7",
+        "type": "fuchsia.component.test/Config"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.component.test/Capability.directory",
         "ordinal": "2",
         "type": "fuchsia.component.test/Directory"
@@ -98,6 +104,28 @@
     {
         "kind": "table",
         "name": "fuchsia.component.test/ChildOptions"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Config.as",
+        "ordinal": "2",
+        "type": "string:255"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Config.availability",
+        "ordinal": "3",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Config.name",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.test/Config"
     },
     {
         "kind": "table/member",
@@ -283,6 +311,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.component.test/Realm.AddCapability",
+        "strictness": "strict",
+        "ordinal": "2568821583469085257",
+        "direction": "two_way",
+        "request": "fuchsia.component.test/RealmAddCapabilityRequest",
+        "response": "fuchsia.component.test/Realm_AddCapability_Response",
+        "error": "fuchsia.component.test/RealmBuilderError"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.component.test/Realm.AddChild",
         "strictness": "strict",
         "ordinal": "4570035841292032001",
@@ -415,6 +453,16 @@
         "name": "fuchsia.component.test/Realm",
         "openness": "closed",
         "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.test/RealmAddCapabilityRequest.capability",
+        "ordinal": "1",
+        "type": "fuchsia.component.decl/Capability"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.test/RealmAddCapabilityRequest"
     },
     {
         "kind": "struct/member",

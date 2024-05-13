@@ -177,7 +177,7 @@ type Capability = flexible union {
     5: event Event;
     @available(added=9)
     6: event_stream EventStream;
-    @available(added=HEAD)
+    @available(added=20)
     7: config Config;
     @available(added=HEAD)
     8: dictionary Dictionary;
@@ -333,7 +333,7 @@ type EventStream = table {
 };
 
 /// A configuration capability
-@available(added=HEAD)
+@available(added=20)
 type Config = table {
     /// The name of the capability.
     1: name fuchsia.component.name;
@@ -679,7 +679,7 @@ closed protocol Realm {
     }) -> () error RealmBuilderError;
 
     /// Add a capability to the realm.
-    @available(added=HEAD)
+    @available(added=20)
     strict AddCapability(struct {
         capability fuchsia.component.decl.Capability;
     }) -> () error RealmBuilderError;

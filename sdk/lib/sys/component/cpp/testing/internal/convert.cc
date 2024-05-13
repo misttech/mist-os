@@ -129,7 +129,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #endif
   }
   if ([[maybe_unused]] auto config = cpp17_get_if<Config>(&capability)) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 20
     fuchsia::component::test::Config fidl_capability;
 
     fidl_capability.set_name(std::string(config->name));

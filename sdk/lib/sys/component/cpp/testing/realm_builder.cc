@@ -168,7 +168,7 @@ Realm& Realm::SetConfigValue(const std::string& name, const std::string& key, Co
   return *this;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 20
 Realm& Realm::AddConfiguration(std::vector<ConfigCapability> configurations) {
   for (ConfigCapability& c : configurations) {
     fuchsia::component::decl::Configuration config;
@@ -342,7 +342,7 @@ RealmBuilder& RealmBuilder::InitMutableConfigToEmpty(const std::string& name) {
   return *this;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 20
 RealmBuilder& RealmBuilder::AddConfiguration(std::vector<ConfigCapability> configurations) {
   root_.AddConfiguration(std::move(configurations));
   return *this;
