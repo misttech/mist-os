@@ -174,8 +174,8 @@ void ChainLock::ReleaseInternal() {
   // step #2, we will have a UAF situation.
   //
   // On of the properties we would really like to preserve for these locks is,
-  // "If the lock is unlocked, then there is CPU which is going to touch any of
-  // the lock's internal storage for any reason except to acquire the lock".
+  // "If the lock is unlocked, then there is no CPU which is going to touch any
+  // of the lock's internal storage for any reason except to acquire the lock".
   // Obeying this rule eliminates the UAF potential described above (as well as
   // many other potential variations).
   //
