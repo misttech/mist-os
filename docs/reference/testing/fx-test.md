@@ -1,15 +1,9 @@
-# User guide for `fx test`
+# User guide for fx test
 
-`fx test` is the developer entrypoint to run tests in a checkout of fuchsia.git.
-
-This document provides a developer-oriented guide to using `fx test`
-for your in-tree testing.
-
-Important: This document describes the new `fx test`, which is currently
-opt-in behind a flag. To opt-in, set this environment variable:
-`export FUCHSIA_DISABLED_legacy_fxtest=1`. See
-[this page][fxtest-source]
-for more details on the current status of the new tool.
+This page provides best practices, examples, and reference materials
+for using the `fx test` command for running tests in
+a [Fuchsia source checkout setup][fuchsia-source-checkout]
+(`fuchsia.git`).
 
 ## Basic usage
 
@@ -31,6 +25,9 @@ This will do several things:
 If you did not include any tests in your build, `fx test` will exit.
 Try `fx set core.x64`**`--with //src/diagnostics:tests`** on your
 `fx set` command line to include some tests as an example.
+
+For more details on the current status of `fx test`, see this
+[`README`][fxtest-source] page.
 
 ## Basic concepts
 
@@ -416,21 +413,13 @@ When the format is stabilized, it will be possible to build interactive
 viewers and converters to other formats (such as [Build Event
 Protocol][build-event-protocol]{:.external}).
 
-<!-- Reference links -->
 
-[build-event-protocol]: https://bazel.build/remote/bep
-[fxtest-rewrite-event]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite/event.py
-[fxtest-source]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
-[trf-docs]: /docs/development/testing/components/test_runner_framework.md
-[zxdb-docs]: /docs/development/debugger/commands.md
-[zxdb-testing-docs]: /docs/development/debugger/tests.md
+## Common issues
 
-## Common Issues
-
-### `fx test` does not work with emacs
+### fx test does not work with emacs
 
 The emacs compilation window does not emulate an xterm-compatible terminal,
-resulting in an error like:
+resulting in an error like below:
 
 ```bash {:.devsite-disable-click-to-copy}
 in _make_progress_bar raise ValueError("Width must be at least 3")
@@ -439,26 +428,22 @@ in _make_progress_bar raise ValueError("Width must be at least 3")
 To solve this problem, run `fx test` with the `--no-status` option to disable
 the status bar.
 
-### Escape sequences appear in `fx test` output
+### Escape sequences appear in fx test output
 
-Your terminal may not support ANSI color codes, and `fx test` failed
-to detect this fact.
+Your terminal may not support ANSI color codes, which `fx test` fails to detect.
 
-Pass the `--no-style` option to `fx test` to disable color output
-or the `--no-status` option to disable the updating status bar.
-
-Passing the `--simple` option to `fx test` is equivalent to `--no-style
---no-status`.
+Pass the `--no-style` option to `fx test` to disable color output or the
+`--no-status` option to disable the updating status bar. Passing the
+`--simple` option to `fx test` is equivalent to
+`--no-style --no-status`.
 
 ### I don't know where my log file is
 
 You can set the location of the log by passing `--logpath` to `fx test`, though
 this is recommended only for non-interactive use.
 
-Your logs are stored in your Fuchsia output directory by default as timestamped
-files.
-
-Print the path to the previous log using `fx test -pr path`.
+By default, your logs are stored in your Fuchsia output directory as timestamped
+files. Print the path to the previous logs using `fx test -pr path`.
 
 ### Printing the log file dumps garbage into my terminal
 
@@ -469,15 +454,35 @@ print the most recent log to your terminal:
 cat `fx test -pr path` | gunzip | jq -C | less -R
 ```
 
-This does the following:
+This command does the following:
 
 - Find the most recent log path (`fx test -pr path`).
 - Pipe the log to `gunzip` to decompress the log.
 - Pipe the decompressed log to `jq` to pretty-print it with color output (`-C`).
 - Pipe the color output to `less` configured to display color (`-R`).
 
-For convenience you can add an alias for this command in your .bashrc:
+For convenience, you can add an alias for this command in your `.bashrc` file:
 
 ```bash
 alias testlog='cat `fx test -pr path` | gunzip | jq -C | less -R'
 ```
+
+### Opting out of the new fx test command
+
+The new `fx test` command is currently set to be the default.
+
+To opt out of this setting, set the following environment variable:
+
+```bash
+export FUCHSIA_DISABLED_legacy_fxtest=0
+```
+
+<!-- Reference links -->
+
+[fuchsia-source-checkout]: /docs/get-started/get_fuchsia_source.md
+[build-event-protocol]: https://bazel.build/remote/bep
+[fxtest-rewrite-event]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite/event.py
+[fxtest-source]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
+[trf-docs]: /docs/development/testing/components/test_runner_framework.md
+[zxdb-docs]: /docs/development/debugger/commands.md
+[zxdb-testing-docs]: /docs/development/debugger/tests.md
