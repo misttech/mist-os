@@ -84,9 +84,6 @@ source_set("src") {
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
-
-    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/media/audio/drivers/lib/intel-hda",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

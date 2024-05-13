@@ -6,7 +6,6 @@
 
 #include <fuchsia/hardware/usb/dci/c/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
-#include <lib/ddk/binding.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>

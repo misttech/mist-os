@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.intel.hda/cpp/wire.h>
 #include <fuchsia/hardware/intelhda/codec/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/handle.h>
