@@ -83,6 +83,7 @@ system-update-committer
 ?text_manager
 ?time-zone-info-service
 ?timekeeper
+?trusted-apps
 ?tzdata-provider
 ?ui
 ?virtual_keyboard_manager

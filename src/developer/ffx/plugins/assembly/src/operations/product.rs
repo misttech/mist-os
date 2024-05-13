@@ -257,6 +257,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Add product-specified packages and configuration
     builder.add_product_packages(product.packages).context("Adding product-provided packages")?;
 
+    // Add any packages compiled by the assembly process itself
+    for package in configuration.compiled_packages.values() {
+        builder
+            .add_compiled_package(package, "".into())
+            .context("adding configuration-generated package")?;
+    }
+
     builder
         .add_product_base_drivers(product.base_drivers)
         .context("Adding product-provided base-drivers")?;

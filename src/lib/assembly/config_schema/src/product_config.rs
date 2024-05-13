@@ -41,6 +41,10 @@ pub struct ProductConfig {
     #[serde(default)]
     #[file_relative_paths]
     pub component_policy: ComponentPolicyConfig,
+
+    /// Components which depend on trusted applications running in the TEE.
+    #[serde(default)]
+    pub trusted_apps: Vec<TrustedApp>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -159,6 +163,24 @@ pub struct ComponentPolicyConfig {
     #[serde(default)]
     #[file_relative_paths]
     pub product_policies: Vec<FileRelativePathBuf>,
+}
+
+/// A configuration for a component which depends on TEE-based protocols.
+/// Examples include components which implement DRM, or authentication services.
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+pub struct TrustedApp {
+    /// The URL of the component.
+    pub component_url: String,
+    /// GUIDs which of the form fuchsia.tee.Application.{GUID} will match a
+    /// protocol provided by the TEE.
+    pub guids: Vec<String>,
+    /// Capabilities provided by this component which should be routed to the
+    /// rest of the system.
+    pub capabilities: Vec<String>,
+    /// Additional protocols which are required for this component to work, and
+    /// which will be routed from 'parent'
+    #[serde(default)]
+    pub additional_required_protocols: Vec<String>,
 }
 
 #[cfg(test)]

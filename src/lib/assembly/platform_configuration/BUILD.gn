@@ -46,6 +46,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/swd.rs",
     "src/subsystems/thermal.rs",
     "src/subsystems/timekeeper.rs",
+    "src/subsystems/trusted_apps.rs",
     "src/subsystems/ui.rs",
     "src/subsystems/usb.rs",
     "src/subsystems/virtualization.rs",
@@ -63,6 +64,7 @@ rustc_library("platform_configuration") {
     "//src/lib/assembly/named_file_map",
     "//src/lib/assembly/util",
     "//src/lib/fuchsia-url",
+    "//src/sys/lib/cm_types",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
@@ -70,6 +72,7 @@ rustc_library("platform_configuration") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
+    "//tools/lib/cml",
   ]
   test_deps = [
     "//src/lib/assembly/images_config",

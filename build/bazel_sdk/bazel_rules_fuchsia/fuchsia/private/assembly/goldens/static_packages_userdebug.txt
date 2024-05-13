@@ -97,6 +97,7 @@ system-update-committer
 ?timekeeper
 ?toolbox
 ?triage-detect
+?trusted-apps
 ?tzdata-provider
 ?ui
 ?update-bin
