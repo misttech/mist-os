@@ -323,6 +323,15 @@ impl<I: IpExt> Tuple<I> {
     /// Returns `None` if the packet doesn't have an inner transport packet.
     pub(crate) fn from_packet<'a, P: IpPacket<I>>(packet: &'a P) -> Option<Self> {
         let maybe_transport_packet = packet.transport_packet();
+
+        // Subtlety: For ICMP packets, only request/response messages will have
+        // a transport packet defined (and currently only ECHO messages do).
+        // This gets us basic tracking for free, and lets us implicitly ignore
+        // ICMP errors, which are not meant to be tracked.
+        //
+        // If other message types eventually have TransportPacket impls, then
+        // this would lead to confusing different message types that happen to
+        // have the same ID.
         let transport_packet = maybe_transport_packet.transport_packet()?;
 
         Some(Self {
@@ -340,8 +349,8 @@ impl<I: IpExt> Tuple<I> {
     /// ports are reversed, but for ICMP, where the ports stand in for other
     /// information, things are more complicated.
     pub(crate) fn invert(self) -> Tuple<I> {
-        // TODO(https://fxbug.dev/328064082): Support ICMP properly. The
-        // request/response message have different ICMP types.
+        // TODO(https://fxbug.dev/328064082): Support tracking different ICMP
+        // request/response types.
         Self {
             protocol: self.protocol,
             src_addr: self.dst_addr,

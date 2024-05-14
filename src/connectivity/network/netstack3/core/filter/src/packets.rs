@@ -983,6 +983,9 @@ fn parse_icmpv4_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHea
         | Icmpv4MessageType::Redirect
         | Icmpv4MessageType::TimeExceeded
         | Icmpv4MessageType::ParameterProblem
+        // NOTE: If these are parsed, then without further work, conntrack won't
+        // be able to differentiate between these and ECHO message with the same
+        // ID.
         | Icmpv4MessageType::TimestampRequest
         | Icmpv4MessageType::TimestampReply => None,
     }?;
