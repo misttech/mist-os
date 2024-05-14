@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "pwm:tests" ]
+  deps = [
+    "pwm:tests",
+    "pwm-init:tests",
+  ]
   testonly = true
 }
