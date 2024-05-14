@@ -626,3 +626,9 @@
   available_in_git: 'd60145af7b3e75ada3b25eb4c24d49bd9636c19f'
   areas: ['Serial']
   path: '/src/devices/serial/drivers/serial-async'
+- short_description: 'Intel HD Audio ELD (EDID-like data) support in the display coordinator driver'
+  deletion_reason: 'HD Audio on HDMI is not actively used or tested on Intel NUC devices. Current implementation blocks display driver migration to DFv2'
+  gerrit_change_id: '1046392'
+  available_in_git: 'dd7557d95161c1e30014d441ce2df679eb1814f0'
+  areas: ['Display', 'Audio']
+  path: 'src/graphics/display/drivers/coordinator/eld.cc'

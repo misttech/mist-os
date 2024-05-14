@@ -9,7 +9,6 @@ test("display-coordinator-unittests") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "display-test.cc",
-    "eld-test.cc",
     "fence-test.cc",
     "image-test.cc",
     "inspect-test.cc",

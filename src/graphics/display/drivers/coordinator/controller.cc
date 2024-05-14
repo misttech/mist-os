@@ -46,7 +46,6 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
-#include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -159,13 +158,6 @@ zx::result<> Controller::AddDisplay(const added_display_args_t& banjo_added_disp
 
   fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
   DisplayId display_id = display_info->id;
-  if (display_info->edid.has_value()) {
-    fbl::Array<uint8_t> eld = ComputeEld(display_info->edid->base);
-
-    // The array is empty if memory allocation failed. We prefer using an
-    // empty ELD to dropping the display altogether.
-    engine_driver_client_->SetEld(display_id, eld);
-  }
 
   fbl::AutoLock lock(mtx());
   auto display_it = displays_.find(display_id);
