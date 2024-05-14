@@ -71,9 +71,12 @@ constexpr amlogic_cpu::operating_point_t operating_points[] = {
 };
 // clang-format on
 
+// Note: relative_performance are placeholder values to indicate that the a53 is lower
+//       performance than the a73. They currently do not represent the true relative performace
+//       of the two cores.
 constexpr amlogic_cpu::perf_domain_t performance_domains[] = {
-    {.id = kPdArmA53, .core_count = 2, .name = "a311d-arm-a53"},
-    {.id = kPdArmA73, .core_count = 4, .name = "a311d-arm-a73"},
+    {.id = kPdArmA53, .core_count = 2, .relative_performance = 127, .name = "a311d-arm-a53"},
+    {.id = kPdArmA73, .core_count = 4, .relative_performance = 255, .name = "a311d-arm-a73"},
 };
 
 const std::vector<fpbus::Metadata> cpu_metadata{
