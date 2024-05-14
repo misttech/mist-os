@@ -5,14 +5,13 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_FAKE_HCI_SERVER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_FAKE_HCI_SERVER_H_
 
-#include <fuchsia/hardware/bluetooth/cpp/fidl_test_base.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/channel.h>
 
 #include <string>
 
-#include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "gmock/gmock.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
@@ -20,14 +19,13 @@
 
 namespace bt::fidl::testing {
 
-namespace fhbt = fuchsia::hardware::bluetooth;
+namespace fhbt = fuchsia_hardware_bluetooth;
 
-class FakeHciServer final : public fhbt::testing::Hci_TestBase {
+class FakeHciServer final : public ::fidl::Server<fhbt::Hci> {
  public:
-  FakeHciServer(::fidl::InterfaceRequest<fhbt::Hci> request, async_dispatcher_t* dispatcher)
-      : dispatcher_(dispatcher) {
-    binding_.Bind(std::move(request));
-  }
+  FakeHciServer(::fidl::ServerEnd<fhbt::Hci> server_end, async_dispatcher_t* dispatcher)
+      : dispatcher_(dispatcher),
+        binding_(::fidl::BindServer(dispatcher_, std::move(server_end), this)) {}
 
   void Unbind() { binding_.Unbind(); }
 
@@ -90,46 +88,58 @@ class FakeHciServer final : public fhbt::testing::Hci_TestBase {
   bool iso_channel_valid() const { return iso_channel_.is_valid(); }
 
  private:
-  void OpenCommandChannel(zx::channel channel, OpenCommandChannelCallback callback) override {
-    command_channel_ = std::move(channel);
+  void OpenCommandChannel(OpenCommandChannelRequest& request,
+                          OpenCommandChannelCompleter::Sync& completer) override {
+    command_channel_ = std::move(request.channel());
     InitializeWait(command_wait_, command_channel_);
-    callback(fpromise::ok());
+    completer.Reply(fit::success());
   }
 
-  void OpenAclDataChannel(zx::channel channel, OpenAclDataChannelCallback callback) override {
-    acl_channel_ = std::move(channel);
+  void OpenAclDataChannel(OpenAclDataChannelRequest& request,
+                          OpenAclDataChannelCompleter::Sync& completer) override {
+    acl_channel_ = std::move(request.channel());
     InitializeWait(acl_wait_, acl_channel_);
-    callback(fpromise::ok());
+    completer.Reply(fit::success());
   }
 
-  void OpenScoDataChannel(zx::channel channel, OpenScoDataChannelCallback callback) override {
-    sco_channel_ = std::move(channel);
+  void OpenScoDataChannel(OpenScoDataChannelRequest& request,
+                          OpenScoDataChannelCompleter::Sync& completer) override {
+    sco_channel_ = std::move(request.channel());
     InitializeWait(sco_wait_, sco_channel_);
-    callback(fpromise::ok());
+    completer.Reply(fit::success());
   }
 
-  void OpenIsoDataChannel(zx::channel channel, OpenIsoDataChannelCallback callback) override {
-    iso_channel_ = std::move(channel);
+  void OpenIsoDataChannel(OpenIsoDataChannelRequest& request,
+                          OpenIsoDataChannelCompleter::Sync& completer) override {
+    iso_channel_ = std::move(request.channel());
     InitializeWait(iso_wait_, iso_channel_);
-    callback(fpromise::ok());
+    completer.Reply(fit::success());
   }
 
-  void ConfigureSco(fhbt::ScoCodingFormat coding_format, fhbt::ScoEncoding encoding,
-                    fhbt::ScoSampleRate sample_rate, ConfigureScoCallback callback) override {
+  void ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::Sync& completer) override {
     if (check_configure_sco_) {
-      check_configure_sco_(coding_format, encoding, sample_rate);
+      check_configure_sco_(request.coding_format(), request.encoding(), request.sample_rate());
     }
-    callback(fpromise::ok());
+    completer.Reply(fit::success());
   }
 
-  void ResetSco(ResetScoCallback callback) override {
+  void ResetSco(ResetScoCompleter::Sync& completer) override {
     if (reset_sco_cb_) {
       reset_sco_cb_();
     }
-    callback(fpromise::ok());
+    completer.Reply(fit::success());
   }
 
-  void NotImplemented_(const std::string& name) override { FAIL() << name << " not implemented"; }
+  void OpenSnoopChannel(OpenSnoopChannelRequest& request,
+                        OpenSnoopChannelCompleter::Sync& completer) override {
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override {
+    // Not implemented
+  }
 
   void InitializeWait(async::WaitBase& wait, zx::channel& channel) {
     BT_ASSERT(channel.is_valid());
@@ -216,8 +226,6 @@ class FakeHciServer final : public fhbt::testing::Hci_TestBase {
     iso_wait_.Begin(dispatcher_);
   }
 
-  ::fidl::Binding<fhbt::Hci> binding_{this};
-
   zx::channel command_channel_;
   std::vector<bt::DynamicByteBuffer> commands_received_;
 
@@ -238,6 +246,7 @@ class FakeHciServer final : public fhbt::testing::Hci_TestBase {
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnIsoSignal> iso_wait_{this};
 
   async_dispatcher_t* dispatcher_;
+  ::fidl::ServerBindingRef<fhbt::Hci> binding_;
 };
 
 }  // namespace bt::fidl::testing

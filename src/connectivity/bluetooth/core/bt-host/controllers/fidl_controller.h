@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_CONTROLLERS_FIDL_CONTROLLER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_CONTROLLERS_FIDL_CONTROLLER_H_
 
-#include <fuchsia/hardware/bluetooth/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/channel.h>
@@ -14,12 +14,35 @@
 
 namespace bt::controllers {
 
+class VendorEventHandler : public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Vendor> {
+ public:
+  VendorEventHandler(std::function<void(zx_status_t)> callback);
+  void on_fidl_error(fidl::UnbindInfo error) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Vendor> metadata) override;
+
+ private:
+  std::function<void(zx_status_t)> callback_;
+};
+
+class HciEventHandler : public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Hci> {
+ public:
+  HciEventHandler(std::function<void(zx_status_t)> callback);
+  void on_fidl_error(fidl::UnbindInfo error) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Hci> metadata) override;
+
+ private:
+  std::function<void(zx_status_t)> callback_;
+};
+
 class FidlController final : public pw::bluetooth::Controller {
  public:
   using PwStatusCallback = pw::Callback<void(pw::Status)>;
 
   // |dispatcher| must outlive this object.
-  FidlController(fuchsia::hardware::bluetooth::VendorHandle vendor, async_dispatcher_t* dispatcher);
+  FidlController(fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end,
+                 async_dispatcher_t* dispatcher);
 
   ~FidlController() override;
 
@@ -79,14 +102,17 @@ class FidlController final : public pw::bluetooth::Controller {
 
   // Initializes HCI layer by binding |hci_handle| to |hci_| and opening two-way command channel and
   // ACL data channel
-  void InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_handle);
+  void InitializeHci(fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci_client_end);
 
   // |vendor_handle_| holds the Vendor channel until Initialize() is called, at which point
   // |vendor_| is bound to the channel. This prevents errors from being lost before initialization.
-  fuchsia::hardware::bluetooth::VendorHandle vendor_handle_;
-  fuchsia::hardware::bluetooth::VendorPtr vendor_;
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end_;
+  fidl::Client<fuchsia_hardware_bluetooth::Vendor> vendor_;
 
-  fuchsia::hardware::bluetooth::HciPtr hci_;
+  fidl::Client<fuchsia_hardware_bluetooth::Hci> hci_;
+
+  VendorEventHandler vendor_event_handler_;
+  HciEventHandler hci_event_handler_;
 
   async_dispatcher_t* dispatcher_;
 

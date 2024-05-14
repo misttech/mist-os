@@ -4,8 +4,6 @@
 
 #include "fidl_controller.h"
 
-#include <lib/fidl/cpp/binding.h>
-
 #include <optional>
 
 #include "gmock/gmock.h"
@@ -16,7 +14,7 @@
 
 namespace bt::controllers {
 
-namespace fhbt = fuchsia::hardware::bluetooth;
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 constexpr hci_spec::ConnectionHandle kConnectionHandle = 0x0001;
 const StaticByteBuffer kSetAclPriorityNormalCommand(0x00);
@@ -26,10 +24,11 @@ const StaticByteBuffer kSetAclPrioritySinkCommand(0x02);
 class FidlControllerTest : public bt::testing::TestLoopFixture {
  public:
   void SetUp() override {
-    fhbt::VendorHandle vendor;
+    auto [vendor_client_end, vendor_server_end] =
+        ::fidl::Endpoints<fuchsia_hardware_bluetooth::Vendor>::Create();
 
-    fake_vendor_server_.emplace(vendor.NewRequest(), dispatcher());
-    fidl_controller_.emplace(std::move(vendor), dispatcher());
+    fake_vendor_server_.emplace(std::move(vendor_server_end), dispatcher());
+    fidl_controller_.emplace(std::move(vendor_client_end), dispatcher());
   }
 
   void InitializeController() {
@@ -53,10 +52,10 @@ class FidlControllerTest : public bt::testing::TestLoopFixture {
   fhbt::BtVendorFeatures FeaturesBitsToVendorFeatures(FidlController::FeaturesBits bits) {
     fhbt::BtVendorFeatures out{0};
     if (bits & FidlController::FeaturesBits::kSetAclPriorityCommand) {
-      out |= fhbt::BtVendorFeatures::SET_ACL_PRIORITY_COMMAND;
+      out |= fhbt::BtVendorFeatures::kSetAclPriorityCommand;
     }
     if (bits & FidlController::FeaturesBits::kAndroidVendorExtensions) {
-      out |= fhbt::BtVendorFeatures::ANDROID_VENDOR_EXTENSIONS;
+      out |= fhbt::BtVendorFeatures::kAndroidVendorExtensions;
     }
     return out;
   }
@@ -230,9 +229,9 @@ TEST_F(FidlControllerTest, ConfigureScoWithFormatCvsdEncoding8BitsSampleRate8Khz
                                                            fhbt::ScoEncoding encoding,
                                                            fhbt::ScoSampleRate rate) mutable {
     device_cb_count++;
-    EXPECT_EQ(format, fhbt::ScoCodingFormat::CVSD);
-    EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_8);
-    EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_8);
+    EXPECT_EQ(format, fhbt::ScoCodingFormat::kCvsd);
+    EXPECT_EQ(encoding, fhbt::ScoEncoding::kBits8);
+    EXPECT_EQ(rate, fhbt::ScoSampleRate::kKhz8);
   });
 
   int controller_cb_count = 0;
@@ -258,9 +257,9 @@ TEST_F(FidlControllerTest, ConfigureScoWithFormatCvsdEncoding16BitsSampleRate8Kh
 
   hci_server()->set_check_configure_sco(
       [](fhbt::ScoCodingFormat format, fhbt::ScoEncoding encoding, fhbt::ScoSampleRate rate) {
-        EXPECT_EQ(format, fhbt::ScoCodingFormat::CVSD);
-        EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_16);
-        EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_8);
+        EXPECT_EQ(format, fhbt::ScoCodingFormat::kCvsd);
+        EXPECT_EQ(encoding, fhbt::ScoEncoding::kBits16);
+        EXPECT_EQ(rate, fhbt::ScoSampleRate::kKhz8);
       });
 
   int config_cb_count = 0;
@@ -282,9 +281,9 @@ TEST_F(FidlControllerTest, ConfigureScoWithFormatCvsdEncoding16BitsSampleRate16K
 
   hci_server()->set_check_configure_sco(
       [](fhbt::ScoCodingFormat format, fhbt::ScoEncoding encoding, fhbt::ScoSampleRate rate) {
-        EXPECT_EQ(format, fhbt::ScoCodingFormat::CVSD);
-        EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_16);
-        EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_16);
+        EXPECT_EQ(format, fhbt::ScoCodingFormat::kCvsd);
+        EXPECT_EQ(encoding, fhbt::ScoEncoding::kBits16);
+        EXPECT_EQ(rate, fhbt::ScoSampleRate::kKhz16);
       });
 
   int config_cb_count = 0;
@@ -306,9 +305,9 @@ TEST_F(FidlControllerTest, ConfigureScoWithFormatMsbcEncoding16BitsSampleRate16K
 
   hci_server()->set_check_configure_sco(
       [](fhbt::ScoCodingFormat format, fhbt::ScoEncoding encoding, fhbt::ScoSampleRate rate) {
-        EXPECT_EQ(format, fhbt::ScoCodingFormat::MSBC);
-        EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_16);
-        EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_16);
+        EXPECT_EQ(format, fhbt::ScoCodingFormat::kMsbc);
+        EXPECT_EQ(encoding, fhbt::ScoEncoding::kBits16);
+        EXPECT_EQ(rate, fhbt::ScoSampleRate::kKhz16);
       });
 
   int config_cb_count = 0;
@@ -394,7 +393,7 @@ TEST_F(FidlControllerTest, VendorGetFeatures) {
       [&](FidlController::FeaturesBits bits) { features = FeaturesBitsToVendorFeatures(bits); });
   RunLoopUntilIdle();
   ASSERT_TRUE(features.has_value());
-  EXPECT_EQ(features.value(), fhbt::BtVendorFeatures::SET_ACL_PRIORITY_COMMAND);
+  EXPECT_EQ(features.value(), fhbt::BtVendorFeatures::kSetAclPriorityCommand);
 
   std::optional<pw::Status> close_status;
   controller()->Close([&](pw::Status status) { close_status = status; });
@@ -460,7 +459,6 @@ TEST_F(FidlControllerTest, VendorEncodeSetAclPriorityCommandSource) {
 }
 
 TEST_F(FidlControllerTest, VendorServerClosesChannelBeforeOpenHci) {
-  // Loop is not run after initialization to ensure OpenHci() is not called
   RETURN_IF_FATAL(InitializeController());
   ASSERT_THAT(complete_status(), std::nullopt);
   ASSERT_THAT(controller_error(), std::nullopt);

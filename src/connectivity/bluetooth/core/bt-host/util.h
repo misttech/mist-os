@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_UTIL_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_UTIL_H_
 
-#include <fuchsia/hardware/bluetooth/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 
 #include <string>
@@ -17,7 +17,8 @@ namespace bthost {
 // Creates a FIDL channel connecting to the service directory at |device_path| relative to
 // component's namespace. Creates and returns a VendorHandle using the client end of the channel if
 // successful, otherwise returns nullptr on failure.
-fuchsia::hardware::bluetooth::VendorHandle CreateVendorHandle(const std::string& device_path);
+zx::result<fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor>> CreateVendorHandle(
+    const std::string& device_path);
 
 }  // namespace bthost
 
