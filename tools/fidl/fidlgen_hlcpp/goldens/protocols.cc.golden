@@ -3594,7 +3594,7 @@ AnotherDiscoverableProtocol_SyncProxy::~AnotherDiscoverableProtocol_SyncProxy() 
 
 
 PlatformServer::~PlatformServer() = default;
-const char PlatformServer::Name_[] = "platform";
+const char PlatformServer::Name_[] = "test.protocols.PlatformServer";
 
 const fidl_type_t* ::test::protocols::PlatformServer_RequestDecoder::GetType(uint64_t ordinal, bool* out_needs_response, bool* out_is_known) {
   *out_needs_response = false;

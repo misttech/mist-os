@@ -2979,7 +2979,7 @@ impl fidl::endpoints::ProtocolMarker for PlatformServer_Marker {
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = PlatformServer_SynchronousProxy;
 
-    const DEBUG_NAME: &'static str = "platform";
+    const DEBUG_NAME: &'static str = "test.protocols.PlatformServer";
 }
 impl fidl::endpoints::DiscoverableProtocolMarker for PlatformServer_Marker {}
 

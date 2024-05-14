@@ -5241,7 +5241,7 @@ namespace test_protocols {
 
 template<>
 struct ::fidl::internal::ProtocolDetails<::test_protocols::PlatformServer> {
-    static constexpr char DiscoverableName[] = "platform";
+    static constexpr char DiscoverableName[] = "test.protocols.PlatformServer";
 };
 
 #endif  // __Fuchsia__

@@ -1326,7 +1326,7 @@ func (d *Protocol) GetProtocolName() string {
 		return ""
 	}
 	var name string
-	if arg, ok := attr.LookupArgStandalone(); ok {
+	if arg, ok := attr.LookupArg("name"); ok {
 		name = arg.ValueString()
 	} else {
 		// TODO(https://fxbug.dev/42053780): Construct this string in fidlc, not here.
