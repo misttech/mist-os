@@ -20,9 +20,9 @@ impl OneShotHandle {
 
     /// Returns the handle in this [OneShotHandle], taking it out.
     ///
-    /// Subsequent calls will return an `Unavailable` error.
-    pub fn get_handle(&self) -> Result<zx::Handle, fsandbox::HandleCapabilityError> {
-        self.0.lock().unwrap().take().ok_or(fsandbox::HandleCapabilityError::Unavailable)
+    /// Subsequent calls will return `None`.
+    pub fn take(&self) -> Option<zx::Handle> {
+        self.0.lock().unwrap().take()
     }
 }
 
@@ -34,9 +34,9 @@ impl From<zx::Handle> for OneShotHandle {
 
 impl CapabilityTrait for OneShotHandle {}
 
-impl From<OneShotHandle> for fsandbox::HandleCapability {
+impl From<OneShotHandle> for fsandbox::OneShotHandle {
     fn from(value: OneShotHandle) -> Self {
-        fsandbox::HandleCapability { token: registry::insert_token(value.into()) }
+        fsandbox::OneShotHandle { token: registry::insert_token(value.into()) }
     }
 }
 
@@ -60,8 +60,8 @@ mod tests {
     fn construction() {
         let event = zx::Event::create();
         let one_shot = OneShotHandle::new(event.into_handle());
-        assert_matches!(one_shot.get_handle(), Ok(_));
-        assert_matches!(one_shot.get_handle(), Err(_));
+        assert_matches!(one_shot.take(), Some(_));
+        assert_matches!(one_shot.take(), None);
     }
 
     // Tests converting the OneShotHandle to FIDL and back.
@@ -80,7 +80,7 @@ mod tests {
         let one_shot = assert_matches!(any, Capability::OneShotHandle(h) => h);
 
         // Get the handle.
-        let handle = one_shot.get_handle().unwrap();
+        let handle = one_shot.take().unwrap();
 
         // The handle should be for same Event that was in the original OneShotHandle.
         let got_koid = handle.get_koid().unwrap();
@@ -97,10 +97,10 @@ mod tests {
 
         let one_shot = OneShotHandle::from(event.into_handle());
         let one_shot_clone = one_shot.clone();
-        let fidl_handle: fsandbox::HandleCapability = one_shot.into();
+        let fidl_handle: fsandbox::OneShotHandle = one_shot.into();
 
         // Clone the HandleCapability by cloning the token.
-        let token_clone = fsandbox::HandleCapability {
+        let token_clone = fsandbox::OneShotHandle {
             token: fidl_handle.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         };
 
@@ -110,7 +110,7 @@ mod tests {
             .context("failed to convert from FIDL")?;
         let one_shot = assert_matches!(any, Capability::OneShotHandle(h) => h);
 
-        let handle = one_shot.get_handle().expect("failed to call GetHandle");
+        let handle = one_shot.take().expect("failed to call GetHandle");
 
         // The handle should be for same Event that was in the original OneShotHandle.
         let got_koid = handle.get_koid().unwrap();
@@ -118,10 +118,7 @@ mod tests {
 
         // The original OneShotHandle should now not have a handle because it was taken
         // out by the GetHandle call on the clone.
-        assert_matches!(
-            one_shot_clone.get_handle(),
-            Err(fsandbox::HandleCapabilityError::Unavailable)
-        );
+        assert_matches!(one_shot_clone.take(), None);
 
         Ok(())
     }

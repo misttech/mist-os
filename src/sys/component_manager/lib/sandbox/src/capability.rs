@@ -12,8 +12,6 @@ use vfs::directory::entry::DirectoryEntry;
 
 #[derive(Error, Debug, Clone)]
 pub enum ConversionError {
-    #[error("could not get handle: {err:?}")]
-    Handle { err: fsandbox::HandleCapabilityError },
     #[error("`{0}` is not a valid `fuchsia.io` node name")]
     ParseName(#[from] vfs::name::ParseNameError),
     #[error("conversion to type is not supported")]

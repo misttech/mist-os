@@ -135,7 +135,7 @@ fn translate_handle(cap: Capability, info: &HandleInfo) -> Result<StartupHandle,
         Capability::OneShotHandle(h) => h,
         c => return Err(DeliveryError::UnsupportedCapability(c)),
     };
-    let handle = one_shot.get_handle().map_err(|_| DeliveryError::UnsupportedCapability(cap))?;
+    let handle = one_shot.take().ok_or_else(|| DeliveryError::UnsupportedCapability(cap))?;
 
     Ok(StartupHandle { handle, info: *info })
 }

@@ -13,19 +13,8 @@ const MAX_DATA_LENGTH uint32 = 8192;
 const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
 
 @available(added=HEAD)
-type HandleCapability = resource struct {
+type OneShotHandle = resource struct {
     token zx.Handle:EVENTPAIR;
-};
-
-/// The `Handle` protocol allows a client to get the contained handle.
-@available(added=HEAD)
-open protocol Handle {
-    /// Take the handle or error if the handle was already taken.
-    flexible GetHandle() -> (resource struct {
-        handle zx.Handle;
-    }) error @generated_name("HandleCapabilityError") strict enum {
-        UNAVAILABLE = 1;
-    };
 };
 
 @available(added=HEAD)
@@ -44,7 +33,7 @@ type Connector = resource struct {
 @available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
-    2: handle HandleCapability;
+    2: handle OneShotHandle;
     3: data DataCapability;
     4: dictionary client_end:Dictionary;
     5: connector Connector;
@@ -222,6 +211,15 @@ type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
 };
 
+@available(added=HEAD)
+type FactoryError = flexible enum : uint32 {
+    /// An invalid argument was passed.
+    INVALID_ARGS = 1;
+
+    /// The requested resource was unavailable.
+    UNAVAILABLE = 2;
+};
+
 /// The [`Factory`] protocol handles:
 ///
 /// - Instantiation of sandbox types.
@@ -231,21 +229,27 @@ type ProtocolPayload = resource struct {
 @available(added=HEAD)
 open protocol Factory {
     /// Open a connection from the provided [Connector] capability.
+    ///
+    /// If there is an error, it will be reported as a zx.Status epitaph on `server_end`.
+    /// Errors:
+    ///
+    /// - `INVALID_ARGS`: `capability` is not a recognized [Connector].
     flexible OpenConnector(resource struct {
         capability Connector;
         server_end zx.Handle:CHANNEL;
     });
 
-    /// Operate on the provided handle capability.
+    /// Extract the handle owned by the underlying `capability`, if it wasn't taken already.
     ///
-    /// Consumes a token referencing a bedrock object and serves the
-    /// corresponding FIDL representation on `server_end`. The peer of the
-    /// `server_end` is another reference to the bedrock object. Dropping the
-    /// control channel decreases one reference on the object.
-    flexible OpenHandle(resource struct {
-        capability HandleCapability;
-        server_end server_end:Handle;
-    });
+    /// Errors:
+    ///
+    /// - `INVALID_ARGS`: `capability` does not contain a recognized [OneShotHandle] token.
+    /// - `UNAVAILABLE`: The underlying handle was already taken.h
+    flexible TakeHandle(resource struct {
+        capability OneShotHandle;
+    }) -> (resource struct {
+        handle zx.Handle;
+    }) error FactoryError;
 
     /// Creates a `Connector` from a client served `Receiver`.
     flexible CreateConnector(resource struct {
@@ -254,11 +258,11 @@ open protocol Factory {
         capability Connector;
     });
 
-    /// Creates a `Handle` from the provided `handle`.
-    flexible CreateHandle(resource struct {
+    /// Creates a `OneShotHandle` from the provided `handle`.
+    flexible CreateOneShotHandle(resource struct {
         handle zx.Handle;
     }) -> (resource struct {
-        capability HandleCapability;
+        capability OneShotHandle;
     });
 
     /// Creates a new empty [`Dictionary`].
