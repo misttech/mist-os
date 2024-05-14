@@ -46,6 +46,7 @@ fuchsia_toolchain_info(
     blobfs = "//tools:{{HOST_CPU}}/blobfs_do_not_depend",
     blobfs_manifest = "//tools:{{HOST_CPU}}/blobfs_do_not_depend-meta.json",
     bootserver = "//tools:{{HOST_CPU}}/bootserver",
+    configc = "//tools:{{HOST_CPU}}/configc",
     cmc = "//tools:{{HOST_CPU}}/cmc",
     cmc_includes = select({
         "@platforms//os:fuchsia": "//:cmc_includes",
@@ -76,6 +77,7 @@ fuchsia_toolchain_info(
     ffx_test_fho_meta = "//tools:{{HOST_CPU}}/ffx_tools/ffx-test.json",
     ffx_test_manifest = "//tools:{{HOST_CPU}}/ffx_tools/ffx-test-meta.json",
     fidlc = "//tools:{{HOST_CPU}}/fidlc",
+    fidl_format = "//tools:{{HOST_CPU}}/fidl-format",
     fidlgen_cpp = "//tools:{{HOST_CPU}}/fidlgen_cpp",
     fidlgen_hlcpp = "//tools:{{HOST_CPU}}/fidlgen_hlcpp",
     fssh = "//tools:{{HOST_CPU}}/fssh",
