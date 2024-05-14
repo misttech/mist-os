@@ -37,8 +37,6 @@ rustc_library_with_features("netstack3-core") {
     "src/benchmarks.rs",
     "src/context.rs",
     "src/counters.rs",
-    "src/data_structures.rs",
-    "src/data_structures/socketmap.rs",
     "src/device/api.rs",
     "src/device/arp.rs",
     "src/device/base.rs",

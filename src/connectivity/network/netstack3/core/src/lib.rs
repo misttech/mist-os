@@ -28,7 +28,6 @@ extern crate fakestd as std;
 mod api;
 mod context;
 mod counters;
-mod data_structures;
 mod lock_ordering;
 mod marker;
 mod state;
@@ -46,6 +45,22 @@ pub(crate) mod algorithm {
 }
 pub(crate) mod convert {
     pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
+}
+
+pub(crate) mod data_structures {
+    pub(crate) mod ref_counted_hash_map {
+        pub(crate) use netstack3_base::ref_counted_hash_map::{
+            InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
+        };
+    }
+    pub(crate) mod socketmap {
+        pub(crate) use netstack3_base::socketmap::{
+            Entry, IterShadows, OccupiedEntry, SocketMap, Tagged,
+        };
+    }
+    pub(crate) mod token_bucket {
+        pub(crate) use netstack3_base::TokenBucket;
+    }
 }
 
 /// The device layer.

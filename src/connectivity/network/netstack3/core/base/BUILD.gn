@@ -16,6 +16,7 @@ rustc_library_with_features("netstack3-base") {
     "src/counters.rs",
     "src/data_structures.rs",
     "src/data_structures/ref_counted_hash_map.rs",
+    "src/data_structures/socketmap.rs",
     "src/data_structures/token_bucket.rs",
     "src/error.rs",
     "src/event.rs",
@@ -45,7 +46,10 @@ rustc_library_with_features("netstack3-base") {
     "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
+    "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
 
     # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
@@ -57,7 +61,6 @@ rustc_library_with_features("netstack3-base") {
     "//src/connectivity/lib/packet-formats",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:criterion",
-    "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-subscriber",
@@ -97,7 +100,12 @@ rustc_library_with_features("netstack3-base") {
       target_name = "netstack3-base-instrumented"
       with_unit_tests = true
       features = [ "instrumented" ]
-      test_deps = _testutils_deps
+      test_deps = [
+        "//src/lib/proptest-support",
+        "//third_party/rust_crates:proptest",
+      ]
+      test_deps += _testutils_deps
+
       deps += [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync-instrumented" ]
     },
   ]

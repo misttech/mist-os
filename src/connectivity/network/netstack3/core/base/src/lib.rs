@@ -62,6 +62,14 @@ pub mod ref_counted_hash_map {
     };
 }
 
+/// Defines generic data structures used to implement common application socket
+/// functionality for multiple protocols.
+pub mod socketmap {
+    pub use crate::data_structures::socketmap::{
+        Entry, IterShadows, OccupiedEntry, SocketMap, Tagged, VacantEntry,
+    };
+}
+
 /// Sync utilities common to netstack3.
 pub mod sync {
     // TODO(https://fxbug.dev/42062225): Support single-threaded variants of

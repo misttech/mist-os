@@ -32,7 +32,9 @@ use derivative::Derivative;
 /// Produces an iterator that yields all the shadows of a given value. The order
 /// of iteration is unspecified.
 pub trait IterShadows {
+    /// The iterator returned by `iter_shadows`.
     type IterShadows: Iterator<Item = Self>;
+    /// Produces the iterator for shadow values.
     fn iter_shadows(&self) -> Self::IterShadows;
 }
 
@@ -41,6 +43,7 @@ pub trait IterShadows {
 /// This can be used to provide a summary value, e.g. even or odd for an
 /// integer-like type.
 pub trait Tagged<A> {
+    /// The tag type.
     type Tag: Copy + Eq + core::fmt::Debug;
 
     /// Returns the tag value for `self` at the given address.
@@ -114,7 +117,9 @@ pub enum Entry<'a, A: Hash + Eq, V: Tagged<A>> {
     // additional map lookup with the same key. Experimentation suggests the
     // compiler will optimize this duplicate lookup out, since it is the same
     // one done by `SocketMap::entry` to produce the `Entry` in the first place.
+    /// An occupied entry.
     Occupied(OccupiedEntry<'a, A, V>),
+    /// A vacant entry.
     Vacant(VacantEntry<'a, A, V>),
 }
 
@@ -123,8 +128,8 @@ where
     A: IterShadows + Hash + Eq,
     V: Tagged<A>,
 {
-    #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
+    /// Returns the number of entries in this `SocketMap`.
+    pub fn len(&self) -> usize {
         self.len
     }
 
@@ -185,8 +190,7 @@ where
     }
 
     /// Returns an iterator over the keys and values in the map.
-    #[cfg(test)]
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&'_ A, &'_ V)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&'_ A, &'_ V)> {
         let Self { map, len: _ } = self;
         map.iter().filter_map(|(a, MapValue { value, descendant_counts: _ })| {
             value.as_ref().map(|v| (a, v))
@@ -240,13 +244,13 @@ where
 
 impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> OccupiedEntry<'a, K, V> {
     /// Gets a reference to the key for the entry.
-    pub(crate) fn key(&self) -> &K {
+    pub fn key(&self) -> &K {
         let Self(SocketMap { map: _, len: _ }, key) = self;
         key
     }
 
     /// Retrieves the value referenced by this entry.
-    pub(crate) fn get(&self) -> &V {
+    pub fn get(&self) -> &V {
         let Self(SocketMap { map, len: _ }, key) = self;
         let MapValue { descendant_counts: _, value } = map.get(key).unwrap();
         // unwrap() call is guaranteed safe by OccupiedEntry invariant.
@@ -259,7 +263,7 @@ impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> OccupiedEntry<'a, K, V> {
     /// Runs the provided callback on the value referenced by this entry.
     ///
     /// Returns the result of the callback.
-    pub(crate) fn map_mut<R>(&mut self, apply: impl FnOnce(&mut V) -> R) -> R {
+    pub fn map_mut<R>(&mut self, apply: impl FnOnce(&mut V) -> R) -> R {
         let Self(SocketMap { map, len: _ }, key) = self;
         // unwrap() calls are guaranteed safe by OccupiedEntry invariant.
         let MapValue { descendant_counts: _, value } = map.get_mut(key).unwrap();
@@ -273,25 +277,25 @@ impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> OccupiedEntry<'a, K, V> {
     }
 
     /// Extracts the underlying [`SocketMap`] reference backing this entry.
-    pub(crate) fn into_map(self) -> &'a mut SocketMap<K, V> {
+    pub fn into_map(self) -> &'a mut SocketMap<K, V> {
         let Self(socketmap, _) = self;
         socketmap
     }
 
     /// Removes the value from the map and returns it.
-    pub(crate) fn remove(self) -> V {
+    pub fn remove(self) -> V {
         let (value, _map) = self.remove_from_map();
         value
     }
 
     /// Gets a reference to the backing map.
-    pub(crate) fn get_map(&self) -> &SocketMap<K, V> {
+    pub fn get_map(&self) -> &SocketMap<K, V> {
         let Self(socketmap, _) = self;
         socketmap
     }
 
     /// Removes the value from the map and returns the value and map.
-    pub(crate) fn remove_from_map(self) -> (V, &'a mut SocketMap<K, V>) {
+    pub fn remove_from_map(self) -> (V, &'a mut SocketMap<K, V>) {
         let Self(socketmap, key) = self;
         let SocketMap { map, len } = socketmap;
         let shadows = key.iter_shadows();
@@ -322,7 +326,7 @@ impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> VacantEntry<'a, K, V> {
     /// Inserts a value for the key referenced by this entry.
     ///
     /// Returns a reference to the newly-inserted value.
-    pub(crate) fn insert(self, value: V) -> OccupiedEntry<'a, K, V>
+    pub fn insert(self, value: V) -> OccupiedEntry<'a, K, V>
     where
         K: Clone,
     {
@@ -339,15 +343,13 @@ impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> VacantEntry<'a, K, V> {
     }
 
     /// Extracts the underlying [`SocketMap`] reference backing this entry.
-    pub(crate) fn into_map(self) -> &'a mut SocketMap<K, V> {
+    pub fn into_map(self) -> &'a mut SocketMap<K, V> {
         let Self(socketmap, _) = self;
         socketmap
     }
 
     /// Gets the descendant counts for this entry.
-    pub(crate) fn descendant_counts(
-        &self,
-    ) -> impl ExactSizeIterator<Item = &'_ (V::Tag, NonZeroUsize)> {
+    pub fn descendant_counts(&self) -> impl ExactSizeIterator<Item = &'_ (V::Tag, NonZeroUsize)> {
         let Self(socket_map, key) = self;
         socket_map.descendant_counts(&key)
     }
