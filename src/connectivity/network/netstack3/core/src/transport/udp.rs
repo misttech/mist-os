@@ -33,7 +33,7 @@ use thiserror::Error;
 use tracing::{debug, trace};
 
 use crate::{
-    algorithm::{self, PortAllocImpl, ProtocolFlowId},
+    algorithm::{self, PortAllocImpl},
     context::{
         ContextPair, CounterContext, InstantContext, ReferenceNotifiers, RngContext, TracingContext,
     },
@@ -624,10 +624,8 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
         bindings_ctx: &mut BC,
         flow: datagram::DatagramFlowId<I::Addr, UdpRemotePort>,
     ) -> Option<NonZeroU16> {
-        let DatagramFlowId { local_ip, remote_ip, remote_id } = flow;
-        let id = ProtocolFlowId::new(local_ip, remote_ip, remote_id);
         let mut rng = bindings_ctx.rng();
-        algorithm::simple_randomized_port_alloc(&mut rng, &id, bound, &())
+        algorithm::simple_randomized_port_alloc(&mut rng, &flow, bound, &())
             .map(|p| NonZeroU16::new(p).expect("ephemeral ports should be non-zero"))
     }
 }
@@ -964,7 +962,7 @@ impl<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> PortAllocImpl
     for UdpBoundSocketMap<I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
-    type Id = ProtocolFlowId<SocketIpAddr<I::Addr>, UdpRemotePort>;
+    type Id = DatagramFlowId<I::Addr, UdpRemotePort>;
     type PortAvailableArg = ();
 
     fn is_port_available(&self, id: &Self::Id, port: u16, (): &()) -> bool {

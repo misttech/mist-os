@@ -17,40 +17,6 @@ use rand::RngCore;
 // type alias for simplicity.
 pub(crate) type PortNumber = u16;
 
-/// A common implementation of `HashableId` providing usual 3-tuple flow
-/// identifiers.
-///
-/// `ProtocolFlowId` provides the most common 3-tuple needed to be used when
-/// allocating ports: local IP, remote IP, and remote port number.
-#[derive(Hash, Debug)]
-pub(crate) struct ProtocolFlowId<A, P> {
-    local_addr: A,
-    remote_addr: A,
-    remote_port: P,
-}
-
-impl<A, P> ProtocolFlowId<A, P> {
-    /// Creates a new `ProtocolFlowId` with given parameters.
-    pub(crate) fn new(local_addr: A, remote_addr: A, remote_port: P) -> Self {
-        Self { local_addr, remote_addr, remote_port }
-    }
-
-    /// Gets this `ProtocolFlowId`'s local address.
-    pub(crate) fn local_addr(&self) -> &A {
-        &self.local_addr
-    }
-
-    /// Gets this `ProtocolFlowId`'s remote address.
-    pub(crate) fn remote_addr(&self) -> &A {
-        &self.remote_addr
-    }
-
-    /// Gets this `ProtocolFlowId`'s remote port number.
-    pub(crate) fn remote_port(&self) -> &P {
-        &self.remote_port
-    }
-}
-
 /// Trait that configures the behavior of port allocation.
 ///
 /// `PortAllocImpl` provides the types, custom behaviors, and port availability

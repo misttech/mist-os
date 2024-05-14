@@ -29,7 +29,6 @@ use packet_formats::ip::IpProtoExt;
 use thiserror::Error;
 
 use crate::{
-    algorithm::ProtocolFlowId,
     context::{ReferenceNotifiers, RngContext},
     convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter},
     device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
@@ -600,14 +599,12 @@ impl<A: Eq + Hash, D: Eq + Hash> IntoIterator for MulticastMemberships<A, D> {
 
 impl<A: IpAddress, D: crate::device::Id, LI, RI: Copy> ConnAddr<ConnIpAddr<A, LI, RI>, D> {
     pub(crate) fn from_protocol_flow_and_local_port(
-        id: &ProtocolFlowId<SocketIpAddr<A>, RI>,
+        id: &DatagramFlowId<A, RI>,
         local_port: LI,
     ) -> Self {
+        let DatagramFlowId { local_ip, remote_ip, remote_id } = id;
         Self {
-            ip: ConnIpAddr {
-                local: (*id.local_addr(), local_port),
-                remote: (*id.remote_addr(), *id.remote_port()),
-            },
+            ip: ConnIpAddr { local: (*local_ip, local_port), remote: (*remote_ip, *remote_id) },
             device: None,
         }
     }
