@@ -6,6 +6,9 @@
 
 #include <endian.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -91,10 +94,220 @@ bool TestSdmmcRootDevice::use_fidl_;
 bool TestSdmmcRootDevice::is_sd_;
 FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
+class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+ public:
+  FakeSystemActivityGovernor(zx::event exec_state_passive, zx::event wake_handling_active)
+      : exec_state_passive_(std::move(exec_state_passive)),
+        wake_handling_active_(std::move(wake_handling_active)) {}
+
+  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
+    fuchsia_power_system::PowerElements elements;
+    zx::event execution_element, wake_handling_element;
+    exec_state_passive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
+    wake_handling_active_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
+
+    fuchsia_power_system::ExecutionState exec_state = {
+        {.passive_dependency_token = std::move(execution_element)}};
+
+    fuchsia_power_system::WakeHandling wake_handling = {
+        {.active_dependency_token = std::move(wake_handling_element)}};
+
+    elements = {
+        {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
+
+    completer.Reply({{std::move(elements)}});
+  }
+
+  void RegisterListener(RegisterListenerRequest& req,
+                        RegisterListenerCompleter::Sync& completer) override {}
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+
+  zx::event exec_state_passive_;
+  zx::event wake_handling_active_;
+};
+
+class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
+ public:
+  void AddSideEffect(fit::function<void()> side_effect) { side_effect_ = std::move(side_effect); }
+
+  void Lease(fuchsia_power_broker::LessorLeaseRequest& req,
+             LeaseCompleter::Sync& completer) override {
+    if (side_effect_) {
+      side_effect_();
+    }
+
+    auto [lease_control_client_end, lease_control_server_end] =
+        fidl::Endpoints<fuchsia_power_broker::LeaseControl>::Create();
+    completer.Reply(fit::success(std::move(lease_control_client_end)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fit::function<void()> side_effect_;
+};
+
+class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
+ public:
+  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& req,
+              UpdateCompleter::Sync& completer) override {
+    completer.Reply(fit::success());
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+};
+
+class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
+ public:
+  void Watch(WatchCompleter::Sync& completer) override {
+    completer.Reply(fit::success(required_level_));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::PowerLevel required_level_ = SdmmcBlockDevice::kPowerLevelOff;
+};
+
+class PowerElement {
+ public:
+  explicit PowerElement(fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control,
+                        fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
+                        fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
+                        fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
+      : element_control_(std::move(element_control)),
+        lessor_(std::move(lessor)),
+        current_level_(std::move(current_level)),
+        required_level_(std::move(required_level)) {}
+
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
+  fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
+  fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
+  fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
+};
+
+class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
+ public:
+  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void AddElement(fuchsia_power_broker::ElementSchema& req,
+                  AddElementCompleter::Sync& completer) override {
+    // Get channels from request.
+    ASSERT_TRUE(req.level_control_channels().has_value());
+    fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>& current_level_server_end =
+        req.level_control_channels().value().current();
+    fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
+        req.level_control_channels().value().required();
+    fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
+
+    // Make channels to return to client
+    auto [element_control_client_end, element_control_server_end] =
+        fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+
+    // Instantiate (fake) lessor implementation.
+    auto lessor_impl = std::make_unique<FakeLessor>();
+    if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
+      hardware_power_lessor_ = lessor_impl.get();
+    } else if (req.element_name() == SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName) {
+      wake_on_request_lessor_ = lessor_impl.get();
+    } else {
+      ZX_ASSERT_MSG(0, "Unexpected power element.");
+    }
+    fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
+        fidl::BindServer<fuchsia_power_broker::Lessor>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lessor_server_end),
+            std::move(lessor_impl),
+            [](FakeLessor* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
+
+    // Instantiate (fake) current and required level implementations.
+    auto current_level_impl = std::make_unique<FakeCurrentLevel>();
+    auto required_level_impl = std::make_unique<FakeRequiredLevel>();
+    if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
+      hardware_power_current_level_ = current_level_impl.get();
+      hardware_power_required_level_ = required_level_impl.get();
+    } else if (req.element_name() == SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName) {
+      wake_on_request_current_level_ = current_level_impl.get();
+      wake_on_request_required_level_ = required_level_impl.get();
+    } else {
+      ZX_ASSERT_MSG(0, "Unexpected power element.");
+    }
+    fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
+        fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(current_level_server_end),
+            std::move(current_level_impl),
+            [](FakeCurrentLevel* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> server_end) mutable {});
+    fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_binding =
+        fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(required_level_server_end),
+            std::move(required_level_impl),
+            [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
+
+    if (wake_on_request_lessor_ && hardware_power_required_level_) {
+      wake_on_request_lessor_->AddSideEffect([&]() {
+        hardware_power_required_level_->required_level_ = SdmmcBlockDevice::kPowerLevelOn;
+      });
+    }
+
+    servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
+                          std::move(current_level_binding), std::move(required_level_binding));
+
+    fuchsia_power_broker::TopologyAddElementResponse result{
+        {.element_control_channel = std::move(element_control_client_end)},
+    };
+
+    completer.Reply(fit::success(std::move(result)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  FakeLessor* hardware_power_lessor_ = nullptr;
+  FakeCurrentLevel* hardware_power_current_level_ = nullptr;
+  FakeRequiredLevel* hardware_power_required_level_ = nullptr;
+  FakeLessor* wake_on_request_lessor_ = nullptr;
+  FakeCurrentLevel* wake_on_request_current_level_ = nullptr;
+  FakeRequiredLevel* wake_on_request_required_level_ = nullptr;
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
+
+  std::vector<PowerElement> servers_;
+};
+
 struct IncomingNamespace {
+  IncomingNamespace() {
+    zx::event::create(0, &exec_passive);
+    zx::event::create(0, &wake_active);
+    zx::event exec_passive_dupe, wake_active_dupe;
+    ASSERT_OK(exec_passive.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_passive_dupe));
+    ASSERT_OK(wake_active.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_active_dupe));
+    system_activity_governor.emplace(std::move(exec_passive_dupe), std::move(wake_active_dupe));
+  }
+
   fdf_testing::TestNode node{"root"};
   fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server;
+  zx::event exec_passive, wake_active;
+  std::optional<FakeSystemActivityGovernor> system_activity_governor;
+  FakePowerBroker power_broker;
 };
 
 class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
@@ -139,14 +352,16 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     }
   }
 
-  zx_status_t StartDriverForMmc(uint64_t speed_capabilities = 0) {
-    return StartDriver(/*is_sd=*/false, speed_capabilities);
+  zx_status_t StartDriverForMmc(uint64_t speed_capabilities = 0,
+                                bool supply_power_framework = false) {
+    return StartDriver(/*is_sd=*/false, speed_capabilities, supply_power_framework);
   }
-  zx_status_t StartDriverForSd(uint64_t speed_capabilities = 0) {
-    return StartDriver(/*is_sd=*/true, speed_capabilities);
+  zx_status_t StartDriverForSd(uint64_t speed_capabilities = 0,
+                               bool supply_power_framework = false) {
+    return StartDriver(/*is_sd=*/true, speed_capabilities, supply_power_framework);
   }
 
-  zx_status_t StartDriver(bool is_sd, uint64_t speed_capabilities) {
+  zx_status_t StartDriver(bool is_sd, uint64_t speed_capabilities, bool supply_power_framework) {
     TestSdmmcRootDevice::use_fidl_ = GetParam();
     TestSdmmcRootDevice::is_sd_ = is_sd;
     if (is_sd) {
@@ -191,6 +406,26 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
                                                     metadata->size()));
       ASSERT_OK(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                               &incoming->env.incoming_directory()));
+
+      if (supply_power_framework) {
+        // Serve (fake) system_activity_governor.
+        {
+          auto result = incoming->env.incoming_directory()
+                            .component()
+                            .AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+                                incoming->system_activity_governor->CreateHandler());
+          ASSERT_TRUE(result.is_ok());
+        }
+
+        // Serve (fake) power_broker.
+        {
+          auto result = incoming->env.incoming_directory()
+                            .component()
+                            .AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
+                                incoming->power_broker.CreateHandler());
+          ASSERT_TRUE(result.is_ok());
+        }
+      }
     });
 
     // Start dut_.
@@ -1914,17 +2149,24 @@ TEST_P(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
 }
 
 TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
+  libsync::Completion sleep_complete;
+  libsync::Completion awake_complete;
   sdmmc_.set_command_callback(MMC_SLEEP_AWAKE,
-                              [](const sdmmc_req_t& req, uint32_t out_response[4]) {
+                              [&](const sdmmc_req_t& req, uint32_t out_response[4]) {
                                 const bool sleep = (req.arg >> 15) & 0x1;
                                 if (sleep) {
                                   out_response[0] |= MMC_STATUS_CURRENT_STATE_STBY;
+                                  sleep_complete.Signal();
                                 } else {
                                   out_response[0] |= MMC_STATUS_CURRENT_STATE_SLP;
+                                  awake_complete.Signal();
                                 }
                               });
 
-  ASSERT_OK(StartDriverForMmc());
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/true));
+
+  // Initial power level is kPowerLevelOff.
+  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
   const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
   ASSERT_TRUE(inspect_vmo.is_valid());
@@ -1938,9 +2180,35 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   const auto* power_suspended =
       root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
-  EXPECT_FALSE(power_suspended->value());
+  EXPECT_TRUE(power_suspended->value());
+  const auto* wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 0);
 
-  EXPECT_OK(block_device_->SuspendPower());
+  // Issue request while power is suspended.
+  awake_complete.Reset();
+  sleep_complete.Reset();
+  std::optional<block::Operation<OperationContext>> op;
+  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op));
+  CallbackContext ctx(1);
+  FillSdmmc(1, 0x400);
+  user_.Queue(op->operation(), OperationCallback, &ctx);
+  runtime_.PerformBlockingWork([&] {
+    EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+    EXPECT_TRUE(op->private_storage()->completed);
+    EXPECT_OK(op->private_storage()->status);
+    ASSERT_NO_FATAL_FAILURE(CheckVmo(op->private_storage()->mapper, 1));
+
+    // Return driver to suspension.
+    incoming_.SyncCall([](IncomingNamespace* incoming) {
+      incoming->power_broker.hardware_power_required_level_->required_level_ =
+          SdmmcBlockDevice::kPowerLevelOff;
+    });
+
+    awake_complete.Wait();
+    sleep_complete.Wait();
+  });
 
   inspector.ReadInspect(inspect_vmo);
 
@@ -1950,8 +2218,18 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
+  wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 1);
 
-  EXPECT_OK(block_device_->ResumePower());
+  // Trigger power level change to kPowerLevelOn.
+  awake_complete.Reset();
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        SdmmcBlockDevice::kPowerLevelOn;
+  });
+  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
 
   inspector.ReadInspect(inspect_vmo);
 
@@ -1961,6 +2239,31 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_FALSE(power_suspended->value());
+  wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 1);
+
+  // Trigger power level change to kPowerLevelOff.
+  sleep_complete.Reset();
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        SdmmcBlockDevice::kPowerLevelOff;
+  });
+  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_TRUE(power_suspended->value());
+  wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(SdmmcProtocolUsingFidlTest, SdmmcBlockDeviceTest, zxtest::Bool());

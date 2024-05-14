@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_BLOCK_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -88,6 +89,12 @@ struct ReadWriteMetadata {
 
 class SdmmcBlockDevice {
  public:
+  static constexpr char kHardwarePowerElementName[] = "sdmmc-hardware";
+  static constexpr char kSystemWakeOnRequestPowerElementName[] = "sdmmc-system-wake-on-request";
+  // Common to hardware power and wake-on-request power elements.
+  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
+  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
+
   SdmmcBlockDevice(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc)
       : parent_(parent), sdmmc_(std::move(sdmmc)) {
     block_info_.max_transfer_size = static_cast<uint32_t>(sdmmc_->host_info().max_transfer_size);
@@ -111,9 +118,8 @@ class SdmmcBlockDevice {
   void StopWorkerDispatcher(std::optional<fdf::PrepareStopCompleter> completer = std::nullopt)
       TA_EXCL(lock_);
 
-  // TODO(b/309152899): Integrate with Power Framework.
-  zx_status_t SuspendPower() TA_EXCL(power_lock_);
-  zx_status_t ResumePower() TA_EXCL(power_lock_);
+  zx_status_t SuspendPower() TA_REQ(lock_);
+  zx_status_t ResumePower() TA_REQ(lock_);
 
   // Called by children of this device.
   void Queue(BlockOperation txn) TA_EXCL(lock_);
@@ -169,9 +175,37 @@ class SdmmcBlockDevice {
   bool MmcSupportsHsDdr();
   bool MmcSupportsHs200();
   bool MmcSupportsHs400();
-  void MmcSetInspectProperties();
+  void MmcSetInspectProperties() TA_REQ(lock_);
 
   void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status);
+
+  // TODO(b/309152899): Once fuchsia.power.SuspendEnabled config cap is available, have this method
+  // return failure if power management could not be configured. Use fuchsia.power.SuspendEnabled to
+  // ignore this failure when expected.
+  // Register power configs with Power Broker, and begin the continuous power level adjustment of
+  // hardware. For products that don't support the Power Framework, this method simply returns
+  // success.
+  zx::result<> ConfigurePowerManagement();
+
+  // Acquires a lease on a power element via the supplied |lessor_client|, returning the resulting
+  // lease control client end.
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease(
+      const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client);
+
+  // Informs Power Broker of the updated |power_level| via the supplied |current_level_client|.
+  void UpdatePowerLevel(
+      const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
+      fuchsia_power_broker::PowerLevel power_level);
+
+  // Watches the required hardware power level and adjusts it accordingly. Also serves requests that
+  // were delayed because they were received during suspended state. Communicates power level
+  // transitions to the Power Broker.
+  void WatchHardwareRequiredLevel();
+
+  // Watches the required wake-on-request power level and replies to the Power Broker accordingly.
+  // Does not directly effect any real power level change of storage hardware. (That happens in
+  // WatchHardwareRequiredLevel().)
+  void WatchWakeOnRequestRequiredLevel();
 
   SdmmcRootDevice* const parent_;
   // Only accessed by ProbeSd, ProbeMmc, SuspendPower, ResumePower, and WorkerLoop.
@@ -188,7 +222,10 @@ class SdmmcBlockDevice {
   std::array<uint8_t, MMC_EXT_CSD_SIZE> raw_ext_csd_;
 
   fbl::Mutex lock_;
+  // Signals the worker loop to process incoming commands (or driver shutdown).
   fbl::ConditionVariable worker_event_ TA_GUARDED(lock_);
+  // Signals that the worker loop is idle and awaiting incoming commands (or driver shutdown).
+  fbl::ConditionVariable idle_event_ TA_GUARDED(lock_);
 
   // blockio requests
   block::BorrowedOperationQueue<PartitionInfo> txn_list_ TA_GUARDED(lock_);
@@ -198,11 +235,28 @@ class SdmmcBlockDevice {
   fdf::Dispatcher worker_dispatcher_;
   // Signaled when worker_dispatcher_ is shut down.
   libsync::Completion worker_shutdown_completion_;
+  // Signaled when power has been resumed.
+  libsync::Completion wait_for_power_resumed_;
 
-  fbl::Mutex power_lock_;
-  bool power_suspended_ TA_GUARDED(power_lock_) = false;
+  bool worker_idle_ TA_GUARDED(lock_) = false;
+  bool power_suspended_ TA_GUARDED(lock_) = false;
   bool shutdown_ TA_GUARDED(lock_) = false;
   trace_async_id_t trace_async_id_;
+
+  std::vector<zx::event> active_power_dep_tokens_;
+  std::vector<zx::event> passive_power_dep_tokens_;
+
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_end_;
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
+  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
+
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> wake_on_request_element_control_client_end_;
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
+  fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
+
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
 
   block_info_t block_info_{};
 
@@ -230,6 +284,7 @@ class SdmmcBlockDevice {
     inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
     inspect::BoolProperty using_fidl_;                   // Set once by the init thread.
     inspect::BoolProperty power_suspended_;              // Updated whenever power state changes.
+    inspect::UintProperty wake_on_request_count_;        // Updated whenever wake-on-request occurs.
   } properties_;
 
   std::optional<inspect::ComponentInspector> exposed_inspector_;

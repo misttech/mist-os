@@ -19,6 +19,10 @@
         { service: "fuchsia.hardware.sdio.Service" },
     ],
     use: [
+        { protocol: "fuchsia.power.broker.Topology" },
+
+        // Used by //sdk/lib/driver/power/cpp
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },

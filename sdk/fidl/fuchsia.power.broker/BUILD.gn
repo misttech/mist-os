@@ -17,6 +17,7 @@ fidl("fuchsia.power.broker") {
     "//sdk/fidl/fuchsia.session.power/*:*",
     "//sdk/lib/driver/power/cpp/*:*",
     "//src/devices/block/drivers/aml-sdmmc/*:*",
+    "//src/devices/block/drivers/sdmmc/*:*",
     "//src/devices/bus/drivers/platform/test/*:*",
     "//src/devices/hrtimer/drivers/aml-hrtimer/*:*",
     "//src/graphics/drivers/msd-arm-mali/*:*",
