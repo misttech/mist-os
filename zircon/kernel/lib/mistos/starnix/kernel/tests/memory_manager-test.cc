@@ -15,6 +15,8 @@
 #include <tuple>
 #include <utility>
 
+#include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 #include <lockdep/guard.h>
 #include <zxtest/zxtest.h>
 
@@ -153,11 +155,11 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
   {
     Guard<Mutex> lock(mm->mm_state_rw_lock());
     // Verify that requesting an unmapped address returns an empty iterator.
-    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a - 100, 50)->empty());
-    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a - 100, 200)->empty());
+    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a - 100, 50)->is_empty());
+    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a - 100, 200)->is_empty());
 
     // Verify that requesting zero bytes returns an empty iterator.
-    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a, 0)->empty());
+    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a, 0)->is_empty());
 
 // Verify errors.
 #if 0
@@ -187,50 +189,130 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     }();
 
     // Verify result when requesting a whole mapping or portions of it.
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a, page_size).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size}}));
 
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a, page_size / 2).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size / 2}}));
+    fbl::AllocChecker ac;
+    fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>> expected;
+    expected.push_back({map_a, page_size}, &ac);
+    ASSERT(ac.check());
 
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size / 2).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size / 2}}));
+    ASSERT_EQ(expected[0], mm->state().get_contiguous_mappings_at(addr_a, page_size).value()[0]);
 
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a + page_size / 4, page_size / 8).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size / 8}}));
+    expected.reset();
+    expected.push_back({map_a, page_size / 2}, &ac);
+    ASSERT(ac.check());
+    ASSERT_EQ(expected[0],
+              mm->state().get_contiguous_mappings_at(addr_a, page_size / 2).value()[0]);
+
+    ASSERT_EQ(
+        expected[0],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size / 2).value()[0]);
+
+    expected.reset();
+    expected.push_back({map_a, page_size / 8}, &ac);
+    ASSERT(ac.check());
+    ASSERT_EQ(
+        expected[0],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 4, page_size / 8).value()[0]);
+
+    expected.reset();
+    expected.push_back({map_a, page_size / 2}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_b, page_size / 2}, &ac);
+    ASSERT(ac.check());
 
     // Verify result when requesting a range spanning more than one mapping.
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size / 2},
-                                                                    {map_b, page_size / 2}}));
+    ASSERT_EQ(expected[0],
+              mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[0]);
+    ASSERT_EQ(expected[1],
+              mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[1]);
+
+    expected.reset();
+    expected.push_back({map_a, page_size / 2}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_b, page_size}, &ac);
+    ASSERT(ac.check());
+
+    ASSERT_EQ(expected[0],
+              mm->state()
+                  .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2)
+                  .value()[0]);
+    ASSERT_EQ(expected[1],
+              mm->state()
+                  .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2)
+                  .value()[1]);
+
+    expected.reset();
+    expected.push_back({map_a, page_size}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_b, page_size / 2}, &ac);
+    ASSERT(ac.check());
+
+    ASSERT_EQ(expected[0],
+              mm->state().get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value()[0]);
+    ASSERT_EQ(expected[1],
+              mm->state().get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value()[1]);
+
+    expected.reset();
+    expected.push_back({map_a, page_size / 2}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_b, page_size}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_c, page_size / 2}, &ac);
+    ASSERT(ac.check());
 
     ASSERT_EQ(
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2).value(),
-        (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size / 2},
-                                                              {map_b, page_size}}));
-
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_a, page_size},
-                                                                    {map_b, page_size / 2}}));
-
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{
-                  {map_a, page_size / 2}, {map_b, page_size}, {map_c, page_size / 2}}));
-
+        expected[0],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[0]);
     ASSERT_EQ(
-        mm->state().get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2).value(),
-        (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_b, page_size / 2},
-                                                              {map_c, page_size}}));
+        expected[1],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[1]);
+    ASSERT_EQ(
+        expected[2],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[2]);
+
+    expected.reset();
+    expected.push_back({map_b, page_size / 2}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_c, page_size}, &ac);
+    ASSERT(ac.check());
+
+    ASSERT_EQ(expected[0],
+              mm->state()
+                  .get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2)
+                  .value()[0]);
+    ASSERT_EQ(expected[1],
+              mm->state()
+                  .get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2)
+                  .value()[1]);
 
     // Verify that results stop if there is a hole.
+
+    expected.reset();
+    expected.push_back({map_a, page_size / 2}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_b, page_size}, &ac);
+    ASSERT(ac.check());
+    expected.push_back({map_c, page_size}, &ac);
+    ASSERT(ac.check());
+
     ASSERT_EQ(
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value(),
-        (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{
-            {map_a, page_size / 2}, {map_b, page_size}, {map_c, page_size}}));
+        expected[0],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[0]);
+    ASSERT_EQ(
+        expected[1],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[1]);
+    ASSERT_EQ(
+        expected[2],
+        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[2]);
 
     // Verify that results stop at the last mapped page.
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(addr_d, page_size * 10).value(),
-              (std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>{{map_d, page_size}}));
+
+    expected.reset();
+    expected.push_back({map_d, page_size}, &ac);
+    ASSERT(ac.check());
+
+    ASSERT_EQ(expected[0],
+              mm->state().get_contiguous_mappings_at(addr_d, page_size * 10).value()[0]);
   }
 #endif
 }
@@ -241,7 +323,7 @@ TEST(MemoryManager, test_unmap_returned_mappings) {
   auto mm = current_task->mm();
   auto addr = map_memory(*current_task, 0, PAGE_SIZE * 2);
 
-  std::vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
   Guard<Mutex> lock(mm->mm_state_rw_lock());
   auto unmap_result = mm->state().unmap(addr, PAGE_SIZE, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
@@ -255,7 +337,7 @@ TEST(MemoryManager, test_unmap_returns_multiple_mappings) {
   auto addr = map_memory(*current_task, 0, PAGE_SIZE);
   map_memory(*current_task, addr.ptr() + 2 * PAGE_SIZE, PAGE_SIZE);
 
-  std::vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
   Guard<Mutex> lock(mm->mm_state_rw_lock());
   auto unmap_result = mm->state().unmap(addr, PAGE_SIZE * 3, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());

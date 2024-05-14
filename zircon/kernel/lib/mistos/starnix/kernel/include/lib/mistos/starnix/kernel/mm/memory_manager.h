@@ -207,7 +207,7 @@ class MemoryManagerState {
 
   fit::result<Errno, UserAddress> map_anonymous(
       DesiredAddress addr, size_t length, ProtectionFlags prot_flags, MappingOptionsFlags options,
-      MappingName name, std::vector<fbl::RefPtr<Mapping>>& released_mappings);
+      MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
 
   fit::result<Errno, UserAddress> map_internal(DesiredAddress addr, const zx::vmo& vmo,
                                                uint64_t vmo_offset, size_t length,
@@ -217,10 +217,10 @@ class MemoryManagerState {
   fit::result<Errno, UserAddress> map_vmo(DesiredAddress addr, zx::ArcVmo vmo, uint64_t vmo_offset,
                                           size_t length, MappingFlags flags, bool populate,
                                           MappingName name,
-                                          std::vector<fbl::RefPtr<Mapping>>& released_mappings);
+                                          fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
 
   fit::result<Errno> unmap(UserAddress, size_t length,
-                           std::vector<fbl::RefPtr<Mapping>>& released_mappings);
+                           fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
 
   zx::vmar& user_vmar() { return user_vmar_; }
   const zx::vmar& user_vmar() const { return user_vmar_; }
@@ -234,15 +234,15 @@ class MemoryManagerState {
 
   bool check_has_unauthorized_splits(UserAddress addr, size_t length);
 
-  fit::result<Errno, std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>>
-  get_contiguous_mappings_at(UserAddress addr, size_t length);
+  fit::result<Errno, fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>>>
+  get_contiguous_mappings_at(UserAddress addr, size_t length) const;
 
-  UserAddress max_address();
+  UserAddress max_address() const;
 
   fit::result<Errno> protect(UserAddress addr, size_t length, ProtectionFlags prot_flags);
 
   fit::result<Errno> update_after_unmap(UserAddress addr, size_t length,
-                                        std::vector<fbl::RefPtr<Mapping>>& released_mappings);
+                                        fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
 
   fit::result<Errno, size_t> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes);
   fit::result<Errno> write_mapping_memory(UserAddress addr, fbl::RefPtr<Mapping>& mapping,

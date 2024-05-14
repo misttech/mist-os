@@ -1,4 +1,5 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -13,6 +14,7 @@
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/range-map.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
@@ -23,7 +25,6 @@
 #include <optional>
 #include <utility>
 #include <variant>
-#include <vector>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
@@ -141,7 +142,7 @@ bool MemoryManagerState::Initialize(zx::vmar vmar, zx_info_vmar_t info,
 
 fit::result<Errno, UserAddress> MemoryManagerState::map_anonymous(
     DesiredAddress addr, size_t length, ProtectionFlags prot_flags, MappingOptionsFlags options,
-    MappingName name, std::vector<fbl::RefPtr<Mapping>>& released_mappings) {
+    MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
   auto result = create_anonymous_mapping_vmo(length);
   if (result.is_error()) {
     return result.take_error();
@@ -172,8 +173,8 @@ fit::result<Errno> MemoryManagerState::validate_addr(DesiredAddress addr, size_t
 
 fit::result<Errno, UserAddress> MemoryManagerState::map_vmo(
     DesiredAddress addr, zx::ArcVmo vmo, uint64_t vmo_offset, size_t length, MappingFlags flags,
-    bool populate, MappingName name, std::vector<fbl::RefPtr<Mapping>>& released_mappings) {
-  LTRACE;
+    bool populate, MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
+  LTRACEF("length %zu flags 0x%x populate %s\n", length, flags.bits(), populate ? "true" : "false");
   auto va = validate_addr(addr, length);
   if (va.is_error())
     return va.take_error();
@@ -249,9 +250,9 @@ bool MemoryManagerState::check_has_unauthorized_splits(UserAddress addr, size_t 
 //   only partially mapped.
 //
 // Returns EFAULT if the requested range overflows or extends past the end of the vmar.
-fit::result<Errno, std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>>>
-MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) {
-  std::vector<std::pair<fbl::RefPtr<Mapping>, size_t>> result;
+fit::result<Errno, fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>>>
+MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) const {
+  fbl::Vector<std::pair<fbl::RefPtr<Mapping>, size_t>> result;
   UserAddress end_addr;
   if (auto r = addr.checked_add(length); r) {
     end_addr = r.value();
@@ -282,18 +283,24 @@ MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) 
         auto mapping_length = std::min(length, range.end - addr) - offset;
         offset += mapping_length;
         prev_range_end = range.end;
-        result.emplace_back(mapping, mapping_length);
+        fbl::AllocChecker ac;
+        result.push_back(ktl::pair(mapping, mapping_length), &ac);
+        if (!ac.check()) {
+          return fit::error(errno(ENOMEM));
+        }
       }
     }
   }
-  return fit::ok(result);
+  return fit::ok(ktl::move(result));
 }
 
-UserAddress MemoryManagerState::max_address() { return user_vmar_info_.base + user_vmar_info_.len; }
+UserAddress MemoryManagerState::max_address() const {
+  return user_vmar_info_.base + user_vmar_info_.len;
+}
 
 // Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.
 fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
-                                             std::vector<fbl::RefPtr<Mapping>>& released_mappings) {
+                                             fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
   if (!addr.is_aligned(PAGE_SIZE)) {
     return fit::error(errno(EINVAL));
   }
@@ -341,7 +348,7 @@ fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
 //
 // Unmapped mappings are placed in `released_mappings`.
 fit::result<Errno> MemoryManagerState::update_after_unmap(
-    UserAddress addr, size_t length, std::vector<fbl::RefPtr<Mapping>>& released_mappings) {
+    UserAddress addr, size_t length, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
   UserAddress end_addr;
   if (auto result = addr.checked_add(length); result) {
     end_addr = result.value();
@@ -392,7 +399,7 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(
 
   // Remove the original range of mappings from our map.
   auto vec = mappings_.remove(util::Range<UserAddress>({addr, end_addr}));
-  released_mappings.insert(released_mappings.end(), vec.begin(), vec.end());
+  ktl::copy(vec.begin(), vec.end(), util::back_inserter(released_mappings));
 
   if (truncated_tail) {
     util::Range<UserAddress> range;
@@ -600,7 +607,7 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
   // TODO (Herrera) use rlimit from current process
   uint64_t rlimit_data = ktl::min(kProgramBreakLimit, static_cast<uint64_t>(-1));
 
-  std::vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
   Guard<Mutex> lock(&mm_state_rw_lock_);
   ProgramBreak brk;
   if (!state_->brk.has_value()) {
@@ -752,7 +759,7 @@ fit::result<Errno, size_t> MemoryManager::vmo_write_memory(UserAddress addr,
 }
 
 fit::result<Errno> MemoryManager::unmap(UserAddress addr, size_t length) {
-  std::vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
   Guard<Mutex> lock(&mm_state_rw_lock_);
   return state_.unmap(addr, length, released_mappings);
 }
@@ -768,7 +775,7 @@ fit::result<Errno, UserAddress> MemoryManager::map_anonymous(DesiredAddress addr
                                                              MappingOptionsFlags options,
                                                              MappingName name) {
   LTRACE;
-  std::vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
   Guard<Mutex> lock(&mm_state_rw_lock_);
   return state_.map_anonymous(addr, length, prot_flags, options, name, released_mappings);
 }
