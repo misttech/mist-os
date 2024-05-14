@@ -44,7 +44,8 @@ use starnix_uapi::{
     NAME_MAX,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    borrow::Borrow,
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
@@ -98,7 +99,8 @@ impl Namespace {
         // Follow the same path in the new namespace
         let mut mount = Arc::clone(&new_ns.root_mount);
         for mountpoint in mountpoints.iter().rev() {
-            let next_mount = Arc::clone(mount.read().submounts.get(ArcKey::ref_cast(mountpoint))?);
+            let next_mount =
+                mount.read().submounts.get(ArcKey::ref_cast(mountpoint))?.mount.clone();
             mount = next_mount;
         }
         node.mount = Some(mount).into();
@@ -220,13 +222,15 @@ pub struct MountState {
     /// a cycle.
     mountpoint: Option<(Weak<Mount>, DirEntryHandle)>,
 
-    // The keys of this map are always descendants of this mount's root.
+    // The set is keyed by the mountpoints which are always descendants of this mount's root.
+    // Conceptually, the set is more akin to a map: `DirEntry -> MountHandle`, but we use a set
+    // instead because `Submount` has a drop implementation that needs both the key and value.
     //
     // Each directory entry can only have one mount attached. Mount shadowing works by using the
     // root of the inner mount as a mountpoint. For example, if filesystem A is mounted at /foo,
     // mounting filesystem B on /foo will create the mount as a child of the A mount, attached to
     // A's root, instead of the root mount.
-    submounts: HashMap<ArcKey<DirEntry>, MountHandle>,
+    submounts: HashSet<Submount>,
 
     /// The membership of this mount in its peer group. Do not access directly. Instead use
     /// peer_group(), take_from_peer_group(), and set_peer_group().
@@ -291,6 +295,11 @@ impl Mount {
         NamespaceNode { mount: Some(Arc::clone(self)).into(), entry: Arc::clone(&self.root) }
     }
 
+    /// Returns true if there is a submount on top of `dir_entry`.
+    pub fn has_submount(&self, dir_entry: &DirEntryHandle) -> bool {
+        self.state.read().submounts.contains(ArcKey::ref_cast(dir_entry))
+    }
+
     /// The NamespaceNode on which this Mount is mounted.
     fn mountpoint(&self) -> Option<NamespaceNode> {
         let state = self.state.read();
@@ -346,9 +355,8 @@ impl Mount {
     fn remove_submount(
         self: &MountHandle,
         mount_hash_key: &ArcKey<DirEntry>,
-        mountpoint: &DirEntryHandle,
         propagate: bool,
-    ) -> Result<Arc<Mount>, Errno> {
+    ) -> Result<(), Errno> {
         if propagate {
             // create_submount explains why we need to make a copy of peers.
             let peers = {
@@ -360,11 +368,11 @@ impl Mount {
                 if Arc::ptr_eq(self, &peer) {
                     continue;
                 }
-                peer.write().remove_submount_internal(mount_hash_key, mountpoint);
+                let _ = peer.write().remove_submount_internal(mount_hash_key);
             }
         }
 
-        self.write().remove_submount_internal(mount_hash_key, mountpoint).ok_or(errno!(EINVAL))
+        self.write().remove_submount_internal(mount_hash_key)
     }
 
     /// Create a new mount with the same filesystem, flags, and peer group. Used to implement bind
@@ -386,7 +394,7 @@ impl Mount {
             // violation. I'm not convinced it's a real issue, but I can't convince myself it's not
             // either.
             let mut submounts = vec![];
-            for (dir, mount) in &self.state.read().submounts {
+            for Submount { dir, mount } in &self.state.read().submounts {
                 submounts.push((dir.clone(), mount.clone_mount_recursive()));
             }
             let mut clone_state = clone.write();
@@ -423,8 +431,8 @@ impl Mount {
         }
 
         if recursive {
-            for mount in state.submounts.values() {
-                mount.change_propagation(flag, recursive);
+            for submount in &state.submounts {
+                submount.mount.change_propagation(flag, recursive);
             }
         }
     }
@@ -450,6 +458,12 @@ impl Mount {
         // The "effect [of MS_STRICTATIME] is to clear the MS_NOATIME and MS_RELATIME flags."
         flags &= !MountFlags::STRICTATIME;
         *stored_flags = flags;
+    }
+
+    pub fn unmount(&self, propagate: bool) -> Result<(), Errno> {
+        let mountpoint = self.mountpoint().ok_or_else(|| errno!(EINVAL))?;
+        let parent_mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
+        parent_mount.remove_submount(mountpoint.mount_hash_key(), propagate)
     }
 
     state_accessor!(Mount, state, Arc<Mount>);
@@ -501,37 +515,34 @@ impl MountState<Base = Mount, BaseType = Arc<Mount>> {
             return;
         }
 
-        dir.register_mount();
+        let submount = mount.fs.kernel.upgrade().unwrap().mounts.register_mount(dir, mount.clone());
         let old_mountpoint =
             mount.state.write().mountpoint.replace((Arc::downgrade(self.base), Arc::clone(dir)));
         assert!(old_mountpoint.is_none(), "add_submount can only take a newly created mount");
         // Mount shadowing is implemented by mounting onto the root of the first mount, not by
         // creating two mounts on the same mountpoint.
-        let old_mount = self.submounts.insert(ArcKey(dir.clone()), Arc::clone(&mount));
+        let old_mount = self.submounts.replace(submount);
 
         // In rare cases, mount propagation might result in a request to mount on a directory where
         // something is already mounted. MountTest.LotsOfShadowing will trigger this. Linux handles
         // this by inserting the new mount between the old mount and the current mount.
-        if let Some(old_mount) = old_mount {
+        if let Some(mut old_mount) = old_mount {
             // Previous state: self[dir] = old_mount
             // New state: self[dir] = new_mount, new_mount[new_mount.root] = old_mount
             // The new mount has already been inserted into self, now just update the old mount to
             // be a child of the new mount.
-            old_mount.write().mountpoint = Some((Arc::downgrade(&mount), Arc::clone(dir)));
-            mount.write().submounts.insert(ArcKey(Arc::clone(&mount.root)), old_mount);
+            old_mount.mount.write().mountpoint = Some((Arc::downgrade(&mount), Arc::clone(dir)));
+            old_mount.dir = ArcKey(mount.root.clone());
+            mount.write().submounts.insert(old_mount);
         }
     }
 
-    fn remove_submount_internal(
-        &mut self,
-        mount_hash_key: &ArcKey<DirEntry>,
-        mountpoint: &DirEntryHandle,
-    ) -> Option<Arc<Mount>> {
-        let removed = self.submounts.remove(mount_hash_key);
-        if removed.is_some() {
-            mountpoint.unregister_mount();
+    fn remove_submount_internal(&mut self, mount_hash_key: &ArcKey<DirEntry>) -> Result<(), Errno> {
+        if self.submounts.remove(mount_hash_key) {
+            Ok(())
+        } else {
+            error!(EINVAL)
         }
-        removed
     }
 
     /// Set this mount's peer group.
@@ -909,7 +920,7 @@ fn for_each_mount<E>(
     callback(mount)?;
     // Collect list first to avoid self deadlock when ProcMountinfoFile::read_at tries to call
     // NamespaceNode::path()
-    let submounts: Vec<_> = mount.read().submounts.values().map(Arc::clone).collect();
+    let submounts: Vec<_> = mount.read().submounts.iter().map(|s| s.mount.clone()).collect();
     for submount in submounts {
         for_each_mount(&submount, callback)?;
     }
@@ -1394,9 +1405,10 @@ impl NamespaceNode {
         // While the child is a mountpoint, replace child with the mount's root.
         fn enter_one_mount(node: &NamespaceNode) -> Option<NamespaceNode> {
             if let Some(mount) = node.mount.deref() {
-                if let Some(mount) = mount.state.read().submounts.get(ArcKey::ref_cast(&node.entry))
+                if let Some(submount) =
+                    mount.state.read().submounts.get(ArcKey::ref_cast(&node.entry))
                 {
-                    return Some(mount.root());
+                    return Some(submount.mount.root());
                 }
             }
             None
@@ -1490,20 +1502,10 @@ impl NamespaceNode {
 
     /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
     pub fn unmount(&self) -> Result<(), Errno> {
-        // Drop submount outside of this state lock to ensure it is not done while holding a lock.
-        let _submount = {
-            let propagate = {
-                if let Ok(mount) = self.mount_if_root() {
-                    mount.read().is_shared()
-                } else {
-                    false
-                }
-            };
-            let mountpoint = self.enter_mount().mountpoint().ok_or_else(|| errno!(EINVAL))?;
-            let mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
-            mount.remove_submount(mountpoint.mount_hash_key(), &mountpoint.entry, propagate)?;
-        };
-        Ok(())
+        let propagate = self.mount_if_root().map_or(false, |mount| mount.read().is_shared());
+        let node = self.enter_mount();
+        let mount = node.mount_if_root()?;
+        mount.unmount(propagate)
     }
 
     pub fn rename(
@@ -1610,12 +1612,98 @@ impl Hash for NamespaceNode {
     }
 }
 
+/// Tracks all mounts, keyed by mount point.
+pub struct Mounts {
+    mounts: Mutex<HashMap<WeakKey<DirEntry>, Vec<ArcKey<Mount>>>>,
+}
+
+impl Mounts {
+    pub fn new() -> Self {
+        Mounts { mounts: Mutex::default() }
+    }
+
+    /// Registers the mount in the global mounts map.
+    fn register_mount(&self, dir_entry: &Arc<DirEntry>, mount: MountHandle) -> Submount {
+        let mut mounts = self.mounts.lock();
+        mounts
+            .entry(WeakKey::from(dir_entry))
+            .or_insert_with(|| {
+                dir_entry.set_has_mounts(true);
+                Vec::new()
+            })
+            .push(ArcKey(mount.clone()));
+        Submount { dir: ArcKey(dir_entry.clone()), mount }
+    }
+
+    /// Unregisters the mount.  This is called by `Submount::drop`.
+    fn unregister_mount(&self, dir_entry: &Arc<DirEntry>, mount: &MountHandle) {
+        let mut mounts = self.mounts.lock();
+        let Entry::Occupied(mut o) = mounts.entry(WeakKey::from(dir_entry)) else {
+            // This can happen if called from `unmount` below.
+            return;
+        };
+        // This is O(N), but directory entries with large numbers of mounts should be rare.
+        let index = o.get().iter().position(|e| e == ArcKey::ref_cast(mount)).unwrap();
+        if o.get().len() == 1 {
+            o.remove_entry();
+            dir_entry.set_has_mounts(false);
+        } else {
+            o.get_mut().swap_remove(index);
+        }
+    }
+
+    /// Unmounts all mounts associated with `dir_entry`.  This is called when `dir_entry` is
+    /// unlinked (which would normally result in EBUSY, but not if it isn't mounted in the local
+    /// namespace).
+    pub fn unmount(&self, dir_entry: &DirEntry) {
+        let mounts = self.mounts.lock().remove(&PtrKey::from(dir_entry as *const _));
+        if let Some(mounts) = mounts {
+            for mount in mounts {
+                // Ignore errors.
+                let _ = mount.unmount(false);
+            }
+        }
+    }
+}
+
+/// A RAII object that unregisters a mount when dropped.
+#[derive(Debug)]
+struct Submount {
+    dir: ArcKey<DirEntry>,
+    mount: MountHandle,
+}
+
+impl Drop for Submount {
+    fn drop(&mut self) {
+        self.mount.fs.kernel.upgrade().unwrap().mounts.unregister_mount(&self.dir, &self.mount)
+    }
+}
+
+/// Submount is stored in a mount's submounts hash set, which is keyed by the mountpoint.
+impl Eq for Submount {}
+impl PartialEq<Self> for Submount {
+    fn eq(&self, other: &Self) -> bool {
+        self.dir == other.dir
+    }
+}
+impl Hash for Submount {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.dir.hash(state)
+    }
+}
+
+impl Borrow<ArcKey<DirEntry>> for Submount {
+    fn borrow(&self) -> &ArcKey<DirEntry> {
+        &self.dir
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
         fs::tmpfs::TmpFs,
         testing::create_kernel_task_and_unlocked,
-        vfs::{LookupContext, Namespace, UnlinkKind, WhatToMount},
+        vfs::{LookupContext, Namespace, NamespaceNode, RenameFlags, UnlinkKind, WhatToMount},
     };
     use starnix_uapi::{errno, mount_flags::MountFlags};
     use std::sync::Arc;
@@ -1793,11 +1881,106 @@ mod test {
         let foofs = TmpFs::new_fs(&kernel);
         foo_dir.mount(WhatToMount::Fs(foofs), MountFlags::empty())?;
 
+        // Trying to unlink from ns1 should fail.
         assert_eq!(
-            errno!(EBUSY),
-            ns2.root()
+            ns1.root()
                 .unlink(&mut locked, &current_task, "foo".into(), UnlinkKind::Directory, false)
-                .unwrap_err()
+                .unwrap_err(),
+            errno!(EBUSY),
+        );
+
+        // But unlinking from ns2 should succeed.
+        ns2.root()
+            .unlink(&mut locked, &current_task, "foo".into(), UnlinkKind::Directory, false)
+            .expect("unlink failed");
+
+        // And it should no longer show up in ns1.
+        assert_eq!(
+            ns1.root()
+                .unlink(&mut locked, &current_task, "foo".into(), UnlinkKind::Directory, false)
+                .unwrap_err(),
+            errno!(ENOENT),
+        );
+
+        Ok(())
+    }
+
+    #[::fuchsia::test]
+    async fn test_rename_mounted_directory() -> anyhow::Result<()> {
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let root_fs = TmpFs::new_fs(&kernel);
+        let ns1 = Namespace::new(root_fs.clone());
+        let ns2 = Namespace::new(root_fs.clone());
+        let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
+        let _bar_node = root_fs.root().create_dir(&mut locked, &current_task, "bar".into())?;
+        let _baz_node = root_fs.root().create_dir(&mut locked, &current_task, "baz".into())?;
+        let mut context = LookupContext::default();
+        let foo_dir = ns1.root().lookup_child(&current_task, &mut context, "foo".into())?;
+
+        let foofs = TmpFs::new_fs(&kernel);
+        foo_dir.mount(WhatToMount::Fs(foofs), MountFlags::empty())?;
+
+        // Trying to rename over foo from ns1 should fail.
+        let root = ns1.root();
+        assert_eq!(
+            NamespaceNode::rename(
+                &current_task,
+                &root,
+                "bar".into(),
+                &root,
+                "foo".into(),
+                RenameFlags::empty()
+            )
+            .unwrap_err(),
+            errno!(EBUSY),
+        );
+        // Likewise the other way.
+        assert_eq!(
+            NamespaceNode::rename(
+                &current_task,
+                &root,
+                "foo".into(),
+                &root,
+                "bar".into(),
+                RenameFlags::empty()
+            )
+            .unwrap_err(),
+            errno!(EBUSY),
+        );
+
+        // But renaming from ns2 should succeed.
+        let root = ns2.root();
+
+        // First rename the directory with the mount.
+        NamespaceNode::rename(
+            &current_task,
+            &root,
+            "foo".into(),
+            &root,
+            "bar".into(),
+            RenameFlags::empty(),
+        )
+        .expect("rename failed");
+
+        // Renaming over a directory with a mount should also work.
+        NamespaceNode::rename(
+            &current_task,
+            &root,
+            "baz".into(),
+            &root,
+            "bar".into(),
+            RenameFlags::empty(),
+        )
+        .expect("rename failed");
+
+        // "foo" and "baz" should no longer show up in ns1.
+        assert_eq!(
+            ns1.root().lookup_child(&current_task, &mut context, "foo".into()).unwrap_err(),
+            errno!(ENOENT)
+        );
+        assert_eq!(
+            ns1.root().lookup_child(&current_task, &mut context, "baz".into()).unwrap_err(),
+            errno!(ENOENT)
         );
 
         Ok(())

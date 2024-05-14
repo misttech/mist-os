@@ -6,7 +6,7 @@ use crate::{
     task::CurrentTask,
     vfs::{
         path, CheckAccessReason, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr,
-        FsString, MountInfo, NamespaceNode, UnlinkKind,
+        FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind,
     },
 };
 use bitflags::bitflags;
@@ -69,8 +69,8 @@ struct DirEntryState {
     /// Whether this directory entry has been removed from the tree.
     is_dead: bool,
 
-    /// The number of filesystem mounted on the directory entry.
-    mount_count: u32,
+    /// Whether the entry has filesystems mounted on top of it.
+    has_mounts: bool,
 }
 
 pub trait DirEntryOps: Send + Sync + 'static {
@@ -159,7 +159,7 @@ impl DirEntry {
                 parent,
                 local_name,
                 is_dead: false,
-                mount_count: 0,
+                has_mounts: false,
             }),
             children: Default::default(),
         });
@@ -195,22 +195,6 @@ impl DirEntry {
 
     fn lock_children<'a>(self: &'a DirEntryHandle) -> DirEntryLockedChildren<'a> {
         DirEntryLockedChildren { entry: self, children: self.children.write() }
-    }
-
-    /// Register that a filesystem is mounted on the directory.
-    pub fn register_mount(&self) {
-        self.state.write().mount_count += 1;
-    }
-
-    /// Unregister that a filesystem is mounted on the directory.
-    pub fn unregister_mount(&self) {
-        let mut state = self.state.write();
-        assert!(state.mount_count > 0);
-        state.mount_count -= 1;
-    }
-
-    pub fn mount_count(&self) -> u32 {
-        self.state.read().mount_count
     }
 
     /// The name that this node's parent calls this node.
@@ -421,9 +405,7 @@ impl DirEntry {
         child = self_children.component_lookup(current_task, mount, name)?;
         let child_children = child.children.read();
 
-        if child.state.read().mount_count > 0 {
-            return error!(EBUSY);
-        }
+        child.require_no_mounts(mount)?;
 
         // Check that this filesystem entry must be a directory. This can
         // happen if the path terminates with a trailing slash.
@@ -460,7 +442,7 @@ impl DirEntry {
         std::mem::drop(child_children);
         std::mem::drop(self_children);
 
-        child.destroy();
+        child.destroy(&current_task.kernel().mounts);
 
         Ok(())
     }
@@ -468,15 +450,19 @@ impl DirEntry {
     /// Destroy this directory entry.
     ///
     /// Notice that this method takes `self` by value to destroy this reference.
-    fn destroy(self: DirEntryHandle) {
-        {
+    fn destroy(self: DirEntryHandle, mounts: &Mounts) {
+        let unmount = {
             let mut state = self.state.write();
             if state.is_dead {
                 return;
             }
             state.is_dead = true;
-        }
+            std::mem::replace(&mut state.has_mounts, false)
+        };
         self.node.fs().will_destroy_dir_entry(&self);
+        if unmount {
+            mounts.unmount(&self);
+        }
         self.notify_deletion();
     }
 
@@ -604,9 +590,7 @@ impl DirEntry {
             // TODO: We should hold a read lock on the mount points for this
             //       namespace to prevent the child from becoming a mount point
             //       while this function is executing.
-            if renamed.state.read().mount_count > 0 {
-                return error!(EBUSY);
-            }
+            renamed.require_no_mounts(mount)?;
 
             // We need to check if there is already a DirEntry with
             // new_basename in new_parent. If so, there are additional checks
@@ -638,9 +622,7 @@ impl DirEntry {
                         // TODO: We should hold a read lock on the mount points for this
                         //       namespace to prevent the child from becoming a mount point
                         //       while this function is executing.
-                        if replaced.state.read().mount_count > 0 {
-                            return error!(EBUSY);
-                        }
+                        replaced.require_no_mounts(mount)?;
                     }
 
                     if !flags.intersects(RenameFlags::EXCHANGE | RenameFlags::REPLACE_ANY) {
@@ -718,7 +700,7 @@ impl DirEntry {
 
         if let Some(replaced) = maybe_replaced {
             if !flags.contains(RenameFlags::EXCHANGE) {
-                replaced.destroy();
+                replaced.destroy(&current_task.kernel().mounts);
             }
         }
 
@@ -742,14 +724,15 @@ impl DirEntry {
         callback(&children)
     }
 
-    /// Remove the child with the given name from the children cache.
-    pub fn remove_child(&self, name: &FsStr) {
+    /// Remove the child with the given name from the children cache.  The child must not have any
+    /// mounts.
+    pub fn remove_child(&self, name: &FsStr, mounts: &Mounts) {
         let mut children = self.children.write();
         let child = children.get(name).and_then(Weak::upgrade);
         if let Some(child) = child {
             children.remove(name);
             std::mem::drop(children);
-            child.destroy();
+            child.destroy(mounts);
         }
     }
 
@@ -788,7 +771,7 @@ impl DirEntry {
                     (child, true)
                 } else {
                     self.internal_remove_child(&child);
-                    child.destroy();
+                    child.destroy(&current_task.kernel().mounts);
 
                     let (child, create_result) = self.lock_children().get_or_create_child(
                         current_task,
@@ -872,6 +855,28 @@ impl DirEntry {
         if Arc::strong_count(&self.node) == 1 {
             self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, Default::default(), mode);
         }
+    }
+
+    /// Returns true if this entry has mounts.
+    pub fn has_mounts(&self) -> bool {
+        self.state.read().has_mounts
+    }
+
+    /// Records whether or not the entry has mounts.
+    pub fn set_has_mounts(&self, v: bool) {
+        self.state.write().has_mounts = v;
+    }
+
+    /// Verifies this directory has nothing mounted on it.
+    fn require_no_mounts(self: &Arc<Self>, parent_mount: &MountInfo) -> Result<(), Errno> {
+        if self.state.read().has_mounts {
+            if let Some(mount) = parent_mount.as_ref() {
+                if mount.has_submount(self) {
+                    return error!(EBUSY);
+                }
+            }
+        }
+        Ok(())
     }
 }
 

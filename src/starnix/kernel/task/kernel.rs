@@ -25,7 +25,7 @@ use crate::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
-        DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString,
+        DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
     },
 };
 use bstr::BString;
@@ -229,6 +229,9 @@ pub struct Kernel {
 
     /// The syslog manager.
     pub syslog: Syslog,
+
+    /// All mounts.
+    pub mounts: Mounts,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -349,6 +352,7 @@ impl Kernel {
             delayed_releaser: Default::default(),
             role_manager,
             syslog: Default::default(),
+            mounts: Mounts::new(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

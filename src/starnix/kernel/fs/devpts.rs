@@ -343,10 +343,10 @@ impl DevPtmxFile {
 impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
         self.terminal.main_close();
         let id = FsString::from(self.terminal.id.to_string());
-        self.dev_pts_root.remove_child(id.as_ref());
+        self.dev_pts_root.remove_child(id.as_ref(), &current_task.kernel().mounts);
     }
 
     fn read(
