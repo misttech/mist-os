@@ -251,7 +251,9 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
     FX_LOGS(INFO) << "wait for button POWER";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
-    EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakeEmptyEvent()));
+    // TODO(https://fxbug.dev/329271369): Soft-migrate power-button
+    // functionality.
+    // EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakeEmptyEvent()));
     EXPECT_EQ(ToString(listener.events_received()[1]), ToString(MakeEmptyEvent()));
     listener.clear_events();
   }
