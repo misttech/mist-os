@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
+#include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
@@ -116,6 +117,20 @@ struct MappingBackingVmo {
   // The offset in the VMO that corresponds to the base address.
   uint64_t vmo_offset;
 
+  // impl MappingBackingVmo
+
+  /// Reads exactly `bytes.len()` bytes of memory from `addr`.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to read data from.
+  /// - `bytes`: The byte array to read into.
+  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr, ktl::span<uint8_t>& bytes);
+
+  /// Writes the provided bytes to `addr`.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to write to.
+  /// - `bytes`: The bytes to write to the VMO.
   fit::result<Errno> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes);
 
   // Converts a `UserAddress` to an offset in this mapping's VMO.
@@ -244,9 +259,40 @@ class MemoryManagerState {
   fit::result<Errno> update_after_unmap(UserAddress addr, size_t length,
                                         fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
 
-  fit::result<Errno, size_t> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes);
+  /// Reads exactly `bytes.len()` bytes of memory.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to read data from.
+  /// - `bytes`: The byte array to read into.
+  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
+                                                     ktl::span<uint8_t>& bytes) const;
+
+  /// Reads exactly `bytes.len()` bytes of memory from `addr`.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to read data from.
+  /// - `bytes`: The byte array to read into.
+  fit::result<Errno, ktl::span<uint8_t>> read_mapping_memory(UserAddress addr,
+                                                             fbl::RefPtr<Mapping>& mapping,
+                                                             ktl::span<uint8_t>& bytes) const;
+
+  /// Writes the provided bytes.
+  ///
+  /// In case of success, the number of bytes written will always be `bytes.len()`.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to write to.
+  /// - `bytes`: The bytes to write.
+  fit::result<Errno, size_t> write_memory(UserAddress addr,
+                                          const ktl::span<const uint8_t>& bytes) const;
+
+  /// Writes the provided bytes to `addr`.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to write to.
+  /// - `bytes`: The bytes to write to the VMO.
   fit::result<Errno> write_mapping_memory(UserAddress addr, fbl::RefPtr<Mapping>& mapping,
-                                          const ktl::span<const uint8_t>& bytes);
+                                          const ktl::span<const uint8_t>& bytes) const;
 
   // The VMAR in which userspace mappings occur.
   //
@@ -271,11 +317,11 @@ class MemoryManagerState {
 
 class CurrentTask;
 
-class MemoryManager : public fbl::RefCounted<MemoryManager> {
+class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccessorExt {
  public:
   static zx_status_t New(zx::vmar root_vmar, fbl::RefPtr<MemoryManager>* out);
 
-  bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) {
+  bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
     return root_vmar_ == other->root_vmar_;
   }
 
@@ -286,9 +332,6 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
   fit::result<Errno> unmap(UserAddress, size_t length);
-
-  fit::result<Errno, size_t> unified_write_memory(const CurrentTask& current_task, UserAddress addr,
-                                                  const ktl::span<const uint8_t>& bytes);
 
   fit::result<Errno, UserAddress> map_anonymous(DesiredAddress addr, size_t length,
                                                 ProtectionFlags prot_flags,
@@ -301,11 +344,30 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
   MemoryManagerState& state() TA_REQ(mm_state_rw_lock_) { return state_; }
   const MemoryManagerState& state() const TA_REQ_SHARED(mm_state_rw_lock_) { return state_; }
 
+  // impl MemoryAccessor for MemoryManager
+  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
+                                                     ktl::span<uint8_t>& bytes) const final;
+
+  fit::result<Errno, size_t> write_memory(UserAddress addr,
+                                          const ktl::span<const uint8_t>& bytes) const final;
+
+  fit::result<Errno, ktl::span<uint8_t>> unified_read_memory(const CurrentTask& current_task,
+                                                             UserAddress addr,
+                                                             ktl::span<uint8_t>& bytes) const;
+
+  fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory(UserAddress addr,
+                                                         ktl::span<uint8_t>& bytes) const;
+
+  fit::result<Errno, size_t> unified_write_memory(const CurrentTask& current_task, UserAddress addr,
+                                                  const ktl::span<const uint8_t>& bytes) const;
+
   fit::result<Errno, size_t> vmo_write_memory(UserAddress addr,
-                                              const ktl::span<const uint8_t>& bytes);
+                                              const ktl::span<const uint8_t>& bytes) const;
 
  private:
   ZXTEST_FRIEND_TEST(MemoryManager, test_get_contiguous_mappings_at);
+  ZXTEST_FRIEND_TEST(MemoryManager, test_read_write_crossing_mappings);
+  ZXTEST_FRIEND_TEST(MemoryManager, test_read_write_errors);
 
   MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t user_vmar_info);
 
@@ -324,7 +386,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   // Mutable state for the memory manager.
   mutable DECLARE_MUTEX(MemoryManager) mm_state_rw_lock_;
-  MemoryManagerState state_ TA_GUARDED(mm_state_rw_lock_);
+  mutable MemoryManagerState state_ TA_GUARDED(mm_state_rw_lock_);
 
   /// Whether this address space is dumpable.
   // pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,

@@ -456,24 +456,62 @@ fit::result<Errno> MemoryManagerState::protect(UserAddress addr, size_t length,
   return fit::error(errno(ENOTSUP));
 }
 
-// Writes the provided bytes.
-//
-// In case of success, the number of bytes written will always be `bytes.len()`.
-//
-// # Parameters
-// - `addr`: The address to write to.
-// - `bytes`: The bytes to write.
-fit::result<Errno, size_t> MemoryManagerState::write_memory(UserAddress addr,
-                                                            const ktl::span<const uint8_t>& bytes) {
+fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
   size_t bytes_written = 0;
   auto vec = get_contiguous_mappings_at(addr, bytes.size());
-  if (vec.is_error())
+  if (vec.is_error()) {
+    LTRACEF_LEVEL(2, "error code %d\n", vec.error_value().error_code());
     return vec.take_error();
+  }
+
+  for (auto [mapping, len] : vec.value()) {
+    auto next_offset = bytes_written + len;
+    ktl::span<uint8_t> current_span{bytes.data() + bytes_written, next_offset};
+    auto result = read_mapping_memory(addr + bytes_written, mapping, current_span);
+    if (result.is_error())
+      return result.take_error();
+    bytes_written = next_offset;
+  }
+
+  if (bytes_written != bytes.size()) {
+    return fit::error(errno(EFAULT));
+  } else {
+    return fit::ok(bytes);
+  }
+}
+
+fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_mapping_memory(
+    UserAddress addr, fbl::RefPtr<Mapping>& mapping, ktl::span<uint8_t>& bytes) const {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
+  if (!mapping->can_read()) {
+    return fit::error(errno(EFAULT));
+  }
+
+  return std::visit(MappingBacking::overloaded{
+                        [](PrivateAnonymous&) {
+                          return fit::result<Errno, ktl::span<uint8_t>>(fit::error(errno(EFAULT)));
+                        },
+                        [&](MappingBackingVmo& m) { return m.read_memory(addr, bytes); },
+                    },
+                    mapping->backing().variant);
+}
+
+fit::result<Errno, size_t> MemoryManagerState::write_memory(
+    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
+  size_t bytes_written = 0;
+  auto vec = get_contiguous_mappings_at(addr, bytes.size());
+  if (vec.is_error()) {
+    LTRACEF_LEVEL(2, "error code %d\n", vec.error_value().error_code());
+    return vec.take_error();
+  }
 
   for (auto [mapping, len] : vec.value()) {
     auto next_offset = bytes_written + len;
     auto result = write_mapping_memory(addr + bytes_written, mapping,
-                                       bytes.subspan(bytes_written, next_offset));
+                                       {bytes.data() + bytes_written, next_offset});
     if (result.is_error())
       return result.take_error();
     bytes_written = next_offset;
@@ -486,14 +524,9 @@ fit::result<Errno, size_t> MemoryManagerState::write_memory(UserAddress addr,
   }
 }
 
-// Writes the provided bytes to `addr`.
-//
-// # Parameters
-// - `addr`: The address to write to.
-// - `bytes`: The bytes to write to the VMO.
-fit::result<Errno> MemoryManagerState::write_mapping_memory(UserAddress addr,
-                                                            fbl::RefPtr<Mapping>& mapping,
-                                                            const ktl::span<const uint8_t>& bytes) {
+fit::result<Errno> MemoryManagerState::write_mapping_memory(
+    UserAddress addr, fbl::RefPtr<Mapping>& mapping, const ktl::span<const uint8_t>& bytes) const {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
   if (!mapping->can_write()) {
     return fit::error(errno(EFAULT));
   }
@@ -506,8 +539,19 @@ fit::result<Errno> MemoryManagerState::write_mapping_memory(UserAddress addr,
       mapping->backing().variant);
 }
 
+fit::result<Errno, ktl::span<uint8_t>> MappingBackingVmo::read_memory(UserAddress addr,
+                                                                      ktl::span<uint8_t>& bytes) {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
+  if (zx_status_t status = vmo->as_ref().read(bytes.data(), address_to_offset(addr), bytes.size());
+      status != ZX_OK) {
+    return fit::error(errno(EFAULT));
+  }
+  return fit::ok(bytes);
+}
+
 fit::result<Errno> MappingBackingVmo::write_memory(UserAddress addr,
                                                    const ktl::span<const uint8_t>& bytes) {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
   if (zx_status_t status = vmo->as_ref().write(bytes.data(), address_to_offset(addr), bytes.size());
       status != ZX_OK) {
     return fit::error(errno(EFAULT));
@@ -516,7 +560,7 @@ fit::result<Errno> MappingBackingVmo::write_memory(UserAddress addr,
 }
 
 uint64_t MappingBackingVmo::address_to_offset(UserAddress addr) {
-  return static_cast<uint64_t>(addr - base) + vmo_offset;
+  return static_cast<uint64_t>(addr.ptr() - base.ptr()) + vmo_offset;
 }
 
 zx_status_t Mapping::New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
@@ -745,15 +789,59 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
   return fit::ok();
 }
 
-fit::result<Errno, size_t> MemoryManager::unified_write_memory(
-    const CurrentTask& current_task, UserAddress addr, const ktl::span<const uint8_t>& bytes) {
-  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
-  // TODO (Herrera) Use usercopy
+// impl MemoryAccessor for MemoryManager
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::read_memory(UserAddress addr,
+                                                                  ktl::span<uint8_t>& bytes) const {
+  return vmo_read_memory(addr, bytes);
+}
+
+fit::result<Errno, size_t> MemoryManager::write_memory(
+    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
   return vmo_write_memory(addr, bytes);
 }
 
-fit::result<Errno, size_t> MemoryManager::vmo_write_memory(UserAddress addr,
-                                                           const ktl::span<const uint8_t>& bytes) {
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory(
+    const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+#if 0
+  user_in_ptr<uint8_t> user_ptr = make_user_out_ptr(reinterpret_cast<uint8_t*>(addr.ptr()));
+  printf("dst %p src %p size %zu\n", user_ptr.get(), bytes.data(), bytes.size());
+  if (zx_status_t status = user_ptr.copy_array_from_user(bytes.data(), bytes.size());
+      status != ZX_OK) {
+    return fit::error(errno(from_status_like_fdio(status)));
+  }
+  return fit::ok(bytes.size());
+#else
+  return vmo_read_memory(addr, bytes);
+#endif
+}
+
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::vmo_read_memory(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  Guard<Mutex> lock(&mm_state_rw_lock_);
+  return state_.read_memory(addr, bytes);
+}
+
+fit::result<Errno, size_t> MemoryManager::unified_write_memory(
+    const CurrentTask& current_task, UserAddress addr,
+    const ktl::span<const uint8_t>& bytes) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+
+#if 0
+  user_out_ptr<uint8_t> user_ptr = make_user_out_ptr(reinterpret_cast<uint8_t*>(addr.ptr()));
+  printf("dst %p src %p size %zu\n", user_ptr.get(), bytes.data(), bytes.size());
+  if (zx_status_t status = user_ptr.copy_array_to_user(bytes.data(), bytes.size());
+      status != ZX_OK) {
+    return fit::error(errno(from_status_like_fdio(status)));
+  }
+  return fit::ok(bytes.size());
+#else
+  return vmo_write_memory(addr, bytes);
+#endif
+}
+
+fit::result<Errno, size_t> MemoryManager::vmo_write_memory(
+    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
   Guard<Mutex> lock(&mm_state_rw_lock_);
   return state_.write_memory(addr, bytes);
 }

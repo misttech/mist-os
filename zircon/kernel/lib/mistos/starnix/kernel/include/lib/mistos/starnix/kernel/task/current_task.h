@@ -78,9 +78,9 @@ class Kernel;
 // `CurrentTask`, which lets them manipulate this state.
 //
 // See also `Task` for more information about tasks.
-class CurrentTask : public MemoryAccessor {
+class CurrentTask : public MemoryAccessorExt {
  public:
-  static CurrentTask From(const TaskBuilder& builder) { return std::move(builder.task()); }
+  static CurrentTask From(const TaskBuilder& builder) { return ktl::move(builder.task()); }
 
   // Accessors.
   const fbl::RefPtr<Task>& task() const;
@@ -216,6 +216,9 @@ class CurrentTask : public MemoryAccessor {
   fit::result<Errno, NamespaceNode> lookup_path_from_root(const FsStr& path) const;
 
   Task* operator->() const;
+
+  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
+                                                     ktl::span<uint8_t>& bytes) const final;
 
   fit::result<Errno, size_t> write_memory(UserAddress addr,
                                           const ktl::span<const uint8_t>& bytes) const final;

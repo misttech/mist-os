@@ -317,6 +317,72 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
 #endif
 }
 
+TEST(MemoryManager, test_read_write_crossing_mappings) {
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto mm = current_task->mm();
+  auto ma = *current_task;
+
+  // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
+  size_t page_size = PAGE_SIZE;
+  auto addr = mm->base_addr_ + 10 * page_size;
+  ASSERT_EQ(addr, map_memory(*current_task, addr, page_size));
+  ASSERT_EQ(addr + page_size, map_memory(*current_task, addr + page_size, page_size));
+#if STARNIX_ANON_ALLOCS
+  ASSERT_EQ(1, mm->get_mapping_count());
+#else
+  ASSERT_EQ(2, mm->get_mapping_count());
+#endif
+
+  // Write a pattern crossing our two mappings.
+  auto test_addr = addr + page_size / 2;
+  fbl::AllocChecker ac;
+  fbl::Vector<uint8_t> data;
+  data.reserve(page_size, &ac);
+  ASSERT(ac.check());
+
+  std::generate(data.begin(), data.end(),
+                [i = 0]() mutable { return static_cast<uint8_t>(i++ % 256); });
+
+  ASSERT_TRUE(ma.write_memory(test_addr, {data.begin(), data.end()}).is_ok(),
+              "failed to write test data");
+
+  auto read_result = ma.read_memory_to_vec(test_addr, data.size());
+  ASSERT_FALSE(read_result.is_error(), "failed to read test data");
+  ASSERT_BYTES_EQ(data.data(), read_result.value().data(), data.size());
+}
+
+TEST(MemoryManager, test_read_write_errors) {
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto ma = *current_task;
+
+  size_t page_size = PAGE_SIZE;
+  auto addr = map_memory(*current_task, UserAddress(), page_size);
+  fbl::Vector<uint8_t> buf;
+  fbl::AllocChecker ac;
+  buf.resize(page_size, &ac);
+  ASSERT(ac.check());
+
+  // Verify that accessing data that is only partially mapped is an error.
+  auto partial_addr_before = addr - page_size / 2;
+  ASSERT_EQ(errno(EFAULT),
+            ma.write_memory(partial_addr_before, {buf.data(), buf.size()}).error_value());
+  ASSERT_EQ(errno(EFAULT), ma.read_memory_to_vec(partial_addr_before, buf.size()).error_value());
+  auto partial_addr_after = addr + page_size / 2;
+  ASSERT_EQ(errno(EFAULT),
+            ma.write_memory(partial_addr_after, {buf.data(), buf.size()}).error_value());
+  ASSERT_EQ(errno(EFAULT), ma.read_memory_to_vec(partial_addr_after, buf.size()).error_value());
+
+  // Verify that accessing unmapped memory is an error.
+  auto unmapped_addr = addr + 10 * page_size;
+  ASSERT_EQ(errno(EFAULT), ma.write_memory(unmapped_addr, {buf.data(), buf.size()}).error_value());
+  ASSERT_EQ(errno(EFAULT), ma.read_memory_to_vec(unmapped_addr, buf.size()).error_value());
+
+  // However, accessing zero bytes in unmapped memory is not an error.
+  ASSERT_FALSE(ma.write_memory(unmapped_addr, {(uint8_t*)nullptr, 0}).is_error(),
+               "failed to write no data");
+  ASSERT_FALSE(ma.read_memory_to_vec(unmapped_addr, 0).is_error(), "failed to read no data");
+}
+
 TEST(MemoryManager, test_unmap_returned_mappings) {
   auto result = starnix::testing::create_kernel_and_task();
   auto [kernel, current_task] = result;
