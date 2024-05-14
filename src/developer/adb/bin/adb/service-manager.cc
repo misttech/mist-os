@@ -51,7 +51,7 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_adb::Provider>> ServiceManager::Crea
                                 fuchsia_component::wire::CreateChildArgs());
   if (!result.ok() || (result->is_error() &&
                        result->error_value() != fuchsia_component::Error::kInstanceAlreadyExists)) {
-    auto status = result.ok() ? static_cast<int32_t>(result->error_value()) : ZX_ERR_INTERNAL;
+    auto status = result.ok() ? static_cast<uint32_t>(result->error_value()) : ZX_ERR_INTERNAL;
     FX_LOGS(ERROR) << "Create child failed with " << status;
     return zx::error(status);
   }
@@ -69,7 +69,7 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_adb::Provider>> ServiceManager::Conn
       std::move(endpoints->server));
   if (!result.ok() || result->is_error()) {
     auto status =
-        result->is_error() ? static_cast<int32_t>(result->error_value()) : result.status();
+        result->is_error() ? static_cast<uint32_t>(result->error_value()) : result.status();
     FX_LOGS(ERROR) << "OpenExposedDir failed " << status;
     return zx::error(status);
   }

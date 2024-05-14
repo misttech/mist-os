@@ -59,6 +59,8 @@ const char* GetErrorString(fcomponent::Error error) {
       return "INSTANCE_CANNOT_UNRESOLVE";
     case fcomponent::Error::kInstanceAlreadyStarted:
       return "INSTANCE_ALREADY_STARTED";
+    default:
+      return "UNKNOWN";
   }
 }
 

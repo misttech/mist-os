@@ -52,9 +52,7 @@ closed protocol RealmBuilderFactory {
 };
 
 /// Errors that may be returned by the `Realm` and `Builder` protocols.
-///
-/// Will be renamed to `RealmBuilderError` once the other definition under this
-/// name earlier in this file is removed.
+@available(replaced=20)
 type RealmBuilderError = strict enum : uint32 {
     /// Child cannot be added to the realm, as there is already a child in the
     /// realm with that name.
@@ -136,6 +134,91 @@ type RealmBuilderError = strict enum : uint32 {
     /// A config value cannot be set because the realm has not chosen its override
     /// policy.
     @available(added=9)
+    CONFIG_OVERRIDE_UNSUPPORTED = 21;
+};
+
+/// Errors that may be returned by the `Realm` and `Builder` protocols.
+@available(added=20)
+type RealmBuilderError = flexible enum : uint32 {
+    /// Child cannot be added to the realm, as there is already a child in the
+    /// realm with that name.
+    CHILD_ALREADY_EXISTS = 0;
+
+    /// A legacy component URL was given to `AddChild`, or a modern component
+    /// url was given to `AddLegacyChild`.
+    INVALID_MANIFEST_EXTENSION = 1;
+
+    /// A component declaration failed validation.
+    INVALID_COMPONENT_DECL = 2;
+
+    /// The referenced child does not exist.
+    NO_SUCH_CHILD = 3;
+
+    /// The component declaration for the referenced child cannot be viewed nor
+    /// manipulated by RealmBuilder, because the child was added to the realm
+    /// using an URL that was neither a fragment-only nor a legacy URL.
+    CHILD_DECL_NOT_VISIBLE = 4;
+
+    /// The source does not exist.
+    NO_SUCH_SOURCE = 5;
+
+    /// A target does not exist.
+    NO_SUCH_TARGET = 6;
+
+    /// The `capabilities` field is empty.
+    CAPABILITIES_EMPTY = 7;
+
+    /// The `targets` field is empty.
+    TARGETS_EMPTY = 8;
+
+    /// The `from` value is equal to one of the elements in `to`.
+    SOURCE_AND_TARGET_MATCH = 9;
+
+    /// The test package does not contain the component declaration referenced
+    /// by a fragment-only component URL.
+    DECL_NOT_FOUND = 10;
+
+    /// Encountered an I/O error when attempting to read a component declaration
+    /// referenced by a fragment-only component URL from the test package.
+    DECL_READ_ERROR = 11;
+
+    /// The `Build` function has been called multiple times on this channel.
+    BUILD_ALREADY_CALLED = 12;
+
+    /// A capability is invalid. This may occur if a required field is empty or
+    /// if an unsupported type is received.
+    CAPABILITY_INVALID = 13;
+
+    /// The handle the client provided for the child realm is not usable.
+    INVALID_CHILD_REALM_HANDLE = 14;
+
+    /// `ReplaceComponentDecl` was called on a legacy or local component with a
+    /// program declaration that did not match the one from the old component
+    /// declaration. This could render a legacy or local component
+    /// non-functional, and is disallowed.
+    IMMUTABLE_PROGRAM = 15;
+
+    /// The URL provided to `RealmBuilderFactory.CreateFromRelativeURL` is not a
+    /// fragment-only component URL.
+    URL_IS_NOT_RELATIVE = 16;
+
+    /// The handle the client provided for the test's pkg directory is not
+    /// usable.
+    INVALID_PKG_DIR_HANDLE = 17;
+
+    /// The component does not have a config schema defined. Attempting to
+    /// set a config value is not allowed.
+    NO_CONFIG_SCHEMA = 18;
+
+    /// The component's config schema does not have a field with that name.
+    NO_SUCH_CONFIG_FIELD = 19;
+
+    /// A config value is invalid. This may mean a type mismatch or an issue
+    /// with constraints like string/vector length.
+    CONFIG_VALUE_INVALID = 20;
+
+    /// A config value cannot be set because the realm has not chosen its override
+    /// policy.
     CONFIG_OVERRIDE_UNSUPPORTED = 21;
 };
 

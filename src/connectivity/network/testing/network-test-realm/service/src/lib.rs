@@ -96,7 +96,9 @@ async fn has_running_child(
             | fcomponent::Error::Internal
             | fcomponent::Error::ResourceNotFound
             | fcomponent::Error::ResourceUnavailable
-            | fcomponent::Error::Unsupported => {
+            | fcomponent::Error::Unsupported
+            | fcomponent::ErrorUnknown!()
+                => {
                 Err(anyhow!("failed to list children: {:?}", error))
             }
         },

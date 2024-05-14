@@ -682,7 +682,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.component.test/RealmBuilderError",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {
