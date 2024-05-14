@@ -152,7 +152,6 @@ constexpr std::array<uint32_t, kChildHandleCount> HandleInfoTable() {
   info[kBootfsVmo] = PA_HND(PA_VMO_BOOTFS, 0);
   info[kProcSelf] = PA_HND(PA_PROC_SELF, 0);
   info[kRootJob] = PA_HND(PA_JOB_DEFAULT, 0);
-  info[kRootResource] = PA_HND(PA_RESOURCE, 0);
   info[kMmioResource] = PA_HND(PA_MMIO_RESOURCE, 0);
   info[kIrqResource] = PA_HND(PA_IRQ_RESOURCE, 0);
 #if __x86_64__
@@ -476,7 +475,8 @@ struct TerminationInfo {
   std::array<zx_handle_t, kChildHandleCount> handles = ExtractHandles(std::move(channel));
 
   zx::debuglog log;
-  auto status = zx::debuglog::create(*zx::unowned_resource{handles[kRootResource]}, 0, &log);
+  // TODO(https://fxbug.dev/42107086): remove use of invalid resource handle to debuglog_create.
+  auto status = zx::debuglog::create({}, 0, &log);
   check(log, status, "zx_debuglog_create failed: %d", status);
 
   zx::vmar vmar_self{handles[kVmarRootSelf]};
