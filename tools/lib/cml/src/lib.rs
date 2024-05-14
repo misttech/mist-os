@@ -4266,6 +4266,7 @@ pub fn format_cml(buffer: &str, file: &std::path::Path) -> Result<Vec<u8>, Error
         "url",
         "startup",
         "environment",
+        "dictionary",
         "durability",
         "service",
         "protocol",
