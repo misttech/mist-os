@@ -50,7 +50,7 @@ use crate::{
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
         FilterHandlerProvider, FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict,
-        IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
+        IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
     },
     inspect::{Inspectable, Inspector},
     ip::{
@@ -998,7 +998,7 @@ impl<
         packet_metadata: IpLayerPacketMetadata<I, BC>,
     ) -> Result<(), S>
     where
-        S: Serializer + MaybeTransportPacket,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta.into(), body, packet_metadata)
@@ -1772,7 +1772,7 @@ fn dispatch_receive_ipv4_packet<
     src_ip: Ipv4Addr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
     proto: Ipv4Proto,
-    body: B,
+    mut body: B,
     parse_metadata: Option<ParseMetadata>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv4>>,
@@ -1790,7 +1790,7 @@ fn dispatch_receive_ipv4_packet<
     }
 
     match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, &body),
+        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, body.as_mut()),
         device,
         &mut packet_metadata,
     ) {
@@ -1878,7 +1878,7 @@ fn dispatch_receive_ipv6_packet<
     src_ip: Ipv6SourceAddr,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
     proto: Ipv6Proto,
-    body: B,
+    mut body: B,
     parse_metadata: Option<ParseMetadata>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv6>>,
@@ -1902,7 +1902,7 @@ fn dispatch_receive_ipv6_packet<
     }
 
     match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, &body),
+        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, body.as_mut()),
         device,
         &mut packet_metadata,
     ) {
@@ -3145,7 +3145,7 @@ pub(crate) trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer + MaybeTransportPacket,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
 
     /// Send an IP packet that doesn't require the encapsulation and other
@@ -3180,7 +3180,7 @@ impl<
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer + MaybeTransportPacket,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta, body, IpLayerPacketMetadata::default())
@@ -3231,7 +3231,7 @@ where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
-    S: Serializer + MaybeTransportPacket,
+    S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {
     let SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu } = meta;

@@ -839,8 +839,18 @@ impl<I, O> Nested<I, O> {
     }
 
     #[inline]
+    pub fn inner_mut(&mut self) -> &mut I {
+        &mut self.inner
+    }
+
+    #[inline]
     pub fn outer(&self) -> &O {
         &self.outer
+    }
+
+    #[inline]
+    pub fn outer_mut(&mut self) -> &mut O {
+        &mut self.outer
     }
 }
 

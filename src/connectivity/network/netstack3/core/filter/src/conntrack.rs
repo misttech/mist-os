@@ -622,8 +622,11 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeBindingsCtx, FakeCtx},
-        packets::testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt},
-        IpRoutines,
+        packets::{
+            testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt},
+            MaybeTransportPacketMut,
+        },
+        state::IpRoutines,
     };
 
     trait TestIpExt: Ip {
@@ -656,6 +659,14 @@ mod tests {
     impl<I: IpExt> TransportPacketExt<I> for &NoTransportPacket {
         fn proto() -> I::Proto {
             I::Proto::from(IpProto::Tcp)
+        }
+    }
+
+    impl<I: IpExt> MaybeTransportPacketMut<I> for NoTransportPacket {
+        type TransportPacketMut<'a> = Never;
+
+        fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+            None
         }
     }
 

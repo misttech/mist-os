@@ -1282,7 +1282,7 @@ pub trait DatagramSocketSpec: Sized + 'static {
 
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
     /// for a given IP version and buffer type.
-    type Serializer<I: IpExt, B: BufferMut>: TransportPacketSerializer<Buffer = B>;
+    type Serializer<I: IpExt, B: BufferMut>: TransportPacketSerializer<I, Buffer = B>;
     /// The potential error for serializing a packet. For example, in UDP, this
     /// should be infallible but for ICMP, there will be an error if the input
     /// is not an echo request.

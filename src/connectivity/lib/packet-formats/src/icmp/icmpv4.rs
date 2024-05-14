@@ -9,15 +9,16 @@ use core::fmt;
 use net_types::ip::{Ipv4, Ipv4Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
+    byteorder::network_endian::U32, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
+    Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
 
 use super::common::{IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpTimeExceeded};
 use super::{
-    peek_message_type, IcmpIpExt, IcmpMessageType, IcmpPacket, IcmpParseArgs, IcmpUnusedCode,
-    IdAndSeq, OriginalPacket,
+    peek_message_type, HeaderPrefix, IcmpIpExt, IcmpMessageType, IcmpPacket, IcmpParseArgs,
+    IcmpUnusedCode, IdAndSeq, OriginalPacket,
 };
 
 /// An ICMPv4 packet with a dynamic message type.
@@ -37,6 +38,22 @@ pub enum Icmpv4Packet<B: ByteSlice> {
     ParameterProblem(IcmpPacket<Ipv4, B, Icmpv4ParameterProblem>),
     TimestampRequest(IcmpPacket<Ipv4, B, Icmpv4TimestampRequest>),
     TimestampReply(IcmpPacket<Ipv4, B, Icmpv4TimestampReply>),
+}
+
+impl<B: ByteSliceMut> Icmpv4Packet<B> {
+    pub(super) fn header_prefix_mut(&mut self) -> &mut HeaderPrefix {
+        use Icmpv4Packet::*;
+        match self {
+            EchoReply(p) => &mut p.header.prefix,
+            DestUnreachable(p) => &mut p.header.prefix,
+            Redirect(p) => &mut p.header.prefix,
+            EchoRequest(p) => &mut p.header.prefix,
+            TimeExceeded(p) => &mut p.header.prefix,
+            ParameterProblem(p) => &mut p.header.prefix,
+            TimestampRequest(p) => &mut p.header.prefix,
+            TimestampReply(p) => &mut p.header.prefix,
+        }
+    }
 }
 
 impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv4Packet<B> {

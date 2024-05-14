@@ -5496,7 +5496,7 @@ mod tests {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {

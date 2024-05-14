@@ -9,11 +9,11 @@ use alloc::collections::hash_map;
 use core::{fmt::Debug, num::NonZeroU16};
 
 use assert_matches::assert_matches;
-use net_types::{ip::IpAddress, SpecifiedAddr};
+use net_types::SpecifiedAddr;
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
     error::ParseError,
-    ip::IpProto,
+    ip::{IpExt, IpProto},
     tcp::{
         TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
         TcpSegmentBuilderWithOptions,
@@ -1105,13 +1105,13 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     }
 }
 
-pub(super) fn tcp_serialize_segment<'a, S, A>(
+pub(super) fn tcp_serialize_segment<'a, S, I>(
     segment: S,
-    conn_addr: ConnIpAddr<A, NonZeroU16, NonZeroU16>,
-) -> impl TransportPacketSerializer<Buffer = EmptyBuf> + Debug + 'a
+    conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug + 'a
 where
     S: Into<Segment<SendPayload<'a>>>,
-    A: IpAddress,
+    I: IpExt,
 {
     let Segment { seq, ack, wnd, contents, options } = segment.into();
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
@@ -1188,7 +1188,7 @@ mod test {
         const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 
         let options = segment.options;
-        let serializer = super::tcp_serialize_segment(
+        let serializer = super::tcp_serialize_segment::<_, I>(
             segment,
             ConnIpAddr {
                 local: (SocketIpAddr::try_from(I::TEST_ADDRS.local_ip).unwrap(), SOURCE_PORT),

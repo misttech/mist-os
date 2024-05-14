@@ -1957,7 +1957,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
 ) where
     I: crate::ip::IpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
-    S: TransportPacketSerializer,
+    S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
 {
@@ -4028,7 +4028,7 @@ mod tests {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {

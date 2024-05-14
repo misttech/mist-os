@@ -549,6 +549,11 @@ where
             internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, &new_bytes);
         self.hdr_prefix.ttl = ttl;
     }
+
+    /// The packet body.
+    pub fn body_mut(&mut self) -> &mut [u8] {
+        &mut self.body
+    }
 }
 
 impl<B> Debug for Ipv4Packet<B>

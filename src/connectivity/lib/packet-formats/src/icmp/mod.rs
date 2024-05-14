@@ -36,14 +36,14 @@ use core::mem;
 use byteorder::{ByteOrder, NetworkEndian};
 use derivative::Derivative;
 use internet_checksum::Checksum;
-use net_types::ip::{Ip, IpAddress, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::records::options::{Options, OptionsImpl};
 use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, FromRaw,
     PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
 };
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
@@ -90,6 +90,9 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(bytes: &[u8]) -> ParseResult<
 
 /// An extension trait adding ICMP-related functionality to `Ipv4` and `Ipv6`.
 pub trait IcmpIpExt: IpProtoExt {
+    /// The ICMP packet type for this IP version.
+    type IcmpPacketType<B: ByteSliceMut>: IcmpPacketType<B, Self>;
+
     /// The type of ICMP messages.
     ///
     /// For `Ipv4`, this is `Icmpv4MessageType`, and for `Ipv6`, this is
@@ -135,6 +138,7 @@ pub trait IcmpIpExt: IpProtoExt {
 }
 
 impl IcmpIpExt for Ipv4 {
+    type IcmpPacketType<B: ByteSliceMut> = Icmpv4Packet<B>;
     type IcmpMessageType = Icmpv4MessageType;
     type ParameterProblemCode = Icmpv4ParameterProblemCode;
     type ParameterProblemPointer = u8;
@@ -156,6 +160,7 @@ impl IcmpIpExt for Ipv4 {
 }
 
 impl IcmpIpExt for Ipv6 {
+    type IcmpPacketType<B: ByteSliceMut> = Icmpv6Packet<B>;
     type IcmpMessageType = Icmpv6MessageType;
     type ParameterProblemCode = Icmpv6ParameterProblemCode;
     type ParameterProblemPointer = u32;
@@ -180,14 +185,28 @@ impl IcmpIpExt for Ipv6 {
 /// An ICMP or ICMPv6 packet
 ///
 /// 'IcmpPacketType' is implemented by `Icmpv4Packet` and `Icmpv6Packet`
-pub trait IcmpPacketType<B: ByteSlice, I: Ip>:
+pub trait IcmpPacketType<B: ByteSliceMut, I: Ip>:
     Sized + ParsablePacket<B, IcmpParseArgs<I::Addr>, Error = ParseError>
 {
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    fn update_checksum_pseudo_header_address(&mut self, old: I::Addr, new: I::Addr);
 }
 
-impl<B: ByteSlice> IcmpPacketType<B, Ipv4> for Icmpv4Packet<B> {}
+impl<B: ByteSliceMut> IcmpPacketType<B, Ipv4> for Icmpv4Packet<B> {
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    fn update_checksum_pseudo_header_address(&mut self, old: Ipv4Addr, new: Ipv4Addr) {
+        let checksum = &mut self.header_prefix_mut().checksum;
+        *checksum = internet_checksum::update(*checksum, old.bytes(), new.bytes());
+    }
+}
 
-impl<B: ByteSlice> IcmpPacketType<B, Ipv6> for Icmpv6Packet<B> {}
+impl<B: ByteSliceMut> IcmpPacketType<B, Ipv6> for Icmpv6Packet<B> {
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    fn update_checksum_pseudo_header_address(&mut self, old: Ipv6Addr, new: Ipv6Addr) {
+        let checksum = &mut self.header_prefix_mut().checksum;
+        *checksum = internet_checksum::update(*checksum, old.bytes(), new.bytes());
+    }
+}
 
 /// Empty message.
 #[derive(Derivative, Debug, Clone, Copy, PartialEq, Eq)]
@@ -604,6 +623,16 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> IcmpPacketBuilder<I, M> {
     /// Returns the message in the ICMP packet.
     pub fn message(&self) -> &M {
         &self.msg
+    }
+
+    /// Sets the source IP address of the ICMP packet.
+    pub fn set_src_ip(&mut self, addr: I::Addr) {
+        self.src_ip = addr;
+    }
+
+    /// Sets the destination IP address of the ICMP packet.
+    pub fn set_dst_ip(&mut self, addr: I::Addr) {
+        self.dst_ip = addr;
     }
 }
 

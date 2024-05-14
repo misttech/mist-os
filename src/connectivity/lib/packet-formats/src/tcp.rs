@@ -27,7 +27,7 @@ use packet::{
 };
 use zerocopy::{
     byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
+    AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -444,6 +444,14 @@ impl<B: ByteSlice> TcpSegment<B> {
     }
 }
 
+impl<B: ByteSliceMut> TcpSegment<B> {
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        self.hdr_prefix.checksum =
+            internet_checksum::update(self.hdr_prefix.checksum, old.bytes(), new.bytes());
+    }
+}
+
 /// The minimal information required from a TCP segment header.
 ///
 /// A `TcpFlowHeader` may be the result of a partially parsed TCP segment in
@@ -744,6 +752,16 @@ impl<A: IpAddress, O> TcpSegmentBuilderWithOptions<A, O> {
     /// Returns the destination port for the builder.
     pub fn dst_port(&self) -> Option<NonZeroU16> {
         self.prefix_builder.dst_port
+    }
+
+    /// Sets the source IP address for the builder.
+    pub fn set_src_ip(&mut self, addr: A) {
+        self.prefix_builder.src_ip = addr;
+    }
+
+    /// Sets the destination IP address for the builder.
+    pub fn set_dst_ip(&mut self, addr: A) {
+        self.prefix_builder.dst_ip = addr;
     }
 }
 

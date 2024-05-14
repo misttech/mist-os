@@ -768,6 +768,11 @@ impl<B: ByteSliceMut> Ipv6Packet<B> {
     pub fn set_hop_limit(&mut self, hlim: u8) {
         self.fixed_hdr.hop_limit = hlim;
     }
+
+    /// The packet body.
+    pub fn body_mut(&mut self) -> &mut [u8] {
+        &mut self.body
+    }
 }
 
 impl<B: ByteSlice> Debug for Ipv6Packet<B> {

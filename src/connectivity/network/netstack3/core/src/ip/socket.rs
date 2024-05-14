@@ -77,7 +77,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         O: SendOptions<I>;
 
@@ -115,7 +115,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
         O: SendOptions<I>,
@@ -143,7 +143,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), IpSockCreateAndSendError>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> S,
         O: SendOptions<I>,
@@ -377,7 +377,7 @@ where
         packet_metadata: IpLayerPacketMetadata<I, BC>,
     ) -> Result<(), S>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
 }
 
@@ -425,7 +425,7 @@ where
         options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         O: SendOptions<I>,
     {
@@ -501,13 +501,13 @@ fn send_ip_packet<I, S, BC, CC, O>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     socket: &IpSock<I, CC::WeakDeviceId>,
-    body: S,
+    mut body: S,
     mtu: Option<u32>,
     options: &O,
 ) -> Result<(), (S, IpSockSendError)>
 where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
-    S: TransportPacketSerializer,
+    S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
@@ -532,7 +532,8 @@ where
 
     // TODO(https://fxbug.dev/318717702): when we implement NAT, perform re-routing
     // after the LOCAL_EGRESS hook since the packet may have been changed.
-    let mut packet = crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &body);
+    let mut packet =
+        crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().local_egress_hook(&mut packet, &device, &mut packet_metadata) {
@@ -1030,7 +1031,7 @@ pub(crate) mod testutil {
             _options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1071,7 +1072,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1298,7 +1299,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1339,7 +1340,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {

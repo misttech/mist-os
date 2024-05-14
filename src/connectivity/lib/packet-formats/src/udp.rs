@@ -21,8 +21,8 @@ use packet::{
     ParseMetadata, SerializeTarget, Serializer,
 };
 use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref,
-    Unaligned,
+    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
+    Ref, Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
@@ -207,6 +207,14 @@ impl<B: ByteSlice> UdpPacket<B> {
     {
         let builder = self.builder(src_ip, dst_ip);
         ByteSliceInnerPacketBuilder(self.body).into_serializer().encapsulate(builder)
+    }
+}
+
+impl<B: ByteSliceMut> UdpPacket<B> {
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        self.header.checksum =
+            internet_checksum::update(self.header.checksum, old.bytes(), new.bytes());
     }
 }
 
@@ -431,6 +439,16 @@ impl<A: IpAddress> UdpPacketBuilder<A> {
     /// Returns the destination port for the builder.
     pub fn dst_port(&self) -> Option<NonZeroU16> {
         self.dst_port
+    }
+
+    /// Sets the source IP address for the builder.
+    pub fn set_src_ip(&mut self, addr: A) {
+        self.src_ip = addr;
+    }
+
+    /// Sets the destination IP address for the builder.
+    pub fn set_dst_ip(&mut self, addr: A) {
+        self.dst_ip = addr;
     }
 }
 
