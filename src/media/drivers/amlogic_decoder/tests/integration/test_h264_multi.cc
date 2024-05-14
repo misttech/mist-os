@@ -98,6 +98,7 @@ class TestH264Multi {
     ASSERT_TRUE(video);
     TestFrameAllocator frame_allocator(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     H264TestFrameDataProvider frame_data_provider(video.get());
@@ -212,6 +213,7 @@ class TestH264Multi {
     ASSERT_TRUE(video);
     TestFrameAllocator frame_allocator(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     H264TestFrameDataProvider frame_data_provider(video.get());
@@ -311,6 +313,7 @@ class TestH264Multi {
     ASSERT_TRUE(video);
     TestFrameAllocator frame_allocator(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     H264TestFrameDataProvider frame_data_provider(video.get());
@@ -345,6 +348,7 @@ class TestH264Multi {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     std::vector<std::unique_ptr<TestFrameAllocator>> clients;
@@ -466,6 +470,7 @@ class TestH264Multi {
     ASSERT_TRUE(video);
     TestFrameAllocator frame_allocator(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     H264TestFrameDataProvider frame_data_provider(video.get());
@@ -565,6 +570,7 @@ class TestH264Multi {
     ASSERT_TRUE(video);
     TestFrameAllocator frame_allocator(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     H264TestFrameDataProvider frame_data_provider(video.get());
@@ -649,6 +655,7 @@ class TestH264Multi {
     ASSERT_TRUE(video);
     TestFrameAllocator frame_allocator(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     H264TestFrameDataProvider frame_data_provider(video.get());

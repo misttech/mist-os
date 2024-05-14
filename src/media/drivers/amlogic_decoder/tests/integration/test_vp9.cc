@@ -153,6 +153,7 @@ class TestVP9 {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
     Vp9TestClient client(video.get());
@@ -261,6 +262,7 @@ class TestVP9 {
     ASSERT_TRUE(video);
     Vp9TestClient client(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
 
@@ -339,6 +341,7 @@ class TestVP9 {
     ASSERT_TRUE(video);
     Vp9TestClient client(video.get());
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
 
@@ -428,6 +431,7 @@ class TestVP9 {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
 
@@ -601,6 +605,7 @@ class TestVP9 {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
 

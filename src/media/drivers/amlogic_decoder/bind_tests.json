@@ -31,6 +31,15 @@
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.VIDEO",
                     "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2"
                 }
+            },
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,g12b-vdec\""
+                }
             }
         ]
     },
@@ -66,7 +75,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
-                    "fuchsia.BIND_CLOCK_ID": "fuchsia.clock.FUNCTION.DOS_GCLK_VDEC"
+                    "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.DOS_GCLK_VDEC"
                 }
             }
         ]
@@ -79,7 +88,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
-                    "fuchsia.BIND_CLOCK_ID": "fuchsia.clock.FUNCTION.DOS"
+                    "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.DOS"
                 }
             }
         ]

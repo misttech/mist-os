@@ -27,6 +27,7 @@ class TestAmlogicVideo {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
 
     constexpr uint32_t kBufferSize = 4096;
@@ -63,6 +64,7 @@ class TestAmlogicVideo {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
     uint8_t* data;
     uint32_t firmware_size;

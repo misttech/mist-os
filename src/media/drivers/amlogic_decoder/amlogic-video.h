@@ -29,6 +29,7 @@
 
 #include "decoder_core.h"
 #include "decoder_instance.h"
+#include "device_type.h"
 #include "firmware_blob.h"
 #include "parser.h"
 #include "registers.h"
@@ -64,6 +65,11 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   ~AmlogicVideo();
 
   void SetMetrics(CodecMetrics* metrics);
+
+  zx_status_t SetDeviceType(zx_device_t* parent);
+  // Exposed for tests.
+  void SetDeviceType(DeviceType type) { device_type_ = type; }
+
   [[nodiscard]] zx_status_t InitRegisters(zx_device_t* parent);
   [[nodiscard]] zx_status_t InitDecoder();
 

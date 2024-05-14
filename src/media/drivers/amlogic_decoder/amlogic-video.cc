@@ -4,6 +4,7 @@
 
 #include "amlogic-video.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -27,11 +28,16 @@
 #include <optional>
 #include <thread>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/devicetree/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <hwreg/bitfields.h>
 #include <hwreg/mmio.h>
 
 #include "device_ctx.h"
 #include "device_fidl.h"
+#include "device_type.h"
 #include "hevcdec.h"
 #include "local_codec_factory.h"
 #include "macros.h"
@@ -862,6 +868,81 @@ std::string GetObjectName(zx_handle_t handle) {
   return status == ZX_OK ? std::string(name) : std::string();
 }
 
+zx_status_t AmlogicVideo::SetDeviceType(zx_device_t* parent) {
+  constexpr uint32_t kMaxPropertyCount = 10;
+  zx_device_prop_t props[kMaxPropertyCount] = {};
+  zx_device_str_prop_t str_props[kMaxPropertyCount] = {};
+  device_props_args_t prop_out_args = {
+      .props = props,
+      .prop_count = kMaxPropertyCount,
+      .str_props = str_props,
+      .str_prop_count = kMaxPropertyCount,
+  };
+  zx_status_t status = device_get_properties(parent, &prop_out_args);
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to get device properties. Status: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  uint32_t pid = 0;
+  uint32_t did = 0;
+  uint32_t vid = 0;
+
+  std::string compatible;
+  for (uint32_t i = 0; i < prop_out_args.actual_str_prop_count; i++) {
+    if (!strcmp(str_props[i].key, bind_fuchsia::PLATFORM_DEV_VID.c_str())) {
+      vid = str_props[i].property_value.data.int_val;
+    }
+    if (!strcmp(str_props[i].key, bind_fuchsia::PLATFORM_DEV_PID.c_str())) {
+      pid = str_props[i].property_value.data.int_val;
+    }
+    if (!strcmp(str_props[i].key, bind_fuchsia::PLATFORM_DEV_DID.c_str())) {
+      did = str_props[i].property_value.data.int_val;
+    }
+
+    if (!strcmp(str_props[i].key, bind_fuchsia_devicetree::FIRST_COMPATIBLE.c_str())) {
+      ZX_ASSERT(str_props[i].property_value.data_type == ZX_DEVICE_PROPERTY_VALUE_STRING);
+      compatible = std::string(str_props[i].property_value.data.str_val);
+      break;
+    }
+  }
+
+  LOG(DEBUG, "vid: %d pid: %d did: %d compatible: %s", vid, pid, did, compatible.c_str());
+
+  if (vid == bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC &&
+      did == bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE) {
+    if (compatible == "amlogic,g12a-vdec") {
+      device_type_ = DeviceType::kG12A;
+    } else if (compatible == "amlogic,g12b-vdec") {
+      device_type_ = DeviceType::kG12B;
+    } else {
+      DECODE_ERROR("Unknown soc compatible string: %s", compatible.c_str());
+      return ZX_ERR_INVALID_ARGS;
+    }
+  } else {
+    switch (pid) {
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S912:
+        device_type_ = DeviceType::kGXM;
+        break;
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2:
+        device_type_ = DeviceType::kG12A;
+        break;
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931:
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D:
+        device_type_ = DeviceType::kG12B;
+        break;
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3:
+        device_type_ = DeviceType::kSM1;
+        break;
+      default:
+        DECODE_ERROR("Unknown soc pid: %d", pid);
+        return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   TRACE_DURATION("media", "AmlogicVideo::InitRegisters");
   parent_ = parent;
@@ -944,32 +1025,6 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via
     // video_firmware TA
     LOG(INFO, "Skipped ZX_PROTOCOL_TEE");
-  }
-
-  pdev_device_info_t info;
-  status = pdev_.GetDeviceInfo(&info);
-  if (status != ZX_OK) {
-    DECODE_ERROR("pdev_.GetDeviceInfo failed");
-    return status;
-  }
-
-  switch (info.pid) {
-    case PDEV_PID_AMLOGIC_S912:
-      device_type_ = DeviceType::kGXM;
-      break;
-    case PDEV_PID_AMLOGIC_S905D2:
-      device_type_ = DeviceType::kG12A;
-      break;
-    case PDEV_PID_AMLOGIC_T931:
-    case PDEV_PID_AMLOGIC_A311D:
-      device_type_ = DeviceType::kG12B;
-      break;
-    case PDEV_PID_AMLOGIC_S905D3:
-      device_type_ = DeviceType::kSM1;
-      break;
-    default:
-      DECODE_ERROR("Unknown soc pid: %d", info.pid);
-      return ZX_ERR_INVALID_ARGS;
   }
 
   static constexpr uint32_t kTrustedOsSmcIndex = 0;
