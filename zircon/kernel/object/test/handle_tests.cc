@@ -12,49 +12,12 @@
 #include <object/dispatcher.h>
 #include <object/event_pair_dispatcher.h>
 
+#include "fake_dispatcher.h"
 #include "object/handle.h"
 
 #include <ktl/enforce.h>
 
 namespace {
-
-// A Dispatcher-like class that tracks the number of calls to on_zero_handles()
-// for testing purposes.
-//
-// This base class is available so that we can test that KernelHandle can
-// properly upcast child->base RefPtrs.
-class FakeDispatcherBase : public fbl::RefCounted<FakeDispatcherBase> {
- public:
-  virtual ~FakeDispatcherBase() = default;
-
-  uint32_t current_handle_count() const { return 0; }
-  int on_zero_handles_calls() const { return on_zero_handles_calls_; }
-  void on_zero_handles() { on_zero_handles_calls_++; }
-
- protected:
-  FakeDispatcherBase() = default;
-
- private:
-  int on_zero_handles_calls_ = 0;
-};
-
-class FakeDispatcher : public FakeDispatcherBase {
- public:
-  static fbl::RefPtr<FakeDispatcher> Create() {
-    fbl::AllocChecker ac;
-    auto dispatcher = fbl::AdoptRef(new (&ac) FakeDispatcher());
-    if (!ac.check()) {
-      unittest_printf("Failed to allocate FakeDispatcher\n");
-      return nullptr;
-    }
-    return dispatcher;
-  }
-
-  ~FakeDispatcher() override = default;
-
- private:
-  FakeDispatcher() = default;
-};
 
 bool KernelHandleCreate() {
   BEGIN_TEST;
