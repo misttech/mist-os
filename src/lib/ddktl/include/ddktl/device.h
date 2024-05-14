@@ -319,6 +319,39 @@ class MetadataList {
   std::vector<device_metadata_t> metadata_list_;
 };
 
+// Factory functions to create a zx_device_str_prop_t.
+inline zx_device_str_prop_t MakeStrProperty(const std::string& key, uint32_t val) {
+  return {key.c_str(), str_prop_int_val(val)};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const char* key, uint32_t val) {
+  return {key, str_prop_int_val(val)};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const std::string& key, bool val) {
+  return {key.c_str(), str_prop_bool_val(val)};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const char* key, bool val) {
+  return {key, str_prop_bool_val(val)};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const std::string& key, const std::string& val) {
+  return {key.c_str(), str_prop_str_val(val.c_str())};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const char* key, const std::string& val) {
+  return {key, str_prop_str_val(val.c_str())};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const std::string& key, const char* val) {
+  return {key.c_str(), str_prop_str_val(val)};
+}
+
+inline zx_device_str_prop_t MakeStrProperty(const char* key, const char* val) {
+  return {key, str_prop_str_val(val)};
+}
+
 class DeviceAddArgs {
  public:
   explicit DeviceAddArgs(const char* name) {
