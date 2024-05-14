@@ -1747,10 +1747,6 @@ where
     ///   available local ports for that address)
     /// - If there is no route to `remote_ip`
     /// - If `id` belongs to an already-connected socket
-    ///
-    /// # Panics
-    ///
-    /// `connect` panics if `id` is not a valid [`SocketId`].
     pub fn connect(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -1772,10 +1768,6 @@ where
     /// Sets the device to be used for sending and receiving packets for a socket.
     /// If the socket is not currently bound to a local address and port, the device
     /// will be used when binding.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid [`UdpSocketId`].
     pub fn set_device(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -1787,10 +1779,6 @@ where
     }
 
     /// Gets the device the specified socket is bound to.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid socket ID.
     pub fn get_bound_device(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -1807,10 +1795,6 @@ where
     ///
     /// Returns an error if the socket does not support the `IPV6_V6ONLY` socket
     /// option (e.g. an IPv4 socket).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn set_dual_stack_enabled(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -1851,10 +1835,6 @@ where
     ///
     /// Returns an error if the socket does not support the `IPV6_V6ONLY` socket
     /// option (e.g. an IPv4 socket).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn get_dual_stack_enabled(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -1897,10 +1877,6 @@ where
     /// # Errors
     ///
     /// Returns an error if the socket is already bound.
-    ///
-    /// # Panics
-    ///
-    /// panics if `id` is not a valid `UdpSocketId`.
     pub fn set_posix_reuse_port(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -1912,10 +1888,6 @@ where
     }
 
     /// Gets the POSIX `SO_REUSEPORT` option for the specified socket.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn get_posix_reuse_port(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
         datagram::get_sharing(self.core_ctx(), id).reuse_port
     }
@@ -2200,10 +2172,6 @@ where
     /// # Errors
     ///
     /// Returns an error if the socket is not connected.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn disconnect(&mut self, id: &UdpApiSocketId<I, C>) -> Result<(), ExpectedConnError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         debug!("disconnect {id:?}");
@@ -2215,10 +2183,6 @@ where
     /// # Errors
     ///
     /// Returns an error if the socket is not connected.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn shutdown(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2233,20 +2197,12 @@ where
     ///
     /// If the socket is not connected, or if `shutdown` was not called on it,
     /// returns `None`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid `UdpSocketId`.
     pub fn get_shutdown(&mut self, id: &UdpApiSocketId<I, C>) -> Option<ShutdownType> {
         let (core_ctx, bindings_ctx) = self.contexts();
         datagram::get_shutdown_connected(core_ctx, bindings_ctx, id)
     }
 
     /// Removes a socket that was previously created.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid [`UdpSocketId`].
     pub fn close(
         &mut self,
         id: UdpApiSocketId<I, C>,
@@ -2261,10 +2217,6 @@ where
 
     /// Gets the [`SocketInfo`] associated with the UDP socket referenced by
     /// `id`.
-    ///
-    /// # Panics
-    ///
-    /// `get_udp_info` panics if `id` is not a valid `UdpSocketId`.
     pub fn get_info(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2289,10 +2241,6 @@ where
     /// # Errors
     ///
     /// Returns an error if the socket is not currently unbound.
-    ///
-    /// # Panics
-    ///
-    /// `listen_udp` panics if `id` is not a valid [`UdpSocketId`].
     pub fn listen(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2316,10 +2264,6 @@ where
     /// Returns an error if the socket is not connected or the packet cannot be
     /// sent. On error, the original `body` is returned unmodified so that it
     /// can be reused by the caller.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid UDP socket identifier.
     pub fn send<B: BufferMut>(
         &mut self,
         id: &UdpApiSocketId<I, C>,
@@ -2350,10 +2294,6 @@ where
     /// Returns an error if the socket is unbound and connecting fails, or if the
     /// packet could not be sent. If the socket is unbound and connecting succeeds
     /// but sending fails, the socket remains connected.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` is not a valid UDP socket identifier.
     pub fn send_to<B: BufferMut>(
         &mut self,
         id: &UdpApiSocketId<I, C>,
