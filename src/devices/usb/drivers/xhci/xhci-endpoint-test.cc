@@ -56,7 +56,9 @@ class EndpointHarness : public zxtest::Test {
       expected_cancel_all_.emplace(kDeviceId, ep_->ep_addr());
       expected_disable_endpoint_.emplace(kDeviceId, ep_->ep_addr());
 
-      { auto unused = std::move(client_); }
+      {
+        auto unused = std::move(client_);
+      }
       sync_completion_wait(&client_unbound_, zx::time::infinite().get());
     }
     ep_.reset();
@@ -254,7 +256,7 @@ zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* 
 }
 zx_status_t TransferRing::DeinitIfActive() { return ZX_OK; }
 zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> context,
-                                        TRB* first_trb) {
+                                        TRB* first_trb, TRB* setup) {
   return ZX_OK;
 }
 void TransferRing::CommitTransaction(const State& start) {}

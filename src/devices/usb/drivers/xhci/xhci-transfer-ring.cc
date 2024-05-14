@@ -7,16 +7,18 @@
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
 namespace usb_xhci {
-void TransferRing::AdvancePointer() {
-  if ((reinterpret_cast<size_t>(trbs_) / zx_system_get_page_size()) !=
-      (reinterpret_cast<size_t>(trbs_ + 1) / zx_system_get_page_size())) {
+
+TRB* TransferRing::AdvancePointerHelper(TRB* trb) {
+  TRB* ptr = trb ? trb : trbs_;
+  if ((reinterpret_cast<size_t>(ptr) / zx_system_get_page_size()) !=
+      (reinterpret_cast<size_t>(ptr + 1) / zx_system_get_page_size())) {
     CommitLocked();
-    trbs_ = static_cast<TRB*>(
-        (*virt_to_buffer_.find((reinterpret_cast<size_t>(trbs_) / zx_system_get_page_size()) + 1)
+    ptr = static_cast<TRB*>(
+        (*virt_to_buffer_.find((reinterpret_cast<size_t>(ptr) / zx_system_get_page_size()) + 1)
               ->second)
             .virt());
   } else {
-    trbs_++;
+    ptr++;
   }
 
   // In some cases empty segments (segments containing only a link TRB)
@@ -24,20 +26,24 @@ void TransferRing::AdvancePointer() {
   // account for empty segments.
   // See the test "CanHandleConsecutiveLinks" in xhci-transfer-ring-test.cc for an
   // example that triggers this scenario.
-  Control control = Control::FromTRB(trbs_);
+  Control control = Control::FromTRB(ptr);
   while (control.Type() == Control::Link) {
-    zx_paddr_t ptr = trbs_->ptr;
-    control.set_Cycle(pcs_).ToTrb(trbs_);
-    // Read link pointer
-    if (control.EntTC()) {
-      pcs_ = !pcs_;
+    zx_paddr_t addr = ptr->ptr;
+    if (!trb) {
+      control.set_Cycle(pcs_).ToTrb(ptr);
+      // Read link pointer
+      if (control.EntTC()) {
+        pcs_ = !pcs_;
+      }
+      CommitLocked();
     }
-    CommitLocked();
     zx_vaddr_t base_virt = reinterpret_cast<zx_vaddr_t>(
-        (*(phys_to_buffer_.find(ptr / zx_system_get_page_size())->second)).virt());
-    trbs_ = reinterpret_cast<TRB*>(base_virt + (ptr % zx_system_get_page_size()));
-    control = Control::FromTRB(trbs_);
+        (*(phys_to_buffer_.find(addr / zx_system_get_page_size())->second)).virt());
+    ptr = reinterpret_cast<TRB*>(base_virt + (addr % zx_system_get_page_size()));
+    control = Control::FromTRB(ptr);
   }
+
+  return ptr;
 }
 
 zx_status_t TransferRing::AllocInternal(Control control) {
@@ -231,7 +237,7 @@ zx_status_t TransferRing::HandleShortPacket(TRB* short_trb, size_t short_length,
 }
 
 zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> context,
-                                        TRB* first_trb) {
+                                        TRB* first_trb, TRB* setup_trb) {
   fbl::AutoLock l(&mutex_);
   if (context->token != token_) {
     return ZX_ERR_INVALID_ARGS;
@@ -242,6 +248,7 @@ zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> co
   }
   context->first_trb = first_trb;
   context->trb = trb;
+  context->setup_trb = setup_trb;
   pending_trbs_.push_back(std::move(context));
   return ZX_OK;
 }
@@ -347,6 +354,14 @@ TRB* TransferRing::PhysToVirtLocked(zx_paddr_t paddr) {
   auto vaddr = reinterpret_cast<zx_vaddr_t>(buffer->second->virt()) + offset;
   return reinterpret_cast<TRB*>(vaddr);
 }
+bool TransferRing::IsTRBInRange(TRB* trb, TRB* start, TRB* end) {
+  for (auto* cur = start; cur != end; AdvancePointer(cur)) {
+    if (cur == trb) {
+      return true;
+    }
+  }
+  return end == trb;
+}
 zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* context) {
   fbl::AutoLock l(&mutex_);
   if (pending_trbs_.is_empty()) {
@@ -355,9 +370,15 @@ zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* con
   }
   dequeue_trb_ = trb;
   *context = pending_trbs_.pop_front();
-  if (trb != (*context)->trb) {
+  if (!IsTRBInRange(trb, (*context)->first_trb, (*context)->trb) &&
+      (trb != (*context)->setup_trb)) {
     zxlogf(ERROR, "Lost a TRB! Expected %p but we received an event for %p", (*context)->trb, trb);
     return ZX_ERR_IO;
+  }
+  if (trb != (*context)->trb) {
+    zxlogf(WARNING,
+           "Received a completion event in response to not the last TRB."
+           " This transaction should have failed! Please double check.");
   }
   return ZX_OK;
 }

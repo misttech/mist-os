@@ -250,8 +250,8 @@ zx_status_t Endpoint::ControlRequestDataPhase(UsbRequestState* state) {
                         ->setup()
                         ->bm_request_type();
           // Control transfers always get interrupter 0 (we consider those to be low-priority)
-          // TODO(https://fxbug.dev/42109334): Change bus snooping options based on input from higher-level
-          // drivers.
+          // TODO(https://fxbug.dev/42109334): Change bus snooping options based on input from
+          // higher-level drivers.
           data->set_CHAIN(next != nullptr)
               .set_DIRECTION((bm_request_type & USB_DIR_IN) != 0)
               .set_INTERRUPTER(0)
@@ -310,7 +310,8 @@ void Endpoint::ControlRequestCommit(UsbRequestState* state) {
         std::get<Request>(*state->context->request).request(), 0,
         std::get<Request>(*state->context->request).request()->header.length);
   }
-  transfer_ring_.AssignContext(state->status_trb_ptr, std::move(state->context), state->first_trb);
+  transfer_ring_.AssignContext(state->status_trb_ptr, std::move(state->context), state->first_trb,
+                               state->setup);
   Control::FromTRB(state->setup)
       .set_Type(Control::Setup)
       .set_Cycle(state->setup_cycle)
