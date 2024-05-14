@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_FUCHSIA_POWER_MANAGER_H_
 
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <lib/inspect/cpp/inspect.h>
 
 #include "parent_device.h"
 
@@ -18,7 +19,7 @@ class FuchsiaPowerManager {
   };
   explicit FuchsiaPowerManager(Owner* owner);
 
-  bool Initialize(ParentDevice* parent_device);
+  bool Initialize(ParentDevice* parent_device, inspect::Node& node);
   zx_status_t AcquireLease(
       const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
       fidl::ClientEnd<fuchsia_power_broker::LeaseControl>& lease_control_client_end);
@@ -37,6 +38,10 @@ class FuchsiaPowerManager {
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
   std::vector<zx::event> active_power_dep_tokens_;
   std::vector<zx::event> passive_power_dep_tokens_;
+
+  inspect::BoolProperty power_lease_active_;
+  inspect::UintProperty required_power_level_;
+  inspect::UintProperty current_power_level_;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_FUCHSIA_POWER_MANAGER_H_

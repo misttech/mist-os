@@ -294,7 +294,7 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
   StartGpuInterruptThread();
   if (parent_device_->suspend_enabled()) {
     fuchsia_power_manager_ = std::make_unique<FuchsiaPowerManager>(this);
-    if (!fuchsia_power_manager_->Initialize(parent_device_)) {
+    if (!fuchsia_power_manager_->Initialize(parent_device_, inspect_)) {
       MAGMA_LOG(ERROR, "Failed to initialize fuchsia power manager");
       return false;
     }

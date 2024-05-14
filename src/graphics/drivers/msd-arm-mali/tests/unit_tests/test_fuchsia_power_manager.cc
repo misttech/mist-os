@@ -374,7 +374,8 @@ TEST(FuchsiaPowerManager, Basic) {
   fake_config.enable_suspend() = true;
   auto parent = ParentDeviceDFv2::Create(std::make_shared<fdf::Namespace>(std::move(*fdf_incoming)),
                                          std::move(fake_config));
-  EXPECT_TRUE(manager.Initialize(parent.get()));
+  inspect::Node node;
+  EXPECT_TRUE(manager.Initialize(parent.get(), node));
 
   runtime.RunUntil([&]() { return !owner.enabled_calls().empty(); });
 

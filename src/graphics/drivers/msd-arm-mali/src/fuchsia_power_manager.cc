@@ -11,10 +11,14 @@
 
 FuchsiaPowerManager::FuchsiaPowerManager(Owner* owner) : owner_(owner) {}
 
-bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device) {
+bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node& node) {
   if (!parent_device->incoming()) {
     return false;
   }
+
+  power_lease_active_ = node.CreateBool("power_lease_active", false);
+  required_power_level_ = node.CreateUint("required_power_level", 0);
+  current_power_level_ = node.CreateUint("current_power_level", 0);
 
   auto result = parent_device->GetPowerConfiguration();
   if (!result.ok()) {
@@ -129,6 +133,7 @@ zx_status_t FuchsiaPowerManager::AcquireLease(
     return ZX_ERR_BAD_STATE;
   }
   lease_control_client_end = std::move(result->value()->lease_control);
+  power_lease_active_.Set(true);
   return ZX_OK;
 }
 
@@ -151,11 +156,13 @@ void FuchsiaPowerManager::CheckRequiredLevel() {
         }
         uint8_t required_level = result->value()->required_level;
         MAGMA_LOG(INFO, "Starting transition to power level %d", required_level);
+        required_power_level_.Set(required_level);
 
         bool enabled = required_level == kPoweredUpPowerLevel;
         owner_->SetPowerState(enabled, [this](bool powered_on) {
           uint8_t new_level = powered_on ? kPoweredUpPowerLevel : kPoweredDownPowerLevel;
           MAGMA_LOG(INFO, "Finished transition to power level %d", new_level);
+          current_power_level_.Set(new_level);
           auto result = hardware_power_current_level_client_->Update(new_level);
           if (!result.ok()) {
             MAGMA_LOG(ERROR, "Call to Update failed: %s", result.status_string());
