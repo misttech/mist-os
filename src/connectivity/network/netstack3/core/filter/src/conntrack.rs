@@ -6,8 +6,8 @@ use alloc::{collections::HashMap, fmt::Debug, sync::Arc, vec::Vec};
 use core::{hash::Hash, time::Duration};
 
 use derivative::Derivative;
-use net_types::ip::IpVersionMarker;
-use packet_formats::ip::IpExt;
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::{
     context::FilterBindingsContext, logic::FilterTimerId, packets::TransportPacket,
@@ -20,26 +20,33 @@ use netstack3_base::{
 /// The time from the end of one GC cycle to the beginning of the next.
 const GC_INTERVAL: Duration = Duration::from_secs(10);
 
-/// The time since the last seen packet after which an established connection
-/// (one that has seen traffic in both directions) is considered expired and is
-/// eligible for garbage collection.
+/// The time since the last seen packet after which an unestablished TCP
+/// connection is considered expired and is eligible for garbage collection.
+///
+/// This is small because it's just meant to be the time between the initial SYN
+/// and response SYN/ACK packet.
+const CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED: Duration = Duration::from_secs(30);
+
+/// The time since the last seen packet after which an established TCP
+/// connection is considered expired and is eligible for garbage collection.
 ///
 /// Until we have TCP tracking, this is a large value to ensure that connections
 /// that are still valid aren't cleaned up prematurely.
-const CONNECTION_EXPIRY_TIME_ESTABLISHED: Duration = Duration::from_secs(12 * 60 * 60);
+const CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED: Duration = Duration::from_secs(6 * 60 * 60);
 
-/// The time since the last seen packet after which an unestablished connection
-/// (one that has only seen traffic in one direction) is considered expired and
-/// is eligible for garbage collection.
+/// The time since the last seen packet after which an established UDP
+/// connection will be considered expired and is eligible for garbage
+/// collection.
 ///
-/// This is lower than the one for established connections as an optimization to
-/// prune unused connections from the conntrack table. We expect that
-/// connections establish very quickly (e.g. a handful of milliseconds for a TCP
-/// handshake or DNS query).
-const CONNECTION_EXPIRY_TIME_UNESTABLISHED: Duration = Duration::from_secs(60);
+/// This was taken from RFC 4787 REQ-5.
+const CONNECTION_EXPIRY_TIME_UDP: Duration = Duration::from_secs(120);
+
+/// The time since the last seen packet after which a generic connection will be
+/// considered expired and is eligible for garbage collection.
+const CONNECTION_EXPIRY_OTHER: Duration = Duration::from_secs(30);
 
 /// The maximum number of connections in the conntrack table.
-const MAXIMUM_CONNECTIONS: usize = 10_000;
+const MAXIMUM_CONNECTIONS: usize = 50_000;
 
 /// The maximum size of the conntrack table. We double the table size limit
 /// because each connection is inserted into the table twice, once for the
@@ -300,7 +307,8 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I,
 }
 
 /// A tuple for a flow in a single direction.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub struct Tuple<I: IpExt> {
     protocol: I::Proto,
     src_addr: I::Addr,
@@ -586,17 +594,67 @@ pub struct ConnectionShared<I: IpExt, BT: FilterBindingsTypes, E> {
     state: Mutex<ConnectionState<BT>>,
 }
 
+#[derive(GenericOverIp)]
+#[generic_over_ip()]
+enum IpAgnosticTransportProtocol {
+    Tcp,
+    Udp,
+    Icmp,
+    Other,
+}
+
+impl From<Ipv4Proto> for IpAgnosticTransportProtocol {
+    fn from(value: Ipv4Proto) -> Self {
+        match value {
+            Ipv4Proto::Proto(IpProto::Tcp) => IpAgnosticTransportProtocol::Tcp,
+            Ipv4Proto::Proto(IpProto::Udp) => IpAgnosticTransportProtocol::Udp,
+            Ipv4Proto::Icmp => IpAgnosticTransportProtocol::Icmp,
+            _ => IpAgnosticTransportProtocol::Other,
+        }
+    }
+}
+
+impl From<Ipv6Proto> for IpAgnosticTransportProtocol {
+    fn from(value: Ipv6Proto) -> Self {
+        match value {
+            Ipv6Proto::Proto(IpProto::Tcp) => IpAgnosticTransportProtocol::Tcp,
+            Ipv6Proto::Proto(IpProto::Udp) => IpAgnosticTransportProtocol::Udp,
+            Ipv6Proto::Icmpv6 => IpAgnosticTransportProtocol::Icmp,
+            _ => IpAgnosticTransportProtocol::Other,
+        }
+    }
+}
+
 impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
     fn is_expired(&self, now: BT::Instant) -> bool {
-        let state = self.state.lock();
-
+        let state = self.state.lock().clone();
         let duration = now.duration_since(state.last_packet_time);
 
-        if state.established {
-            duration >= CONNECTION_EXPIRY_TIME_ESTABLISHED
-        } else {
-            duration >= CONNECTION_EXPIRY_TIME_UNESTABLISHED
-        }
+        let protocol = I::map_ip(
+            &self.inner.original_tuple,
+            |tuple| tuple.protocol.into(),
+            |tuple| tuple.protocol.into(),
+        );
+
+        let expiry_duration = match protocol {
+            IpAgnosticTransportProtocol::Tcp => {
+                if state.established {
+                    CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED
+                } else {
+                    CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED
+                }
+            }
+            IpAgnosticTransportProtocol::Udp => CONNECTION_EXPIRY_TIME_UDP,
+            // The ICMP messages we track are simple request/response
+            // protocols, so we always expect to get a response quickly
+            // (within 2 RTT).  Any followup messages (e.g. if making
+            // periodic ECHO requests) should reuse this existing
+            // connection.
+            IpAgnosticTransportProtocol::Icmp => CONNECTION_EXPIRY_OTHER,
+            IpAgnosticTransportProtocol::Other => CONNECTION_EXPIRY_OTHER,
+        };
+
+        duration >= expiry_duration
     }
 }
 
@@ -614,7 +672,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use net_types::ip::{Ipv4, Ipv6};
     use netstack3_base::{testutil::FakeTimerCtxExt, IntoCoreTimerCtx};
     use packet_formats::ip::IpProto;
     use test_case::test_case;
@@ -1116,11 +1174,11 @@ mod tests {
         // Connection 1
         //   - Not established
         //   - Last packet seen at T=0
-        //   - Expires at T=CONNECTION_EXPIRY_TIME_UNESTABLISHED+GC_INTERVAL
+        //   - Expires at T=CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED+GC_INTERVAL
         // Connection 2:
         //   - Established
         //   - Last packet seen at T=GC_INTERVAL
-        //   - Expires at CONNECTION_EXPIRY_TIME_ESTABLISHED + GC_INTERVAL
+        //   - Expires at CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED + GC_INTERVAL
 
         // T=2*GC_INTERVAL: Triggering a GC does not clean up any connections.
         bindings_ctx.sleep(GC_INTERVAL);
@@ -1131,9 +1189,9 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
 
         // Time advances to expiry for the first packet
-        // (T=CONNECTION_EXPIRY_TIME_UNESTABLISHED + GC_INTERVAL) trigger gc and
+        // (T=CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED + GC_INTERVAL) trigger gc and
         // note that the first connection was cleaned up
-        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_UNESTABLISHED - GC_INTERVAL);
+        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED - GC_INTERVAL);
         perform_gc(&mut core_ctx, &mut bindings_ctx, gc_trigger);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
@@ -1142,8 +1200,9 @@ mod tests {
 
         // Advance time past the expiry time for the second connection and see
         // that it is cleaned up.
-        bindings_ctx
-            .sleep(CONNECTION_EXPIRY_TIME_ESTABLISHED - CONNECTION_EXPIRY_TIME_UNESTABLISHED);
+        bindings_ctx.sleep(
+            CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED - CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED,
+        );
         perform_gc(&mut core_ctx, &mut bindings_ctx, gc_trigger);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
