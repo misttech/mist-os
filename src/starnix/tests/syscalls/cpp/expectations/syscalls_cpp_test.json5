@@ -62,10 +62,6 @@
                 "VmspliceTest.RemapSharedBufferInPipeThenModify",
                 "VmspliceTest/VmspliceUnmapBufferAfterVmsplicingRemappedBufferTest.UnmapBufferAfterVmsplicingRemappedBuffer/*",
 
-                // TODO(https://fxbug.dev/331965660):
-                "FuseMkPermissionCheck/FuseMkPermissionCheck.MkPermissionCheck/1",
-                "FuseMkPermissionCheck/FuseMkPermissionCheck.MkPermissionCheck/5",
-
                 // TODO(https://fxbug.dev/331965426)
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/4",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/5",

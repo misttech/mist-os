@@ -749,7 +749,12 @@ impl DirEntry {
             return error!(ENOTDIR);
         }
         // The user must be able to search the directory (requires the EXEC permission)
-        self.node.check_access(current_task, mount, Access::EXEC, CheckAccessReason::Lookup)?;
+        self.node.check_access(
+            current_task,
+            mount,
+            Access::EXEC,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
 
         // Check if the child is already in children. In that case, we can
         // simply return the child and we do not need to call init_fn.

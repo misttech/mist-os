@@ -503,8 +503,6 @@ pub enum CheckAccessReason {
     Access,
     Chdir,
     Chroot,
-    Open,
-    Lookup,
     InternalPermissionChecks,
 }
 
@@ -1210,7 +1208,7 @@ impl FsNode {
                 current_task,
                 mount,
                 Access::from_open_flags(flags),
-                CheckAccessReason::Open,
+                CheckAccessReason::InternalPermissionChecks,
             )?;
         }
 
@@ -1251,7 +1249,12 @@ impl FsNode {
         mount: &MountInfo,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.check_access(current_task, mount, Access::EXEC, CheckAccessReason::Lookup)?;
+        self.check_access(
+            current_task,
+            mount,
+            Access::EXEC,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         self.ops().lookup(self, current_task, name)
     }
 

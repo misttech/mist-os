@@ -1034,23 +1034,12 @@ impl FsNodeOps for Arc<FuseNode> {
                     error!(EINVAL)
                 }
             }
-            CheckAccessReason::Open | CheckAccessReason::Lookup => {
-                // Don't perform any access checks when this access check is being
-                // performed for an open/lookup. Their handlers are expected to validate
-                // that the request is valid for the given node being operated on,
-                // including the flags which hold the requested access permissions
-                // like read/write (e.g. `O_RDONLY`/`O_RDWR`).
-                //
-                // For more details, see fuse(4) and `libfuse`'s low-level handlers.
-                Ok(())
-            }
             CheckAccessReason::InternalPermissionChecks => {
-                return self.default_check_access_with_valid_node_attributes(
-                    node,
-                    current_task,
-                    access,
-                    info,
-                );
+                // Per FUSE's mount options, the kernel does not check file access
+                // permissions unless the default permissions mount option is set.
+                //
+                // See https://www.kernel.org/doc/html/v5.6/filesystems/fuse.html#mount-options.
+                Ok(())
             }
         }
     }
