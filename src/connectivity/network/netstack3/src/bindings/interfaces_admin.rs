@@ -1293,8 +1293,8 @@ async fn run_address_state_provider(
                     .expect("missing device info for interface")
                     .downgrade();
 
-                let route_set_v4 = routes::admin::UserRouteSet::new(ctx.clone());
-                let route_set_v6 = routes::admin::UserRouteSet::new(ctx.clone());
+                let route_set_v4 = routes::admin::UserRouteSet::from_main_table(ctx.clone());
+                let route_set_v6 = routes::admin::UserRouteSet::from_main_table(ctx.clone());
 
                 let add_route_result = match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => {

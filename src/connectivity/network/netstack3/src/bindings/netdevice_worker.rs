@@ -635,7 +635,7 @@ async fn add_initial_routes(bindings_ctx: &BindingsCtx, device: &DeviceId<Bindin
 
     for change in v4_changes.chain(v6_changes) {
         bindings_ctx
-            .apply_route_change_either(change)
+            .apply_main_table_route_change_either(change)
             .await
             .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("adding initial routes should succeed");

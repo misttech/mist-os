@@ -748,7 +748,7 @@ async fn test_list_del_routes() {
         test_stack
             .ctx()
             .bindings_ctx()
-            .apply_route_change_either(match route.into() {
+            .apply_main_table_route_change_either(match route.into() {
                 netstack3_core::routes::AddableEntryEither::V4(entry) => {
                     routes::ChangeEither::V4(routes::Change::RouteOp(
                         routes::RouteOp::Add(entry),

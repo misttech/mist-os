@@ -126,14 +126,14 @@ impl StackFidlWorker {
         self.netstack
             .ctx
             .bindings_ctx()
-            .apply_route_change_either(routes::ChangeEither::global_add(entry))
+            .apply_main_table_route_change_either(routes::ChangeEither::global_add(entry))
             .await
             .map_err(|err| match err {
-                routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
-                routes::Error::ShuttingDown => panic!(
+                routes::ChangeError::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
+                routes::ChangeError::TableRemoved => panic!(
                     "can't apply route change because route change runner has been shut down"
                 ),
-                routes::Error::SetRemoved => {
+                routes::ChangeError::SetRemoved => {
                     unreachable!("fuchsia.net.stack only uses the global route set")
                 }
             })
@@ -150,7 +150,7 @@ impl StackFidlWorker {
         let bindings_ctx = self.netstack.ctx.bindings_ctx();
         if let Ok(subnet) = subnet.try_into_core() {
             bindings_ctx
-                .apply_route_change_either(match subnet {
+                .apply_main_table_route_change_either(match subnet {
                     net_types::ip::SubnetEither::V4(subnet) => routes::Change::RouteOp(
                         routes::RouteOp::RemoveToSubnet(subnet),
                         routes::SetMembership::Global,
@@ -164,11 +164,11 @@ impl StackFidlWorker {
                 })
                 .await
                 .map_err(|err| match err {
-                    routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
-                    routes::Error::ShuttingDown => panic!(
+                    routes::ChangeError::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
+                    routes::ChangeError::TableRemoved => panic!(
                         "can't apply route change because route change runner has been shut down"
                     ),
-                    super::routes::Error::SetRemoved => {
+                    super::routes::ChangeError::SetRemoved => {
                         unreachable!("fuchsia.net.stack only uses the global route set")
                     }
                 })

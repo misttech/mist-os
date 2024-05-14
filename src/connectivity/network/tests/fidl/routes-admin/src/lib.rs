@@ -30,7 +30,7 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack_testing_common::{
-    realms::{Netstack, TestSandboxExt},
+    realms::{Netstack, Netstack3, TestSandboxExt},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -1547,4 +1547,26 @@ async fn main_table_authorization<
         .await
         .expect("fidl should succeed");
     assert_eq!(table_id, authorized_table_id);
+}
+
+#[netstack_test]
+async fn add_route_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let realm = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let main_route_table =
+        realm.connect_to_protocol::<I::RouteTableMarker>().expect("connect to main route table");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let user_route_table =
+        fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+            .expect("create new user table");
+    let main_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&main_route_table).await.expect("get table id");
+    let user_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&user_route_table).await.expect("get table id");
+    assert_ne!(main_table_id, user_table_id);
 }

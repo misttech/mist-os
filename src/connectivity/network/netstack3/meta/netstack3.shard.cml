@@ -16,6 +16,8 @@
             protocol: [
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.filter.State",
+                "fuchsia.net.routes.admin.RouteTableProviderV4",
+                "fuchsia.net.routes.admin.RouteTableProviderV6",
             ],
         },
     ],
@@ -24,6 +26,8 @@
             protocol: [
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.filter.State",
+                "fuchsia.net.routes.admin.RouteTableProviderV4",
+                "fuchsia.net.routes.admin.RouteTableProviderV6",
             ],
             from: "self",
         },
