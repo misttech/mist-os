@@ -141,7 +141,6 @@ mod tests {
     use zerocopy::ByteSlice;
 
     use crate::{
-        algorithm::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
         context::{
             testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
             InstantContext as _, RngContext as _,
@@ -159,6 +158,7 @@ mod tests {
                     Ipv6DeviceConfigurationUpdate,
                 },
                 get_ipv6_hop_limit,
+                opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
                 slaac::{
                     self, InnerSlaacTimerId, SlaacBindingsContext, SlaacConfiguration,

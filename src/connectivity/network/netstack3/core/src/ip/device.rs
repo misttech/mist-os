@@ -9,6 +9,7 @@ pub(crate) mod config;
 pub(crate) mod dad;
 pub(crate) mod integration;
 pub(crate) mod nud;
+pub(crate) mod opaque_iid;
 pub(crate) mod route_discovery;
 pub(crate) mod router_solicitation;
 pub(crate) mod slaac;

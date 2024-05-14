@@ -25,7 +25,6 @@ extern crate fakealloc as alloc;
 // TODO(https://github.com/dtolnay/thiserror/pull/64): remove this module.
 extern crate fakestd as std;
 
-mod algorithm;
 mod api;
 mod context;
 mod counters;
@@ -42,6 +41,11 @@ pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
+pub(crate) mod algorithm {
+    // TODO(https://fxbug.dev/338448790): Move to base crate.
+    mod port_alloc;
+    pub(crate) use port_alloc::*;
+}
 pub(crate) mod convert {
     pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 }
@@ -162,7 +166,6 @@ pub mod ip {
     pub(crate) use base::*;
 
     // Re-exported types.
-    pub use crate::algorithm::StableIidSecret;
     pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
         api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, SetIpAddressPropertiesError},
@@ -170,6 +173,7 @@ pub mod ip {
             IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
             Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
         },
+        opaque_iid::StableIidSecret,
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
         state::{
             IpDeviceConfiguration, Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags,

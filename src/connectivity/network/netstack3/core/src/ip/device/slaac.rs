@@ -23,7 +23,6 @@ use rand::{distributions::Uniform, Rng as _, RngCore};
 use tracing::{debug, error, trace};
 
 use crate::{
-    algorithm::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
     context::{
         CoreTimerContext, CounterContext, HandleableTimer, InstantBindingsTypes, InstantContext,
         RngContext, TimerBindingsTypes, TimerContext,
@@ -32,6 +31,7 @@ use crate::{
     device::{self, AnyDevice, DeviceIdContext, Id, WeakId as _},
     error::{ExistsError, NotFoundError},
     ip::device::{
+        opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
         state::{Lifetime, SlaacConfig, TemporarySlaacConfig},
         AddressRemovedReason, Ipv6DeviceAddr,
     },

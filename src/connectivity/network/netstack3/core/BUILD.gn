@@ -33,7 +33,6 @@ rustc_library_with_features("netstack3-core") {
   }
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
-    "src/algorithm.rs",
     "src/algorithm/port_alloc.rs",
     "src/api.rs",
     "src/benchmarks.rs",
@@ -71,6 +70,7 @@ rustc_library_with_features("netstack3-core") {
     "src/ip/device/integration.rs",
     "src/ip/device/nud.rs",
     "src/ip/device/nud/api.rs",
+    "src/ip/device/opaque_iid.rs",
     "src/ip/device/route_discovery.rs",
     "src/ip/device/router_solicitation.rs",
     "src/ip/device/slaac.rs",

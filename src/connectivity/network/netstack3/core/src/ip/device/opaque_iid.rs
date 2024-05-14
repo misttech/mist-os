@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Common algorithms.
+//! Opaque interface identifier (IID) used in SLAAC.
 
 use core::fmt::{self, Debug};
 
 use hmac::Mac as _;
 use net_types::ip::{Ipv6Addr, Subnet};
 use rand::RngCore;
-
-mod port_alloc;
-
-pub(crate) use port_alloc::*;
 
 /// The length in bytes of the `secret_key` argument to
 /// [`generate_opaque_interface_identifier`].
