@@ -36,7 +36,10 @@ group("tests") {
 python_binary("run_cpu_breakdown_bin") {
   testonly = true
   main_source = "run_cpu_breakdown.py"
-  deps = [ ":trace_processing" ]
+  deps = [
+    ":trace_processing",
+    "//src/performance/trace2json",
+  ]
   enable_mypy = true
   output_name = "run_cpu_breakdown.pyz"
 }
