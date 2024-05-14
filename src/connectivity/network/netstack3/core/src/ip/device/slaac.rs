@@ -22,9 +22,8 @@ use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
 use rand::{distributions::Uniform, Rng as _, RngCore};
 use tracing::{debug, error, trace};
 
-pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
-    algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
+    algorithm::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
     context::{
         CoreTimerContext, CounterContext, HandleableTimer, InstantBindingsTypes, InstantContext,
         RngContext, TimerBindingsTypes, TimerContext,
@@ -982,7 +981,7 @@ pub struct TemporarySlaacAddressConfiguration {
     /// The secret to use when generating new temporary addresses. This should
     /// be initialized from a random number generator before generating any
     /// temporary addresses.
-    pub secret_key: [u8; STABLE_IID_SECRET_KEY_BYTES],
+    pub secret_key: StableIidSecret,
 }
 
 impl TemporarySlaacAddressConfiguration {
@@ -1004,7 +1003,7 @@ impl TemporarySlaacAddressConfiguration {
     pub const DEFAULT_TEMP_IDGEN_RETRIES: u8 = 3;
 
     /// Constructs a new instance with default values and the given secret key.
-    pub fn default_with_secret_key(secret_key: [u8; STABLE_IID_SECRET_KEY_BYTES]) -> Self {
+    pub fn default_with_secret_key(secret_key: StableIidSecret) -> Self {
         Self {
             temp_valid_lifetime: Self::DEFAULT_TEMP_VALID_LIFETIME,
             temp_preferred_lifetime: Self::DEFAULT_TEMP_PREFERRED_LIFETIME,
@@ -1359,14 +1358,14 @@ fn generate_global_temporary_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8; 8],
     seed: u64,
-    secret_key: &[u8; STABLE_IID_SECRET_KEY_BYTES],
+    secret_key: &StableIidSecret,
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     let prefix_len = usize::from(prefix.prefix() / 8);
 
     assert_eq!(usize::from(Ipv6Addr::BYTES) - prefix_len, iid.len());
     let mut address = prefix.network().ipv6_bytes();
 
-    let interface_identifier = generate_opaque_interface_identifier(
+    let interface_identifier = OpaqueIid::new(
         /* prefix */ *prefix,
         /* net_iface */ iid,
         /* net_id */ [],
@@ -2324,7 +2323,7 @@ mod tests {
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
     }
 
-    const SECRET_KEY: [u8; STABLE_IID_SECRET_KEY_BYTES] = [1; STABLE_IID_SECRET_KEY_BYTES];
+    const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;
 
     const ONE_HOUR: NonZeroDuration =
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));

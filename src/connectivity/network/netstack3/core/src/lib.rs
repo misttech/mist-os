@@ -162,7 +162,7 @@ pub mod ip {
     pub(crate) use base::*;
 
     // Re-exported types.
-    pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
+    pub use crate::algorithm::StableIidSecret;
     pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
         api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, SetIpAddressPropertiesError},

@@ -26,7 +26,7 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, EthernetLinkDevice},
     error::AddressResolutionFailed,
-    ip::{Ipv6DeviceConfigurationUpdate, STABLE_IID_SECRET_KEY_BYTES},
+    ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret},
     neighbor::LinkResolutionResult,
     routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
 };
@@ -934,7 +934,7 @@ async fn test_add_remote_routes() {
 fn get_slaac_secret<'s>(
     test_stack: &'s mut TestStack,
     if_id: BindingId,
-) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
+) -> Option<StableIidSecret> {
     test_stack.with_ctx(|ctx| {
         let device = ctx.bindings_ctx().devices.get_core_id(if_id).unwrap();
         ctx.api()

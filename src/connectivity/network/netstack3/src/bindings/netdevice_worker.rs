@@ -28,12 +28,11 @@ use netstack3_core::{
     },
     ip::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-        SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
+        SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
     },
     routes::RawMetric,
     sync::RwLock as CoreRwLock,
 };
-use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
@@ -508,8 +507,7 @@ impl DeviceHandler {
 
         // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
-        let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        ctx.rng().fill(&mut secret_key);
+        let secret_key = StableIidSecret::new_random(&mut ctx.rng());
 
         let ip_config = IpDeviceConfigurationUpdate {
             ip_enabled: Some(false),

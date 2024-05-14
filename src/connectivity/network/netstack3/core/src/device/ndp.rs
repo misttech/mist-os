@@ -141,9 +141,7 @@ mod tests {
     use zerocopy::ByteSlice;
 
     use crate::{
-        algorithm::{
-            generate_opaque_interface_identifier, OpaqueIidNonce, STABLE_IID_SECRET_KEY_BYTES,
-        },
+        algorithm::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
         context::{
             testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
             InstantContext as _, RngContext as _,
@@ -1869,8 +1867,7 @@ mod tests {
         max_preferred_lifetime: NonZeroDuration,
         max_generation_retries: u8,
     ) {
-        let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        rng.fill_bytes(&mut secret_key);
+        let secret_key = StableIidSecret::new_random(&mut rng);
         config.temporary_address_configuration = Some(TemporarySlaacAddressConfiguration {
             temp_valid_lifetime: max_valid_lifetime,
             temp_preferred_lifetime: max_preferred_lifetime,
@@ -2054,7 +2051,7 @@ mod tests {
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
         let subnet = subnet_v6!("0102:0304:0506:0708::/64");
-        let interface_identifier = generate_opaque_interface_identifier(
+        let interface_identifier = OpaqueIid::new(
             subnet,
             &config.local_mac.to_eui64()[..],
             [],
@@ -3271,7 +3268,7 @@ mod tests {
         let max_preferred_until = now.checked_add(max_preferred_lifetime.get()).unwrap();
         let secret_key = temporary_address_config.secret_key;
 
-        let interface_identifier = generate_opaque_interface_identifier(
+        let interface_identifier = OpaqueIid::new(
             subnet,
             &Ipv6::TEST_ADDRS.local_mac.to_eui64()[..],
             [],
