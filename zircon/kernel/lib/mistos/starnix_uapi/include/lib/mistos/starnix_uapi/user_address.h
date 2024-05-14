@@ -18,9 +18,10 @@
 namespace starnix_uapi {
 
 class UserAddress {
- public:
+ private:
   static constexpr uint64_t kNullPtr = 0;
 
+ public:
   static const UserAddress NULL_;
 
   UserAddress() = default;
@@ -91,8 +92,6 @@ class UserAddress {
  private:
   uint64_t address_ = kNullPtr;
 };
-
-// using UserAddress = uintptr_t;
 
 }  // namespace starnix_uapi
 
