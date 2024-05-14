@@ -388,6 +388,20 @@ class FuseServer {
         OK_OR_RETURN(HandleLookup(node, in_header, reinterpret_cast<const char*>(in_payload)));
         break;
       }
+      case FUSE_MKNOD: {
+        struct fuse_mknod_in mknod_in = {};
+        memcpy(&mknod_in, in_payload, sizeof(mknod_in));
+        OK_OR_RETURN(HandleMknod(node, in_header, &mknod_in,
+                                 reinterpret_cast<const char*>(in_payload) + sizeof(mknod_in)));
+        break;
+      }
+      case FUSE_MKDIR: {
+        struct fuse_mkdir_in mkdir_in = {};
+        memcpy(&mkdir_in, in_payload, sizeof(mkdir_in));
+        OK_OR_RETURN(HandleMkdir(node, in_header, &mkdir_in,
+                                 reinterpret_cast<const char*>(in_payload) + sizeof(mkdir_in)));
+        break;
+      }
       case FUSE_OPENDIR:
       case FUSE_OPEN: {
         struct fuse_open_in open_in = {};
@@ -461,6 +475,36 @@ class FuseServer {
       return WriteStructResponse(in_header, entry_out);
     }
     return testing::AssertionSuccess();
+  }
+
+  virtual testing::AssertionResult HandleMknod(const std::shared_ptr<Node>& dir_node,
+                                               const struct fuse_in_header& in_header,
+                                               const struct fuse_mknod_in* mknod_in,
+                                               const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+    }
+
+    std::shared_ptr<File> node = fs_.AddFileAt(dir, std::string(name));
+    fuse_entry_out entry_out;
+    node->PopulateEntry(entry_out);
+    return WriteStructResponse(in_header, entry_out);
+  }
+
+  virtual testing::AssertionResult HandleMkdir(const std::shared_ptr<Node>& dir_node,
+                                               const struct fuse_in_header& in_header,
+                                               const struct fuse_mkdir_in* mkdir_in,
+                                               const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+    }
+
+    std::shared_ptr<Directory> node = fs_.AddDirAt(dir, std::string(name));
+    fuse_entry_out entry_out;
+    node->PopulateEntry(entry_out);
+    return WriteStructResponse(in_header, entry_out);
   }
 
   virtual testing::AssertionResult HandleOpen(const std::shared_ptr<Node>& node,
@@ -1652,3 +1696,66 @@ INSTANTIATE_TEST_SUITE_P(FuseDirPermissionCheck, FuseDirPermissionCheck,
                                  .perms = 0,
                                  .expect_open = false,
                              }));
+
+struct MkPermissionCheckTestCase {
+  uint32_t want_init_flags;
+  uint32_t perms;
+  int expected_errno;
+};
+
+class FuseMkPermissionCheck
+    : public FuseServerTest,
+      public ::testing::WithParamInterface<
+          std::tuple<std::function<int(const std::string&)>, MkPermissionCheckTestCase>> {};
+
+TEST_P(FuseMkPermissionCheck, MkPermissionCheck) {
+  const std::tuple<std::function<int(const std::string&)>, MkPermissionCheckTestCase>& param =
+      GetParam();
+  const std::function<int(const std::string&)>& test_fn = std::get<0>(param);
+  const MkPermissionCheckTestCase& test_case = std::get<1>(param);
+
+  std::shared_ptr<FuseServer> server(new FuseServer(test_case.want_init_flags));
+  FileSystem& fs = server->fs();
+  std::shared_ptr<Directory> dir = fs.AddDirAtRoot("dir");
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+
+  std::string path = GetMountDir() + "/dir/node";
+  dir->SetPermissions(test_case.perms);
+  InThreadWithoutCapDacOverride([&]() {
+    int ret = test_fn(path);
+    if (test_case.expected_errno == 0) {
+      EXPECT_EQ(ret, 0) << strerror(errno);
+    } else {
+      ASSERT_EQ(ret, -1);
+      EXPECT_EQ(errno, test_case.expected_errno);
+    }
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FuseMkPermissionCheck, FuseMkPermissionCheck,
+    testing::Combine(
+        testing::Values([](const std::string& path) { return mknod(path.c_str(), 0, 0); },
+                        [](const std::string& path) { return mkdir(path.c_str(), 0); }),
+        testing::Values(
+            MkPermissionCheckTestCase{
+                .want_init_flags = 0,
+                .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                .expected_errno = 0,
+            },
+            MkPermissionCheckTestCase{
+                .want_init_flags = 0,
+                .perms = 0,
+                .expected_errno = 0,
+            },
+            MkPermissionCheckTestCase{
+                .want_init_flags = FUSE_POSIX_ACL,
+                .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                .expected_errno = 0,
+            },
+            MkPermissionCheckTestCase{
+                .want_init_flags = FUSE_POSIX_ACL,
+                .perms = 0,
+                .expected_errno = EACCES,
+            })));
