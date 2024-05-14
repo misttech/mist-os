@@ -119,9 +119,7 @@ template("_test_non_executable") {
 
   target(invoker.target_type, shlib_target_name) {
     visibility = [ ":*" ]
-
-    # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
-    #testonly = true
+    testonly = true
 
     deps = []
     public_deps = []
@@ -356,9 +354,7 @@ foreach(in_process,
 # depends on.
 group("test-module.deps") {
   visibility = [ ":*" ]
-
-  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
-  #testonly = true
+  testonly = true
 
   # When llvm-profdata instrumentation is in use, it may generate calls to
   # functions that are supplied by the runtime.  Even though the modules aren't
@@ -697,9 +693,7 @@ test_executable("tls-ie") {
 
 ifs_shared_library("tls-ie-dep-weak") {
   visibility = [ ":*" ]
-
-  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
-  #testonly = true
+  testonly = true
 
   abi = "tls-ie-dep-weak.ifs"
 
@@ -715,8 +709,9 @@ test_shared_library("tls-ie-dep") {
   sources = [ "tls-ie-dep.cc" ]
   deps = [ "//zircon/system/public" ]
 
-  # TODO(https://fxbug.dev/42085421): LTO insists on using LE accesses. Remove this when
-  # the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  # TODO(https://fxbug.dev/42085421): LTO insists on using LE accesses. Remove
+  # this when the LLVM bug gets fixed and the fixed toolchain rolled into
+  # Fuchsia.
   remove_configs = [ "//build/config/lto" ]
   configs = [ "//build/config/lto:no-lto" ]
 }
@@ -751,8 +746,7 @@ test_executable("missing-sym") {
 }
 
 ifs_shared_library("missing-sym-dep-a") {
-  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
-  #testonly = true
+  testonly = true
   abi = "missing-sym-dep-a.ifs"
   data_deps = [ ":ld-dep-a" ]
 }
@@ -768,8 +762,7 @@ test_executable("missing-dep") {
 }
 
 ifs_shared_library("missing-dep-dep") {
-  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
-  #testonly = true
+  testonly = true
   abi = "missing-dep-dep.ifs"
 }
 

@@ -86,11 +86,7 @@ template("ifs_shared_library") {
   }
 
   config(config_target) {
-    forward_variables_from(invoker,
-                           [
-                             "visibility",
-                             "testonly",
-                           ])
+    forward_variables_from(invoker, [ "visibility" ])
     if (defined(visibility)) {
       visibility += [ ":$main_target" ]
     }
