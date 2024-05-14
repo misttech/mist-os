@@ -131,8 +131,8 @@ bool ConsumeStep::ConsumeConstant(std::unique_ptr<RawConstant> raw_constant,
   switch (raw_constant->kind) {
     case RawConstant::Kind::kIdentifier: {
       auto identifier = static_cast<RawIdentifierConstant*>(raw_constant.get());
-      *out_constant =
-          std::make_unique<IdentifierConstant>(*identifier->identifier, identifier->span());
+      *out_constant = std::make_unique<IdentifierConstant>(Reference(*identifier->identifier),
+                                                           identifier->span());
       break;
     }
     case RawConstant::Kind::kLiteral: {
@@ -535,7 +535,7 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
   if (arg == nullptr || !arg->value->IsResolved()) {
     return;
   }
-  auto str = arg->value->Value().AsString();
+  auto str = arg->value->Value().AsString().value();
   if (IsValidIdentifierComponent(str)) {
     context->set_name_override(std::string(str));
   } else {

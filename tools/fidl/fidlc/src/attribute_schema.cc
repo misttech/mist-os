@@ -368,19 +368,19 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
 static bool DiscoverableConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                    const Attribute* attr, const Element* element) {
   if (auto arg = attr->GetArg("name")) {
-    auto name = arg->value->Value().AsString();
+    auto name = arg->value->Value().AsString().value();
     if (!IsValidDiscoverableName(name)) {
       return reporter->Fail(ErrInvalidDiscoverableName, arg->span, name);
     }
   }
   if (auto arg = attr->GetArg("client")) {
-    auto locations = arg->value->Value().AsString();
+    auto locations = arg->value->Value().AsString().value();
     if (!IsValidImplementationLocations(locations)) {
       return reporter->Fail(ErrInvalidDiscoverableLocation, arg->span, locations);
     }
   }
   if (auto arg = attr->GetArg("server")) {
-    auto locations = arg->value->Value().AsString();
+    auto locations = arg->value->Value().AsString().value();
     if (!IsValidImplementationLocations(locations)) {
       return reporter->Fail(ErrInvalidDiscoverableLocation, arg->span, locations);
     }
@@ -392,7 +392,8 @@ static bool TransportConstraint(Reporter* reporter, ExperimentalFlagSet flags,
                                 const Attribute* attribute, const Element* element) {
   ZX_ASSERT(element);
   ZX_ASSERT(element->kind == Element::Kind::kProtocol);
-  auto value = attribute->GetArg(AttributeArg::kDefaultAnonymousName)->value->Value().AsString();
+  auto value =
+      attribute->GetArg(AttributeArg::kDefaultAnonymousName)->value->Value().AsString().value();
   if (!Transport::FromTransportName(value)) {
     return reporter->Fail(ErrInvalidTransportType, attribute->span, value,
                           Transport::AllTransportNames());

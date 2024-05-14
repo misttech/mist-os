@@ -5,8 +5,6 @@
 #ifndef TOOLS_FIDL_FIDLC_SRC_VALUES_H_
 #define TOOLS_FIDL_FIDLC_SRC_VALUES_H_
 
-#include <iostream>
-#include <limits>
 #include <type_traits>
 
 #include "tools/fidl/fidlc/src/properties.h"
@@ -46,11 +44,15 @@ struct ConstantValue {
   virtual bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const = 0;
   virtual std::unique_ptr<ConstantValue> Clone() const = 0;
 
-  // Assserts this is a NumericConstantValue and returns the number.
+  // If this is a NumericConstantValue<ValueType>, returns the ValueType.
   template <typename ValueType>
-  ValueType AsNumeric() const;
-  // Asserts this is a StringConstantValue and returns the string.
-  std::string_view AsString() const;
+  std::optional<ValueType> AsNumeric() const;
+  // If this is a NumericConstantValue<uint??_t>, returns it widened to uint64_t.
+  std::optional<uint64_t> AsUnsigned() const;
+  // If this is a NumericConstantValue<int??_t> returns it widened to int64_t.
+  std::optional<int64_t> AsSigned() const;
+  // If this is StringConstantValue, returns the std::string_view.
+  std::optional<std::string_view> AsString() const;
 
   const Kind kind;
 
@@ -65,62 +67,10 @@ struct NumericConstantValue final : ConstantValue {
 
   explicit NumericConstantValue(ValueType value) : ConstantValue(GetKind()), value(value) {}
 
-  friend bool operator==(const NumericConstantValue<ValueType>& l,
-                         const NumericConstantValue<ValueType>& r) {
-    return l.value == r.value;
-  }
-
-  friend bool operator<(const NumericConstantValue<ValueType>& l,
-                        const NumericConstantValue<ValueType>& r) {
-    return l.value < r.value;
-  }
-
-  friend bool operator>(const NumericConstantValue<ValueType>& l,
-                        const NumericConstantValue<ValueType>& r) {
-    return l.value > r.value;
-  }
-
-  friend bool operator!=(const NumericConstantValue<ValueType>& l,
-                         const NumericConstantValue<ValueType>& r) {
-    return l.value != r.value;
-  }
-
-  friend bool operator<=(const NumericConstantValue<ValueType>& l,
-                         const NumericConstantValue<ValueType>& r) {
-    return l.value <= r.value;
-  }
-
-  friend bool operator>=(const NumericConstantValue<ValueType>& l,
-                         const NumericConstantValue<ValueType>& r) {
-    return l.value >= r.value;
-  }
-
-  friend NumericConstantValue<ValueType> operator|(const NumericConstantValue<ValueType>& l,
-                                                   const NumericConstantValue<ValueType>& r) {
-    static_assert(!std::is_same_v<ValueType, float> && !std::is_same_v<ValueType, double>);
-    return NumericConstantValue<ValueType>(l.value | r.value);
-  }
-
-  friend std::ostream& operator<<(std::ostream& os, const NumericConstantValue<ValueType>& v) {
-    if constexpr (GetKind() == Kind::kInt8)
-      return os << static_cast<int>(v.value);
-    if constexpr (GetKind() == Kind::kUint8)
-      return os << static_cast<unsigned>(v.value);
-    return os << v.value;
-  }
-
   bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const override;
 
   std::unique_ptr<ConstantValue> Clone() const override {
     return std::make_unique<NumericConstantValue<ValueType>>(value);
-  }
-
-  static NumericConstantValue<ValueType> Min() {
-    return NumericConstantValue<ValueType>(std::numeric_limits<ValueType>::lowest());
-  }
-
-  static NumericConstantValue<ValueType> Max() {
-    return NumericConstantValue<ValueType>(std::numeric_limits<ValueType>::max());
   }
 
   constexpr static Kind GetKind() {
@@ -153,33 +103,26 @@ struct NumericConstantValue final : ConstantValue {
   bool ConvertTo(std::unique_ptr<ConstantValue>* out_value) const;
 };
 
+// A size constant value, e.g. in array<T, size> or vector<T>:size.
 using SizeValue = NumericConstantValue<uint32_t>;
+
+// A sentinel value meaning unbounded size, e.g. in vector<T>:MAX.
+const uint32_t kMaxSize = UINT32_MAX;
+
+// Handle subtype/rights constant values, e.g. in zx.Handle:<subtype, rights>.
 using HandleSubtypeValue = NumericConstantValue<uint32_t>;
 using HandleRightsValue = NumericConstantValue<RightsWrappedType>;
 
 template <typename ValueType>
-ValueType ConstantValue::AsNumeric() const {
-  ZX_ASSERT(kind == NumericConstantValue<ValueType>::GetKind());
-  return static_cast<const NumericConstantValue<ValueType>*>(this)->value;
+std::optional<ValueType> ConstantValue::AsNumeric() const {
+  if (kind == NumericConstantValue<ValueType>::GetKind())
+    return static_cast<const NumericConstantValue<ValueType>*>(this)->value;
+  return std::nullopt;
 }
 
 struct BoolConstantValue final : ConstantValue {
   explicit BoolConstantValue(bool value)
       : ConstantValue(ConstantValue::Kind::kBool), value(value) {}
-
-  explicit operator bool() const { return value; }
-
-  friend bool operator==(const BoolConstantValue& l, const BoolConstantValue& r) {
-    return l.value == r.value;
-  }
-
-  friend bool operator!=(const BoolConstantValue& l, const BoolConstantValue& r) {
-    return l.value != r.value;
-  }
-
-  friend std::ostream& operator<<(std::ostream& os, const BoolConstantValue& v) {
-    return os << v.value;
-  }
 
   bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const override;
 
@@ -194,10 +137,6 @@ struct DocCommentConstantValue final : ConstantValue {
   explicit DocCommentConstantValue(std::string_view value)
       : ConstantValue(ConstantValue::Kind::kDocComment), value(value) {}
 
-  friend std::ostream& operator<<(std::ostream& os, const DocCommentConstantValue& v) {
-    return os << v.value;
-  }
-
   bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const override;
 
   std::unique_ptr<ConstantValue> Clone() const override {
@@ -211,10 +150,6 @@ struct DocCommentConstantValue final : ConstantValue {
 struct StringConstantValue final : ConstantValue {
   explicit StringConstantValue(std::string_view value)
       : ConstantValue(ConstantValue::Kind::kString), value(value) {}
-
-  friend std::ostream& operator<<(std::ostream& os, const StringConstantValue& v) {
-    return os << v.value;
-  }
 
   bool Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const override;
 
@@ -244,11 +179,9 @@ struct Constant {
 
   const Kind kind;
   const SourceSpan span;
-  // compiled tracks whether we attempted to resolve this constant, to avoid
-  // resolving twice a constant which cannot be resolved.
+  // True if we have attempted to resolve the constant.
   bool compiled = false;
-
-  // set when resolved to
+  // Set when the constant is resolved.
   const Type* type = nullptr;
 
  protected:
@@ -260,9 +193,6 @@ struct Constant {
 };
 
 struct IdentifierConstant final : Constant {
-  IdentifierConstant(const RawCompoundIdentifier& name, SourceSpan span)
-      : Constant(Kind::kIdentifier, span), reference(name) {}
-  // This constructor is needed for IdentifierLayoutParameter::Disambiguate().
   IdentifierConstant(Reference reference, SourceSpan span)
       : Constant(Kind::kIdentifier, span), reference(std::move(reference)) {}
 

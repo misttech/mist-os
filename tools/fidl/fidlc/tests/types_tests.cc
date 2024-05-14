@@ -312,7 +312,7 @@ type TypeDecl= struct {
   auto v0_type = static_cast<const VectorType*>(v0_type_base);
   EXPECT_EQ(v0_type->nullability, Nullability::kNonnullable);
   EXPECT_EQ(v0_type->element_type->kind, Type::Kind::kPrimitive);
-  EXPECT_EQ(v0_type->ElementCount(), SizeValue::Max().value);
+  EXPECT_EQ(v0_type->ElementCount(), kMaxSize);
 
   auto v1_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(v1_type_base->kind, Type::Kind::kVector);
@@ -326,7 +326,7 @@ type TypeDecl= struct {
   auto v2_type = static_cast<const VectorType*>(v2_type_base);
   EXPECT_EQ(v2_type->nullability, Nullability::kNullable);
   EXPECT_EQ(v2_type->element_type->kind, Type::Kind::kPrimitive);
-  EXPECT_EQ(v2_type->ElementCount(), SizeValue::Max().value);
+  EXPECT_EQ(v2_type->ElementCount(), kMaxSize);
 
   auto v3_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(v3_type_base->kind, Type::Kind::kVector);
@@ -338,7 +338,7 @@ type TypeDecl= struct {
   ASSERT_EQ(b4_type_base->kind, Type::Kind::kVector);
   auto b4_type = static_cast<const VectorType*>(b4_type_base);
   EXPECT_EQ(b4_type->nullability, Nullability::kNonnullable);
-  EXPECT_EQ(b4_type->ElementCount(), SizeValue::Max().value);
+  EXPECT_EQ(b4_type->ElementCount(), kMaxSize);
 
   auto b5_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(b5_type_base->kind, Type::Kind::kVector);
@@ -350,7 +350,7 @@ type TypeDecl= struct {
   ASSERT_EQ(b6_type_base->kind, Type::Kind::kVector);
   auto b6_type = static_cast<const VectorType*>(b6_type_base);
   EXPECT_EQ(b6_type->nullability, Nullability::kNullable);
-  EXPECT_EQ(b6_type->ElementCount(), SizeValue::Max().value);
+  EXPECT_EQ(b6_type->ElementCount(), kMaxSize);
 
   auto b7_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(b7_type_base->kind, Type::Kind::kVector);
@@ -362,7 +362,7 @@ type TypeDecl= struct {
   ASSERT_EQ(s8_type_base->kind, Type::Kind::kString);
   auto s8_type = static_cast<const StringType*>(s8_type_base);
   EXPECT_EQ(s8_type->nullability, Nullability::kNonnullable);
-  EXPECT_EQ(s8_type->MaxSize(), SizeValue::Max().value);
+  EXPECT_EQ(s8_type->MaxSize(), kMaxSize);
 
   auto s9_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(s9_type_base->kind, Type::Kind::kString);
@@ -374,7 +374,7 @@ type TypeDecl= struct {
   ASSERT_EQ(s10_type_base->kind, Type::Kind::kString);
   auto s10_type = static_cast<const StringType*>(s10_type_base);
   EXPECT_EQ(s10_type->nullability, Nullability::kNullable);
-  EXPECT_EQ(s10_type->MaxSize(), SizeValue::Max().value);
+  EXPECT_EQ(s10_type->MaxSize(), kMaxSize);
 
   auto s11_type_base = type_decl->members[i++].type_ctor->type;
   ASSERT_EQ(s11_type_base->kind, Type::Kind::kString);
@@ -390,7 +390,7 @@ type TypeDecl= struct {
   auto a12_type = static_cast<const VectorType*>(a12_type_base);
   EXPECT_EQ(a12_type->nullability, Nullability::kNonnullable);
   EXPECT_EQ(a12_type->element_type->kind, Type::Kind::kPrimitive);
-  EXPECT_EQ(a12_type->ElementCount(), SizeValue::Max().value);
+  EXPECT_EQ(a12_type->ElementCount(), kMaxSize);
   EXPECT_EQ(a12_invocation.size_resolved, nullptr);
 
   auto a13_invocation = type_decl->members[i].type_ctor->resolved_params;
@@ -412,7 +412,7 @@ type TypeDecl= struct {
   auto a14_type = static_cast<const VectorType*>(a14_type_base);
   EXPECT_EQ(a14_type->nullability, Nullability::kNullable);
   EXPECT_EQ(a14_type->element_type->kind, Type::Kind::kPrimitive);
-  EXPECT_EQ(a14_type->ElementCount(), SizeValue::Max().value);
+  EXPECT_EQ(a14_type->ElementCount(), kMaxSize);
   // EXPECT_EQ(a14_type->ElementCount(), a14_invocation->maybe_size);
   EXPECT_EQ(a14_invocation.size_resolved, nullptr);
 

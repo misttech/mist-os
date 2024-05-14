@@ -28,64 +28,36 @@ void JSONGenerator::Generate(NameSpan value) {
 void JSONGenerator::Generate(const ConstantValue& value) {
   switch (value.kind) {
     case ConstantValue::Kind::kUint8:
-    case ConstantValue::Kind::kZxUchar: {
-      EmitNumeric(value.AsNumeric<uint8_t>(), kAsString);
-      break;
-    }
-    case ConstantValue::Kind::kUint16: {
-      EmitNumeric(value.AsNumeric<uint16_t>(), kAsString);
-      break;
-    }
-    case ConstantValue::Kind::kUint32: {
-      EmitNumeric(value.AsNumeric<uint32_t>(), kAsString);
-      break;
-    }
+    case ConstantValue::Kind::kZxUchar:
+    case ConstantValue::Kind::kUint16:
+    case ConstantValue::Kind::kUint32:
     case ConstantValue::Kind::kUint64:
     case ConstantValue::Kind::kZxUsize64:
-    case ConstantValue::Kind::kZxUintptr64: {
-      EmitNumeric(value.AsNumeric<uint64_t>(), kAsString);
+    case ConstantValue::Kind::kZxUintptr64:
+      EmitNumeric(value.AsUnsigned().value(), kAsString);
       break;
-    }
-    case ConstantValue::Kind::kInt8: {
-      EmitNumeric(value.AsNumeric<int8_t>(), kAsString);
+    case ConstantValue::Kind::kInt8:
+    case ConstantValue::Kind::kInt16:
+    case ConstantValue::Kind::kInt32:
+    case ConstantValue::Kind::kInt64:
+      EmitNumeric(value.AsSigned().value(), kAsString);
       break;
-    }
-    case ConstantValue::Kind::kInt16: {
-      EmitNumeric(value.AsNumeric<int16_t>(), kAsString);
+    case ConstantValue::Kind::kFloat32:
+      EmitNumeric(value.AsNumeric<float>().value(), kAsString);
       break;
-    }
-    case ConstantValue::Kind::kInt32: {
-      EmitNumeric(value.AsNumeric<int32_t>(), kAsString);
+    case ConstantValue::Kind::kFloat64:
+      EmitNumeric(value.AsNumeric<double>().value(), kAsString);
       break;
-    }
-    case ConstantValue::Kind::kInt64: {
-      EmitNumeric(value.AsNumeric<int64_t>(), kAsString);
+    case ConstantValue::Kind::kBool:
+      EmitBoolean(static_cast<const BoolConstantValue&>(value).value, kAsString);
       break;
-    }
-    case ConstantValue::Kind::kFloat32: {
-      EmitNumeric(value.AsNumeric<float>(), kAsString);
+    case ConstantValue::Kind::kDocComment:
+      EmitString(static_cast<const DocCommentConstantValue&>(value).value);
       break;
-    }
-    case ConstantValue::Kind::kFloat64: {
-      EmitNumeric(value.AsNumeric<double>(), kAsString);
+    case ConstantValue::Kind::kString:
+      EmitLiteral(value.AsString().value());
       break;
-    }
-    case ConstantValue::Kind::kBool: {
-      auto& bool_constant = static_cast<const BoolConstantValue&>(value);
-      EmitBoolean(static_cast<bool>(bool_constant), kAsString);
-      break;
-    }
-    case ConstantValue::Kind::kDocComment: {
-      auto& doc_comment_constant = static_cast<const DocCommentConstantValue&>(value);
-      EmitString(doc_comment_constant.value);
-      break;
-    }
-    case ConstantValue::Kind::kString: {
-      auto& string_constant = static_cast<const StringConstantValue&>(value);
-      EmitLiteral(string_constant.value);
-      break;
-    }
-  }  // switch
+  }
 }
 
 void JSONGenerator::Generate(HandleSubtype value) { EmitString(NameHandleSubtype(value)); }
@@ -169,14 +141,14 @@ void JSONGenerator::Generate(const Type* value) {
         // other handling of kVector is handled in GenerateParameterizedType.
         const auto* type = static_cast<const VectorType*>(value);
         GenerateObjectMember("element_type", type->element_type);
-        if (type->ElementCount() < SizeValue::Max().value)
+        if (type->ElementCount() < kMaxSize)
           GenerateObjectMember("maybe_element_count", type->ElementCount());
         GenerateObjectMember("nullable", type->nullability);
         break;
       }
       case Type::Kind::kString: {
         const auto* type = static_cast<const StringType*>(value);
-        if (type->MaxSize() < SizeValue::Max().value)
+        if (type->MaxSize() < kMaxSize)
           GenerateObjectMember("maybe_element_count", type->MaxSize());
         GenerateObjectMember("nullable", type->nullability);
         break;
@@ -185,7 +157,7 @@ void JSONGenerator::Generate(const Type* value) {
         const auto* type = static_cast<const HandleType*>(value);
         GenerateObjectMember("obj_type", static_cast<uint32_t>(type->subtype));
         GenerateObjectMember("subtype", type->subtype);
-        GenerateObjectMember("rights", type->rights->AsNumeric<uint32_t>());
+        GenerateObjectMember("rights", type->rights->AsNumeric<uint32_t>().value());
         GenerateObjectMember("nullable", type->nullability);
         GenerateObjectMember("resource_identifier", FullyQualifiedName(type->resource_decl->name));
         break;
@@ -435,7 +407,7 @@ void JSONGenerator::GenerateEndpointImplementationLocations(const std::string_vi
                                                             Position position) {
   auto arg = discoverable->GetArg(endpoint);
   if (arg) {
-    auto locations = ParseImplementationLocations(arg->value->Value().AsString());
+    auto locations = ParseImplementationLocations(arg->value->Value().AsString().value());
     ZX_ASSERT(locations.has_value());
     GenerateObjectMember(endpoint, locations.value(), position);
   } else {
@@ -523,7 +495,7 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
       case Type::Kind::kVector: {
         const auto* vector_type = static_cast<const VectorType*>(type);
         GenerateTypeAndFromAlias(TypeKind::kParameterized, invocation.element_type_raw);
-        if (vector_type->ElementCount() < SizeValue::Max().value)
+        if (vector_type->ElementCount() < kMaxSize)
           GenerateObjectMember("maybe_element_count", vector_type->ElementCount());
         GenerateObjectMember("nullable", vector_type->nullability);
         break;

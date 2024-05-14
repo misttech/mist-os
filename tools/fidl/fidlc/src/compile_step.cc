@@ -160,9 +160,8 @@ bool CompileStep::ResolveOrOperatorConstant(Constant* constant, std::optional<co
     return false;
   if (!right_operand.Convert(ConstantValue::Kind::kUint64, &right_operand_u64))
     return false;
-  NumericConstantValue<uint64_t> result =
-      *static_cast<NumericConstantValue<uint64_t>*>(left_operand_u64.get()) |
-      *static_cast<NumericConstantValue<uint64_t>*>(right_operand_u64.get());
+  NumericConstantValue<uint64_t> result(left_operand_u64->AsNumeric<uint64_t>().value() |
+                                        right_operand_u64->AsNumeric<uint64_t>().value());
   std::unique_ptr<ConstantValue> converted_result;
   if (!result.Convert(ConstantValuePrimitiveKind(static_cast<const PrimitiveType*>(type)->subtype),
                       &converted_result))
@@ -428,25 +427,11 @@ bool CompileStep::ResolveLiteralConstant(LiteralConstant* literal_constant,
           auto primitive_type = static_cast<const PrimitiveType*>(underlying_type);
           if (!ResolveLiteralConstantNumeric(literal_constant, primitive_type))
             return false;
-          auto& value = literal_constant->Value();
-          uint64_t raw_value;
-          switch (value.kind) {
-            case ConstantValue::Kind::kUint8:
-              raw_value = value.AsNumeric<uint8_t>();
-              break;
-            case ConstantValue::Kind::kUint16:
-              raw_value = value.AsNumeric<uint16_t>();
-              break;
-            case ConstantValue::Kind::kUint32:
-              raw_value = value.AsNumeric<uint32_t>();
-              break;
-            case ConstantValue::Kind::kUint64:
-              raw_value = value.AsNumeric<uint64_t>();
-              break;
-            default:
-              return false;
-          }
-          if (raw_value != 0) {
+          auto number = literal_constant->Value().AsUnsigned();
+          if (!number.has_value())
+            return false;
+          // The only numeric literal allowed is 0, to represent an empty bits value.
+          if (number.value() != 0) {
             return reporter()->Fail(ErrTypeCannotBeConvertedToType,
                                     literal_constant->literal->span(), literal_constant,
                                     inferred_type, type);
@@ -1048,7 +1033,7 @@ void CompileStep::ValidateSelectorAndCalcOrdinal(const Name& protocol_name,
   if (auto attr = method->attributes->Get("selector")) {
     if (auto arg = attr->GetArg(AttributeArg::kDefaultAnonymousName)) {
       if (auto& constant = arg->value; constant && constant->IsResolved()) {
-        auto value = constant->Value().AsString();
+        auto value = constant->Value().AsString().value();
         if (IsValidFullyQualifiedMethodIdentifier(value)) {
           selector = value;
         } else if (IsValidIdentifierComponent(value)) {
@@ -1367,7 +1352,7 @@ bool CompileStep::ResolveSizeBound(Constant* size_constant, const SizeValue** ou
     auto target = identifier_constant->reference.resolved().element();
     if (target->kind == Element::Kind::kBuiltin &&
         static_cast<Builtin*>(target)->id == Builtin::Identity::kMax) {
-      size_constant->ResolveTo(SizeValue::Max().Clone(),
+      size_constant->ResolveTo(std::make_unique<SizeValue>(kMaxSize),
                                typespace()->GetPrimitiveType(PrimitiveSubtype::kUint32));
     }
   }
@@ -1395,7 +1380,7 @@ bool CompileStep::ValidateMembers(DeclType* decl, MemberValidator<MemberType> va
       continue;
     }
 
-    MemberType value = member.value->Value().template AsNumeric<MemberType>();
+    MemberType value = member.value->Value().template AsNumeric<MemberType>().value();
     const auto value_result = value_scope.Insert(value, member.name);
     if (!value_result.ok()) {
       const auto previous_span = value_result.previous_occurrence();
@@ -1462,7 +1447,7 @@ bool CompileStep::ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl,
       if (explicit_unknown_value.has_value()) {
         return reporter()->Fail(ErrUnknownAttributeOnMultipleEnumMembers, member.name);
       }
-      explicit_unknown_value = member.value->Value().AsNumeric<MemberType>();
+      explicit_unknown_value = member.value->Value().AsNumeric<MemberType>().value();
     }
   }
 

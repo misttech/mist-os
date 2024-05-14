@@ -128,7 +128,7 @@ struct VectorType final : public Type, public VectorConstraints {
 
   Type* element_type;
 
-  uint32_t ElementCount() const { return size ? size->value : SizeValue::Max().value; }
+  uint32_t ElementCount() const { return size ? size->value : kMaxSize; }
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
@@ -144,7 +144,7 @@ struct StringType final : public Type, public VectorConstraints {
   StringType(const Name& name, Constraints constraints)
       : Type(name, Kind::kString), Constraints(std::move(constraints)) {}
 
-  uint32_t MaxSize() const { return size ? size->value : SizeValue::Max().value; }
+  uint32_t MaxSize() const { return size ? size->value : kMaxSize; }
   bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,

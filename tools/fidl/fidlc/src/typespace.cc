@@ -10,8 +10,6 @@
 
 namespace fidlc {
 
-static const SizeValue kMaxSize = SizeValue::Max();
-
 static std::optional<PrimitiveSubtype> BuiltinToPrimitiveSubtype(Builtin::Identity id) {
   switch (id) {
     case Builtin::Identity::kBool:

@@ -273,7 +273,7 @@ std::optional<Platform> AvailabilityStep::GetPlatform(const AttributeArg* maybe_
   if (!(maybe_arg && maybe_arg->value->IsResolved())) {
     return std::nullopt;
   }
-  auto str = maybe_arg->value->Value().AsString();
+  auto str = maybe_arg->value->Value().AsString().value();
   auto platform = Platform::Parse(std::string(str));
   if (!platform) {
     reporter()->Fail(ErrInvalidPlatform, maybe_arg->value->span, str);
@@ -287,7 +287,7 @@ std::optional<Version> AvailabilityStep::GetVersion(const AttributeArg* maybe_ar
     return std::nullopt;
   }
   // CompileAttributeEarly resolves version arguments to uint32.
-  auto value = maybe_arg->value->Value().AsNumeric<uint32_t>();
+  auto value = maybe_arg->value->Value().AsNumeric<uint32_t>().value();
   auto version = Version::From(value);
   // Do not allow referencing the LEGACY version directly. It may only be
   // specified on the command line, or in FIDL libraries via the `legacy`
