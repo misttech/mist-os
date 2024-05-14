@@ -423,7 +423,10 @@ fuchsia_test_package("carnelian-integration-test") {
     "//src/ui/testing/test_ui_stack:test-ui-stack",
   ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 }
 
@@ -449,7 +452,10 @@ fuchsia_test_package("carnelian-fb-integration-test") {
   test_components = [ ":carnelian-fb-integration-test-component" ]
   deps = [ ":carnelian-fb-integration-test-component" ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 }
 

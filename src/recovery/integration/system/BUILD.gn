@@ -43,6 +43,9 @@ fuchsia_test_component("recovery_integration_test_component") {
 fuchsia_test_package("recovery_integration_test") {
   test_components = [ ":recovery_integration_test_component" ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 }

@@ -462,7 +462,8 @@ fuchsia_test_package("h264_decoder_test") {
                      astro_env,
                      sherlock_env,
                      vim3_env,
-                     nuc_env,
+                     nuc7_env,
+                     nuc11_env,
                    ]
   }
 }

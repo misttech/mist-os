@@ -84,7 +84,8 @@ python_mobly_test("echo_stress_test") {
   environments = [
     emu_env,
     vim3_env,
-    nuc_env,
+    nuc7_env,
+    nuc11_env,
   ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data",
@@ -103,7 +104,8 @@ python_mobly_test("reboot_test") {
   environments = [
     emu_env,
     vim3_env,
-    nuc_env,
+    nuc7_env,
+    nuc11_env,
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
@@ -129,7 +131,8 @@ python_mobly_test("tracing_test") {
   environments = [
     emu_env,
     vim3_env,
-    nuc_env,
+    nuc7_env,
+    nuc11_env,
   ]
   deps = [
     ":tracing_runtime_deps",

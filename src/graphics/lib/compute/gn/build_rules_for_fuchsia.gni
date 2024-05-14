@@ -166,7 +166,8 @@ template("graphics_compute_test_rule") {
         astro_env,
         atlas_env,
         nelson_env,
-        nuc_env,
+        nuc7_env,
+        nuc11_env,
         sherlock_env,
         vim3_env,
       ]

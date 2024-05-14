@@ -267,6 +267,8 @@ core_tests("core-tests") {
 if (current_cpu == "x64") {
   core_tests("core-tests-hpet") {
     args = [ "kernel.wallclock=hpet" ]
+
+    # NUC11 HPET is unreliable, do not include it, see https://chat.google.com/room/AAAAOlfJ3J8/S_Law3cxzwQ
     device_types = [ "Intel NUC Kit NUC7i5DNHE" ]
 
     # TODO(b/336639740): Re-enable cuckoo for core-tests-hpet when

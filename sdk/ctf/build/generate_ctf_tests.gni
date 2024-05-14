@@ -143,7 +143,10 @@ template("generate_timekeeper-integration") {
       "//src/sys/time/testing/realm-proxy:pkg",
     ]
     test_specs = {
-      environments = [ nuc_env ]
+      environments = [
+        nuc7_env,
+        nuc11_env,
+      ]
       log_settings = {
         # Some tests produce "error" level logs as part of the test execution.
         max_severity = "ERROR"
@@ -162,7 +165,10 @@ template("generate_faketime-integration") {
       "//src/sys/time/testing/realm-proxy:pkg",
     ]
     test_specs = {
-      environments = [ nuc_env ]
+      environments = [
+        nuc7_env,
+        nuc11_env,
+      ]
       log_settings = {
         # Some tests produce "error" level logs as part of the test execution.
         max_severity = "ERROR"

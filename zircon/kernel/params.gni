@@ -157,6 +157,7 @@ kernel_test_device_types = [
   "Astro",
   "QEMU",
   "Intel NUC Kit NUC7i5DNHE",
+  "Intel NUC Kit NUC11TNHv5",
   "Sherlock",
   "Vim3",
 ]

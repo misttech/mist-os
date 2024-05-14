@@ -393,7 +393,10 @@ fuchsia_test_package("system_recovery_tests") {
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }
@@ -478,7 +481,10 @@ fuchsia_test_package("system_recovery_installer_tests") {
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }

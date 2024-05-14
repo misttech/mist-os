@@ -39,7 +39,8 @@ foreach(target_name, test_list) {
     non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
 
     environments = [
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
       vim3_env,
     ]
   }

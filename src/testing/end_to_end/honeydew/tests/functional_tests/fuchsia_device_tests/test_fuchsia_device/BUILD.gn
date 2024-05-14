@@ -36,7 +36,10 @@ if (is_host) {
     ]
     params_source = "params_x64.yaml"
     transport = "fuchsia-controller"
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 
   python_mobly_test("x64_nuc_test_fc_preferred") {
@@ -47,7 +50,10 @@ if (is_host) {
     ]
     params_source = "params_x64.yaml"
     transport = "fuchsia-controller-preferred"
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 
   python_mobly_test("vim3_test_fc") {

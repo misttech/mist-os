@@ -69,6 +69,7 @@ if (current_toolchain == default_toolchain) {
       "Astro",
       "QEMU",
       "Intel NUC Kit NUC7i5DNHE",
+      "Intel NUC Kit NUC11TNHv5",
       "Sherlock",
     ]
   }
@@ -84,6 +85,7 @@ if (current_toolchain == default_toolchain) {
       "Astro",
       "QEMU",
       "Intel NUC Kit NUC7i5DNHE",
+      "Intel NUC Kit NUC11TNHv5",
       "Sherlock",
     ]
   }

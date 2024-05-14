@@ -111,7 +111,8 @@ fuchsia_test_package("starnix_magma_tests") {
     }
     environments = [
       atlas_env,
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
       vim3_env,
     ]
   }

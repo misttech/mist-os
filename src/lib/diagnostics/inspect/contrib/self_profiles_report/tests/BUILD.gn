@@ -77,7 +77,8 @@ fuchsia_test_package("inspect_self_profile_integration_tests") {
   test_specs = {
     # This test asserts on the relative timing of operations which are more predictable on hardware.
     environments = [
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
       vim3_env,
     ]
   }

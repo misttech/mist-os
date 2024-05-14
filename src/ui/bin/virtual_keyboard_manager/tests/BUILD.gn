@@ -30,7 +30,10 @@ fuchsia_test_package("virtual_keyboard_tests") {
     log_settings = {
       max_severity = "ERROR"
     }
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 }
 

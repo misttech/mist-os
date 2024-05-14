@@ -11,7 +11,8 @@ if (is_host) {
     extra_args = [ "-v" ]
 
     environments = [
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
       {
         dimensions = {
           device_type = "Astro"

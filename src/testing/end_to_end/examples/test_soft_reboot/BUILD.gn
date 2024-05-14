@@ -20,7 +20,8 @@ python_mobly_test("soft_reboot_test_fc") {
   environments = [
     emu_env,
     vim3_env,
-    nuc_env,
+    nuc7_env,
+    nuc11_env,
   ]
 }
 

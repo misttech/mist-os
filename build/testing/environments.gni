@@ -143,15 +143,18 @@ _all_named_fuchsia_envs += [
   },
 ]
 
-nuc_env = {
+nuc7_env = {
   dimensions = {
     device_type = "Intel NUC Kit NUC7i5DNHE"
   }
 }
+
+# TODO(b/326499130): Delete nuc_env after all other repositories references are migrated to nuc7.
+nuc_env = nuc7_env
 _all_named_fuchsia_envs += [
   {
-    name = "nuc"
-    env = nuc_env
+    name = "nuc7"
+    env = nuc7_env
   },
 ]
 
@@ -257,7 +260,8 @@ with_display_envs = [
   atlas_env,
   luis_env,
   nelson_env,
-  nuc_env,
+  nuc7_env,
+  nuc11_env,
   sherlock_env,
   vim3_env,
 ]

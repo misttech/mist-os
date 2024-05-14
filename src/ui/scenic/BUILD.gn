@@ -128,7 +128,10 @@ fuchsia_unittest_package(
     }
 
     # Force these tests to run on NUC + basic_envs in CQ. Do not remove.
-    environments = [ nuc_env ] + basic_envs
+    environments = [
+                     nuc7_env,
+                     nuc11_env,
+                   ] + basic_envs
   }
   test_type = "vulkan"
 }

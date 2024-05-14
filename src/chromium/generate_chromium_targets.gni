@@ -148,7 +148,8 @@ if (current_cpu == "riscv64") {
 
     default_test_environments = [
       atlas_env,
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
     ]
 
     _prebuilt_archive_base_path = "${prebuilt_archive_root_path}/web_engine_tests${invoker.archive_path_suffix}"

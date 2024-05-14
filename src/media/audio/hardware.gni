@@ -11,7 +11,8 @@ import("//build/testing/environments.gni")
 hardware_envs = chromebook_envs + [
                   astro_env,
                   nelson_env,
-                  nuc_env,
+                  nuc7_env,
+                  nuc11_env,
                   sherlock_env,
                   vim3_env,
                 ]
