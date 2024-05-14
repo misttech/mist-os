@@ -215,18 +215,6 @@ open protocol Engine {
         config_stamp fuchsia.hardware.display.types.ConfigStamp;
     }) -> ();
 
-    /// Set ELD (EDID Like Data, audio info in EDID) for one display.
-    ///
-    /// This method is called independently from the CheckConfiguration and
-    /// ApplyConfiguration methods. The display_id may be unconfigured at the
-    /// time this method is called. raw_eld is the ELD raw data formatted
-    /// according to the HDA specification version 1.0a section 7.3.3.34.1.
-    /// https://www.intel.com/content/dam/www/public/us/en/documents/product-specifications/high-definition-audio-specification.pdf
-    flexible SetEld(struct {
-        display_id uint64;
-        raw_eld vector<uint8>:MAX;
-    }) -> ();
-
     /// Set sysmem buffer collection contraints needed to ensure an image can be
     /// imported with `config` on the imported BufferCollecition with
     /// `collection_id`.

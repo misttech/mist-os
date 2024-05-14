@@ -55,8 +55,6 @@ class DisplayControllerBanjo : public ddk::DisplayControllerImplProtocol<Display
   void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
                                                size_t banjo_display_configs_count,
                                                const config_stamp_t* banjo_config_stamp);
-  void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
-                                   size_t raw_eld_count);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* banjo_image_buffer_usage,
       uint64_t banjo_driver_buffer_collection_id);

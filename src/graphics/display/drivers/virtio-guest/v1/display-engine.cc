@@ -347,11 +347,6 @@ void DisplayEngine::ApplyConfiguration(cpp20::span<const display_config_t> displ
   }
 }
 
-void DisplayEngine::SetEld(display::DisplayId display_id, cpp20::span<const uint8_t> raw_eld) {
-  // No ELD required for non-HDA systems.
-  return;
-}
-
 zx::result<> DisplayEngine::SetBufferCollectionConstraints(
     const display::ImageBufferUsage& image_buffer_usage,
     display::DriverBufferCollectionId driver_buffer_collection_id) {

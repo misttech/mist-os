@@ -505,19 +505,6 @@ closed protocol DisplayControllerImpl {
         config_stamp ConfigStamp;
     }) -> ();
 
-    /// Set ELD for one display.
-    ///
-    /// This method is called independently from the CheckConfiguration and ApplyConfiguration
-    /// methods. The display_id may be unconfigured at the time this method is called.
-    /// raw_eld is the ELD raw data formatted according to the HDA specification version 1.0a
-    /// section 7.3.3.34.1.
-    /// https://www.intel.com/content/dam/www/public/us/en/documents/product-specifications/high-definition-audio-specification.pdf
-    /// The driver must not retain references to the ELD after this function returns.
-    strict SetEld(struct {
-        display_id uint64;
-        raw_eld vector<uint8>:MAX;
-    }) -> ();
-
     /// Conveys the display hardware's limitations on image buffers to sysmem.
     ///
     /// The sysmem BufferCollection imported with `collection_id` will receive

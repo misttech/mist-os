@@ -100,8 +100,6 @@ class Controller : public DeviceType,
   void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
                                                size_t display_config_count,
                                                const config_stamp_t* banjo_config_stamp);
-  void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
-                                   size_t raw_eld_count);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
@@ -342,8 +340,6 @@ class Controller : public DeviceType,
 
   // Various configuration values set by the BIOS which need to be carried across suspend.
   bool ddi_e_disabled_ = true;
-
-  std::optional<display::DisplayId> eld_display_id_;
 
   // Debug
   inspect::Inspector inspector_;

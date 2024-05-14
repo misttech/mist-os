@@ -56,8 +56,6 @@ class EngineDriverClient {
   void ApplyConfiguration(const display_config_t* display_config_list, size_t display_config_count,
                           const config_stamp_t* config_stamp);
 
-  void SetEld(DisplayId display_id, cpp20::span<const uint8_t> raw_eld);
-
   // TODO(https://fxbug.dev/314126494): These methods are only used in the
   // banjo transport. Remove when all drivers are migrated to FIDL transport.
   void SetDisplayControllerInterface(const display_controller_interface_protocol_t& protocol);

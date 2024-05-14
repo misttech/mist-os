@@ -401,9 +401,6 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(
   current_config_stamp_.store(config_stamp, std::memory_order_relaxed);
 }
 
-void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
-                                              size_t raw_eld_count) {}
-
 enum class FakeDisplay::BufferCollectionUsage {
   kPrimaryLayer = 1,
   kCapture = 2,

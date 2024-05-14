@@ -126,14 +126,6 @@ void DisplayControllerBanjo::DisplayControllerImplApplyConfiguration(
   return engine_.ApplyConfiguration(display_configs, banjo_config_stamp);
 }
 
-void DisplayControllerBanjo::DisplayControllerImplSetEld(uint64_t banjo_display_id,
-                                                         const uint8_t* raw_eld_list,
-                                                         size_t raw_eld_count) {
-  const display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
-  const cpp20::span<const uint8_t> raw_eld(raw_eld_list, raw_eld_count);
-  engine_.SetEld(display_id, raw_eld);
-}
-
 zx_status_t DisplayControllerBanjo::DisplayControllerImplSetBufferCollectionConstraints(
     const image_buffer_usage_t* banjo_image_buffer_usage,
     uint64_t banjo_driver_buffer_collection_id) {

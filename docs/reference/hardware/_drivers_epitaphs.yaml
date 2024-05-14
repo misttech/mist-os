@@ -632,3 +632,9 @@
   available_in_git: 'dd7557d95161c1e30014d441ce2df679eb1814f0'
   areas: ['Display', 'Audio']
   path: 'src/graphics/display/drivers/coordinator/eld.cc'
+- short_description: 'Intel HD Audio ELD (EDID-like data) setup on intel-i915 driver'
+  deletion_reason: 'HD Audio on HDMI is not actively used or tested on Intel NUC devices. Current implementation blocks display driver migration to DFv2'
+  gerrit_change_id: '1046393'
+  available_in_git: 'dd7557d95161c1e30014d441ce2df679eb1814f0'
+  areas: ['Display', 'Audio']
+  path: 'src/graphics/display/drivers/intel-i915/intel-i915.cc'

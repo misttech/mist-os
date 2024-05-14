@@ -191,11 +191,6 @@ class Device : public DeviceType {
   void DisplayControllerImplApplyConfiguration(
       const display_config_t** display_config, size_t display_count) {}
 
-  void DisplayControllerImplSetEld(
-      uint64_t display_id,
-      const uint8_t* raw_eld_list,
-      size_t raw_eld_count) {}
-
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;

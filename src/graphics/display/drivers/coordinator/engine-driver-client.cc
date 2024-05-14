@@ -184,15 +184,6 @@ void EngineDriverClient::ApplyConfiguration(const display_config_t* display_conf
   dc_.ApplyConfiguration(display_config_list, display_config_count, config_stamp);
 }
 
-void EngineDriverClient::SetEld(DisplayId display_id, cpp20::span<const uint8_t> raw_eld) {
-  if (use_engine_) {
-    return;
-  }
-
-  ZX_DEBUG_ASSERT(dc_.is_valid());
-  dc_.SetEld(ToBanjoDisplayId(display_id), raw_eld.data(), raw_eld.size());
-}
-
 void EngineDriverClient::SetDisplayControllerInterface(
     const display_controller_interface_protocol_t& protocol) {
   if (use_engine_) {

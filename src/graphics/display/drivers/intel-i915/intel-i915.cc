@@ -762,13 +762,6 @@ void Controller::DisableSystemAgentGeyserville() {
 }
 
 void Controller::RemoveDisplay(std::unique_ptr<DisplayDevice> display) {
-  // Invalidate and disable any ELD.
-  if (display->id() == eld_display_id_) {
-    auto audio_pin = registers::AudioPinEldCPReadyStatus::Get().ReadFrom(mmio_space());
-    audio_pin.set_eld_valid_a(0).set_audio_enable_a(0).WriteTo(mmio_space());
-    eld_display_id_.reset();
-  }
-
   // Make sure the display's resources get freed before reallocating the pipe buffers by letting
   // "display" go out of scope.
 }
@@ -1825,36 +1818,6 @@ uint16_t Controller::DataBufferBlockCount() const {
   static constexpr uint16_t kTigerLakeDataBufferBlockCount = 1023;
 
   return is_tgl(device_id_) ? kTigerLakeDataBufferBlockCount : kKabyLakeDataBufferBlockCount;
-}
-
-void Controller::DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
-                                             size_t raw_eld_count) {
-  const display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
-  // We use the first "a" of the 3 ELD slots in the datasheet.
-  if (eld_display_id_.has_value() && eld_display_id_.value() != display_id) {
-    zxlogf(ERROR, "ELD display already in use");
-    return;
-  }
-  eld_display_id_ = display_id;
-
-  constexpr size_t kMaxEldLength = 48;
-  size_t length = std::min<size_t>(raw_eld_count, kMaxEldLength);
-  auto edid0 = registers::AudEdidData::Get(0).ReadFrom(mmio_space());
-  auto audio_pin = registers::AudioPinEldCPReadyStatus::Get().ReadFrom(mmio_space());
-  auto ctrl = registers::AudioDipEldControlStatus::Get().ReadFrom(mmio_space());
-  audio_pin.set_audio_enable_a(1).set_eld_valid_a(0).WriteTo(mmio_space());
-
-  // TODO(andresoportus): We should "Wait for 2 vertical blanks" if we do this with the display
-  // enabled.
-
-  ctrl.set_eld_access_address(0).WriteTo(mmio_space());
-  ZX_ASSERT(!(length % 4));  // We don't use vendor block so length is multiple of 4.
-  for (size_t i = 0; i < length; i += 4) {
-    edid0.set_data(raw_eld_list[i] | (raw_eld_list[i + 1] << 8) | (raw_eld_list[i + 2] << 16) |
-                   (raw_eld_list[i + 3] << 24));
-    edid0.WriteTo(mmio_space());
-  }
-  audio_pin.set_eld_valid_a(1).WriteTo(mmio_space());
 }
 
 void Controller::DisplayControllerImplApplyConfiguration(
