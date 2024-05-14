@@ -977,6 +977,7 @@ mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::{collections::HashMap, vec, vec::Vec};
+    use core::marker::PhantomData;
 
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
@@ -1097,10 +1098,11 @@ mod tests {
     }
 
     /// Tuple of references
-    struct FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices>(
+    struct FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices, Device>(
         &'m mut AnyDevice,
         &'m mut AllSockets,
         &'m mut Devices,
+        PhantomData<Device>,
     );
 
     /// Helper trait to allow treating a `&mut self` as a
@@ -1109,15 +1111,17 @@ mod tests {
         type AnyDevice: 'static;
         type AllSockets: 'static;
         type Devices: 'static;
+        type Device: 'static;
         fn as_sockets_ref(
             &mut self,
-        ) -> FakeSocketsMutRefs<'_, Self::AnyDevice, Self::AllSockets, Self::Devices>;
+        ) -> FakeSocketsMutRefs<'_, Self::AnyDevice, Self::AllSockets, Self::Devices, Self::Device>;
     }
 
     impl<D: FakeStrongDeviceId> AsFakeSocketsMutRefs for FakeCoreCtx<D> {
         type AnyDevice = AnyDeviceSockets<FakeStrongId>;
         type AllSockets = FakeAllSockets<D>;
         type Devices = HashMap<D, DeviceSockets<FakeStrongId>>;
+        type Device = D;
 
         fn as_sockets_ref(
             &mut self,
@@ -1126,22 +1130,26 @@ mod tests {
             AnyDeviceSockets<FakeStrongId>,
             FakeAllSockets<D>,
             HashMap<D, DeviceSockets<FakeStrongId>>,
+            D,
         > {
             let FakeSockets { any_device_sockets, device_sockets, all_sockets } = &mut self.state;
-            FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets)
+            FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets, PhantomData)
         }
     }
 
-    impl<'m, AnyDevice: 'static, AllSockets: 'static, Devices: 'static> AsFakeSocketsMutRefs
-        for FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices>
+    impl<'m, AnyDevice: 'static, AllSockets: 'static, Devices: 'static, Device: 'static>
+        AsFakeSocketsMutRefs for FakeSocketsMutRefs<'m, AnyDevice, AllSockets, Devices, Device>
     {
         type AnyDevice = AnyDevice;
         type AllSockets = AllSockets;
         type Devices = Devices;
+        type Device = Device;
 
-        fn as_sockets_ref(&mut self) -> FakeSocketsMutRefs<'_, AnyDevice, AllSockets, Devices> {
-            let Self(any_device, all_sockets, devices) = self;
-            FakeSocketsMutRefs(any_device, all_sockets, devices)
+        fn as_sockets_ref(
+            &mut self,
+        ) -> FakeSocketsMutRefs<'_, AnyDevice, AllSockets, Devices, Device> {
+            let Self(any_device, all_sockets, devices, PhantomData) = self;
+            FakeSocketsMutRefs(any_device, all_sockets, devices, PhantomData)
         }
     }
 
@@ -1182,17 +1190,6 @@ mod tests {
         }
     }
 
-    /// Simplified trait that provides a blanket impl of [`DeviceIdContext`].
-    pub trait FakeDeviceIdContext {
-        type DeviceId: FakeStrongDeviceId;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool;
-    }
-
-    impl<CC: FakeDeviceIdContext> DeviceIdContext<AnyDevice> for CC {
-        type DeviceId = CC::DeviceId;
-        type WeakDeviceId = FakeWeakDeviceId<CC::DeviceId>;
-    }
-
     impl<
             'm,
             DeviceId: FakeStrongDeviceId,
@@ -1200,8 +1197,6 @@ mod tests {
                 + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
                 + DeviceSocketContextTypes<SocketId = FakeStrongId>,
         > SocketStateAccessor<FakeBindingsCtx<DeviceId>> for As
-    where
-        As::Devices: FakeDeviceIdContext<DeviceId = DeviceId>,
     {
         fn with_socket_state<
             F: FnOnce(&ExternalSocketState<Self::DeviceId>, &Target<Self::WeakDeviceId>) -> R,
@@ -1211,7 +1206,7 @@ mod tests {
             socket: &Self::SocketId,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(_, all_sockets, _) = self.as_sockets_ref();
+            let FakeSocketsMutRefs(_, all_sockets, _, _) = self.as_sockets_ref();
             let (state, target) = all_sockets.get(socket.0).unwrap();
             cb(state, target)
         }
@@ -1224,7 +1219,7 @@ mod tests {
             socket: &Self::SocketId,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(_, all_sockets, _) = self.as_sockets_ref();
+            let FakeSocketsMutRefs(_, all_sockets, _, _) = self.as_sockets_ref();
             let (state, target) = all_sockets.get_mut(socket.0).unwrap();
             cb(state, target)
         }
@@ -1240,8 +1235,13 @@ mod tests {
                 + DeviceSocketContextTypes<SocketId = FakeStrongId>,
         > DeviceSocketAccessor<FakeBindingsCtx<DeviceId>> for As
     {
-        type DeviceSocketCoreCtx<'a> =
-            FakeSocketsMutRefs<'a, As::AnyDevice, FakeAllSockets<DeviceId>, HashSet<DeviceId>>;
+        type DeviceSocketCoreCtx<'a> = FakeSocketsMutRefs<
+            'a,
+            As::AnyDevice,
+            FakeAllSockets<DeviceId>,
+            HashSet<DeviceId>,
+            DeviceId,
+        >;
         fn with_device_sockets<
             F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
             R,
@@ -1250,10 +1250,11 @@ mod tests {
             device: &Self::DeviceId,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets) = self.as_sockets_ref();
+            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets, PhantomData) =
+                self.as_sockets_ref();
             let mut devices = device_sockets.keys().cloned().collect();
             let device = device_sockets.get(device).unwrap();
-            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices))
+            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices, PhantomData))
         }
         fn with_device_sockets_mut<
             F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
@@ -1263,10 +1264,11 @@ mod tests {
             device: &Self::DeviceId,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets) = self.as_sockets_ref();
+            let FakeSocketsMutRefs(any_device, all_sockets, device_sockets, PhantomData) =
+                self.as_sockets_ref();
             let mut devices = device_sockets.keys().cloned().collect();
             let device = device_sockets.get_mut(device).unwrap();
-            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices))
+            cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices, PhantomData))
         }
     }
 
@@ -1286,9 +1288,11 @@ mod tests {
             (),
             FakeAllSockets<DeviceId>,
             HashMap<DeviceId, DeviceSockets<FakeStrongId>>,
+            DeviceId,
         >;
         fn create_socket(&mut self, state: ExternalSocketState<DeviceId>) -> Self::SocketId {
-            let FakeSocketsMutRefs(_any_device, all_sockets, _devices) = self.as_sockets_ref();
+            let FakeSocketsMutRefs(_any_device, all_sockets, _devices, PhantomData) =
+                self.as_sockets_ref();
             FakeStrongId(all_sockets.push((state, Target::default())))
         }
         fn remove_socket(&mut self, id: Self::SocketId) {
@@ -1296,6 +1300,7 @@ mod tests {
                 AnyDeviceSockets(any_device_sockets),
                 all_sockets,
                 device_sockets,
+                PhantomData,
             ) = self.as_sockets_ref();
             // Ensure there aren't any additional references to the socket's
             // state.
@@ -1314,9 +1319,12 @@ mod tests {
             &mut self,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets) =
+            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets, PhantomData) =
                 self.as_sockets_ref();
-            cb(any_device_sockets, &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets))
+            cb(
+                any_device_sockets,
+                &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets, PhantomData),
+            )
         }
         fn with_any_device_sockets_mut<
             F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
@@ -1325,33 +1333,20 @@ mod tests {
             &mut self,
             cb: F,
         ) -> R {
-            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets) =
+            let FakeSocketsMutRefs(any_device_sockets, all_sockets, device_sockets, PhantomData) =
                 self.as_sockets_ref();
-            cb(any_device_sockets, &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets))
+            cb(
+                any_device_sockets,
+                &mut FakeSocketsMutRefs(&mut (), all_sockets, device_sockets, PhantomData),
+            )
         }
     }
 
-    impl<'m, X: 'static, Y: 'static, Z: FakeDeviceIdContext + 'static> FakeDeviceIdContext
-        for FakeSocketsMutRefs<'m, X, Y, Z>
+    impl<'m, X, Y, Z, D: FakeStrongDeviceId> DeviceIdContext<AnyDevice>
+        for FakeSocketsMutRefs<'m, X, Y, Z, D>
     {
-        type DeviceId = Z::DeviceId;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            self.2.contains_id(device_id)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> FakeDeviceIdContext for HashSet<D> {
         type DeviceId = D;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            self.contains(device_id)
-        }
-    }
-
-    impl<V, D: FakeStrongDeviceId> FakeDeviceIdContext for HashMap<D, V> {
-        type DeviceId = D;
-        fn contains_id(&self, device_id: &Self::DeviceId) -> bool {
-            self.contains_key(device_id)
-        }
+        type WeakDeviceId = FakeWeakDeviceId<D>;
     }
 
     const SOME_PROTOCOL: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2000));

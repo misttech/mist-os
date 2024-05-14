@@ -34,7 +34,10 @@ pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
-pub use device::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier};
+pub use device::{
+    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier,
+    StrongDeviceIdentifier, WeakDeviceIdentifier,
+};
 pub use error::{
     AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
     RemoteAddressError, SocketError, ZonedAddressError,

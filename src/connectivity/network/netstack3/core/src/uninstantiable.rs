@@ -10,7 +10,7 @@ use packet::{BufferMut, Serializer};
 
 use crate::{
     context::CounterContext,
-    device::{Device, DeviceIdContext, WeakDeviceIdentifier},
+    device::WeakDeviceIdentifier,
     ip::{
         socket::{DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError, SendOptions},
         EitherDeviceId, HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError,
@@ -32,11 +32,6 @@ use crate::{
 };
 
 pub use netstack3_base::{Uninstantiable, UninstantiableWrapper};
-
-impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrapper<C> {
-    type DeviceId = C::DeviceId;
-    type WeakDeviceId = C::WeakDeviceId;
-}
 
 impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     DatagramBoundStateContext<I, C, S> for UninstantiableWrapper<P>

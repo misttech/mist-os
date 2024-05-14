@@ -13,7 +13,10 @@ use core::{convert::Infallible as Never, marker::PhantomData};
 
 use explicit::UnreachableExt as _;
 
-use crate::{BidirectionalConverter, CoreTimerContext, CounterContext, TimerBindingsTypes};
+use crate::{
+    BidirectionalConverter, CoreTimerContext, CounterContext, Device, DeviceIdContext,
+    TimerBindingsTypes,
+};
 
 /// An uninstantiable type.
 #[derive(Clone, Copy)]
@@ -64,4 +67,9 @@ impl<P, C> CounterContext<C> for UninstantiableWrapper<P> {
     fn with_counters<O, F: FnOnce(&C) -> O>(&self, _cb: F) -> O {
         self.uninstantiable_unreachable()
     }
+}
+
+impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrapper<C> {
+    type DeviceId = C::DeviceId;
+    type WeakDeviceId = C::WeakDeviceId;
 }

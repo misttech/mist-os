@@ -29,7 +29,7 @@ use crate::{
         ethernet::{EthernetLinkDevice, EthernetTimerId},
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
-            EthernetWeakDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier,
+            EthernetWeakDeviceId,
         },
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
@@ -51,57 +51,7 @@ use crate::{
     BindingsContext, CoreCtx, Inspector, StackState,
 };
 
-/// A device.
-///
-/// `Device` is used to identify a particular device implementation. It
-/// is only intended to exist at the type level, never instantiated at runtime.
-pub trait Device: 'static {}
-
-/// Marker type for a generic device.
-pub enum AnyDevice {}
-
-impl Device for AnyDevice {}
-
-/// An execution context which provides device ID types type for various
-/// netstack internals to share.
-pub trait DeviceIdContext<D: Device> {
-    /// The type of device IDs.
-    type DeviceId: StrongDeviceIdentifier<Weak = Self::WeakDeviceId> + 'static;
-
-    /// The type of weakly referenced device IDs.
-    type WeakDeviceId: WeakDeviceIdentifier<Strong = Self::DeviceId> + 'static;
-}
-
-/// A marker trait tying [`DeviceIdContext`] implementations.
-///
-/// To call into the IP layer, we need to be able to represent device
-/// identifiers in the [`AnyDevice`] domain. This trait is a statement that a
-/// [`DeviceIdContext`] in some domain `D` has its identifiers convertible into
-/// the [`AnyDevice`] domain with `From` bounds.
-///
-/// It is provided as a blanket implementation for [`DeviceIdContext`]s that
-/// fulfill the conversion.
-pub trait DeviceIdAnyCompatContext<D: Device>:
-    DeviceIdContext<D>
-    + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId_, WeakDeviceId = Self::WeakDeviceId_>
-{
-    type DeviceId_: StrongDeviceIdentifier<Weak = Self::WeakDeviceId_>
-        + From<<Self as DeviceIdContext<D>>::DeviceId>;
-    type WeakDeviceId_: WeakDeviceIdentifier<Strong = Self::DeviceId_>
-        + From<<Self as DeviceIdContext<D>>::WeakDeviceId>;
-}
-
-impl<CC, D> DeviceIdAnyCompatContext<D> for CC
-where
-    D: Device,
-    CC: DeviceIdContext<D> + DeviceIdContext<AnyDevice>,
-    <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId:
-        From<<CC as DeviceIdContext<D>>::WeakDeviceId>,
-    <CC as DeviceIdContext<AnyDevice>>::DeviceId: From<<CC as DeviceIdContext<D>>::DeviceId>,
-{
-    type DeviceId_ = <CC as DeviceIdContext<AnyDevice>>::DeviceId;
-    type WeakDeviceId_ = <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId;
-}
+pub(crate) use netstack3_base::{AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext};
 
 pub(super) struct RecvIpFrameMeta<D, I: Ip> {
     /// The device on which the IP frame was received.

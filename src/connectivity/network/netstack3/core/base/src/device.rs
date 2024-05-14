@@ -48,12 +48,70 @@ pub trait WeakDeviceIdentifier: DeviceIdentifier + PartialEq<Self::Strong> {
     fn upgrade(&self) -> Option<Self::Strong>;
 }
 
+/// A device.
+///
+/// `Device` is used to identify a particular device implementation. It
+/// is only intended to exist at the type level, never instantiated at runtime.
+pub trait Device: 'static {}
+
+/// Marker type for a generic device.
+///
+/// This generally represents a device at the IP layer. Other implementations
+/// may exist for type safe link devices.
+pub enum AnyDevice {}
+
+impl Device for AnyDevice {}
+
+/// An execution context which provides device ID types type for various
+/// netstack internals to share.
+pub trait DeviceIdContext<D: Device> {
+    /// The type of device IDs.
+    type DeviceId: StrongDeviceIdentifier<Weak = Self::WeakDeviceId> + 'static;
+
+    /// The type of weakly referenced device IDs.
+    type WeakDeviceId: WeakDeviceIdentifier<Strong = Self::DeviceId> + 'static;
+}
+
+/// A marker trait tying [`DeviceIdContext`] implementations.
+///
+/// To call into the IP layer, we need to be able to represent device
+/// identifiers in the [`AnyDevice`] domain. This trait is a statement that a
+/// [`DeviceIdContext`] in some domain `D` has its identifiers convertible into
+/// the [`AnyDevice`] domain with `From` bounds.
+///
+/// It is provided as a blanket implementation for [`DeviceIdContext`]s that
+/// fulfill the conversion.
+#[allow(missing_docs)]
+pub trait DeviceIdAnyCompatContext<D: Device>:
+    DeviceIdContext<D>
+    + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId_, WeakDeviceId = Self::WeakDeviceId_>
+{
+    type DeviceId_: StrongDeviceIdentifier<Weak = Self::WeakDeviceId_>
+        + From<<Self as DeviceIdContext<D>>::DeviceId>;
+    type WeakDeviceId_: WeakDeviceIdentifier<Strong = Self::DeviceId_>
+        + From<<Self as DeviceIdContext<D>>::WeakDeviceId>;
+}
+
+impl<CC, D> DeviceIdAnyCompatContext<D> for CC
+where
+    D: Device,
+    CC: DeviceIdContext<D> + DeviceIdContext<AnyDevice>,
+    <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId:
+        From<<CC as DeviceIdContext<D>>::WeakDeviceId>,
+    <CC as DeviceIdContext<AnyDevice>>::DeviceId: From<<CC as DeviceIdContext<D>>::DeviceId>,
+{
+    type DeviceId_ = <CC as DeviceIdContext<AnyDevice>>::DeviceId;
+    type WeakDeviceId_ = <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId;
+}
+
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::sync::Arc;
     use core::sync::atomic::AtomicBool;
 
     use super::*;
+
+    use crate::testutil::FakeCoreCtx;
 
     /// A fake weak device id.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -218,5 +276,10 @@ pub(crate) mod testutil {
         fn is_alive(&self) -> bool {
             true
         }
+    }
+
+    impl<S, Meta, D: StrongDeviceIdentifier> DeviceIdContext<AnyDevice> for FakeCoreCtx<S, Meta, D> {
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
     }
 }

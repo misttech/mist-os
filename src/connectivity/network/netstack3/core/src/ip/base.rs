@@ -3578,15 +3578,6 @@ pub(crate) mod testutil {
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
     };
 
-    impl<S, Meta, D: StrongDeviceIdentifier + 'static> DeviceIdContext<AnyDevice>
-        for crate::context::testutil::FakeCoreCtx<S, Meta, D>
-    where
-        FakeIpDeviceIdCtx<D>: DeviceIdContext<AnyDevice, DeviceId = D, WeakDeviceId = D::Weak>,
-    {
-        type DeviceId = D;
-        type WeakDeviceId = D::Weak;
-    }
-
     #[derive(Debug, GenericOverIp)]
     #[generic_over_ip()]
     pub(crate) enum DualStackSendIpPacketMeta<D> {
