@@ -16,7 +16,7 @@ fidl("fuchsia.sys") {
 
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Component Framework"
 
   sources = [
     "component_controller.fidl",
