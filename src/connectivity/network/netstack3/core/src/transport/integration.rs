@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use lock_order::{
-    lock::{RwLockFor, UnlockedAccess},
+    lock::{LockLevelFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
     wrap::prelude::*,
 };
@@ -581,6 +581,12 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.transport.tcp_state::<I>().sockets.demux.write()
     }
+}
+
+impl<I: crate::transport::tcp::socket::DualStackIpExt, D: device::WeakId, BT: BindingsTypes>
+    LockLevelFor<TcpSocketId<I, D, BT>> for crate::lock_ordering::TcpSocketState<I>
+{
+    type Data = TcpSocketState<I, D, BT>;
 }
 
 impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>

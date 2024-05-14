@@ -71,6 +71,140 @@ pub trait UnlockedAccess<A> {
     fn access(&self) -> Self::Guard<'_>;
 }
 
+/// Marks a type as offering ordered lock access for some inner type `T`.
+///
+/// This trait allows for types that are lock order sensitive to be defined in a
+/// separate crate than the lock levels themselves while nudging local code away
+/// from using the locks without regards for ordering.
+///
+/// The crate defining the lock levels can implement [`LockLevelFor`] to declare
+/// the lock level to access the field exposed by this implementation.
+pub trait OrderedLockAccess<T> {
+    /// The lock type that observes ordering.
+    ///
+    /// This should be a type that implements either [`ExclusiveLock`] or
+    /// [`ReadWriteLock`].
+    type Lock;
+    /// Returns a borrow to the order-aware lock.
+    ///
+    /// Note that this returns [`OrderedLockRef`] to further prevent out of
+    /// order lock usage. Once sealed into [`OrderedLockRef`], the borrow can
+    /// only be used via the blanket [`RwLockFor`] and [`LockFor`]
+    /// implementations provided by this crate.
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock>;
+}
+
+/// A borrowed order-aware lock.
+pub struct OrderedLockRef<'a, T>(&'a T);
+
+impl<'a, T> OrderedLockRef<'a, T> {
+    /// Creates a new `OrderedLockRef` with a borrow on `lock`.
+    pub fn new(lock: &'a T) -> Self {
+        Self(lock)
+    }
+}
+
+/// Declares a type as the lock level for some type `T` that exposes locked
+/// state of type `Self::Data`.
+///
+/// If `T` implements [`OrderedLockAccess`] for `Self::Data`, then the
+/// [`LockFor`] and [`RwLockFor`] traits can be used to gain access to the
+/// protected state `Data` within `T` at lock level `Self`.
+///
+/// See [`OrderedLockAccess`] for more details.
+pub trait LockLevelFor<T> {
+    /// The data type within `T` that this is a lock level for.
+    type Data;
+}
+
+/// Abstracts an exclusive lock (i.e. a Mutex).
+pub trait ExclusiveLock<T>: 'static {
+    /// The guard type returned when locking the lock.
+    type Guard<'l>: DerefMut<Target = T>;
+    /// Locks this lock.
+    fn lock(&self) -> Self::Guard<'_>;
+}
+
+/// Abstracts a read write lock (i.e. an RwLock).
+pub trait ReadWriteLock<T>: 'static {
+    /// The guard type returned when locking for reads (i.e. shared).
+    type ReadGuard<'l>: Deref<Target = T>;
+    /// The guard type returned when locking for writes (i.e. exclusive).
+    type WriteGuard<'l>: DerefMut<Target = T>;
+    /// Locks this lock for reading.
+    fn read_lock(&self) -> Self::ReadGuard<'_>;
+    /// Locks this lock for writing.
+    fn write_lock(&self) -> Self::WriteGuard<'_>;
+}
+
+impl<L, T> LockFor<L> for T
+where
+    L: LockLevelFor<T>,
+    T: OrderedLockAccess<L::Data>,
+    T::Lock: ExclusiveLock<L::Data>,
+{
+    type Data = L::Data;
+    type Guard<'l> = <T::Lock as ExclusiveLock<L::Data>>::Guard<'l>
+    where
+        Self: 'l;
+    fn lock(&self) -> Self::Guard<'_> {
+        let OrderedLockRef(lock) = self.ordered_lock_access();
+        lock.lock()
+    }
+}
+
+impl<L, T> RwLockFor<L> for T
+where
+    L: LockLevelFor<T>,
+    T: OrderedLockAccess<L::Data>,
+    T::Lock: ReadWriteLock<L::Data>,
+{
+    type Data = L::Data;
+    type ReadGuard<'l> = <T::Lock as ReadWriteLock<L::Data>>::ReadGuard<'l>
+    where
+        Self: 'l;
+    type WriteGuard<'l> = <T::Lock as ReadWriteLock<L::Data>>::WriteGuard<'l>
+    where
+        Self: 'l;
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        let OrderedLockRef(lock) = self.ordered_lock_access();
+        lock.read_lock()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        let OrderedLockRef(lock) = self.ordered_lock_access();
+        lock.write_lock()
+    }
+}
+
+/// Declares a type that is an [`UnlockedAccess`] marker for some field `Data`
+/// within `T`.
+///
+/// This is the equivalent of [`LockLevelFor`] for [`UnlockedAccess`], but given
+/// unlocked access is freely available through borrows the foreign type can
+/// safely expose a getter.
+pub trait UnlockedAccessMarkerFor<T> {
+    /// The data type within `T` that this an unlocked access marker for.
+    type Data: 'static;
+
+    /// Retrieves `Self::Data` from `T`.
+    fn unlocked_access(t: &T) -> &Self::Data;
+}
+
+impl<L, T> UnlockedAccess<L> for T
+where
+    L: UnlockedAccessMarkerFor<T>,
+{
+    type Data = <L as UnlockedAccessMarkerFor<T>>::Data;
+
+    type Guard<'l> = &'l <L as UnlockedAccessMarkerFor<T>>::Data
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        L::unlocked_access(self)
+    }
+}
+
 #[cfg(test)]
 mod example {
     //! Example implementations of the traits in this crate.

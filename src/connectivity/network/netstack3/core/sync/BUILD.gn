@@ -14,7 +14,10 @@ rustc_library_with_features("netstack3-sync") {
     "src/lib.rs",
     "src/rc.rs",
   ]
-  deps = [ "//third_party/rust_crates:derivative" ]
+  deps = [
+    "//src/connectivity/network/netstack3/core/lock-order",
+    "//third_party/rust_crates:derivative",
+  ]
 
   feature_sets = [
     {

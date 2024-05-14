@@ -59,6 +59,14 @@ impl<T> Mutex<T> {
     }
 }
 
+impl<T: 'static> lock_order::lock::ExclusiveLock<T> for Mutex<T> {
+    type Guard<'l> = LockGuard<'l, T>;
+
+    fn lock(&self) -> Self::Guard<'_> {
+        self.lock()
+    }
+}
+
 /// A [`std::sync::RwLock`] assuming lock poisoning will never occur.
 #[derive(Debug, Default)]
 pub struct RwLock<T>(std::sync::RwLock<T>);
@@ -124,6 +132,20 @@ impl<T> RwLock<T> {
     #[cfg(not(loom))]
     pub fn get_mut(&mut self) -> &mut T {
         self.0.get_mut().expect("unexpectedly poisoned")
+    }
+}
+
+impl<T: 'static> lock_order::lock::ReadWriteLock<T> for RwLock<T> {
+    type ReadGuard<'l> = RwLockReadGuard<'l, T>;
+
+    type WriteGuard<'l> = RwLockWriteGuard<'l, T>;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.read()
+    }
+
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.write()
     }
 }
 

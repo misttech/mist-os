@@ -32,6 +32,7 @@ use core::{
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
@@ -1798,25 +1799,12 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> WeakTcpSocketId
 }
 
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
-    lock_order::lock::RwLockFor<crate::lock_ordering::TcpSocketState<I>> for TcpSocketId<I, D, BT>
+    OrderedLockAccess<TcpSocketState<I, D, BT>> for TcpSocketId<I, D, BT>
 {
-    type Data = TcpSocketState<I, D, BT>;
-
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
-        where
-            Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data>
-        where
-            Self: 'l ;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        let Self(l) = self;
-        l.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        let Self(l) = self;
-        l.write()
+    type Lock = RwLock<TcpSocketState<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        let Self(rc) = self;
+        OrderedLockRef::new(&*rc)
     }
 }
 
