@@ -45,11 +45,13 @@ sdk_source_set("cpp") {
   #    |\_________\   \|__|  \|_______|\|__|
   #    \|_________|
   #
-  # **WARNING**: This library is currently undergoing an API overhaul. Please avoid new uses and
-  # prefer using the in-tree VFS at //src/storage/lib/vfs/cpp where possible.
+  # **WARNING**: This library is currently undergoing an API overhaul. In the meantime, please reach
+  # out to the storage team before adding new entries to this allow-list.
   #
   # See https://fxbug.dev/311176363 for details.
   #
+  # TODO(https://fxbug.dev/336617685): Relax this visibility list once this library is compatible
+  # with the new C++ FIDL bindings, and has support for io2 rights.
   visibility = [
     ":*",
     "//build/sdk:*",
