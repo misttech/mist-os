@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     context::{CounterContext, InstantContext, TracingContext},
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier as _},
     filter::{
         FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
     },
@@ -470,7 +470,7 @@ fn new_ip_socket<I, D>(
 ) -> IpSock<I, D::Weak>
 where
     I: IpLayerIpExt,
-    D: device::StrongId,
+    D: StrongDeviceIdentifier,
 {
     // TODO(https://fxbug.dev/323389672): Cache a reference to the route to
     // avoid the route lookup on send as long as the routing table hasn't

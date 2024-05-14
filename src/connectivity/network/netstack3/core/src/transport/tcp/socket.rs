@@ -54,7 +54,7 @@ use crate::{
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId},
+    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier as _, WeakDeviceIdentifier},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
@@ -94,12 +94,12 @@ pub use accept_queue::ListenerNotifier;
 pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
-    type DemuxSocketId<D: device::WeakId, BT: TcpBindingsTypes>: SpecSocketId;
+    type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>: SpecSocketId;
 
     /// The type for a connection, for [`Ipv4`], this will be just the single
     /// stack version of the connection state and the connection address. For
     /// [`Ipv6`], this will be a `EitherStack`.
-    type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes>: Send + Sync + Debug;
+    type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>: Send + Sync + Debug;
 
     /// The type for the address that the listener is listening on. This should
     /// be just [`ListenerIpAddr`] for [`Ipv4`], but a [`DualStackListenerIpAddr`]
@@ -111,25 +111,25 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
 
     /// Determines which stack the demux socket ID belongs to and converts
     /// (by reference) to a dual stack TCP socket ID.
-    fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
     ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>>;
 
     /// Determines which stack the demux socket ID belongs to and converts
     /// (by value) to a dual stack TCP socket ID.
-    fn into_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: Self::DemuxSocketId<D, BT>,
     ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>>;
 
     /// Turns a [`TcpSocketId`] of the current stack into the demuxer ID.
-    fn into_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_demux_socket_id<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT>;
 
-    fn get_conn_info<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_conn_info<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> ConnectionInfo<Self::Addr, D>;
-    fn get_accept_queue_mut<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_accept_queue_mut<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &mut Self::ConnectionAndAddr<D, BT>,
     ) -> &mut Option<
         AcceptQueue<
@@ -138,13 +138,13 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
             BT::ListenerNotifierOrProvidedBuffers,
         >,
     >;
-    fn get_defunct<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_defunct<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> bool;
-    fn get_state<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_state<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> &State<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer, BT::ListenerNotifierOrProvidedBuffers>;
-    fn get_bound_info<D: device::WeakId>(
+    fn get_bound_info<D: WeakDeviceIdentifier>(
         listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D>;
 
@@ -159,14 +159,14 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
 }
 
 impl DualStackIpExt for Ipv4 {
-    type DemuxSocketId<D: device::WeakId, BT: TcpBindingsTypes> =
+    type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
         EitherStack<TcpSocketId<Ipv4, D, BT>, TcpSocketId<Ipv6, D, BT>>;
-    type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes> =
+    type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
         (Connection<Ipv4, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>);
     type ListenerIpAddr = ListenerIpAddr<Ipv4Addr, NonZeroU16>;
     type DualStackIpOptions = ();
 
-    fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
     ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>> {
         match id {
@@ -174,22 +174,22 @@ impl DualStackIpExt for Ipv4 {
             EitherStack::OtherStack(id) => EitherStack::OtherStack(id),
         }
     }
-    fn into_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: Self::DemuxSocketId<D, BT>,
     ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>> {
         id
     }
-    fn into_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_demux_socket_id<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT> {
         EitherStack::ThisStack(id)
     }
-    fn get_conn_info<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_conn_info<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         (_conn, addr): &Self::ConnectionAndAddr<D, BT>,
     ) -> ConnectionInfo<Self::Addr, D> {
         addr.clone().into()
     }
-    fn get_accept_queue_mut<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_accept_queue_mut<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         (conn, _addr): &mut Self::ConnectionAndAddr<D, BT>,
     ) -> &mut Option<
         AcceptQueue<
@@ -200,18 +200,18 @@ impl DualStackIpExt for Ipv4 {
     > {
         &mut conn.accept_queue
     }
-    fn get_defunct<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_defunct<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         (conn, _addr): &Self::ConnectionAndAddr<D, BT>,
     ) -> bool {
         conn.defunct
     }
-    fn get_state<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_state<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         (conn, _addr): &Self::ConnectionAndAddr<D, BT>,
     ) -> &State<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer, BT::ListenerNotifierOrProvidedBuffers>
     {
         &conn.state
     }
-    fn get_bound_info<D: device::WeakId>(
+    fn get_bound_info<D: WeakDeviceIdentifier>(
         listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D> {
         listener_addr.clone().into()
@@ -241,31 +241,31 @@ pub struct Ipv6Options {
 }
 
 impl DualStackIpExt for Ipv6 {
-    type DemuxSocketId<D: device::WeakId, BT: TcpBindingsTypes> = TcpSocketId<Ipv6, D, BT>;
-    type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes> = EitherStack<
+    type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> = TcpSocketId<Ipv6, D, BT>;
+    type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> = EitherStack<
         (Connection<Ipv6, Ipv6, D, BT>, ConnAddr<ConnIpAddr<Ipv6Addr, NonZeroU16, NonZeroU16>, D>),
         (Connection<Ipv6, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>),
     >;
     type DualStackIpOptions = Ipv6Options;
     type ListenerIpAddr = DualStackListenerIpAddr<Ipv6Addr, NonZeroU16>;
 
-    fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
     ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>> {
         EitherStack::ThisStack(id)
     }
-    fn into_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: Self::DemuxSocketId<D, BT>,
     ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>> {
         EitherStack::ThisStack(id)
     }
 
-    fn into_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_demux_socket_id<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT> {
         id
     }
-    fn get_conn_info<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_conn_info<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> ConnectionInfo<Self::Addr, D> {
         match conn_and_addr {
@@ -290,7 +290,7 @@ impl DualStackIpExt for Ipv6 {
             },
         }
     }
-    fn get_accept_queue_mut<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_accept_queue_mut<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &mut Self::ConnectionAndAddr<D, BT>,
     ) -> &mut Option<
         AcceptQueue<
@@ -304,7 +304,7 @@ impl DualStackIpExt for Ipv6 {
             EitherStack::OtherStack((conn, _addr)) => &mut conn.accept_queue,
         }
     }
-    fn get_defunct<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_defunct<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> bool {
         match conn_and_addr {
@@ -312,7 +312,7 @@ impl DualStackIpExt for Ipv6 {
             EitherStack::OtherStack((conn, _addr)) => conn.defunct,
         }
     }
-    fn get_state<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn get_state<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> &State<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer, BT::ListenerNotifierOrProvidedBuffers>
     {
@@ -321,7 +321,7 @@ impl DualStackIpExt for Ipv6 {
             EitherStack::OtherStack((conn, _addr)) => &conn.state,
         }
     }
-    fn get_bound_info<D: device::WeakId>(
+    fn get_bound_info<D: WeakDeviceIdentifier>(
         ListenerAddr { ip, device }: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D> {
         match ip {
@@ -368,13 +368,13 @@ impl DualStackIpExt for Ipv6 {
     Debug(bound = "")
 )]
 #[allow(missing_docs)]
-pub enum TimerId<D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum TimerId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     V4(WeakTcpSocketId<Ipv4, D, BT>),
     V6(WeakTcpSocketId<Ipv6, D, BT>),
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> From<WeakTcpSocketId<I, D, BT>>
-    for TimerId<D, BT>
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
+    From<WeakTcpSocketId<I, D, BT>> for TimerId<D, BT>
 {
     fn from(f: WeakTcpSocketId<I, D, BT>) -> Self {
         I::map_ip(f, TimerId::V4, TimerId::V6)
@@ -463,7 +463,7 @@ impl<BC> TcpBindingsContext for BC where
 {
 }
 
-pub trait TcpDemuxContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>:
+pub trait TcpDemuxContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
     TcpCoreTimerContext<I, D, BT>
 {
     type IpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
@@ -513,7 +513,7 @@ impl<T> AsThisStack<T> for T {
 }
 
 /// A shortcut for the `CoreTimerContext` required by TCP.
-pub trait TcpCoreTimerContext<I: DualStackIpExt, D: device::WeakId, BC: TcpBindingsTypes>:
+pub trait TcpCoreTimerContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BC: TcpBindingsTypes>:
     CoreTimerContext<WeakTcpSocketId<I, D, BC>, BC>
 {
 }
@@ -521,7 +521,7 @@ pub trait TcpCoreTimerContext<I: DualStackIpExt, D: device::WeakId, BC: TcpBindi
 impl<CC, I, D, BC> TcpCoreTimerContext<I, D, BC> for CC
 where
     I: DualStackIpExt,
-    D: device::WeakId,
+    D: WeakDeviceIdentifier,
     BC: TcpBindingsTypes,
     CC: CoreTimerContext<WeakTcpSocketId<I, D, BC>, BC>,
 {
@@ -726,14 +726,14 @@ pub struct Ipv6SocketIdToIpv4DemuxIdConverter;
 /// a dual-stack CoreContext.
 pub trait DualStackDemuxIdConverter<I: DualStackIpExt> {
     /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
-    fn convert<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<I, D, BT>,
     ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
 }
 
 impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
-    fn convert<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<Ipv6, D, BT>,
     ) -> <Ipv4 as DualStackIpExt>::DemuxSocketId<D, BT> {
@@ -742,7 +742,7 @@ impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
 }
 
 /// A provider of dualstack socket functionality required by TCP sockets.
-pub trait TcpDualStackContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     type Converter: DualStackDemuxIdConverter<I> + Clone + Copy;
 
     type DualStackIpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
@@ -854,7 +854,7 @@ pub(crate) enum TcpIpTransportContext {}
 /// number of type parameters percolating down to the socket map types since
 /// they only really care about the identifier's behavior.
 pub trait SpecSocketId: Clone + Eq + PartialEq + Debug + 'static {}
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> SpecSocketId
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> SpecSocketId
     for TcpSocketId<I, D, BT>
 {
 }
@@ -864,7 +864,7 @@ impl<A: SpecSocketId, B: SpecSocketId> SpecSocketId for EitherStack<A, B> {}
 /// Uninstantiatable type for implementing [`SocketMapStateSpec`].
 struct TcpSocketSpec<I, D, BT>(PhantomData<(I, D, BT)>, Never);
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> SocketMapStateSpec
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> SocketMapStateSpec
     for TcpSocketSpec<I, D, BT>
 {
     type ListenerId = I::DemuxSocketId<D, BT>;
@@ -948,7 +948,7 @@ impl<'a, S> Inserter<S> for ListenerAddrInserter<'a, S> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub enum BoundSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum BoundSocketState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     Listener((MaybeListener<I, D, BT>, ListenerSharingState, ListenerAddr<I::ListenerIpAddr, D>)),
     Connected { conn: I::ConnectionAndAddr<D, BT>, sharing: SharingState, timer: BT::Timer },
 }
@@ -1060,7 +1060,7 @@ impl<S: SpecSocketId> SocketMapAddrStateSpec for ListenerAddrState<S> {
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     SocketMapUpdateSharingPolicy<
         ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState,
@@ -1262,7 +1262,7 @@ impl Default for SharingState {
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     SocketMapConflictPolicy<
         ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState,
@@ -1320,7 +1320,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     SocketMapConflictPolicy<
         ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
         SharingState,
@@ -1413,7 +1413,7 @@ type WeakRc<I, D, BT> = crate::sync::WeakRc<ReferenceState<I, D, BT>>;
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub enum TcpSocketSetEntry<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum TcpSocketSetEntry<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     /// The socket set is holding a primary reference.
     Primary(PrimaryRc<I, D, BT>),
     /// The socket set is holding a "dead on arrival" (DOA) entry for a strong
@@ -1432,18 +1432,20 @@ pub enum TcpSocketSetEntry<I: DualStackIpExt, D: device::WeakId, BT: TcpBindings
 /// sockets in the system.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct TcpSocketSet<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
+pub struct TcpSocketSet<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
     HashMap<TcpSocketId<I, D, BT>, TcpSocketSetEntry<I, D, BT>>,
 );
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Deref for TcpSocketSet<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Deref
+    for TcpSocketSet<I, D, BT>
+{
     type Target = HashMap<TcpSocketId<I, D, BT>, TcpSocketSetEntry<I, D, BT>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> DerefMut
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> DerefMut
     for TcpSocketSet<I, D, BT>
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -1456,7 +1458,9 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> DerefMut
 /// Because [`TcpSocketId`] is not really RAII in respect to closing the socket,
 /// tests might finish without closing them and it's easier to deal with that in
 /// a single place.
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Drop for TcpSocketSet<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Drop
+    for TcpSocketSet<I, D, BT>
+{
     fn drop(&mut self) {
         // Listening sockets may hold references to other sockets so we walk
         // through all of the sockets looking for unclosed listeners and close
@@ -1486,12 +1490,12 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Drop for TcpSoc
 
 type BoundSocketMap<I, D, BT> = socket::BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>;
 
-pub struct DemuxState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub struct DemuxState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     socketmap: BoundSocketMap<I, D, BT>,
 }
 
 /// Holds all the TCP socket states.
-pub(crate) struct Sockets<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub(crate) struct Sockets<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     pub(crate) demux: RwLock<DemuxState<I, D, BT>>,
     // Destroy all_sockets last so the strong references in the demux are
     // dropped before the primary references in the set.
@@ -1500,7 +1504,7 @@ pub(crate) struct Sockets<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsT
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub struct TcpSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub struct TcpSocketState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     pub(crate) socket_state: TcpSocketStateInner<I, D, BT>,
     // The following only contains IP version specific options, `socket_state`
     // may still hold generic IP options (inside of the `IpSock`).
@@ -1512,12 +1516,12 @@ pub struct TcpSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsT
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub enum TcpSocketStateInner<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum TcpSocketStateInner<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     Unbound(Unbound<D, BT::ListenerNotifierOrProvidedBuffers>),
     Bound(BoundSocketState<I, D, BT>),
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAllocImpl
     for BoundSocketMap<I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
@@ -1556,14 +1560,14 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
     }
 }
 
-struct TcpDualStackPortAlloc<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
+struct TcpDualStackPortAlloc<'a, I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
     &'a BoundSocketMap<I, D, BT>,
     &'a BoundSocketMap<I::OtherVersion, D, BT>,
 );
 
 /// When binding to IPv6 ANY address (::), we need to allocate a port that is
 /// available in both stacks.
-impl<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
+impl<'a, I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAllocImpl
     for TcpDualStackPortAlloc<'a, I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> =
@@ -1577,7 +1581,7 @@ impl<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocIm
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Sockets<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Sockets<I, D, BT> {
     pub(crate) fn new() -> Self {
         Self {
             demux: RwLock::new(DemuxState { socketmap: Default::default() }),
@@ -1596,7 +1600,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Sockets<I, D, B
 pub struct Connection<
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    D: device::WeakId,
+    D: WeakDeviceIdentifier,
     BT: TcpBindingsTypes,
 > {
     accept_queue: Option<
@@ -1626,8 +1630,12 @@ pub struct Connection<
     handshake_status: HandshakeStatus,
 }
 
-impl<SockI: DualStackIpExt, WireI: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
-    Connection<SockI, WireI, D, BT>
+impl<
+        SockI: DualStackIpExt,
+        WireI: DualStackIpExt,
+        D: WeakDeviceIdentifier,
+        BT: TcpBindingsTypes,
+    > Connection<SockI, WireI, D, BT>
 {
     /// Updates this connection's state to reflect the error.
     ///
@@ -1660,7 +1668,7 @@ impl<SockI: DualStackIpExt, WireI: DualStackIpExt, D: device::WeakId, BT: TcpBin
         Eq(bound = "BT::ReturnedBuffers: Eq, BT::ListenerNotifierOrProvidedBuffers: Eq"),
     )
 )]
-pub struct Listener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub struct Listener<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     backlog: NonZeroUsize,
     accept_queue: AcceptQueue<
         TcpSocketId<I, D, BT>,
@@ -1673,7 +1681,7 @@ pub struct Listener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> 
     // is needed, we can construct an ip socket here to be reused.
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Listener<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Listener<I, D, BT> {
     fn new(
         backlog: NonZeroUsize,
         buffer_sizes: BufferSizes,
@@ -1704,7 +1712,7 @@ pub struct BoundState<Extra> {
         )
     )
 )]
-pub enum MaybeListener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum MaybeListener<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     Bound(BoundState<BT::ListenerNotifierOrProvidedBuffers>),
     Listener(Listener<I, D, BT>),
 }
@@ -1713,11 +1721,13 @@ pub enum MaybeListener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsType
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-pub struct TcpSocketId<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
+pub struct TcpSocketId<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
     StrongRc<I, D, BT>,
 );
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Clone for TcpSocketId<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Clone
+    for TcpSocketId<I, D, BT>
+{
     #[cfg_attr(feature = "instrumented", track_caller)]
     fn clone(&self) -> Self {
         let Self(rc) = self;
@@ -1725,7 +1735,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Clone for TcpSo
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
     pub(crate) fn new(socket_state: TcpSocketStateInner<I, D, BT>) -> (Self, PrimaryRc<I, D, BT>) {
         let primary = PrimaryRc::new(RwLock::new(TcpSocketState {
             socket_state,
@@ -1749,14 +1759,16 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpSocketId<I, 
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Debug for TcpSocketId<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Debug
+    for TcpSocketId<I, D, BT>
+{
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("TcpSocketId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
     pub(crate) fn downgrade(&self) -> WeakTcpSocketId<I, D, BT> {
         let Self(this) = self;
         WeakTcpSocketId(StrongRc::downgrade(this))
@@ -1767,11 +1779,11 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpSocketId<I, 
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-pub struct WeakTcpSocketId<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
+pub struct WeakTcpSocketId<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
     WeakRc<I, D, BT>,
 );
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Debug
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Debug
     for WeakTcpSocketId<I, D, BT>
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1780,8 +1792,8 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Debug
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PartialEq<TcpSocketId<I, D, BT>>
-    for WeakTcpSocketId<I, D, BT>
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
+    PartialEq<TcpSocketId<I, D, BT>> for WeakTcpSocketId<I, D, BT>
 {
     fn eq(&self, other: &TcpSocketId<I, D, BT>) -> bool {
         let Self(this) = self;
@@ -1790,7 +1802,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PartialEq<TcpSo
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> WeakTcpSocketId<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> WeakTcpSocketId<I, D, BT> {
     #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn upgrade(&self) -> Option<TcpSocketId<I, D, BT>> {
         let Self(this) = self;
@@ -1798,7 +1810,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> WeakTcpSocketId
     }
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
     OrderedLockAccess<TcpSocketState<I, D, BT>> for TcpSocketId<I, D, BT>
 {
     type Lock = RwLock<TcpSocketState<I, D, BT>>;
@@ -2566,7 +2578,7 @@ where
                     };
                 fn single_stack_remover<
                     WireI: DualStackIpExt,
-                    D: device::WeakId,
+                    D: WeakDeviceIdentifier,
                     BT: TcpBindingsTypes,
                 >(
                     socketmap: &mut BoundSocketMap<WireI, D, BT>,
@@ -3271,7 +3283,7 @@ where
     ) -> Result<(), SetDeviceError>
     where
         WireI: DualStackIpExt,
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
     {
         let entry = socketmap
             .listeners_mut()
@@ -4954,7 +4966,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     CC: CounterContext<TcpCounters<SockI>>
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
     BC: TcpBindingsTypes,
-    D: WeakId,
+    D: WeakDeviceIdentifier,
 {
     let control = segment.contents.control();
     let result = match ip_sock {
@@ -5031,7 +5043,7 @@ mod tests {
             link::LinkDevice,
             socket::DeviceSocketTypes,
             testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
-            DeviceLayerStateTypes,
+            DeviceLayerStateTypes, StrongDeviceIdentifier,
         },
         filter::{FilterBindingsTypes, TransportPacketSerializer},
         ip::{
@@ -5122,7 +5134,7 @@ mod tests {
     /// This is required because we implement the traits on [`TcpCoreCtx`]
     /// abstracting away the bindings types, even though they're always
     /// [`TcpBindingsCtx`].
-    trait TcpTestBindingsTypes<D: device::StrongId>:
+    trait TcpTestBindingsTypes<D: StrongDeviceIdentifier>:
         TcpBindingsTypes<DispatchId = TimerId<D::Weak, Self>> + Sized
     {
     }
@@ -5130,7 +5142,7 @@ mod tests {
     impl<D, BT> TcpTestBindingsTypes<D> for BT
     where
         BT: TcpBindingsTypes<DispatchId = TimerId<D::Weak, Self>> + Sized,
-        D: device::StrongId,
+        D: StrongDeviceIdentifier,
     {
     }
 
@@ -5876,7 +5888,7 @@ mod tests {
     }
 
     /// Utilities for accessing locked internal state in tests.
-    impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
+    impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
         fn get(&self) -> impl Deref<Target = TcpSocketState<I, D, BT>> + '_ {
             let Self(rc) = self;
             rc.read()

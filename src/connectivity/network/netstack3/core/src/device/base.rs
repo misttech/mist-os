@@ -29,7 +29,7 @@ use crate::{
         ethernet::{EthernetLinkDevice, EthernetTimerId},
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
-            EthernetWeakDeviceId, StrongId, WeakId,
+            EthernetWeakDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier,
         },
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
@@ -66,10 +66,10 @@ impl Device for AnyDevice {}
 /// netstack internals to share.
 pub trait DeviceIdContext<D: Device> {
     /// The type of device IDs.
-    type DeviceId: StrongId<Weak = Self::WeakDeviceId> + 'static;
+    type DeviceId: StrongDeviceIdentifier<Weak = Self::WeakDeviceId> + 'static;
 
     /// The type of weakly referenced device IDs.
-    type WeakDeviceId: WeakId<Strong = Self::DeviceId> + 'static;
+    type WeakDeviceId: WeakDeviceIdentifier<Strong = Self::DeviceId> + 'static;
 }
 
 /// A marker trait tying [`DeviceIdContext`] implementations.
@@ -85,9 +85,9 @@ pub trait DeviceIdAnyCompatContext<D: Device>:
     DeviceIdContext<D>
     + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId_, WeakDeviceId = Self::WeakDeviceId_>
 {
-    type DeviceId_: StrongId<Weak = Self::WeakDeviceId_>
+    type DeviceId_: StrongDeviceIdentifier<Weak = Self::WeakDeviceId_>
         + From<<Self as DeviceIdContext<D>>::DeviceId>;
-    type WeakDeviceId_: WeakId<Strong = Self::DeviceId_>
+    type WeakDeviceId_: WeakDeviceIdentifier<Strong = Self::DeviceId_>
         + From<<Self as DeviceIdContext<D>>::WeakDeviceId>;
 }
 
@@ -602,11 +602,6 @@ pub enum DeviceSendFrameError<T> {
 pub(crate) mod testutil {
     use super::*;
 
-    #[cfg(test)]
-    use alloc::sync::Arc;
-    #[cfg(test)]
-    use core::sync::atomic::AtomicBool;
-
     use crate::{
         ip::device::config::{
             IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
@@ -615,170 +610,11 @@ pub(crate) mod testutil {
         testutil::{Ctx, CtxPairExt as _},
     };
 
-    /// A fake weak device id.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-    pub struct FakeWeakDeviceId<D>(pub(crate) D);
-
-    impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {
-        fn eq(&self, other: &D) -> bool {
-            let Self(this) = self;
-            this == other
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> WeakId for FakeWeakDeviceId<D> {
-        type Strong = D;
-
-        fn upgrade(&self) -> Option<D> {
-            let Self(inner) = self;
-            inner.is_alive().then(|| inner.clone())
-        }
-    }
-
-    impl<D: crate::device::Id> crate::device::Id for FakeWeakDeviceId<D> {
-        fn is_loopback(&self) -> bool {
-            let Self(inner) = self;
-            inner.is_loopback()
-        }
-    }
-
-    /// A fake device ID for use in testing.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-    pub(crate) struct FakeDeviceId;
-
-    impl StrongId for FakeDeviceId {
-        type Weak = FakeWeakDeviceId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakDeviceId(self.clone())
-        }
-    }
-
-    impl crate::device::Id for FakeDeviceId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    impl crate::filter::InterfaceProperties<()> for FakeDeviceId {
-        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
-        fn device_class_matches(&self, _: &()) -> bool {
-            unimplemented!()
-        }
-    }
-
-    impl FakeStrongDeviceId for FakeDeviceId {
-        fn is_alive(&self) -> bool {
-            true
-        }
-    }
-
-    /// A fake device ID for use in testing.
-    ///
-    /// [`FakeReferencyDeviceId`] behaves like a referency device ID, each
-    /// constructed instance represents a new device.
-    #[derive(Clone, Debug, Default)]
     #[cfg(test)]
-    pub(crate) struct FakeReferencyDeviceId {
-        removed: Arc<AtomicBool>,
-    }
-
-    #[cfg(test)]
-    impl core::hash::Hash for FakeReferencyDeviceId {
-        fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-            let Self { removed } = self;
-            core::ptr::hash(alloc::sync::Arc::as_ptr(removed), state)
-        }
-    }
-
-    #[cfg(test)]
-    impl core::cmp::Eq for FakeReferencyDeviceId {}
-
-    #[cfg(test)]
-    impl core::cmp::PartialEq for FakeReferencyDeviceId {
-        fn eq(&self, Self { removed: other }: &Self) -> bool {
-            let Self { removed } = self;
-            alloc::sync::Arc::ptr_eq(removed, other)
-        }
-    }
-
-    #[cfg(test)]
-    impl core::cmp::Ord for FakeReferencyDeviceId {
-        fn cmp(&self, Self { removed: other }: &Self) -> core::cmp::Ordering {
-            let Self { removed } = self;
-            alloc::sync::Arc::as_ptr(removed).cmp(&alloc::sync::Arc::as_ptr(other))
-        }
-    }
-
-    #[cfg(test)]
-    impl core::cmp::PartialOrd for FakeReferencyDeviceId {
-        fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    #[cfg(test)]
-    impl FakeReferencyDeviceId {
-        /// Marks this device as removed, all weak references will not be able
-        /// to upgrade anymore.
-        pub(crate) fn mark_removed(&self) {
-            self.removed.store(true, core::sync::atomic::Ordering::Relaxed);
-        }
-    }
-
-    #[cfg(test)]
-    impl StrongId for FakeReferencyDeviceId {
-        type Weak = FakeWeakDeviceId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakDeviceId(self.clone())
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::device::Id for FakeReferencyDeviceId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::filter::InterfaceProperties<()> for FakeReferencyDeviceId {
-        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
-        fn device_class_matches(&self, _: &()) -> bool {
-            unimplemented!()
-        }
-    }
-
-    #[cfg(test)]
-    impl FakeStrongDeviceId for FakeReferencyDeviceId {
-        fn is_alive(&self) -> bool {
-            !self.removed.load(core::sync::atomic::Ordering::Relaxed)
-        }
-    }
-
-    /// Marks a fake strong device id.
-    pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {
-        /// Returns whether this ID is still alive.
-        ///
-        /// This is used by [`FakeWeakDeviceId`] to return `None` when trying to
-        /// upgrade back a `FakeStrongDeviceId`.
-        fn is_alive(&self) -> bool;
-    }
+    pub(crate) use netstack3_base::testutil::{
+        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+        MultipleDevicesId,
+    };
 
     /// Enables `device`.
     pub fn enable_device<BC: BindingsContext>(ctx: &mut Ctx<BC>, device: &DeviceId<BC>) {
@@ -834,61 +670,6 @@ pub(crate) mod testutil {
         let crate::ip::device::state::IpDeviceConfiguration { forwarding_enabled, .. } =
             configuration.as_ref();
         *forwarding_enabled
-    }
-
-    /// A device ID type that supports identifying more than one distinct
-    /// device.
-    #[cfg(test)]
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
-    pub(crate) enum MultipleDevicesId {
-        A,
-        B,
-        C,
-    }
-
-    #[cfg(test)]
-    impl MultipleDevicesId {
-        pub(crate) fn all() -> [Self; 3] {
-            [Self::A, Self::B, Self::C]
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::device::Id for MultipleDevicesId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    #[cfg(test)]
-    impl StrongId for MultipleDevicesId {
-        type Weak = FakeWeakDeviceId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakDeviceId(self.clone())
-        }
-    }
-
-    #[cfg(test)]
-    impl FakeStrongDeviceId for MultipleDevicesId {
-        fn is_alive(&self) -> bool {
-            true
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::filter::InterfaceProperties<()> for MultipleDevicesId {
-        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
-        fn device_class_matches(&self, _: &()) -> bool {
-            unimplemented!()
-        }
     }
 }
 

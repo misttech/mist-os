@@ -53,7 +53,7 @@ use crate::{
         CoreTimerContext, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult},
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
     time::LocalTimerHeap,
     Instant,
 };
@@ -858,12 +858,12 @@ impl<I: Instant, P: ProtocolSpecific> GmpStateMachine<I, P> {
 
 /// A timer ID for GMP to send a report.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct GmpDelayedReportTimerId<I: Ip, D: device::WeakId> {
+pub struct GmpDelayedReportTimerId<I: Ip, D: WeakDeviceIdentifier> {
     pub(crate) device: D,
     pub(crate) _marker: IpVersionMarker<I>,
 }
 
-impl<I: Ip, D: device::WeakId> GmpDelayedReportTimerId<I, D> {
+impl<I: Ip, D: WeakDeviceIdentifier> GmpDelayedReportTimerId<I, D> {
     fn device_id(&self) -> &D {
         let Self { device, _marker: IpVersionMarker { .. } } = self;
         device
@@ -900,7 +900,7 @@ pub struct GmpState<I: Ip, BT: GmpBindingsTypes> {
 // RngContext to construct GmpState.
 impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
     pub(crate) fn new<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         CC: CoreTimerContext<GmpDelayedReportTimerId<I, D>, BC>,
     >(
         bindings_ctx: &mut BC,

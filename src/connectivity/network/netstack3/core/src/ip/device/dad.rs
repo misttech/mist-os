@@ -18,7 +18,7 @@ use crate::{
         CoreEventContext, CoreTimerContext, EventContext, HandleableTimer, TimerBindingsTypes,
         TimerContext,
     },
-    device::{self, AnyDevice, DeviceIdContext, StrongId as _, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier as _, WeakDeviceIdentifier},
     ip::device::{
         state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext,
         IpDeviceIpExt, WeakIpAddressId,
@@ -27,12 +27,12 @@ use crate::{
 
 /// A timer ID for duplicate address detection.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct DadTimerId<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> {
+pub struct DadTimerId<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> {
     pub(crate) device_id: D,
     pub(crate) addr: A,
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> DadTimerId<D, A> {
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> DadTimerId<D, A> {
     pub(super) fn device_id(&self) -> &D {
         let Self { device_id, addr: _ } = self;
         device_id

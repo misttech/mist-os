@@ -43,7 +43,7 @@ use crate::{
         DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
         InstantContext, RngContext, TimerContext, TimerHandler,
     },
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier},
     error::{ExistsError, NotFoundError},
     filter::{IpPacket, ProofOfEgressCheck},
     inspect::Inspectable,
@@ -97,13 +97,15 @@ use self::state::Ipv6NetworkLearnedParameters;
     Debug(bound = "")
 )]
 #[generic_over_ip(I, Ip)]
-pub struct IpDeviceTimerId<I: IpDeviceIpExt, D: device::WeakId, A: IpAddressIdSpec>(I::Timer<D, A>);
+pub struct IpDeviceTimerId<I: IpDeviceIpExt, D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
+    I::Timer<D, A>,
+);
 
 /// A timer ID for IPv4 devices.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct Ipv4DeviceTimerId<D: device::WeakId>(IgmpTimerId<D>);
+pub struct Ipv4DeviceTimerId<D: WeakDeviceIdentifier>(IgmpTimerId<D>);
 
-impl<D: device::WeakId> Ipv4DeviceTimerId<D> {
+impl<D: WeakDeviceIdentifier> Ipv4DeviceTimerId<D> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
         let Self(this) = self;
@@ -111,7 +113,7 @@ impl<D: device::WeakId> Ipv4DeviceTimerId<D> {
     }
 }
 
-impl<D: device::WeakId, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv4, D, A>>
+impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv4, D, A>>
     for Ipv4DeviceTimerId<D>
 {
     fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv4, D, A>) -> Self {
@@ -119,7 +121,7 @@ impl<D: device::WeakId, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv4, D, A>>
     }
 }
 
-impl<D: device::WeakId, A: IpAddressIdSpec> From<Ipv4DeviceTimerId<D>>
+impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<Ipv4DeviceTimerId<D>>
     for IpDeviceTimerId<Ipv4, D, A>
 {
     fn from(value: Ipv4DeviceTimerId<D>) -> Self {
@@ -127,13 +129,13 @@ impl<D: device::WeakId, A: IpAddressIdSpec> From<Ipv4DeviceTimerId<D>>
     }
 }
 
-impl<D: device::WeakId> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
+impl<D: WeakDeviceIdentifier> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
     fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D> {
         Ipv4DeviceTimerId(id)
     }
 }
 
-impl<D: device::WeakId, BC, CC: TimerHandler<BC, IgmpTimerId<D>>> HandleableTimer<CC, BC>
+impl<D: WeakDeviceIdentifier, BC, CC: TimerHandler<BC, IgmpTimerId<D>>> HandleableTimer<CC, BC>
     for Ipv4DeviceTimerId<D>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
@@ -164,7 +166,7 @@ where
 
 /// A timer ID for IPv6 devices.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub enum Ipv6DeviceTimerId<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> {
+pub enum Ipv6DeviceTimerId<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> {
     Mld(MldTimerId<D>),
     Dad(DadTimerId<D, A>),
     Rs(RsTimerId<D>),
@@ -172,7 +174,7 @@ pub enum Ipv6DeviceTimerId<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> {
     Slaac(SlaacTimerId<D>),
 }
 
-impl<D: device::WeakId, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv6, D, A>>
+impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv6, D, A>>
     for Ipv6DeviceTimerId<D, A::WeakV6>
 {
     fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv6, D, A>) -> Self {
@@ -180,7 +182,7 @@ impl<D: device::WeakId, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv6, D, A>>
     }
 }
 
-impl<D: device::WeakId, A: IpAddressIdSpec> From<Ipv6DeviceTimerId<D, A::WeakV6>>
+impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<Ipv6DeviceTimerId<D, A::WeakV6>>
     for IpDeviceTimerId<Ipv6, D, A>
 {
     fn from(value: Ipv6DeviceTimerId<D, A::WeakV6>) -> Self {
@@ -188,7 +190,7 @@ impl<D: device::WeakId, A: IpAddressIdSpec> From<Ipv6DeviceTimerId<D, A::WeakV6>
     }
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D, A> {
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D, A> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
         match self {
@@ -202,7 +204,7 @@ impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D, A> {
     }
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<MldTimerId<D>>
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<MldTimerId<D>>
     for Ipv6DeviceTimerId<D, A>
 {
     fn from(id: MldTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
@@ -210,7 +212,7 @@ impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<MldTimerId<D>>
     }
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<D, A>>
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<D, A>>
     for Ipv6DeviceTimerId<D, A>
 {
     fn from(id: DadTimerId<D, A>) -> Ipv6DeviceTimerId<D, A> {
@@ -218,7 +220,7 @@ impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<D, A>>
     }
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<RsTimerId<D>>
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<RsTimerId<D>>
     for Ipv6DeviceTimerId<D, A>
 {
     fn from(id: RsTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
@@ -226,7 +228,7 @@ impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<RsTimerId<D>>
     }
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<Ipv6DiscoveredRouteTimerId<D>>
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<Ipv6DiscoveredRouteTimerId<D>>
     for Ipv6DeviceTimerId<D, A>
 {
     fn from(id: Ipv6DiscoveredRouteTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
@@ -234,7 +236,7 @@ impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<Ipv6DiscoveredRouteTi
     }
 }
 
-impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<SlaacTimerId<D>>
+impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<SlaacTimerId<D>>
     for Ipv6DeviceTimerId<D, A>
 {
     fn from(id: SlaacTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
@@ -243,7 +245,7 @@ impl<D: device::WeakId, A: WeakIpAddressId<Ipv6Addr>> From<SlaacTimerId<D>>
 }
 
 impl<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         A: WeakIpAddressId<Ipv6Addr>,
         BC,
         CC: TimerHandler<BC, RsTimerId<D>>
@@ -269,7 +271,7 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
     type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
         + AsMut<IpDeviceState<Self, BT>>;
     type Configuration: AsRef<IpDeviceConfiguration> + Clone;
-    type Timer<D: device::WeakId, A: IpAddressIdSpec>: Into<IpDeviceTimerId<Self, D, A>>
+    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec>: Into<IpDeviceTimerId<Self, D, A>>
         + From<IpDeviceTimerId<Self, D, A>>
         + Clone
         + Eq
@@ -301,7 +303,7 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
 
     fn is_addr_assigned<I: Instant>(addr_state: &Self::AddressState<I>) -> bool;
 
-    fn timer_device_id<D: device::WeakId, A: IpAddressIdSpec>(
+    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
         timer: &Self::Timer<D, A>,
     ) -> Option<D::Strong>;
 
@@ -313,7 +315,7 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
 impl IpDeviceIpExt for Ipv4 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv4DeviceState<BT>;
     type Configuration = Ipv4DeviceConfiguration;
-    type Timer<D: device::WeakId, A: IpAddressIdSpec> = Ipv4DeviceTimerId<D>;
+    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv4DeviceTimerId<D>;
     type AssignedWitness = SpecifiedAddr<Ipv4Addr>;
     type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
@@ -330,7 +332,7 @@ impl IpDeviceIpExt for Ipv4 {
         true
     }
 
-    fn timer_device_id<D: device::WeakId, A: IpAddressIdSpec>(
+    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
         timer: &Self::Timer<D, A>,
     ) -> Option<D::Strong> {
         timer.device_id()
@@ -346,7 +348,7 @@ impl IpDeviceIpExt for Ipv4 {
 impl IpDeviceIpExt for Ipv6 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv6DeviceState<BT>;
     type Configuration = Ipv6DeviceConfiguration;
-    type Timer<D: device::WeakId, A: IpAddressIdSpec> = Ipv6DeviceTimerId<D, A::WeakV6>;
+    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv6DeviceTimerId<D, A::WeakV6>;
     type AssignedWitness = Ipv6DeviceAddr;
     type AddressConfig<I: Instant> = Ipv6AddrConfig<I>;
     type ManualAddressConfig<I: Instant> = Ipv6AddrManualConfig<I>;
@@ -362,7 +364,7 @@ impl IpDeviceIpExt for Ipv6 {
         addr_state.flags.assigned
     }
 
-    fn timer_device_id<D: device::WeakId, A: IpAddressIdSpec>(
+    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
         timer: &Self::Timer<D, A>,
     ) -> Option<D::Strong> {
         timer.device_id()
@@ -459,7 +461,7 @@ pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
 }
 
 /// The bindings execution context for IP devices.
-pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
+pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: StrongDeviceIdentifier>:
     IpDeviceStateBindingsTypes
     + DeferredResourceRemovalContext
     + TimerContext
@@ -468,7 +470,7 @@ pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, D: device::StrongId>:
 {
 }
 impl<
-        D: device::StrongId,
+        D: StrongDeviceIdentifier,
         I: IpDeviceIpExt,
         BC: IpDeviceStateBindingsTypes
             + DeferredResourceRemovalContext

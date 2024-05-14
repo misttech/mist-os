@@ -65,6 +65,7 @@ use crate::{
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTimerId,
         DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceCounters,
         EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, RecvIpFrameMeta,
+        WeakDeviceIdentifier,
     },
     ip::{
         device::nud::{
@@ -825,12 +826,14 @@ fn deliver_as(
 /// `D` is the type of device ID that identifies different Ethernet devices.
 #[derive(Clone, Eq, PartialEq, Debug, Hash, GenericOverIp)]
 #[generic_over_ip()]
-pub enum EthernetTimerId<D: device::WeakId> {
+pub enum EthernetTimerId<D: WeakDeviceIdentifier> {
     Arp(ArpTimerId<EthernetLinkDevice, D>),
     Nudv6(NudTimerId<Ipv6, EthernetLinkDevice, D>),
 }
 
-impl<I: Ip, D: device::WeakId> From<NudTimerId<I, EthernetLinkDevice, D>> for EthernetTimerId<D> {
+impl<I: Ip, D: WeakDeviceIdentifier> From<NudTimerId<I, EthernetLinkDevice, D>>
+    for EthernetTimerId<D>
+{
     fn from(id: NudTimerId<I, EthernetLinkDevice, D>) -> EthernetTimerId<D> {
         I::map_ip(id, EthernetTimerId::Arp, EthernetTimerId::Nudv6)
     }
@@ -1468,7 +1471,7 @@ impl DeviceStateSpec for EthernetLinkDevice {
     type External<BT: DeviceLayerTypes> = BT::EthernetDeviceState;
     type CreationProperties = EthernetCreationProperties;
     type Counters = EthernetDeviceCounters;
-    type TimerId<D: device::WeakId> = EthernetTimerId<D>;
+    type TimerId<D: WeakDeviceIdentifier> = EthernetTimerId<D>;
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,

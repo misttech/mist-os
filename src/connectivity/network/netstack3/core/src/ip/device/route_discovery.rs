@@ -19,7 +19,7 @@ use crate::{
     context::{
         CoreTimerContext, HandleableTimer, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
     },
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
     time::LocalTimerHeap,
 };
 
@@ -34,7 +34,7 @@ pub struct Ipv6RouteDiscoveryState<BT: Ipv6RouteDiscoveryBindingsTypes> {
 }
 
 impl<BC: Ipv6RouteDiscoveryBindingsContext> Ipv6RouteDiscoveryState<BC> {
-    pub fn new<D: device::WeakId, CC: CoreTimerContext<Ipv6DiscoveredRouteTimerId<D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<Ipv6DiscoveredRouteTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {
@@ -62,11 +62,11 @@ pub struct Ipv6DiscoveredRoute {
 
 /// A timer ID for IPv6 route discovery.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct Ipv6DiscoveredRouteTimerId<D: device::WeakId> {
+pub struct Ipv6DiscoveredRouteTimerId<D: WeakDeviceIdentifier> {
     device_id: D,
 }
 
-impl<D: device::WeakId> Ipv6DiscoveredRouteTimerId<D> {
+impl<D: WeakDeviceIdentifier> Ipv6DiscoveredRouteTimerId<D> {
     pub(super) fn device_id(&self) -> &D {
         &self.device_id
     }

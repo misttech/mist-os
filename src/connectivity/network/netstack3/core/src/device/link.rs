@@ -73,7 +73,7 @@ pub(crate) mod testutil {
         context::testutil::FakeCoreCtx,
         device::{
             testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-            DeviceIdContext, Id, StrongId,
+            DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier,
         },
     };
 
@@ -121,7 +121,7 @@ pub(crate) mod testutil {
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
     pub(crate) struct FakeLinkDeviceId;
 
-    impl StrongId for FakeLinkDeviceId {
+    impl StrongDeviceIdentifier for FakeLinkDeviceId {
         type Weak = FakeWeakDeviceId<Self>;
 
         fn downgrade(&self) -> Self::Weak {
@@ -129,7 +129,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl Id for FakeLinkDeviceId {
+    impl DeviceIdentifier for FakeLinkDeviceId {
         fn is_loopback(&self) -> bool {
             false
         }

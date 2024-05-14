@@ -51,7 +51,9 @@ use crate::{
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
-    device::{self, AnyDevice, DeviceIdContext, FrameDestination, StrongId as _, WeakId as _},
+    device::{
+        AnyDevice, DeviceIdContext, FrameDestination, StrongDeviceIdentifier, WeakDeviceIdentifier,
+    },
     filter::{MaybeTransportPacket, TransportPacketSerializer},
     ip::{
         base::TransparentLocalDelivery,
@@ -155,7 +157,7 @@ impl From<Icmpv6ErrorCode> for IcmpErrorCode {
 #[generic_over_ip(I, Ip)]
 pub(crate) struct IcmpState<
     I: IpExt + datagram::DualStackIpExt,
-    D: device::WeakId,
+    D: WeakDeviceIdentifier,
     BT: IcmpBindingsTypes,
 > {
     pub(crate) sockets: IcmpSockets<I, D, BT>,
@@ -333,7 +335,9 @@ impl Icmpv4StateBuilder {
         self
     }
 
-    pub(crate) fn build<D: device::WeakId, BT: IcmpBindingsTypes>(self) -> Icmpv4State<D, BT> {
+    pub(crate) fn build<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes>(
+        self,
+    ) -> Icmpv4State<D, BT> {
         Icmpv4State {
             inner: IcmpState {
                 sockets: Default::default(),
@@ -347,13 +351,13 @@ impl Icmpv4StateBuilder {
 }
 
 /// The state associated with the ICMPv4 protocol.
-pub(crate) struct Icmpv4State<D: device::WeakId, BT: IcmpBindingsTypes> {
+pub(crate) struct Icmpv4State<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> {
     pub(crate) inner: IcmpState<Ipv4, D, BT>,
     send_timestamp_reply: bool,
 }
 
 // Used by `receive_icmp_echo_reply`.
-impl<D: device::WeakId, BT: IcmpBindingsTypes> AsRef<IcmpState<Ipv4, D, BT>>
+impl<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> AsRef<IcmpState<Ipv4, D, BT>>
     for Icmpv4State<D, BT>
 {
     fn as_ref(&self) -> &IcmpState<Ipv4, D, BT> {
@@ -362,7 +366,7 @@ impl<D: device::WeakId, BT: IcmpBindingsTypes> AsRef<IcmpState<Ipv4, D, BT>>
 }
 
 // Used by `send_icmpv4_echo_request_inner`.
-impl<D: device::WeakId, BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv4, D, BT>>
+impl<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv4, D, BT>>
     for Icmpv4State<D, BT>
 {
     fn as_mut(&mut self) -> &mut IcmpState<Ipv4, D, BT> {
@@ -383,7 +387,9 @@ impl Default for Icmpv6StateBuilder {
 }
 
 impl Icmpv6StateBuilder {
-    pub(crate) fn build<D: device::WeakId, BT: IcmpBindingsTypes>(self) -> Icmpv6State<D, BT> {
+    pub(crate) fn build<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes>(
+        self,
+    ) -> Icmpv6State<D, BT> {
         Icmpv6State {
             inner: IcmpState {
                 sockets: Default::default(),
@@ -397,13 +403,13 @@ impl Icmpv6StateBuilder {
 }
 
 /// The state associated with the ICMPv6 protocol.
-pub(crate) struct Icmpv6State<D: device::WeakId, BT: IcmpBindingsTypes> {
+pub(crate) struct Icmpv6State<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> {
     pub(crate) inner: IcmpState<Ipv6, D, BT>,
     pub(crate) ndp_counters: NdpCounters,
 }
 
 // Used by `receive_icmp_echo_reply`.
-impl<D: device::WeakId, BT: IcmpBindingsTypes> AsRef<IcmpState<Ipv6, D, BT>>
+impl<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> AsRef<IcmpState<Ipv6, D, BT>>
     for Icmpv6State<D, BT>
 {
     fn as_ref(&self) -> &IcmpState<Ipv6, D, BT> {
@@ -412,7 +418,7 @@ impl<D: device::WeakId, BT: IcmpBindingsTypes> AsRef<IcmpState<Ipv6, D, BT>>
 }
 
 // Used by `send_icmpv6_echo_request_inner`.
-impl<D: device::WeakId, BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv6, D, BT>>
+impl<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv6, D, BT>>
     for Icmpv6State<D, BT>
 {
     fn as_mut(&mut self) -> &mut IcmpState<Ipv6, D, BT> {
@@ -708,7 +714,7 @@ impl<
 
 /// A marker for all the contexts provided by bindings require by the ICMP
 /// module.
-pub trait IcmpBindingsContext<I: socket::IpExt, D: device::StrongId>:
+pub trait IcmpBindingsContext<I: socket::IpExt, D: StrongDeviceIdentifier>:
     InstantContext + IcmpEchoBindingsContext<I, D> + RngContext + ReferenceNotifiers + IcmpBindingsTypes
 {
 }
@@ -719,7 +725,7 @@ impl<
             + RngContext
             + ReferenceNotifiers
             + IcmpBindingsTypes,
-        D: device::StrongId,
+        D: StrongDeviceIdentifier,
     > IcmpBindingsContext<I, D> for BC
 {
 }
@@ -3133,7 +3139,7 @@ mod tests {
     /// This is exposed to super so it can be shared with the socket tests.
     pub(super) type FakeIcmpCtx<I> = CtxPair<FakeIcmpCoreCtx<I>, FakeIcmpBindingsCtx<I>>;
 
-    pub(super) struct FakeIcmpCoreCtxState<I: socket::IpExt, D: device::WeakId> {
+    pub(super) struct FakeIcmpCoreCtxState<I: socket::IpExt, D: WeakDeviceIdentifier> {
         bound_socket_map_and_allocator: BoundSockets<I, D, FakeIcmpBindingsCtx<I>>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
@@ -3251,7 +3257,7 @@ mod tests {
     }
 
     /// Utilities for accessing locked internal state in tests.
-    impl<I: socket::IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, BT> {
+    impl<I: socket::IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, BT> {
         fn get(&self) -> impl Deref<Target = IcmpSocketState<I, D, BT>> + '_ {
             self.state_for_locking().read()
         }

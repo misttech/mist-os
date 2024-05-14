@@ -10,7 +10,7 @@ use packet::{BufferMut, Serializer};
 
 use crate::{
     context::CounterContext,
-    device::{self, Device, DeviceIdContext},
+    device::{Device, DeviceIdContext, WeakDeviceIdentifier},
     ip::{
         socket::{DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError, SendOptions},
         EitherDeviceId, HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError,
@@ -189,7 +189,7 @@ where
 
 impl<
         I: tcp_socket::DualStackIpExt,
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         BT: TcpBindingsTypes,
         P: tcp_socket::TcpDemuxContext<I, D, BT>,
     > tcp_socket::TcpDemuxContext<I, D, BT> for UninstantiableWrapper<P>
@@ -285,7 +285,7 @@ impl<P> tcp_socket::AsThisStack<P> for UninstantiableWrapper<P> {
 }
 
 impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for Uninstantiable {
-    fn convert<D: device::WeakId, BT: tcp_socket::TcpBindingsTypes>(
+    fn convert<D: WeakDeviceIdentifier, BT: tcp_socket::TcpBindingsTypes>(
         &self,
         _id: tcp_socket::TcpSocketId<I, D, BT>,
     ) -> <I::OtherVersion as tcp_socket::DualStackIpExt>::DemuxSocketId<D, BT> {
@@ -295,7 +295,7 @@ impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for
 
 impl<
         I: tcp_socket::DualStackIpExt,
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         BT: TcpBindingsTypes,
         P: tcp_socket::TcpDualStackContext<I::OtherVersion, D, BT>,
     > tcp_socket::TcpDualStackContext<I, D, BT> for UninstantiableWrapper<P>

@@ -42,9 +42,8 @@ use crate::{
     },
     counters::Counter,
     device::{
-        self,
         link::{LinkAddress, LinkDevice, LinkUnicastAddress},
-        AnyDevice, DeviceIdContext, StrongId, WeakId as _,
+        AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
     },
     error::AddressResolutionFailed,
     socket::address::SocketIpAddr,
@@ -332,7 +331,7 @@ fn schedule_timer_if_should_retransmit<I, D, DeviceId, CC, BC>(
 where
     I: Ip,
     D: LinkDevice,
-    DeviceId: StrongId,
+    DeviceId: StrongDeviceIdentifier,
     BC: NudBindingsContext<I, D, DeviceId>,
     CC: NudConfigContext<I>,
 {
@@ -395,7 +394,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         D: LinkDevice,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
     {
         let mut this = Incomplete {
             transmit_counter: Some(core_ctx.max_multicast_solicit()),
@@ -423,7 +422,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         D: LinkDevice,
         BC: NudBindingsContext<I, D, DeviceId, Notifier = N>,
         CC: NudConfigContext<I>,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
     {
         let mut this = Incomplete {
             transmit_counter: Some(core_ctx.max_multicast_solicit()),
@@ -449,7 +448,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
     where
         I: Ip,
         D: LinkDevice,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
     {
@@ -581,7 +580,7 @@ impl<D: LinkDevice> Delay<D> {
     ) -> Probe<D>
     where
         I: Ip,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
     {
@@ -622,7 +621,7 @@ impl<D: LinkDevice> Probe<D> {
     ) -> bool
     where
         I: Ip,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
     {
@@ -720,7 +719,7 @@ impl<D: LinkDevice> Unreachable<D> {
     ) -> Option<TransmitProbe<D::Address>>
     where
         I: Ip,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
     {
@@ -774,7 +773,7 @@ impl<D: LinkDevice> Unreachable<D> {
     ) -> bool
     where
         I: Ip,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
     {
@@ -840,7 +839,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         neighbor: SpecifiedAddr<I::Addr>,
     ) where
         I: Ip,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId>,
     {
         let expected_event = match self {
@@ -1049,7 +1048,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     )
     where
         I: Ip,
-        DeviceId: StrongId,
+        DeviceId: StrongDeviceIdentifier,
         BC: NudBindingsContext<I, D, DeviceId, Notifier = BT::Notifier>,
         CC: NudConfigContext<I>,
     {
@@ -1433,7 +1432,7 @@ enum NudEvent {
 
 #[derive(GenericOverIp, Copy, Clone, Debug, Eq, PartialEq, Hash)]
 #[generic_over_ip(I, Ip)]
-pub struct NudTimerId<I: Ip, L: LinkDevice, D: device::WeakId> {
+pub struct NudTimerId<I: Ip, L: LinkDevice, D: WeakDeviceIdentifier> {
     device_id: D,
     timer_type: NudTimerType,
     _marker: PhantomData<(I, L)>,
@@ -1454,7 +1453,7 @@ struct TimerHeap<I: Ip, BT: TimerBindingsTypes + InstantBindingsTypes> {
 
 impl<I: Ip, BC: TimerContext> TimerHeap<I, BC> {
     fn new<
-        DeviceId: device::WeakId,
+        DeviceId: WeakDeviceIdentifier,
         L: LinkDevice,
         CC: CoreTimerContext<NudTimerId<I, L, DeviceId>, BC>,
     >(
@@ -1553,7 +1552,10 @@ pub struct NudState<I: Ip, D: LinkDevice, BT: NudBindingsTypes<D>> {
 }
 
 impl<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D> + TimerContext> NudState<I, D, BC> {
-    pub fn new<DeviceId: device::WeakId, CC: CoreTimerContext<NudTimerId<I, D, DeviceId>, BC>>(
+    pub fn new<
+        DeviceId: WeakDeviceIdentifier,
+        CC: CoreTimerContext<NudTimerId<I, D, DeviceId>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
     ) -> Self {

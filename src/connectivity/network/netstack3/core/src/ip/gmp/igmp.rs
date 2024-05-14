@@ -32,7 +32,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{CoreTimerContext, HandleableTimer, TimerContext},
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
     ip::{
         device::IpDeviceSendContext,
         gmp::{
@@ -59,7 +59,7 @@ pub struct IgmpState<BT: IgmpBindingsTypes> {
 }
 
 impl<BC: IgmpBindingsTypes + TimerContext> IgmpState<BC> {
-    pub(crate) fn new<D: device::WeakId, CC: CoreTimerContext<IgmpTimerId<D>, BC>>(
+    pub(crate) fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<IgmpTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device: D,
     ) -> Self {
@@ -322,14 +322,14 @@ pub(crate) enum IgmpError {
 pub(crate) type IgmpResult<T> = Result<T, IgmpError>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum IgmpTimerId<D: device::WeakId> {
+pub enum IgmpTimerId<D: WeakDeviceIdentifier> {
     /// A GMP timer.
     Gmp(GmpDelayedReportTimerId<Ipv4, D>),
     /// The timer used to determine whether there is a router speaking IGMPv1.
     V1RouterPresent { device: D },
 }
 
-impl<D: device::WeakId> IgmpTimerId<D> {
+impl<D: WeakDeviceIdentifier> IgmpTimerId<D> {
     pub(crate) fn device_id(&self) -> &D {
         match self {
             Self::Gmp(id) => id.device_id(),
@@ -338,7 +338,7 @@ impl<D: device::WeakId> IgmpTimerId<D> {
     }
 }
 
-impl<D: device::WeakId> From<GmpDelayedReportTimerId<Ipv4, D>> for IgmpTimerId<D> {
+impl<D: WeakDeviceIdentifier> From<GmpDelayedReportTimerId<Ipv4, D>> for IgmpTimerId<D> {
     fn from(id: GmpDelayedReportTimerId<Ipv4, D>) -> IgmpTimerId<D> {
         IgmpTimerId::Gmp(id)
     }

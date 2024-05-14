@@ -36,7 +36,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::HandleableTimer,
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
     filter::MaybeTransportPacket,
     ip::{
         device::IpDeviceSendContext,
@@ -339,16 +339,16 @@ impl<I: Instant> AsMut<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupStat
 
 /// An MLD timer to delay the sending of a report.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
-pub struct MldTimerId<D: device::WeakId>(pub(crate) GmpDelayedReportTimerId<Ipv6, D>);
+pub struct MldTimerId<D: WeakDeviceIdentifier>(pub(crate) GmpDelayedReportTimerId<Ipv6, D>);
 
-impl<D: device::WeakId> MldTimerId<D> {
+impl<D: WeakDeviceIdentifier> MldTimerId<D> {
     pub(crate) fn device_id(&self) -> &D {
         let Self(this) = self;
         this.device_id()
     }
 }
 
-impl<D: device::WeakId> From<GmpDelayedReportTimerId<Ipv6, D>> for MldTimerId<D> {
+impl<D: WeakDeviceIdentifier> From<GmpDelayedReportTimerId<Ipv6, D>> for MldTimerId<D> {
     fn from(id: GmpDelayedReportTimerId<Ipv6, D>) -> MldTimerId<D> {
         MldTimerId(id)
     }

@@ -22,36 +22,7 @@ use crate::{
     sync::{DynDebugReferences, PrimaryRc, StrongRc},
 };
 
-/// An identifier for a device.
-pub trait Id: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static {
-    /// Returns true if the device is a loopback device.
-    fn is_loopback(&self) -> bool;
-}
-
-/// A strong device reference.
-///
-/// [`StrongId`] indicates that the referenced device is alive while the
-/// instance exists.
-pub trait StrongId: Id {
-    /// The weak version of this identifier.
-    type Weak: WeakId<Strong = Self>;
-
-    /// Returns a weak ID for this strong ID.
-    fn downgrade(&self) -> Self::Weak;
-}
-
-/// A weak device reference.
-///
-/// This is the weak reference equivalent of [`StrongId`].
-pub trait WeakId: Id + PartialEq<Self::Strong> {
-    /// The strong version of this identifier.
-    type Strong: StrongId<Weak = Self>;
-
-    /// Attempts to upgrade this weak ID to a strong ID.
-    ///
-    /// Returns `None` if the resource has been destroyed.
-    fn upgrade(&self) -> Option<Self::Strong>;
-}
+pub(crate) use netstack3_base::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier};
 
 /// A weak ID identifying a device.
 ///
@@ -112,7 +83,7 @@ impl<BT: DeviceLayerTypes> WeakDeviceId<BT> {
     }
 }
 
-impl<BT: DeviceLayerTypes> Id for WeakDeviceId<BT> {
+impl<BT: DeviceLayerTypes> DeviceIdentifier for WeakDeviceId<BT> {
     fn is_loopback(&self) -> bool {
         match self {
             WeakDeviceId::Loopback(_) => true,
@@ -121,7 +92,7 @@ impl<BT: DeviceLayerTypes> Id for WeakDeviceId<BT> {
     }
 }
 
-impl<BT: DeviceLayerTypes> WeakId for WeakDeviceId<BT> {
+impl<BT: DeviceLayerTypes> WeakDeviceIdentifier for WeakDeviceId<BT> {
     type Strong = DeviceId<BT>;
 
     fn upgrade(&self) -> Option<Self::Strong> {
@@ -318,7 +289,7 @@ impl<BT: DeviceLayerTypes> DeviceId<BT> {
     }
 }
 
-impl<BT: DeviceLayerTypes> Id for DeviceId<BT> {
+impl<BT: DeviceLayerTypes> DeviceIdentifier for DeviceId<BT> {
     fn is_loopback(&self) -> bool {
         match self {
             DeviceId::Loopback(_) => true,
@@ -327,7 +298,7 @@ impl<BT: DeviceLayerTypes> Id for DeviceId<BT> {
     }
 }
 
-impl<BT: DeviceLayerTypes> StrongId for DeviceId<BT> {
+impl<BT: DeviceLayerTypes> StrongDeviceIdentifier for DeviceId<BT> {
     type Weak = WeakDeviceId<BT>;
 
     fn downgrade(&self) -> Self::Weak {
@@ -400,13 +371,13 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Debug for BaseWeakDeviceId<T, BT>
     }
 }
 
-impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Id for BaseWeakDeviceId<T, BT> {
+impl<T: DeviceStateSpec, BT: DeviceLayerTypes> DeviceIdentifier for BaseWeakDeviceId<T, BT> {
     fn is_loopback(&self) -> bool {
         T::IS_LOOPBACK
     }
 }
 
-impl<T: DeviceStateSpec, BT: DeviceLayerTypes> WeakId for BaseWeakDeviceId<T, BT> {
+impl<T: DeviceStateSpec, BT: DeviceLayerTypes> WeakDeviceIdentifier for BaseWeakDeviceId<T, BT> {
     type Strong = BaseDeviceId<T, BT>;
 
     fn upgrade(&self) -> Option<Self::Strong> {
@@ -488,13 +459,13 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Debug for BaseDeviceId<T, BT> {
     }
 }
 
-impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Id for BaseDeviceId<T, BT> {
+impl<T: DeviceStateSpec, BT: DeviceLayerTypes> DeviceIdentifier for BaseDeviceId<T, BT> {
     fn is_loopback(&self) -> bool {
         T::IS_LOOPBACK
     }
 }
 
-impl<T: DeviceStateSpec, BT: DeviceLayerTypes> StrongId for BaseDeviceId<T, BT> {
+impl<T: DeviceStateSpec, BT: DeviceLayerTypes> StrongDeviceIdentifier for BaseDeviceId<T, BT> {
     type Weak = BaseWeakDeviceId<T, BT>;
 
     fn downgrade(&self) -> Self::Weak {

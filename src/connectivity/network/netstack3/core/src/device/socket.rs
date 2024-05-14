@@ -25,7 +25,7 @@ use crate::{
     context::{ContextPair, SendFrameContext},
     device::{
         self, AnyDevice, Device, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination,
-        StrongId as _, WeakDeviceId, WeakId as _,
+        StrongDeviceIdentifier as _, WeakDeviceId, WeakDeviceIdentifier as _,
     },
     for_any_device_id,
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
@@ -989,7 +989,7 @@ mod tests {
             testutil::{
                 FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
             },
-            Id,
+            DeviceIdentifier, StrongDeviceIdentifier,
         },
         testutil::CtxPairExt as _,
     };
@@ -1050,11 +1050,11 @@ mod tests {
         }
     }
 
-    impl<D: Id> DeviceSocketTypes for FakeBindingsCtx<D> {
+    impl<D: DeviceIdentifier> DeviceSocketTypes for FakeBindingsCtx<D> {
         type SocketState = ExternalSocketState<D>;
     }
 
-    impl<D: Id> DeviceSocketBindingsContext<D> for FakeBindingsCtx<D> {
+    impl<D: DeviceIdentifier> DeviceSocketBindingsContext<D> for FakeBindingsCtx<D> {
         fn receive_frame(
             &self,
             state: &ExternalSocketState<D>,
@@ -1086,7 +1086,7 @@ mod tests {
     struct ExternalSocketState<D>(Mutex<Vec<ReceivedFrame<D>>>);
 
     type FakeAllSockets<D> =
-        DenseMap<(ExternalSocketState<D>, Target<<D as crate::device::StrongId>::Weak>)>;
+        DenseMap<(ExternalSocketState<D>, Target<<D as StrongDeviceIdentifier>::Weak>)>;
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]

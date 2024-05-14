@@ -26,9 +26,8 @@ use crate::{
     },
     counters::Counter,
     device::{
-        self,
         link::{LinkDevice, LinkUnicastAddress},
-        DeviceIdContext, FrameDestination,
+        DeviceIdContext, FrameDestination, WeakDeviceIdentifier,
     },
     ip::device::nud::{
         self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
@@ -632,7 +631,10 @@ pub struct ArpState<D: ArpDevice, BT: NudBindingsTypes<D>> {
 }
 
 impl<D: ArpDevice, BC: NudBindingsTypes<D> + TimerContext> ArpState<D, BC> {
-    pub fn new<DeviceId: device::WeakId, CC: CoreTimerContext<ArpTimerId<D, DeviceId>, BC>>(
+    pub fn new<
+        DeviceId: WeakDeviceIdentifier,
+        CC: CoreTimerContext<ArpTimerId<D, DeviceId>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
     ) -> Self {

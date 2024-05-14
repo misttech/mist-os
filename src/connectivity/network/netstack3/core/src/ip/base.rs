@@ -46,7 +46,10 @@ use crate::{
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
-    device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
+    device::{
+        AnyDevice, DeviceId, DeviceIdContext, DeviceIdentifier as _, FrameDestination,
+        StrongDeviceIdentifier, WeakDeviceId, WeakDeviceIdentifier,
+    },
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
         FilterHandlerProvider, FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict,
@@ -479,7 +482,7 @@ impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, 
     }
 }
 
-impl<S: Id, W: crate::device::WeakId<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
+impl<S: StrongDeviceIdentifier, W: WeakDeviceIdentifier<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
     pub(crate) fn as_strong_ref<'a>(&'a self) -> Option<Cow<'a, S>> {
         match self {
             EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
@@ -501,7 +504,7 @@ impl<S, W> EitherDeviceId<S, W> {
     }
 }
 
-impl<S: crate::device::StrongId<Weak = W>, W: crate::device::WeakId<Strong = S>>
+impl<S: StrongDeviceIdentifier<Weak = W>, W: WeakDeviceIdentifier<Strong = S>>
     EitherDeviceId<S, W>
 {
     pub(crate) fn as_strong<'a>(&'a self) -> Option<Cow<'a, S>> {
@@ -556,7 +559,7 @@ pub enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub trait IpLayerIpExt: IpExt {
     type AddressStatus;
-    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>: AsRef<
+    type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>: AsRef<
         IpStateInner<Self, StrongDeviceId, BT>,
     >;
     type PacketIdState;
@@ -567,7 +570,8 @@ pub trait IpLayerIpExt: IpExt {
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
-    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv4State<StrongDeviceId, BT>;
+    type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> =
+        Ipv4State<StrongDeviceId, BT>;
     type PacketIdState = AtomicU16;
     type PacketId = u16;
     type RxCounters = Ipv4RxCounters;
@@ -581,7 +585,8 @@ impl IpLayerIpExt for Ipv4 {
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
-    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv6State<StrongDeviceId, BT>;
+    type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> =
+        Ipv6State<StrongDeviceId, BT>;
     type PacketIdState = ();
     type PacketId = ();
     type RxCounters = Ipv6RxCounters;
@@ -1124,7 +1129,9 @@ where
     //
     // See https://github.com/rust-lang/rust/issues/20671#issuecomment-1905186183
     // for more discussion.
-    type DeviceId_: crate::filter::InterfaceProperties<BC::DeviceClass> + StrongId + Debug;
+    type DeviceId_: crate::filter::InterfaceProperties<BC::DeviceClass>
+        + StrongDeviceIdentifier
+        + Debug;
 }
 
 impl<I, BC, CC> IpLayerEgressContext<I, BC> for CC
@@ -1280,7 +1287,7 @@ impl Ipv4StateBuilder {
 
     pub(crate) fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
-        StrongDeviceId: StrongId,
+        StrongDeviceId: StrongDeviceIdentifier,
         BC: TimerContext + IpLayerBindingsTypes,
     >(
         self,
@@ -1308,7 +1315,7 @@ pub(crate) struct Ipv6StateBuilder {
 impl Ipv6StateBuilder {
     pub(crate) fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
-        StrongDeviceId: StrongId,
+        StrongDeviceId: StrongDeviceIdentifier,
         BC: TimerContext + IpLayerBindingsTypes,
     >(
         self,
@@ -1327,14 +1334,16 @@ impl Ipv6StateBuilder {
     }
 }
 
-pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
+pub struct Ipv4State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
     pub(super) filter: RwLock<crate::filter::State<Ipv4, BT>>,
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceId, BT> {
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    Ipv4State<StrongDeviceId, BT>
+{
     pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, BT>> {
         &self.filter
     }
@@ -1348,7 +1357,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceI
     }
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     AsRef<IpStateInner<Ipv4, StrongDeviceId, BT>> for Ipv4State<StrongDeviceId, BT>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv4, StrongDeviceId, BT> {
@@ -1362,14 +1371,16 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
-pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
+pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
     pub(super) filter: RwLock<crate::filter::State<Ipv6, BT>>,
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceId, BT> {
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    Ipv6State<StrongDeviceId, BT>
+{
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.slaac_counters
     }
@@ -1387,7 +1398,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceI
     }
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     AsRef<IpStateInner<Ipv6, StrongDeviceId, BT>> for Ipv6State<StrongDeviceId, BT>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv6, StrongDeviceId, BT> {
@@ -1456,7 +1467,7 @@ where
     }
 }
 
-impl<I: datagram::DualStackIpExt, D: crate::device::WeakId, BT: IcmpEchoBindingsTypes>
+impl<I: datagram::DualStackIpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
     RwLockFor<crate::lock_ordering::IcmpSocketState<I>> for IcmpSocketId<I, D, BT>
 {
     type Data = IcmpSocketState<I, D, BT>;
@@ -3567,7 +3578,7 @@ pub(crate) mod testutil {
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
     };
 
-    impl<S, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
+    impl<S, Meta, D: StrongDeviceIdentifier + 'static> DeviceIdContext<AnyDevice>
         for crate::context::testutil::FakeCoreCtx<S, Meta, D>
     where
         FakeIpDeviceIdCtx<D>: DeviceIdContext<AnyDevice, DeviceId = D, WeakDeviceId = D::Weak>,

@@ -13,7 +13,6 @@ use tracing::warn;
 use crate::{
     context::{CoreTimerContext, ResourceCounterContext, TimerContext},
     device::{
-        self,
         queue::{
             tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler},
             TransmitQueueFrameError,
@@ -21,7 +20,7 @@ use crate::{
         state::DeviceStateSpec,
         BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceCounters,
         DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
-        PureIpDeviceCounters,
+        PureIpDeviceCounters, WeakDeviceIdentifier,
     },
     sync::RwLock,
 };
@@ -95,7 +94,7 @@ impl DeviceStateSpec for PureIpDevice {
     type Counters = PureIpDeviceCounters;
     const IS_LOOPBACK: bool = false;
     const DEBUG_TYPE: &'static str = "PureIP";
-    type TimerId<D: device::WeakId> = Never;
+    type TimerId<D: WeakDeviceIdentifier> = Never;
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,

@@ -50,6 +50,7 @@ use crate::{
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
         DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceCounters, FrameDestination,
+        WeakDeviceIdentifier,
     },
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -86,7 +87,7 @@ impl DeviceStateSpec for LoopbackDevice {
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
     type CreationProperties = LoopbackCreationProperties;
     type Counters = EthernetDeviceCounters;
-    type TimerId<D: device::WeakId> = Never;
+    type TimerId<D: WeakDeviceIdentifier> = Never;
 
     fn new_link_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,

@@ -20,7 +20,7 @@ use crate::{
         CoreTimerContext, HandleableTimer, RngContext, TimerBindingsTypes, TimerContext,
         TimerHandler,
     },
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
     filter::MaybeTransportPacket,
 };
 
@@ -47,11 +47,11 @@ pub(crate) const MAX_RTR_SOLICITATION_DELAY: Duration = Duration::from_secs(1);
 pub(crate) const RTR_SOLICITATION_INTERVAL: Duration = Duration::from_secs(4);
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct RsTimerId<D: device::WeakId> {
+pub struct RsTimerId<D: WeakDeviceIdentifier> {
     device_id: D,
 }
 
-impl<D: device::WeakId> RsTimerId<D> {
+impl<D: WeakDeviceIdentifier> RsTimerId<D> {
     pub(super) fn device_id(&self) -> &D {
         let Self { device_id } = self;
         device_id
@@ -70,7 +70,7 @@ pub struct RsState<BT: RsBindingsTypes> {
 }
 
 impl<BC: RsBindingsTypes + TimerContext> RsState<BC> {
-    pub fn new<D: device::WeakId, CC: CoreTimerContext<RsTimerId<D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<RsTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {

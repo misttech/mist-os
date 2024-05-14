@@ -12,8 +12,8 @@ use net_types::ip::{Ipv4, Ipv6};
 use crate::{
     context::{CoreTimerContext, TimerContext},
     device::{
-        self, socket::HeldDeviceSockets, Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes,
-        OriginTracker,
+        socket::HeldDeviceSockets, Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes,
+        OriginTracker, WeakDeviceIdentifier,
     },
     inspect::Inspectable,
     ip::{
@@ -35,7 +35,7 @@ pub trait DeviceStateSpec: Device + Sized + Send + Sync + 'static {
     /// Device-specific counters.
     type Counters: Inspectable;
     /// The timer identifier required by this device state.
-    type TimerId<D: device::WeakId>;
+    type TimerId<D: WeakDeviceIdentifier>;
 
     /// Creates a new link state from the given properties.
     fn new_link_state<
@@ -90,7 +90,7 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
 impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
     pub(super) fn new<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         A: IpAddressIdSpec,
         CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
             + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,

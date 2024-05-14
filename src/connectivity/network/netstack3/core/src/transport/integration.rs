@@ -11,7 +11,7 @@ use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
     context::{CoreTimerContext, CounterContext},
-    device::{self, WeakDeviceId},
+    device::{WeakDeviceId, WeakDeviceIdentifier},
     socket::{datagram, MaybeDualStack},
     transport::{
         tcp::{
@@ -583,8 +583,11 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     }
 }
 
-impl<I: crate::transport::tcp::socket::DualStackIpExt, D: device::WeakId, BT: BindingsTypes>
-    LockLevelFor<TcpSocketId<I, D, BT>> for crate::lock_ordering::TcpSocketState<I>
+impl<
+        I: crate::transport::tcp::socket::DualStackIpExt,
+        D: WeakDeviceIdentifier,
+        BT: BindingsTypes,
+    > LockLevelFor<TcpSocketId<I, D, BT>> for crate::lock_ordering::TcpSocketState<I>
 {
     type Data = TcpSocketState<I, D, BT>;
 }
@@ -600,7 +603,7 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
     }
 }
 
-impl<I: datagram::IpExt, D: device::WeakId, BT: BindingsTypes>
+impl<I: datagram::IpExt, D: WeakDeviceIdentifier, BT: BindingsTypes>
     RwLockFor<crate::lock_ordering::UdpSocketState<I>> for UdpSocketId<I, D, BT>
 {
     type Data = UdpSocketState<I, D, BT>;

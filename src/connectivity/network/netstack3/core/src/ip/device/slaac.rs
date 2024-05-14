@@ -28,7 +28,7 @@ use crate::{
         RngContext, TimerBindingsTypes, TimerContext,
     },
     counters::Counter,
-    device::{self, AnyDevice, DeviceIdContext, Id, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, DeviceIdentifier, WeakDeviceIdentifier},
     error::{ExistsError, NotFoundError},
     ip::device::{
         opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
@@ -67,7 +67,7 @@ pub struct SlaacState<BT: SlaacBindingsTypes> {
 }
 
 impl<BC: SlaacBindingsTypes + TimerContext> SlaacState<BC> {
-    pub fn new<D: device::WeakId, CC: CoreTimerContext<SlaacTimerId<D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<SlaacTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {
@@ -87,11 +87,11 @@ impl<BC: SlaacBindingsTypes + TimerContext> SlaacState<BC> {
 
 /// A timer ID for SLAAC.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
-pub struct SlaacTimerId<D: device::WeakId> {
+pub struct SlaacTimerId<D: WeakDeviceIdentifier> {
     device_id: D,
 }
 
-impl<D: device::WeakId> SlaacTimerId<D> {
+impl<D: WeakDeviceIdentifier> SlaacTimerId<D> {
     pub(super) fn device_id(&self) -> &D {
         let Self { device_id } = self;
         device_id
@@ -562,7 +562,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     )
 }
 
-fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext>(
+fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     address_entry: SlaacAddressEntryMut<'_, BC::Instant>,
     state: &mut SlaacState<BC>,
     subnet: Subnet<Ipv6Addr>,

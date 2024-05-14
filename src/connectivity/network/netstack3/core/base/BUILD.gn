@@ -18,6 +18,7 @@ rustc_library_with_features("netstack3-base") {
     "src/data_structures/ref_counted_hash_map.rs",
     "src/data_structures/socketmap.rs",
     "src/data_structures/token_bucket.rs",
+    "src/device.rs",
     "src/error.rs",
     "src/event.rs",
     "src/frame.rs",

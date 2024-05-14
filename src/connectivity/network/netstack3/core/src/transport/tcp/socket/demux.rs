@@ -25,7 +25,7 @@ use tracing::{debug, error, warn};
 use crate::{
     context::{CounterContext, CtxPair},
     convert::BidirectionalConverter as _,
-    device::{self, StrongId as _, WeakId as _},
+    device::{StrongDeviceIdentifier as _, WeakDeviceIdentifier},
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
@@ -403,7 +403,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
     }
 }
 
-enum SocketLookupResult<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+enum SocketLookupResult<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     Connection(I::DemuxSocketId<D, BT>, ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>),
     Listener((I::DemuxSocketId<D, BT>, ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>)),
 }

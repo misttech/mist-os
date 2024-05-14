@@ -17,6 +17,7 @@ mod context;
 mod convert;
 mod counters;
 mod data_structures;
+mod device;
 mod error;
 mod event;
 mod frame;
@@ -33,6 +34,7 @@ pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
+pub use device::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier};
 pub use error::{
     AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
     RemoteAddressError, SocketError, ZonedAddressError,
@@ -96,6 +98,10 @@ pub mod testutil {
     mod misc;
     mod monotonic_id;
 
+    pub use crate::device::testutil::{
+        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+        MultipleDevicesId,
+    };
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};

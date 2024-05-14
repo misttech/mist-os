@@ -26,7 +26,7 @@ use crate::{
         CoreTimerContext, InstantBindingsTypes, NestedIntoCoreTimerCtx, ReferenceNotifiers,
         TimerBindingsTypes, TimerContext,
     },
-    device,
+    device::WeakDeviceIdentifier,
     inspect::{Inspectable, InspectableValue, Inspector},
     ip::{
         device::{
@@ -75,11 +75,11 @@ pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
     /// The GMP protocol-specific state.
     type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
     /// The timer id for GMP timers.
-    type GmpTimerId<D: device::WeakId>: From<GmpDelayedReportTimerId<Self, D>>;
+    type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpDelayedReportTimerId<Self, D>>;
 
     /// Creates a new [`Self::GmpProtoState`].
     fn new_gmp_state<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
         BC: IpDeviceStateBindingsTypes + TimerContext,
     >(
@@ -92,10 +92,10 @@ impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpGroupState<I: Instant> = IgmpGroupState<I>;
-    type GmpTimerId<D: device::WeakId> = IgmpTimerId<D>;
+    type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
 
     fn new_gmp_state<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
         BC: IpDeviceStateBindingsTypes + TimerContext,
     >(
@@ -156,10 +156,10 @@ impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddress<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
     type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpGroupState<I: Instant> = MldGroupState<I>;
-    type GmpTimerId<D: device::WeakId> = MldTimerId<D>;
+    type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
 
     fn new_gmp_state<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
         BC: IpDeviceStateBindingsTypes + TimerContext,
     >(
@@ -321,7 +321,7 @@ impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::Routin
 }
 
 impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDeviceState<I, BC> {
-    fn new<D: device::WeakId, CC: CoreTimerContext<I::GmpTimerId<D>, BC>>(
+    fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<I::GmpTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> IpDeviceState<I, BC> {
@@ -432,7 +432,7 @@ impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceCon
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv4DeviceState<BC> {
-    fn new<D: device::WeakId, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
+    fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<Ipv4DeviceTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Ipv4DeviceState<BC> {
@@ -716,7 +716,7 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
     pub fn new<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         A: WeakIpAddressId<Ipv6Addr>,
         CC: CoreTimerContext<Ipv6DeviceTimerId<D, A>, BC>,
     >(
@@ -782,7 +782,7 @@ pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
     pub(crate) fn new<
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         A: IpAddressIdSpec,
         CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
             + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,
