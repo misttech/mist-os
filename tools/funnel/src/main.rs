@@ -255,7 +255,6 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     let target = choose_target(&mut stdin, &mut stdout, targets, args.target_name).await?;
     // Drop the locks we have on stdin and stdout
     drop(stdin);
-    drop(stdout);
 
     tracing::debug!("Target to forward: {:?}", target);
     tracing::info!("Additional port forwards: {:?}", args.additional_port_forwards);
@@ -265,7 +264,8 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     } else {
         default_repository_ports()
     };
-    let do_ssh_fut = do_ssh(host.clone(), target, repository_ports, args.additional_port_forwards);
+    let do_ssh_fut =
+        do_ssh(&mut stdout, host.clone(), target, repository_ports, args.additional_port_forwards);
     // Need to both do ssh and listen for signals
     let mut signals = Signals::new(&[SIGINT]).unwrap();
     let handle = signals.handle();
@@ -284,6 +284,7 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     });
 
     let do_ssh_res = do_ssh_fut.await;
+    drop(stdout);
     tracing::info!("result from do_ssh: {:?}", do_ssh_res);
     match do_ssh_res {
         Ok(_) => {}

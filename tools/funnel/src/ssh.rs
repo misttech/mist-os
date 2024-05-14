@@ -7,6 +7,7 @@ use addr::TargetAddr;
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
 use home::home_dir;
+use std::io::Write;
 use std::process::Command;
 use std::process::Stdio;
 use std::{os::unix::process::CommandExt, path::PathBuf};
@@ -72,7 +73,8 @@ fn get_control_path() -> Result<Utf8PathBuf, TunnelError> {
     Ok(funnel_control_path)
 }
 
-pub(crate) async fn do_ssh(
+pub(crate) async fn do_ssh<W: Write>(
+    writer: W,
     host: String,
     target: TargetInfo,
     repo_port: Vec<u32>,
@@ -83,7 +85,8 @@ pub(crate) async fn do_ssh(
     // Set up ssh command
     let mut ssh_cmd = &mut Command::new("ssh");
     for arg in
-        build_ssh_args(target, funnel_control_path, repo_port, additional_port_forwards)?.iter()
+        build_ssh_args(writer, target, funnel_control_path, repo_port, additional_port_forwards)?
+            .iter()
     {
         ssh_cmd = ssh_cmd.arg(arg);
     }
@@ -109,7 +112,8 @@ pub(crate) async fn do_ssh(
     }
 }
 
-fn build_ssh_args(
+fn build_ssh_args<W: Write>(
+    mut writer: W,
     target: TargetInfo,
     control_master_path: impl AsRef<Utf8Path>,
     repo_port: Vec<u32>,
@@ -134,6 +138,25 @@ fn build_ssh_args(
         );
     }
 
+    let remote_forwards = vec![
+        // Requests from the remote to ssh to localhost:8022 will be forwarded to the
+        // target.
+        (8022, 22, "SSH and Overnet"),
+        // zxdb & fidlcat requests from the remote to 2345 are forwarded to the target.
+        (2345, 2345, "zxdb and fidlcat"),
+        // libassistant debug requests from the remote to 8007 are forwarded to the
+        // target.
+        (8007, 8007, "libassistant"),
+        (8008, 8008, "libassistant"),
+        (8443, 8443, "libassistant"),
+        // SL4F requests to port 9080 on the remote are forwarded to target port 80.
+        (9080, 80, "SL4F"),
+        // UMA log requests to port 8888 on the remote are forwarded to target port 8888.
+        (8888, 8888, "UMA Log"),
+        // Some targets use Fastboot over TCP which listens on 5554
+        (5554, 5554, "Fastboot over TCP"),
+    ];
+
     let mut res: Vec<String> = vec![
         // We want all binds for the port forwards, since the device may be using IPv4 or IPv6, and the server may be using an IPv6 address to look it up.
         "-o AddressFamily any".into(),
@@ -144,31 +167,42 @@ fn build_ssh_args(
         "-o RequestTTY no".into(),
         "-o ExitOnForwardFailure yes".into(),
         "-o StreamLocalBindUnlink yes".into(),
-        // Requests from the remote to ssh to localhost:8022 will be forwarded to the
-        // target.
-        format!("-o RemoteForward 8022 [{target_ip}]:22"),
-        // zxdb & fidlcat requests from the remote to 2345 are forwarded to the target.
-        format!("-o RemoteForward 2345 [{target_ip}]:2345"),
-        // libassistant debug requests from the remote to 8007 are forwarded to the
-        // target.
-        format!("-o RemoteForward 8007 [{target_ip}]:8007"),
-        format!("-o RemoteForward 8008 [{target_ip}]:8008"),
-        format!("-o RemoteForward 8443 [{target_ip}]:8443"),
-        // SL4F requests to port 9080 on the remote are forwarded to target port 80.
-        format!("-o RemoteForward 9080 [{target_ip}]:80"),
-        // UMA log requests to port 8888 on the remote are forwarded to target port 8888.
-        format!("-o RemoteForward 8888 [{target_ip}]:8888"),
-        // Some targets use Fastboot over TCP which listens on 5554
-        format!("-o RemoteForward 5554 [{target_ip}]:5554"),
     ];
 
+    let remote_forward_spec = remote_forwards
+        .clone()
+        .into_iter()
+        .map(|pair| format!("-o RemoteForward {0} [{target_ip}]:{1}", pair.0, pair.1));
+    res.extend(remote_forward_spec);
+
     let additional_forwards = additional_port_forwards
+        .clone()
         .into_iter()
         .map(|p| format!("-o RemoteForward {p} [{target_ip}]:{p}"));
     res.extend(additional_forwards);
+
     let repo_forwards =
-        repo_port.into_iter().map(|p| format!("-o LocalForward *:{p} localhost:{p}"));
+        repo_port.clone().into_iter().map(|p| format!("-o LocalForward *:{p} localhost:{p}"));
     res.extend(repo_forwards);
+
+    writeln!(writer, "Setting up ssh forwards like so:")?;
+    for spec in remote_forwards {
+        writeln!(
+            writer,
+            "  * Remote Host port {0} --> Target port {1} [ {2} ]",
+            spec.0, spec.1, spec.2
+        )?;
+    }
+    for forward in additional_port_forwards {
+        writeln!(
+            writer,
+            "  * Remote Host port {0} --> Target port {0}   [ User Defined ]",
+            forward
+        )?;
+    }
+    for forward in repo_port {
+        writeln!(writer, "  * Local Host port {0} --> Cloudtop port {0} [ Repository ]", forward)?;
+    }
 
     Ok(res)
 }
@@ -243,7 +277,8 @@ mod test {
             addresses: vec![src_ipv4.into(), src.into()],
         };
 
-        let got = build_ssh_args(target, "/foo", vec![8081], vec![5555])?;
+        let mut writer = vec![];
+        let got = build_ssh_args(&mut writer, target, "/foo", vec![8081], vec![5555])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily any",
@@ -265,6 +300,23 @@ mod test {
         ];
 
         assert_eq!(got, want);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            r#"Setting up ssh forwards like so:
+  * Remote Host port 8022 --> Target port 22 [ SSH and Overnet ]
+  * Remote Host port 2345 --> Target port 2345 [ zxdb and fidlcat ]
+  * Remote Host port 8007 --> Target port 8007 [ libassistant ]
+  * Remote Host port 8008 --> Target port 8008 [ libassistant ]
+  * Remote Host port 8443 --> Target port 8443 [ libassistant ]
+  * Remote Host port 9080 --> Target port 80 [ SL4F ]
+  * Remote Host port 8888 --> Target port 8888 [ UMA Log ]
+  * Remote Host port 5554 --> Target port 5554 [ Fastboot over TCP ]
+  * Remote Host port 5555 --> Target port 5555   [ User Defined ]
+  * Local Host port 8081 --> Cloudtop port 8081 [ Repository ]
+"#
+            .to_string()
+        );
         Ok(())
     }
 
@@ -283,7 +335,8 @@ mod test {
             ..Default::default()
         };
 
-        let got = build_ssh_args(target, "/foo", vec![8081], vec![])?;
+        let writer = vec![];
+        let got = build_ssh_args(writer, target, "/foo", vec![8081], vec![])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily any",
@@ -322,7 +375,8 @@ mod test {
             ..Default::default()
         };
 
-        let got = build_ssh_args(target, "/foo", vec![8081, 8085], vec![])?;
+        let writer = vec![];
+        let got = build_ssh_args(writer, target, "/foo", vec![8081, 8085], vec![])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily any",
@@ -352,18 +406,24 @@ mod test {
         let nodename = "cytherea".to_string();
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
+
+            let writer = vec![];
+            let res = build_ssh_args(writer, target, "/foo", vec![9091], vec![]);
             assert!(res.is_err());
         }
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
+
+            let writer = vec![];
+            let res = build_ssh_args(writer, target, "/foo", vec![9091], vec![]);
             assert!(res.is_err());
         }
         {
             let target =
                 TargetInfo { nodename: nodename.clone(), addresses: vec![], ..Default::default() };
-            let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
+
+            let writer = vec![];
+            let res = build_ssh_args(writer, target, "/foo", vec![9091], vec![]);
             assert!(res.is_err());
         }
     }
@@ -375,7 +435,9 @@ mod test {
             addresses: vec![],
             ..Default::default()
         };
-        let res = build_ssh_args(target, "/foo", vec![9091], vec![]);
+
+        let writer = vec![];
+        let res = build_ssh_args(writer, target, "/foo", vec![9091], vec![]);
         assert!(res.is_err());
     }
 }
