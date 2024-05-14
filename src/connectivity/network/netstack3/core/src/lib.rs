@@ -36,7 +36,7 @@ mod time;
 mod transport;
 mod uninstantiable;
 
-#[cfg(test)]
+#[cfg(any(test, benchmark))]
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;

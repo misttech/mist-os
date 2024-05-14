@@ -32,6 +32,7 @@ mod work_queue;
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
+pub use data_structures::token_bucket::TokenBucket;
 pub use error::{
     AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
     RemoteAddressError, SocketError, ZonedAddressError,
@@ -104,4 +105,13 @@ pub mod testutil {
     };
     pub use misc::{assert_empty, set_logger_for_test};
     pub use monotonic_id::MonotonicIdentifier;
+}
+
+/// Benchmarks defined in the base crate.
+#[cfg(benchmark)]
+pub mod benchmarks {
+    /// Adds benchmarks defined in the base crate to the provided benchmarker.
+    pub fn add_benches(b: criterion::Benchmark) -> criterion::Benchmark {
+        crate::data_structures::token_bucket::benchmarks::add_benches(b)
+    }
 }

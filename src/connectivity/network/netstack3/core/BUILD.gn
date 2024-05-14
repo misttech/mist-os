@@ -39,7 +39,6 @@ rustc_library_with_features("netstack3-core") {
     "src/counters.rs",
     "src/data_structures.rs",
     "src/data_structures/socketmap.rs",
-    "src/data_structures/token_bucket.rs",
     "src/device/api.rs",
     "src/device/arp.rs",
     "src/device/base.rs",
@@ -145,15 +144,16 @@ rustc_library_with_features("netstack3-core") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
+  _testutil_deps = [ "//third_party/rust_crates:assert_matches" ]
   test_deps = [
     "//src/connectivity/lib/ip-test-macro",
     "//src/connectivity/lib/net-declare",
     "//src/lib/proptest-support",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:test-case",
   ]
+  test_deps += _testutil_deps
 
   feature_sets = [
     {
@@ -224,7 +224,7 @@ rustc_library_with_features("netstack3-core") {
     {
       target_name = "netstack3-core-benchmarks"
       testonly = true
-      features = []
+      features = [ "testutils" ]
 
       _core_deps = [
         "base:netstack3-base-benchmarks",
@@ -233,7 +233,7 @@ rustc_library_with_features("netstack3-core") {
       ]
       deps += _core_deps
       deps += [ "//third_party/rust_crates:criterion" ]
-      deps += test_deps
+      deps += _testutil_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - _core_deps
@@ -284,10 +284,7 @@ config("loom") {
 }
 
 config("benchmark") {
-  rustflags = [
-    "--cfg=benchmark",
-    "--cfg=test",
-  ]
+  rustflags = [ "--cfg=benchmark" ]
 }
 
 rustc_fuzzer("fuzz-single-device") {

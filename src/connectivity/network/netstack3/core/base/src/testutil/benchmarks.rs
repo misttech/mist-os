@@ -21,7 +21,7 @@
 macro_rules! bench {
     ($name:ident, $fn:expr) => {
         #[cfg(benchmark)]
-        fn $name(b: &mut $crate::testutil::RealBencher) {
+        pub(crate) fn $name(b: &mut $crate::testutil::RealBencher) {
             $fn(b);
         }
 

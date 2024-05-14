@@ -24,16 +24,16 @@ use core::{
 
 use derivative::Derivative;
 use lock_order::wrap::prelude::*;
+#[cfg(test)]
+use net_types::MulticastAddr;
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr,
-        Ipv6, Ipv6Addr, Subnet, SubnetEither,
+        AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4,
+        Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
     },
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
-#[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr};
 use packet::{Buf, BufferMut};
 
 #[cfg(test)]
@@ -98,6 +98,11 @@ pub mod ndp {
 /// Context test utilities.
 pub mod context {
     pub use crate::context::testutil::*;
+}
+
+/// Device test utilities.
+pub mod device {
+    pub use crate::device::testutil::*;
 }
 
 /// The default interface routing metric for test interfaces.
@@ -816,8 +821,7 @@ pub struct FakeCtxBuilder {
 
 impl FakeCtxBuilder {
     /// Construct a `FakeCtxBuilder` from a `TestAddrs`.
-    #[cfg(test)]
-    pub(crate) fn with_addrs<A: IpAddress>(addrs: TestAddrs<A>) -> FakeCtxBuilder {
+    pub fn with_addrs<A: IpAddress>(addrs: TestAddrs<A>) -> FakeCtxBuilder {
         assert!(addrs.subnet.contains(&addrs.local_ip));
         assert!(addrs.subnet.contains(&addrs.remote_ip));
 

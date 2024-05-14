@@ -607,16 +607,15 @@ pub(crate) mod testutil {
     #[cfg(test)]
     use core::sync::atomic::AtomicBool;
 
-    #[cfg(test)]
-    use crate::testutil::Ctx;
     use crate::{
         ip::device::config::{
             IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
             Ipv6DeviceConfigurationUpdate,
         },
-        testutil::CtxPairExt as _,
+        testutil::{Ctx, CtxPairExt as _},
     };
 
+    /// A fake weak device id.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub struct FakeWeakDeviceId<D>(pub(crate) D);
 
@@ -772,6 +771,7 @@ pub(crate) mod testutil {
         }
     }
 
+    /// Marks a fake strong device id.
     pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {
         /// Returns whether this ID is still alive.
         ///
@@ -780,10 +780,8 @@ pub(crate) mod testutil {
         fn is_alive(&self) -> bool;
     }
 
-    pub fn enable_device<BC: BindingsContext>(
-        ctx: &mut crate::testutil::Ctx<BC>,
-        device: &DeviceId<BC>,
-    ) {
+    /// Enables `device`.
+    pub fn enable_device<BC: BindingsContext>(ctx: &mut Ctx<BC>, device: &DeviceId<BC>) {
         let ip_config =
             IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() };
         let _: Ipv4DeviceConfigurationUpdate = ctx
@@ -805,9 +803,8 @@ pub(crate) mod testutil {
     }
 
     /// Enables or disables IP packet routing on `device`.
-    #[cfg(test)]
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub(crate) fn set_forwarding_enabled<BC: BindingsContext, I: crate::IpExt>(
+    pub fn set_forwarding_enabled<BC: BindingsContext, I: crate::IpExt>(
         ctx: &mut Ctx<BC>,
         device: &DeviceId<BC>,
         enabled: bool,

@@ -4,7 +4,7 @@
 
 use core::time::Duration;
 
-use crate::context::InstantContext;
+use crate::InstantContext;
 
 // TODO(https://github.com/rust-lang/rust/issues/57391): Replace this with Duration::SECOND.
 const SECOND: Duration = Duration::from_secs(1);
@@ -53,7 +53,7 @@ impl<I> TokenBucket<I> {
     /// # Panics
     ///
     /// `new` panics if `tokens_per_second` is greater than 2^56 - 1.
-    pub(crate) fn new(tokens_per_second: u64) -> TokenBucket<I> {
+    pub fn new(tokens_per_second: u64) -> TokenBucket<I> {
         let token_fractions_per_second = tokens_per_second.checked_mul(TOKEN_MULTIPLIER).unwrap();
         TokenBucket {
             last_refilled: None,
@@ -75,7 +75,7 @@ impl<I: crate::Instant> TokenBucket<I> {
     /// `try_take` attempts to take a token from the bucket. If the bucket is
     /// currently empty, then no token is available to be taken, and `try_take`
     /// return false.
-    pub(crate) fn try_take<BC: InstantContext<Instant = I>>(&mut self, bindings_ctx: &BC) -> bool {
+    pub fn try_take<BC: InstantContext<Instant = I>>(&mut self, bindings_ctx: &BC) -> bool {
         if self.token_fractions >= TOKEN_MULTIPLIER {
             self.token_fractions -= TOKEN_MULTIPLIER;
             return true;
@@ -178,9 +178,7 @@ impl<I: crate::Instant> TokenBucket<I> {
 pub(crate) mod tests {
     use super::*;
 
-    use netstack3_base::{bench, testutil::Bencher};
-
-    use crate::context::testutil::{FakeInstant, FakeInstantCtx};
+    use crate::testutil::{FakeInstant, FakeInstantCtx};
 
     impl<I: crate::Instant> TokenBucket<I> {
         /// Call `try_take` `n` times, and assert that it succeeds every time.
@@ -335,6 +333,29 @@ pub(crate) mod tests {
         }
     }
 
+    #[test]
+    fn test_token_bucket_new() {
+        // Test that `new` doesn't panic if given 2^56 - 1.
+        let _: TokenBucket<()> = TokenBucket::<()>::new((1 << 56) - 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_token_bucket_new_panics() {
+        // Test that `new` panics if given 2^56
+        let _: TokenBucket<()> = TokenBucket::<()>::new(1 << 56);
+    }
+}
+
+#[cfg(any(test, benchmark))]
+pub(crate) mod benchmarks {
+    use super::*;
+
+    use crate::{
+        bench,
+        testutil::{Bencher, FakeInstantCtx},
+    };
+
     fn bench_try_take<B: Bencher>(b: &mut B, enforced_rate: u64, try_rate: u32) {
         let sleep = SECOND / try_rate;
         let mut ctx = FakeInstantCtx::default();
@@ -363,7 +384,7 @@ pub(crate) mod tests {
     bench!(bench_try_take_double_rate, |b| bench_try_take(b, 64, 64 * 2));
 
     #[cfg(benchmark)]
-    pub(crate) fn add_benches(b: criterion::Benchmark) -> criterion::Benchmark {
+    pub fn add_benches(b: criterion::Benchmark) -> criterion::Benchmark {
         let mut b = b.with_function("TokenBucket/TryTake/Slow", bench_try_take_slow);
         b = b.with_function("TokenBucket/TryTake/HalfRate", bench_try_take_half_rate);
         b = b.with_function("TokenBucket/TryTake/EqualRate", bench_try_take_equal_rate);
@@ -371,17 +392,4 @@ pub(crate) mod tests {
             .with_function("TokenBucket/TryTake/AlmostEqualRate", bench_try_take_almost_equal_rate);
         b.with_function("TokenBucket/TryTake/DoubleRate", bench_try_take_double_rate)
     }
-}
-
-#[test]
-fn test_token_bucket_new() {
-    // Test that `new` doesn't panic if given 2^56 - 1.
-    let _: TokenBucket<()> = TokenBucket::<()>::new((1 << 56) - 1);
-}
-
-#[test]
-#[should_panic]
-fn test_token_bucket_new_panics() {
-    // Test that `new` panics if given 2^56
-    let _: TokenBucket<()> = TokenBucket::<()>::new(1 << 56);
 }

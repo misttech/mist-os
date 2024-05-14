@@ -6,7 +6,8 @@
 use fuchsia_criterion::{criterion::Criterion, FuchsiaCriterion};
 
 pub(crate) fn main() {
-    let core_benches = netstack3_core::benchmarks::get_benchmark();
+    let benches = netstack3_core::benchmarks::get_benchmark();
+    let benches = netstack3_base::benchmarks::add_benches(benches);
 
     let mut c = FuchsiaCriterion::default();
     let internal_c: &mut Criterion = &mut c;
@@ -14,5 +15,5 @@ pub(crate) fn main() {
         .warm_up_time(std::time::Duration::from_millis(1))
         .measurement_time(std::time::Duration::from_millis(100))
         .sample_size(100);
-    let _: &mut Criterion = c.bench("fuchsia.netstack3.core", core_benches);
+    let _: &mut Criterion = c.bench("fuchsia.netstack3.core", benches);
 }

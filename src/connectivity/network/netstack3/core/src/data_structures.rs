@@ -11,4 +11,6 @@ pub(crate) mod ref_counted_hash_map {
 }
 
 pub(crate) mod socketmap;
-pub(crate) mod token_bucket;
+pub(crate) mod token_bucket {
+    pub(crate) use netstack3_base::TokenBucket;
+}
