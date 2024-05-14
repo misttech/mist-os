@@ -270,6 +270,11 @@ class __OWNER(T) Vector {
   constexpr const_reverse_iterator rend()    const noexcept { return const_reverse_iterator(begin()); }
 
   // clang-format on
+
+  void set_size(size_t size) {
+    ZX_DEBUG_ASSERT(size <= capacity_);
+    size_ = size;
+  }
 #endif
 
  private:
