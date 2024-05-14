@@ -9,5 +9,5 @@ fidl("fuchsia.net.stackmigrationdeprecated") {
 
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Netstack"
 }
