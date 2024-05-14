@@ -13,6 +13,6 @@ fidl("fuchsia.hardware.power") {
   ]
   sdk_category = "partner"
   stable = false
-  sdk_area = "Unknown"
+  sdk_area = "Power"
   public_deps = [ "//zircon/vdso/zx" ]
 }
