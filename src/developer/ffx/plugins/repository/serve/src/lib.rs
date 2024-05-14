@@ -999,6 +999,7 @@ mod test {
             );
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+        let tmp_port_file_path = tmp_port_file.path().to_owned();
 
         // Future resolves once fake target exists
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -1014,28 +1015,31 @@ mod test {
         .await
         .unwrap();
 
-        let serve_tool = ServeTool {
-            cmd: ServeCommand {
-                repository: Some(REPO_NAME.to_string()),
-                trusted_root: None,
-                address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                repo_path: Some(EMPTY_REPO_PATH.into()),
-                product_bundle: None,
-                alias: vec!["example.com".into(), "fuchsia.com".into()],
-                storage_type: Some(RepositoryStorageType::Ephemeral),
-                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                port_path: Some(tmp_port_file.path().to_owned()),
-                no_device: false,
-            },
-            context: test_env.context.clone(),
-            target_collection_proxy: target_collection_proxy,
-        };
-
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
         // Run main in background
-        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
+        let _task = fasync::Task::local(async move {
+            serve_impl(
+                target_collection_proxy,
+                ServeCommand {
+                    repository: Some(REPO_NAME.to_string()),
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    product_bundle: None,
+                    alias: vec!["example.com".into(), "fuchsia.com".into()],
+                    storage_type: Some(RepositoryStorageType::Ephemeral),
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                    port_path: Some(tmp_port_file_path),
+                    no_device: false,
+                },
+                test_env.context.clone(),
+                writer,
+            )
+            .await
+            .unwrap()
+        });
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -1136,6 +1140,7 @@ mod test {
         let test_env = get_test_env().await;
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+        let tmp_port_file_path = tmp_port_file.path().to_owned();
 
         let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
@@ -1143,28 +1148,31 @@ mod test {
         let (_, target_collection_proxy, _) =
             FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
 
-        let serve_tool = ServeTool {
-            cmd: ServeCommand {
-                repository: Some(REPO_NAME.to_string()),
-                trusted_root: None,
-                address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                repo_path: Some(EMPTY_REPO_PATH.into()),
-                product_bundle: None,
-                alias: vec![],
-                storage_type: None,
-                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                port_path: Some(tmp_port_file.path().to_owned()),
-                no_device: true,
-            },
-            context: test_env.context.clone(),
-            target_collection_proxy: target_collection_proxy,
-        };
-
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
         // Run main in background
-        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
+        let _task = fasync::Task::local(async move {
+            serve_impl(
+                target_collection_proxy,
+                ServeCommand {
+                    repository: Some(REPO_NAME.to_string()),
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    product_bundle: None,
+                    alias: vec!["example.com".into(), "fuchsia.com".into()],
+                    storage_type: Some(RepositoryStorageType::Ephemeral),
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                    port_path: Some(tmp_port_file_path),
+                    no_device: false,
+                },
+                test_env.context.clone(),
+                writer,
+            )
+            .await
+            .unwrap()
+        });
 
         // Wait for the "Serving repository ..." output
         for _ in 0..10 {
@@ -1289,6 +1297,7 @@ mod test {
         write_product_bundle(&pb_dir).await;
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+        let tmp_port_file_path = tmp_port_file.path().to_owned();
 
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
@@ -1309,28 +1318,31 @@ mod test {
         .await
         .unwrap();
 
-        let serve_tool = ServeTool {
-            cmd: ServeCommand {
-                repository: None,
-                trusted_root: None,
-                address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                repo_path: None,
-                product_bundle: Some(pb_dir),
-                alias: vec![],
-                storage_type: Some(RepositoryStorageType::Ephemeral),
-                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                port_path: Some(tmp_port_file.path().to_owned()),
-                no_device: false,
-            },
-            context: test_env.context.clone(),
-            target_collection_proxy: target_collection_proxy,
-        };
-
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
         // Run main in background
-        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
+        let _task = fasync::Task::local(async move {
+            serve_impl(
+                target_collection_proxy,
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: None,
+                    product_bundle: Some(pb_dir),
+                    alias: vec![],
+                    storage_type: Some(RepositoryStorageType::Ephemeral),
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                    port_path: Some(tmp_port_file_path),
+                    no_device: false,
+                },
+                test_env.context.clone(),
+                writer,
+            )
+            .await
+            .unwrap()
+        });
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
