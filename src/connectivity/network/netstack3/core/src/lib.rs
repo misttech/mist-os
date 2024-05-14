@@ -42,9 +42,7 @@ pub mod benchmarks;
 pub mod testutil;
 
 pub(crate) mod algorithm {
-    // TODO(https://fxbug.dev/338448790): Move to base crate.
-    mod port_alloc;
-    pub(crate) use port_alloc::*;
+    pub(crate) use netstack3_base::{simple_randomized_port_alloc, PortAllocImpl};
 }
 pub(crate) mod convert {
     pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};

@@ -1555,10 +1555,15 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
     }
 }
 
+struct TcpDualStackPortAlloc<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
+    &'a BoundSocketMap<I, D, BT>,
+    &'a BoundSocketMap<I::OtherVersion, D, BT>,
+);
+
 /// When binding to IPv6 ANY address (::), we need to allocate a port that is
 /// available in both stacks.
 impl<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
-    for (&'a BoundSocketMap<I, D, BT>, &'a BoundSocketMap<I::OtherVersion, D, BT>)
+    for TcpDualStackPortAlloc<'a, I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> =
         <BoundSocketMap<I, D, BT> as PortAllocImpl>::EPHEMERAL_RANGE;
@@ -1566,7 +1571,7 @@ impl<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocIm
     type PortAvailableArg = ();
 
     fn is_port_available(&self, (): &Self::Id, port: u16, (): &Self::PortAvailableArg) -> bool {
-        let (this, other) = self;
+        let Self(this, other) = self;
         this.is_port_available(&None, port, &None) && other.is_port_available(&None, port, &None)
     }
 }
@@ -2228,12 +2233,16 @@ where
                                     // stacks before `bind_inner` tries to make
                                     // a decision, because it might give two
                                     // unrelated ports which is undesired.
+                                    let port_alloc = TcpDualStackPortAlloc(
+                                        &demux.socketmap,
+                                        &other_demux.socketmap
+                                    );
                                     let port = match port {
                                         Some(port) => port,
                                         None => match algorithm::simple_randomized_port_alloc(
                                             &mut bindings_ctx.rng(),
                                             &(),
-                                            &(&demux.socketmap, &other_demux.socketmap),
+                                            &port_alloc,
                                             &(),
                                         ){
                                             Some(port) => NonZeroU16::new(port)

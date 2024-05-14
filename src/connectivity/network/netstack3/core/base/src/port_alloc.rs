@@ -12,16 +12,16 @@ use core::{hash::Hash, marker::PhantomData, ops::RangeInclusive};
 use rand::RngCore;
 
 /// A port number.
-// NOTE(brunodalbo): `PortNumber` could be a trait, but given the expected use
-// of the PortAlloc algorithm is to allocate `u16` ports, it's just defined as a
-// type alias for simplicity.
-pub(crate) type PortNumber = u16;
+// NB: `PortNumber` could be a trait, but given the expected use of the
+// PortAlloc algorithm is to allocate `u16` ports, it's just defined as a type
+// alias for simplicity.
+type PortNumber = u16;
 
 /// Trait that configures the behavior of port allocation.
 ///
 /// `PortAllocImpl` provides the types, custom behaviors, and port availability
 /// checks necessary to operate the port allocation algorithm.
-pub(crate) trait PortAllocImpl {
+pub trait PortAllocImpl {
     /// The range of ports that can be allocated.
     ///
     /// Local ports used in transport protocols are called [Ephemeral Ports].
@@ -69,14 +69,14 @@ pub(crate) trait PortAllocImpl {
 ///
 /// `EphemeralPort` is always guaranteed to contain a port that is within
 /// `I::EPHEMERAL_RANGE`.
-pub(crate) struct EphemeralPort<I: PortAllocImpl + ?Sized> {
+pub struct EphemeralPort<I: PortAllocImpl + ?Sized> {
     port: PortNumber,
     _marker: PhantomData<I>,
 }
 
 impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
     /// Creates a new `EphemeralPort` with a port chosen randomly in `range`.
-    pub(crate) fn new_random<R: RngCore>(rng: &mut R) -> Self {
+    pub fn new_random<R: RngCore>(rng: &mut R) -> Self {
         let num_ephemeral = u32::from(I::EPHEMERAL_RANGE.end() - I::EPHEMERAL_RANGE.start()) + 1;
         let port = I::EPHEMERAL_RANGE.start() + ((rng.next_u32() % num_ephemeral) as PortNumber);
         Self { port, _marker: PhantomData }
@@ -84,7 +84,7 @@ impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
 
     /// Increments the current [`PortNumber`] to the next value in the contained
     /// range, wrapping around to the start of the range.
-    pub(crate) fn next(&mut self) {
+    pub fn next(&mut self) {
         if self.port == *I::EPHEMERAL_RANGE.end() {
             self.port = *I::EPHEMERAL_RANGE.start();
         } else {
@@ -93,7 +93,7 @@ impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
     }
 
     /// Gets the `PortNumber` value.
-    pub(crate) fn get(&self) -> PortNumber {
+    pub fn get(&self) -> PortNumber {
         self.port
     }
 }
@@ -101,7 +101,7 @@ impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
 /// Implements the [algorithm 1] as described in RFC 6056.
 ///
 /// [algorithm 1]: https://datatracker.ietf.org/doc/html/rfc6056#section-3.3.1
-pub(crate) fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: RngCore>(
+pub fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: RngCore>(
     rng: &mut R,
     id: &I::Id,
     state: &I,

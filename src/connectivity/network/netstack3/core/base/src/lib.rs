@@ -21,6 +21,7 @@ mod error;
 mod event;
 mod frame;
 mod inspect;
+mod port_alloc;
 mod resource_references;
 mod rng;
 mod time;
@@ -38,6 +39,7 @@ pub use error::{
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
+pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
     RemoveResourceResultWithContext,
