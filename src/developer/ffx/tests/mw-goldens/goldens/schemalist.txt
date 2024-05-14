@@ -1,4 +1,5 @@
 component_show.json
+daemon_stop.json
 emu_show.json
 emu_start.json
 emu_stop.json
