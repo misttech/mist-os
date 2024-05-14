@@ -16,7 +16,7 @@ fidl("fuchsia.auth") {
   # partner sdk dependency for internal interfaces.
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Identity"
   api = "fuchsia.auth.api"
 
   sources = [
