@@ -149,8 +149,15 @@ class Test:
     def __eq__(self, other: object) -> bool:
         return self.build.__eq__(other)
 
-    def is_device_test(self) -> bool:
-        return self.build.test.package_url is not None
+    def needs_device(self) -> bool:
+        """Determine if this test requires a device.
+
+        Device tests require one or more target devices to execute.
+
+        Returns:
+            bool: True only if the test requires a device to run.
+        """
+        return self.is_pure_device_test() or self.is_e2e_test()
 
     def is_host_test(self) -> bool:
         # These are "pure" host tests, which excludes E2E tests
@@ -199,6 +206,16 @@ class Test:
                 for env in self.build.environments or []
             ]
         )
+
+    def is_pure_device_test(self) -> bool:
+        """Determine if this test is a pure device test.
+
+        Pure device tests run directly on target devices.
+
+        Returns:
+            bool: True only if the test is a pure device test.
+        """
+        return self.build.test.package_url is not None
 
     def is_boot_test(self) -> bool:
         """Determine if this test is a boot test.

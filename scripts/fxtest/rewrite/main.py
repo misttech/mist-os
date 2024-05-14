@@ -893,7 +893,7 @@ async def run_all_tests(
         return False
 
     device_environment: environment.DeviceEnvironment | None = None
-    if tests.has_e2e_test():
+    if tests.has_device_test():
         device_environment = (
             await execution.get_device_environment_from_exec_env(
                 exec_env, recorder=recorder
@@ -937,7 +937,7 @@ async def run_all_tests(
                 flags,
                 run_suffix=None if flags.count == 1 else i + 1,
                 device_env=(
-                    None if not test.is_e2e_test() else device_environment
+                    None if not test.needs_device() else device_environment
                 ),
             )
             for i in range(flags.count)

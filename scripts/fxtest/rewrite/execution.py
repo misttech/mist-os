@@ -104,7 +104,16 @@ class TestExecution:
         Returns:
             list[str]: The command line for the test.
         """
-        if self._test.info.execution is not None:
+
+        if self._use_test_interface():
+            # assert for mypy
+            assert self._test.build.test.new_path is not None
+            return [
+                os.path.join(
+                    self._exec_env.out_dir, self._test.build.test.new_path
+                )
+            ]
+        elif self._test.info.execution is not None:
             execution = self._test.info.execution
 
             component_url = self._get_component_url()
@@ -207,13 +216,41 @@ class TestExecution:
                 the test, or None if no environment is needed.
         """
         env = self._flags.computed_env()
-        if self._test.build.test.path or self._test.is_e2e_test():
+        if (
+            self._test.build.test.path
+            or self._test.is_e2e_test()
+            or self._use_test_interface()
+        ):
             env.update(
                 {
                     "CWD": self._exec_env.out_dir,
                 }
             )
-
+        if self._use_test_interface():
+            # TODO(https://fxbug.dev/327640651): Add support for other
+            # parameters like test filter, etc.
+            env.update(
+                {
+                    # TODO(https://fxbug.dev/327640651): For now add ask path as
+                    # host-tools till we figure out a better way.
+                    "FUCHSIA_SDK_TOOL_PATH": os.path.join(
+                        self._exec_env.out_dir, "host-tools"
+                    ),
+                }
+            )
+            if self._device_env is not None:
+                env.update(
+                    {
+                        "FUCHSIA_TARGETS": self._device_env.address,
+                    }
+                )
+            if self._flags.extra_args:
+                custom_args = " ".join(self._flags.extra_args)
+                env.update(
+                    {
+                        "FUCHSIA_CUSTOM_TEST_ARGS": custom_args,
+                    }
+                )
         if self._test.is_e2e_test() and self._device_env is not None:
             env.update(
                 {
@@ -374,6 +411,19 @@ class TestExecution:
                     f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or run fx build."
                 )
         return component_url
+
+    def _use_test_interface(self) -> bool:
+        """Should this test use the experimental test interface API.
+
+
+        Returns:
+            True if experimental flag is enabled and the test supports new
+            interface.
+        """
+        return (
+            self._flags.use_test_interface
+            and self._test.build.test.new_path is not None
+        )
 
 
 _PACKAGE_NAME_REGEX = re.compile(r"fuchsia-pkg://fuchsia\.com/([^/#]+)#")

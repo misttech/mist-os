@@ -90,9 +90,9 @@ async def select_tests(
         filtered_entry_scores = {
             test.name(): NO_MATCH_DISTANCE
             for test in entries
-            if not test.is_device_test()
+            if not test.is_pure_device_test()
         }
-        entries = list(filter(Test.is_device_test, entries))
+        entries = list(filter(Test.is_pure_device_test, entries))
     elif mode == SelectionMode.E2E:
         filtered_entry_scores = {
             test.name(): NO_MATCH_DISTANCE

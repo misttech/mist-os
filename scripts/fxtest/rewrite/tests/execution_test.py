@@ -282,6 +282,95 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
+    async def test_test_execution_component_with_experimental_new_path(
+        self,
+    ) -> None:
+        """Test the usage of the TestExecution wrapper on a component test while using test interface"""
+
+        exec_env = environment.ExecutionEnvironment(
+            "/fuchsia", "/out/fuchsia", None, "", ""
+        )
+
+        test = execution.TestExecution(
+            test_list_file.Test(
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection(
+                        "foo",
+                        "//foo",
+                        "fuchsia",
+                        new_path="bin/test_component_wrapper.sh",
+                    )
+                ),
+                test_list_file.TestListEntry(
+                    "foo",
+                    [],
+                    test_list_file.TestListExecutionEntry(
+                        "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
+                        realm="foo_tests",
+                        max_severity_logs="INFO",
+                        min_severity_logs="TRACE",
+                    ),
+                ),
+            ),
+            exec_env,
+            args.parse_args(["--use-test-interface", "--", "--some_extra_arg"]),
+        )
+
+        command_line = test.command_line()
+        self.assertEquals(
+            ["/out/fuchsia/bin/test_component_wrapper.sh"], command_line
+        )
+        env = test.environment()
+        assert env is not None
+        # TODO: Add environment checking when added.
+        self.assertDictContainsSubset(
+            {
+                "CWD": "/out/fuchsia",
+                "FUCHSIA_CUSTOM_TEST_ARGS": "--some_extra_arg",
+            },
+            env,
+        )
+
+        # without -use-test-interface-flag
+        test = execution.TestExecution(
+            test_list_file.Test(
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection(
+                        "foo",
+                        "//foo",
+                        "fuchsia",
+                        new_path="bin/test_component_wrapper.sh",
+                    )
+                ),
+                test_list_file.TestListEntry(
+                    "foo",
+                    [],
+                    test_list_file.TestListExecutionEntry(
+                        "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
+                        realm="foo_tests",
+                        max_severity_logs="INFO",
+                        min_severity_logs="TRACE",
+                    ),
+                ),
+            ),
+            exec_env,
+            args.parse_args(
+                ["--no-use-package-hash", "--", "--some_extra_arg"]
+            ),
+        )
+
+        command_line = test.command_line()
+        self.assertContainsSublist(
+            ["fx", "ffx", "test", "run", "--realm", "foo_tests"], command_line
+        )
+        self.assertContainsSublist(
+            ["fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm"], command_line
+        )
+
+        self.assertContainsSublist(["--", "--some_extra_arg"], command_line)
+
+        self.assertIsNone(test.environment())
+
     async def test_test_execution_host(self) -> None:
         """Test the usage of the TestExecution wrapper on a host test, and actually run it"""
 
