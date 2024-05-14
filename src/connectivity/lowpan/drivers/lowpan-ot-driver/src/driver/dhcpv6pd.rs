@@ -155,8 +155,7 @@ impl DhcpV6PdInner {
 }
 
 impl DhcpV6Pd {
-    pub fn check_last_state<T: ot::BorderRouter>(&self, instance: &T) -> Result {
-        let state = instance.border_routing_dhcp6_pd_get_state();
+    pub fn process_pd_state_change(&self, state: ot::BorderRoutingDhcp6PdState) -> Result {
         let mut inner = self.inner.lock();
         if state != inner.last_state {
             inner.last_state = state;

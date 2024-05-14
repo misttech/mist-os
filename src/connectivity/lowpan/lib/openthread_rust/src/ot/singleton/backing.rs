@@ -26,6 +26,8 @@ pub(crate) struct InstanceBacking {
     >,
     pub dnssd_query_sub_unsub_fn: Cell<Option<std::boxed::Box<dyn FnMut(bool, &CStr)>>>,
     pub nat64_receive_fn: Cell<Option<std::boxed::Box<dyn FnMut(OtMessageBox<'_>)>>>,
+    pub dhcp6pd_state_change_callback_fn:
+        Cell<Option<std::boxed::Box<dyn FnMut(BorderRoutingDhcp6PdState)>>>,
 }
 
 impl InstanceBacking {
@@ -44,6 +46,7 @@ impl InstanceBacking {
             dnssd_query_sub_unsub_fn: Cell::new(None),
             multicast_listener_callback: Cell::new(None),
             nat64_receive_fn: Cell::new(None),
+            dhcp6pd_state_change_callback_fn: Cell::new(None),
         }
     }
 }

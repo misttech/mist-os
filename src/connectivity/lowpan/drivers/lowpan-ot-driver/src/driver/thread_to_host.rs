@@ -54,18 +54,6 @@ where
         debug!("OpenThread State Change: {:?}", flags);
         self.update_connectivity_state();
 
-        {
-            // Check to make sure if we need to handle
-            // any state changes from DHCPv6-PD in OpenThread.
-            let driver_state = self.driver_state.lock();
-            match driver_state.dhcp_v6_pd.check_last_state(&driver_state.ot_instance) {
-                Ok(()) => {}
-                Err(err) => {
-                    error!("Call to driver_state.dhcp_v6_pd.check_last_state failed: {:?}", err);
-                }
-            }
-        }
-
         // TODO(rquattle): Consider make this a little more selective, this async-condition
         //                 is a bit of a big hammer.
         if flags.intersects(

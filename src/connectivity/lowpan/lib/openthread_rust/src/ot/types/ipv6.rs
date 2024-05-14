@@ -5,6 +5,7 @@
 use crate::prelude_internal::*;
 
 use core::fmt::{Debug, Formatter};
+use num_derive::FromPrimitive;
 use std::net::SocketAddrV6;
 
 /// IPv6 Address Type. Functional equivalent of [`otsys::otIp6Address`](crate::otsys::otIp6Address).
@@ -612,13 +613,32 @@ impl BorderRoutingPrefixTableEntry {
 }
 
 /// This enumeration represents the state of DHCPv6 Prefix Delegation State.
-#[derive(
-    Debug, Default, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, num_derive::FromPrimitive,
-)]
+///
+/// Functional equivalent of [`otsys::otBorderRoutingDhcp6PdState`](crate::otsys::otBorderRoutingDhcp6PdState).
+#[derive(Debug, Default, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, FromPrimitive)]
 #[allow(missing_docs)]
 pub enum BorderRoutingDhcp6PdState {
     #[default]
+    /// Functional equivalent of [`otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_DISABLED`](crate::otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_DISABLED)
     Disabled = OT_BORDER_ROUTING_DHCP6_PD_STATE_DISABLED as isize,
+
+    /// Functional equivalent of [`otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_STOPPED`](crate::otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_STOPPED)
     Stopped = OT_BORDER_ROUTING_DHCP6_PD_STATE_STOPPED as isize,
+
+    /// Functional equivalent of [`otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING`](crate::otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING)
     Running = OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING as isize,
+}
+
+impl From<otBorderRoutingDhcp6PdState> for BorderRoutingDhcp6PdState {
+    fn from(x: otBorderRoutingDhcp6PdState) -> Self {
+        use num::FromPrimitive;
+        Self::from_u32(x)
+            .unwrap_or_else(|| panic!("Unknown otBorderRoutingDhcp6PdState value: {x}"))
+    }
+}
+
+impl From<BorderRoutingDhcp6PdState> for otBorderRoutingDhcp6PdState {
+    fn from(x: BorderRoutingDhcp6PdState) -> Self {
+        x as otBorderRoutingDhcp6PdState
+    }
 }
