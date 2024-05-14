@@ -1055,7 +1055,7 @@ async def run_all_tests(
                 else:
                     status = event.TestSuiteStatus.PASSED
             except execution.TestCouldNotRun as e:
-                status = event.TestSuiteStatus.SKIPPED
+                status = event.TestSuiteStatus.FAILED_TO_START
                 message = str(e)
             except execution.TestSkipped as e:
                 status = event.TestSuiteStatus.SKIPPED

@@ -243,6 +243,10 @@ class TestSuiteStatus(enum.Enum):
     # The test suite was aborted due to exceeding its timeout.
     TIMEOUT = "TIMEOUT"
 
+    # The test suite failed to start due to a configuration issue. This
+    # counts as a failure.
+    FAILED_TO_START = "FAILED_TO_START"
+
 
 @dataparse
 @dataclass

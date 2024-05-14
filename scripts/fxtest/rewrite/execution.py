@@ -358,12 +358,12 @@ class TestExecution:
                 name = extract_package_name_from_url(component_url)
                 if name is None:
                     raise TestCouldNotRun(
-                        "Failed to parse package name for Merkle root matching.\nTry running with --no-use-package-hash."
+                        "Failed to parse package name for Merkle root matching.\nTry running with --no-use-package-hash or run fx build."
                     )
 
                 if name not in package_repo.name_to_merkle:
                     raise TestCouldNotRun(
-                        f"Could not find a Merkle hash for this test: {component_url}\nTry running with --no-use-package-hash or rebuild your package repository."
+                        f"Could not find a Merkle hash for this test: {component_url}\nTry running with --no-use-package-hash or run fx build."
                     )
 
                 suffix = f"?hash={package_repo.name_to_merkle[name]}"
@@ -371,7 +371,7 @@ class TestExecution:
 
             except package_repository.PackageRepositoryError as e:
                 raise TestCouldNotRun(
-                    f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or rebuild your package repository."
+                    f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or run fx build."
                 )
         return component_url
 
