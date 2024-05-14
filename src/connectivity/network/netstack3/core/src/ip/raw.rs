@@ -11,12 +11,12 @@ use net_types::ip::{Ip, IpVersionMarker};
 use tracing::debug;
 
 use crate::{
-    context::ContextPair,
+    context::{ContextPair, ReferenceNotifiers, ReferenceNotifiersExt as _},
     ip::{
         base::IpLayerIpExt,
         raw::state::{RawIpSocketLockedState, RawIpSocketState},
     },
-    sync::{PrimaryRc, StrongRc},
+    sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc},
 };
 
 mod integration;
@@ -43,7 +43,7 @@ impl<I: Ip, C> RawIpSocketApi<I, C> {
 impl<I: IpLayerIpExt, C> RawIpSocketApi<I, C>
 where
     C: ContextPair,
-    C::BindingsContext: RawIpSocketsBindingsTypes,
+    C::BindingsContext: RawIpSocketsBindingsTypes + ReferenceNotifiers + 'static,
     C::CoreContext: RawIpSocketMapContext<I, C::BindingsContext>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
@@ -75,11 +75,18 @@ where
     pub fn remove(
         &mut self,
         id: RawIpApiSocketId<I, C>,
-    ) -> <C::BindingsContext as RawIpSocketsBindingsTypes>::RawIpSocketState<I> {
+    ) -> RemoveResourceResultWithContext<
+        <C::BindingsContext as RawIpSocketsBindingsTypes>::RawIpSocketState<I>,
+        C::BindingsContext,
+    > {
         let primary = self.core_ctx().with_socket_map_mut(|socket_map| socket_map.remove(id));
         debug!("removed raw IP socket {primary:?}");
         let PrimaryRawIpSocketId(primary) = primary;
-        PrimaryRc::unwrap(primary).into_external_state()
+
+        C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(
+            primary,
+            |state: RawIpSocketState<I, C::BindingsContext>| state.into_external_state(),
+        )
     }
 }
 
@@ -174,8 +181,10 @@ pub trait RawIpSocketMapContext<I: IpLayerIpExt, BT: RawIpSocketsBindingsTypes> 
 mod test {
     use super::*;
 
+    use core::convert::Infallible as Never;
     use ip_test_macro::ip_test;
     use net_types::ip::{Ipv4, Ipv6};
+    use netstack3_base::sync::DynDebugReferences;
     use packet_formats::ip::IpProto;
 
     use crate::context::{ContextProvider, CtxPair};
@@ -223,6 +232,18 @@ mod test {
         }
     }
 
+    impl ReferenceNotifiers for FakeBindingsCtx {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            _debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            unimplemented!("raw IP socket removal shouldn't be deferred in tests");
+        }
+    }
+
     fn new_raw_ip_socket_api<I: IpLayerIpExt>(
     ) -> RawIpSocketApi<I, CtxPair<FakeCoreCtx<I>, FakeBindingsCtx>> {
         RawIpSocketApi::new(Default::default())
@@ -232,6 +253,6 @@ mod test {
     fn create_and_remove<I: Ip + IpLayerIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(IpProto::Udp.into(), Default::default());
-        let FakeExternalSocketState {} = api.remove(sock);
+        let FakeExternalSocketState {} = api.remove(sock).into_removed();
     }
 }

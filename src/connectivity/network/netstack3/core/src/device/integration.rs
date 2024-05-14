@@ -21,7 +21,8 @@ use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
     context::{
-        CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta, ResourceCounterContext,
+        CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta,
+        ReferenceNotifiersExt as _, ResourceCounterContext,
     },
     device::{
         config::DeviceConfigurationContext,
@@ -61,10 +62,7 @@ use crate::{
         },
         types::IpTypesIpExt,
     },
-    sync::{
-        MapRcNotifier, PrimaryRc, RemoveResourceResult, RemoveResourceResultWithContext, StrongRc,
-        WeakRc,
-    },
+    sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc, WeakRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
@@ -378,17 +376,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let extract_addr_sub = |Ipv4AddressEntry { addr_sub, state: _ }| addr_sub;
-        let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
-        match PrimaryRc::unwrap_or_notify_with(primary, || {
-            let (notifier, receiver) =
-                BC::new_reference_notifier::<AddrSubnet<Ipv4Addr>>(debug_references);
-            let notifier = MapRcNotifier::new(notifier, extract_addr_sub);
-            (notifier, receiver)
-        }) {
-            Ok(entry) => RemoveResourceResult::Removed(extract_addr_sub(entry)),
-            Err(receiver) => RemoveResourceResult::Deferred(receiver),
-        }
+        BC::unwrap_or_notify_with_new_reference_notifier(
+            primary,
+            |Ipv4AddressEntry { addr_sub, state: _ }| addr_sub,
+        )
     }
 
     fn get_address_id(
@@ -676,19 +667,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
-        let extract_addr_sub = |Ipv6AddressEntry { addr_sub, dad_state: _, state: _ }| {
-            addr_sub.to_witness::<SpecifiedAddr<_>>()
-        };
-        match PrimaryRc::unwrap_or_notify_with(primary, || {
-            let (notifier, receiver) =
-                BC::new_reference_notifier::<AddrSubnet<Ipv6Addr>>(debug_references);
-            let notifier = MapRcNotifier::new(notifier, extract_addr_sub);
-            (notifier, receiver)
-        }) {
-            Ok(entry) => RemoveResourceResult::Removed(extract_addr_sub(entry)),
-            Err(receiver) => RemoveResourceResult::Deferred(receiver),
-        }
+        BC::unwrap_or_notify_with_new_reference_notifier(
+            primary,
+            |Ipv6AddressEntry { addr_sub, dad_state: _, state: _ }| {
+                addr_sub.to_witness::<SpecifiedAddr<_>>()
+            },
+        )
     }
 
     fn get_address_id(

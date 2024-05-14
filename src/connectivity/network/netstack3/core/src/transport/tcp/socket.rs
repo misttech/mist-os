@@ -49,8 +49,8 @@ use crate::{
     algorithm::{self, PortAllocImpl},
     context::{
         ContextPair, CoreTimerContext, CounterContext, CtxPair, DeferredResourceRemovalContext,
-        HandleableTimer, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
-        TracingContext,
+        HandleableTimer, InstantBindingsTypes, ReferenceNotifiersExt as _, RngContext,
+        TimerBindingsTypes, TimerContext, TracingContext,
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
@@ -76,7 +76,7 @@ use crate::{
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, UpdateSharingError,
     },
-    sync::{MapRcNotifier, RwLock},
+    sync::{RemoveResourceResult, RwLock},
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
         segment::Segment,
@@ -4261,23 +4261,11 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
         };
 
         let weak = PrimaryRc::downgrade(&primary);
-        match PrimaryRc::unwrap_or_notify_with(primary, move || {
-            let (notifier, receiver) =
-                BC::new_reference_notifier::<TcpSocketResource<I>>(debug_refs.into_dyn());
-            let notifier = MapRcNotifier::new(notifier, |_: ReferenceState<_, _, _>| {
-                // Expose a neat and empty type to bindings since we're always
-                // going to delegate this resource removal to it and it has no
-                // use for the internal reference state.
-                TcpSocketResource::<I>::default()
-            });
-            (notifier, receiver)
-        }) {
-            Ok(state) => {
-                debug!("destroyed {weak:?} {state:?}");
-            }
-            Err(receiver) => {
-                bindings_ctx.defer_removal(receiver);
-            }
+        let remove_result =
+            BC::unwrap_or_notify_with_new_reference_notifier(primary, |state| state);
+        match remove_result {
+            RemoveResourceResult::Removed(state) => debug!("destroyed {weak:?} {state:?}"),
+            RemoveResourceResult::Deferred(receiver) => bindings_ctx.defer_removal(receiver),
         }
     })
 }

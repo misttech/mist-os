@@ -29,7 +29,7 @@ use packet_formats::ip::IpProtoExt;
 use thiserror::Error;
 
 use crate::{
-    context::{ReferenceNotifiers, RngContext},
+    context::{ReferenceNotifiers, ReferenceNotifiersExt as _, RngContext},
     convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter},
     device::{
         AnyDevice, DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier as _,
@@ -58,7 +58,7 @@ use crate::{
         NotDualStackCapableError, Shutdown, ShutdownType, SocketMapAddrSpec,
         SocketMapConflictPolicy, SocketMapStateSpec, StrictlyZonedAddr,
     },
-    sync::{MapRcNotifier, RemoveResourceResult, RemoveResourceResultWithContext, RwLock},
+    sync::{RemoveResourceResultWithContext, RwLock},
 };
 
 /// Datagram demultiplexing map.
@@ -1502,26 +1502,12 @@ pub(crate) fn close<
     // Drop the (hopefully last) strong ID before unwrapping the primary
     // reference.
     core::mem::drop(id);
-
-    fn foo<T: Send + Sync + 'static>() {}
-
-    foo::<ReferenceState<I, CC::WeakDeviceId, S>>();
-
-    let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
-    match PrimaryRc::unwrap_or_notify_with(primary, || {
-        let (notifier, receiver) =
-            BC::new_reference_notifier::<S::ExternalData<I>>(debug_references);
-        let notifier =
-            MapRcNotifier::new(notifier, |ReferenceState { state: _, external_data }| {
-                external_data
-            });
-        (notifier, receiver)
-    }) {
-        Ok(ReferenceState { state: _, external_data }) => {
-            RemoveResourceResult::Removed(external_data)
-        }
-        Err(receiver) => RemoveResourceResult::Deferred(receiver),
-    }
+    BC::unwrap_or_notify_with_new_reference_notifier(
+        primary,
+        |ReferenceState { state: _, external_data }: ReferenceState<I, CC::WeakDeviceId, S>| {
+            external_data
+        },
+    )
 }
 
 /// State associated with removing a socket.

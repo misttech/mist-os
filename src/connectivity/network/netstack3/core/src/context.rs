@@ -46,8 +46,9 @@ pub use netstack3_base::{
     BuildableCoreContext, ContextPair, ContextProvider, CoreEventContext, CoreTimerContext,
     CounterContext, CtxPair, DeferredResourceRemovalContext, EventContext, HandleableTimer,
     InstantBindingsTypes, InstantContext, NestedIntoCoreTimerCtx, ReceivableFrameMeta,
-    RecvFrameContext, ReferenceNotifiers, ResourceCounterContext, RngContext, SendFrameContext,
-    SendableFrameMeta, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    RecvFrameContext, ReferenceNotifiers, ReferenceNotifiersExt, ResourceCounterContext,
+    RngContext, SendFrameContext, SendableFrameMeta, TimerBindingsTypes, TimerContext,
+    TimerHandler, TracingContext,
 };
 
 // Enable all blanket implementations on CoreCtx.

@@ -47,8 +47,8 @@ pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, Sendabl
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
-    DeferredResourceRemovalContext, ReferenceNotifiers, RemoveResourceResult,
-    RemoveResourceResultWithContext,
+    DeferredResourceRemovalContext, ReferenceNotifiers, ReferenceNotifiersExt,
+    RemoveResourceResult, RemoveResourceResultWithContext,
 };
 pub use rng::RngContext;
 pub use time::{
