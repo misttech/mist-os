@@ -18,11 +18,12 @@
 #include <functional>
 #include <optional>
 #include <utility>
-#include <vector>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/canary.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <kernel/mutex.h>
 #include <ktl/span.h>
 #include <zxtest/cpp/zxtest_prod.h>
@@ -349,9 +350,15 @@ struct NumberOfElementsRead {
 /// The read function must only return `Ok(n)` if at least one element was read and `n` holds
 /// the number of elements of type `T` read starting from the beginning of the slice.
 template <typename T, typename E>
-fit::result<E, std::vector<T>> read_to_vec(
+fit::result<E, fbl::Vector<T>> read_to_vec(
     size_t max_len, std::function<fit::result<E, NumberOfElementsRead>(ktl::span<T>&)> read_fn) {
-  auto buffer = std::vector<T>(max_len);
+  fbl::AllocChecker ac;
+  auto buffer = fbl::Vector<T>();
+  buffer.reserve(max_len, &ac);
+  if (!ac.check()) {
+    return fit::error(errno(ENOMEM));
+  }
+
   ktl::span<T> capacity(buffer.data(), max_len);
   auto read_fn_result = read_fn(capacity);
   if (read_fn_result.is_error())
@@ -360,8 +367,10 @@ fit::result<E, std::vector<T>> read_to_vec(
   NumberOfElementsRead read_elements{read_fn_result.value()};
   DEBUG_ASSERT_MSG(read_elements.n_elements <= max_len, "read_elements=%zu, max_len=%zu",
                    read_elements.n_elements, max_len);
-  buffer.resize(read_elements.n_elements);
-  return fit::ok(std::move(buffer));
+  // SAFETY: The new length is equal to the number of elements successfully
+  // initialized (since `read_fn` returned successfully).
+  buffer.set_size(read_elements.n_elements);
+  return fit::ok(ktl::move(buffer));
 }
 
 /// Creates a VMO that can be used in an anonymous mapping for the `mmap`

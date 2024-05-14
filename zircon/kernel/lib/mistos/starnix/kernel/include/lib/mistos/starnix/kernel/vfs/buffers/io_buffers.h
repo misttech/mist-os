@@ -11,9 +11,11 @@
 #include <lib/mistos/starnix_uapi/user_buffer.h>
 
 #include <functional>
-#include <vector>
 
+#include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 #include <ktl/algorithm.h>
+#include <ktl/move.h>
 #include <ktl/span.h>
 #include <zxtest/cpp/zxtest_prod.h>
 
@@ -160,20 +162,19 @@ class InputBuffer : public Buffer {
     return fit::ok(length);
   }
 
-  /// Read all the remaining content in this buffer and returns it as a `Vec`.
-  virtual fit::result<Errno, std::vector<uint8_t>> read_all() {
+  virtual fit::result<Errno, fbl::Vector<uint8_t>> read_all() {
     auto peek_all_result = peek_all();
     if (peek_all_result.is_error())
       return peek_all_result.take_error();
 
     auto drain_result = drain();
-    auto result = peek_all_result.value();
+    auto result = ktl::move(peek_all_result.value());
     ASSERT(result.size() == drain_result);
-    return fit::ok(result);
+    return fit::ok(ktl::move(result));
   }
 
-  /// Peek all the remaining content in this buffer and returns it as a `Vec`.
-  virtual fit::result<Errno, std::vector<uint8_t>> peek_all();
+  /// Peek all the remaining content in this buffer and returns it as a `fbl::Vector`.
+  virtual fit::result<Errno, fbl::Vector<uint8_t>> peek_all();
 
   /// Peeks the content of this buffer into `buffer`.
   /// If `buffer` is too small, the read will be partial.
@@ -186,7 +187,7 @@ class InputBuffer : public Buffer {
       auto size = ktl::min(buffer.size() - index, data.size());
       auto dest = buffer.subspan(index, index + size);
       auto src = data.subspan(0, size);
-      __unsanitized_memcpy(dest.data(), src.data(), src.size());
+      memcpy(dest.data(), src.data(), src.size());
       index += size;
       return fit::ok(size);
     });
@@ -237,19 +238,7 @@ class InputBufferExt : public InputBuffer {};
 /// An OutputBuffer that write data to an internal buffer.
 class VecOutputBuffer : public OutputBuffer {
  private:
-  // Custom allocator that does not initialize memory(emulate Rust Vec::set_len when resize())
-  template <typename T>
-  struct NoInitAlloc : std::allocator<T> {
-    template <typename U>
-    struct rebind {
-      typedef NoInitAlloc<U> other;
-    };
-
-    template <class U, class... Args>
-    void construct(U*, Args&&...) {}
-  };
-
-  std::vector<uint8_t, NoInitAlloc<uint8_t>> buffer_;
+  fbl::Vector<uint8_t> buffer_;
 
   /// Used to keep track of the requested capacity. `Vec::with_capacity` may
   /// allocate more than the requested capacity so we can't rely on
@@ -262,7 +251,7 @@ class VecOutputBuffer : public OutputBuffer {
 
   const uint8_t* data() const { return buffer_.data(); }
 
-  void reset() { buffer_.clear(); }
+  void reset() { buffer_.reset(); }
 
  private:
   /// impl From<VecOutputBuffer>
@@ -290,7 +279,7 @@ class VecOutputBuffer : public OutputBuffer {
       return fit::error(errno(EINVAL));
     }
     // SAFETY: the vector is now initialized for an extra `written` bytes.
-    buffer_.resize(current_len + written);
+    buffer_.set_size(current_len + written);
     return fit::ok(written);
   }
 
@@ -300,7 +289,11 @@ class VecOutputBuffer : public OutputBuffer {
 
   fit::result<Errno, size_t> zero() final {
     auto zeroed = capacity_ - buffer_.size();
-    buffer_.resize(capacity_, 0);
+    fbl::AllocChecker ac;
+    buffer_.resize(capacity_, 0, &ac);
+    if (!ac.check()) {
+      return fit::error(errno(ENOMEM));
+    }
     return fit::ok(zeroed);
   }
 
@@ -308,27 +301,34 @@ class VecOutputBuffer : public OutputBuffer {
     if (length > available()) {
       return fit::error(errno(EINVAL));
     }
-
     capacity_ -= length;
     auto current_len = buffer_.size();
-    buffer_.reserve(current_len + length);
+    fbl::AllocChecker ac;
+    buffer_.reserve(current_len + length, &ac);
+    if (!ac.check()) {
+      return fit::error(errno(ENOMEM));
+    }
     return fit::ok();
   }
 
  public:
   // C++
-  ~VecOutputBuffer() override { buffer_.clear(); }
+  ~VecOutputBuffer() override { buffer_.reset(); }
 
  private:
   ZXTEST_FRIEND_TEST(IoBuffers, test_vec_output_buffer);
 
-  VecOutputBuffer(size_t capacity) : buffer_(), capacity_(capacity) { buffer_.reserve(capacity); }
+  VecOutputBuffer(size_t capacity) : buffer_(), capacity_(capacity) {
+    fbl::AllocChecker ac;
+    buffer_.reserve(capacity, &ac);
+    ASSERT(ac.check());
+  }
 };
 
 /// An InputBuffer that read data from an internal buffer.
 class VecInputBuffer : public InputBuffer {
  private:
-  std::vector<uint8_t> buffer_;
+  fbl::Vector<uint8_t> buffer_;
 
   // Invariant: `bytes_read <= buffer.len()` at all times.
   size_t bytes_read_ = 0;
@@ -338,7 +338,7 @@ class VecInputBuffer : public InputBuffer {
   static VecInputBuffer New(const ktl::span<uint8_t>& data);
 
   // impl From<Vec<u8>>
-  static VecInputBuffer from(const std::vector<uint8_t>& buffer);
+  static VecInputBuffer from(fbl::Vector<uint8_t> buffer);
 
  private:
   /// impl Buffer
@@ -405,12 +405,12 @@ class VecInputBuffer : public InputBuffer {
   }
 
   // C++
-  ~VecInputBuffer() override { buffer_.clear(); }
+  ~VecInputBuffer() override { buffer_.reset(); }
 
  private:
   ZXTEST_FRIEND_TEST(IoBuffers, test_vec_input_buffer);
 
-  VecInputBuffer(const std::vector<uint8_t>& buffer) : buffer_(buffer) {}
+  explicit VecInputBuffer(fbl::Vector<uint8_t> buffer) : buffer_(ktl::move(buffer)) {}
 };
 
 }  // namespace starnix

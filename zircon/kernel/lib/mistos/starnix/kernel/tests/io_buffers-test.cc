@@ -7,46 +7,54 @@
 
 #include <array>
 
+#include <fbl/alloc_checker.h>
 #include <ktl/span.h>
 #include <zxtest/zxtest.h>
 
 namespace starnix {
 
 TEST(IoBuffers, test_vec_input_buffer) {
-  auto input_buffer = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
-  ASSERT_TRUE(input_buffer
+  auto input_buffer1 = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
+  ASSERT_TRUE(input_buffer1
                   .peek_each([](const ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
                     return fit::ok(data.size() + 1);
                   })
                   .is_error());
 
-  input_buffer = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
-  ASSERT_EQ(0, input_buffer.bytes_read());
-  ASSERT_EQ(10, input_buffer.available());
-  ASSERT_EQ(10, input_buffer.drain());
-  ASSERT_EQ(10, input_buffer.bytes_read());
-  ASSERT_EQ(0, input_buffer.available());
+  auto input_buffer2 = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
+  ASSERT_EQ(0, input_buffer2.bytes_read());
+  ASSERT_EQ(10, input_buffer2.available());
+  ASSERT_EQ(10, input_buffer2.drain());
+  ASSERT_EQ(10, input_buffer2.bytes_read());
+  ASSERT_EQ(0, input_buffer2.available());
 
-  input_buffer = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
-  ASSERT_EQ(0, input_buffer.bytes_read());
-  ASSERT_EQ(10, input_buffer.available());
+  auto input_buffer3 = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
+  ASSERT_EQ(0, input_buffer3.bytes_read());
+  ASSERT_EQ(10, input_buffer3.available());
 
   const char* ptr = "helloworld";
-  ASSERT_EQ(std::vector<uint8_t>(ptr, ptr + 10),
-            input_buffer.read_all().value_or(std::vector<uint8_t>()), "read_all");
-  ASSERT_EQ(10, input_buffer.bytes_read());
-  ASSERT_EQ(0, input_buffer.available());
+  fbl::AllocChecker ac;
+  fbl::Vector<uint8_t> vec;
+  vec.resize(10, &ac);
+  ASSERT(ac.check());
+  memcpy(vec.data(), ptr, 10);
 
-  input_buffer = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
+  ASSERT_BYTES_EQ(vec.data(), input_buffer3.read_all().value_or(fbl::Vector<uint8_t>()).data(),
+                  vec.size(), "read_all");
+
+  ASSERT_EQ(10, input_buffer3.bytes_read());
+  ASSERT_EQ(0, input_buffer3.available());
+
+  auto input_buffer4 = VecInputBuffer::New(ktl::span<uint8_t>{(uint8_t*)"helloworld", 10});
   uint8_t buffer[5];
   ktl::span<uint8_t> span{buffer, 5};
-  ASSERT_EQ(5, input_buffer.read_exact(span).value_or(0), "read");
-  ASSERT_EQ(5, input_buffer.bytes_read());
-  ASSERT_EQ(5, input_buffer.available());
+  ASSERT_EQ(5, input_buffer4.read_exact(span).value_or(0), "read");
+  ASSERT_EQ(5, input_buffer4.bytes_read());
+  ASSERT_EQ(5, input_buffer4.available());
   ASSERT_BYTES_EQ("hello", buffer, 5);
-  ASSERT_EQ(5, input_buffer.read_exact(span).value_or(0), "read");
-  ASSERT_EQ(10, input_buffer.bytes_read());
-  ASSERT_EQ(0, input_buffer.available());
+  ASSERT_EQ(5, input_buffer4.read_exact(span).value_or(0), "read");
+  ASSERT_EQ(10, input_buffer4.bytes_read());
+  ASSERT_EQ(0, input_buffer4.available());
   ASSERT_BYTES_EQ("world", buffer, 5);
 
   //  TODO (Herrera): Test read_object
@@ -86,7 +94,7 @@ TEST(IoBuffers, test_vec_write_buffer) {
   auto input_buffer = VecInputBuffer::New(data);
   auto output_buffer = VecOutputBuffer::New(20);
   ASSERT_EQ(10, output_buffer.write_buffer(input_buffer).value(), "write_buffer");
-  ASSERT_EQ(0, memcmp(data.data(), output_buffer.data(), data.size()));
+  ASSERT_BYTES_EQ(data.data(), output_buffer.data(), data.size());
 }
 
 }  // namespace starnix

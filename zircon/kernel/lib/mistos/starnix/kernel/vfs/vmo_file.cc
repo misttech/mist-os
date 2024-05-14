@@ -122,7 +122,7 @@ fit::result<Errno, size_t> VmoFileObject::write(const zx::vmo& vmo, const FileOb
   auto result = data->peek_all();
   if (result.is_error())
     return result.take_error();
-  auto buf = result.value();
+  auto buf = ktl::move(result.value());
 
   return file.node()->update_info<fit::result<Errno, size_t>>(
       [&](FsNodeInfo& info) -> fit::result<Errno, size_t> {

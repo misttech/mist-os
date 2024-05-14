@@ -7,19 +7,21 @@
 
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 
-#include <iterator>
-#include <vector>
 #include <algorithm>
+#include <iterator>
+
+#include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 
 namespace starnix {
 
 fit::result<Errno, size_t> OutputBuffer::write(const ktl::span<uint8_t>& buffer) {
   ktl::span buf = buffer;
   return write_each([&](ktl::span<uint8_t>& data) -> fit::result<Errno, size_t> {
-    auto size = std::min(buf.size(), data.size());
+    auto size = ktl::min(buf.size(), data.size());
     ktl::span to_clone(buf.data(), size);
     ktl::span remaining(buf.data() + size, buf.size() - size);
-    __unsanitized_memcpy(data.data(), to_clone.data(), size);
+    memcpy(data.data(), to_clone.data(), size);
     buf = remaining;
     return fit::ok(size);
   });
@@ -46,10 +48,10 @@ fit::result<Errno, size_t> OutputBuffer::write_buffer(InputBuffer& input) {
   });
 }
 
-fit::result<Errno, std::vector<uint8_t>> InputBuffer::peek_all() {
+fit::result<Errno, fbl::Vector<uint8_t>> InputBuffer::peek_all() {
   // SAFETY: self.peek returns the number of bytes read.
   return read_to_vec<uint8_t, Errno>(
-      available(), [&](ktl::span<uint8_t> buf) -> fit::result<Errno, NumberOfElementsRead> {
+      available(), [&](ktl::span<uint8_t>& buf) -> fit::result<Errno, NumberOfElementsRead> {
         auto peek_result = this->peek(buf);
         if (peek_result.is_error())
           return peek_result.take_error();
@@ -58,11 +60,16 @@ fit::result<Errno, std::vector<uint8_t>> InputBuffer::peek_all() {
 }
 
 VecInputBuffer VecInputBuffer::New(const ktl::span<uint8_t>& data) {
-  return VecInputBuffer(std::vector<uint8_t>(data.begin(), data.end()));
+  fbl::AllocChecker ac;
+  fbl::Vector<uint8_t> buffer;
+  buffer.resize(data.size(), &ac);
+  ASSERT(ac.check());
+  memcpy(buffer.data(), data.data(), data.size());
+  return VecInputBuffer(ktl::move(buffer));
 }
 
-VecInputBuffer VecInputBuffer::from(const std::vector<uint8_t>& buffer) {
-  return VecInputBuffer(buffer);
+VecInputBuffer VecInputBuffer::from(fbl::Vector<uint8_t> buffer) {
+  return VecInputBuffer(ktl::move(buffer));
 }
 
 }  // namespace starnix
