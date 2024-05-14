@@ -55,6 +55,7 @@ cc_library(
         ":gatt",
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/common:uuid_string_util",
         "@pigweed//pw_async:heap_dispatcher",
         "@pigweed//pw_unit_test",
     ],

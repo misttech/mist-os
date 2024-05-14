@@ -76,6 +76,7 @@ pw_source_set("testing") {
     "$dir_pw_async:heap_dispatcher",
     "$dir_pw_unit_test",
     "//src/connectivity/bluetooth/core/bt-host/common",
+    "//src/connectivity/bluetooth/core/bt-host/common:uuid_string_util",
   ]
 }
 

@@ -65,6 +65,7 @@ source_set("helpers") {
     "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_hlcpp",
     "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
     "//src/connectivity/bluetooth/core/bt-host/common",
+    "//src/connectivity/bluetooth/core/bt-host/common:uuid_string_util",
     "//src/connectivity/bluetooth/core/bt-host/gap",
     "//src/connectivity/bluetooth/core/bt-host/gatt",
     "//src/connectivity/bluetooth/core/bt-host/sdp",
