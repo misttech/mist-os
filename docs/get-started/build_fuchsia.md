@@ -91,28 +91,15 @@ see [Configure a build](/docs/development/build/fx.md#configure-a-build).
 Note: This step is not required to build Fuchsia, but it's recommended
 since it can save you a lot of time when you build Fuchsia.
 
-To speed up the Fuchsia build, you can use one of the following services:
+To speed up the Fuchsia build, you can use the following service:
 
-*   [Enable Goma](#enable-goma)
 *   [Install ccache](#install-ccache)
-
-### Enable Goma {#enable-goma}
-
-[Goma](https://chromium.googlesource.com/infra/goma/server/){:.external} is a
-distributed compiler service for open source projects such as Chrome, Android
-and Fuchsia.
-
-If you have access to Goma, enable a Goma client on your machine:
-
-```posix-terminal
-fx goma
-```
 
 ### Install ccache {#install-ccache}
 
-If you do not have access to Goma, but want to accelerate the Fuchsia build
-locally, use <code>[ccache](https://ccache.dev/){:.external}</code> to cache
-artifacts from previous builds.
+To accelerate the Fuchsia build locally,
+use [`ccache`](https://ccache.dev/){:.external} to cache
+C and C++ artifacts from previous builds.
 
 * {Linux}
 
