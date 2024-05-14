@@ -1284,7 +1284,23 @@ template("clang_toolchain") {
           depend_output,
           link_output,
         ]
-        command += " && ${prefix}/llvm-ifs --write-if-changed --output-ifs=$depend_output --output-elf=$link_output $unstripped_output"
+        _remote_ifs_prefix = ""
+        if (_link_rbe_enable) {
+          _remote_ifs_prefix_list =
+              [
+                rebase_path(python_exe_src, root_build_dir),
+                "-S",
+                rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+                "--inputs",
+                "\"$unstripped_output\"",
+                "--output_files",
+                "\"$depend_output,$link_output\"",
+                "--preserve_unchanged_output_mtime",  # only overwrite if
+                                                      # changed
+              ] + _link_rbe_exec_strategy_flags + [ "--" ]
+          _remote_ifs_prefix = string_join(" ", _remote_ifs_prefix_list)
+        }
+        command += " && $_remote_ifs_prefix ${prefix}/llvm-ifs --write-if-changed --output-ifs=$depend_output --output-elf=$link_output $unstripped_output"
       }
     }
 
