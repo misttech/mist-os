@@ -5,43 +5,25 @@
 //! Implementations for raw IP sockets that integrate with traits/types from
 //! foreign modules.
 
-use lock_order::{lock::RwLockFor, relation::LockBefore, wrap::LockedWrapperApi};
+use lock_order::{relation::LockBefore, wrap::LockedWrapperApi};
 
 use crate::{
     ip::{
         base::IpLayerIpExt,
         raw::{
             RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
-            RawIpSocketState, RawIpSocketStateContext,
+            RawIpSocketStateContext,
         },
     },
-    lock_ordering,
-    sync::{RwLockReadGuard, RwLockWriteGuard},
-    BindingsTypes, CoreCtx,
+    lock_ordering, BindingsTypes, CoreCtx,
 };
 
-impl<I: IpLayerIpExt> RwLockFor<lock_ordering::RawIpSocketState<I>> for RawIpSocketState<I> {
-    type Data = RawIpSocketLockedState<I>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data>
-        where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.locked_state.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.locked_state.write()
-    }
-}
-
 impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::RawIpSocketState<I>>>
-    RawIpSocketStateContext<I> for CoreCtx<'_, BT, L>
+    RawIpSocketStateContext<I, BT> for CoreCtx<'_, BT, L>
 {
     fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I>) -> O>(
         &mut self,
-        RawIpSocketId(state_rc): &RawIpSocketId<I>,
+        RawIpSocketId(state_rc): &RawIpSocketId<I, BT>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(&**state_rc);
@@ -50,7 +32,7 @@ impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::RawIpSocke
     }
     fn with_locked_state_mut<O, F: FnOnce(&mut RawIpSocketLockedState<I>) -> O>(
         &mut self,
-        RawIpSocketId(state_rc): &RawIpSocketId<I>,
+        RawIpSocketId(state_rc): &RawIpSocketId<I, BT>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(&**state_rc);
@@ -61,13 +43,13 @@ impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::RawIpSocke
 }
 
 impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSockets<I>>>
-    RawIpSocketMapContext<I> for CoreCtx<'_, BT, L>
+    RawIpSocketMapContext<I, BT> for CoreCtx<'_, BT, L>
 {
-    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I>) -> O>(&mut self, cb: F) -> O {
+    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O {
         let sockets = self.read_lock::<lock_ordering::AllRawIpSockets<I>>();
         cb(&sockets)
     }
-    fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I>) -> O>(&mut self, cb: F) -> O {
+    fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O {
         let mut sockets = self.write_lock::<lock_ordering::AllRawIpSockets<I>>();
         cb(&mut sockets)
     }

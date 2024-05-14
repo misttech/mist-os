@@ -27,6 +27,7 @@ use crate::{
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
         },
         icmp::{IcmpBindingsContext, IcmpBindingsTypes},
+        raw::RawIpSocketsBindingsTypes,
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
@@ -120,6 +121,7 @@ pub trait BindingsTypes:
     + TcpBindingsTypes
     + FilterBindingsTypes
     + IcmpBindingsTypes
+    + RawIpSocketsBindingsTypes
     + UdpBindingsTypes
     + TimerBindingsTypes<DispatchId = TimerId<Self>>
 {
@@ -131,6 +133,7 @@ impl<O> BindingsTypes for O where
         + TcpBindingsTypes
         + FilterBindingsTypes
         + IcmpBindingsTypes
+        + RawIpSocketsBindingsTypes
         + UdpBindingsTypes
         + TimerBindingsTypes<DispatchId = TimerId<Self>>
 {

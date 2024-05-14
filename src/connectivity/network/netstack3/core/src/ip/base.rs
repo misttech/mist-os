@@ -70,7 +70,7 @@ use crate::{
         ipv6,
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
-        raw::RawIpSocketMap,
+        raw::{RawIpSocketMap, RawIpSocketsBindingsTypes},
         reassembly::{
             FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
             IpPacketFragmentCache,
@@ -1522,7 +1522,7 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPack
 impl<I: IpLayerIpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::AllRawIpSockets<I>>
     for StackState<BT>
 {
-    type Data = RawIpSocketMap<I>;
+    type Data = RawIpSocketMap<I, BT>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data>
         where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data>
@@ -1648,8 +1648,14 @@ impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::
 }
 
 /// Marker trait for the bindings types required by the IP layer's inner state.
-pub trait IpStateBindingsTypes: PmtuBindingsTypes + FragmentBindingsTypes {}
-impl<BT> IpStateBindingsTypes for BT where BT: PmtuBindingsTypes + FragmentBindingsTypes {}
+pub trait IpStateBindingsTypes:
+    PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes
+{
+}
+impl<BT> IpStateBindingsTypes for BT where
+    BT: PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes
+{
+}
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -1658,7 +1664,7 @@ pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
-    raw_sockets: RwLock<RawIpSocketMap<I>>,
+    raw_sockets: RwLock<RawIpSocketMap<I, BT>>,
 }
 
 impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, DeviceId, BT> {

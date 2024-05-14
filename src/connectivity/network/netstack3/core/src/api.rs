@@ -22,6 +22,7 @@ use crate::{
             nud::api::NeighborApi,
         },
         icmp::socket::IcmpEchoSocketApi,
+        raw::RawIpSocketApi,
     },
     time::TimerId,
     transport::{tcp::socket::TcpApi, udp::UdpApi},
@@ -61,6 +62,12 @@ where
     pub fn tcp<I: Ip>(self) -> TcpApi<I, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         TcpApi::new(ctx)
+    }
+
+    /// Gets access to the raw IP socket API.
+    pub fn raw_ip_socket<I: Ip>(self) -> RawIpSocketApi<I, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        RawIpSocketApi::new(ctx)
     }
 
     /// Gets access to the device socket API.

@@ -65,6 +65,7 @@ use crate::{
             IpDeviceEvent,
         },
         icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
+        raw::RawIpSocketsBindingsTypes,
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -1154,6 +1155,10 @@ impl IcmpEchoBindingsTypes for FakeBindingsCtx {
 
 impl crate::device::socket::DeviceSocketTypes for FakeBindingsCtx {
     type SocketState = Mutex<Vec<(WeakDeviceId<FakeBindingsCtx>, Vec<u8>)>>;
+}
+
+impl RawIpSocketsBindingsTypes for FakeBindingsCtx {
+    type RawIpSocketState<I: Ip> = ();
 }
 
 impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {

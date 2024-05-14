@@ -168,13 +168,13 @@ pub mod ip {
     pub(crate) mod forwarding;
     pub(crate) mod gmp;
     pub(crate) mod icmp;
+    pub(crate) mod raw;
     pub(crate) mod reassembly;
     pub(crate) mod socket;
     pub(crate) mod types;
 
     mod integration;
     mod ipv6;
-    mod raw;
 
     pub(crate) use base::*;
 
@@ -195,6 +195,7 @@ pub mod ip {
         },
         AddressRemovedReason, IpAddressState, IpDeviceEvent,
     };
+    pub use raw::RawIpSocketsBindingsTypes;
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }
 

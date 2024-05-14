@@ -82,6 +82,7 @@ rustc_library_with_features("netstack3-core") {
     "src/ip/path_mtu.rs",
     "src/ip/raw.rs",
     "src/ip/raw/integration.rs",
+    "src/ip/raw/state.rs",
     "src/ip/reassembly.rs",
     "src/ip/socket.rs",
     "src/ip/types.rs",
