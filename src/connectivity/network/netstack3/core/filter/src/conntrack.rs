@@ -246,8 +246,8 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         let to_remove: Vec<_> = guard
             .table
             .iter()
-            .filter_map(|(_, conn)| {
-                if conn.is_expired(now) {
+            .filter_map(|(tuple, conn)| {
+                if *tuple == conn.inner.original_tuple && conn.is_expired(now) {
                     Some((conn.inner.original_tuple.clone(), conn.inner.reply_tuple.clone()))
                 } else {
                     None
@@ -256,8 +256,8 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             .collect();
 
         for (original_tuple, reply_tuple) in to_remove {
-            let _ = guard.table.remove(&original_tuple);
-            let _ = guard.table.remove(&reply_tuple);
+            assert!(guard.table.remove(&original_tuple).is_some());
+            assert!(guard.table.remove(&reply_tuple).is_some());
         }
 
         // The table is only expected to be empty in exceptional cases, or
