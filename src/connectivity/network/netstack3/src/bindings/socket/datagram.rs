@@ -126,6 +126,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SetSocketDeviceError: IntoErrno;
     type SetMulticastMembershipError: IntoErrno;
     type MulticastInterfaceError: IntoErrno;
+    type SetReuseAddrError: IntoErrno;
     type SetReusePortError: IntoErrno;
     type ShutdownError: IntoErrno;
     type SetIpTransparentError: IntoErrno;
@@ -187,6 +188,14 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         ctx: &mut Ctx,
         id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError>;
+
+    fn set_reuse_addr(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        reuse_addr: bool,
+    ) -> Result<(), Self::SetReuseAddrError>;
+
+    fn get_reuse_addr(ctx: &mut Ctx, id: &Self::SocketId) -> bool;
 
     fn set_reuse_port(
         ctx: &mut Ctx,
@@ -309,6 +318,7 @@ where
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = SetMulticastMembershipError;
     type MulticastInterfaceError = NotDualStackCapableError;
+    type SetReuseAddrError = ExpectedUnboundError;
     type SetReusePortError = ExpectedUnboundError;
     type SetIpTransparentError = Never;
     type LocalIdentifier = NonZeroU16;
@@ -385,20 +395,24 @@ where
         ctx.api().udp().get_bound_device(id)
     }
 
+    fn set_reuse_addr(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        reuse_addr: bool,
+    ) -> Result<(), Self::SetReusePortError> {
+        ctx.api().udp().set_posix_reuse_addr(id, reuse_addr).inspect_err(|_| {
+            warn!("tried to set SO_REUSEADDR on a bound socket; see https://fxbug.dev/42051599")
+        })
+    }
+
     fn set_reuse_port(
         ctx: &mut Ctx,
         id: &Self::SocketId,
         reuse_port: bool,
     ) -> Result<(), Self::SetReusePortError> {
-        match ctx.api().udp().set_posix_reuse_port(id, reuse_port) {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                warn!(
-                    "tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/42051599"
-                );
-                Err(e)
-            }
-        }
+        ctx.api().udp().set_posix_reuse_port(id, reuse_port).inspect_err(|_| {
+            warn!("tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/42051599")
+        })
     }
 
     fn set_dual_stack_enabled(
@@ -414,6 +428,10 @@ where
         id: &Self::SocketId,
     ) -> Result<bool, NotDualStackCapableError> {
         ctx.api().udp().get_dual_stack_enabled(id)
+    }
+
+    fn get_reuse_addr(ctx: &mut Ctx, id: &Self::SocketId) -> bool {
+        ctx.api().udp().get_posix_reuse_addr(id)
     }
 
     fn get_reuse_port(ctx: &mut Ctx, id: &Self::SocketId) -> bool {
@@ -578,6 +596,7 @@ where
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = NotSupportedError;
     type MulticastInterfaceError = NotSupportedError;
+    type SetReuseAddrError = NotSupportedError;
     type SetReusePortError = NotSupportedError;
     type SetIpTransparentError = NotSupportedError;
     type LocalIdentifier = NonZeroU16;
@@ -682,6 +701,18 @@ where
             // support dual stack operations.
             IpVersion::V6 => Ok(false),
         }
+    }
+
+    fn set_reuse_addr(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _reuse_addr: bool,
+    ) -> Result<(), Self::SetReuseAddrError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_reuse_addr(_ctx: &mut Ctx, _id: &Self::SocketId) -> bool {
+        false
     }
 
     fn set_reuse_port(
@@ -1248,18 +1279,15 @@ where
                     .send(Ok(self.get_max_receive_buffer_size()))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
-            Request::SetReuseAddress { value: _, responder } => {
-                tracing::warn!(
-                    "TODO(https://fxbug.dev/42180094): implement SO_REUSEADDR; returning OK"
-                );
-                // ANVL's UDP test stub requires that setting SO_REUSEADDR succeeds.
-                // Blindly return success here to unblock test coverage (possible since
-                // the network test realm is restarted before each test case).
-                // TODO(https://fxbug.dev/42180094): Actually implement SetReuseAddress.
-                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+            Request::SetReuseAddress { value, responder } => {
+                let result = self.set_reuse_addr(value);
+                maybe_log_error!("set_reuse_addr", &result);
+                responder.send(result).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             Request::GetReuseAddress { responder } => {
-                respond_not_supported!("syncudp::GetReuseAddress", responder)
+                responder
+                    .send(Ok(self.get_reuse_addr()))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             Request::SetReusePort { value, responder } => {
                 let result = self.set_reuse_port(value);
@@ -1914,6 +1942,16 @@ where
             |Ipv6BindingsData { recv_pkt_info }| Some(*recv_pkt_info),
         );
         correct_ip_version.ok_or(fposix::Errno::Eopnotsupp)
+    }
+
+    fn set_reuse_addr(self, reuse_addr: bool) -> Result<(), fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::set_reuse_addr(ctx, id, reuse_addr).map_err(IntoErrno::into_errno)
+    }
+
+    fn get_reuse_addr(self) -> bool {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_reuse_addr(ctx, id)
     }
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {

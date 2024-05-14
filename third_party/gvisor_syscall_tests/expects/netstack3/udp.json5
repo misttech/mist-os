@@ -6,9 +6,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // Netstack3 does not support SO_REUSEADDR and only partially supports
-                // SO_REUSEPORT for UDP sockets.
-                "AllUDPSockets/UDPSocketPairTest.ReuseAddrDefault/*",
+                // Netstack3 does not support SO_REUSEADDR and SO_REUSEPORT on bound sockets.
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddr/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddrReusePort/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReusePort/*",
