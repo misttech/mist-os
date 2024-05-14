@@ -7,5 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.power.metrics") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
+  stable = true
   sources = [ "recorder.fidl" ]
 }

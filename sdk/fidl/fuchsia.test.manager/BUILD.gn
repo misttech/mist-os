@@ -7,7 +7,9 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.test.manager") {
   sources = [ "test_manager.fidl" ]
 
-  sdk_category = "internal"
+  sdk_category = "partner_internal"
+  sdk_area = "Testing"
+  stable = true
 
   public_deps = [
     "//sdk/fidl/fuchsia.component",
