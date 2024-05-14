@@ -55,7 +55,6 @@
                 // Netstack3 does not support many UDP socket options or operations
                 "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/*",
                 "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/*",
-                "AllUDPSockets/AllSocketPairTest.GetSndBufSucceeds/*",
                 "AllUDPSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
                 "AllUDPSockets/AllSocketPairTest.GetSocketRcvbufOption/*",
                 "AllUDPSockets/AllSocketPairTest.KeepAliveSocketOption/*",
@@ -65,7 +64,6 @@
                 "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
                 "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
                 "AllUDPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
-                "AllUDPSockets/NonStreamSocketPairTest.SendMsgTooLarge/*",
                 "AllUDPSockets/UDPSocketPairTest.GetSocketAcceptConn/*",
                 "AllUDPSockets/UDPSocketPairTest.IPPKTINFODefault/*",
                 "AllUDPSockets/UDPSocketPairTest.RecvTosDefault/*",

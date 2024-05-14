@@ -1264,7 +1264,12 @@ where
                 responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             Request::GetSendBuffer { responder } => {
-                respond_not_supported!("syncudp::GetSendBuffer", responder)
+                // TODO(https://fxbug.dev/42074004): Actually implement SetSendBuffer.
+                // Until then we return the default buffer size used on Linux.
+                const DEFAULT_SEND_BUFFER: u64 = 212992;
+                responder
+                    .send(Ok(DEFAULT_SEND_BUFFER))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             Request::SetReceiveBuffer { value_bytes, responder } => {
                 responder

@@ -17,8 +17,6 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBuf/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBuf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufAboveMax/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufBelowMin/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenReceive/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenSend/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenSend/*",
