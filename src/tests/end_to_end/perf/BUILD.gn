@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/dart/dart_library.gni")
-import("//build/dart/test.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/testing/perf/test.gni")
@@ -15,36 +13,6 @@ import("//build/testing/perf/test.gni")
 # executables (dart_test targets here) because the Fuchsia Infra tools
 # for retrying tests and tracking flakes operate on the granularity of
 # test executables.
-
-test_list = [
-  # keep-sorted start
-  "flatland_benchmarks_test",
-  # keep-sorted end
-]
-
-foreach(target_name, test_list) {
-  dart_test(target_name) {
-    sources = [
-      "$target_name.dart",
-      "helpers.dart",
-    ]
-
-    deps = [
-      "//sdk/testing/sl4f/client",
-      "//third_party/dart-pkg/pub/logging",
-      "//third_party/dart-pkg/pub/meta",
-      "//third_party/dart-pkg/pub/test",
-    ]
-
-    non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
-
-    environments = [
-      nuc7_env,
-      nuc11_env,
-      vim3_env,
-    ]
-  }
-}
 
 _tests = [
   {
@@ -121,20 +89,11 @@ foreach(test, _tests) {
 }
 
 if (is_host) {
-  metric_files = [
-    # keep-sorted start
-    "fuchsia.flatland_latency.txt",
-    # keep-sorted end
-  ]
-
   host_test_data("runtime_deps") {
     sources = [
       "$root_out_dir/catapult_converter",
       "$root_out_dir/trace2json",
     ]
-    foreach(filename, metric_files) {
-      sources += [ "expected_metric_names/$filename" ]
-    }
     outputs = [ "$target_gen_dir/runtime_deps/{{source_file_part}}" ]
 
     deps = [
@@ -170,10 +129,6 @@ group("test") {
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
   ]
-
-  foreach(target_name, test_list) {
-    deps += [ ":$target_name($host_toolchain)" ]
-  }
 }
 
 group("tests_to_run_on_internal_builders") {

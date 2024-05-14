@@ -30,15 +30,17 @@ assumptions about the type of performance test being written.
         modify the software-under-test to generate extra trace events.
 
         An example is [`perftest_trace_events_test`][perftest_trace_events_test]
-        which uses the `trace_processing` library and extracts a set of events.
+        which uses the `trace_processing` library to extracts a set of events.
+
+        Another example is [`flatland_benchmark`][flatland_benchmark]
+        which uses the `trace_processing.app_render` library to extracts a set
+        of events, then uses `perf_publish` to upload result.
 
         The test should use the [`python_perf_test`][python_perf_test]
         template as it includes all the necessary dependencies for trace
         processing and metrics publishing.
 
-        <!-- TODO(https://fxbug.dev/305080561): link to a better example -->
-
-*   **Dart:**
+*   **Dart (Deprecated):**
 
     *   **High level:** You can use the Dart [`trace_processing`
         library][trace_processing] to extract performance metrics from
@@ -46,11 +48,6 @@ assumptions about the type of performance test being written.
         existing correctness test and you want to extend it to also
         produce performance results. In that case, it is common to
         modify the software-under-test to generate extra trace events.
-
-        An example is
-        [`flatland_benchmarks_test.dart`](/src/tests/end_to_end/perf/test/flatland_benchmarks_test.dart),
-        which uses the `trace_processing` library by defining a
-        `MetricsSpecSet`.
 
     *   **Low level:** You can use the [`TestCaseResults`
         class][metrics_results] to generate entries for
@@ -100,6 +97,7 @@ tests written in Python that deal with performance metrics.
 
 
 [dart-wrappers]: /src/tests/end_to_end/perf/test/
+[flatland_benchmark]: /src/tests/end_to_end/perf/test/flatland_benchmark.py
 [fuchsia-criterion Rust library]: /src/developer/fuchsia-criterion/
 [Fuchsiaperf Rust library]: /src/performance/lib/fuchsiaperf/src/lib.rs
 [go-benchmarking]: /src/lib/go-benchmarking/
