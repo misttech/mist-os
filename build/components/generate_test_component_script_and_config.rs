@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use fidl_fuchsia_component_decl::Component;
 use fidl_fuchsia_data as fdata;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use structopt::StructOpt;
 
@@ -73,7 +74,7 @@ struct TestComponentEntry {
     moniker: Option<String>,
 }
 
-fn generate_bash_script(args: &Args) -> std::io::Result<()> {
+fn generate_bash_script(args: &Args) -> Result<(), Error> {
     let mut file = File::create(&args.script_output_filename)?;
     file.write_all(b"#!/bin/bash\n")?;
     file.write_all(b"\n")?;
@@ -84,6 +85,10 @@ fn generate_bash_script(args: &Args) -> std::io::Result<()> {
         )
         .as_bytes(),
     )?;
+    let mut perm = file.metadata()?.permissions();
+    // Add the executable bit for user, group, and others
+    perm.set_mode(0o751);
+    file.set_permissions(perm).context("Error setting permissions on generated file")?;
     Ok(())
 }
 
