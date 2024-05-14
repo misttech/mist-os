@@ -97,13 +97,9 @@ zx::result<fbl::RefPtr<fs::Vnode>> Directory::Create(std::string_view name, fs::
   TRACE_DURATION("blobfs", "Directory::Create", "name", name);
   ZX_DEBUG_ASSERT(name.find('/') == std::string_view::npos);
 
-  fbl::RefPtr<Blob> new_blob;
-  zx_status_t status = blobfs_->node_operations().create.Track([&]() -> zx_status_t {
-    switch (type) {
-      case fs::CreationType::kFile:
-        break;
-      default:
-        return ZX_ERR_INVALID_ARGS;
+  return blobfs_->node_operations().create.Track([&]() -> zx::result<fbl::RefPtr<fs::Vnode>> {
+    if (type != fs::CreationType::kFile) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
     bool is_delivery_blob = false;
@@ -116,19 +112,18 @@ zx::result<fbl::RefPtr<fs::Vnode>> Directory::Create(std::string_view name, fs::
 
     Digest digest;
     if (zx_status_t status = digest.Parse(name.data(), name.length()); status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
 
-    new_blob = fbl::AdoptRef(new Blob(*blobfs_, digest, is_delivery_blob));
+    fbl::RefPtr new_blob = fbl::AdoptRef(new Blob(*blobfs_, digest, is_delivery_blob));
     if (zx_status_t status = blobfs_->GetCache().Add(new_blob); status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     if (zx_status_t status = new_blob->Open(nullptr); status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
-    return ZX_OK;
+    return zx::ok(std::move(new_blob));
   });
-  return zx::make_result(status, std::move(new_blob));
 }
 
 zx::result<std::string> Directory::GetDevicePath() const {
