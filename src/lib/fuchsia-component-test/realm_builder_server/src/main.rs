@@ -1202,7 +1202,21 @@ impl RealmNode2 {
                     return Err(RealmBuilderError::NoSuchTarget(ref_to_string(&target)));
                 }
 
-                if is_parent_ref(&target) {
+                if let fcdecl::Ref::Capability(fcdecl::CapabilityRef { name: target_name }) = target
+                {
+                    if !state_guard.decl.capabilities.iter().any(|c| {
+                        matches!(c, cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
+                            name,
+                            ..
+                        }) if name == target_name)
+                    }) {
+                        return Err(RealmBuilderError::NoSuchTargetCapability(ref_to_string(
+                            target,
+                        )));
+                    }
+                }
+
+                if is_parent_ref(target) {
                     match &capability {
                         ftest::Capability::Protocol(ftest::Protocol { availability, .. })
                         | ftest::Capability::Directory(ftest::Directory { availability, .. })
@@ -1344,10 +1358,10 @@ async fn add_use_decl_if_needed(
 
 async fn add_expose_decl_if_needed(
     realm: &mut RealmNodeState,
-    ref_: fcdecl::Ref,
+    from: fcdecl::Ref,
     capability: ftest::Capability,
 ) -> Result<(), RealmBuilderError> {
-    if let fcdecl::Ref::Child(child) = ref_ {
+    if let fcdecl::Ref::Child(child) = from {
         if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(child.name)) {
             let mut decl = child.get_decl().await;
             push_if_not_present(
@@ -1367,6 +1381,14 @@ async fn add_expose_decl_if_needed(
     }
 
     Ok(())
+}
+
+fn parse_relative_path(path: Option<String>) -> Result<RelativePath, RealmBuilderError> {
+    path.map(|p| {
+        RelativePath::new(&p).map_err(|_| RealmBuilderError::InvalidRelativePath(p.clone()))
+    })
+    .transpose()
+    .map(|p| p.unwrap_or_default())
 }
 
 fn into_dependency_type(type_: &Option<fcdecl::DependencyType>) -> cm_rust::DependencyType {
@@ -1529,13 +1551,14 @@ fn create_offer_decl(
     Ok(match capability {
         ftest::Capability::Protocol(protocol) => {
             let source_name = try_into_source_name(&protocol.name)?;
+            let source_dictionary = parse_relative_path(protocol.from_dictionary)?;
             let target_name = try_into_target_name(&protocol.name, &protocol.as_)?;
             let dependency_type = into_dependency_type(&protocol.type_);
             let availability = get_offer_availability(&protocol.availability);
             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                 source,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target,
                 target_name,
                 dependency_type,
@@ -1544,13 +1567,14 @@ fn create_offer_decl(
         }
         ftest::Capability::Directory(directory) => {
             let source_name = try_into_source_name(&directory.name)?;
+            let source_dictionary = parse_relative_path(directory.from_dictionary)?;
             let target_name = try_into_target_name(&directory.name, &directory.as_)?;
             let dependency_type = into_dependency_type(&directory.type_);
             let availability = get_offer_availability(&directory.availability);
             cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                 source,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target,
                 target_name,
                 rights: directory.rights,
@@ -1573,12 +1597,13 @@ fn create_offer_decl(
         }
         ftest::Capability::Service(service) => {
             let source_name = try_into_source_name(&service.name)?;
+            let source_dictionary = parse_relative_path(service.from_dictionary)?;
             let target_name = try_into_target_name(&service.name, &service.as_)?;
             let availability = get_offer_availability(&service.availability);
             cm_rust::OfferDecl::Service(cm_rust::OfferServiceDecl {
                 source,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target,
                 target_name,
                 source_instance_filter: None,
@@ -1612,12 +1637,13 @@ fn create_offer_decl(
             })
         }
         ftest::Capability::Dictionary(dictionary) => {
+            let source_dictionary = parse_relative_path(dictionary.from_dictionary)?;
             let dependency_type = into_dependency_type(&dictionary.type_);
             let availability = get_offer_availability(&dictionary.availability);
             cm_rust::OfferDecl::Dictionary(cm_rust::OfferDictionaryDecl {
                 source,
                 source_name: try_into_source_name(&dictionary.name)?,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target,
                 target_name: try_into_target_name(&dictionary.name, &dictionary.as_)?,
                 dependency_type,
@@ -1653,6 +1679,7 @@ fn create_expose_decl(
     Ok(match capability {
         ftest::Capability::Protocol(protocol) => {
             let source_name = try_into_source_name(&protocol.name)?;
+            let source_dictionary = parse_relative_path(protocol.from_dictionary)?;
             let target_name = match exposing_in {
                 ExposingIn::Child => try_into_source_name(&protocol.name)?,
                 ExposingIn::Realm => try_into_target_name(&protocol.name, &protocol.as_)?,
@@ -1660,7 +1687,7 @@ fn create_expose_decl(
             cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                 source: source.clone(),
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
                 // TODO(https://fxbug.dev/42058594): Support optional exposes.
@@ -1669,6 +1696,7 @@ fn create_expose_decl(
         }
         ftest::Capability::Directory(directory) => {
             let source_name = try_into_source_name(&directory.name)?;
+            let source_dictionary = parse_relative_path(directory.from_dictionary)?;
             let target_name = match exposing_in {
                 ExposingIn::Child => try_into_source_name(&directory.name)?,
                 ExposingIn::Realm => try_into_target_name(&directory.name, &directory.as_)?,
@@ -1683,7 +1711,7 @@ fn create_expose_decl(
             cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
                 source,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
                 rights: directory.rights,
@@ -1700,6 +1728,7 @@ fn create_expose_decl(
         }
         ftest::Capability::Service(service) => {
             let source_name = try_into_source_name(&service.name)?;
+            let source_dictionary = parse_relative_path(service.from_dictionary)?;
             let target_name = match exposing_in {
                 ExposingIn::Child => try_into_source_name(&service.name)?,
                 ExposingIn::Realm => try_into_target_name(&service.name, &service.as_)?,
@@ -1707,7 +1736,7 @@ fn create_expose_decl(
             cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
                 source,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
                 // TODO(https://fxbug.dev/42058594): Support optional exposes.
@@ -1716,6 +1745,7 @@ fn create_expose_decl(
         }
         ftest::Capability::Dictionary(dictionary) => {
             let source_name = try_into_source_name(&dictionary.name)?;
+            let source_dictionary = parse_relative_path(dictionary.from_dictionary)?;
             let target_name = match exposing_in {
                 ExposingIn::Child => try_into_source_name(&dictionary.name)?,
                 ExposingIn::Realm => try_into_target_name(&dictionary.name, &dictionary.as_)?,
@@ -1723,7 +1753,7 @@ fn create_expose_decl(
             cm_rust::ExposeDecl::Dictionary(cm_rust::ExposeDictionaryDecl {
                 source,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
                 availability: cm_rust::Availability::Required,
@@ -1758,6 +1788,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             // If the capability was renamed in the parent's offer declaration, we want to use the
             // post-rename version of it here.
             let source_name = try_into_target_name(&protocol.name, &protocol.as_)?;
+            let source_dictionary = parse_relative_path(protocol.from_dictionary)?;
             let target_path = try_into_service_path(
                 &Some(source_name.clone().native_into_fidl()),
                 &protocol.path,
@@ -1769,7 +1800,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target_path,
                 dependency_type,
                 availability: check_and_unwrap_use_availability(protocol.availability)?,
@@ -1779,6 +1810,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             // If the capability was renamed in the parent's offer declaration, we want to use the
             // post-rename version of it here.
             let source_name = try_into_target_name(&directory.name, &directory.as_)?;
+            let source_dictionary = parse_relative_path(directory.from_dictionary)?;
             let target_path = try_into_capability_path(&directory.path)?;
             let rights = directory.rights.ok_or_else(|| RealmBuilderError::CapabilityInvalid(
                 anyhow::format_err!(
@@ -1792,7 +1824,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
                 source: cm_rust::UseSource::Parent,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target_path,
                 rights,
                 // We only want to set the sub-directory field once, and if we're generating a use
@@ -1818,6 +1850,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             // If the capability was renamed in the parent's offer declaration, we want to use the
             // post-rename version of it here.
             let source_name = try_into_target_name(&service.name, &service.as_)?;
+            let source_dictionary = parse_relative_path(service.from_dictionary)?;
             let target_path = try_into_service_path(
                 &Some(source_name.clone().native_into_fidl()),
                 &service.path,
@@ -1825,7 +1858,7 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
             cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
                 source: cm_rust::UseSource::Parent,
                 source_name,
-                source_dictionary: Default::default(),
+                source_dictionary,
                 target_path,
                 dependency_type: cm_rust::DependencyType::Strong,
                 availability: check_and_unwrap_use_availability(service.availability)?,
@@ -1941,6 +1974,9 @@ enum RealmBuilderError {
     #[error("The component declaration for child \"{0}\" is invalid. Please fix all the listed errors:\n{1}\nFor a reference as to how component declarations are authored, see https://fuchsia.dev/go/components/declaration.")]
     InvalidComponentDeclWithName(String, String),
 
+    #[error("The provided path {0} is not a valid relative path.")]
+    InvalidRelativePath(String),
+
     /// The referenced child does not exist.
     #[error("No child exists with the name \"{0}\". Before fetching or changing its component declaration, a child must be added to the realm with the `AddChild` group of methods.")]
     NoSuchChild(String),
@@ -1958,6 +1994,10 @@ enum RealmBuilderError {
     /// A target does not exist.
     #[error("Target component for capability is invalid. No child exists with the name '{0}'. Before a component can be set as a source for a capability, it must be added to the realm with the `AddChild` group of methods.")]
     NoSuchTarget(String),
+
+    /// A target does not exist.
+    #[error("Target capability for capability is invalid. No dictionary capability exists with the name '{0}'.")]
+    NoSuchTargetCapability(String),
 
     /// The `capabilities` field is empty.
     #[error("The `capabilities` field can not be omitted. It is used to specify what capabilities will be routed. Provide at least one capability to route: https://fuchsia.dev/go/components/realm-builder-reference#Realm.AddRoute.")]
@@ -2035,6 +2075,7 @@ impl From<RealmBuilderError> for ftest::RealmBuilderError {
             RealmBuilderError::ChildAlreadyExists(_) => Self::ChildAlreadyExists,
             RealmBuilderError::InvalidComponentDecl(_) => Self::InvalidComponentDecl,
             RealmBuilderError::InvalidComponentDeclWithName(_, _) => Self::InvalidComponentDecl,
+            RealmBuilderError::InvalidRelativePath(_) => Self::InvalidComponentDecl,
             RealmBuilderError::NoSuchChild(_) => Self::NoSuchChild,
             RealmBuilderError::ChildNameInvalid => Self::InvalidComponentDecl,
             RealmBuilderError::EnvironmentNameInvalid => Self::InvalidComponentDecl,
@@ -2042,6 +2083,7 @@ impl From<RealmBuilderError> for ftest::RealmBuilderError {
             RealmBuilderError::ChildDeclNotVisible(_) => Self::ChildDeclNotVisible,
             RealmBuilderError::NoSuchSource(_) => Self::NoSuchSource,
             RealmBuilderError::NoSuchTarget(_) => Self::NoSuchTarget,
+            RealmBuilderError::NoSuchTargetCapability(_) => Self::NoSuchTarget,
             RealmBuilderError::CapabilitiesEmpty => Self::CapabilitiesEmpty,
             RealmBuilderError::TargetsEmpty => Self::TargetsEmpty,
             RealmBuilderError::SourceAndTargetMatch(_) => Self::SourceAndTargetMatch,
@@ -3225,7 +3267,7 @@ mod tests {
             .add_child_or_panic("b", "test:///b", ftest::ChildOptions::default())
             .await;
 
-        // Assert that parent -> child capabilities generate proper offer decls.
+        // Assert that parent -> child routes generate proper offer decls.
         realm_and_builder_task
             .add_route_or_panic(
                 vec![
@@ -3233,12 +3275,14 @@ mod tests {
                         name: Some("fuchsia.examples.Hippo".to_owned()),
                         as_: Some("fuchsia.examples.Elephant".to_owned()),
                         type_: Some(fcdecl::DependencyType::Strong),
+                        from_dictionary: Some("source/dict1".into()),
                         ..Default::default()
                     }),
                     ftest::Capability::Directory(ftest::Directory {
                         name: Some("config-data".to_owned()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some("component".to_owned()),
+                        from_dictionary: Some("source/dict2".into()),
                         ..Default::default()
                     }),
                     ftest::Capability::Storage(ftest::Storage {
@@ -3249,6 +3293,7 @@ mod tests {
                     ftest::Capability::Service(ftest::Service {
                         name: Some("fuchsia.examples.Whale".to_string()),
                         as_: Some("fuchsia.examples.Orca".to_string()),
+                        from_dictionary: Some("source/dict3".into()),
                         ..Default::default()
                     }),
                     ftest::Capability::EventStream(ftest::EventStream {
@@ -3260,6 +3305,7 @@ mod tests {
                         name: Some("dict".to_string()),
                         as_: Some("dict2".to_string()),
                         type_: Some(fcdecl::DependencyType::Weak),
+                        from_dictionary: Some("source/dict4".into()),
                         ..Default::default()
                     }),
                 ],
@@ -3271,7 +3317,16 @@ mod tests {
             )
             .await;
 
-        // Assert that child -> child capabilities generate proper offer decls.
+        // Assert that child -> (child, capability) routes generate proper offer decls.
+        realm_and_builder_task
+            .realm_proxy
+            .add_capability(&fcdecl::Capability::Dictionary(fcdecl::Dictionary {
+                name: Some("my_dict".into()),
+                ..Default::default()
+            }))
+            .await
+            .unwrap()
+            .unwrap();
         realm_and_builder_task
             .add_route_or_panic(
                 vec![ftest::Capability::Protocol(ftest::Protocol {
@@ -3282,25 +3337,32 @@ mod tests {
                     name: "a".parse().unwrap(),
                     collection: None,
                 }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "b".parse().unwrap(),
-                    collection: None,
-                })],
+                vec![
+                    fcdecl::Ref::Child(fcdecl::ChildRef {
+                        name: "b".parse().unwrap(),
+                        collection: None,
+                    }),
+                    fcdecl::Ref::Capability(fcdecl::CapabilityRef {
+                        name: "my_dict".parse().unwrap(),
+                    }),
+                ],
             )
             .await;
 
-        // Assert that child -> parent capabilities generate proper expose decls.
+        // Assert that child -> parent routes generate proper expose decls.
         realm_and_builder_task
             .add_route_or_panic(
                 vec![
                     ftest::Capability::Protocol(ftest::Protocol {
                         name: Some("fuchsia.examples.Echo".to_owned()),
                         type_: Some(fcdecl::DependencyType::Weak),
+                        from_dictionary: Some("source/dict1".into()),
                         ..Default::default()
                     }),
                     ftest::Capability::Dictionary(ftest::Dictionary {
                         name: Some("dict".into()),
                         as_: Some("dict2".into()),
+                        from_dictionary: Some("source/dict2".into()),
                         ..Default::default()
                     }),
                 ],
@@ -3322,6 +3384,7 @@ mod tests {
                         .name("fuchsia.examples.Hippo")
                         .target_name("fuchsia.examples.Elephant")
                         .source(cm_rust::OfferSource::Parent)
+                        .from_dictionary("source/dict1")
                         .target_static_child("a"),
                 )
                 .offer(
@@ -3330,7 +3393,8 @@ mod tests {
                         .source(cm_rust::OfferSource::Parent)
                         .target_static_child("a")
                         .rights(fio::RW_STAR_DIR)
-                        .subdir("component"),
+                        .subdir("component")
+                        .from_dictionary("source/dict2"),
                 )
                 .offer(
                     OfferBuilder::storage()
@@ -3344,7 +3408,8 @@ mod tests {
                         .name("fuchsia.examples.Whale")
                         .target_name("fuchsia.examples.Orca")
                         .source(cm_rust::OfferSource::Parent)
-                        .target_static_child("a"),
+                        .target_static_child("a")
+                        .from_dictionary("source/dict3"),
                 )
                 .offer(
                     OfferBuilder::event_stream()
@@ -3359,7 +3424,8 @@ mod tests {
                         .target_name("dict2")
                         .source(cm_rust::OfferSource::Parent)
                         .target_static_child("a")
-                        .dependency(cm_rust::DependencyType::Weak),
+                        .dependency(cm_rust::DependencyType::Weak)
+                        .from_dictionary("source/dict4"),
                 )
                 .offer(
                     OfferBuilder::protocol()
@@ -3367,17 +3433,26 @@ mod tests {
                         .source_static_child("a")
                         .target_static_child("b"),
                 )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("fuchsia.examples.Echo")
+                        .source_static_child("a")
+                        .target(cm_rust::OfferTarget::Capability("my_dict".parse().unwrap())),
+                )
                 .expose(
                     ExposeBuilder::protocol()
                         .name("fuchsia.examples.Echo")
-                        .source_static_child("a"),
+                        .source_static_child("a")
+                        .from_dictionary("source/dict1"),
                 )
                 .expose(
                     ExposeBuilder::dictionary()
                         .name("dict")
                         .target_name("dict2")
-                        .source_static_child("a"),
+                        .source_static_child("a")
+                        .from_dictionary("source/dict2"),
                 )
+                .dictionary_default("my_dict")
                 .build(),
             children: vec![],
         };

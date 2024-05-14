@@ -38,6 +38,9 @@ pub enum Error {
 
     #[error("could not start root component using lifecycle controller: {0:?}")]
     CannotStartRootComponent(anyhow::Error),
+
+    #[error("from_dictionary is not supported for capability type: {0:?}")]
+    FromDictionaryNotSupported(ftest::Capability),
 }
 
 impl From<ftest::RealmBuilderError> for Error {

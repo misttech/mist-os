@@ -9,6 +9,7 @@
 #include <fuchsia/component/test/cpp/fidl.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -44,31 +45,27 @@ std::shared_ptr<fcdecl::Offer> CreateFidlStorageOfferDecl(std::string_view sourc
 
 // Conversion functions for |fuchsia.component.test| types.
 std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(
-    fcdecl::StartupMode startup_mode, std::string_view environment
-#if __Fuchsia_API_level__ >= 13
-    ,
-    std::vector<std::pair<std::string, fcdecl::ConfigValue>> config_overrides
-#endif
-);
+    fcdecl::StartupMode startup_mode, std::string_view environment,
+    std::vector<std::pair<std::string, fcdecl::ConfigValue>> config_overrides);
 
-std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(std::string_view name,
-                                                                 std::string_view as,
-                                                                 fcdecl::DependencyType type,
-                                                                 std::string_view path);
+std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(
+    std::string_view name, cpp17::optional<std::string_view> as = std::nullopt,
+    cpp17::optional<fcdecl::DependencyType> type = std::nullopt,
+    cpp17::optional<std::string_view> path = std::nullopt,
+    cpp17::optional<std::string_view> from_dictionary = std::nullopt);
 
-std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(std::string_view name);
-
-std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(std::string_view name,
-                                                                std::string_view as,
-                                                                std::string_view path);
-
-std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(std::string_view name);
+std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(
+    std::string_view name, cpp17::optional<std::string_view> as = std::nullopt,
+    cpp17::optional<std::string_view> path = std::nullopt,
+    cpp17::optional<std::string_view> from_dictionary = std::nullopt);
 
 std::shared_ptr<fctest::Capability> CreateFidlDirectoryCapability(
-    std::string_view name, std::string_view as, fcdecl::DependencyType type,
-    std::string_view subdir, fio::Operations rights, std::string_view path);
-
-std::shared_ptr<fctest::Capability> CreateFidlDirectoryCapability(std::string_view name);
+    std::string_view name, cpp17::optional<std::string_view> as = std::nullopt,
+    cpp17::optional<fcdecl::DependencyType> type = std::nullopt,
+    cpp17::optional<std::string_view> subdir = std::nullopt,
+    cpp17::optional<fio::Operations> rights = std::nullopt,
+    cpp17::optional<std::string_view> path = std::nullopt,
+    cpp17::optional<std::string_view> from_dictionary = std::nullopt);
 
 }  // namespace tests
 }  // namespace component

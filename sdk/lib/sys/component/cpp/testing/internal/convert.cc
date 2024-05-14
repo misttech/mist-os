@@ -83,6 +83,9 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, path, fidl_capability);
     ZX_COMPONENT_ADD_IF_PRESENT(protocol, type, fidl_capability);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, from_dictionary, fidl_capability);
+#endif
 
     return fuchsia::component::test::Capability::WithProtocol(std::move(fidl_capability));
   }
@@ -92,6 +95,9 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     fidl_capability.set_name(std::string(service->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, path, fidl_capability);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(service, from_dictionary, fidl_capability);
+#endif
 
     return fuchsia::component::test::Capability::WithService(std::move(fidl_capability));
   }
@@ -104,6 +110,9 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, subdir, fidl_capability);
     ZX_COMPONENT_ADD_IF_PRESENT(directory, rights, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, path, fidl_capability);
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, from_dictionary, fidl_capability);
+#endif
 
     return fuchsia::component::test::Capability::WithDirectory(std::move(fidl_capability));
   }
@@ -122,6 +131,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     fidl_capability.set_name(std::string(dictionary->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(dictionary, as, fidl_capability);
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(dictionary, from_dictionary, fidl_capability);
 
     return fuchsia::component::test::Capability::WithDictionary(std::move(fidl_capability));
 #else

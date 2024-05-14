@@ -289,6 +289,11 @@ type Protocol = table {
     /// component.
     @available(added=10)
     5: availability fuchsia.component.decl.Availability;
+
+    /// Optional. If set, the path to the dictionary routed by `from` which contains
+    /// the capability.
+    @available(added=HEAD)
+    6: from_dictionary string:MAX;
 };
 
 /// A directory capability.
@@ -325,6 +330,11 @@ type Directory = table {
     /// component.
     @available(added=10)
     7: availability fuchsia.component.decl.Availability;
+
+    /// Optional. If set, the path to the dictionary routed by `from` which contains
+    /// the capability.
+    @available(added=HEAD)
+    8: from_dictionary string:MAX;
 };
 
 /// A storage capability
@@ -370,6 +380,11 @@ type Service = table {
     /// component.
     @available(added=10)
     4: availability fuchsia.component.decl.Availability;
+
+    /// Optional. If set, the path to the dictionary routed by `from` which contains
+    /// the capability.
+    @available(added=HEAD)
+    5: from_dictionary string:MAX;
 };
 
 /// An event capability
@@ -444,6 +459,10 @@ type Dictionary = table {
     /// Optional. Cannot be set to `SameAsTarget` if `to` contains a local
     /// component.
     4: availability fuchsia.component.decl.Availability;
+
+    /// Optional. If set, the path to the dictionary routed by `from` which contains
+    /// the capability.
+    5: from_dictionary string:MAX;
 };
 
 
