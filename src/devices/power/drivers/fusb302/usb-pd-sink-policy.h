@@ -70,6 +70,9 @@ class SinkPolicy {
   // Fills in `sink_capabilities_` based on the policy.
   void PopulateSinkCapabilities();
 
+  // Logs the data in `sink_capabilities_`.
+  void LogSourcePowerCapabilities();
+
   // Evaluates a single Fixed Power Supply against the policy.
   //
   // The returned PowerRequestData must have RDO-specific fields set, as well as
