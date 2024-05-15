@@ -43,12 +43,20 @@ AudioCompositeServer::AudioCompositeServer(
     async_dispatcher_t* dispatcher, metadata::AmlVersion aml_version,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
-    std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients)
+    std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients,
+    fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control,
+    fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
+    fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
+    fidl::Client<fuchsia_power_broker::RequiredLevel> required_level)
     : dispatcher_(dispatcher),
       bti_(std::move(bti)),
       clock_gate_(std::move(clock_gate_client)),
       pll_(std::move(pll_client)),
-      gpio_sclk_clients_(std::move(gpio_sclk_clients)) {
+      gpio_sclk_clients_(std::move(gpio_sclk_clients)),
+      element_control_(std::move(element_control)),
+      lessor_(std::move(lessor)),
+      required_level_(std::move(required_level)),
+      current_level_(std::move(current_level)) {
   for (auto& dai : kDaiIds) {
     element_completers_[dai].first_response_sent = false;
     element_completers_[dai].completer = {};
@@ -102,11 +110,50 @@ AudioCompositeServer::AudioCompositeServer(
   BarrierBeforeRelease();
   ZX_ASSERT(bti_.release_quarantine() == ZX_OK);
 
-#if 0
-  // TODO(b/309153055): Once integration with the Power Framework is completed, we can remove
-  // this testing code.
-  TestPowerManagement();
-#endif
+  if (!lessor_.is_valid()) {
+    FDF_LOG(INFO, "No lessor available for power management");
+    return;
+  }
+  // The lease request on the audio-hw power element remains persistent throughout the lifetime
+  // of this driver.
+  auto result_lease = lessor_->Lease(kAudioHardwareOn);
+  if (result_lease.is_error()) {
+    FDF_LOG(ERROR, "Failed to acquire lease on audio-hw: %s",
+            result_lease.error_value().FormatDescription().c_str());
+    return;
+  }
+  lease_control_ = std::move(result_lease->lease_control());
+  WatchRequiredLevel();
+}
+
+void AudioCompositeServer::WatchRequiredLevel() {
+  required_level_->Watch().Then(
+      [this](fidl::Result<fuchsia_power_broker::RequiredLevel::Watch>& result) {
+        if (result.is_error()) {
+          // TODO(339826112): We don't continue to call Watch here to avoid a potential infinite
+          // loop but we need a recovery mechanism, like a retry after a delay.
+          FDF_LOG(ERROR, "Power level required call failed: %s. Stop monitoring required level",
+                  result.error_value().FormatDescription().c_str());
+          return;
+        }
+        zx_status_t status = ZX_OK;
+        if (result->required_level() == kAudioHardwareOn) {
+          status = StartSocPower();
+        } else {
+          status = StopSocPower();
+        }
+
+        if (status == ZX_OK) {
+          auto result_update = current_level_->Update(result->required_level());
+          if (result_update.is_error()) {  // We still restart the watch below.
+            FDF_LOG(ERROR, "Power level update call failed: %s",
+                    result.error_value().FormatDescription().c_str());
+          }
+        } else {
+          FDF_LOG(ERROR, "Could not Start/Stop SoC power, no current level update");
+        }
+        WatchRequiredLevel();
+      });
 }
 
 zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, bool input,
@@ -465,12 +512,12 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
 }
 
 zx_status_t AudioCompositeServer::StartSocPower() {
-  // TODO(b/309153055): Use this method when we integrate with Power Framework.
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
   if (soc_power_started_) {
     return ZX_OK;
   }
+  FDF_LOG(INFO, "Starting SoC power");
   fidl::WireResult clock_gate_result = clock_gate_->Enable();
   if (!clock_gate_result.ok()) {
     FDF_LOG(ERROR, "Failed to send request to enable clock gate: %s",
@@ -502,17 +549,18 @@ zx_status_t AudioCompositeServer::StartSocPower() {
       return result.status();
     }
   }
+  TRACE_ASYNC_END("aml-g12-composite", "suspend", trace_async_id_);
   soc_power_started_ = true;
   return ZX_OK;
 }
 
 zx_status_t AudioCompositeServer::StopSocPower() {
-  // TODO(b/309153055): Use this method when we integrate with Power Framework.
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
   if (!soc_power_started_) {
     return ZX_OK;
   }
+  FDF_LOG(INFO, "Stopping SoC power");
   for (auto& gpio_sclk_client : gpio_sclk_clients_) {
     constexpr uint32_t kGpioAltFunction = 0;
     fidl::WireResult alt_function_result = gpio_sclk_client->SetAltFunction(kGpioAltFunction);
@@ -552,6 +600,8 @@ zx_status_t AudioCompositeServer::StopSocPower() {
             zx_status_get_string(pll_result->error_value()));
     return pll_result->error_value();
   }
+  trace_async_id_ = TRACE_NONCE();
+  TRACE_ASYNC_BEGIN("aml-g12-composite", "suspend", trace_async_id_);
   soc_power_started_ = false;
   return ZX_OK;
 }
@@ -736,17 +786,6 @@ zx_status_t RingBufferServer::InitBuffer(size_t size) {
     return status;
   }
   return ZX_OK;
-}
-
-void AudioCompositeServer::TestPowerManagement() {
-  pm_timer_.PostDelayed(dispatcher_, zx::sec(1));
-  static bool enabled = true;
-  if (enabled) {
-    StartSocPower();
-  } else {
-    StopSocPower();
-  }
-  enabled = !enabled;
 }
 
 void RingBufferServer::ProcessRingNotification() {

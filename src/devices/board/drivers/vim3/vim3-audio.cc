@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -161,6 +162,33 @@ zx_status_t Vim3::AudioInit() {
     tdm_dev.did() = PDEV_DID_AMLOGIC_AUDIO_COMPOSITE;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = composite_btis;
+
+    // Power configuration.
+    // fuchsia_hardware_power uses FIDL uint8 for power levels matching fuchsia_power_broker's.
+    constexpr uint8_t kPowerLevelOff =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
+    constexpr uint8_t kPowerLevelOn =
+        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
+    constexpr char kPowerElementName[] = "audio-hw";
+    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
+        .child_level = kPowerLevelOn,
+        .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kActive),
+    }};
+    fuchsia_hardware_power::PowerDependency passive_on_execution_state = {{
+        .child = kPowerElementName,
+        .parent = fuchsia_hardware_power::ParentElement::WithSag(
+            fuchsia_hardware_power::SagElement::kExecutionState),
+        .level_deps = {{std::move(wake_handling_on)}},
+        .strength = fuchsia_hardware_power::RequirementType::kPassive,
+    }};
+    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
+    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelOn, .name = "on"}};
+    fuchsia_hardware_power::PowerElement element = {
+        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
+    fuchsia_hardware_power::PowerElementConfiguration config = {
+        {.element = std::move(element), .dependencies = {{std::move(passive_on_execution_state)}}}};
+    tdm_dev.power_config() = {std::move(config)};
+
     auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, composite_spec));
     if (!result.ok()) {

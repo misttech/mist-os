@@ -8,7 +8,65 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
 
+#include "sdk/lib/driver/power/cpp/element-description-builder.h"
+#include "sdk/lib/driver/power/cpp/power-support.h"
+
 namespace audio::aml_g12 {
+
+zx::result<PowerConfiguration> Driver::GetPowerConfiguration(
+    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
+  auto power_broker = incoming()->Connect<fuchsia_power_broker::Topology>();
+  if (power_broker.is_error() || !power_broker->is_valid()) {
+    FDF_LOG(WARNING, "Failed to connect to power broker: %s", power_broker.status_string());
+    return power_broker.take_error();
+  }
+
+  const auto result_power_config = pdev->GetPowerConfiguration();
+  if (!result_power_config.ok()) {
+    FDF_LOG(ERROR, "Call to get power config failed: %s", result_power_config.status_string());
+    return zx::error(result_power_config.status());
+  }
+  if (result_power_config->is_error()) {
+    FDF_LOG(INFO, "GetPowerConfiguration failed: %s",
+            zx_status_get_string(result_power_config->error_value()));
+    return zx::error(result_power_config->error_value());
+  }
+  if (result_power_config->value()->config.count() != 1) {
+    FDF_LOG(ERROR, "Unexpected number of power configurations: %zu",
+            result_power_config->value()->config.count());
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  const auto& config = result_power_config->value()->config[0];
+  if (config.element().name().get() != "audio-hw") {
+    FDF_LOG(ERROR, "Unexpected power element: %s",
+            std::string(config.element().name().get()).c_str());
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
+  if (tokens.is_error()) {
+    FDF_LOG(ERROR, "Failed to get power dependency tokens: %u",
+            static_cast<uint8_t>(tokens.error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  fdf_power::ElementDesc description =
+      fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+  auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
+  if (result_add_element.is_error()) {
+    FDF_LOG(ERROR, "Failed to add power element: %u",
+            static_cast<uint8_t>(result_add_element.error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  PowerConfiguration response;
+  response.element_control_client = std::move(result_add_element->element_control_channel());
+  response.lessor_client = std::move(*description.lessor_client_);
+  response.current_level_client = std::move(*description.current_level_client_);
+  response.required_level_client = std::move(*description.required_level_client_);
+  return zx::ok(std::move(response));
+}
 
 zx::result<> Driver::CreateDevfsNode() {
   fidl::Arena arena;
@@ -205,9 +263,30 @@ zx::result<> Driver::Start() {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
+  // Power configuration.
+  // TODO(b/339038497): This driver is built with Bazel and structured configuration is not
+  // yet supported when building a driver with Bazel. Once available add a config parameter check
+  // to completely disable power awareness in products where the power framework is not enabled.
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control;
+  fidl::SyncClient<fuchsia_power_broker::Lessor> lessor;
+  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level;
+  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level;
+  zx::result<PowerConfiguration> power_configuration = GetPowerConfiguration(pdev_);
+  if (power_configuration.is_error()) {
+    FDF_LOG(INFO, "Could not get power configuration: %s, continue without it",
+            zx_status_get_string(power_configuration.error_value()));
+  } else {
+    element_control = std::move(power_configuration->element_control_client);
+    lessor.Bind(std::move(std::move(power_configuration->lessor_client)));
+    current_level.Bind(std::move(power_configuration->current_level_client));
+    required_level.Bind(std::move(power_configuration->required_level_client), dispatcher());
+  }
+
   server_ = std::make_unique<AudioCompositeServer>(
       std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), aml_version,
-      std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients));
+      std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients),
+      std::move(element_control), std::move(lessor), std::move(current_level),
+      std::move(required_level));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
