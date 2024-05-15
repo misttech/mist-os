@@ -6198,19 +6198,34 @@ static zx_status_t brcmf_process_link_event(struct brcmf_if* ifp, const struct b
   return ZX_OK;
 }
 
+static zx_status_t brcmf_process_deauth_ind_event(struct brcmf_if* ifp, const struct brcmf_event_msg* e,
+                                                  void* data) {
+  BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
+
+  brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
+  if (brcmf_is_apmode(ifp->vif)) {
+    brcmf_notify_deauth_ind(ifp->ndev, e->addr,
+                            static_cast<fuchsia_wlan_ieee80211::ReasonCode>(e->reason), false);
+    return ZX_OK;
+  }
+
+  // Sometimes FW sends E_DEAUTH when a unicast packet is received before association
+  // is complete. Ignore it.
+  if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state) &&
+      e->reason == BRCMF_E_REASON_UCAST_FROM_UNASSOC_STA) {
+    BRCMF_DBG(EVENT, "E_DEAUTH because data rcvd before assoc...ignore");
+    return ZX_OK;
+  }
+  return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DEAUTHENTICATING);
+}
+
 static zx_status_t brcmf_process_deauth_event(struct brcmf_if* ifp, const struct brcmf_event_msg* e,
                                               void* data) {
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
-    if (e->event_code == BRCMF_E_DEAUTH_IND) {
-      brcmf_notify_deauth_ind(ifp->ndev, e->addr,
-                              static_cast<fuchsia_wlan_ieee80211::ReasonCode>(e->reason), false);
-    } else {
-      // E_DEAUTH
-      brcmf_notify_deauth(ifp->ndev, e->addr);
-    }
+    brcmf_notify_deauth(ifp->ndev, e->addr);
     return ZX_OK;
   }
 
@@ -6230,12 +6245,20 @@ static zx_status_t brcmf_process_disassoc_ind_event(struct brcmf_if* ifp,
 
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
   if (brcmf_is_apmode(ifp->vif)) {
-    if (e->event_code == BRCMF_E_DISASSOC_IND)
-      brcmf_notify_disassoc_ind(ifp->ndev, e->addr,
-                                static_cast<fuchsia_wlan_ieee80211::ReasonCode>(e->reason), false);
-    else
-      // E_DISASSOC
-      brcmf_notify_disassoc(ifp->ndev, ZX_OK);
+    brcmf_notify_disassoc_ind(ifp->ndev, e->addr,
+                              static_cast<fuchsia_wlan_ieee80211::ReasonCode>(e->reason), false);
+    return ZX_OK;
+  }
+  return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
+}
+
+static zx_status_t brcmf_process_disassoc_event(struct brcmf_if* ifp,
+                                                const struct brcmf_event_msg* e, void* data) {
+  BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
+
+  brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
+  if (brcmf_is_apmode(ifp->vif)) {
+    brcmf_notify_disassoc(ifp->ndev, ZX_OK);
     return ZX_OK;
   }
   return brcmf_indicate_client_disconnect(ifp, e, data, brcmf_connect_status_t::DISASSOCIATING);
@@ -6502,10 +6525,10 @@ static void brcmf_register_event_handlers(struct brcmf_cfg80211_info* cfg) {
   brcmf_fweh_register(cfg->pub, BRCMF_E_LINK, brcmf_process_link_event);
   brcmf_fweh_register(cfg->pub, BRCMF_E_AUTH, brcmf_process_auth_event);
   brcmf_fweh_register(cfg->pub, BRCMF_E_AUTH_IND, brcmf_process_auth_ind_event);
-  brcmf_fweh_register(cfg->pub, BRCMF_E_DEAUTH_IND, brcmf_process_deauth_event);
+  brcmf_fweh_register(cfg->pub, BRCMF_E_DEAUTH_IND, brcmf_process_deauth_ind_event);
   brcmf_fweh_register(cfg->pub, BRCMF_E_DEAUTH, brcmf_process_deauth_event);
   brcmf_fweh_register(cfg->pub, BRCMF_E_DISASSOC_IND, brcmf_process_disassoc_ind_event);
-  brcmf_fweh_register(cfg->pub, BRCMF_E_DISASSOC, brcmf_process_disassoc_ind_event);
+  brcmf_fweh_register(cfg->pub, BRCMF_E_DISASSOC, brcmf_process_disassoc_event);
   brcmf_fweh_register(cfg->pub, BRCMF_E_ASSOC, brcmf_handle_assoc_event);
   brcmf_fweh_register(cfg->pub, BRCMF_E_ASSOC_IND, brcmf_handle_assoc_ind);
   brcmf_fweh_register(cfg->pub, BRCMF_E_REASSOC_IND, brcmf_handle_assoc_ind);
