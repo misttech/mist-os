@@ -55,7 +55,8 @@ use crate::{
         loopback::LoopbackDeviceId,
         DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
         DeviceLayerStateTypes, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId,
-        EthernetWeakDeviceId, PureIpDeviceId, PureIpWeakDeviceId, WeakDeviceId,
+        EthernetWeakDeviceId, PureIpDeviceId, PureIpWeakDeviceId, ReceiveQueueBindingsContext,
+        TransmitQueueBindingsContext, WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
@@ -1180,15 +1181,19 @@ impl DeviceLayerStateTypes for FakeBindingsCtx {
     type DeviceIdentifier = MonotonicIdentifier;
 }
 
-impl DeviceLayerEventDispatcher for FakeBindingsCtx {
+impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for FakeBindingsCtx {
     fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeBindingsCtx>) {
         self.state_mut().rx_available.push(device.clone());
     }
+}
 
-    fn wake_tx_task(&mut self, device: &DeviceId<FakeBindingsCtx>) {
-        self.state_mut().tx_available.push(device.clone());
+impl<D: Clone + Into<DeviceId<Self>>> TransmitQueueBindingsContext<D> for FakeBindingsCtx {
+    fn wake_tx_task(&mut self, device: &D) {
+        self.state_mut().tx_available.push(device.clone().into());
     }
+}
 
+impl DeviceLayerEventDispatcher for FakeBindingsCtx {
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<FakeBindingsCtx>,

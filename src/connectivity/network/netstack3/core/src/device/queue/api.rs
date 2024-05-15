@@ -43,7 +43,7 @@ where
     C::CoreContext:
         TransmitDequeueContext<D, C::BindingsContext> + DeviceSocketHandler<D, C::BindingsContext>,
     C::BindingsContext:
-        TransmitQueueBindingsContext<D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
+        TransmitQueueBindingsContext<<C::CoreContext as DeviceIdContext<D>>::DeviceId>,
 {
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
         let Self(pair, PhantomData) = self;
@@ -185,7 +185,7 @@ where
     D: Device,
     C: ContextPair,
     C::BindingsContext:
-        ReceiveQueueBindingsContext<D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
+        ReceiveQueueBindingsContext<<C::CoreContext as DeviceIdContext<D>>::DeviceId>,
     C::CoreContext: ReceiveDequeContext<D, C::BindingsContext>,
 {
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {

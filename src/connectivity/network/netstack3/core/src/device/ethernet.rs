@@ -50,9 +50,8 @@ use crate::{
         link::LinkDevice,
         queue::{
             tx::{
-                BufVecU8Allocator, TransmitDequeueContext, TransmitQueue,
-                TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext,
-                TransmitQueueHandler, TransmitQueueState,
+                BufVecU8Allocator, TransmitDequeueContext, TransmitQueue, TransmitQueueCommon,
+                TransmitQueueContext, TransmitQueueHandler, TransmitQueueState,
             },
             DequeueState, TransmitQueueFrameError,
         },
@@ -713,14 +712,6 @@ impl<BC: BindingsContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
         self.link.tx_queue.deque.lock()
-    }
-}
-
-impl<BC: BindingsContext> TransmitQueueBindingsContext<EthernetLinkDevice, EthernetDeviceId<BC>>
-    for BC
-{
-    fn wake_tx_task(&mut self, device_id: &EthernetDeviceId<BC>) {
-        DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
     }
 }
 
@@ -1529,6 +1520,7 @@ mod tests {
         context::{testutil::FakeInstant, CtxPair},
         device::{
             arp::ArpCounters,
+            queue::tx::TransmitQueueBindingsContext,
             socket::Frame,
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
@@ -1863,7 +1855,7 @@ mod tests {
         }
     }
 
-    impl TransmitQueueBindingsContext<EthernetLinkDevice, FakeDeviceId> for FakeBindingsCtx {
+    impl TransmitQueueBindingsContext<FakeDeviceId> for FakeBindingsCtx {
         fn wake_tx_task(&mut self, FakeDeviceId: &FakeDeviceId) {
             unimplemented!("unused by tests")
         }

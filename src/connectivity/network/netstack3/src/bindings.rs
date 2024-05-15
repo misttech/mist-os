@@ -74,7 +74,7 @@ use netstack3_core::{
     device::{
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
         EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
-        PureIpDeviceId, WeakDeviceId,
+        PureIpDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
     },
     error::ExistsError,
     filter::FilterBindingsTypes,
@@ -235,6 +235,24 @@ impl DeviceIdExt for DeviceId<BindingsCtx> {
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
             DeviceId::PureIp(d) => DeviceSpecificInfo::PureIp(d.external_state()),
         }
+    }
+}
+
+impl DeviceIdExt for EthernetDeviceId<BindingsCtx> {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
+        DeviceSpecificInfo::Ethernet(self.external_state())
+    }
+}
+
+impl DeviceIdExt for LoopbackDeviceId<BindingsCtx> {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
+        DeviceSpecificInfo::Loopback(self.external_state())
+    }
+}
+
+impl DeviceIdExt for PureIpDeviceId<BindingsCtx> {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
+        DeviceSpecificInfo::PureIp(self.external_state())
     }
 }
 
@@ -472,20 +490,24 @@ impl DeviceLayerStateTypes for BindingsCtx {
     type DeviceIdentifier = DeviceIdAndName;
 }
 
-impl DeviceLayerEventDispatcher for BindingsCtx {
+impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {
     fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self>) {
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             device.external_state();
         rx_notifier.schedule()
     }
+}
 
-    fn wake_tx_task(&mut self, device: &DeviceId<BindingsCtx>) {
+impl<D: DeviceIdExt> TransmitQueueBindingsContext<D> for BindingsCtx {
+    fn wake_tx_task(&mut self, device: &D) {
         let external_state = device.external_state();
         let StaticCommonInfo { tx_notifier, authorization_token: _ } =
             external_state.static_common_info();
         tx_notifier.schedule()
     }
+}
 
+impl DeviceLayerEventDispatcher for BindingsCtx {
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,

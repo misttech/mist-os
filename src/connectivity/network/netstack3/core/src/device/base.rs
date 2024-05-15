@@ -33,6 +33,7 @@ use crate::{
         },
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
+        queue::{rx::ReceiveQueueBindingsContext, tx::TransmitQueueBindingsContext},
         socket::{self, HeldSockets},
         state::{DeviceStateSpec, IpLinkDeviceStateInner},
     },
@@ -498,23 +499,14 @@ impl<
 }
 
 /// An event dispatcher for the device layer.
-pub trait DeviceLayerEventDispatcher: DeviceLayerTypes + Sized {
-    /// Signals to the dispatcher that RX frames are available and ready to be
-    /// handled by [`handle_queued_rx_packets`].
-    ///
-    /// Implementations must make sure that [`handle_queued_rx_packets`] is
-    /// scheduled to be called as soon as possible so that enqueued RX frames
-    /// are promptly handled.
-    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self>);
-
-    /// Signals to the dispatcher that TX frames are available and ready to be
-    /// sent by [`transmit_queued_tx_frames`].
-    ///
-    /// Implementations must make sure that [`transmit_queued_tx_frames`] is
-    /// scheduled to be called as soon as possible so that enqueued TX frames
-    /// are promptly sent.
-    fn wake_tx_task(&mut self, device: &DeviceId<Self>);
-
+pub trait DeviceLayerEventDispatcher:
+    DeviceLayerTypes
+    + ReceiveQueueBindingsContext<LoopbackDeviceId<Self>>
+    + TransmitQueueBindingsContext<EthernetDeviceId<Self>>
+    + TransmitQueueBindingsContext<LoopbackDeviceId<Self>>
+    + TransmitQueueBindingsContext<PureIpDeviceId<Self>>
+    + Sized
+{
     /// Send a frame to an Ethernet device driver.
     ///
     /// See [`DeviceSendFrameError`] for the ways this call may fail; all other

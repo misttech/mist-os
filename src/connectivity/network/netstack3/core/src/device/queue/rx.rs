@@ -40,8 +40,13 @@ impl<Meta, Buffer> ReceiveQueueState<Meta, Buffer> {
 }
 
 /// The bindings context for the receive queue.
-pub trait ReceiveQueueBindingsContext<D: Device, DeviceId> {
-    /// Wakes up RX task.
+pub trait ReceiveQueueBindingsContext<DeviceId> {
+    /// Signals to bindings that RX frames are available and ready to be handled
+    /// by device.
+    ///
+    /// Implementations must make sure that the API call to handle queued
+    /// packets is scheduled to be called as soon as possible so that enqueued
+    /// RX frames are promptly handled.
     fn wake_rx_task(&mut self, device_id: &DeviceId);
 }
 
@@ -130,11 +135,8 @@ pub(crate) trait ReceiveQueueHandler<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     ) -> Result<(), ReceiveQueueFullError<(Self::Meta, Self::Buffer)>>;
 }
 
-impl<
-        D: Device,
-        BC: ReceiveQueueBindingsContext<D, CC::DeviceId>,
-        CC: ReceiveQueueContext<D, BC>,
-    > ReceiveQueueHandler<D, BC> for CC
+impl<D: Device, BC: ReceiveQueueBindingsContext<CC::DeviceId>, CC: ReceiveQueueContext<D, BC>>
+    ReceiveQueueHandler<D, BC> for CC
 {
     fn queue_rx_frame(
         &mut self,
@@ -189,7 +191,7 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeRxQueueState, (), FakeLinkDeviceId>;
     type FakeBindingsCtxImpl = FakeBindingsCtx<(), (), FakeRxQueueBindingsCtxState, ()>;
 
-    impl ReceiveQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeBindingsCtxImpl {
+    impl ReceiveQueueBindingsContext<FakeLinkDeviceId> for FakeBindingsCtxImpl {
         fn wake_rx_task(&mut self, device_id: &FakeLinkDeviceId) {
             self.state.woken_rx_tasks.push(device_id.clone())
         }

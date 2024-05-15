@@ -21,22 +21,18 @@ use crate::{
     device::{
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
         queue::{
-            rx::{ReceiveQueue, ReceiveQueueBindingsContext, ReceiveQueueState},
-            tx::{
-                BufVecU8Allocator, TransmitQueue, TransmitQueueBindingsContext,
-                TransmitQueueHandler, TransmitQueueState,
-            },
+            rx::{ReceiveQueue, ReceiveQueueState},
+            tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
             DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams, HeldDeviceSockets,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
-        Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, EthernetDeviceCounters, WeakDeviceIdentifier,
+        Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
+        EthernetDeviceCounters, WeakDeviceIdentifier,
     },
     sync::{Mutex, RwLock},
-    BindingsContext,
 };
 
 pub(super) mod integration;
@@ -301,24 +297,6 @@ impl DeviceReceiveFrameSpec for LoopbackDevice {
     // Loopback never receives frames from bindings, so make it impossible to
     // instantiate it.
     type FrameMetadata<D> = Never;
-}
-
-// TODO(https://fxbug.dev/338448926): This implementation won't hold post-crate
-// split. We need bindings to implement ReceiveQueueBindingsContext directly.
-impl<BC: BindingsContext> ReceiveQueueBindingsContext<LoopbackDevice, LoopbackDeviceId<BC>> for BC {
-    fn wake_rx_task(&mut self, device_id: &LoopbackDeviceId<BC>) {
-        DeviceLayerEventDispatcher::wake_rx_task(self, device_id)
-    }
-}
-
-// TODO(https://fxbug.dev/338448926): This implementation won't hold post-crate
-// split. We need bindings to implement TransmitQueueBindingsContext directly.
-impl<BC: BindingsContext> TransmitQueueBindingsContext<LoopbackDevice, LoopbackDeviceId<BC>>
-    for BC
-{
-    fn wake_tx_task(&mut self, device_id: &LoopbackDeviceId<BC>) {
-        DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
-    }
 }
 
 #[cfg(test)]

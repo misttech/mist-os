@@ -26,8 +26,8 @@ use crate::{
         },
         queue::{
             tx::{
-                BufVecU8Allocator, TransmitDequeueContext, TransmitQueueBindingsContext,
-                TransmitQueueCommon, TransmitQueueContext, TransmitQueueState,
+                BufVecU8Allocator, TransmitDequeueContext, TransmitQueueCommon,
+                TransmitQueueContext, TransmitQueueState,
             },
             DequeueState,
         },
@@ -270,12 +270,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxDequ
                 cb(&mut x, &mut locked.cast_core_ctx())
             },
         )
-    }
-}
-
-impl<BC: BindingsContext> TransmitQueueBindingsContext<PureIpDevice, PureIpDeviceId<BC>> for BC {
-    fn wake_tx_task(&mut self, device_id: &PureIpDeviceId<BC>) {
-        DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
     }
 }
 

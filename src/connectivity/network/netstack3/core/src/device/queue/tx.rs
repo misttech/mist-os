@@ -44,8 +44,13 @@ pub(crate) struct TransmitQueue<Meta, Buffer, Allocator> {
 }
 
 /// The bindings context for the transmit queue.
-pub trait TransmitQueueBindingsContext<D: Device, DeviceId> {
-    /// Wakes up TX task.
+pub trait TransmitQueueBindingsContext<DeviceId> {
+    /// Signals to bindings that TX frames are available and ready to be sent
+    /// over the device.
+    ///
+    /// Implementations must make sure that the API call to handle queued
+    /// packets is scheduled to be called as soon as possible so that enqueued
+    /// TX frames are promptly handled.
     fn wake_tx_task(&mut self, device_id: &DeviceId);
 }
 
@@ -131,7 +136,7 @@ pub(crate) trait TransmitQueueHandler<D: Device, BC>: TransmitQueueCommon<D, BC>
 
 pub(super) fn deliver_to_device_sockets<
     D: Device,
-    BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
+    BC: TransmitQueueBindingsContext<CC::DeviceId>,
     CC: TransmitQueueCommon<D, BC> + DeviceSocketHandler<D, BC>,
 >(
     core_ctx: &mut CC,
@@ -161,7 +166,7 @@ pub(super) fn deliver_to_device_sockets<
 
 impl<
         D: Device,
-        BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
+        BC: TransmitQueueBindingsContext<CC::DeviceId>,
         CC: TransmitQueueContext<D, BC> + DeviceSocketHandler<D, BC>,
     > TransmitQueueHandler<D, BC> for CC
 where
@@ -273,7 +278,7 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeTxQueueState, (), FakeLinkDeviceId>;
     type FakeBindingsCtxImpl = FakeBindingsCtx<(), (), FakeTxQueueBindingsCtxState, ()>;
 
-    impl TransmitQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeBindingsCtxImpl {
+    impl TransmitQueueBindingsContext<FakeLinkDeviceId> for FakeBindingsCtxImpl {
         fn wake_tx_task(&mut self, device_id: &FakeLinkDeviceId) {
             self.state.woken_tx_tasks.push(device_id.clone())
         }

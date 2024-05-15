@@ -101,7 +101,10 @@ pub mod device {
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
         PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
-    pub use queue::tx::TransmitQueueConfiguration;
+    pub use queue::{
+        rx::ReceiveQueueBindingsContext,
+        tx::{TransmitQueueBindingsContext, TransmitQueueConfiguration},
+    };
 }
 
 /// Device socket API.
