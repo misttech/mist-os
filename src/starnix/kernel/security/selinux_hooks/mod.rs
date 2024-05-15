@@ -9,7 +9,7 @@ use super::ProcAttr;
 use selinux::{
     permission_check::PermissionCheck, security_server::SecurityServer, InitialSid, SecurityId,
 };
-use selinux_common::{FilePermission, ObjectClass, ProcessPermission};
+use selinux_common::{ClassPermission, FilePermission, ObjectClass, Permission, ProcessPermission};
 use starnix_logging::log_debug;
 use starnix_uapi::{
     errno, error,
@@ -235,11 +235,11 @@ pub fn set_procattr(
 }
 
 /// Checks if `permission` is allowed from the task with `source_sid` to the task with `target_sid`.
-pub(super) fn check_permission(
+pub(super) fn check_permission<P: ClassPermission + Into<Permission> + 'static>(
     permission_check: &impl PermissionCheck,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: ProcessPermission,
+    permission: P,
 ) -> Result<(), Errno> {
     match permission_check.has_permission(source_sid, target_sid, permission) {
         true => Ok(()),
