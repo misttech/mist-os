@@ -9,14 +9,13 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fit/function.h>
 #include <lib/zx/bti.h>
+#include <lib/zx/time.h>
 #include <threads.h>
 
-#include <map>
 #include <memory>
-#include <vector>
 
-#include <fbl/array.h>
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
@@ -37,9 +36,15 @@ class TestBase : public testing::Test {
   const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_fidl();
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
-  bool RunLoopWithTimeoutOrUntil(fit::function<bool()>&& condition,
-                                 zx::duration timeout = zx::sec(1),
-                                 zx::duration step = zx::msec(10));
+
+  // Waits until `predicate` returns true.
+  //
+  // `predicate` will only be evaluated on `loop_`.
+  //
+  // Returns true if the last evaluation of`predicate` returned true. Returns
+  // false when the predicate can no longer be evaluated, such as when the
+  // loop is destroyed.
+  bool PollUntilOnLoop(fit::function<bool()> predicate, zx::duration poll_interval = zx::msec(10));
 
  private:
   async::Loop loop_;
