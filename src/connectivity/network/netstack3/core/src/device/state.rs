@@ -7,6 +7,7 @@
 use alloc::sync::Arc;
 use core::fmt::Debug;
 
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
@@ -114,5 +115,14 @@ impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
 impl<T, BT: DeviceLayerTypes> AsRef<DualStackIpDeviceState<BT>> for IpLinkDeviceStateInner<T, BT> {
     fn as_ref(&self) -> &DualStackIpDeviceState<BT> {
         &self.ip
+    }
+}
+
+impl<T, BT: DeviceLayerTypes> OrderedLockAccess<HeldDeviceSockets<BT>>
+    for IpLinkDeviceStateInner<T, BT>
+{
+    type Lock = RwLock<HeldDeviceSockets<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.sockets)
     }
 }

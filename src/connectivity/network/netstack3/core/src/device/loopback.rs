@@ -25,14 +25,12 @@ use crate::{
             tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
             DequeueState, TransmitQueueFrameError,
         },
-        socket::{
-            DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams, HeldDeviceSockets,
-        },
+        socket::{DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams},
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
         EthernetDeviceCounters, WeakDeviceIdentifier,
     },
-    sync::{Mutex, RwLock},
+    sync::Mutex,
 };
 
 pub(super) mod integration;
@@ -148,15 +146,6 @@ impl<BT: DeviceLayerTypes> OrderedLockAccess<DequeueState<LoopbackTxQueueMeta, B
     type Lock = Mutex<DequeueState<LoopbackTxQueueMeta, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
-    }
-}
-
-impl<BT: DeviceLayerTypes> OrderedLockAccess<HeldDeviceSockets<BT>>
-    for IpLinkDeviceState<LoopbackDevice, BT>
-{
-    type Lock = RwLock<HeldDeviceSockets<BT>>;
-    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
-        OrderedLockRef::new(&self.sockets)
     }
 }
 

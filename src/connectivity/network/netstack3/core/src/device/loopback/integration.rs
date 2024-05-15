@@ -36,9 +36,7 @@ use crate::{
             },
             DequeueState, ReceiveQueueFullError,
         },
-        socket::{
-            DeviceSocketHandler, HeldDeviceSockets, ParseSentFrameError, ReceivedFrame, SentFrame,
-        },
+        socket::{DeviceSocketHandler, ParseSentFrameError, ReceivedFrame, SentFrame},
         state::IpLinkDeviceState,
         DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceSendFrameError,
         EthernetDeviceCounters, FrameDestination,
@@ -311,10 +309,4 @@ impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackTxDequeue
 {
     type Data = DequeueState<LoopbackTxQueueMeta, Buf<Vec<u8>>>;
-}
-
-impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
-    for crate::lock_ordering::DeviceSockets
-{
-    type Data = HeldDeviceSockets<BT>;
 }

@@ -40,7 +40,7 @@ use crate::{
         },
         socket::{
             DeviceSocketBindingsContext, DeviceSocketHandler, DeviceSocketMetadata,
-            DeviceSocketSendTypes, EthernetHeaderParams, HeldDeviceSockets, ReceivedFrame,
+            DeviceSocketSendTypes, EthernetHeaderParams, ReceivedFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
@@ -315,15 +315,6 @@ impl<BT: DeviceLayerTypes> OrderedLockAccess<DynamicEthernetDeviceState>
     type Lock = RwLock<DynamicEthernetDeviceState>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.dynamic_state)
-    }
-}
-
-impl<BT: DeviceLayerTypes> OrderedLockAccess<HeldDeviceSockets<BT>>
-    for IpLinkDeviceState<EthernetLinkDevice, BT>
-{
-    type Lock = RwLock<HeldDeviceSockets<BT>>;
-    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
-        OrderedLockRef::new(&self.sockets)
     }
 }
 

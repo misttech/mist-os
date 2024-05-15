@@ -22,8 +22,8 @@ use crate::{
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
-            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame,
-            HeldDeviceSockets, IpFrame, ReceivedFrame,
+            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame, IpFrame,
+            ReceivedFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceCounters,
@@ -310,14 +310,5 @@ impl<BT: DeviceLayerTypes>
     type Lock = Mutex<DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
-    }
-}
-
-impl<BT: DeviceLayerTypes> OrderedLockAccess<HeldDeviceSockets<BT>>
-    for IpLinkDeviceState<PureIpDevice, BT>
-{
-    type Lock = RwLock<HeldDeviceSockets<BT>>;
-    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
-        OrderedLockRef::new(&self.sockets)
     }
 }

@@ -45,7 +45,7 @@ use crate::{
             },
             DequeueState,
         },
-        socket::{HeldDeviceSockets, ParseSentFrameError, SentFrame},
+        socket::{ParseSentFrameError, SentFrame},
         state::IpLinkDeviceState,
         DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError,
         EthernetDeviceCounters, EthernetDeviceId, EthernetWeakDeviceId,
@@ -585,12 +585,6 @@ impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
     for crate::lock_ordering::EthernetDeviceDynamicState
 {
     type Data = DynamicEthernetDeviceState;
-}
-
-impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
-    for crate::lock_ordering::DeviceSockets
-{
-    type Data = HeldDeviceSockets<BT>;
 }
 
 impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>

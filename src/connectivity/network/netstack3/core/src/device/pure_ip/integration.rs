@@ -30,7 +30,7 @@ use crate::{
             },
             DequeueState,
         },
-        socket::{HeldDeviceSockets, IpFrame, ParseSentFrameError, SentFrame},
+        socket::{IpFrame, ParseSentFrameError, SentFrame},
         state::IpLinkDeviceState,
         DeviceCollectionContext, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher,
         DeviceSendFrameError, RecvIpFrameMeta,
@@ -209,12 +209,6 @@ impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
     for crate::lock_ordering::PureIpDeviceTxDequeue
 {
     type Data = DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>;
-}
-
-impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
-    for crate::lock_ordering::DeviceSockets
-{
-    type Data = HeldDeviceSockets<BT>;
 }
 
 impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<PureIpDevice, BT>>

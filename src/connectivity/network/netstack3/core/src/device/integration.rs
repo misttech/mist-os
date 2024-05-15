@@ -7,7 +7,7 @@
 use core::{fmt::Debug, num::NonZeroU8, ops::Deref as _};
 
 use lock_order::{
-    lock::{RwLockFor, UnlockedAccess},
+    lock::{LockLevelFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
     wrap::prelude::*,
 };
@@ -31,7 +31,7 @@ use crate::{
         pure_ip::{self, PureIpDeviceId},
         queue::tx::TransmitQueueHandler,
         socket,
-        state::{DeviceStateSpec, IpLinkDeviceState},
+        state::{DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
         AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
         DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices,
         DevicesIter, EthernetDeviceCounters, EthernetDeviceId, EthernetPrimaryDeviceId,
@@ -1277,4 +1277,10 @@ impl<'a, BC: BindingsContext, L> ResourceCounterContext<PureIpDeviceId<BC>, Pure
             cb(state.unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
         })
     }
+}
+
+impl<T, BT: BindingsTypes> LockLevelFor<IpLinkDeviceStateInner<T, BT>>
+    for crate::lock_ordering::DeviceSockets
+{
+    type Data = socket::HeldDeviceSockets<BT>;
 }
