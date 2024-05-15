@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/debug/debug_agent/integration_tests/message_loop_wrapper.h"
-#include "src/developer/debug/debug_agent/integration_tests/so_wrapper.h"
 #include "src/developer/debug/debug_agent/local_stream_backend.h"
 #include "src/developer/debug/debug_agent/zircon_system_interface.h"
 #include "src/developer/debug/ipc/protocol.h"

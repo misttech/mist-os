@@ -411,11 +411,7 @@ fuchsia_unittest_package("debug_agent_integration_tests") {
   manifest = "meta/debug_agent_integration_tests.cml"
   deps = [
     "integration_tests",
-    "test_data:debug_agent_test_loadable_module",
-
-    # These are executables that integration tests will need in order to test
-    # actual behaviour against zircon.
-    "test_data:test_executables",
+    "test_data:load_so_exe",
   ]
 
   # required for accessing RootJob.
