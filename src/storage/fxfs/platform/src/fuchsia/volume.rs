@@ -335,10 +335,12 @@ impl FxVolume {
 
         // `NodeCache::terminate` will break any strong reference cycles contained within nodes
         // (pager registration). The only remaining nodes should be those with open FIDL
-        // connections. `ExecutionScope::shutdown` + `ExecutionScope::wait` will close the open FIDL
-        // connections which should result in all nodes flushing and then dropping. Any async tasks
-        // required to flush a node should take an active guard on the `ExecutionScope` which will
-        // prevent `ExecutionScope::wait` from completing until all nodes are flushed.
+        // connections or vmo references in the process of handling the VMO_ZERO_CHILDREN signal.
+        // `ExecutionScope::shutdown` + `ExecutionScope::wait` will close the open FIDL connections
+        // and synchonrize the signal handling which should result in all nodes flushing and then
+        // dropping. Any async tasks required to flush a node should take an active guard on the
+        // `ExecutionScope` which will prevent `ExecutionScope::wait` from completing until all
+        // nodes are flushed.
         self.scope.shutdown();
         self.cache.terminate();
         self.scope.wait().await;

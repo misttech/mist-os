@@ -112,6 +112,16 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
         // notification for the file.
         let mut file = self.file.lock().unwrap();
         if let FileHolder::Strong(strong) = &*file {
+            // If the last strong reference to the Arc is dropped here, then FxVolume's shutdown
+            // won't wait for the inner node object to be dropped. Taking an active guard around
+            // dropping the strong reference forces the FxVolume to wait for the file to be dropped.
+            // If the scope has begun shutdown then we can't take an active guard, so instead we do
+            // nothing here and the strong reference in the FileHolder will be removed by calling
+            // `FxNode.terminate()` as part of `NodeCache.terminate()` in the FxVolume termination
+            // thread.
+            let Some(_guard) = strong.pager().scope.try_active_guard() else {
+                return;
+            };
             match strong.vmo().info() {
                 Ok(info) => {
                     if info.num_children == 0 {
