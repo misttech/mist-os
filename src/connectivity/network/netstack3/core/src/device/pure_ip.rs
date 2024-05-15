@@ -5,24 +5,32 @@
 //! A pure IP device, capable of directly sending/receiving IPv4 & IPv6 packets.
 
 use alloc::vec::Vec;
-use core::convert::Infallible as Never;
-use net_types::ip::{Ip, IpVersion, Mtu};
+use core::{convert::Infallible as Never, fmt::Debug};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
 use packet::{Buf, BufferMut, Serializer};
 use tracing::warn;
 
 use crate::{
-    context::{CoreTimerContext, ResourceCounterContext, TimerContext},
+    context::{
+        CoreTimerContext, ReceivableFrameMeta, RecvFrameContext, ResourceCounterContext,
+        SendableFrameMeta, TimerContext,
+    },
     device::{
         queue::{
-            tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler},
-            TransmitQueueFrameError,
+            tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
+            DequeueState, TransmitQueueFrameError,
         },
-        state::DeviceStateSpec,
+        socket::{
+            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame,
+            HeldDeviceSockets, IpFrame, ReceivedFrame,
+        },
+        state::{DeviceStateSpec, IpLinkDeviceState},
         BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceCounters,
         DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
-        PureIpDeviceCounters, WeakDeviceIdentifier,
+        PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceIdentifier,
     },
-    sync::RwLock,
+    sync::{Mutex, RwLock},
 };
 
 mod integration;
@@ -143,6 +151,71 @@ pub(crate) trait PureIpDeviceStateContext: DeviceIdContext<PureIpDevice> {
     ) -> O;
 }
 
+impl DeviceSocketSendTypes for PureIpDevice {
+    type Metadata = PureIpHeaderParams;
+}
+
+impl<CC, BC> ReceivableFrameMeta<CC, BC> for PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
+where
+    CC: DeviceIdContext<PureIpDevice>
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>
+        + DeviceSocketHandler<PureIpDevice, BC>,
+{
+    fn receive_meta<B: BufferMut + Debug>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        buffer: B,
+    ) {
+        let Self { device_id, ip_version } = self;
+        core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
+
+        // NB: For conformance with Linux, don't verify that the contents of
+        // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
+        // allowed to receive malformed packets.
+        core_ctx.handle_frame(
+            bindings_ctx,
+            &device_id,
+            Frame::Received(ReceivedFrame::Ip(IpFrame { ip_version, body: buffer.as_ref() })),
+            buffer.as_ref(),
+        );
+
+        match ip_version {
+            IpVersion::V4 => core_ctx.receive_frame(
+                bindings_ctx,
+                RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
+                buffer,
+            ),
+            IpVersion::V6 => core_ctx.receive_frame(
+                bindings_ctx,
+                RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
+                buffer,
+            ),
+        }
+    }
+}
+
+impl<CC, BC> SendableFrameMeta<CC, BC> for DeviceSocketMetadata<PureIpDevice, CC::DeviceId>
+where
+    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+{
+    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
+        let Self { device_id, metadata: PureIpHeaderParams { ip_version } } = self;
+        net_types::for_any_ip_version!(
+            ip_version,
+            I,
+            send_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, &device_id, body)
+        )
+    }
+}
+
 /// Enqueues the given IP packet on the TX queue for the given [`PureIpDevice`].
 pub(super) fn send_ip_frame<CC, BC, I, S>(
     core_ctx: &mut CC,
@@ -206,4 +279,45 @@ pub(super) fn set_mtu<CC: PureIpDeviceStateContext>(
     new_mtu: Mtu,
 ) {
     core_ctx.with_pure_ip_state_mut(device_id, |DynamicPureIpDeviceState { mtu }| *mtu = new_mtu)
+}
+
+impl<BT: DeviceLayerTypes> OrderedLockAccess<DynamicPureIpDeviceState>
+    for IpLinkDeviceState<PureIpDevice, BT>
+{
+    type Lock = RwLock<DynamicPureIpDeviceState>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.link.dynamic_state)
+    }
+}
+
+impl<BT: DeviceLayerTypes>
+    OrderedLockAccess<
+        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
+    > for IpLinkDeviceState<PureIpDevice, BT>
+{
+    type Lock = Mutex<
+        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
+    >;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.link.tx_queue.queue)
+    }
+}
+
+impl<BT: DeviceLayerTypes>
+    OrderedLockAccess<DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>
+    for IpLinkDeviceState<PureIpDevice, BT>
+{
+    type Lock = Mutex<DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.link.tx_queue.deque)
+    }
+}
+
+impl<BT: DeviceLayerTypes> OrderedLockAccess<HeldDeviceSockets<BT>>
+    for IpLinkDeviceState<PureIpDevice, BT>
+{
+    type Lock = RwLock<HeldDeviceSockets<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.sockets)
+    }
 }

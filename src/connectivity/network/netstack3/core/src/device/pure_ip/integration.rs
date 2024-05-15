@@ -7,21 +7,20 @@
 
 use alloc::{fmt::Debug, vec::Vec};
 use lock_order::{
-    lock::{LockFor, RwLockFor, UnlockedAccess},
+    lock::{LockLevelFor, UnlockedAccessMarkerFor},
     relation::LockBefore,
     wrap::LockedWrapperApi,
 };
-use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
-use packet::{Buf, BufferMut, Serializer};
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use packet::{Buf, BufferMut};
 
 use crate::{
-    context::{ReceivableFrameMeta, RecvFrameContext, ResourceCounterContext, SendableFrameMeta},
+    context::{ReceivableFrameMeta, ResourceCounterContext},
     device::{
         config::DeviceConfigurationContext,
         pure_ip::{
             DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
-            PureIpDeviceReceiveFrameMetadata, PureIpDeviceStateContext,
-            PureIpDeviceTxQueueFrameMetadata, PureIpHeaderParams, PureIpPrimaryDeviceId,
+            PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
             PureIpWeakDeviceId,
         },
         queue::{
@@ -31,10 +30,7 @@ use crate::{
             },
             DequeueState,
         },
-        socket::{
-            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, Frame,
-            HeldDeviceSockets, IpFrame, ParseSentFrameError, ReceivedFrame, SentFrame,
-        },
+        socket::{HeldDeviceSockets, IpFrame, ParseSentFrameError, SentFrame},
         state::IpLinkDeviceState,
         DeviceCollectionContext, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher,
         DeviceSendFrameError, RecvIpFrameMeta,
@@ -88,48 +84,6 @@ where
     }
 }
 
-impl<CC, BC> ReceivableFrameMeta<CC, BC> for PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
-where
-    CC: DeviceIdContext<PureIpDevice>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>
-        + DeviceSocketHandler<PureIpDevice, BC>,
-{
-    fn receive_meta<B: BufferMut + Debug>(
-        self,
-        core_ctx: &mut CC,
-        bindings_ctx: &mut BC,
-        buffer: B,
-    ) {
-        let Self { device_id, ip_version } = self;
-        core_ctx.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
-
-        // NB: For conformance with Linux, don't verify that the contents of
-        // of the buffer are a valid IPv4/IPv6 packet. Device sockets are
-        // allowed to receive malformed packets.
-        core_ctx.handle_frame(
-            bindings_ctx,
-            &device_id,
-            Frame::Received(ReceivedFrame::Ip(IpFrame { ip_version, body: buffer.as_ref() })),
-            buffer.as_ref(),
-        );
-
-        match ip_version {
-            IpVersion::V4 => core_ctx.receive_frame(
-                bindings_ctx,
-                RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
-                buffer,
-            ),
-            IpVersion::V6 => core_ctx.receive_frame(
-                bindings_ctx,
-                RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
-                buffer,
-            ),
-        }
-    }
-}
-
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
     ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>
 {
@@ -157,41 +111,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequ
         let Self { device, frame_dst, _marker: _ } = self;
         core_ctx.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv6_delivered);
         crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
-    }
-}
-
-impl DeviceSocketSendTypes for PureIpDevice {
-    type Metadata = PureIpHeaderParams;
-}
-
-impl<
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::AllDeviceSockets>
-            + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
-    > SendableFrameMeta<CoreCtx<'_, BC, L>, BC>
-    for DeviceSocketMetadata<PureIpDevice, PureIpDeviceId<BC>>
-{
-    fn send_meta<S>(
-        self,
-        core_ctx: &mut CoreCtx<'_, BC, L>,
-        bindings_ctx: &mut BC,
-        body: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        let Self { device_id, metadata: PureIpHeaderParams { ip_version } } = self;
-        net_types::for_any_ip_version!(
-            ip_version,
-            I,
-            crate::device::pure_ip::send_ip_frame::<_, _, I, _>(
-                core_ctx,
-                bindings_ctx,
-                &device_id,
-                body
-            )
-        )
     }
 }
 
@@ -273,78 +192,37 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxDequ
     }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::PureIpDeviceDynamicState>
-    for IpLinkDeviceState<PureIpDevice, BC>
+impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
+    for crate::lock_ordering::PureIpDeviceDynamicState
 {
     type Data = DynamicPureIpDeviceState;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, DynamicPureIpDeviceState>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, DynamicPureIpDeviceState>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.link.dynamic_state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.link.dynamic_state.write()
-    }
 }
 
-impl<BC: BindingsContext> LockFor<crate::lock_ordering::PureIpDeviceTxQueue>
-    for IpLinkDeviceState<PureIpDevice, BC>
+impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
+    for crate::lock_ordering::PureIpDeviceTxQueue
 {
     type Data =
         TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>;
-    type Guard<'l> = crate::sync::LockGuard<
-            'l, TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.link.tx_queue.queue.lock()
-    }
 }
 
-impl<BC: BindingsContext> LockFor<crate::lock_ordering::PureIpDeviceTxDequeue>
-    for IpLinkDeviceState<PureIpDevice, BC>
+impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
+    for crate::lock_ordering::PureIpDeviceTxDequeue
 {
     type Data = DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>;
-    type Guard<'l> = crate::sync::LockGuard<
-            'l, DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.link.tx_queue.deque.lock()
-    }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceSockets>
-    for IpLinkDeviceState<PureIpDevice, BC>
+impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
+    for crate::lock_ordering::DeviceSockets
 {
-    type Data = HeldDeviceSockets<BC>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<BC>>
-        where
-            Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, HeldDeviceSockets<BC>>
-        where
-            Self: 'l ;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.sockets.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.sockets.write()
-    }
+    type Data = HeldDeviceSockets<BT>;
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCounters>
-    for IpLinkDeviceState<PureIpDevice, BC>
+impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<PureIpDevice, BT>>
+    for crate::lock_ordering::PureIpDeviceCounters
 {
     type Data = PureIpDeviceCounters;
-    type Guard<'l> = &'l PureIpDeviceCounters
-        where
-            Self: 'l ;
-    fn access(&self) -> Self::Guard<'_> {
-        &self.link.counters
+    fn unlocked_access(t: &IpLinkDeviceState<PureIpDevice, BT>) -> &Self::Data {
+        &t.link.counters
     }
 }
 
@@ -382,14 +260,18 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::{
-        ip::{AddrSubnet, IpAddress as _, Mtu},
+        ip::{AddrSubnet, IpAddress as _, IpVersion, Mtu},
         Witness, ZonedAddr,
     };
+    use packet::Serializer as _;
     use packet_formats::ip::{IpPacketBuilder, IpProto};
     use test_case::test_case;
 
     use crate::{
-        device::{pure_ip::PureIpDeviceCreationProperties, DeviceId, TransmitQueueConfiguration},
+        device::{
+            pure_ip::{PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata},
+            DeviceId, TransmitQueueConfiguration,
+        },
         ip::IpLayerIpExt,
         sync::RemoveResourceResult,
         testutil::{
