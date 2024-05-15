@@ -1074,7 +1074,7 @@ pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, BC>:
         proto: I::Proto,
         body: B,
         transport_override: Option<TransparentLocalDelivery<I>>,
-    ) -> Result<(), (B, TransportReceiveError)>;
+    ) -> Result<(), TransportReceiveError>;
 }
 
 /// A marker trait for all the contexts required for IP ingress.
@@ -1156,7 +1156,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         proto: Ipv4Proto,
         body: B,
         transport_override: Option<TransparentLocalDelivery<Ipv4>>,
-    ) -> Result<(), (B, TransportReceiveError)> {
+    ) -> Result<(), TransportReceiveError> {
         // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
 
@@ -1171,6 +1171,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             Ipv4Proto::Igmp => {
                 device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body);
@@ -1186,6 +1187,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             Ipv4Proto::Proto(IpProto::Tcp) => {
                 <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
@@ -1197,13 +1199,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             // TODO(joshlf): Once all IP protocol numbers are covered, remove
             // this default case.
-            _ => Err((
-                body,
-                TransportReceiveError { inner: TransportReceiveErrorInner::ProtocolUnsupported },
-            )),
+            _ => Err(TransportReceiveError {
+                inner: TransportReceiveErrorInner::ProtocolUnsupported,
+            }),
         }
     }
 }
@@ -1220,7 +1222,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         proto: Ipv6Proto,
         body: B,
         transport_override: Option<TransparentLocalDelivery<Ipv6>>,
-    ) -> Result<(), (B, TransportReceiveError)> {
+    ) -> Result<(), TransportReceiveError> {
         // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
 
@@ -1235,6 +1237,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             // A value of `Ipv6Proto::NoNextHeader` tells us that there is no
             // header whatsoever following the last lower-level header so we stop
@@ -1250,6 +1253,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             Ipv6Proto::Proto(IpProto::Udp) => {
                 <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
@@ -1261,13 +1265,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             // TODO(joshlf): Once all IP Next Header numbers are covered, remove
             // this default case.
-            _ => Err((
-                body,
-                TransportReceiveError { inner: TransportReceiveErrorInner::ProtocolUnsupported },
-            )),
+            _ => Err(TransportReceiveError {
+                inner: TransportReceiveErrorInner::ProtocolUnsupported,
+            }),
         }
     }
 }
@@ -1757,6 +1761,88 @@ where
     }
 }
 
+/// A [`TransportReceiveError`], and the metadata required to handle it.
+struct DispatchIpPacketError<I: IcmpHandlerIpExt> {
+    /// The error that occurred while dispatching to the transport layer.
+    err: TransportReceiveError,
+    /// The original source IP address of the packet (before the local-ingress
+    /// hook evaluation).
+    src_ip: I::SourceAddress,
+    /// The original destination IP address of the packet (before the
+    /// local-ingress hook evaluation).
+    dst_ip: SpecifiedAddr<I::Addr>,
+    /// The frame destination of the packet.
+    frame_dst: Option<FrameDestination>,
+    /// The metadata from the packet, allowing the packet's backing buffer to be
+    /// returned to it's pre-IP-parse state with [`GrowBuffer::undo_parse`].
+    meta: ParseMetadata,
+}
+
+impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
+    /// Generate an send an appropriate ICMP error in response to this error.
+    ///
+    /// The provided `body` must be the original buffer from which the IP
+    /// packet responsible for this error was parsed. It is expected to be in a
+    /// state that allows undoing the IP packet parse (e.g. unmodified after the
+    /// IP packet was parsed).
+    fn respond_with_icmp_error<B: BufferMut, BC, CC: IcmpErrorHandler<I, BC>>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        mut body: B,
+        device: &CC::DeviceId,
+    ) {
+        fn icmp_error_from_transport_error<I: IcmpHandlerIpExt>(
+            err: TransportReceiveError,
+            header_len: usize,
+        ) -> I::IcmpError {
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct ErrorHolder<I: Ip + IcmpHandlerIpExt>(I::IcmpError);
+
+            let ErrorHolder(err) = match err.inner {
+                TransportReceiveErrorInner::ProtocolUnsupported => I::map_ip(
+                    header_len,
+                    |header_len| {
+                        ErrorHolder(Icmpv4Error {
+                            kind: Icmpv4ErrorKind::ProtocolUnreachable,
+                            header_len,
+                        })
+                    },
+                    |header_len| ErrorHolder(Icmpv6ErrorKind::ProtocolUnreachable { header_len }),
+                ),
+                TransportReceiveErrorInner::PortUnreachable => I::map_ip(
+                    header_len,
+                    |header_len| {
+                        ErrorHolder(Icmpv4Error {
+                            kind: Icmpv4ErrorKind::PortUnreachable,
+                            header_len,
+                        })
+                    },
+                    |_header_len| ErrorHolder(Icmpv6ErrorKind::PortUnreachable),
+                ),
+            };
+            err
+        }
+
+        let DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta } = self;
+        // Undo the parsing of the IP Packet, moving the buffer's cursor so that
+        // it points at the start of the IP header. This way, the sent ICMP
+        // error will contain the entire original IP packet.
+        body.undo_parse(meta);
+
+        core_ctx.send_icmp_error_message(
+            bindings_ctx,
+            device,
+            frame_dst,
+            src_ip,
+            dst_ip,
+            body,
+            icmp_error_from_transport_error::<I>(err, meta.header_len()),
+        );
+    }
+}
+
 // TODO(joshlf): Once we support multiple extension headers in IPv6, we will
 // need to verify that the callers of this function are still sound. In
 // particular, they may accidentally pass a parse_metadata argument which
@@ -1779,7 +1865,6 @@ where
 /// `dispatch_receive_ip_packet` will also panic.
 fn dispatch_receive_ipv4_packet<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
-    B: BufferMut,
     CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
     core_ctx: &mut CC,
@@ -1788,12 +1873,10 @@ fn dispatch_receive_ipv4_packet<
     frame_dst: Option<FrameDestination>,
     src_ip: Ipv4Addr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
-    proto: Ipv4Proto,
-    mut body: B,
-    parse_metadata: Option<ParseMetadata>,
+    mut packet: Ipv4Packet<&mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv4>>,
-) {
+) -> Result<(), DispatchIpPacketError<Ipv4>> {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
@@ -1806,77 +1889,41 @@ fn dispatch_receive_ipv4_packet<
         | None => (),
     }
 
+    let proto = packet.proto();
+
     match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, body.as_mut()),
+        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, packet.body_mut()),
         device,
         &mut packet_metadata,
     ) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
-            return;
+            return Ok(());
         }
         crate::filter::Verdict::Accept => {}
     }
     packet_metadata.acknowledge_drop();
 
-    let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
-        bindings_ctx,
-        device,
-        src_ip,
-        dst_ip,
-        proto,
-        body,
-        transport_override,
-    ) {
-        Ok(()) => return,
-        Err(e) => e,
-    };
-    // All branches promise to return the buffer in the same state it was in
-    // when they were executed. Thus, all we have to do is undo the parsing
-    // of the IP packet header, and the buffer will be back to containing
-    // the entire original IP packet.
-    let meta = parse_metadata.unwrap();
-    body.undo_parse(meta);
+    let buffer = Buf::new(packet.body_mut(), ..);
 
-    if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
-        match err.inner {
-            TransportReceiveErrorInner::ProtocolUnsupported => {
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv4Error {
-                        kind: Icmpv4ErrorKind::ProtocolUnreachable,
-                        header_len: meta.header_len(),
-                    },
-                );
+    core_ctx
+        .dispatch_receive_ip_packet(
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            proto,
+            buffer,
+            transport_override,
+        )
+        .or_else(|err| {
+            if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
+                let (_, _, _, meta) = packet.into_metadata();
+                Err(DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta })
+            } else {
+                Ok(())
             }
-            TransportReceiveErrorInner::PortUnreachable => {
-                // TODO(joshlf): What if we're called from a loopback
-                // handler, and device and parse_metadata are None? In other
-                // words, what happens if we attempt to send to a loopback
-                // port which is unreachable? We will eventually need to
-                // restructure the control flow here to handle that case.
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv4Error {
-                        kind: Icmpv4ErrorKind::PortUnreachable,
-                        header_len: meta.header_len(),
-                    },
-                );
-            }
-        }
-    } else {
-        trace!("dispatch_receive_ipv4_packet: Cannot send ICMP error message in response to a packet from the unspecified address");
-    }
+        })
 }
 
 /// Dispatch a received IPv6 packet to the appropriate protocol.
@@ -1885,7 +1932,6 @@ fn dispatch_receive_ipv4_packet<
 /// `dispatch_receive_ipv4_packet`, but for IPv6.
 fn dispatch_receive_ipv6_packet<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
-    B: BufferMut,
     CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
     core_ctx: &mut CC,
@@ -1894,12 +1940,10 @@ fn dispatch_receive_ipv6_packet<
     frame_dst: Option<FrameDestination>,
     src_ip: Ipv6SourceAddr,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
-    proto: Ipv6Proto,
-    mut body: B,
-    parse_metadata: Option<ParseMetadata>,
+    mut packet: Ipv6Packet<&mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv6>>,
-) {
+) -> Result<(), DispatchIpPacketError<Ipv6>> {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
     // function are still sound. In particular, they may accidentally pass a
@@ -1918,76 +1962,42 @@ fn dispatch_receive_ipv6_packet<
         | None => (),
     }
 
+    let proto = packet.proto();
+
     match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, body.as_mut()),
+        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, packet.body_mut()),
         device,
         &mut packet_metadata,
     ) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
-            return;
+            return Ok(());
         }
         crate::filter::Verdict::Accept => {}
     }
 
-    let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
-        bindings_ctx,
-        device,
-        src_ip,
-        dst_ip,
-        proto,
-        body,
-        transport_override,
-    ) {
-        Ok(()) => {
-            packet_metadata.acknowledge_drop();
-            return;
-        }
-        Err(e) => e,
-    };
+    let buffer = Buf::new(packet.body_mut(), ..);
 
-    // All branches promise to return the buffer in the same state it was in
-    // when they were executed. Thus, all we have to do is undo the parsing
-    // of the IP packet header, and the buffer will be back to containing
-    // the entire original IP packet.
-    let meta = parse_metadata.unwrap();
-    body.undo_parse(meta);
-
-    match err.inner {
-        TransportReceiveErrorInner::ProtocolUnsupported => {
+    let result = core_ctx
+        .dispatch_receive_ip_packet(
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            proto,
+            buffer,
+            transport_override,
+        )
+        .or_else(|err| {
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    *src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv6ErrorKind::ProtocolUnreachable { header_len: meta.header_len() },
-                );
+                let (_, _, _, meta) = packet.into_metadata();
+                Err(DispatchIpPacketError { err, src_ip: *src_ip, dst_ip, frame_dst, meta })
+            } else {
+                Ok(())
             }
-        }
-        TransportReceiveErrorInner::PortUnreachable => {
-            // TODO(joshlf): What if we're called from a loopback handler,
-            // and device and parse_metadata are None? In other words, what
-            // happens if we attempt to send to a loopback port which is
-            // unreachable? We will eventually need to restructure the
-            // control flow here to handle that case.
-            if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    *src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv6ErrorKind::PortUnreachable,
-                );
-            }
-        }
-    }
-
+        });
     packet_metadata.acknowledge_drop();
+    result
 }
 
 pub(crate) fn send_ip_frame<I, CC, BC, S>(
@@ -2053,7 +2063,6 @@ macro_rules! process_fragment {
                 trace!("receive_ip_packet: not fragmented");
                 // TODO(joshlf):
                 // - Check for already-expired TTL?
-                let (_, _, proto, meta) = packet.into_metadata();
                 $dispatch(
                     $core_ctx,
                     $bindings_ctx,
@@ -2061,12 +2070,12 @@ macro_rules! process_fragment {
                     $frame_dst,
                     $src_ip,
                     $dst_ip,
-                    proto,
-                    $buffer,
-                    Some(meta),
+                    packet,
                     $packet_metadata,
                     None,
-                );
+                ).unwrap_or_else(|err| {
+                    err.respond_with_icmp_error($core_ctx, $bindings_ctx, $buffer, $device)
+                })
             }
             // Ready to reassemble a packet.
             FragmentProcessingState::Ready { key, packet_len } => {
@@ -2090,26 +2099,25 @@ macro_rules! process_fragment {
                         trace!("receive_ip_packet: fragmented, reassembled packet: {:?}", packet);
                         // TODO(joshlf):
                         // - Check for already-expired TTL?
-                        let (_, _, proto, meta) = packet.into_metadata();
                         // Since each fragment had its own packet metadata, it's
                         // not clear what metadata to use for the reassembled
                         // packet. Resetting the metadata is the safest bet,
                         // though it means downstream consumers must be aware of
                         // this case.
                         let packet_metadata = IpLayerPacketMetadata::default();
-                        $dispatch::<_, Buf<Vec<u8>>, _,>(
+                        $dispatch::<_, _,>(
                             $core_ctx,
                             $bindings_ctx,
                             $device,
                             $frame_dst,
                             $src_ip,
                             $dst_ip,
-                            proto,
-                            buffer,
-                            Some(meta),
+                            packet,
                             packet_metadata,
                             None,
-                        );
+                        ).unwrap_or_else(|err| {
+                            err.respond_with_icmp_error($core_ctx, $bindings_ctx, $buffer, $device)
+                        })
                     }
                     // TODO(ghanan): Handle reassembly errors, remove
                     // `allow(unreachable_patterns)` when complete.
@@ -2310,7 +2318,6 @@ pub(crate) fn receive_ipv4_packet<
             // address and port to which the packet should be transparently delivered at the
             // transport layer.
             let src_ip = packet.src_ip();
-            let (_, _, proto, meta) = packet.into_metadata();
             dispatch_receive_ipv4_packet(
                 core_ctx,
                 bindings_ctx,
@@ -2318,12 +2325,13 @@ pub(crate) fn receive_ipv4_packet<
                 frame_dst,
                 src_ip,
                 dst_ip,
-                proto,
-                buffer,
-                Some(meta),
+                packet,
                 packet_metadata,
                 Some(TransparentLocalDelivery { addr, port }),
-            );
+            )
+            .unwrap_or_else(|err| {
+                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+            });
             return;
         }
     }
@@ -2605,7 +2613,6 @@ pub(crate) fn receive_ipv6_packet<
             // Short-circuit the routing process and override local demux, providing a local
             // address and port to which the packet should be transparently delivered at the
             // transport layer.
-            let (_, _, proto, meta) = packet.into_metadata();
             dispatch_receive_ipv6_packet(
                 core_ctx,
                 bindings_ctx,
@@ -2613,12 +2620,13 @@ pub(crate) fn receive_ipv6_packet<
                 frame_dst,
                 src_ip,
                 dst_ip,
-                proto,
-                buffer,
-                Some(meta),
+                packet,
                 packet_metadata,
                 Some(TransparentLocalDelivery { addr, port }),
-            );
+            )
+            .unwrap_or_else(|err| {
+                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+            });
             return;
         }
     }
@@ -2662,7 +2670,6 @@ pub(crate) fn receive_ipv6_packet<
                     // - Do something with ICMP if we don't have a handler for
                     //   that protocol?
                     // - Check for already-expired TTL?
-                    let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) = packet.into_metadata();
                     dispatch_receive_ipv6_packet(
                         core_ctx,
                         bindings_ctx,
@@ -2670,12 +2677,13 @@ pub(crate) fn receive_ipv6_packet<
                         frame_dst,
                         src_ip,
                         dst_ip,
-                        proto,
-                        buffer,
-                        Some(meta),
+                        packet,
                         packet_metadata,
                         None,
-                    );
+                    )
+                    .unwrap_or_else(|err| {
+                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+                    });
                 }
                 Ipv6PacketAction::ProcessFragment => {
                     trace!(
