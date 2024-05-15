@@ -4408,6 +4408,16 @@ One of:
 
 From //build/toolchain/rbe.gni:250
 
+### link_rbe_download_unstripped_outputs
+
+Controls whether or not to download (often large) unstripped linker
+outputs.  When downloading is disabled, the build produces stubs
+that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+
+**Current value (from the default):** `true`
+
+From //build/toolchain/rbe.gni:255
+
 ### link_rbe_enable
 
 Set to true to enable remote linking using RBE.
@@ -5262,15 +5272,15 @@ From //build/config/BUILDCONFIG.gn:32
 
 ### override_build_time_supported_api_levels
 
-Valid values are either false (Default), or a list contains only `supported`
-or `in development` API levels listed in //sdk/version_history.json file.
-By default, all supported and in development API levels defined in
-//sdk/version_history.json will be built. If you only want to build
-artifacts targeting API level PLATFORM, override this with `[]`.
+Overrides the set of API levels for which the build will provide build-time
+support in the IDK/SDK. The default (`false`) set is all `supported` and
+`in development` API levels in //sdk/version_history.json. Other valid
+values are a list containing a subset of the default set. To build
+artifacts targeting API level PLATFORM, set to `[]`.
 
-This will help reduce the overall build time of any product/driver that uses
-Bazel SDK, or final_fuchsia_idk. For example, a vim3 build can be shorten
-from 16 mins to 10 mins.
+This is useful for reducing the overall build time of any build that
+includes the IDK/SDK in exchange for reduced coverage of API level support.
+This includes `fx build final_fuchsia_idk` and products built in-tree.
 
 **Current value (from the default):** `false`
 
