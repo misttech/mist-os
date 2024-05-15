@@ -3332,9 +3332,20 @@ macro_rules! ip_generic {
     }
 }
 
+// Implement GenericOverIp for common types.
+ip_generic!(bool);
+ip_generic!(isize);
+ip_generic!(i8);
+ip_generic!(i16);
+ip_generic!(i32);
+ip_generic!(i64);
+ip_generic!(usize);
+ip_generic!(u8);
+ip_generic!(u16);
+ip_generic!(u32);
+ip_generic!(u64);
 ip_generic!(Option<T>);
 ip_generic!(Result<R, E>);
-ip_generic!(bool);
 #[cfg(feature = "std")]
 ip_generic!(Vec<T>);
 
