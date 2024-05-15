@@ -261,6 +261,25 @@ def track_providers(providers):
         ],
     )]
 
+def can_forward_provider(provider):
+    """Return True if a given provider value should never be forwarded to dependents.
+
+    This is important for providers that are collected through aspects, as forwarding
+    them (e.g. with a function like forward_providers()), would create
+    duplicate entries in the build graph, resulting in chaos.
+
+    Unlike native providers like DefaultInfo or CCInfo, `type(provider)` will always
+    return "struct" for custom providers, so instead rely on the fact that their values
+    include a "never_forward" field which should be True if they should not be
+    forwarded.
+
+    Args:
+       provider: A provider value.
+    Returns:
+       True if the value can be forwarded to dependents by fowrard_providers().
+    """
+    return not getattr(provider, "never_forward", False)
+
 # buildifier: disable=function-docstring
 def forward_providers(ctx, target, *providers, rename_executable = None):
     default_info = target[DefaultInfo]
@@ -289,7 +308,7 @@ def forward_providers(ctx, target, *providers, rename_executable = None):
     return [
         target[Provider]
         for Provider in providers
-        if Provider in target
+        if Provider in target and can_forward_provider(Provider)
     ] + target_provider_info.providers + [default_info]
 
 def _forward_providers(ctx):

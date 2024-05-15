@@ -68,6 +68,7 @@ load(
 load(
     "//fuchsia/private:fuchsia_debug_symbols.bzl",
     _fuchsia_debug_symbols = "fuchsia_debug_symbols",
+    _fuchsia_unstripped_binary = "fuchsia_unstripped_binary",
 )
 load(
     "//fuchsia/private:fuchsia_devicetree_visitor.bzl",
@@ -151,6 +152,7 @@ fuchsia_component_manifest = _fuchsia_component_manifest
 fuchsia_component_manifest_shard = _fuchsia_component_manifest_shard
 fuchsia_component_manifest_shard_collection = _fuchsia_component_manifest_shard_collection
 fuchsia_debug_symbols = _fuchsia_debug_symbols
+fuchsia_unstripped_binary = _fuchsia_unstripped_binary
 fuchsia_driver_component = _fuchsia_driver_component
 fuchsia_driver_bind_bytecode = _fuchsia_driver_bind_bytecode
 fuchsia_driver_tool = _fuchsia_driver_tool

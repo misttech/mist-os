@@ -7,7 +7,13 @@
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
-load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols", "get_build_id_dirs", "strip_resources")
+load(
+    ":fuchsia_debug_symbols.bzl",
+    "FUCHSIA_DEBUG_SYMBOLS_ATTRS",
+    "collect_debug_symbols",
+    "get_build_id_dirs",
+    "strip_resources",
+)
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(
     ":providers.bzl",
@@ -578,26 +584,13 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
             doc = "Include debug symbols from @fuchsia_sdk.",
             default = "@fuchsia_sdk//:debug_symbols",
         ),
-        "_elf_strip_tool": attr.label(
-            default = "//fuchsia/tools:elf_strip",
-            executable = True,
-            cfg = "exec",
-        ),
         "_meta_content_append_tool": attr.label(
             default = "//fuchsia/tools:meta_content_append",
             executable = True,
             cfg = "exec",
         ),
-        "_generate_symbols_dir_tool": attr.label(
-            default = "//fuchsia/tools:generate_symbols_dir",
-            executable = True,
-            cfg = "exec",
-        ),
-        "_cc_toolchain": attr.label(
-            default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
-        ),
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
-    } | FUCHSIA_API_LEVEL_ATTRS,
+    } | FUCHSIA_API_LEVEL_ATTRS | FUCHSIA_DEBUG_SYMBOLS_ATTRS,
 )

@@ -40,10 +40,72 @@ FuchsiaPackagedComponentInfo = provider(
     },
 )
 
+def _fuchsia_unstripped_binary_info_init(*, unstripped_file, dest, stripped_file = None, source_dir = None):
+    if not dest or type(dest) != "string":
+        fail("Required 'dest' argument must be a string, got: %s" % repr(dest))
+    if not unstripped_file or type(unstripped_file) != "File":
+        fail("Required 'unstripped_file' argument must be a File, got: %s" % repr(unstripped_file))
+    if stripped_file and type(stripped_file) != "File":
+        fail("Optional 'stripped_file' argument must be a File, got: %s" % repr(stripped_file))
+    if source_dir and type(source_dir) != "File":
+        fail("Optional 'source_dir' argument must be a File, if not None, got: %s" % repr(source_dir))
+    return {
+        "dest": dest,
+        "unstripped_file": unstripped_file,
+        "stripped_file": stripped_file,
+        "source_dir": source_dir,
+        "never_forward": True,
+    }
+
+FuchsiaUnstrippedBinaryInfo, make_fuchsia_unstripped_binary_info = provider(
+    "Contains information about one unstripped Fuchsia binary and its install location for the corresponding stripped file",
+    fields = {
+        "unstripped_file": "A required File value for the source unstripped ELF binary file.",
+        "stripped_file": "Either None, or a File value for the corresponding stripped ELF binary file, if available as a prebuilt.",
+        "dest": "A Fuchsia package install path string for the stripped file.",
+        "source_dir": """Either None, or a File value pointing to a file or directory,
+            see FuchsiaDebugSymbolInfo for documentation about this value. If None, the root workspace
+            directory is used as the source directory.""",
+        "never_forward": """A boolean whose value must be True. Its presence ensures that these values are
+            never forwarded to dependents. See documentation for can_forward_provider() function.""",
+    },
+    init = _fuchsia_unstripped_binary_info_init,
+)
+
+FuchsiaCollectedUnstrippedBinariesInfo = provider(
+    "Contains information about a set of unstripped ELF binaries.",
+    fields = {
+        "source_dir_to_unstripped_binary": """
+            A { source_dir -> depset[struct(dest, unstripped_file, stripped_file)] } dictionary,
+            Where 'unstripped_file' is a source File value for the unstripped file,
+            where 'stripped_file' is either None, or a source File value for the corresponding
+            stripped file if available as a prebuilt, and 'dest' is a install path string within
+            a Fuchsia package for the corresponding stripped file.
+
+            Where 'source_dir' is either a string or a File value describing the source
+            directory used by the zxdb to locate sources at debug time. See FuchsiaDebugSymbolInfo
+            for more details about this value.
+            """,
+    },
+)
+
 FuchsiaDebugSymbolInfo = provider(
     "Contains information that can be used to register debug symbols.",
     fields = {
-        "build_id_dirs": "A mapping of build directory to depset of build_id directories.",
+        "build_id_dirs": """A { source_dir -> depset[build_dir] } dictionary, where 'build_dir'
+            is a File value pointing to a .build-id/ directory, and 'source_dir' is either a
+            string or a File value, used to locate source files when using the debugger.
+
+            If 'source_dir' is a string, it is interpreted as an environment variable,
+            which must be defined by Bazel when the action that registers debug symbols
+            is run, such as BAZEL_WORKSPACE_DIRECTORY (see Bazel user manual).
+
+            If 'source_dir' is a File pointing to a directory, the latter is used directly
+            as a possible source directory.
+
+            If 'source_dir' is a File pointing to a file, its parent directory is used
+            instead as a possible source directory.
+            """,
     },
 )
 
@@ -205,8 +267,7 @@ FuchsiaRunnableInfo = provider(
 FuchsiaDriverToolInfo = provider(
     doc = "A provider which contains information about a driver tool",
     fields = {
-        "binary": "A resource struct containing the binary",
-        "resources": "A list of all the resources needed by the target",
+        "tool_path": "A tool's binary package-relative path (e.g. 'bin/tool').",
     },
 )
 

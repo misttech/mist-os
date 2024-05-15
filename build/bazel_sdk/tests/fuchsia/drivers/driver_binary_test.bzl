@@ -4,7 +4,7 @@
 
 """A test which verifies that driver binaries are built correctly. """
 
-load("@fuchsia_sdk//fuchsia/private:fuchsia_debug_symbols.bzl", "strip_resources")
+load("@fuchsia_sdk//fuchsia/private:fuchsia_debug_symbols.bzl", "FUCHSIA_DEBUG_SYMBOLS_ATTRS", "strip_resources")
 load("@fuchsia_sdk//fuchsia/private:fuchsia_transition.bzl", "fuchsia_transition")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
@@ -61,22 +61,8 @@ driver_binary_test = rule(
             cfg = "exec",
             allow_single_file = True,
         ),
-        # The CC tools are needed to strip the binary
-        "_elf_strip_tool": attr.label(
-            default = "@fuchsia_sdk//fuchsia/tools:elf_strip",
-            executable = True,
-            cfg = "exec",
-        ),
-        "_generate_symbols_dir_tool": attr.label(
-            default = "@fuchsia_sdk//fuchsia/tools:generate_symbols_dir",
-            executable = True,
-            cfg = "exec",
-        ),
-        "_cc_toolchain": attr.label(
-            default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
-        ),
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
-    } | PY_TOOLCHAIN_DEPS,
+    } | PY_TOOLCHAIN_DEPS | FUCHSIA_DEBUG_SYMBOLS_ATTRS,
 )
