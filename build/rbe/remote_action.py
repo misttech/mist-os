@@ -875,7 +875,9 @@ def download_from_stub_path(
             return ok_result
 
         return stub_info.download(
-            downloader=downloader, working_dir_abs=working_dir_abs
+            downloader=downloader,
+            working_dir_abs=working_dir_abs,
+            dest=stub_path,
         )
 
 
