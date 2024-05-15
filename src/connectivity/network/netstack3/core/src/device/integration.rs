@@ -984,7 +984,7 @@ fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerS
 ) -> Mtu {
     match device {
         DeviceId::Ethernet(id) => self::ethernet::get_mtu(core_ctx, &id),
-        DeviceId::Loopback(id) => self::loopback::get_mtu(core_ctx, id),
+        DeviceId::Loopback(id) => self::loopback::integration::get_mtu(core_ctx, id),
         DeviceId::PureIp(id) => self::pure_ip::get_mtu(core_ctx, &id),
     }
 }
@@ -1062,7 +1062,7 @@ where
             broadcast,
         ),
         DeviceId::Loopback(id) => {
-            loopback::send_ip_frame::<_, A, _, _>(core_ctx, bindings_ctx, id, local_addr, body)
+            loopback::send_ip_frame::<_, _, A, _>(core_ctx, bindings_ctx, id, local_addr, body)
         }
         DeviceId::PureIp(id) => {
             pure_ip::send_ip_frame::<_, _, A::Version, _>(core_ctx, bindings_ctx, id, body)
