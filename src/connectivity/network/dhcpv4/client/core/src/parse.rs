@@ -46,6 +46,7 @@ pub(crate) fn parse_dhcp_message_from_ip_packet(
         packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Tcp)
         | packet_formats::ip::Ipv4Proto::Icmp
         | packet_formats::ip::Ipv4Proto::Igmp
+        | packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Reserved)
         | packet_formats::ip::Ipv4Proto::Other(_) => return Err(ParseError::NotUdp),
     };
     let mut ip_packet_body = ip_packet.body();

@@ -277,6 +277,7 @@ create_protocol_enum!(
     pub enum IpProto: u8 {
         Tcp, 6, "TCP";
         Udp, 17, "UDP";
+        Reserved, 255, "IANA-RESERVED";
     }
 );
 

@@ -14,12 +14,16 @@ use crate::{
     context::{ContextPair, ReferenceNotifiers, ReferenceNotifiersExt as _},
     ip::{
         base::IpLayerIpExt,
-        raw::state::{RawIpSocketLockedState, RawIpSocketState},
+        raw::{
+            protocol::RawIpSocketProtocol,
+            state::{RawIpSocketLockedState, RawIpSocketState},
+        },
     },
     sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc},
 };
 
 mod integration;
+mod protocol;
 mod state;
 
 /// Types provided by bindings used in the raw IP socket implementation.
@@ -54,14 +58,21 @@ where
     /// Creates a raw IP socket for the given protocol.
     pub fn create(
         &mut self,
-        protocol: I::Proto,
+        protocol: RawIpSocketProtocol<I>,
         external_state: <C::BindingsContext as RawIpSocketsBindingsTypes>::RawIpSocketState<I>,
-    ) -> RawIpApiSocketId<I, C> {
+    ) -> Result<RawIpApiSocketId<I, C>, RawIpSocketCreationError> {
+        // TODO(https://fxbug.dev/339692009): Support IPPROTO_RAW.
+        match protocol {
+            RawIpSocketProtocol::Raw => {
+                return Err(RawIpSocketCreationError::IpProtoRawNotSupported)
+            }
+            RawIpSocketProtocol::Proto(_) => {}
+        }
         let socket =
             PrimaryRawIpSocketId(PrimaryRc::new(RawIpSocketState::new(protocol, external_state)));
         let strong = self.core_ctx().with_socket_map_mut(|socket_map| socket_map.insert(socket));
-        debug!("created raw IP socket {strong:?}, on protocol {protocol}");
-        strong
+        debug!("created raw IP socket {strong:?}, on protocol {protocol:?}");
+        Ok(strong)
     }
 
     /// Removes the raw IP socket from the system, returning its external state.
@@ -88,6 +99,14 @@ where
             |state: RawIpSocketState<I, C::BindingsContext>| state.into_external_state(),
         )
     }
+}
+
+/// Errors that can occur while creating a raw IP socket.
+#[derive(Debug, PartialEq)]
+pub enum RawIpSocketCreationError {
+    /// IPPROTO_RAW (IANA Internet Protocol 255) is not yet supported.
+    // TODO(https://fxbug.dev/339692009): Support IPPROTO_RAW.
+    IpProtoRawNotSupported,
 }
 
 /// The owner of socket state.
@@ -252,7 +271,20 @@ mod test {
     #[ip_test]
     fn create_and_remove<I: Ip + IpLayerIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
-        let sock = api.create(IpProto::Udp.into(), Default::default());
+        let sock = api
+            .create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default())
+            .expect("create should succeed");
         let FakeExternalSocketState {} = api.remove(sock).into_removed();
+    }
+
+    #[ip_test]
+    fn create_fails_with_ip_proto_raw<I: Ip + IpLayerIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let protocol = RawIpSocketProtocol::new(IpProto::Reserved.into());
+        assert_eq!(protocol, RawIpSocketProtocol::Raw);
+        assert_eq!(
+            api.create(protocol, Default::default()),
+            Err(RawIpSocketCreationError::IpProtoRawNotSupported)
+        );
     }
 }

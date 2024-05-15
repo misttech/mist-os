@@ -935,7 +935,7 @@ fn parse_transport_header_in_ipv4_packet<B: ParseBuffer>(
         Ipv4Proto::Proto(IpProto::Udp) => parse_udp_header::<_, Ipv4>(body),
         Ipv4Proto::Proto(IpProto::Tcp) => parse_tcp_header(body),
         Ipv4Proto::Icmp => parse_icmpv4_header(body),
-        Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
+        Ipv4Proto::Proto(IpProto::Reserved) | Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
     }
 }
 
@@ -947,7 +947,7 @@ fn parse_transport_header_in_ipv6_packet<B: ParseBuffer>(
         Ipv6Proto::Proto(IpProto::Udp) => parse_udp_header::<_, Ipv6>(body),
         Ipv6Proto::Proto(IpProto::Tcp) => parse_tcp_header(body),
         Ipv6Proto::Icmpv6 => parse_icmpv6_header(body),
-        Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => None,
+        Ipv6Proto::Proto(IpProto::Reserved) | Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => None,
     }
 }
 
@@ -1064,7 +1064,7 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv4> {
             Ipv4Proto::Icmp => Some(Self::Icmp(
                 Icmpv4Packet::parse_mut(body, IcmpParseArgs::new(src_ip, dst_ip)).ok()?,
             )),
-            Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
+            Ipv4Proto::Proto(IpProto::Reserved) | Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
         }
     }
 }
@@ -1086,7 +1086,9 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv6> {
             Ipv6Proto::Icmpv6 => Some(Self::Icmp(
                 Icmpv6Packet::parse_mut(body, IcmpParseArgs::new(src_ip, dst_ip)).ok()?,
             )),
-            Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => None,
+            Ipv6Proto::Proto(IpProto::Reserved) | Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => {
+                None
+            }
         }
     }
 }

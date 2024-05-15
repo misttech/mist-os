@@ -3567,7 +3567,7 @@ mod tests {
         for proto in 0u8..=255 {
             let v4proto = Ipv4Proto::from(proto);
             match v4proto {
-                Ipv4Proto::Other(_) => {
+                Ipv4Proto::Other(_) | Ipv4Proto::Proto(IpProto::Reserved) => {
                     test_receive_ip_packet::<Ipv4, _, _, _, _, _>(
                         |_| {},
                         |_| {},
@@ -3601,7 +3601,8 @@ mod tests {
                 | Ipv6Proto::NoNextHeader
                 | Ipv6Proto::Proto(IpProto::Udp)
                 | Ipv6Proto::Proto(IpProto::Tcp)
-                | Ipv6Proto::Other(_) => {}
+                | Ipv6Proto::Other(_)
+                | Ipv6Proto::Proto(IpProto::Reserved) => {}
             }
         }
     }

@@ -8,7 +8,10 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{Ip, IpVersionMarker};
 use packet_formats::ip::IpProtoExt;
 
-use crate::{ip::raw::RawIpSocketsBindingsTypes, sync::RwLock};
+use crate::{
+    ip::raw::{protocol::RawIpSocketProtocol, RawIpSocketsBindingsTypes},
+    sync::RwLock,
+};
 
 /// State for a raw IP socket that can be modified, and is lock protected.
 #[derive(Default)]
@@ -24,21 +27,21 @@ pub(super) struct RawIpSocketState<I: IpProtoExt, BT: RawIpSocketsBindingsTypes>
     /// The IANA Internet Protocol of this socket.
     ///
     /// This field is specified at creation time and never changes.
-    protocol: I::Proto,
+    protocol: RawIpSocketProtocol<I>,
     // The locked socket state, accessible via the [`RawIpSocketStateContext`].
     locked_state: RwLock<RawIpSocketLockedState<I>>,
 }
 
 impl<I: IpProtoExt, BT: RawIpSocketsBindingsTypes> RawIpSocketState<I, BT> {
     pub(super) fn new(
-        protocol: I::Proto,
+        protocol: RawIpSocketProtocol<I>,
         external_state: BT::RawIpSocketState<I>,
     ) -> RawIpSocketState<I, BT> {
         RawIpSocketState { external_state, protocol, locked_state: Default::default() }
     }
     // TODO(https://fxbug.dev/42175797): Use this method during rx.
     #[allow(dead_code)]
-    pub(super) fn protocol(&self) -> &I::Proto {
+    pub(super) fn protocol(&self) -> &RawIpSocketProtocol<I> {
         &self.protocol
     }
     pub(super) fn into_external_state(self) -> BT::RawIpSocketState<I> {

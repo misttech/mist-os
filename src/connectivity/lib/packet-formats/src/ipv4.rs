@@ -528,6 +528,10 @@ impl<B: ByteSlice> Ipv4Packet<B> {
                 let common_serializer = Nat64Serializer::Other(self.body().into_serializer());
                 Nat64TranslationResult::Forward(common_serializer.encapsulate(v6_pkt_builder))
             }
+
+            // Don't forward packets that use IANA's reserved protocol; they're
+            // invalid.
+            Ipv4Proto::Proto(IpProto::Reserved) => Nat64TranslationResult::Drop,
         }
     }
 }

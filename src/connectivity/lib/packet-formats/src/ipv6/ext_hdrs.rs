@@ -1149,7 +1149,7 @@ pub(super) fn is_valid_next_header_upper_layer(next_header: u8) -> bool {
         | Ipv6Proto::Proto(IpProto::Udp)
         | Ipv6Proto::Icmpv6
         | Ipv6Proto::NoNextHeader => true,
-        Ipv6Proto::Other(_) => false,
+        Ipv6Proto::Proto(IpProto::Reserved) | Ipv6Proto::Other(_) => false,
     }
 }
 
