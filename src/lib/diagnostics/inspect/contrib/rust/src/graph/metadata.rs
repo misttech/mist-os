@@ -4,8 +4,8 @@
 
 use super::{
     events::GraphObjectEventTracker,
-    types::{EdgeMarker, VertexMarker},
-    GraphObject, VertexId,
+    types::{EdgeMarker, GraphObject, VertexMarker},
+    VertexId,
 };
 use fuchsia_inspect::{self as inspect, ArrayProperty, Property};
 use std::{borrow::Cow, collections::BTreeMap};
