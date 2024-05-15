@@ -219,6 +219,11 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   root_ = inspector_.GetRoot().CreateChild("sdmmc_core");
   properties_.io_errors_ = root_.CreateUint("io_errors", 0);
   properties_.io_retries_ = root_.CreateUint("io_retries", 0);
+  properties_.wake_on_request_count_ = root_.CreateUint("wake_on_request_count", 0);
+  // 14 buckets spanning from 1us to ~8ms.
+  properties_.wake_on_request_latency_us_ = root_.CreateExponentialUintHistogram(
+      "wake_on_request_latency_us", /*floor=*/1, /*initial_step=*/1, /*step_multiplier=*/2,
+      /*buckets=*/14);
 
   fbl::AutoLock lock(&lock_);
 
@@ -496,16 +501,23 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
         switch (required_level) {
           case kPowerLevelOn: {
+            const zx::time start = zx::clock::get_monotonic();
+
             fbl::AutoLock lock(&lock_);
             // Actually raise the hardware's power level.
             zx_status_t status = ResumePower();
             if (status != ZX_OK) {
-              FDF_LOGL(ERROR, logger(), "Failed to resume power: %s", zx_status_get_string(status));
+              const zx::duration duration = zx::clock::get_monotonic() - start;
+              FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
+                       duration.to_usecs(), zx_status_get_string(status));
               return;
             }
 
             // Communicate to Power Broker that the hardware power level has been raised.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
+
+            const zx::duration duration = zx::clock::get_monotonic() - start;
+            properties_.wake_on_request_latency_us_.Insert(duration.to_usecs());
 
             wait_for_power_resumed_.Signal();
             break;

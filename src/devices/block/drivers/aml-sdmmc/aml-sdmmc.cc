@@ -436,7 +436,9 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
             // Actually raise the hardware's power level.
             zx_status_t status = ResumePower();
             if (status != ZX_OK) {
-              FDF_LOGL(ERROR, logger(), "Failed to resume power: %s", zx_status_get_string(status));
+              const zx::duration duration = zx::clock::get_monotonic() - start;
+              FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
+                       duration.to_usecs(), zx_status_get_string(status));
               return;
             }
 

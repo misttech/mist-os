@@ -285,6 +285,8 @@ class SdmmcBlockDevice {
     inspect::BoolProperty using_fidl_;                   // Set once by the init thread.
     inspect::BoolProperty power_suspended_;              // Updated whenever power state changes.
     inspect::UintProperty wake_on_request_count_;        // Updated whenever wake-on-request occurs.
+    inspect::ExponentialUintHistogram
+        wake_on_request_latency_us_;  // Updated whenever wake-on-request occurs.
   } properties_;
 
   std::optional<inspect::ComponentInspector> exposed_inspector_;
