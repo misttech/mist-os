@@ -10,6 +10,13 @@ use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
 
 extern "C" {
+    // This function performs a data copy like `memcpy`.
+    //
+    // Returns the last accessed destination address when `ret_dest` is `true`,
+    // or the last accessed source address when `ret_dest` is `false`.
+    fn hermetic_copy(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
+    fn hermetic_copy_end();
+
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
 
@@ -99,13 +106,9 @@ pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
 
 type HermeticCopyFn =
     unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
-
 type HermeticZeroFn = unsafe extern "C" fn(dest: *mut u8, len: usize) -> usize;
 
 pub struct Usercopy {
-    // Pointer to the hermetic_copy routine loaded into memory.
-    hermetic_copy_fn: HermeticCopyFn,
-
     // Pointer to the hermetic_copy_until_null_byte routine loaded into memory.
     hermetic_copy_until_null_byte_fn: HermeticCopyFn,
 
@@ -276,9 +279,8 @@ impl Usercopy {
     /// Returns a new instance of `Usercopy` if unified address spaces is
     /// supported on the target architecture.
     pub fn new(restricted_address_range: Range<usize>) -> Result<Self, zx::Status> {
-        let hermetic_copy_addr_range = get_hermetic_copy_bin("/pkg/hermetic_copy.bin")?;
-        let hermetic_copy_fn: HermeticCopyFn =
-            unsafe { std::mem::transmute(hermetic_copy_addr_range.start) };
+        let hermetic_copy_addr_range =
+            hermetic_copy as *const () as usize..hermetic_copy_end as *const () as usize;
 
         let hermetic_copy_until_null_byte_addr_range =
             get_hermetic_copy_bin("/pkg/hermetic_copy_until_null_byte.bin")?;
@@ -412,7 +414,6 @@ impl Usercopy {
         };
 
         Ok(Self {
-            hermetic_copy_fn,
             hermetic_copy_until_null_byte_fn,
             hermetic_zero_fn,
             shutdown_event,
@@ -436,7 +437,7 @@ impl Usercopy {
         count: usize,
         ret_dest: bool,
     ) -> usize {
-        do_hermetic_copy(self.hermetic_copy_fn, dest as usize, source as usize, count, ret_dest)
+        do_hermetic_copy(hermetic_copy, dest as usize, source as usize, count, ret_dest)
     }
 
     /// Zeros `count` bytes to starting at `dest_addr`.
@@ -483,13 +484,7 @@ impl Usercopy {
         // SAFETY: `source` is a valid Starnix-owned buffer and `dest_addr` is the user-mode
         // buffer.
         unsafe {
-            do_hermetic_copy(
-                self.hermetic_copy_fn,
-                dest_addr,
-                source.as_ptr() as usize,
-                source.len(),
-                true,
-            )
+            do_hermetic_copy(hermetic_copy, dest_addr, source.as_ptr() as usize, source.len(), true)
         }
     }
 
@@ -516,7 +511,7 @@ impl Usercopy {
                 // buffer.
                 unsafe {
                     do_hermetic_copy(
-                        self.hermetic_copy_fn,
+                        hermetic_copy,
                         dest.as_ptr() as usize,
                         source_addr,
                         dest.len(),

@@ -6,6 +6,9 @@
 
 #include "hermetic_copy_common.h"
 
+// Build with the following cc flags:
+//  `-O3 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer`
+
 [[gnu::section(".text.entry")]] uintptr_t hermetic_copy(volatile uint8_t* dest,
                                                         const volatile uint8_t* source,
                                                         size_t count, bool ret_dest) {
