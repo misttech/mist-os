@@ -50,11 +50,6 @@ template("group_with_no_dir_target_deps") {
 
 ############################# Test groups - Start ##############################
 # core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
-  testonly = true
-  public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc_preferred($host_toolchain)" ]
-}
-
 group_with_no_dir_target_deps("core_emulator_stable_tests") {
   testonly = true
   public_deps = [
@@ -65,18 +60,12 @@ group_with_no_dir_target_deps("core_emulator_stable_tests") {
   ]
 }
 
-group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
-  testonly = true
-  public_deps = []
-}
-
 group_with_no_dir_target_deps("core_emulator_unstable_tests") {
   testonly = true
   public_deps = []
 }
 
 # workbench_eng.emulator
-# Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
   testonly = true
   public_deps = [
@@ -96,11 +85,6 @@ group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
 }
 
 # core.vim3
-group_with_no_dir_target_deps("core_vim3_stable_sl4f_tests") {
-  testonly = true
-  public_deps = [ "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc_preferred($host_toolchain)" ]
-}
-
 group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
@@ -110,18 +94,12 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
   ]
 }
 
-group_with_no_dir_target_deps("core_vim3_unstable_sl4f_tests") {
-  testonly = true
-  public_deps = []
-}
-
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
   public_deps = []
 }
 
 # workbench_eng.vim3
-# Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
@@ -138,21 +116,11 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
 }
 
 # core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_sl4f_tests") {
-  testonly = true
-  public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc_preferred($host_toolchain)" ]
-}
-
 group_with_no_dir_target_deps("core_nuc_stable_tests") {
   testonly = true
   public_deps = [
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
   ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_sl4f_tests") {
-  testonly = true
-  public_deps = []
 }
 
 group_with_no_dir_target_deps("core_nuc_unstable_tests") {
@@ -161,7 +129,6 @@ group_with_no_dir_target_deps("core_nuc_unstable_tests") {
 }
 
 # workbench.nuc
-# Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
   testonly = true
   public_deps = [
@@ -190,11 +157,6 @@ group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
 
 ############################ Package groups - Start ############################
 # core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "../..:sl4f_packages" ]
-}
-
 group_with_no_dir_target_deps("core_emulator_stable_packages") {
   testonly = true
   public_deps = [
@@ -203,18 +165,12 @@ group_with_no_dir_target_deps("core_emulator_stable_packages") {
   ]
 }
 
-group_with_no_dir_target_deps("core_emulator_unstable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "../..:sl4f_packages" ]
-}
-
 group_with_no_dir_target_deps("core_emulator_unstable_packages") {
   testonly = true
   public_deps = []
 }
 
 # workbench.emulator
-# Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
   testonly = true
   public_deps = [
@@ -229,19 +185,9 @@ group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
 }
 
 # core.vim3
-group_with_no_dir_target_deps("core_vim3_stable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "../..:sl4f_packages" ]
-}
-
 group_with_no_dir_target_deps("core_vim3_stable_packages") {
   testonly = true
   public_deps = []
-}
-
-group_with_no_dir_target_deps("core_vim3_unstable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group_with_no_dir_target_deps("core_vim3_unstable_packages") {
@@ -250,7 +196,6 @@ group_with_no_dir_target_deps("core_vim3_unstable_packages") {
 }
 
 # workbench.vim3
-# Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
   testonly = true
   public_deps = []
@@ -262,19 +207,9 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
 }
 
 # core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "../..:sl4f_packages" ]
-}
-
 group_with_no_dir_target_deps("core_nuc_stable_packages") {
   testonly = true
   public_deps = []
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group_with_no_dir_target_deps("core_nuc_unstable_packages") {
@@ -283,7 +218,6 @@ group_with_no_dir_target_deps("core_nuc_unstable_packages") {
 }
 
 # workbench.nuc
-# Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
   testonly = true
   public_deps = []

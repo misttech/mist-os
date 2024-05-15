@@ -17,6 +17,7 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
+  # For local runs to test "fuchsia-controller-preferred" class
   python_mobly_test("x64_emu_test_fc_preferred") {
     main_source = "test_fuchsia_device.py"
     libraries = [
@@ -25,7 +26,6 @@ if (is_host) {
     ]
     params_source = "params_x64.yaml"
     transport = "fuchsia-controller-preferred"
-    environments = [ emu_env ]
   }
 
   python_mobly_test("x64_nuc_test_fc") {
@@ -42,6 +42,7 @@ if (is_host) {
     ]
   }
 
+  # For local runs to test "fuchsia-controller-preferred" class
   python_mobly_test("x64_nuc_test_fc_preferred") {
     main_source = "test_fuchsia_device.py"
     libraries = [
@@ -50,10 +51,6 @@ if (is_host) {
     ]
     params_source = "params_x64.yaml"
     transport = "fuchsia-controller-preferred"
-    environments = [
-      nuc7_env,
-      nuc11_env,
-    ]
   }
 
   python_mobly_test("vim3_test_fc") {
@@ -67,6 +64,7 @@ if (is_host) {
     environments = [ vim3_env ]
   }
 
+  # For local runs to test "fuchsia-controller-preferred" class
   python_mobly_test("vim3_test_fc_preferred") {
     main_source = "test_fuchsia_device.py"
     libraries = [
@@ -75,7 +73,6 @@ if (is_host) {
     ]
     params_source = "params_vim3.yaml"
     transport = "fuchsia-controller-preferred"
-    environments = [ vim3_env ]
   }
 
   # Group containing all of the fuchsia_device functional test cases.
