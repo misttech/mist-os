@@ -14,7 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
+#include <optional>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -58,7 +58,6 @@ constexpr uint8_t kRegAglEnableBitByte0 = 0x80;
 
 namespace audio {
 
-namespace audio_fidl = ::fuchsia::hardware::audio;
 namespace signal_fidl = ::fuchsia::hardware::audio::signalprocessing;
 
 // TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware.
@@ -77,6 +76,17 @@ static const audio::DaiSupportedFormats kSupportedDaiDaiFormats = {
     .bits_per_slot = kSupportedDaiBitsPerSlot,
     .bits_per_sample = kSupportedDaiBitsPerSample,
 };
+
+// Utility function to reason about the combined started/bypassed state.
+std::optional<bool> StateIsEnabled(const signal_fidl::ElementState& state) {
+  if ((state.has_started() && !state.started()) || (state.has_bypassed() && state.bypassed())) {
+    return false;
+  }
+  if (!state.has_started() || !state.has_bypassed()) {
+    return std::nullopt;
+  }
+  return true;
+}
 
 Tas58xx::Tas58xx(zx_device_t* device, ddk::I2cChannel i2c,
                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> fault_gpio)
@@ -379,12 +389,10 @@ zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::ElementState state) {
   bool has_valid_equalizer_specific_state = state.has_type_specific() &&
                                             state.type_specific().is_equalizer() &&
                                             state.type_specific().equalizer().has_band_states();
-  if (state.has_enabled() && state.enabled() && !has_valid_equalizer_specific_state) {
+  if (StateIsEnabled(state).value_or(equalizer_enabled_) && !has_valid_equalizer_specific_state) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (state.has_enabled()) {
-    equalizer_enabled_ = state.enabled();
-  }
+  equalizer_enabled_ = StateIsEnabled(state).value_or(equalizer_enabled_);
 
   // Update device control and equalizer enable before any other I2C configuration.
   zx_status_t status = ZX_OK;
@@ -453,11 +461,8 @@ zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::ElementState state) {
 }
 
 zx_status_t Tas58xx::SetAutomaticGainLimiterElement(signal_fidl::ElementState state) {
-  // If enabled is not present, then perform no operation, we keep the current state.
-  if (!state.has_enabled()) {
-    return ZX_OK;
-  }
-  bool enable_agl = state.enabled();
+  // If started and bypassed are not present, then perform no operation, we keep the current state.
+  bool enable_agl = StateIsEnabled(state).value_or(last_agl_);
 
   TRACE_DURATION_BEGIN("tas58xx", "SetAgl", "Enable AGL", enable_agl != last_agl_);
   if (enable_agl != last_agl_) {
@@ -522,7 +527,8 @@ zx_status_t Tas58xx::SetAutomaticGainLimiterElement(signal_fidl::ElementState st
             ops, std::size(ops)));
 
     signal_fidl::ElementState state;
-    state.set_enabled(enable_agl);
+    state.set_started(true);
+    state.set_bypassed(!enable_agl);
     if (agl_callback_.has_value()) {
       (*agl_callback_)(std::move(state));
       last_reported_agl_.emplace(enable_agl);
@@ -540,16 +546,16 @@ zx_status_t Tas58xx::SetGainElement(signal_fidl::ElementState state) {
   bool has_valid_gain_specific_state = state.has_type_specific() &&
                                        state.type_specific().is_gain() &&
                                        state.type_specific().gain().has_gain();
-  if (state.has_enabled()) {
-    gain_enabled_ = state.enabled();
-  }
+
+  bool new_gain_enabled = StateIsEnabled(state).value_or(gain_enabled_);
 
   if (has_valid_gain_specific_state) {
     gain_state_.gain = state.type_specific().gain().gain();
   }
 
-  if (state.has_enabled() || has_valid_gain_specific_state) {
-    zx_status_t status = SetGain(gain_enabled_ ? gain_state_.gain : 0.0f);
+  if ((new_gain_enabled != gain_enabled_) || has_valid_gain_specific_state) {
+    gain_enabled_ = new_gain_enabled;
+    zx_status_t status = SetGain(new_gain_enabled ? gain_state_.gain : 0.0f);
     if (status != ZX_OK) {
       return status;
     }
@@ -566,9 +572,9 @@ zx_status_t Tas58xx::SetGainElement(signal_fidl::ElementState state) {
 }
 
 zx_status_t Tas58xx::SetMuteElement(signal_fidl::ElementState state) {
-  if (state.has_enabled()) {
-    gain_state_.muted = state.enabled();
-    zx_status_t status = SetMute(gain_state_.muted);
+  if (auto new_muted = StateIsEnabled(state); new_muted.has_value()) {
+    gain_state_.muted = *new_muted;
+    zx_status_t status = SetMute(*new_muted);
     if (status != ZX_OK) {
       return status;
     }
@@ -591,7 +597,8 @@ void Tas58xx::WatchElementState(uint64_t processing_element_id,
     case kAglPeId:
       if (!last_reported_agl_.has_value() || last_reported_agl_.value() != last_agl_) {
         signal_fidl::ElementState state;
-        state.set_enabled(last_agl_);
+        state.set_started(true);
+        state.set_bypassed(!last_agl_);
         callback(std::move(state));
         last_reported_agl_.emplace(last_agl_);
       } else {
@@ -679,7 +686,8 @@ void Tas58xx::SendEqualizerWatchReply(
   equalizer_state.set_band_states(std::move(band_states));
   state.set_type_specific(
       signal_fidl::TypeSpecificElementState::WithEqualizer(std::move(equalizer_state)));
-  state.set_enabled(equalizer_enabled_);
+  state.set_started(true);
+  state.set_bypassed(!equalizer_enabled_);
   callback(std::move(state));
 }
 
@@ -689,14 +697,16 @@ void Tas58xx::SendGainWatchReply(
   signal_fidl::GainElementState gain_state;
   gain_state.set_gain(gain_state_.gain);
   state.set_type_specific(signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_state)));
-  state.set_enabled(gain_enabled_);
+  state.set_started(true);
+  state.set_bypassed(!gain_enabled_);
   callback(std::move(state));
 }
 
 void Tas58xx::SendMuteWatchReply(
     signal_fidl::SignalProcessing::WatchElementStateCallback callback) {
   signal_fidl::ElementState state;
-  state.set_enabled(gain_state_.muted);
+  state.set_started(true);
+  state.set_bypassed(!gain_state_.muted);
   callback(std::move(state));
 }
 

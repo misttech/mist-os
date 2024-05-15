@@ -89,6 +89,8 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
                        SetElementStateCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) override;
 
+  void MaybeCompleteWatchElementState();
+
   std::shared_ptr<Core> core_;
   bool is_input_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>

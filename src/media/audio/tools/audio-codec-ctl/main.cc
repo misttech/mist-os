@@ -44,8 +44,8 @@ Usage:
   audio-codec-ctl [-d|--device <device>] e[lements]
   audio-codec-ctl [-d|--device <device>] t[opologies]
   audio-codec-ctl [-d|--device <device>] w[atch] <id>
-  audio-codec-ctl [-d|--device <device>] set <id> [enable|disable] [gain <gain>] [latency <nsecs>]
-    [vendor <hex> <hex> ...]
+  audio-codec-ctl [-d|--device <device>] set <id> [start|stop] [bypass] [gain <gain>]
+    [latency <nsecs>] [vendor <hex> <hex> ...]
   audio-codec-ctl [-h|--help]
 )""";
 
@@ -93,11 +93,12 @@ Commands:
   e[lements]                        : Returns a vector of supported processing elements.
   t[opologies]                      : Returns a vector of supported topologies.
   w[atch] <id>                      : Get a processing element state.
-  set <id> [enable|disable] [gain <gain>] [latency <nsecs>] [vendor <hex> <hex> ...] : Controls a
-    processing element.
+  set <id> [start|stop] [bypass] [gain <gain>] [latency <nsecs>] [vendor <hex> <hex> ...] : Controls
+    a processing element.
     <id>: Processing element id.
-    enable: Process element enabled state.
-    disable: Process element disabled state.
+    start: Process element started state.
+    stop: Process element stopped state.
+    bypass: Process element bypassed state.
     <gain>: Current gain in GainType format reported in the supported processing elements vector.
     <nsecs>: Latency added to the pipeline in nanoseconds.
     <hex>: Vendor specific raw byte to feed to the processing element in hex format.
@@ -168,12 +169,12 @@ Examples:
   Get a processing element state.
   $ audio-codec-ctl w 1
   Executing on device: /dev/class/codec/706
-  fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 0, }), enabled = true, }
+  fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 0, }), started = true, }
 
   Controls a processing element.
-  $ audio-codec-ctl set 1 enable gain 1.23 vendor 0x12 0x98
+  $ audio-codec-ctl set 1 start gain 1.23 vendor 0x12 0x98
   Setting element state:
-  fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest{ processing_element_id = 1, state = fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 1.23, }), enabled = true, vendor_specific_data = [ 18, 152, ], }, }
+  fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest{ processing_element_id = 1, state = fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 1.23, }), started = true, vendor_specific_data = [ 18, 152, ], }, }
   Executing on device: /dev/class/codec/706
 
   Specify device:
@@ -187,7 +188,7 @@ Examples:
   Executing on device: /dev/class/codec/706
   fuchsia_hardware_audio::PlugState{ plugged = true, plug_state_time = 1167863520, }
 )""";
-// LINT.ThenChange(//docs/reference/tools/hardware/audio-code-ctl.md)
+// LINT.ThenChange(//docs/reference/tools/hardware/audio-codec-ctl.md)
 
 template <typename T>
 std::string ToString(const T& value) {
@@ -497,12 +498,19 @@ int main(int argc, char** argv) {
         fuchsia_hardware_audio_signalprocessing::ElementState state;
 
         if (args.size() > 0) {
-          if (args.front() == "enable") {
+          if (args.front() == "start") {
             args.pop_front();
-            state.enabled(true);
-          } else if (args.front() == "disable") {
+            state.started(true);
+          } else if (args.front() == "stop") {
             args.pop_front();
-            state.enabled(false);
+            state.started(false);
+          }
+        }
+
+        if (args.size() > 0) {
+          if (args.front() == "bypass") {
+            args.pop_front();
+            state.bypassed(true);
           }
         }
 

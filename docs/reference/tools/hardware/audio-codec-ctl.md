@@ -38,8 +38,8 @@ to play, record, and configure audio streams.
 
   audio-codec-ctl [-d|--device <device>] w[atch] <id>
 
-  audio-codec-ctl [-d|--device <device>] set <id> [enable|disable] [gain <gain>] [latency <nsecs>]
-    [vendor <hex> <hex> ...]
+  audio-codec-ctl [-d|--device <device>] set <id> [start|stop] [bypass] [gain <gain>]
+    [latency <nsecs>] [vendor <hex> <hex> ...]
 
   audio-codec-ctl [-h|--help]
 ```
@@ -200,17 +200,19 @@ Get a processing element state.
 ### `set` {#set}
 
 ```none
-  audio-codec-ctl [-d|--device <device>] set <id> [enable|disable] [gain <gain>] [latency <nsecs>]
-    [vendor <hex> <hex> ...]
+  audio-codec-ctl [-d|--device <device>] set <id> [start|stop] [bypass] [gain <gain>]
+    [latency <nsecs>] [vendor <hex> <hex> ...]
 ```
 
 Controls a processing element.
 
 `<id>`: Processing element id.
 
-`enable`: Process element enabled state.
+`start`: Process element started state.
 
-`disable`: Process element disabled state.
+`stop`: Process element stopped state.
+
+`bypass`: Process element bypassed state.
 
 `<gain>`: Current gain in GainType format reported in the supported processing elements vector.
 
@@ -322,15 +324,15 @@ Executing on device: /dev/class/codec/706
 ```none
 $ audio-codec-ctl w 1
 Executing on device: /dev/class/codec/706
-fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 0, }), enabled = true, }
+fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 0, }), started = true, }
 ```
 
 ### Controls a processing element
 
 ```none
-$ audio-codec-ctl set 1 enable gain 1.23 vendor 0x12 0x98
+$ audio-codec-ctl set 1 start gain 1.23 vendor 0x12 0x98
 Setting element state:
-fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest{ processing_element_id = 1, state = fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 1.23, }), enabled = true, vendor_specific_data = [ 18, 152, ], }, }
+fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest{ processing_element_id = 1, state = fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 1.23, }), started = true, vendor_specific_data = [ 18, 152, ], }, }
 Executing on device: /dev/class/codec/706
 ```
 

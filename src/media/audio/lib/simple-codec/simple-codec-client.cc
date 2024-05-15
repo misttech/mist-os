@@ -86,15 +86,15 @@ zx_status_t SimpleCodecClient::SetCodec(
               gain_format.gain_step = pe.type_specific().gain().min_gain_step();
             }
           }
-          // The first call from this client shouldn't block since this is a hanging-get
-          // and the first calls always has new information (no information has previously been
-          // provided).
+          // The first call from this client shouldn't block since this is a hanging-get, and the
+          // first calls always have new information (no information has previously been provided).
           const auto response = signal_processing_.sync()->WatchElementState(gain_pe_id_.value());
           if (!response.ok()) {
             return response.status();
           }
 
-          if (response->state.has_enabled() && response->state.enabled() &&
+          if (response->state.has_started() && response->state.started() &&
+              response->state.has_bypassed() && !response->state.bypassed() &&
               response->state.has_type_specific() && response->state.type_specific().is_gain() &&
               response->state.type_specific().gain().has_gain()) {
             gain_state.gain = response->state.type_specific().gain().gain();
@@ -104,29 +104,29 @@ zx_status_t SimpleCodecClient::SetCodec(
       case fuchsia_hardware_audio_signalprocessing::wire::ElementType::kMute:
         if (!mute_pe_id_.has_value()) {  // Use the first PE with mute support.
           mute_pe_id_.emplace(pe.id());
-          // The first call from this client shouldn't block since this is a hanging-get
-          // and the first calls always has new information (no information has previously been
-          // provided).
+          // The first call from this client shouldn't block since this is a hanging-get, and the
+          // first calls always have new information (no information has previously been provided).
           const auto response = signal_processing_.sync()->WatchElementState(mute_pe_id_.value());
           if (!response.ok()) {
             return response.status();
           }
           gain_format.can_mute = true;
-          gain_state.muted = response->state.has_enabled() && response->state.enabled();
+          gain_state.muted = response->state.has_started() && response->state.started() &&
+                             response->state.has_bypassed() && !response->state.bypassed();
         }
         break;
       case fuchsia_hardware_audio_signalprocessing::wire::ElementType::kAutomaticGainControl:
         if (!agc_pe_id_.has_value()) {  // Use the first PE with agc support.
           agc_pe_id_.emplace(pe.id());
-          // The first call from this client shouldn't block since this is a hanging-get
-          // and the first calls always has new information (no information has previously been
-          // provided).
+          // The first call from this client shouldn't block since this is a hanging-get, and the
+          // first calls always have new information (no information has previously been provided).
           const auto response = signal_processing_.sync()->WatchElementState(agc_pe_id_.value());
           if (!response.ok()) {
             return response.status();
           }
           gain_format.can_agc = true;
-          gain_state.agc_enabled = response->state.has_enabled() && response->state.enabled();
+          gain_state.agc_enabled = response->state.has_started() && response->state.started() &&
+                                   response->state.has_bypassed() && !response->state.bypassed();
         }
         break;
       default:
@@ -259,7 +259,7 @@ void SimpleCodecClient::SetGainState(GainState gain_state) {
   fidl::Arena allocator;
   if (gain_pe_id_.has_value()) {
     auto gain = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(allocator);
-    gain.enabled(true);
+    gain.started(true).bypassed(false);
     auto gain_parameters =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(allocator);
     gain_parameters.gain(gain_state.gain);
@@ -274,7 +274,7 @@ void SimpleCodecClient::SetGainState(GainState gain_state) {
 
   if (mute_pe_id_.has_value()) {
     auto mute = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(allocator);
-    mute.enabled(gain_state.muted);
+    mute.started(true).bypassed(!gain_state.muted);
     auto ret = signal_processing_.sync()->SetElementState(mute_pe_id_.value(), mute.Build());
     if (!ret.ok()) {
       return;
@@ -283,7 +283,7 @@ void SimpleCodecClient::SetGainState(GainState gain_state) {
 
   if (agc_pe_id_.has_value()) {
     auto agc = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(allocator);
-    agc.enabled(gain_state.agc_enabled);
+    agc.started(true).bypassed(!gain_state.agc_enabled);
     auto ret = signal_processing_.sync()->SetElementState(agc_pe_id_.value(), agc.Build());
     if (!ret.ok()) {
       return;
@@ -308,7 +308,8 @@ void SimpleCodecClient::UpdateGainAndStartHangingGet(float gain) {
           if (!result.ok()) {
             return;
           }
-          if (result->state.has_enabled() && result->state.enabled() &&
+          if (result->state.has_started() && result->state.started() &&
+              result->state.has_bypassed() && !result->state.bypassed() &&
               result->state.has_type_specific() && result->state.type_specific().is_gain() &&
               result->state.type_specific().gain().has_gain()) {
             UpdateGainAndStartHangingGet(result->state.type_specific().gain().gain());
@@ -334,7 +335,8 @@ void SimpleCodecClient::UpdateMuteAndStartHangingGet(bool mute) {
           if (!result.ok()) {
             return;
           }
-          UpdateMuteAndStartHangingGet(result->state.has_enabled() && result->state.enabled());
+          UpdateMuteAndStartHangingGet(result->state.has_started() && result->state.started() &&
+                                       result->state.has_bypassed() && !result->state.bypassed());
         });
   }
 }
@@ -356,7 +358,8 @@ void SimpleCodecClient::UpdateAgcAndStartHangingGet(bool agc) {
           if (!result.ok()) {
             return;
           }
-          UpdateAgcAndStartHangingGet(result->state.has_enabled() && result->state.enabled());
+          UpdateAgcAndStartHangingGet(result->state.has_started() && result->state.started() &&
+                                      result->state.has_bypassed() && !result->state.bypassed());
         });
   }
 }
