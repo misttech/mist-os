@@ -6,12 +6,9 @@
 
 import logging
 import statistics
-from typing import Any, Dict, Iterable, Iterator, List
+from typing import Any, Iterable, Iterator, Sequence
 
-import trace_processing.trace_metrics as trace_metrics
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
-import trace_processing.trace_utils as trace_utils
+from trace_processing import trace_metrics, trace_model, trace_utils
 
 
 _LOGGER: logging.Logger = logging.getLogger("InputLatencyMetricsProcessor")
@@ -23,8 +20,8 @@ _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
 
 
 def metrics_processor(
-    model: trace_model.Model, extra_args: Dict[str, Any]
-) -> List[trace_metrics.TestCaseResult]:
+    model: trace_model.Model, extra_args: dict[str, Any]
+) -> Sequence[trace_metrics.TestCaseResult]:
     """Computes latency from input reach to input pipeline to vsync.
 
     Args:
@@ -57,7 +54,7 @@ class InputLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> List[trace_metrics.TestCaseResult]:
+    ) -> Sequence[trace_metrics.TestCaseResult]:
         all_events: Iterator[trace_model.Event] = model.all_events()
         input_events: Iterable[trace_model.Event] = trace_utils.filter_events(
             all_events,
@@ -66,7 +63,7 @@ class InputLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             type=trace_model.DurationEvent,
         )
 
-        latencies: List[float] = []
+        latencies: list[float] = []
 
         for e in input_events:
             vsync = trace_utils.get_nearest_following_event(

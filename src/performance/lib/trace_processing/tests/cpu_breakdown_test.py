@@ -5,7 +5,6 @@
 """Unit tests for cpu_breakdown.py."""
 
 from trace_processing.metrics import cpu_breakdown
-from typing import List
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 import unittest
@@ -16,9 +15,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
     def construct_trace_model(self) -> trace_model.Model:
         model = trace_model.Model()
-        threads: List[trace_model.Thread] = []
-        for i in range(1, 5):
-            threads.append(trace_model.Thread(i, "thread-%d" % i))
+        threads = [trace_model.Thread(i, f"thread-{i}") for i in range(1, 5)]
         model.processes = [
             # Process with PID 1000 and threads with TIDs 1, 2, 3, 4.
             trace_model.Process(1000, "big_process", threads),
@@ -30,7 +27,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         # CPU 2.
         # Total time: 0 to 8000000000 = 8000 ms.
-        records_2: List[trace_model.SchedulingRecord] = [
+        records_2: list[trace_model.SchedulingRecord] = [
             # "thread-1" is active from 0 - 1500 ms, 1500 total duration.
             trace_model.ContextSwitch(
                 trace_time.TimePoint(0),
@@ -85,7 +82,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         # CPU 3.
         # Total time: 3000000000 to 6000000000 = 3000 ms.
-        records_3: List[trace_model.SchedulingRecord] = [
+        records_3: list[trace_model.SchedulingRecord] = [
             # "thread-3" (incoming) is idle; don't log it in breakdown,
             # but do log it in the total CPU duration for CPU 3.
             trace_model.ContextSwitch(
@@ -133,7 +130,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         # CPU 5.
         # Total time: 500000000 to 6000000000 = 5500
-        records_5: List[trace_model.SchedulingRecord] = []
+        records_5: list[trace_model.SchedulingRecord] = []
         # Add 5 Waking and ContextSwitch events for "thread-1" where the incoming_tid
         # is 1 and the outgoing_tid (70) is not mapped to a Thread in our Process.
         for i in range(1, 7):

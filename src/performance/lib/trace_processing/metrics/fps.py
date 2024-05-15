@@ -6,12 +6,9 @@
 
 import logging
 import statistics
-from typing import Any, Dict, Iterable, Iterator, List
+from typing import Any, Iterable, Iterator, Sequence
 
-import trace_processing.trace_metrics as trace_metrics
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
-import trace_processing.trace_utils as trace_utils
+from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger("FPSMetricsProcessor")
 _AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
@@ -23,8 +20,8 @@ _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
 # DEPRECATED: Use FpsMetricsProcessor instead.
 # TODO(b/320778225): Remove once downstream callers are migrated.
 def metrics_processor(
-    model: trace_model.Model, extra_args: Dict[str, Any]
-) -> List[trace_metrics.TestCaseResult]:
+    model: trace_model.Model, extra_args: dict[str, Any]
+) -> Sequence[trace_metrics.TestCaseResult]:
     """Computes frames per second sent to display from Scenic for the given trace.
 
     Args:
@@ -53,7 +50,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> List[trace_metrics.TestCaseResult]:
+    ) -> Sequence[trace_metrics.TestCaseResult]:
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         model = trace_utils.adjust_to_common_process_start(
@@ -70,7 +67,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
             type=trace_model.DurationEvent,
         )
 
-        vsync_events = []
+        vsync_events: list[trace_model.Event] = []
         for start in cpu_render_start_events:
             next_event = trace_utils.get_nearest_following_event(
                 start, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
@@ -80,12 +77,12 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
 
         if len(vsync_events) < 2:
             _LOGGER.info(
-                f"Less than two vsync events are present. Perhaps the trace duration"
-                f"is too short to provide fps information"
+                "Less than two vsync events are present. Perhaps the trace duration "
+                "is too short to provide fps information"
             )
             return []
 
-        fps_values: List[float] = []
+        fps_values: list[float] = []
         for i in range(len(vsync_events) - 1):
             # Two renders may be squashed into one.
             if vsync_events[i + 1].start == vsync_events[i].start:
@@ -96,7 +93,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
             )
 
         if len(fps_values) == 0:
-            _LOGGER.info(f"Not enough valid vsyncs")
+            _LOGGER.info("Not enough valid vsyncs")
             return []
 
         fps_mean: float = statistics.mean(fps_values)

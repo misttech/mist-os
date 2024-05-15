@@ -80,9 +80,7 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             json_trace_file
         )
 
-        input_latency_results: list[
-            trace_metrics.TestCaseResult
-        ] = input_latency.metrics_processor(
+        input_latency_results = input_latency.metrics_processor(
             model, {"aggregateMetricsOnly": False}
         )
 

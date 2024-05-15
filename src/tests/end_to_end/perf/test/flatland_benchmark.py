@@ -5,6 +5,7 @@
 """Flatland Benchmark."""
 
 import os
+import itertools
 import time
 from pathlib import Path
 
@@ -82,9 +83,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             json_trace_file
         )
 
-        app_render_latency_results: list[
-            trace_metrics.TestCaseResult
-        ] = app_render.metrics_processor(
+        app_render_latency_results = app_render.metrics_processor(
             model,
             {
                 "aggregateMetricsOnly": True,
@@ -92,7 +91,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             },
         )
 
-        cpu_results: list[trace_metrics.TestCaseResult] = cpu.metrics_processor(
+        cpu_results = cpu.metrics_processor(
             model, {"aggregateMetricsOnly": False}
         )
 
@@ -101,7 +100,9 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         )
 
         trace_metrics.TestCaseResult.write_fuchsiaperf_json(
-            results=app_render_latency_results + cpu_results,
+            results=itertools.chain.from_iterable(
+                (app_render_latency_results, cpu_results)
+            ),
             test_suite=f"{TEST_NAME}",
             output_path=fuchsiaperf_json_path,
         )

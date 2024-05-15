@@ -6,12 +6,9 @@
 
 import logging
 import statistics
-from typing import Any, Dict, Iterable, Iterator, List, Tuple
+from typing import Any, Iterator, Sequence, Tuple
 
-import trace_processing.trace_metrics as trace_metrics
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
-import trace_processing.trace_utils as trace_utils
+from trace_processing import trace_metrics, trace_model, trace_utils
 
 
 _LOGGER: logging.Logger = logging.getLogger("ScenicMetricsProcessor")
@@ -25,8 +22,8 @@ _DISPLAY_VSYNC_READY_EVENT_NAME: str = "Display::Fence::OnReady"
 # DEPRECATED: Use ScenicMetricsProcessor instead.
 # TODO(b/320778225): Remove once downstream callers are migrated.
 def metrics_processor(
-    model: trace_model.Model, extra_args: Dict[str, Any]
-) -> List[trace_metrics.TestCaseResult]:
+    model: trace_model.Model, extra_args: dict[str, Any]
+) -> Sequence[trace_metrics.TestCaseResult]:
     """Computes how long Scenic takes for operations for the given trace.
 
     Args:
@@ -56,7 +53,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> List[trace_metrics.TestCaseResult]:
+    ) -> Sequence[trace_metrics.TestCaseResult]:
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         model = trace_utils.adjust_to_common_process_start(
@@ -64,7 +61,9 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         )
 
         all_events: Iterator[trace_model.Event] = model.all_events()
-        scenic_start_events: List[trace_model.Event] = list(
+        # Since `filter_events()` returns an Iterator, make a local copy so we can iterate over the
+        # events more than once.
+        scenic_start_events = list(
             trace_utils.filter_events(
                 all_events,
                 category=_EVENT_CATEGORY,
@@ -72,7 +71,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
                 type=trace_model.DurationEvent,
             )
         )
-        scenic_render_events: List[trace_model.Event] = []
+        scenic_render_events: list[trace_model.Event] = []
         for e in scenic_start_events:
             following = trace_utils.get_nearest_following_event(
                 e, _EVENT_CATEGORY, _SCENIC_RENDER_EVENT_NAME
@@ -80,7 +79,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
             if following is not None:
                 scenic_render_events.append(following)
 
-        vsync_ready_events: List[trace_model.Event] = []
+        vsync_ready_events: list[trace_model.Event] = []
         for e in scenic_start_events:
             following = trace_utils.get_nearest_following_event(
                 e, _EVENT_CATEGORY, _DISPLAY_VSYNC_READY_EVENT_NAME
@@ -90,12 +89,12 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
 
         if len(scenic_render_events) < 1 or len(vsync_ready_events) < 1:
             _LOGGER.info(
-                f"No render or vsync events are present. Perhaps the trace duration"
-                f"is too short to provide scenic render information"
+                "No render or vsync events are present. Perhaps the trace duration "
+                "is too short to provide scenic render information"
             )
             return []
 
-        cpu_render_times: List[float] = []
+        cpu_render_times: list[float] = []
         for start_event, render_event in zip(
             scenic_start_events, scenic_render_events
         ):
@@ -115,7 +114,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         cpu_render_mean: float = statistics.mean(cpu_render_times)
         _LOGGER.info(f"Average CPU render time: {cpu_render_mean} ms")
 
-        total_render_times: List[float] = []
+        total_render_times: list[float] = []
         for start_event, vsync_event in zip(
             scenic_start_events, vsync_ready_events
         ):
@@ -128,12 +127,12 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         total_render_mean: float = statistics.mean(total_render_times)
         _LOGGER.info(f"Average Total render time: {total_render_mean} ms")
 
-        metrics_list: List[Tuple[str, List[float]]] = [
+        metrics_list: list[Tuple[str, list[float]]] = [
             ("RenderCpu", cpu_render_times),
             ("RenderTotal", total_render_times),
         ]
 
-        test_case_results: List[trace_metrics.TestCaseResult] = []
+        test_case_results: list[trace_metrics.TestCaseResult] = []
         for name, values in metrics_list:
             if self.aggregates_only:
                 test_case_results.extend(

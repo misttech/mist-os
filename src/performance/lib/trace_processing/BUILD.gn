@@ -18,6 +18,7 @@ python_library("trace_processing") {
     "metrics/cpu_breakdown.py",
     "metrics/fps.py",
     "metrics/input_latency.py",
+    "metrics/power.py",
     "metrics/scenic.py",
     "trace_importing.py",
     "trace_metrics.py",
@@ -51,7 +52,7 @@ python_binary("run_cpu_breakdown_bin") {
 }
 
 # Rename the resulting .pyz for the host tool
-copy("copy") {
+copy("copy_cpu_breakdown_pyz") {
   testonly = true
   deps = [ ":run_cpu_breakdown_bin" ]
   sources = [ "${target_out_dir}/run_cpu_breakdown.pyz" ]
@@ -60,6 +61,28 @@ copy("copy") {
 
 install_host_tools("run_cpu_breakdown") {
   testonly = true
-  deps = [ ":copy" ]
+  deps = [ ":copy_cpu_breakdown_pyz" ]
   outputs = [ "run_cpu_breakdown" ]
+}
+
+python_binary("run_power_metrics_bin") {
+  testonly = true
+  main_source = "run_power_metrics.py"
+  deps = [ ":trace_processing" ]
+  enable_mypy = true
+  output_name = "run_power_metrics.pyz"
+}
+
+# Rename the resulting .pyz for the host tool
+copy("copy_power_metrics_pyz") {
+  testonly = true
+  deps = [ ":run_power_metrics_bin" ]
+  sources = [ "${target_out_dir}/run_power_metrics.pyz" ]
+  outputs = [ "${root_out_dir}/run_power_metrics" ]
+}
+
+install_host_tools("run_power_metrics") {
+  testonly = true
+  deps = [ ":copy_power_metrics_pyz" ]
+  outputs = [ "run_power_metrics" ]
 }
