@@ -11,6 +11,7 @@ use {
     futures::{
         channel::oneshot,
         future::{join_all, BoxFuture, FutureExt},
+        select,
     },
     std::collections::HashMap,
     std::sync::{Arc, Mutex},
@@ -132,7 +133,17 @@ impl ActionSet {
             }
             _ = join_all(prereqs).await;
             let key = action.key();
-            let res = action.handle(component).await;
+            let mut action_fut = action.handle(component.clone()).fuse();
+            let mut timer = fasync::Timer::new(std::time::Duration::from_secs(300)).fuse();
+            let res = select! {
+                res = action_fut => {
+                    res
+                }
+                _ = timer => {
+                    tracing::warn!("action {:?} has been running for over 5 minutes on component {}", key, component.moniker);
+                    action_fut.await
+                }
+            };
             action_set_clone.lock().unwrap().finish(&key);
             res
         }
