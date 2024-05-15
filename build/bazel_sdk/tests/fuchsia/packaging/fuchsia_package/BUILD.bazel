@@ -35,6 +35,29 @@ fuchsia_package_checker_test(
 )
 
 fuchsia_package_checker_test(
+    name = "cc_test_pkg_test",
+    package_name = "test_pkg_for_test",
+    size = "small",
+    expected_abi_revision = HEAD_ABI_REVISION,
+    expected_blobs_to_file_names = {
+        "bin/cc_test": "cc_test_native_stripped",
+        "data/text_file.txt": "text_file.txt",
+
+        # Common files that should automatically be added
+        "lib/ld.so.1": "ld.so.1_stripped",
+        "lib/libc++.so.2": "libc++.so.2_stripped",
+        "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
+        "lib/libunwind.so.1": "libunwind.so.1_stripped",
+    },
+    manifests = [
+        "meta/cc_component.cm",
+        "meta/empty_component.cm",
+    ],
+    package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:test_pkg",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_package_checker_test(
     name = "subpkg_test",
     package_name = "pkg_with_subpkg_for_test",
     size = "small",

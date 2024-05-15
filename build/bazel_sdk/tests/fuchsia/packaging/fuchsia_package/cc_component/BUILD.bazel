@@ -2,7 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_cc_binary", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_binary",
+    "fuchsia_cc_test",
+    "fuchsia_component",
+    "fuchsia_component_manifest",
+    "fuchsia_package",
+    "fuchsia_package_resource",
+    "fuchsia_test_component",
+    "fuchsia_test_package",
+)
 load("//test_utils:make_file.bzl", "make_file")
 
 fuchsia_package(
@@ -23,6 +33,20 @@ fuchsia_package(
     components = [":empty_component"],
     fuchsia_api_level = "HEAD",
     subpackages = [":pkg"],
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_test_package(
+    name = "test_pkg",
+    package_name = "test_pkg_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = "HEAD",
+    resources = [":simple_file_resource"],
+    test_components = [
+        ":cc_test_component",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -61,6 +85,36 @@ fuchsia_component(
     manifest = ":manifest",
     deps = [
         ":cc_bin",
+    ],
+)
+
+# Note: the test package contains a fuchsia_cc_test()
+# that depends on a non-testonly cc_library() to demontrate
+# the issue that requires adding
+# --experimental_retain_test_configuration_across_testonly
+# to every project .bazelrc :-(
+make_file(
+    name = "cc_lib_src",
+    content = "int what() { return 42; } \n",
+    filename = "lib.cc",
+)
+
+cc_library(
+    name = "cc_lib",
+    srcs = [":cc_lib_src"],
+)
+
+fuchsia_cc_test(
+    name = "cc_test",
+    srcs = [":cc_main"],
+    deps = [":cc_lib"],
+)
+
+fuchsia_test_component(
+    name = "cc_test_component",
+    manifest = ":manifest",
+    deps = [
+        ":cc_test",
     ],
 )
 
