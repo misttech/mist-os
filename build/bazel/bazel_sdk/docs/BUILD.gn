@@ -5,13 +5,13 @@
 import("//tools/bazel-docgen/bazel_docgen.gni")
 
 # Create documentation for the Bazel SDK rules
-if (is_host) {
-  # The following are the public APIs that we are exposing
-  extract_bazel_doc_textproto("licenses") {
-    bazel_target = "//build/bazel/bazel_sdk/docs:licenses"
-  }
+# The following are the public APIs that we are exposing
+extract_bazel_doc_textproto("licenses") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:licenses"
+}
 
-  bazel_docgen("docs") {
-    textproto_targets = [ ":licenses" ]
-  }
+bazel_docgen("docs") {
+  docset_name = "bazel_sdk"
+  textproto_targets = [ ":licenses" ]
+  reference_repo_path = "sdk/bazel_sdk"
 }
