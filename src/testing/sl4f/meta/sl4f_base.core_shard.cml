@@ -179,7 +179,7 @@
         },
         {
             protocol: "fuchsia.weave.FactoryDataManager",
-            from: "#weave_auth",
+            from: "#trusted-apps/trusted-app-capabilities",
             to: "#sl4f",
             source_availability: "unknown",
         },

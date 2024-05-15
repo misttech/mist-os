@@ -34,7 +34,7 @@
                 "fuchsia.weave.FactoryDataManager",
                 "fuchsia.weave.Signer",
             ],
-            from: "#weave_auth",
+            from: "#trusted-apps/trusted-app-capabilities",
             to: "#weavestack",
         },
         {

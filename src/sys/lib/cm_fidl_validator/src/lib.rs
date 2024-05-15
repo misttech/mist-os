@@ -2376,7 +2376,7 @@ impl<'a> ValidationContext<'a> {
                 self.validate_child_ref(decl, "source", &child, offer_type);
             }
             // These sources don't.
-            (Some(fdecl::Ref::VoidType(_)), None) => {}
+            (Some(fdecl::Ref::VoidType(_)), _) => {}
             (Some(fdecl::Ref::Framework(_)), None) => {}
             (Some(fdecl::Ref::Capability(c)), None) => {
                 self.validate_source_capability(c, decl, "source");
