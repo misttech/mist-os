@@ -155,6 +155,7 @@ fn build_ssh_args<W: Write>(
         (8888, 8888, "UMA Log"),
         // Some targets use Fastboot over TCP which listens on 5554
         (5554, 5554, "Fastboot over TCP"),
+        (5555, 5555, "Android ADB"),
     ];
 
     let mut res: Vec<String> = vec![
@@ -278,7 +279,7 @@ mod test {
         };
 
         let mut writer = vec![];
-        let got = build_ssh_args(&mut writer, target, "/foo", vec![8081], vec![5555])?;
+        let got = build_ssh_args(&mut writer, target, "/foo", vec![8081], vec![5556])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily any",
@@ -296,6 +297,7 @@ mod test {
             "-o RemoteForward 8888 [ff00::]:8888",
             "-o RemoteForward 5554 [ff00::]:5554",
             "-o RemoteForward 5555 [ff00::]:5555",
+            "-o RemoteForward 5556 [ff00::]:5556",
             "-o LocalForward *:8081 localhost:8081",
         ];
 
@@ -312,7 +314,8 @@ mod test {
   * Remote Host port 9080 --> Target port 80 [ SL4F ]
   * Remote Host port 8888 --> Target port 8888 [ UMA Log ]
   * Remote Host port 5554 --> Target port 5554 [ Fastboot over TCP ]
-  * Remote Host port 5555 --> Target port 5555   [ User Defined ]
+  * Remote Host port 5555 --> Target port 5555 [ Android ADB ]
+  * Remote Host port 5556 --> Target port 5556   [ User Defined ]
   * Local Host port 8081 --> Cloudtop port 8081 [ Repository ]
 "#
             .to_string()
@@ -353,6 +356,7 @@ mod test {
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
             "-o RemoteForward 5554 [ff00::]:5554",
+            "-o RemoteForward 5555 [ff00::]:5555",
             "-o LocalForward *:8081 localhost:8081",
         ];
 
@@ -393,6 +397,7 @@ mod test {
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
             "-o RemoteForward 5554 [ff00::]:5554",
+            "-o RemoteForward 5555 [ff00::]:5555",
             "-o LocalForward *:8081 localhost:8081",
             "-o LocalForward *:8085 localhost:8085",
         ];
