@@ -37,10 +37,6 @@ template("cuckoo_product_assembly_config") {
       storage = {
         filesystems = invoker.filesystems
       }
-      development_support = {
-        authorized_ssh_keys_path =
-            rebase_path("//.ssh/pkey.pub", root_build_dir)
-      }
     }
     product = {
     }

@@ -563,11 +563,6 @@ group("checkout_artifacts.metadata") {
         path = rebase_path("//.ssh/authorized_keys", root_build_dir)
         type = "txt"
       },
-      {
-        name = "ssh_private_key"
-        path = rebase_path("//.ssh/pkey", root_build_dir)
-        type = "txt"
-      },
     ]
   }
 }
