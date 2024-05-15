@@ -7,12 +7,13 @@ import logging
 import os
 import pathlib
 import re
+import stat
 import subprocess
 import time
+from importlib.resources import as_file, files
 from typing import Any, Iterable, Self
 
-import perf_publish.metrics_allowlist as metrics_allowlist
-import perf_publish.summarize as summarize
+from perf_publish import data, metrics_allowlist, summarize
 from perf_test_utils import utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -255,15 +256,14 @@ class CatapultConverter:
 
     def run(self) -> None:
         """Publishes the given metrics."""
-        converter_path = os.path.join(
-            self._runtime_deps_dir, "catapult_converter"
-        )
-        args = self._args()
-        _LOGGER.info(f'Performance: Running {converter_path} {" ".join(args)}')
-        self._subprocess_check_call([str(converter_path)] + args)
-        _LOGGER.info(
-            f"Conversion to catapult results format completed. Output file: {self._output_file}"
-        )
+        with as_file(files(data).joinpath("catapult_converter")) as f:
+            f.chmod(f.stat().st_mode | stat.S_IEXEC)
+            args = self._args()
+            _LOGGER.info(f'Performance: Running {f} {" ".join(args)}')
+            self._subprocess_check_call([str(f)] + args)
+            _LOGGER.info(
+                f"Conversion to catapult results format completed. Output file: {self._output_file}"
+            )
 
     def _check_fuchsia_perf_metrics_naming(
         self,

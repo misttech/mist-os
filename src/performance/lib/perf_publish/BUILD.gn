@@ -14,7 +14,12 @@ python_library("perf_publish") {
     "publish.py",
     "summarize.py",
   ]
-  library_deps = [ "//src/performance/lib/py_test_utils:perf_test_utils" ]
+  library_deps = [
+    "//src/performance/lib/py_test_utils:perf_test_utils",
+    "//src/testing/catapult_converter:converter_bin",
+  ]
+  data_package_name = "data"
+  data_sources = [ "${root_out_dir}/catapult_converter" ]
 }
 
 group("tests") {
