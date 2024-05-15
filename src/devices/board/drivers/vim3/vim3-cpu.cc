@@ -71,11 +71,24 @@ constexpr amlogic_cpu::operating_point_t operating_points[] = {
 };
 // clang-format on
 
-// Note: relative_performance are placeholder values to indicate that the a53 is lower
-//       performance than the a73. They currently do not represent the true relative performace
-//       of the two cores.
+// Note: Relative performance was obtained by running `sysbench` with the task sequentially
+//       pinned to each core with the following results*:
+//       Core 0 - A53:  886 e/s
+//       Core 1 - A53:  886 e/s
+//       Core 2 - A73: 2020 e/s
+//       Core 3 - A73: 2020 e/s
+//       Core 4 - A73: 2020 e/s
+//       Core 5 - A73: 2020 e/s
+// The fastest core always has a relative performance of 255 and lesser cores have a performance
+// that's a fraction of the fastest core's which gives the following derivation:
+//
+//  -> 886 / 2020 = x / 255
+//  -> x ~= 112
+//
+// * This data was obtained with all cores running at the fastest operating point.
+
 constexpr amlogic_cpu::perf_domain_t performance_domains[] = {
-    {.id = kPdArmA53, .core_count = 2, .relative_performance = 127, .name = "a311d-arm-a53"},
+    {.id = kPdArmA53, .core_count = 2, .relative_performance = 112, .name = "a311d-arm-a53"},
     {.id = kPdArmA73, .core_count = 4, .relative_performance = 255, .name = "a311d-arm-a73"},
 };
 
