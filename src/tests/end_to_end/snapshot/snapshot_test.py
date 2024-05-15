@@ -12,57 +12,46 @@ import json
 import logging
 import os
 import tempfile
-import time
-import typing
 import zipfile
 
-from typing import Dict, Any, List
-from mobly import asserts, test_runner
 from fuchsia_base_test import fuchsia_base_test
+from honeydew.interfaces.device_classes.fuchsia_device import FuchsiaDevice
+from mobly import asserts, test_runner
+from perf_utils.utils import FuchsiaPerfResults
+from typing import Dict, Any, List
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+_SNAPSHOT_ZIP = "snapshot_test.zip"
+_TEST_SUITE = "fuchsia.test.diagnostics"
 
 
-class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):
-    def setup_class(self) -> None:
-        """Initialize all DUT(s)"""
-        super().setup_class()
-        self.fuchsia_dut = self.fuchsia_devices[0]
+class SnapshotPerfResults(FuchsiaPerfResults[None, None]):
+    def __init__(self, device: FuchsiaDevice):
+        self._device = device
 
-    def test_snapshot(self) -> None:
-        # Get a device snapshot and extract the inspect.json file.
-        time_ns: list[int] = []
-        for _ in range(self.user_params["repeat_count"]):
-            with tempfile.TemporaryDirectory() as td:
-                file_name = "snapshot_test.zip"
-                start = time.monotonic_ns()
-                self.fuchsia_dut.snapshot(td, file_name)
-                dur = time.monotonic_ns() - start
-                time_ns.append(dur)
+    def pre_action(self) -> None:
+        self._directory = tempfile.TemporaryDirectory()
 
-                final_path = os.path.join(td, file_name)
-                stat = os.stat(final_path)
-                _LOGGER.info(
-                    "Snapshot is %d bytes, took %.3f seconds",
-                    stat.st_size,
-                    (dur / 1e9),
-                )
+    def action(self, _: None) -> None:
+        self._device.snapshot(self._directory.name, _SNAPSHOT_ZIP)
 
-                with zipfile.ZipFile(final_path) as zf:
-                    # IMPORTANT: the exact contents of these files should not be verified. We just
-                    # want to assert that they exist and are not empty.
-                    self._validate_non_empty_files(
-                        zf,
-                        [
-                            "annotations.json",
-                            "build.snapshot.xml",
-                            "log.system.txt",
-                            "log.kernel.txt",
-                            "metadata.json",
-                        ],
-                    )
-                    self._validate_inspect(zf)
-        self._record_fuchsiaperf(time_ns)
+    def post_action(self, _: None) -> None:
+        final_path = os.path.join(self._directory.name, _SNAPSHOT_ZIP)
+        with zipfile.ZipFile(final_path) as zf:
+            # IMPORTANT: the exact contents of these files should not be verified. We just
+            # want to assert that they exist and are not empty.
+            self._validate_non_empty_files(
+                zf,
+                [
+                    "annotations.json",
+                    "build.snapshot.xml",
+                    "log.system.txt",
+                    "log.kernel.txt",
+                    "metadata.json",
+                ],
+            )
+            self._validate_inspect(zf)
+        self._directory.cleanup()
 
     def _validate_non_empty_files(
         self, zf: zipfile.ZipFile, filenames: List[str]
@@ -99,18 +88,18 @@ class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):
             "Archivist did not return OK status",
         )
 
-    def _record_fuchsiaperf(self, time_ns: list[int]) -> None:
-        fuchsiaperf_data = [
-            {
-                "test_suite": "fuchsia.test.snapshot",
-                "label": "SnapshotDuration",
-                "values": time_ns,
-                "unit": "ns",
-            },
-        ]
-        test_perf_file = os.path.join(self.log_path, "results.fuchsiaperf.json")
-        with open(test_perf_file, "w") as f:
-            json.dump(fuchsiaperf_data, f, indent=4)
+
+class SnapshotTest(fuchsia_base_test.FuchsiaBaseTest):
+    def setup_class(self) -> None:
+        super().setup_class()
+        self._fuchsia_device = self.fuchsia_devices[0]
+        self._repetitions = self.user_params["repeat_count"]
+
+    def test_snapshot(self) -> None:
+        """Get a device snapshot and extract the inspect.json file."""
+        SnapshotPerfResults(self._fuchsia_device).execute(
+            _TEST_SUITE, "Snapshot", self.test_case_path, self._repetitions
+        )
 
 
 if __name__ == "__main__":
