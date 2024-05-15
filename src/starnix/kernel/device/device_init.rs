@@ -4,12 +4,15 @@
 
 use crate::{
     device::{
-        device_mapper::create_device_mapper, kobject::DeviceMetadata,
-        loop_device::create_loop_control_device, mem::DevRandom, simple_device_ops, DeviceMode,
-    },
-    device::{
-        device_mapper::device_mapper_init, loop_device::loop_device_init, mem::mem_device_init,
+        device_mapper::{create_device_mapper, device_mapper_init},
+        kobject::DeviceMetadata,
+        loop_device::create_loop_control_device,
+        loop_device::loop_device_init,
+        mem::mem_device_init,
+        mem::DevRandom,
+        simple_device_ops,
         zram::zram_device_init,
+        DeviceMode,
     },
     fs::devpts::tty_device_init,
     fs::sysfs::DeviceDirectory,

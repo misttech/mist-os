@@ -5,7 +5,7 @@
 use crate::{
     device::{
         loop_device::loop_device_init, mem::mem_device_init, misc::misc_device_init,
-        zram::zram_device_init,
+        remote_block_device::remote_block_device_init, zram::zram_device_init,
     },
     fs::devpts::tty_device_init,
     task::CurrentTask,
@@ -22,5 +22,6 @@ pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &Curr
     mem_device_init(locked, system_task);
     tty_device_init(locked, system_task);
     loop_device_init(locked, system_task);
+    remote_block_device_init(locked, system_task);
     zram_device_init(locked, system_task);
 }

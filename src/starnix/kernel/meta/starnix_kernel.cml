@@ -56,6 +56,7 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.VmexResource",
+                "fuchsia.recovery.FactoryReset",
             ],
             from: "parent",
         },
@@ -175,6 +176,20 @@
         startup_file_path: {
             type: "string",
             max_size: 1024,
+        },
+
+        // The remote block devices which get created when the container is created.
+        // The format is:
+        //   ${blk_name}:${blk_size}
+        // A RW block device is made available at /dev/remoteblk-${blk_name} in the Starnix
+        // namespace.  Note that the block device is not persistent at this time.
+        remote_block_devices: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
         },
     },
 }

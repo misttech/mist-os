@@ -1388,6 +1388,11 @@ impl Zxio {
         let status = unsafe { zxio::zxio_allocate(self.as_ptr(), offset, len, mode.bits()) };
         zx::ok(status)
     }
+
+    pub fn sync(&self) -> Result<(), zx::Status> {
+        let status = unsafe { zxio::zxio_sync(self.as_ptr()) };
+        zx::ok(status)
+    }
 }
 
 impl Drop for Zxio {

@@ -93,6 +93,11 @@
             to: [ "#starnix_runner" ],
         },
         {
+            protocol: [ "fuchsia.recovery.FactoryReset" ],
+            from: "#factory_reset",
+            to: [ "#starnix_runner" ],
+        },
+        {
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",

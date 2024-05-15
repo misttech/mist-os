@@ -61,6 +61,7 @@
                 "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
+                "fuchsia.recovery.FactoryReset",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",

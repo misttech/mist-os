@@ -4,9 +4,11 @@
 
 use crate::{
     device::{
+        android::bootloader_message_store::AndroidBootloaderMessageStore,
         device_mapper::DeviceMapperRegistry,
         framebuffer::{AspectRatio, Framebuffer},
         loop_device::LoopDeviceRegistry,
+        remote_block_device::RemoteBlockDeviceRegistry,
         sync_fence_registry::SyncFenceRegistry,
         BinderDevice, DeviceMode, DeviceRegistry,
     },
@@ -135,6 +137,15 @@ pub struct Kernel {
 
     /// The registry of active device mapper devices.
     pub device_mapper_registry: Arc<DeviceMapperRegistry>,
+
+    /// The registry of block devices backed by a remote fuchsia.io file.
+    pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
+
+    /// If a remote block device named "misc" is created, keep track of it; this is used by Android
+    /// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
+    /// for Android, we need to be able to peek into these messages.
+    /// Note that this might never be initialized (if the "misc" device never gets registered).
+    pub bootloader_message_store: OnceCell<AndroidBootloaderMessageStore>,
 
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
@@ -325,6 +336,8 @@ impl Kernel {
             container_data_dir,
             loop_device_registry: Default::default(),
             device_mapper_registry: Default::default(),
+            remote_block_device_registry: Default::default(),
+            bootloader_message_store: OnceCell::new(),
             framebuffer,
             sync_fence_registry: SyncFenceRegistry::new(),
             binders: Default::default(),

@@ -300,6 +300,49 @@ where
     Ok((mount_point.into(), fs))
 }
 
+fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
+    if block_size_str.is_empty() {
+        return Err(anyhow!("Invalid empty block size"));
+    }
+    let (mut string, suffix) = block_size_str.split_at(block_size_str.len() - 1);
+    let multiplier: u64 = match suffix {
+        "K" => 1024,
+        "M" => 1024 * 1024,
+        "G" => 1024 * 1024 * 1024,
+        _ => {
+            string = block_size_str;
+            1
+        }
+    };
+    u64::from_str_radix(string, 10)
+        .map_err(|_| anyhow!("Invalid block size {string}"))
+        .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
+}
+
+pub fn create_remote_block_device_from_spec<'a, L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    spec: &'a str,
+) -> Result<(), Error>
+where
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
+{
+    let mut iter = spec.splitn(2, ':');
+    let device_name =
+        iter.next().ok_or_else(|| anyhow!("remoteblk name is missing from {:?}", spec))?;
+    let device_size =
+        iter.next().ok_or_else(|| anyhow!("remoteblk size is missing from {:?}", spec))?;
+    let device_size = parse_block_size(device_size)?;
+
+    current_task.kernel().remote_block_device_registry.create_remote_block_device_if_absent(
+        locked,
+        current_task,
+        device_name,
+        device_size,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

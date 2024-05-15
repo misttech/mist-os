@@ -12,9 +12,11 @@ use magma_device::magma_device_init;
 use selinux::security_server;
 use starnix_core::{
     device::{
+        android::bootloader_message_store::android_bootloader_message_store_init,
         ashmem::ashmem_device_init,
         framebuffer::{fb_device_init, AspectRatio},
         perfetto_consumer::start_perfetto_consumer_thread,
+        remote_block_device::remote_block_device_init,
     },
     task::{CurrentTask, Kernel, KernelFeatures},
     vfs::FsString,
@@ -59,6 +61,8 @@ pub struct Features {
     pub aspect_ratio: Option<AspectRatio>,
 
     pub perfetto: Option<FsString>,
+
+    pub android_fdr: bool,
 }
 
 /// Parses all the featurse in `entries`.
@@ -70,6 +74,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
+            ("android_fdr", _) => features.android_fdr = true,
             ("android_serialno", _) => features.android_serialno = true,
             ("aspect_ratio", Some(args)) => {
                 let e = anyhow!("Invalid aspect_ratio: {:?}", args);
@@ -211,6 +216,10 @@ pub fn run_container_features(
     }
     if !enabled_profiling {
         fuchsia_inspect_contrib::stop_self_profiling();
+    }
+    if features.android_fdr {
+        android_bootloader_message_store_init(locked, system_task);
+        remote_block_device_init(locked, system_task);
     }
 
     Ok(())

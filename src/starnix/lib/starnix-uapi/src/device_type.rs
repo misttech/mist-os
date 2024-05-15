@@ -14,6 +14,7 @@ pub const FB_MAJOR: u32 = 29;
 // devices.txt.
 pub const DYN_MAJOR: u32 = 234;
 
+pub const REMOTE_BLOCK_MAJOR: u32 = 251;
 // Unclear if this device number is assigned dynamically, but this value is what abarth observed
 // once for /dev/block/zram0.
 pub const ZRAM_MAJOR: u32 = 252;
