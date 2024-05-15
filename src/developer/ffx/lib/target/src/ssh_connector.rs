@@ -11,7 +11,6 @@ use nix::sys::signal::{kill, Signal::SIGKILL};
 use nix::sys::wait::waitpid;
 use nix::unistd::Pid;
 use std::fmt::Debug;
-use std::future::Future;
 use std::net::SocketAddr;
 use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,12 +18,12 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 
 #[derive(Debug)]
-pub struct SshConnector {
+pub(crate) struct SshConnector {
     pub(crate) cmd: Child,
 }
 
 impl SshConnector {
-    pub async fn new(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
+    pub(crate) async fn new(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
         let rev: u64 =
             version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
         let abi_revision = format!("{}", rev);
@@ -50,8 +49,10 @@ impl SshConnector {
         let ssh = ssh_cmd.spawn()?;
         Ok(Self { cmd: ssh })
     }
+}
 
-    async fn connect_impl(&mut self) -> Result<OvernetConnection> {
+impl OvernetConnector for SshConnector {
+    async fn connect(&mut self) -> Result<OvernetConnection> {
         let mut stdout = BufReader::with_capacity(
             BUFFER_SIZE,
             self.cmd.stdout.take().expect("process should have stdout"),
@@ -81,12 +82,6 @@ impl SshConnector {
             compat,
             main_task,
         })
-    }
-}
-
-impl OvernetConnector for SshConnector {
-    fn connect(&mut self) -> impl Future<Output = Result<OvernetConnection>> {
-        self.connect_impl()
     }
 }
 

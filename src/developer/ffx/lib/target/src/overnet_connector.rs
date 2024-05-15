@@ -13,11 +13,11 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite, BufReader};
 
 pub(crate) const BUFFER_SIZE: usize = 65536;
 
-pub trait OvernetConnector: Debug {
-    fn connect(&mut self) -> impl Future<Output = Result<OvernetConnection>>;
+pub(crate) trait OvernetConnector: Debug {
+    async fn connect(&mut self) -> Result<OvernetConnection>;
 }
 
-pub struct OvernetConnection {
+pub(crate) struct OvernetConnection {
     // Currently because of the implementation of ffx_ssh::parse::parse_ssh_output's
     // implementation, this needs to be a buffered reader.
     pub(crate) output: Box<dyn AsyncBufRead + Unpin>,
