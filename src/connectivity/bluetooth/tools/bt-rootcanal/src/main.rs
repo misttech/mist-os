@@ -9,6 +9,7 @@ use {
     },
     fidl_fuchsia_hardware_bluetooth::VirtualControllerMarker,
     fuchsia_async::{self as fasync, net::TcpStream},
+    fuchsia_bluetooth::constants::DEV_DIR,
     fuchsia_component::server::ServiceFs,
     fuchsia_fs::OpenFlags,
     fuchsia_sync::Mutex,
@@ -75,8 +76,9 @@ async fn channel_reader(
 
 /// Opens the virtual loopback device, creates a channel to pass to it and returns that channel.
 async fn open_virtual_device(control_device: &str) -> Result<fasync::Channel, Error> {
-    let dev_directory = fuchsia_fs::directory::open_in_namespace("/dev", OpenFlags::RIGHT_READABLE)
-        .expect("unable to open directory");
+    let dev_directory =
+        fuchsia_fs::directory::open_in_namespace(DEV_DIR, OpenFlags::RIGHT_READABLE)
+            .expect("unable to open directory");
 
     let controller = device_watcher::recursive_wait_and_open::<VirtualControllerMarker>(
         &dev_directory,

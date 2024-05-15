@@ -14,7 +14,7 @@ use fidl_fuchsia_hardware_bluetooth::{
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_bluetooth::constants::{
-    HCI_DEVICE_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT,
+    DEV_DIR, HCI_DEVICE_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT,
 };
 use fuchsia_zircon as zx;
 use futures::TryFutureExt as _;
@@ -217,7 +217,7 @@ impl TestDevice {
         let directory = device_watcher::wait_for_device_with(
             &emulator_dir,
             |device_watcher::DeviceInfo { filename, topological_path }| {
-                let topological_path = topological_path.strip_prefix("/dev")?;
+                let topological_path = topological_path.strip_prefix(DEV_DIR)?;
                 let topological_path = topological_path.strip_prefix('/')?;
                 let topological_path = topological_path.strip_prefix(emulator_device_path)?;
                 let topological_path = topological_path.strip_prefix('/')?;
