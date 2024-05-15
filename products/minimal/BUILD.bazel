@@ -76,6 +76,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
     virtual_devices = [
         ":minimal_emu",
     ],
@@ -103,6 +104,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(
@@ -127,6 +129,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:qemu-x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(
@@ -174,6 +177,7 @@ fuchsia_product_bundle(
     product_bundle_name = "fuchsia",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(
@@ -198,4 +202,5 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:riscv64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
