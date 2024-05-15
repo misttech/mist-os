@@ -25,6 +25,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sysmem/Allocator.ConnectToSysmem2Allocator",
+        "strictness": "strict",
+        "ordinal": "89425358036413988",
+        "direction": "one_way",
+        "request": "fuchsia.sysmem/AllocatorConnectToSysmem2AllocatorRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sysmem/Allocator.SetDebugClientInfo",
         "strictness": "strict",
         "ordinal": "4728512819068308262",
@@ -83,6 +91,17 @@
     {
         "kind": "struct",
         "name": "fuchsia.sysmem/AllocatorBindSharedCollectionRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysmem/AllocatorConnectToSysmem2AllocatorRequest.allocator_request",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.sysmem2/Allocator"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sysmem/AllocatorConnectToSysmem2AllocatorRequest",
         "resourceness": "resource"
     },
     {

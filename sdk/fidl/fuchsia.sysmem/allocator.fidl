@@ -148,7 +148,7 @@ closed protocol Allocator {
     ///
     /// The info set via `SetDebugClientInfo` (if any) is copied to the sysmem2
     /// `Allocator`.
-    @available(added=HEAD)
+    @available(added=20)
     strict ConnectToSysmem2Allocator(resource struct {
         allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
