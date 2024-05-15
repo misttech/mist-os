@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../lib/vars.sh || exit $?
+source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
 
 BT_FILE_DEPS=(
   "prebuilt/third_party/jq/${HOST_PLATFORM}/bin/jq"
@@ -26,6 +27,15 @@ BT_SET_UP() {
   local _BUILD_DIR="out/default"
   echo "${_BUILD_DIR}" > "${BT_TEMP_DIR}/.fx-build-dir"
   _create_build_dir "$_BUILD_DIR"
+
+  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  btf::make_mock "${BT_TEMP_DIR}/tools/devshell/host-tool"
+  cat > "${BT_TEMP_DIR}/tools/devshell/host-tool.mock_side_effects" <<EOF
+    if [[ "\$2" == "ffx" ]]; then
+      shift
+      "${ffx}" "\$@"
+    fi
+EOF
 }
 
 _create_build_dir() {
@@ -398,32 +408,19 @@ TEST_fx-caller() {
 }
 
 TEST_get-ssh-components() {
-  local manifest="${BT_TEMP_DIR}/.fx-ssh-path"
-  # no manifest
-  BT_EXPECT_FILE_DOES_NOT_EXIST "${manifest}"
-  BT_EXPECT_FAIL get-ssh-privkey 2>/dev/null
+    cat >"${ffx}.mock_side_effects" <<INPUT
+if [[ "\$3" == "ssh.pub" ]]; then
+  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
+elif [[ "\$3" == "ssh.priv" ]]; then
+  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_private"
+fi
+INPUT
 
-  # invalid manifest
-  touch "${manifest}"
-  BT_EXPECT_FAIL get-ssh-privkey 2>/dev/null
+  local privkey="${BT_TEMP_DIR}/.ssh/fuchsia_private"
+  local authkey="${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 
-  local privkey="${BT_TEMP_DIR}/custom_ssh_privkey"
-  local authkey="${BT_TEMP_DIR}/custom_ssh_authkey"
-
-  # manifest points to non-existent file
-  echo -e "${privkey}\n${authkey}" > "${manifest}"
-
-  # should fail
-  BT_EXPECT_FAIL get-ssh-privkey >/dev/null 2>&1
-
-  # but even failing because files don't exist, it should still print the filenames
   BT_EXPECT_EQ "$(get-ssh-privkey 2>/dev/null)" "${privkey}"
   BT_EXPECT_EQ "$(get-ssh-authkeys 2>/dev/null)" "${authkey}"
-
-  # should succeed when the files exist (regardless of the content of the files)
-  touch "${privkey}" "${authkey}"
-  BT_EXPECT_EQ "$(get-ssh-privkey)" "${privkey}"
-  BT_EXPECT_EQ "$(get-ssh-authkeys)" "${authkey}"
 }
 
 TEST_json_config() {

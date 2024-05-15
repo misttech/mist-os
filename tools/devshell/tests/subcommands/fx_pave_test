@@ -18,6 +18,7 @@ BT_FILE_DEPS=(
 
 BT_MOCKED_TOOLS=(
   "out/default/pave.sh"
+  "out/default/host-tools/ffx"
   "tools/devshell/build"
   "tools/devshell/get-flash-source"
 )

@@ -614,17 +614,35 @@ function ffx {
   fx-command-run ffx "$@"
 }
 
-# Prints path to the default SSH key. These credentials are created by a
-# jiri hook.
+# Prints path to the default SSH key. These credentials are created
+# and configured via ffx.
 #
 # The corresponding public key is stored in "$(get-ssh-privkey).pub".
 function get-ssh-privkey {
-  _get-ssh-key key
+  init="$(fx-command-run ffx config check-ssh-keys)"
+  RESULT=$?
+  if [ $RESULT -ne 0 ]; then
+    fx-error "$init"
+    return 1
+  fi
+  val="$(fx-command-run ffx config get ssh.priv)"
+  temp="${val%\"}"
+  authkeys="${temp#\"}"
+  echo "${authkeys}"
 }
 
 # Prints path to the default authorized_keys to include on Fuchsia devices.
 function get-ssh-authkeys {
-  _get-ssh-key auth
+  init="$(fx-command-run ffx config check-ssh-keys)"
+  RESULT=$?
+  if [ $RESULT -ne 0 ]; then
+    fx-error "$init"
+    return 1
+  fi
+  val="$(fx-command-run ffx config get ssh.pub)"
+  temp="${val%\"}"
+  authkeys="${temp#\"}"
+  echo "${authkeys}"
 }
 
 # Checks the ssh_config file exists and references the private key, otherwise
