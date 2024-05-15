@@ -128,7 +128,7 @@ const fhasp::Element kElementNoId{{
 const fhasp::Element kElementNoType{{
     .id = kBadElementId,
 }};
-const fhasp::Element kElementNoRequiredTypeSpecific{{
+const fhasp::Element kElementWithoutRequiredTypeSpecific{{
     .id = kBadElementId,
     .type = fhasp::ElementType::kEndpoint,
 }};
@@ -167,7 +167,7 @@ const std::vector<fhasp::Element> kElementsWithNoType{
     kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement, kElementNoType};
 const std::vector<fhasp::Element> kElementsWithNoRequiredTypeSpecific{
     kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement,
-    kElementNoRequiredTypeSpecific};
+    kElementWithoutRequiredTypeSpecific};
 const std::vector<fhasp::Element> kElementsWithWrongTypeSpecific{
     kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement,
     kElementWrongTypeSpecific};

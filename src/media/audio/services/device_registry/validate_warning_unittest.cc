@@ -1132,7 +1132,7 @@ TEST(ValidateWarningTest, ElementInvalid) {
   EXPECT_FALSE(ValidateElement(kElementNoType));
 
   // This element has no 'type_specific', but its 'type' requires one.
-  EXPECT_FALSE(ValidateElement(kElementNoRequiredTypeSpecific));
+  EXPECT_FALSE(ValidateElement(kElementWithoutRequiredTypeSpecific));
 
   // This element contains a 'type_specific' that does not match its 'type'.
   EXPECT_FALSE(ValidateElement(kElementWrongTypeSpecific));
@@ -1475,20 +1475,8 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
     auto dyn_state_threshold_type_none = kDynamicsElementState;
     dyn_state_threshold_type_none.type_specific()->dynamics()->band_states()->at(0).threshold_type(
         std::nullopt);
-    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_threshold_type_none, kDynamicsElement,
-                                              /* from_client */ false));
-    EXPECT_FALSE(ValidateElementState(dyn_state_threshold_type_none, kDynamicsElement,
-                                      /* from_client */ false));
-  }
-  {
-    auto dyn_element_threshold_type_unsupported = kDynamicsElement;
-    dyn_element_threshold_type_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_threshold_type_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kThresholdType);
-    EXPECT_FALSE(ValidateDynamicsElementState(kDynamicsElementState,
-                                              dyn_element_threshold_type_unsupported));
-    EXPECT_FALSE(
-        ValidateElementState(kDynamicsElementState, dyn_element_threshold_type_unsupported));
+    EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_threshold_type_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateElementState(dyn_state_threshold_type_none, kDynamicsElement));
   }
   {
     auto dyn_state_ratio_none = kDynamicsElementState;
@@ -1512,15 +1500,6 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
     EXPECT_FALSE(ValidateElementState(dyn_state_ratio_nan, kDynamicsElement));
   }
   {
-    auto dyn_element_knee_width_unsupported = kDynamicsElement;
-    dyn_element_knee_width_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_knee_width_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kKneeWidth);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_knee_width_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_knee_width_unsupported));
-  }
-  {
     auto dyn_state_knee_neg = kDynamicsElementState;
     dyn_state_knee_neg.type_specific()->dynamics()->band_states()->at(0).knee_width_db(-1.0f);
     EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_knee_neg, kDynamicsElement));
@@ -1539,43 +1518,16 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
     EXPECT_FALSE(ValidateElementState(dyn_state_knee_nan, kDynamicsElement));
   }
   {
-    auto dyn_element_attack_unsupported = kDynamicsElement;
-    dyn_element_attack_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_attack_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kAttack);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_attack_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_attack_unsupported));
-  }
-  {
     auto dyn_state_attack_neg = kDynamicsElementState;
     dyn_state_attack_neg.type_specific()->dynamics()->band_states()->at(0).attack(ZX_USEC(-1));
     EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_attack_neg, kDynamicsElement));
     EXPECT_FALSE(ValidateElementState(dyn_state_attack_neg, kDynamicsElement));
   }
   {
-    auto dyn_element_release_unsupported = kDynamicsElement;
-    dyn_element_release_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_release_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kRelease);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_release_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_release_unsupported));
-  }
-  {
     auto dyn_state_release_neg = kDynamicsElementState;
     dyn_state_release_neg.type_specific()->dynamics()->band_states()->at(0).release(ZX_USEC(-1));
     EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_release_neg, kDynamicsElement));
     EXPECT_FALSE(ValidateElementState(dyn_state_release_neg, kDynamicsElement));
-  }
-  {
-    auto dyn_element_output_gain_unsupported = kDynamicsElement;
-    dyn_element_output_gain_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_output_gain_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kOutputGain);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_output_gain_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_output_gain_unsupported));
   }
   {
     auto dyn_state_output_gain_inf = kDynamicsElementState;
@@ -1595,15 +1547,6 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
     EXPECT_FALSE(ValidateElementState(dyn_state_output_gain_nan, kDynamicsElement));
   }
   {
-    auto dyn_element_input_gain_unsupported = kDynamicsElement;
-    dyn_element_input_gain_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_input_gain_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kInputGain);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_input_gain_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_input_gain_unsupported));
-  }
-  {
     auto dyn_state_input_gain_inf = kDynamicsElementState;
     dyn_state_input_gain_inf.type_specific()->dynamics()->band_states()->at(0).input_gain_db(
         INFINITY);
@@ -1621,39 +1564,11 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
     EXPECT_FALSE(ValidateElementState(dyn_state_input_gain_nan, kDynamicsElement));
   }
   {
-    auto dyn_element_level_type_unsupported = kDynamicsElement;
-    dyn_element_level_type_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_level_type_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kLevelType);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_level_type_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_level_type_unsupported));
-  }
-  {
-    auto dyn_element_lookahead_unsupported = kDynamicsElement;
-    dyn_element_lookahead_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_lookahead_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kLookahead);
-    EXPECT_FALSE(
-        ValidateDynamicsElementState(kDynamicsElementState, dyn_element_lookahead_unsupported));
-    EXPECT_FALSE(ValidateElementState(kDynamicsElementState, dyn_element_lookahead_unsupported));
-  }
-  {
     auto dyn_state_lookahead_neg = kDynamicsElementState;
     dyn_state_lookahead_neg.type_specific()->dynamics()->band_states()->at(0).lookahead(
         ZX_USEC(-1));
     EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_lookahead_neg, kDynamicsElement));
     EXPECT_FALSE(ValidateElementState(dyn_state_lookahead_neg, kDynamicsElement));
-  }
-  {
-    auto dyn_element_linked_channels_unsupported = kDynamicsElement;
-    dyn_element_linked_channels_unsupported.type_specific()->dynamics()->supported_controls(
-        *dyn_element_linked_channels_unsupported.type_specific()->dynamics()->supported_controls() &
-        ~fhasp::DynamicsSupportedControls::kLinkedChannels);
-    EXPECT_FALSE(ValidateDynamicsElementState(kDynamicsElementState,
-                                              dyn_element_linked_channels_unsupported));
-    EXPECT_FALSE(
-        ValidateElementState(kDynamicsElementState, dyn_element_linked_channels_unsupported));
   }
 }
 

@@ -71,10 +71,10 @@ bool ValidateVendorSpecificElement(const fuchsia_hardware_audio_signalprocessing
 
 bool ValidateElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
-    const fuchsia_hardware_audio_signalprocessing::Element& element, bool from_client = true);
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateDynamicsElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
-    const fuchsia_hardware_audio_signalprocessing::Element& element, bool from_client = true);
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateEndpointElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
     const fuchsia_hardware_audio_signalprocessing::Element& element);
