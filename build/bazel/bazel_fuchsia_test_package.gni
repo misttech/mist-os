@@ -70,8 +70,9 @@ template("bazel_fuchsia_test_package") {
         forward_variables_from(invoker.test_specs, "*")
       }
       package_url = "fuchsia-pkg://fuchsia.com/${test_package_name}#meta/${test_component_name}.cm"
-      target = get_label_info(":$test_spec_target", "label_with_toolchain")
-      package_label = get_label_info(":$target_name", "label_with_toolchain")
+      target = get_label_info(":${invoker.target_name}", "label_with_toolchain")
+      package_label =
+          get_label_info(":${invoker.target_name}", "label_with_toolchain")
       package_manifests = rebase_path(
               [ "${target_out_dir}/${invoker.target_name}/package_manifest.json" ],
               root_build_dir)
