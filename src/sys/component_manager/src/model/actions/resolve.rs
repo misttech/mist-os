@@ -50,114 +50,91 @@ async fn do_resolve(
     component: &Arc<ComponentInstance>,
     abortable_scope: AbortableScope,
 ) -> Result<(), ResolveActionError> {
-    {
-        let state = component.lock_state().await;
-        if state.is_shut_down() {
+    match &*component.lock_state().await {
+        InstanceState::New => {
+            panic!("Component {} should be at least discovered", component.moniker)
+        }
+        InstanceState::Unresolved(_) => (),
+        InstanceState::Resolved(_) | InstanceState::Started(_, _) => {
+            // The component is already resolved, there's no work for us to do.
+            return Ok(());
+        }
+        InstanceState::Shutdown(_, _) => {
             return Err(ResolveActionError::InstanceShutDown {
                 moniker: component.moniker.clone(),
             });
         }
-    }
-    let result = async move {
-        let first_resolve = {
-            let state = component.lock_state().await;
-            match *state {
-                InstanceState::New => {
-                    panic!("Component {} should be at least discovered", component.moniker)
-                }
-                InstanceState::Unresolved(_) => true,
-                InstanceState::Resolved(_) | InstanceState::Started(_, _) => false,
-                InstanceState::Shutdown(_, _) => {
-                    return Err(ResolveActionError::InstanceShutDown {
-                        moniker: component.moniker.clone(),
-                    });
-                }
-                InstanceState::Destroyed => {
-                    return Err(ResolveActionError::InstanceDestroyed {
-                        moniker: component.moniker.clone(),
-                    });
-                }
-            }
-        };
-        let component_url = &component.component_url;
-        let component_address =
-            ComponentAddress::from(component_url, component).await.map_err(|err| {
-                ResolveActionError::ComponentAddressParseError {
-                    url: component.component_url.clone(),
-                    moniker: component.moniker.clone(),
-                    err,
-                }
-            })?;
-        let component_info = abortable_scope
-            .run(async {
-                let component_info =
-                    component.environment.resolve(&component_address).await.map_err(|err| {
-                        ResolveActionError::ResolverError {
-                            url: component.component_url.clone(),
-                            err,
-                        }
-                    })?;
-                Component::resolve_with_config(component_info, component.config_parent_overrides())
-            })
-            .await
-            .map_err(|_: AbortError| ResolveActionError::Aborted {
+        InstanceState::Destroyed => {
+            return Err(ResolveActionError::InstanceDestroyed {
                 moniker: component.moniker.clone(),
-            })??;
-        let policy = component.context.abi_revision_policy();
-        policy
-            .check_compatibility(
-                &version_history::HISTORY,
-                &component.moniker,
-                component_info.abi_revision,
-            )
-            .map_err(|err| ResolveActionError::AbiCompatibilityError {
-                url: component_url.clone(),
-                err,
-            })?;
-        if first_resolve {
-            {
-                let mut state = component.lock_state().await;
-                let (instance_token_state, component_input_dict) = match state.deref_mut() {
-                    InstanceState::Resolved(_) => {
-                        panic!("Component was marked Resolved during Resolve action?");
-                    }
-                    InstanceState::Started(_, _) => {
-                        panic!("Component was marked Started during Resolve action?");
-                    }
-                    InstanceState::Shutdown(_, _) => {
-                        return Err(ResolveActionError::InstanceShutDown {
-                            moniker: component.moniker.clone(),
-                        });
-                    }
-                    InstanceState::New => {
-                        panic!("Component was not marked Discovered before Resolve action?");
-                    }
-                    InstanceState::Destroyed => {
-                        return Err(ResolveActionError::InstanceDestroyed {
-                            moniker: component.moniker.clone(),
-                        });
-                    }
-                    InstanceState::Unresolved(unresolved_state) => unresolved_state.to_resolved(),
-                };
-                let resolved_state = ResolvedInstanceState::new(
-                    component,
-                    component_info.clone(),
-                    component_address,
-                    instance_token_state,
-                    component_input_dict,
-                )
-                .await?;
-                state.set(InstanceState::Resolved(resolved_state));
-            }
+            });
         }
-        Ok((component_info, first_resolve))
     }
-    .await;
-
-    let (component_info, first_resolve) = result?;
-
-    if !first_resolve {
-        return Ok(());
+    let component_url = &component.component_url;
+    let component_address =
+        ComponentAddress::from(component_url, component).await.map_err(|err| {
+            ResolveActionError::ComponentAddressParseError {
+                url: component.component_url.clone(),
+                moniker: component.moniker.clone(),
+                err,
+            }
+        })?;
+    let component_info = abortable_scope
+        .run(async {
+            let component_info =
+                component.environment.resolve(&component_address).await.map_err(|err| {
+                    ResolveActionError::ResolverError { url: component.component_url.clone(), err }
+                })?;
+            Component::resolve_with_config(component_info, component.config_parent_overrides())
+        })
+        .await
+        .map_err(|_: AbortError| ResolveActionError::Aborted {
+            moniker: component.moniker.clone(),
+        })??;
+    let policy = component.context.abi_revision_policy();
+    policy
+        .check_compatibility(
+            &version_history::HISTORY,
+            &component.moniker,
+            component_info.abi_revision,
+        )
+        .map_err(|err| ResolveActionError::AbiCompatibilityError {
+            url: component_url.clone(),
+            err,
+        })?;
+    {
+        let mut state = component.lock_state().await;
+        let (instance_token_state, component_input_dict) = match state.deref_mut() {
+            InstanceState::Resolved(_) => {
+                panic!("Component was marked Resolved during Resolve action?");
+            }
+            InstanceState::Started(_, _) => {
+                panic!("Component was marked Started during Resolve action?");
+            }
+            InstanceState::Shutdown(_, _) => {
+                return Err(ResolveActionError::InstanceShutDown {
+                    moniker: component.moniker.clone(),
+                });
+            }
+            InstanceState::New => {
+                panic!("Component was not marked Discovered before Resolve action?");
+            }
+            InstanceState::Destroyed => {
+                return Err(ResolveActionError::InstanceDestroyed {
+                    moniker: component.moniker.clone(),
+                });
+            }
+            InstanceState::Unresolved(unresolved_state) => unresolved_state.to_resolved(),
+        };
+        let resolved_state = ResolvedInstanceState::new(
+            component,
+            component_info.clone(),
+            component_address,
+            instance_token_state,
+            component_input_dict,
+        )
+        .await?;
+        state.set(InstanceState::Resolved(resolved_state));
     }
 
     let weak = sandbox::WeakComponentToken::new(WeakComponentInstance::new(component));
