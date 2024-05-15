@@ -157,6 +157,7 @@ async fn get_target_info(
 async fn handle_to_info(
     context: &EnvironmentContext,
     handle: discovery::TargetHandle,
+    connect_to_target: bool,
 ) -> Result<ffx::TargetInfo> {
     let (target_state, addresses) = match handle.state {
         discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
@@ -166,8 +167,6 @@ async fn handle_to_info(
         discovery::TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
         discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
     };
-    // Temporarily have an override to disable this functionality by default. Enable on ffx builders only
-    let connect_to_target = ffx_config::get("ffx.target-list.local-connect").await.unwrap_or(false);
     let (rcs_state, product_config, board_config) = if connect_to_target {
         if let Some(ref target_addrs) = addresses {
             get_target_info(context, target_addrs).await?
@@ -190,16 +189,30 @@ async fn handle_to_info(
     })
 }
 
+async fn do_connect_to_target(ctx: &EnvironmentContext, cmd: &ListCommand) -> bool {
+    // Should we probe discovered targets by default?
+    if cmd.no_probe {
+        // It'd be nice to use the FfxConfigBacked functionality, but that only works with Option arguments
+        false
+    } else {
+        // TODO(b/340330010) Change the default to "true" when we are ready to roll this out to everyone
+        ctx.get("ffx.target-list.local-connect").await.unwrap_or(false)
+    }
+}
+
 async fn local_list_targets(
     ctx: &EnvironmentContext,
     cmd: &ListCommand,
 ) -> Result<Vec<ffx::TargetInfo>> {
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
-    let handles = ffx_target::resolve_target_query(query, ctx).await?;
+    let handles =
+        ffx_target::resolve_target_query_with(query, ctx, !cmd.no_usb, !cmd.no_mdns).await?;
+    let connect = do_connect_to_target(ctx, cmd).await;
     // Connect to all targets in parallel
     let targets =
-        join_all(handles.into_iter().map(|t| async { handle_to_info(ctx, t).await })).await;
+        join_all(handles.into_iter().map(|t| async { handle_to_info(ctx, t, connect).await }))
+            .await;
     // Fail if any results are Err
     let targets = targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
 
@@ -456,6 +469,25 @@ mod test {
         assert_eq!(address_types_from_cmd(&cmd_all), AddressTypes::All);
         let cmd_all_default = ListCommand::default();
         assert_eq!(address_types_from_cmd(&cmd_all_default), AddressTypes::All);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_logic() -> Result<()> {
+        let env = ffx_config::test_init().await.unwrap();
+        // Default value is false (see b/340330010)
+        assert_eq!(false, do_connect_to_target(&env.context, &ListCommand::default()).await);
+        // When --no-probe -s specified, false
+        let cmd = ListCommand { no_probe: true, ..Default::default() };
+        assert_eq!(false, do_connect_to_target(&env.context, &cmd).await);
+        // If ffx.target-list.local-connect is specified, use it
+        env.context
+            .query("ffx.target-list.local-connect")
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(true.into())
+            .await?;
+        assert_eq!(true, do_connect_to_target(&env.context, &ListCommand::default()).await);
+
         Ok(())
     }
 }

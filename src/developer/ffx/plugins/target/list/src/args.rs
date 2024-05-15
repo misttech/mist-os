@@ -69,6 +69,15 @@ pub struct ListCommand {
 
     #[argh(switch, description = "do not return IPv6 addresses")]
     pub no_ipv6: bool,
+
+    #[argh(switch, description = "do not connect to targets (local discovery only)")]
+    pub no_probe: bool,
+
+    #[argh(switch, description = "do not do mDNS discovery (local discovery only)")]
+    pub no_mdns: bool,
+
+    #[argh(switch, description = "do not do USB discovery (local discovery only)")]
+    pub no_usb: bool,
 }
 
 #[derive(Debug, Default, PartialEq)]

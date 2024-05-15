@@ -40,6 +40,30 @@
       "short": null,
       "description": "do not return IPv6 addresses",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-probe",
+      "short": null,
+      "description": "do not connect to targets (local discovery only)",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-mdns",
+      "short": null,
+      "description": "do not do mDNS discovery (local discovery only)",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-usb",
+      "short": null,
+      "description": "do not do USB discovery (local discovery only)",
+      "hidden": false
     }
   ],
   "notes": [

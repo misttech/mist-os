@@ -5,7 +5,7 @@
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
-use discovery::{TargetEvent, TargetHandle, TargetState};
+use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
@@ -214,6 +214,38 @@ pub async fn resolve_target_query(
     query: TargetInfoQuery,
     ctx: &EnvironmentContext,
 ) -> Result<Vec<discovery::TargetHandle>> {
+    resolve_target_query_with_sources(
+        query,
+        ctx,
+        DiscoverySources::MDNS
+            | DiscoverySources::USB
+            | DiscoverySources::MANUAL
+            | DiscoverySources::EMULATOR,
+    )
+    .await
+}
+
+pub async fn resolve_target_query_with(
+    query: TargetInfoQuery,
+    ctx: &EnvironmentContext,
+    usb: bool,
+    mdns: bool,
+) -> Result<Vec<discovery::TargetHandle>> {
+    let mut sources = DiscoverySources::MANUAL | DiscoverySources::EMULATOR;
+    if usb {
+        sources = sources | DiscoverySources::USB;
+    }
+    if mdns {
+        sources = sources | DiscoverySources::MDNS;
+    }
+    resolve_target_query_with_sources(query, ctx, sources).await
+}
+
+async fn resolve_target_query_with_sources(
+    query: TargetInfoQuery,
+    ctx: &EnvironmentContext,
+    sources: DiscoverySources,
+) -> Result<Vec<discovery::TargetHandle>> {
     // Get nodename, in case we're trying to find an exact match
     let (qname, qaddr) = match query {
         TargetInfoQuery::NodenameOrSerial(ref s) => (Some(s.clone()), None),
@@ -221,7 +253,9 @@ pub async fn resolve_target_query(
         _ => (None, None),
     };
 
-    let sources = query.discovery_sources();
+    let qsources = query.discovery_sources();
+    // Mask out any sources that the query says shouldn't be used
+    let sources = sources & qsources;
     let filter = move |handle: &TargetHandle| {
         let description = handle_to_description(handle);
         query.match_description(&description)
