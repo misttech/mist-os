@@ -177,16 +177,6 @@ impl Dict {
                     })();
                     responder.send(result)?;
                 }
-                fsandbox::DictionaryRequest::Read { responder } => {
-                    let items = self
-                        .enumerate()
-                        .map(|(key, value)| {
-                            let value = value.into_fidl();
-                            fsandbox::DictionaryItem { key: key.to_string(), value }
-                        })
-                        .collect();
-                    responder.send(items)?;
-                }
                 fsandbox::DictionaryRequest::Clone { responder } => {
                     let (client_end, server_end) =
                         endpoints::create_endpoints::<fsandbox::DictionaryMarker>();
@@ -500,10 +490,11 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn serve_read() -> Result<(), Error> {
+    async fn serve_enumerate() {
         let mut dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
+        let (dict_proxy, dict_stream) =
+            create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
         let _server = fasync::Task::spawn(async move { dict.serve_dict(dict_stream).await });
 
         // Create two Data capabilities.
@@ -522,7 +513,16 @@ mod tests {
             .expect("failed to insert");
 
         // Now read the entries back.
-        let mut items = dict_proxy.read().await.unwrap();
+        let (iterator, server_end) = endpoints::create_proxy().unwrap();
+        dict_proxy.enumerate(server_end).unwrap();
+        let mut items = vec![];
+        loop {
+            let mut next = iterator.get_next().await.unwrap();
+            if next.is_empty() {
+                break;
+            }
+            items.append(&mut next);
+        }
         assert_eq!(items.len(), 2);
         assert_matches!(
             items.remove(0),
@@ -542,8 +542,6 @@ mod tests {
             if key == "cap2"
             && num == 2
         );
-
-        Ok(())
     }
 
     /// Tests that `copy` produces a new Dict with cloned entries.

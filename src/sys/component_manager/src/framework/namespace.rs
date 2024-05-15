@@ -10,7 +10,7 @@ use {
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_types::{Name, Path},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
+    fidl::endpoints::{self, DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
@@ -110,13 +110,22 @@ impl NamespaceCapabilityHost {
         for entry in entries {
             let path = entry.path;
             let dict = entry.dictionary.into_proxy().unwrap();
-            let items: Vec<_> =
-                dict.read().await.map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
-            for item in items {
-                let capability: Capability = item.value.try_into().unwrap();
-                let path = Path::new(format!("{}/{}", path, item.key))
-                    .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
-                namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
+            let (iterator, server_end) = endpoints::create_proxy().unwrap();
+            dict.enumerate(server_end).map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
+            loop {
+                let items = iterator
+                    .get_next()
+                    .await
+                    .map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
+                if items.is_empty() {
+                    break;
+                }
+                for item in items {
+                    let capability: Capability = item.value.try_into().unwrap();
+                    let path = Path::new(format!("{}/{}", path, item.key))
+                        .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
+                    namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
+                }
             }
         }
         let namespace = namespace_builder.serve().map_err(Self::error_to_fidl)?;
@@ -172,7 +181,7 @@ mod tests {
     use super::*;
     use {
         assert_matches::assert_matches,
-        fidl::endpoints::{self, ProtocolMarker, Proxy},
+        fidl::endpoints::{ProtocolMarker, Proxy},
         fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
         fuchsia_async as fasync,
         fuchsia_component::client,

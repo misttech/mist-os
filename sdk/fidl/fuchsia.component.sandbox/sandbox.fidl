@@ -109,15 +109,6 @@ open protocol Dictionary {
         capability Capability;
     }) error DictionaryError;
 
-    /// Returns all items in this dictionary, sorted by key in natural order.
-    ///
-    /// This operation creates shallow clones of values.
-    // TODO(b/314361448): Remove once callers use Dictionary.Enumerate instead
-    @available(added=HEAD)
-    flexible Read() -> (resource struct {
-        items vector<DictionaryItem>:MAX;
-    });
-
     /// Creates a new connection to the same underlying dictionary.
     ///
     /// Use `Copy` to a new dictionary with clones of all the exiting entries.

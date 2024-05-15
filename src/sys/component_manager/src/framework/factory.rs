@@ -250,7 +250,9 @@ mod tests {
         let dict = dict.into_proxy().unwrap();
 
         // The dictionary is empty.
-        let items = dict.read().await.unwrap();
+        let (iterator, server_end) = endpoints::create_proxy().unwrap();
+        dict.enumerate(server_end).unwrap();
+        let items = iterator.get_next().await.unwrap();
         assert_eq!(items.len(), 0);
     }
 }
