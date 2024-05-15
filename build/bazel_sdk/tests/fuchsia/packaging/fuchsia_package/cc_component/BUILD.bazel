@@ -12,7 +12,7 @@ fuchsia_package(
         ":cc_component",
         ":empty_component",
     ],
-    fuchsia_api_level = "15",
+    fuchsia_api_level = "HEAD",
     resources = [":simple_file_resource"],
     visibility = ["//visibility:public"],
 )

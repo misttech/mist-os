@@ -5,8 +5,6 @@
 load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
 load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
 
-API_LEVEL_15_ABI_REVISION = "0x7D68E46C02F819AE"
-
 HEAD_ABI_REVISION = [
     level.abi_revision
     for level in get_fuchsia_api_levels()
@@ -17,7 +15,7 @@ fuchsia_package_checker_test(
     name = "cc_pkg_test",
     package_name = "pkg_for_test",
     size = "small",
-    expected_abi_revision = API_LEVEL_15_ABI_REVISION,
+    expected_abi_revision = HEAD_ABI_REVISION,
     expected_blobs_to_file_names = {
         "bin/cc_bin": "cc_bin_native_stripped",
         "data/text_file.txt": "text_file.txt",
@@ -53,7 +51,7 @@ fuchsia_package_checker_test(
     package_name = "test_driver",
     size = "small",
     bind_bytecode = "meta/bind/test_driver.bindbc",
-    expected_abi_revision = API_LEVEL_15_ABI_REVISION,
+    expected_abi_revision = HEAD_ABI_REVISION,
     expected_blobs_to_file_names = {
         "driver/test_driver_so.so": "test_driver_cc_binary.so_stripped",
         # Common files
