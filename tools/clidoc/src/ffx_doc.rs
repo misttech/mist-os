@@ -84,7 +84,7 @@ fn write_command(
     sorted_commands.sort_by(|a, b| a.name.cmp(&b.name));
     let heading_level = "#".repeat(level);
     writeln!(output_writer, "{heading_level} {}\n", command.name.to_lowercase())?;
-    writeln!(output_writer, "{}\n", command.description)?;
+    writeln!(output_writer, "{}\n", escape_text(&command.description))?;
     writeln!(output_writer, "{code_block_start}\n")?;
     writeln!(output_writer, "Usage: {}\n", build_usage_string(parent_cmd, &command)?)?;
     writeln!(output_writer, "```\n")?;
@@ -173,9 +173,19 @@ fn write_flags<W: Write>(output_writer: &mut BufWriter<W>, flags: &Vec<FlagInfo>
             continue;
         }
         if let Some(s) = flag.short {
-            writeln!(output_writer, "| <nobr>-{s}, {}</nobr> | {}", flag.long, flag.description)?;
+            writeln!(
+                output_writer,
+                "| <nobr>-{s}, {}</nobr> | {}",
+                flag.long,
+                escape_text(&flag.description)
+            )?;
         } else {
-            writeln!(output_writer, "| <nobr>{}</nobr> | {}", flag.long, flag.description)?;
+            writeln!(
+                output_writer,
+                "| <nobr>{}</nobr> | {}",
+                flag.long,
+                escape_text(&flag.description)
+            )?;
         }
     }
     writeln!(output_writer, "\n")?;
@@ -189,7 +199,7 @@ fn write_examples(output_writer: &mut BufWriter<File>, examples: &Vec<String>) -
     }
     writeln!(output_writer, "__Examples__\n")?;
     for ex in examples {
-        writeln!(output_writer, "\n<pre>{ex}</pre>\n")?;
+        writeln!(output_writer, "\n<pre>{}</pre>\n", escape_text(ex))?;
     }
     writeln!(output_writer, "\n")?;
     Ok(())
@@ -202,7 +212,7 @@ fn write_notes(output_writer: &mut BufWriter<File>, notes: &Vec<String>) -> Resu
     }
     writeln!(output_writer, "__Notes__\n")?;
     for note in notes {
-        writeln!(output_writer, "* <pre>{note}</pre>")?;
+        writeln!(output_writer, "* <pre>{}</pre>", escape_text(note))?;
     }
     writeln!(output_writer, "\n")?;
     Ok(())
@@ -217,7 +227,7 @@ fn write_errors(output_writer: &mut BufWriter<File>, errors: &Vec<ErrorCodeInfo>
     writeln!(output_writer, "----------- | ------")?;
 
     for e in errors {
-        writeln!(output_writer, "| {} | {}", e.code, e.description)?;
+        writeln!(output_writer, "| {} | {}", e.code, escape_text(&e.description))?;
     }
     writeln!(output_writer, "\n")?;
     Ok(())
@@ -235,10 +245,20 @@ fn write_subcommand_list(
     writeln!(output_writer, "----------- | ------")?;
 
     for cmd in commands {
-        writeln!(output_writer, "| [{}](#{}) | {}", cmd.name, cmd.name, cmd.command.description)?;
+        writeln!(
+            output_writer,
+            "| [{}](#{}) | {}",
+            cmd.name,
+            cmd.name,
+            escape_text(&cmd.command.description)
+        )?;
     }
     writeln!(output_writer, "\n")?;
     Ok(())
+}
+
+fn escape_text(raw: &str) -> String {
+    raw.replace("{", "&#123;").replace("}", "&#125;")
 }
 
 #[cfg(test)]
