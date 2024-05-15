@@ -26,9 +26,7 @@ use crate::{
     },
     device::{
         config::DeviceConfigurationContext,
-        ethernet::{
-            self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
-        },
+        ethernet::{self, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice},
         loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{self, PureIpDeviceId},
         queue::tx::TransmitQueueHandler,
@@ -816,13 +814,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
 impl<BT: BindingsTypes, L> DeviceIdContext<EthernetLinkDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = EthernetDeviceId<BT>;
     type WeakDeviceId = EthernetWeakDeviceId<BT>;
-}
-
-impl<'a, CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>>
-    DeviceIdContext<EthernetLinkDevice> for CoreCtxWithDeviceId<'a, CC>
-{
-    type DeviceId = CC::DeviceId;
-    type WeakDeviceId = CC::WeakDeviceId;
 }
 
 impl<BC: socket::DeviceSocketBindingsContext<DeviceId<BC>> + DeviceLayerEventDispatcher>

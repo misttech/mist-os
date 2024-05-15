@@ -10,6 +10,8 @@ extern crate alloc;
 #[cfg(loom)]
 extern crate loom as std;
 
+use net_types::ip::{GenericOverIp, Ip};
+
 pub mod rc;
 
 /// A [`std::sync::Mutex`] assuming lock poisoning will never occur.
@@ -65,6 +67,13 @@ impl<T: 'static> lock_order::lock::ExclusiveLock<T> for Mutex<T> {
     fn lock(&self) -> Self::Guard<'_> {
         self.lock()
     }
+}
+
+impl<T, I: Ip> GenericOverIp<I> for Mutex<T>
+where
+    T: GenericOverIp<I>,
+{
+    type Type = Mutex<T::Type>;
 }
 
 /// A [`std::sync::RwLock`] assuming lock poisoning will never occur.
@@ -147,6 +156,13 @@ impl<T: 'static> lock_order::lock::ReadWriteLock<T> for RwLock<T> {
     fn write_lock(&self) -> Self::WriteGuard<'_> {
         self.write()
     }
+}
+
+impl<T, I: Ip> GenericOverIp<I> for RwLock<T>
+where
+    T: GenericOverIp<I>,
+{
+    type Type = RwLock<T::Type>;
 }
 
 mod lock_guard {

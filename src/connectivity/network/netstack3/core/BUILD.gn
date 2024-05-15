@@ -42,6 +42,7 @@ rustc_library_with_features("netstack3-core") {
     "src/device/base.rs",
     "src/device/config.rs",
     "src/device/ethernet.rs",
+    "src/device/ethernet/integration.rs",
     "src/device/id.rs",
     "src/device/integration.rs",
     "src/device/link.rs",
