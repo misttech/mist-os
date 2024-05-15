@@ -55,6 +55,8 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
+  void GetDomainId(GetDomainIdCompleter::Sync& completer) override;
+  void GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) override;
 
   // Set CpuInfo in inspect.
   void SetCpuInfo(uint32_t cpu_version_packed);

@@ -67,6 +67,21 @@ closed protocol Device {
     }) -> (struct {
         id uint64;
     });
+
+    /// Returns the id of this performance domain within its package. This
+    /// number should be stable across boots, but clients should prefer to use
+    /// GetRelativePerformance to differentiate cores if possible.
+    strict GetDomainId() -> (struct {
+        domain_id uint32;
+    });
+
+    /// The relative performance of this domain as configured by the platform,
+    /// if known. The highest performance domain should return 255, while others
+    /// should return N/255 fractional values relative to that domain.
+    /// Returns ZX_ERR_NOT_SUPPORTED if the performance level is unknown.
+    strict GetRelativePerformance() -> (struct {
+        relative_performance uint8;
+    }) error zx.Status;
 };
 
 service Service {
