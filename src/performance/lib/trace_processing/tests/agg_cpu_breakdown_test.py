@@ -4,18 +4,21 @@
 # found in the LICENSE file.
 """Unit tests for cpu_breakdown.py."""
 
-from trace_processing.metrics import cpu_breakdown
+from trace_processing.metrics import agg_cpu_breakdown, cpu_breakdown
+from typing import List
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 import unittest
 
 
-class CpuBreakdownTest(unittest.TestCase):
-    """CPU breakdown tests."""
+class AggCpuBreakdownTest(unittest.TestCase):
+    """Aggregated CPU breakdown tests."""
 
     def construct_trace_model(self) -> trace_model.Model:
         model = trace_model.Model()
-        threads = [trace_model.Thread(i, f"thread-{i}") for i in range(1, 5)]
+        threads: List[trace_model.Thread] = []
+        for i in range(1, 5):
+            threads.append(trace_model.Thread(i, "thread-%d" % i))
         model.processes = [
             # Process with PID 1000 and threads with TIDs 1, 2, 3, 4.
             trace_model.Process(1000, "big_process", threads),
@@ -25,9 +28,64 @@ class CpuBreakdownTest(unittest.TestCase):
             ),
         ]
 
+        # CPU 0.
+        # Total time: 0 to 9100000000 = 9100 ms.
+        records_0: List[trace_model.SchedulingRecord] = [
+            # "thread-0" is active from 0 - 1800 ms, 1800 total duration.
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(0),
+                1,
+                100,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(1800000000),
+                100,
+                1,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            # "small-thread" is active from 1800 to 2300 ms, 500 total duration.
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(2300000000),
+                1,
+                100,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            # "thread-2" is active from 3500-9100 ms, 5000 total duration.
+            # Switch the order of adding to records - shouldn't change behavior.
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(9100000000),
+                100,
+                2,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(3500000000),
+                2,
+                70,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            trace_model.Waking(trace_time.TimePoint(3500000000), 2, 612, {}),
+        ]
+
         # CPU 2.
         # Total time: 0 to 8000000000 = 8000 ms.
-        records_2: list[trace_model.SchedulingRecord] = [
+        records_2: List[trace_model.SchedulingRecord] = [
             # "thread-1" is active from 0 - 1500 ms, 1500 total duration.
             trace_model.ContextSwitch(
                 trace_time.TimePoint(0),
@@ -82,7 +140,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         # CPU 3.
         # Total time: 3000000000 to 6000000000 = 3000 ms.
-        records_3: list[trace_model.SchedulingRecord] = [
+        records_3: List[trace_model.SchedulingRecord] = [
             # "thread-3" (incoming) is idle; don't log it in breakdown,
             # but do log it in the total CPU duration for CPU 3.
             trace_model.ContextSwitch(
@@ -130,7 +188,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         # CPU 5.
         # Total time: 500000000 to 6000000000 = 5500
-        records_5: list[trace_model.SchedulingRecord] = []
+        records_5: List[trace_model.SchedulingRecord] = []
         # Add 5 Waking and ContextSwitch events for "thread-1" where the incoming_tid
         # is 1 and the outgoing_tid (70) is not mapped to a Thread in our Process.
         for i in range(1, 7):
@@ -174,10 +232,15 @@ class CpuBreakdownTest(unittest.TestCase):
                 )
             )
 
-        model.scheduling_records = {2: records_2, 3: records_3, 5: records_5}
+        model.scheduling_records = {
+            0: records_0,
+            2: records_2,
+            3: records_3,
+            5: records_5,
+        }
         return model
 
-    def test_process_metrics(self) -> None:
+    def test_aggregate_metrics(self) -> None:
         model = self.construct_trace_model()
 
         self.assertEqual(model.processes[0].name, "big_process")
@@ -186,60 +249,63 @@ class CpuBreakdownTest(unittest.TestCase):
         self.assertEqual(len(model.processes[1].threads), 1)
 
         processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-        breakdown = processor.process_metrics()
+        breakdown, total_time = processor.process_metrics_and_get_total_time()
+        print("total_time: %f" % total_time)
+        agg_processor = agg_cpu_breakdown.AggCpuBreakdownMetricsProcessor(
+            breakdown, {0: 1.8, 2: 2.2, 3: 2.2, 5: 2.2}, total_time
+        )
+        agg_breakdown = agg_processor.aggregate_metrics()
 
-        self.assertEqual(len(breakdown), 5)
-
-        # Make it easier to compare breakdown results.
-        for b in breakdown:
-            b["percent"] = round(float(b["percent"]), 3)
+        self.assertEqual(len(agg_breakdown), 2)
+        self.assertEqual(len(agg_breakdown[1.8]), 3)
+        self.assertEqual(len(agg_breakdown[2.2]), 3)
 
         # Each process: thread has the correct numbers for each CPU.
         # Sorted by descending cpu and descending percent.
         # Note that neither thread-3 nor thread-4 are logged because
         # they are idle or there is no duration.
         self.assertEqual(
-            breakdown,
-            [
-                {
-                    "process_name": "big_process",
-                    "thread_name": "thread-1",
-                    "tid": 1,
-                    "cpu": 5,
-                    "percent": 54.545,
-                    "duration": 3000.0,
-                },
-                {
-                    "process_name": "big_process",
-                    "thread_name": "thread-2",
-                    "tid": 2,
-                    "cpu": 3,
-                    "percent": 33.333,
-                    "duration": 1000.0,
-                },
-                {
-                    "process_name": "big_process",
-                    "thread_name": "thread-2",
-                    "tid": 2,
-                    "cpu": 2,
-                    "percent": 62.5,
-                    "duration": 5000.0,
-                },
-                {
-                    "process_name": "big_process",
-                    "thread_name": "thread-1",
-                    "tid": 1,
-                    "cpu": 2,
-                    "percent": 18.75,
-                    "duration": 1500.0,
-                },
-                {
-                    "process_name": "small_process",
-                    "thread_name": "small-thread",
-                    "tid": 100,
-                    "cpu": 2,
-                    "percent": 6.25,
-                    "duration": 500.0,
-                },
-            ],
+            agg_breakdown,
+            {
+                2.2: [
+                    {
+                        "process_name": "big_process",
+                        "thread_name": "thread-2",
+                        "percent": 65.934,
+                        "duration": 6000.0,
+                    },
+                    {
+                        "process_name": "big_process",
+                        "thread_name": "thread-1",
+                        "percent": 49.451,
+                        "duration": 4500.0,
+                    },
+                    {
+                        "process_name": "small_process",
+                        "thread_name": "small-thread",
+                        "percent": 5.495,
+                        "duration": 500.0,
+                    },
+                ],
+                1.8: [
+                    {
+                        "process_name": "big_process",
+                        "thread_name": "thread-2",
+                        "percent": 61.538,
+                        "duration": 5600.0,
+                    },
+                    {
+                        "process_name": "big_process",
+                        "thread_name": "thread-1",
+                        "percent": 19.78,
+                        "duration": 1800.0,
+                    },
+                    {
+                        "process_name": "small_process",
+                        "thread_name": "small-thread",
+                        "percent": 5.495,
+                        "duration": 500.0,
+                    },
+                ],
+            },
         )

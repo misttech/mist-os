@@ -17,7 +17,12 @@ Binary module includes:
 How to use `run_cpu_breakdown`:
 1. `fx set` with the flag: `--with-host //src/performance/lib/trace_processing:run_cpu_breakdown`
 1. `fx build`
-1. `fx run_cpu_breakdown <path to trace JSON> <path to output>`
+1. `fx run_cpu_breakdown by_cpu <path to trace JSON> <path to output>`
+
+How to use `run_cpu_breakdown` in aggregate mode:
+1. `fx set` with the flag: `--with-host //src/performance/lib/trace_processing:run_cpu_breakdown`
+1. `fx build`
+1. `fx run_cpu_breakdown by_freq <path to trace JSON> <path to output> --hardware_profile="vim3"`
 
 How to run tests for `cpu_breakdown`:
 1. `fx set` with the flag: `--with-host //src/performance/lib:tests,//src/performance/lib/trace_processing:run_cpu_breakdown`

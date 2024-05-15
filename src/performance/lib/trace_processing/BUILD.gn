@@ -12,7 +12,9 @@ python_library("trace_processing") {
   enable_mypy = true
   sources = [
     "__init__.py",
+    "hardware_configs.py",
     "metrics/__init__.py",
+    "metrics/agg_cpu_breakdown.py",
     "metrics/app_render.py",
     "metrics/cpu.py",
     "metrics/cpu_breakdown.py",

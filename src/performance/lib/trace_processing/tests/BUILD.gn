@@ -32,6 +32,12 @@ if (is_host) {
     outputs = [ "${target_out_dir}/runtime_deps/{{source_file_part}}" ]
   }
 
+  python_host_test("agg_cpu_breakdown_test") {
+    enable_mypy = true
+    main_source = "agg_cpu_breakdown_test.py"
+    libraries = [ "//src/performance/lib/trace_processing" ]
+  }
+
   python_host_test("cpu_breakdown_test") {
     enable_mypy = true
     main_source = "cpu_breakdown_test.py"
@@ -77,6 +83,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
+    ":agg_cpu_breakdown_test($host_toolchain)",
     ":cpu_breakdown_test($host_toolchain)",
     ":power_metrics_test($host_toolchain)",
     ":trace_importing_test($host_toolchain)",
