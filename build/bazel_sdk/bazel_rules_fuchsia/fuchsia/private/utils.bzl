@@ -140,12 +140,48 @@ def wrap_executable(ctx, executable, *arguments, script_name = None):
     return wrapper, collect_runfiles(ctx, executable, arguments, ignore_types = ["string"])
 
 def _add_providers_info(implementation):
+    """Wrap a rule implementation function to add a FuchsiaProvidersInfo provider.
+
+    Args:
+       implementation: A rule implementation function, i.e. a callable object that
+          takes a single rule 'ctx' value as argument and returns a list of
+          providers.
+
+    Returns:
+       A new rule implementation function / callable object, which returns the
+       result of calling 'implementation(ctx)', after potentially appending a
+       FuchsiaProvidersInfo provider to it.
+    """
+
     def _impl(ctx):
         return track_providers(implementation(ctx))
 
     return _impl
 
 def _add_default_executable(implementation):
+    """Wrap a rule implementation function to add a default stub executable if needed.
+
+    This returns a new callable object that acts as a rule implementation function,
+    i.e. it accepts a single 'ctx' rule context argument, and will first call
+    'implementation(ctx)' with it to retrieve a list of provider values.
+
+    If that list does not include a DefaultInfo value, a new one will be appended,
+    which points to a stub shell script executable. The script will print an error
+    message at build time to indicate that the target is not really executable.
+
+    Used internally by rule_variants(), see related documentation for more details.
+
+    Args:
+       implementation: A rule implementation function, i.e. a callable object that
+          takes a single rule 'ctx' value as argument and returns a list of
+          providers.
+
+    Returns:
+       A new rule implementation function / callable object, which returns the
+       result of calling 'implementation(ctx)', after potentially appending a
+       DefaultInfo value to it.
+    """
+
     def _impl(ctx):
         providers = implementation(ctx)
         if not [provider for provider in providers if type(provider) == "DefaultInfo"]:
@@ -157,14 +193,50 @@ def _add_default_executable(implementation):
 def rule_variants(implementation, variants = [], attrs = {}, **rule_kwargs):
     """Creates variants of a rule.
 
-    Valid variants:
-     - None: Behaves like `rule` natively.
-     - "executable": Sets executable = True and adds a stub executable if
-       DefaultInfo is not provided by implementation.
-     - "test": Sets test = True and adds a stub executable if DefaultInfo is not
-       provided by implementation.
+    Creates one or more rule() objects whose attributes vary slightly based on
+    the value of items in the 'variants' input list, and which share a common
+    implementation function.
 
-    All other arguments will be forwarded to rule.
+    Example usage:
+
+       ```
+       def _foo_impl(ctx):
+           ....
+
+       foo_binary, foo_test = rule_variants(
+            _foo_impl, ["executable", "test"], attrs = {...})
+       ```
+
+    Args:
+        implementation: base rule implementation function used by all
+           result rule instances. Must take a single 'ctx' argument.
+
+        variants: A list of variant, each item can be None or a string
+           describing a non-default variant. Valid values are:
+
+           - None: Create a rule() that uses 'implementation' and 'attrs' directly.
+                This sets both 'executable' and 'test' to False.
+
+           - "executable": Create a rule() that uses an implementation function
+                that calls 'implementation' then looks at its result, and will
+                add a stub executable *if* it does not include an executable in
+                its DefaultInfo value (this is used to print an error message
+                at build or run time to tell the user the target is not really
+                executable). Sets 'executable' to True, and 'test' to False.
+
+            - "test": Similar to "executable" but sets 'test' to True, making
+                the target usable with `bazel test`.
+
+        attrs: A rule() 'attrs' dictionary value, providing common attributes
+           for all result rule instances. For each result rule() value, this will
+           be augmented with a private '_variant' attribute corresponding to
+           the 'variants' item value used to create it.
+
+        rule_kwargs: Extra arguments are passed directly to each result rule()
+           constructor.
+
+    Returns:
+        A list of rule() instances, one per item in 'variants'.
     """
     return [rule(
         executable = variant == "executable",
