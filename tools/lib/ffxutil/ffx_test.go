@@ -98,5 +98,69 @@ func TestFFXInstance(t *testing.T) {
 	if _, err := ffx.GetSshAuthorizedKeys(ctx); err != nil {
 		t.Errorf("failed to get ssh private key: %s", err)
 	}
+}
 
+func TestFFXPBArtifacts(t *testing.T) {
+
+	for _, testcase := range []struct {
+		name      string
+		output    string
+		errOutput string
+		exitCode  int
+		wantPaths []string
+		wantError error
+	}{
+		{
+			name:      "OK paths",
+			output:    `{"ok": {"paths": [ "pb1.txt", "pb2.txt"]}}`,
+			errOutput: "",
+			exitCode:  0,
+			wantPaths: []string{"pb1.txt", "pb2.txt"},
+			wantError: nil,
+		},
+		{
+			name:      "pb not found paths",
+			output:    `{"user_error": {"message": "path not found"}}`,
+			errOutput: "path not found",
+			exitCode:  1,
+			wantPaths: []string{},
+			wantError: fmt.Errorf("user error: %s", "path not found"),
+		},
+		{
+			name:      "pb not found paths",
+			output:    `{"unexpected_error": {"message": "somthing went wrong"}}`,
+			errOutput: "exception processing metadata",
+			exitCode:  1,
+			wantPaths: []string{},
+			wantError: fmt.Errorf("unexpected error: somthing went wrong"),
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			var testErr error = nil
+			if testcase.exitCode != 0 {
+				testErr = fmt.Errorf("Exit Code %d: %s", testcase.exitCode, testcase.errOutput)
+			}
+			paths, err := processPBArtifactsResult(testcase.output, testErr)
+
+			if err != nil {
+				if testcase.wantError != nil {
+					if err.Error() != testcase.wantError.Error() {
+						t.Errorf("Got error %q wanted error: %q", err, testcase.wantError)
+					}
+				} else if err != nil {
+					t.Errorf("Test error: %s", err)
+				}
+			}
+
+			if len(paths) != len(testcase.wantPaths) {
+				t.Errorf("Length mismatch Got  %v want %v", paths, testcase.wantPaths)
+			}
+			for i := range paths {
+				if paths[i] != testcase.wantPaths[i] {
+					t.Errorf("mismatch index %d. Got  %v want %v", i, paths, testcase.wantPaths)
+				}
+			}
+		})
+
+	}
 }

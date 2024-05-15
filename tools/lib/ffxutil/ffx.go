@@ -80,6 +80,19 @@ type ConfigSettings struct {
 	Settings map[string]any
 }
 
+// Output for get-artifacts
+type ProductArtifacts struct {
+	Ok struct {
+		Paths []string `json:"paths"`
+	} `json:"ok"`
+	UserError struct {
+		Message string `json:"message"`
+	} `json:"user_error"`
+	UnexpectedError struct {
+		Message string `json:"message"`
+	} `json:"unexpected_error"`
+}
+
 // FFXWithTarget returns a copy of the provided ffx instance associated with
 // the provided target. This copy should use the same ffx daemon but run
 // commands with the new target.
@@ -307,7 +320,7 @@ func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (stri
 		f.stdout = origStdout
 	}()
 	if err := f.Run(ctx, args...); err != nil {
-		return "", err
+		return strings.TrimSpace(output.String()), err
 	}
 	return strings.TrimSpace(output.String()), nil
 }
@@ -446,12 +459,34 @@ func (f *FFXInstance) GetSshAuthorizedKeys(ctx context.Context) (string, error) 
 // GetPBArtifacts returns a list of the artifacts required for the specified artifactsGroup (flash or emu).
 // The returned list are relative paths to the pbPath.
 func (f *FFXInstance) GetPBArtifacts(ctx context.Context, pbPath string, artifactsGroup string) ([]string, error) {
-	output, err := f.RunAndGetOutput(ctx, "--config", "ffx_product_get_artifacts=true", "product", "get-artifacts", pbPath, "-r", "-g", artifactsGroup)
-	if err != nil {
-		return nil, err
+	raw, err := f.RunAndGetOutput(ctx, "--machine", "json", "product", "get-artifacts", pbPath, "-r", "-g", artifactsGroup)
+
+	return processPBArtifactsResult(raw, err)
+}
+
+func processPBArtifactsResult(raw string, err error) ([]string, error) {
+
+	if raw == "" {
+		if err == nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("No output received from command")
+
 	}
 
-	return strings.Split(output, "\n"), nil
+	// If there was an error, parse the output first since it will be a stable interface, otherwise fall back.
+	var result ProductArtifacts
+	err = json.Unmarshal([]byte(raw), &result)
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing output %s: %v", raw, err)
+	}
+	if result.UnexpectedError.Message != "" {
+		return nil, fmt.Errorf("unexpected error: %s", result.UnexpectedError.Message)
+	}
+	if result.UserError.Message != "" {
+		return nil, fmt.Errorf("user error: %s", result.UserError.Message)
+	}
+	return result.Ok.Paths, nil
 }
 
 // GetImageFromPB returns an image from a product bundle.
