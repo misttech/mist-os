@@ -10,19 +10,18 @@ The steps are:
 1. [Speed up the build (Optional)](#speed-up-the-build).
 1. [Build Fuchsia](#build-fuchsia).
 
-## 1. Prerequisites {#prerequisites}
+## Prerequisites {#prerequisites .numbered}
 
-Before you start, check out the following requirements:
+This guide requires the following prerequisite items:
 
 * [Source code setup](#source-code-setup)
 * [Hardware requirements](#hardware-requirements)
 
 ### Source code setup {#source-code-setup}
 
-Complete the
-[Download the Fuchsia source code](/docs/get-started/get_fuchsia_source.md)
-guide to download the Fuchsia source code and set up the Fuchsia development
-environment on your machine.
+**Complete the [Download the Fuchsia source code][get-fuchsia-source] guide.**
+This guide helps you download the Fuchsia source code and set up the Fuchsia
+development environment on your host machine.
 
 ### Hardware requirements {#hardware-requirements}
 
@@ -33,12 +32,12 @@ architectures:
 - x86-64 macOS
 - ARM64 macOS
 
-Note: Windows is not supported.
+**Windows is not supported.**
 
-## 2. Set your build configuration {#set-your-build-configuration}
+## Set your build configuration {#set-your-build-configuration .numbered}
 
 Fuchsia's build configuration informs the build system which product to
-build and which architecture to build for.
+build and which architecture to use.
 
 To set your Fuchsia build configuration, run the following
 [`fx set`][fx-set-reference] command:
@@ -53,53 +52,34 @@ Replace the following:
   `workbench_eng`.
 * `BOARD`: The architecture of the product; for example, `x64`.
 
-The example command below sets a build configuration to `core.x64`:
+The example command below sets the build configuration to `core.x64`:
 
 ```posix-terminal
 fx set core.x64
 ```
 
-In this example:
-
-  * `core` is a product with the minimum feature set of Fuchsia, including
-     common network capabilities.
-  * `x64` is a board that runs on a wide range of x64 devices, including the
-    Fuchsia emulator (FEMU), which is based on the open source emulator
-    [QEMU][qemu]{:.external}.
+  * `core` is a product with the minimum feature set of Fuchsia, which includes
+    network capabilities.
+  * `x64` is a board that can run on a wide range of x64 devices, including the
+    Fuchsia emulator ([FEMU][femu]).
 
 On the other hand, the example below sets the build configuration to
-`workbench_eng.x64`, which is commonly used to
-[install Fuchsia's workbench product on a device][build-workbench]:
+[`workbench_eng.x64`][build-workbench]:
 
 ```posix-terminal
 fx set workbench_eng.x64
 ```
 
-The list of possible boards and products is dynamic. Both lists can be gleaned
-starting from the root of the fuchsia repository. For boards see
-[boards](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/boards/)
+The lists of possible [boards][boards] and [products][products] are aggregated
+from the root of the Fuchsia source repository. For more information, see
+[Configure a build][configure-a-build].
 
-for products, see
-[products](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/products/)
+## Speed up the build (Optional) {#speed-up-the-build .numbered}
 
+Note: This step is **not required** for building Fuchsia.
 
-For more information on the build configuration,
-see [Configure a build](/docs/development/build/fx.md#configure-a-build).
-
-## 3. Speed up the build (Optional) {#speed-up-the-build}
-
-Note: This step is not required to build Fuchsia, but it's recommended
-since it can save you a lot of time when you build Fuchsia.
-
-To speed up the Fuchsia build, you can use the following service:
-
-*   [Install ccache](#install-ccache)
-
-### Install ccache {#install-ccache}
-
-To accelerate the Fuchsia build locally,
-use [`ccache`](https://ccache.dev/){:.external} to cache
-C and C++ artifacts from previous builds.
+To accelerate the Fuchsia build locally, use [`ccache`][ccache]{:.external}
+to cache C and C++ artifacts from previous builds.
 
 * {Linux}
 
@@ -131,18 +111,18 @@ To override this default behavior, specify the following flags to `fx set`:
     <code class="devsite-terminal">fx set <var>PRODUCT</var>.<var>BOARD</var> --no-ccache</code>
     </pre>
 
-## 4. Build Fuchsia {#build-fuchsia}
+## Build Fuchsia {#build-fuchsia .numbered}
 
 The [`fx build`][fx-build-reference] command executes the build to transform
 source code into packages and other build artifacts.
 
 To build Fuchsia, run the following command:
 
-Note: Building Fuchsia can take up to 90 minutes.
-
 ```posix-terminal
 fx build
 ```
+
+Note: Building Fuchsia can take up to 90 minutes.
 
 When you modify source code, run the `fx build` command again to perform an
 incremental build, or run the `fx -i build` command to start a watcher, which
@@ -161,7 +141,12 @@ However, if you want to run Fuchsia on a hardware device, see
 
 <!-- Reference links -->
 
+[get-fuchsia-source]:/docs/get-started/get_fuchsia_source.md
 [build-workbench]: /docs/development/build/build_workbench.md
 [fx-set-reference]: https://fuchsia.dev/reference/tools/fx/cmd/set
 [fx-build-reference]: https://fuchsia.dev/reference/tools/fx/cmd/build
-[qemu]: https://www.qemu.org/
+[femu]: /docs/get-started/set_up_femu.md
+[boards]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/boards/
+[products]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/products/
+[configure-a-build]: /docs/development/build/fx.md#configure-a-build
+[ccache]: https://ccache.dev/
