@@ -248,6 +248,11 @@ declare_args() {
   #       by running both and comparing results.
   #
   link_rbe_check = "none"
+
+  # Controls whether or not to download (often large) unstripped linker
+  # outputs.  When downloading is disabled, the build produces stubs
+  # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+  link_rbe_download_unstripped_outputs = true
 }
 
 RBE_EXEC_STRATEGY_MAP = {

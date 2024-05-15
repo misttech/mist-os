@@ -1120,6 +1120,13 @@ template("clang_toolchain") {
             _concurrent_jobs = concurrent_jobs.remote
             _linker_prefix_list += _link_rbe_exec_strategy_flags
           }
+          if (!link_rbe_download_unstripped_outputs) {
+            _linker_prefix_list += [
+              "--download_outputs=false",
+              "--output-is-executable",  # workaround for b/285030257
+            ]  # The remote link wrapper will download everything except the
+               # main output.
+          }
           _linker_prefix_list += [
             "--preserve_unchanged_output_mtime",
             "--",
