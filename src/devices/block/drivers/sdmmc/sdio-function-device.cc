@@ -389,13 +389,13 @@ SdioFunctionDevice::GetDevHwInfo(
               .cccr_vsn = info.dev_hw_info.cccr_vsn,
               .caps =
                   static_cast<fuchsia_hardware_sdio::SdioDeviceCapabilities>(info.dev_hw_info.caps),
+              .max_tran_speed = info.dev_hw_info.max_tran_speed,
           },
       .func_hw_info =
           {
               .manufacturer_id = info.func_hw_info.manufacturer_id,
               .product_id = info.func_hw_info.product_id,
               .max_blk_size = info.func_hw_info.max_blk_size,
-              .max_tran_speed = info.func_hw_info.max_tran_speed,
               .fn_intf_code = info.func_hw_info.fn_intf_code,
           },
       .host_max_transfer_size = info.host_max_transfer_size,

@@ -770,8 +770,8 @@ TEST_F(SdioControllerDeviceTest, ProcessCisFunction0) {
   EXPECT_OK(sdio_controller_device_->SdioGetDevHwInfo(0, &info));
 
   EXPECT_EQ(info.dev_hw_info.num_funcs, 6);
+  EXPECT_EQ(info.dev_hw_info.max_tran_speed, 25000);
   EXPECT_EQ(info.func_hw_info.max_blk_size, 512);
-  EXPECT_EQ(info.func_hw_info.max_tran_speed, 25000);
   EXPECT_EQ(info.func_hw_info.manufacturer_id, 0xbeef);
   EXPECT_EQ(info.func_hw_info.product_id, 0xcafe);
 }

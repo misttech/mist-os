@@ -1050,8 +1050,9 @@ zx_status_t SdioControllerDevice::ParseFuncExtTuple(uint8_t fn_idx, const SdioFu
                                   SDIO_CIS_TPL_FUNCE_MAX_TRAN_SPEED_VAL_LOC);
     uint8_t speed_unit = GetBitsU8(tup.tuple_body[3], SDIO_CIS_TPL_FUNCE_MAX_TRAN_SPEED_UNIT_MASK,
                                    SDIO_CIS_TPL_FUNCE_MAX_TRAN_SPEED_UNIT_LOC);
-    func->hw_info.max_tran_speed = sdio_cis_tpl_funce_tran_speed_val[speed_val] *
-                                   sdio_cis_tpl_funce_tran_speed_unit[speed_unit];
+    // MAX_TRAN_SPEED is set in the function 0 CIS tuple but applies to all functions on the card.
+    hw_info_.max_tran_speed = sdio_cis_tpl_funce_tran_speed_val[speed_val] *
+                              sdio_cis_tpl_funce_tran_speed_unit[speed_unit];
     return ZX_OK;
   }
 

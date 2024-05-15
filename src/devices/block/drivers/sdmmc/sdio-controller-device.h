@@ -184,7 +184,7 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   std::atomic<bool> shutdown_ = false;
   std::array<zx::interrupt, SDIO_MAX_FUNCS> sdio_irqs_;
   std::array<SdioFunction, SDIO_MAX_FUNCS> funcs_ TA_GUARDED(lock_);
-  sdio_device_hw_info_t hw_info_ TA_GUARDED(lock_);
+  sdio_device_hw_info_t hw_info_ TA_GUARDED(lock_) = {};
   bool tuned_ = false;
   std::atomic<bool> tuning_in_progress_ = false;
   inspect::Inspector inspector_;

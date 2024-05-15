@@ -15,7 +15,6 @@ type SdioFuncHwInfo = struct {
     manufacturer_id uint32;
     product_id uint32;
     max_blk_size uint32;
-    max_tran_speed uint32;
     fn_intf_code uint8;
 };
 
@@ -45,6 +44,7 @@ type SdioDeviceHwInfo = struct {
     sdio_vsn uint32;
     cccr_vsn uint32;
     caps uint32;
+    max_tran_speed uint32;
 };
 
 type SdioHwInfo = struct {
