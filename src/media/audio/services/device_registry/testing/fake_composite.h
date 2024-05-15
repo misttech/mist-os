@@ -242,9 +242,7 @@ class FakeComposite
     for (auto& element_iter : elements_) {
       if (element_iter.first == element_id) {
         return (element_iter.second.element.type() ==
-                    fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint &&
-                element_iter.second.element.type_specific()->endpoint()->type() ==
-                    fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
+                fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer);
       }
     }
     return false;  // We didn't find the element.

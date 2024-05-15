@@ -630,12 +630,8 @@ void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
   // buffers, DAI interconnects and other processing elements), allowing their configuration and
   // observability via the virtual audio FIDL APIs.
   fuchsia_hardware_audio_signalprocessing::Element ring_buffer;
-  fuchsia_hardware_audio_signalprocessing::Endpoint ring_buffer_endpoint;
-  ring_buffer_endpoint.type(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
   ring_buffer.id(kRingBufferId)
-      .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
-      .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
-          std::move(ring_buffer_endpoint)));
+      .type(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer);
 
   fuchsia_hardware_audio_signalprocessing::Element dai;
   fuchsia_hardware_audio_signalprocessing::Endpoint dai_endpoint;

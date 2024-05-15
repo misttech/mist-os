@@ -712,13 +712,17 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   ASSERT_EQ(kNumberOfElements, elements_result->processing_elements().size());
   for (size_t i = 0; i < kNumberOfElements; ++i) {
     auto& element = elements_result->processing_elements()[i];
-    ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element.type());
-    ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
-              element.type_specific()->endpoint()->plug_detect_capabilities());
-    auto watch_element_result = signal_client->WatchElementState(*element.id());
-    ASSERT_TRUE(watch_element_result.is_ok());
-    ASSERT_EQ(true,
-              watch_element_result->state().type_specific()->endpoint()->plug_state()->plugged());
+    ASSERT_TRUE(element.type() ==
+                    fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer ||
+                element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
+    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
+                element.type_specific()->endpoint()->plug_detect_capabilities());
+      auto watch_element_result = signal_client->WatchElementState(*element.id());
+      ASSERT_TRUE(watch_element_result.is_ok());
+      ASSERT_EQ(true,
+                watch_element_result->state().type_specific()->endpoint()->plug_state()->plugged());
+    }
   }
   auto& element0 = elements_result->processing_elements()[0];
   auto& element1 = elements_result->processing_elements()[1];
@@ -729,18 +733,18 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   auto& element6 = elements_result->processing_elements()[6];
   auto& element7 = elements_result->processing_elements()[7];
   auto& element8 = elements_result->processing_elements()[8];
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-            element0.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-            element1.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-            element2.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-            element3.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-            element4.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
-            element5.type_specific()->endpoint()->type());
+
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element0.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element1.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element2.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element3.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element4.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element5.type());
+
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element6.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element7.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element8.type());
+
   ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
             element6.type_specific()->endpoint()->type());
   ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,

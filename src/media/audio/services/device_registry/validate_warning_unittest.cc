@@ -1395,6 +1395,8 @@ TEST(ValidateWarningTest, ElementStateInconsistent) {
 TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
   ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
 
+  // Test negative Latency here
+
   // `turn_on_delay` is optional, but if present then it cannot be negative.
   fhasp::ElementState state_with_negative_turn_on_delay = kEndpointElementState;
   state_with_negative_turn_on_delay.turn_on_delay(ZX_NSEC(-1));
@@ -1589,9 +1591,8 @@ TEST(ValidateWarningTest, EndpointElementStateInvalid) {
   {
     auto endp_state_plugged_unsupported = kEndpointElementState;
     endp_state_plugged_unsupported.type_specific()->endpoint()->plug_state()->plugged(false);
-    EXPECT_FALSE(
-        ValidateEndpointElementState(endp_state_plugged_unsupported, kRingBufferEndpointElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plugged_unsupported, kRingBufferEndpointElement));
+    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plugged_unsupported, kRingBufferElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plugged_unsupported, kRingBufferElement));
   }
   {
     auto endp_state_plug_time_none = kEndpointElementState;

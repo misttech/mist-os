@@ -58,6 +58,11 @@ type ElementType = flexible enum {
     /// The start/end of a pipeline.
     @available(added=12)
     ENDPOINT = 12;
+
+    /// Ring Buffer.
+    /// This is one of two types of elements that can start/end processing pipelines.
+    @available(added=20)
+    RING_BUFFER = 13;
 };
 
 /// Type-specific Parameters for an `Element`.

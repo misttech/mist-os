@@ -971,6 +971,10 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     const auto& state = element_map_entry.second.state;
     if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
         !element.type_specific()->endpoint().has_value() ||
+        !element.type_specific()->endpoint()->type().has_value() ||
+        element.type_specific()->endpoint()->type() !=
+            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect ||
+        !element.type_specific()->endpoint()->plug_detect_capabilities().has_value() ||
         element.type_specific()->endpoint()->plug_detect_capabilities() !=
             fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;

@@ -283,9 +283,7 @@ void FakeComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
     completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
-  if (*element_pair_iter->second.element.type() != fhasp::ElementType::kEndpoint ||
-      *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
-          fhasp::EndpointType::kRingBuffer) {
+  if (*element_pair_iter->second.element.type() != fhasp::ElementType::kRingBuffer) {
     ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
     completer.Reply(fit::error(fha::DriverError::kWrongType));
     return;
@@ -332,9 +330,7 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
     completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
     return;
   }
-  if (*element_pair_iter->second.element.type() != fhasp::ElementType::kEndpoint ||
-      *element_pair_iter->second.element.type_specific()->endpoint()->type() !=
-          fhasp::EndpointType::kRingBuffer) {
+  if (*element_pair_iter->second.element.type() != fhasp::ElementType::kRingBuffer) {
     ADR_WARN_METHOD() << "wrong type for element_id " << element_id;
     completer.Reply(fit::error(fha::DriverError::kWrongType));
     return;

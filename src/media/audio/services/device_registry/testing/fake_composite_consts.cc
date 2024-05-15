@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
+#include <lib/zx/time.h>
 
 #include <unordered_map>
 
@@ -212,22 +213,14 @@ const fhasp::Element FakeComposite::kDestDaiElement{{
 }};
 const fhasp::Element FakeComposite::kSourceRbElement{{
     .id = kSourceRbElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kRingBuffer,
-        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
-    }}),
+    .type = fhasp::ElementType::kRingBuffer,
     .description = "Endpoint::RingBuffer source element description",
     .can_stop = false,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kDestRbElement{{
     .id = kDestRbElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kRingBuffer,
-        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
-    }}),
+    .type = fhasp::ElementType::kRingBuffer,
     .description = "Endpoint::RingBuffer destination element description",
     .can_stop = false,
     .can_bypass = false,
@@ -270,23 +263,11 @@ const fhasp::ElementState FakeComposite::kDestDaiElementInitState{{
     .bypassed = false,
 }};
 const fhasp::ElementState FakeComposite::kSourceRbElementInitState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
-        .plug_state = fhasp::PlugState{{
-            .plugged = true,
-            .plug_state_time = 0,
-        }},
-    }}),
     .latency = kSourceRbElementLatency,
     .started = true,
     .bypassed = false,
 }};
 const fhasp::ElementState FakeComposite::kDestRbElementInitState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
-        .plug_state = fhasp::PlugState{{
-            .plugged = true,
-            .plug_state_time = 0,
-        }},
-    }}),
     .latency = kDestRbElementLatency,
     .started = true,
     .bypassed = false,

@@ -1575,20 +1575,14 @@ TEST_F(CompositeTest, GetElements) {
 
   EXPECT_EQ(elements->at(2).id(), FakeComposite::kSourceRbElementId);
   EXPECT_EQ(elements->at(3).id(), FakeComposite::kDestRbElementId);
-  EXPECT_EQ(elements->at(2).type(), fhasp::ElementType::kEndpoint);
-  EXPECT_EQ(elements->at(3).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(2).type(), fhasp::ElementType::kRingBuffer);
+  EXPECT_EQ(elements->at(3).type(), fhasp::ElementType::kRingBuffer);
   EXPECT_FALSE(*elements->at(2).can_bypass());
   EXPECT_FALSE(*elements->at(3).can_bypass());
   EXPECT_FALSE(*elements->at(2).can_stop());
   EXPECT_FALSE(*elements->at(3).can_stop());
   EXPECT_EQ(*elements->at(2).description(), *FakeComposite::kSourceRbElement.description());
   EXPECT_EQ(*elements->at(3).description(), *FakeComposite::kDestRbElement.description());
-  EXPECT_EQ(*elements->at(2).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
-  EXPECT_EQ(*elements->at(3).type_specific()->endpoint()->type(), fhasp::EndpointType::kRingBuffer);
-  EXPECT_EQ(elements->at(2).type_specific()->endpoint()->plug_detect_capabilities(),
-            fhasp::PlugDetectCapabilities::kHardwired);
-  EXPECT_EQ(elements->at(3).type_specific()->endpoint()->plug_detect_capabilities(),
-            fhasp::PlugDetectCapabilities::kHardwired);
 
   EXPECT_EQ(elements->at(4).id(), FakeComposite::kMuteElementId);
   EXPECT_EQ(elements->at(4).type(), fhasp::ElementType::kMute);
@@ -1701,7 +1695,7 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
   ASSERT_TRUE(state.latency().has_value());
-  ASSERT_TRUE(state.type_specific().has_value());
+  EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
   EXPECT_FALSE(state.enabled().has_value());
@@ -1713,18 +1707,11 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
                   .has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
             FakeComposite::kSourceRbElementLatency.latency_frames().value());
-  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
-  const auto& endpt_state3 = state.type_specific()->endpoint();
-  ASSERT_TRUE(endpt_state3.has_value());
-  ASSERT_TRUE(endpt_state3->plug_state().has_value());
-  ASSERT_TRUE(endpt_state3->plug_state()->plugged().has_value());
-  EXPECT_TRUE(*endpt_state3->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state3->plug_state()->plug_state_time(), 0);
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestRbElementId)->second;
   ASSERT_TRUE(state.latency().has_value());
-  ASSERT_TRUE(state.type_specific().has_value());
+  EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
   EXPECT_FALSE(state.enabled().has_value());
@@ -1733,13 +1720,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.latency()->latency_frames().has_value());
   EXPECT_EQ(state.latency()->latency_frames().value(),
             FakeComposite::kDestRbElementLatency.latency_frames().value());
-  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
-  const auto& endpt_state4 = state.type_specific()->endpoint();
-  ASSERT_TRUE(endpt_state4.has_value());
-  ASSERT_TRUE(endpt_state4->plug_state().has_value());
-  ASSERT_TRUE(endpt_state4->plug_state()->plugged().has_value());
-  EXPECT_TRUE(*endpt_state4->plug_state()->plugged());
-  EXPECT_EQ(*endpt_state4->plug_state()->plug_state_time(), 0);
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kMuteElementId)->second;
@@ -1837,12 +1817,17 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_FALSE(state_received.vendor_specific_data().has_value());
 
       EXPECT_FALSE(state_received.enabled().has_value());
+
       ASSERT_TRUE(state_received.started().has_value());
       EXPECT_TRUE(*state_received.started());
+
       ASSERT_TRUE(state_received.bypassed().has_value());
       EXPECT_FALSE(*state_received.bypassed());
-    } else {
+    } else if (element_id == FakeComposite::kDestDaiElementId ||
+               element_id == FakeComposite::kSourceDaiElementId) {
       ASSERT_TRUE(state_received.type_specific().has_value());
+      ASSERT_EQ(state_received.type_specific()->Which(),
+                fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
       ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
       ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state().has_value());
       ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state()->plugged().has_value());
@@ -1850,6 +1835,23 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
           state_received.type_specific()->endpoint()->plug_state()->plug_state_time().has_value());
       EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
                 plug_change_time_to_inject.get());
+      ASSERT_TRUE(state_received.latency().has_value());
+      ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
+      EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
+
+      ASSERT_TRUE(state_received.vendor_specific_data().has_value());
+      ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
+      EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
+
+      EXPECT_FALSE(state_received.enabled().has_value());
+
+      ASSERT_TRUE(state_received.started().has_value());
+      EXPECT_TRUE(state_received.started());
+
+      ASSERT_TRUE(state_received.bypassed().has_value());
+      EXPECT_FALSE(*state_received.bypassed());
+    } else {
+      EXPECT_FALSE(state_received.type_specific().has_value());
 
       ASSERT_TRUE(state_received.latency().has_value());
       ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
@@ -1860,12 +1862,13 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
 
       EXPECT_FALSE(state_received.enabled().has_value());
+
       ASSERT_TRUE(state_received.started().has_value());
       EXPECT_TRUE(state_received.started());
+
       ASSERT_TRUE(state_received.bypassed().has_value());
       EXPECT_FALSE(*state_received.bypassed());
     }
-
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())
         << "WatchElementState response received for unknown element_id " << element_id;
@@ -1960,8 +1963,10 @@ TEST_F(CompositeTest, SetElementState) {
   EXPECT_FALSE(new_state.vendor_specific_data().has_value());
 
   EXPECT_FALSE(new_state.enabled().has_value());
+
   ASSERT_TRUE(new_state.started().has_value());
   EXPECT_TRUE(*new_state.started());
+
   ASSERT_TRUE(new_state.bypassed().has_value());
   EXPECT_FALSE(*new_state.bypassed());
 }

@@ -850,14 +850,8 @@ void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
   // One ring buffer per TDM engine.
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     fuchsia_hardware_audio_signalprocessing::Element ring_buffer;
-    fuchsia_hardware_audio_signalprocessing::Endpoint ring_buffer_endpoint;
-    ring_buffer_endpoint.type(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer)
-        .plug_detect_capabilities(
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
     ring_buffer.id(kRingBufferIds[i])
-        .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
-        .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
-            std::move(ring_buffer_endpoint)))
+        .type(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer)
         .can_stop(false);
     elements.push_back(std::move(ring_buffer));
   }

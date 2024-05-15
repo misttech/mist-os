@@ -354,6 +354,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementType.RING_BUFFER",
+        "value": "13"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.hardware.audio.signalprocessing/ElementType.SAMPLE_RATE_CONVERSION",
         "value": "11"
     },

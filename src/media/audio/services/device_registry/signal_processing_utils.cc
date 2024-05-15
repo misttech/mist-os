@@ -28,9 +28,7 @@ std::unordered_set<ElementId> ring_buffer_endpoints(
     const std::unordered_map<ElementId, ElementRecord>& element_map) {
   std::unordered_set<ElementId> ring_buffer_endpoints;
   for (const auto& element_entry_pair : element_map) {
-    if (element_entry_pair.second.element.type() == fhasp::ElementType::kEndpoint &&
-        element_entry_pair.second.element.type_specific()->endpoint()->type() ==
-            fhasp::EndpointType::kRingBuffer) {
+    if (element_entry_pair.second.element.type() == fhasp::ElementType::kRingBuffer) {
       ring_buffer_endpoints.insert(element_entry_pair.first);
     }
   }

@@ -24,10 +24,7 @@ TEST(SignalProcessingUtilsTest, MapElements) {
             fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
   EXPECT_TRUE(map.at(*kDaiEndpointElement.id()).element.can_stop().value_or(false));
 
-  EXPECT_EQ(*map.at(*kRingBufferEndpointElement.id()).element.type(),
-            *kRingBufferEndpointElement.type());
-  EXPECT_EQ(*map.at(*kRingBufferEndpointElement.id()).element.type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer);
+  EXPECT_EQ(*map.at(*kRingBufferElement.id()).element.type(), *kRingBufferElement.type());
 
   EXPECT_EQ(*map.at(*kAgcElement.id()).element.type(), *kAgcElement.type());
   EXPECT_FALSE(map.at(*kAgcElement.id()).element.can_stop().value_or(true));

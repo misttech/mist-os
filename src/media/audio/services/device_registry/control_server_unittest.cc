@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -601,7 +602,7 @@ TEST_F(ControlServerCompositeTest, CreateRingBuffer) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  // Validate every RingBuffer endpoint on this device.
+  // Validate every RingBuffer on this device.
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client_end, ring_buffer_server_end] =
@@ -711,7 +712,7 @@ TEST_F(ControlServerCompositeTest, ClientRingBufferDropDoesNotAffectControl) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  // Validate every RingBuffer endpoint on this device.
+  // Validate every RingBuffer on this device.
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client_end, ring_buffer_server_end] =
@@ -767,7 +768,7 @@ TEST_F(ControlServerCompositeTest, DriverRingBufferDropDoesNotAffectControl) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  // Validate every RingBuffer endpoint on this device.
+  // Validate every RingBuffer on this device.
   for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
     fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
     auto [ring_buffer_client, ring_buffer_server_end] =
@@ -821,7 +822,7 @@ TEST_F(ControlServerCompositeTest, SetDaiFormat) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  // Validate every Dai endpoint on this device.
+  // Validate every DaiEndpoint on this device.
   for (ElementId dai_element_id : device->dai_endpoint_ids()) {
     auto received_callback = false;
 
@@ -859,7 +860,7 @@ TEST_F(ControlServerCompositeTest, Reset) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  // Validate every Dai endpoint on this device.
+  // Validate every DaiEndpoint on this device.
   for (ElementId dai_element_id : device->dai_endpoint_ids()) {
     auto dai_format =
         SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
@@ -1245,6 +1246,10 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     const auto& state = element_map_entry.second.state;
     if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
         !element.type_specific()->endpoint().has_value() ||
+        !element.type_specific()->endpoint()->type().has_value() ||
+        element.type_specific()->endpoint()->type() !=
+            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect ||
+        !element.type_specific()->endpoint()->plug_detect_capabilities().has_value() ||
         element.type_specific()->endpoint()->plug_detect_capabilities() !=
             fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;

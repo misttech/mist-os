@@ -47,13 +47,10 @@ const fhasp::Element kDaiEndpointElement{{
     .can_stop = true,
     .can_bypass = false,
 }};
-const fhasp::Element kRingBufferEndpointElement{{
-    .id = kRingBufferEndpointElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kRingBuffer,
-        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
-    }}),
+const fhasp::Element kRingBufferElement{{
+    .id = kRingBufferEndpointElementId,  //
+    .type = fhasp::ElementType::kRingBuffer,
+    // .type_specific is missing
     // .description is missing
     // .can_stop is missing
     // .can_bypass is missing
@@ -158,21 +155,21 @@ const fhasp::Element kElementCannotBypass{{
 
 // Collections of Elements
 const std::vector<fhasp::Element> kElements{kDaiEndpointElement, kAgcElement, kDynamicsElement,
-                                            kRingBufferEndpointElement};
+                                            kRingBufferElement};
 const std::vector<fhasp::Element> kEmptyElements{};
 const std::vector<fhasp::Element> kElementsDuplicateId{kDaiEndpointElement, kDaiEndpointElement};
 const std::vector<fhasp::Element> kElementsWithNoId{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement, kElementNoId};
+    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement, kElementNoId};
 const std::vector<fhasp::Element> kElementsWithNoType{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement, kElementNoType};
+    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement, kElementNoType};
 const std::vector<fhasp::Element> kElementsWithNoRequiredTypeSpecific{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement,
+    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement,
     kElementWithoutRequiredTypeSpecific};
 const std::vector<fhasp::Element> kElementsWithWrongTypeSpecific{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement,
+    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement,
     kElementWrongTypeSpecific};
 const std::vector<fhasp::Element> kElementsWithEmptyDescription{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferEndpointElement,
+    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement,
     kElementEmptyDescription};
 
 const std::unordered_map<ElementId, ElementRecord> kEmptyElementMap{};

@@ -264,6 +264,8 @@ inline std::ostream& operator<<(
         return (out << "SAMPLE_RATE_CONVERSION");
       case fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint:
         return (out << "ENDPOINT");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer:
+        return (out << "RING_BUFFER");
       default:
         return (out << "OTHER (unknown enum)");
     }
@@ -370,7 +372,7 @@ inline std::ostream& operator<<(
         out << "DAI_INTERCONNECT ";
         break;
       case fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer:
-        out << "RING_BUFFER      ";
+        out << "RING_BUFFER(old) ";
         break;
       default:
         out << "OTHER (unknown)  ";

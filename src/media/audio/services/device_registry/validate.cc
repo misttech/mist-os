@@ -999,6 +999,8 @@ bool ValidateEndpointElementState(const fhasp::ElementState& element_state,
       !element.type_specific()->endpoint().has_value() ||
       // ... specifically including plug_detect_capabilities()
       !element.type_specific()->endpoint()->type().has_value() ||
+      *element.type_specific()->endpoint()->type() !=
+          fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect ||
       !element.type_specific()->endpoint()->plug_detect_capabilities().has_value() ||
       // ElementState must be type DaiEndpoint as well. type_specific endpoint() must exist
       !element_state.type_specific().has_value() ||
@@ -1283,6 +1285,7 @@ bool ValidateEndpointElement(const fhasp::Element& element) {
       element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEndpoint ||
       !element.type_specific()->endpoint().has_value() ||
       !element.type_specific()->endpoint()->type().has_value() ||
+      *element.type_specific()->endpoint()->type() != fhasp::EndpointType::kDaiInterconnect ||
       // plug_detect_capabilities must be present
       !element.type_specific()->endpoint()->plug_detect_capabilities().has_value()) {
     FX_LOGS(WARNING) << "Invalid Endpoint-specific fields";
@@ -1516,16 +1519,20 @@ bool ValidateTopology(const fhasp::Topology& topology,
   for (auto& [id, element_record] : element_map) {
     if (source_elements.find(id) != source_elements.end() &&
         destination_elements.find(id) == destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kEndpoint) {
-        FX_LOGS(WARNING) << "Element " << id << " has no incoming edges but is not an Endpoint! Is "
+      if (*element_record.element.type() != fhasp::ElementType::kEndpoint &&
+          *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "Element " << id
+                         << " has no incoming edges but is not an Endpoint or RingBuffer! Is "
                          << *element_record.element.type();
         return false;
       }
     }
     if (source_elements.find(id) == source_elements.end() &&
         destination_elements.find(id) != destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kEndpoint) {
-        FX_LOGS(WARNING) << "Element " << id << " has no outgoing edges but is not an Endpoint! Is "
+      if (*element_record.element.type() != fhasp::ElementType::kEndpoint &&
+          *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "Element " << id
+                         << " has no outgoing edges but is not an Endpoint or RingBuffer! Is "
                          << *element_record.element.type();
         return false;
       }

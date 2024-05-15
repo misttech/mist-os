@@ -584,7 +584,10 @@ TEST(ValidateTest, ValidateTopology) {
 
 TEST(ValidateTest, ValidateElements) { EXPECT_TRUE(ValidateElements(kElements)); }
 
-TEST(ValidateTest, ValidateElement) { EXPECT_TRUE(ValidateElement(kAgcElement)); }
+TEST(ValidateTest, ValidateElement) {
+  EXPECT_TRUE(ValidateElement(kAgcElement));
+  EXPECT_TRUE(ValidateElement(kRingBufferElement));
+}
 
 TEST(ValidateTest, ValidateDynamicsElement) {
   EXPECT_TRUE(ValidateDynamicsElement(kDynamicsElement));
@@ -592,12 +595,10 @@ TEST(ValidateTest, ValidateDynamicsElement) {
   EXPECT_TRUE(ValidateElement(kDynamicsElement));
 }
 
-TEST(ValidateTest, ValidateEndpointElement) {
+TEST(ValidateTest, ValidateDaiEndpointElement) {
   EXPECT_TRUE(ValidateEndpointElement(kDaiEndpointElement));
-  EXPECT_TRUE(ValidateEndpointElement(kRingBufferEndpointElement));
 
   EXPECT_TRUE(ValidateElement(kDaiEndpointElement));
-  EXPECT_TRUE(ValidateElement(kRingBufferEndpointElement));
 }
 
 TEST(ValidateTest, ValidateEqualizerElement) {
@@ -631,10 +632,8 @@ TEST(ValidateTest, ValidateDynamicsElementState) {
 
 TEST(ValidateTest, ValidateEndpointElementState) {
   EXPECT_TRUE(ValidateEndpointElementState(kEndpointElementState, kDaiEndpointElement));
-  EXPECT_TRUE(ValidateEndpointElementState(kEndpointElementState, kRingBufferEndpointElement));
 
   EXPECT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));
-  EXPECT_TRUE(ValidateElementState(kEndpointElementState, kRingBufferEndpointElement));
 }
 
 TEST(ValidateTest, ValidateEqualizerElementState) {
