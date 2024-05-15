@@ -225,6 +225,18 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
 }
 
 void Scheduler::Dump(FILE* output_target) {
+  // We're about to acquire the |queue_lock_| and fprintf some things.
+  // Depending on the FILE, calling fprintf may end up calling |DLog::Write|,
+  // which may call |Event::Signal|, which may re-enter the Scheduler.  If that
+  // happens while we're holding the |queue_lock_| that would be bad.
+  // |DLog::Write| has a hack that allows it to defer the Signal operation when
+  // there's an active chain lock transaction.  So even though we don't *need* a
+  // chain lock transaction, we establish one anyway in order to leverage the
+  // deferred Signal behavior and avoid a re-entrancy issue.
+  //
+  // TODO(https://fxbug.dev/331847876): Remove this hack once we have a better
+  // solution to scheduler re-entrancy issues.
+  ChainLockTransactionNoIrqSave clt{CLT_TAG("Scheduler::Dump")};
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
 
   fprintf(output_target,
@@ -282,6 +294,11 @@ void Scheduler::Dump(FILE* output_target) {
 }
 
 void Scheduler::DumpActiveThread(FILE* output_target) {
+  // See comment in |Scheduler::Dump|.
+  //
+  // TODO(https://fxbug.dev/331847876): Remove this hack once we have a better
+  // solution to scheduler re-entrancy issues.
+  ChainLockTransactionNoIrqSave clt{CLT_TAG("Scheduler::DumpActiveThread")};
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
 
   if (active_thread_ != nullptr) {
