@@ -552,6 +552,35 @@ impl BuiltinEnvironment {
         let mut root_input_builder =
             RootComponentInputBuilder::new(model.top_instance().clone(), &runtime_config);
 
+        // If capability passthrough is enabled, add capabilities offered from
+        // the parent to the input dictionary of the root component.
+        if capability_passthrough {
+            match fuchsia_fs::directory::open_in_namespace(
+                "/parent-offered",
+                fio::OpenFlags::empty(),
+            ) {
+                Ok(passthrough_dir) => match fuchsia_fs::directory::readdir(&passthrough_dir).await
+                {
+                    Ok(entries) => {
+                        for entry in entries {
+                            root_input_builder.add_namespace_protocol(&cm_rust::ProtocolDecl {
+                                name: cm_types::BoundedName::new(&entry.name).unwrap(),
+                                source_path: Some(
+                                    cm_types::Path::new(format!("/parent-offered/{}", &entry.name))
+                                        .unwrap(),
+                                ),
+                                delivery: cm_types::DeliveryType::Immediate,
+                            });
+                        }
+                    }
+                    Err(e) => tracing::warn!("failed to read entries in /parent-offered: {e}"),
+                },
+                Err(e) => {
+                    tracing::warn!("failed to open /parent-offered dir: {e}");
+                }
+            }
+        }
+
         for namespace_capability in model.top_instance().namespace_capabilities() {
             match namespace_capability {
                 cm_rust::CapabilityDecl::Protocol(p) => {

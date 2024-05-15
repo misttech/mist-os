@@ -6,9 +6,11 @@ use {
     crate::{error::Error, local_component_runner::LocalComponentRunnerBuilder},
     anyhow::{format_err, Context as _},
     cm_rust::{
-        CapabilityDecl, DirectoryDecl, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
-        ExposeSource, ExposeTarget, FidlIntoNative, NativeIntoFidl, ProtocolDecl,
+        Availability, CapabilityDecl, DependencyType, DirectoryDecl, ExposeDecl,
+        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, FidlIntoNative,
+        NativeIntoFidl, ProtocolDecl, SourceName, UseDecl, UseProtocolDecl, UseSource,
     },
+    cm_types::{Path, RelativePath},
     component_events::{events::Started, matcher::EventMatcher},
     fidl::endpoints::{
         self, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
@@ -37,6 +39,10 @@ pub const DEFAULT_COLLECTION_NAME: &'static str = "realm_builder";
 /// The default path of the remote directory through which a nested component
 /// manager serves capabilities exposed by the root component.
 const ROOT_CAPABILITY_PATH: &'static str = "/root-exposed";
+
+/// The default path of the directory in the nested component manager's
+/// namespace where capabilities offered by the realm builder client are placed.
+const CLIENT_CAPABILITY_PASSTHROUGH_PATH: &'static str = "/parent-offered";
 
 const REALM_BUILDER_SERVER_CHILD_NAME: &'static str = "realm_builder_server";
 
@@ -1001,25 +1007,47 @@ impl RealmBuilder {
         Ok(realm)
     }
 
-    /// Initializes the created realm under an instance of component manager, specified by the
-    /// given fragment-only URL. Returns the realm containing component manager.
+    /// Initializes the created realm under an instance of component manager,
+    /// specified by the given fragment-only URL. Returns the realm containing
+    /// component manager.
     ///
-    /// This function should be used to modify the component manager realm. Otherwise, to directly
-    /// build the created realm under an instance of component manager, use
-    /// `build_in_nested_component_manager()`.
+    /// This function should be used to modify the component manager realm.
+    /// Otherwise, to directly build the created realm under an instance of
+    /// component manager, use `build_in_nested_component_manager()`.
     ///
-    /// Note that any routes with a source of `parent` in the root realm will need to also be `use`d
-    /// in component manager's manifest and listed in `namespace_capabilities` in the config file
-    /// passed to `component_manager`'s `--config` arg.
-    ///
-    /// Note that any routes with a target of `parent` from the root realm will result in exposing
-    /// the capability to component manager, which is rather useless by itself. Component manager
-    /// does expose the hub though, which could be traversed to find an exposed capability.
-    ///
-    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until realm teardown.
+    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until
+    /// realm teardown.
     pub async fn with_nested_component_manager(
         self,
         component_manager_fragment_only_url: &str,
+    ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
+        self.with_nested_component_manager_with_passthrough_offers(
+            component_manager_fragment_only_url,
+            Vec::new(),
+        )
+        .await
+    }
+
+    /// Initializes the created realm under an instance of component manager,
+    /// specified by the given fragment-only URL. Protocol capability offers to
+    /// be passed through to the nested component manager from the parent must
+    /// be specified in `passthrough_protocol_offers`. (Non-protocol capability
+    /// types are not supported for passthrough.) Returns the realm containing
+    /// component manager.
+    ///
+    /// This function should be used to modify the component manager realm.
+    /// Otherwise, to directly build the created realm under an instance of
+    /// component manager, use `build_in_nested_component_manager()`.
+    ///
+    /// Note that any routes passed through from the parent need to be routed to
+    /// "#realm_builder" in the test component's CML file.
+    ///
+    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until
+    /// realm teardown.
+    async fn with_nested_component_manager_with_passthrough_offers(
+        self,
+        component_manager_fragment_only_url: &str,
+        passthrough_protocol_offers: Vec<cm_types::Name>,
     ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
         let collection_name = self.collection_name.clone();
         let root_decl = self.root_realm.get_realm_decl().await?;
@@ -1103,6 +1131,21 @@ impl RealmBuilder {
                 }
             }
         }).collect::<Vec<ExposeDecl>>();
+        let passthrough_use_decls = passthrough_protocol_offers
+            .into_iter()
+            .map(|source_name| UseProtocolDecl {
+                source: UseSource::Parent,
+                source_name: source_name.clone(),
+                target_path: Path::new(format!(
+                    "{CLIENT_CAPABILITY_PASSTHROUGH_PATH}/{source_name}"
+                ))
+                .expect("unable to create path from capability name"),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::default(),
+                source_dictionary: RelativePath::dot(),
+            })
+            .map(|d| UseDecl::Protocol(d))
+            .collect::<Vec<UseDecl>>();
         let (root_url, nested_local_component_runner_task) = self.initialize().await?;
 
         // We now have a root URL we could create in a collection, but instead we want to launch a
@@ -1147,6 +1190,7 @@ impl RealmBuilder {
         }
         component_manager_decl.capabilities.append(&mut passthrough_cap_decls.clone());
         component_manager_decl.exposes.append(&mut passthrough_expose_decls.clone());
+        component_manager_decl.uses.append(&mut passthrough_use_decls.clone());
         component_manager_realm
             .replace_component_decl("component_manager", component_manager_decl)
             .await?;
@@ -1216,26 +1260,52 @@ impl RealmBuilder {
                 }
             }
         }
+        for use_decl in passthrough_use_decls {
+            component_manager_realm
+                .add_route(
+                    Route::new()
+                        .capability(Capability::protocol_by_name(use_decl.source_name().as_str()))
+                        .from(Ref::parent())
+                        .to(Ref::child("component_manager")),
+                )
+                .await?;
+        }
         Ok((component_manager_realm, nested_local_component_runner_task))
     }
 
-    /// Launches a nested component manager which will run the created realm (along with any local
-    /// components in the realm). This component manager _must_ be referenced by a fragment-only
-    /// URL.
-    ///
-    /// Note that any routes with a source of `parent` in the root realm will need to also be `use`d
-    /// in component manager's manifest and listed in `namespace_capabilities` in the config file
-    /// passed to `component_manager`'s `--config` arg.
-    ///
-    /// Note that any routes with a target of `parent` from the root realm will result in exposing
-    /// the capability to component manager, which is rather useless by itself. Component manager
-    /// does expose the hub though, which could be traversed to find an exposed capability.
+    /// Launches a nested component manager which will run the created realm
+    /// (along with any local components in the realm). This component manager
+    /// _must_ be referenced by a fragment-only URL.
     pub async fn build_in_nested_component_manager(
         self,
         component_manager_fragment_only_url: &str,
     ) -> Result<RealmInstance, Error> {
-        let (component_manager_realm, nested_local_component_runner_task) =
-            self.with_nested_component_manager(component_manager_fragment_only_url).await?;
+        self.build_in_nested_component_manager_with_passthrough_offers(
+            component_manager_fragment_only_url,
+            Vec::new(),
+        )
+        .await
+    }
+
+    /// Launches a nested component manager which will run the created realm
+    /// (along with any local components in the realm). This component manager
+    /// _must_ be referenced by a fragment-only URL.
+    ///
+    /// Note that any protocol capabilities with a source of `parent` in the
+    /// root realm will need to be listed in `passthrough_protocol_offers`.
+    /// (Non-protocol capability types are not supported for passthrough from
+    /// the parent.)
+    pub async fn build_in_nested_component_manager_with_passthrough_offers(
+        self,
+        component_manager_fragment_only_url: &str,
+        passthrough_protocol_offers: Vec<cm_types::Name>,
+    ) -> Result<RealmInstance, Error> {
+        let (component_manager_realm, nested_local_component_runner_task) = self
+            .with_nested_component_manager_with_passthrough_offers(
+                component_manager_fragment_only_url,
+                passthrough_protocol_offers,
+            )
+            .await?;
         let mut cm_instance = component_manager_realm.build().await?;
 
         // There are no local components alongside the nested component manager.

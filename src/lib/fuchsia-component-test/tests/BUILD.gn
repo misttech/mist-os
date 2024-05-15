@@ -81,6 +81,22 @@ rustc_test("scoped-instance-test") {
   sources = [ "scoped_instance/lib.rs" ]
 }
 
+rustc_test("offered-cap-passthrough-test") {
+  edition = "2021"
+  source_root = "offered_cap_passthrough/lib.rs"
+
+  sources = [ "offered_cap_passthrough/lib.rs" ]
+
+  deps = [
+    "..:fuchsia-component-test",
+    "//examples/components/routing/fidl:echo_rust",
+    "//src/lib/fuchsia",
+    "//src/sys/lib/cm_types",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+}
+
 rustc_binary("realm") {
   edition = "2021"
   source_root = "scoped_instance/realm.rs"
@@ -109,6 +125,12 @@ fuchsia_test_component("scoped_instance_test_component") {
   component_name = "scoped_instance_test"
   manifest = "meta/scoped_instance_test.cml"
   deps = [ ":scoped-instance-test" ]
+}
+
+fuchsia_test_component("offered_cap_passthrough_test_component") {
+  component_name = "offered_cap_passthrough_test"
+  manifest = "meta/offered-cap-passthrough-test.cml"
+  deps = [ ":offered-cap-passthrough-test" ]
 }
 
 fuchsia_test_component("realm_component") {
@@ -194,10 +216,21 @@ fuchsia_test_package("scoped-instance-tests") {
   ]
 }
 
+fuchsia_test_package("offered-cap-passthrough-tests") {
+  test_components = [ ":offered_cap_passthrough_test_component" ]
+  deps = [
+    ":echo_client_with_elf_runner",
+    "//src/sys/component_manager:component-manager-realm-builder-cmp",
+    "//src/sys/component_manager/testing/echo_client",
+    "//src/sys/component_manager/testing/echo_server",
+  ]
+}
+
 group("tests") {
   testonly = true
   deps = [
     ":fuchsia-component-test-tests",
+    ":offered-cap-passthrough-tests",
     ":scoped-instance-tests",
   ]
 }
