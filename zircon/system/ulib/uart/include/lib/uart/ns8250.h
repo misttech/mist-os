@@ -439,7 +439,7 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     EnableRxInterrupt(io);
 
     // Modem Control Register: Auxiliary Output 2 is another IRQ enable bit.
-    auto mcr = ModemControlRegister::Get().FromValue(0);
+    auto mcr = ModemControlRegister::Get().ReadFrom(io.io());
     mcr.set_auxiliary_out_2(true).WriteTo(io.io());
 
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART ||
