@@ -8,8 +8,8 @@ Returns CPU breakdown in a JSON file.
 """
 
 import argparse
+import json
 import pathlib
-import pprint
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu_breakdown
 import sys
@@ -62,7 +62,7 @@ def main() -> None:
     ).process_metrics()
 
     with open(args.output_path, "w") as json_file:
-        pprint.pprint(breakdown, json_file)
+        json.dump(breakdown, json_file, indent=4)
 
 
 if __name__ == "__main__":
