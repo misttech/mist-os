@@ -93,6 +93,19 @@ type ProductArtifacts struct {
 	} `json:"unexpected_error"`
 }
 
+// Output for get-image-path
+type ProductImagePath struct {
+	Ok struct {
+		Path string `json:"path"`
+	} `json:"ok"`
+	UserError struct {
+		Message string `json:"message"`
+	} `json:"user_error"`
+	UnexpectedError struct {
+		Message string `json:"message"`
+	} `json:"unexpected_error"`
+}
+
 // FFXWithTarget returns a copy of the provided ffx instance associated with
 // the provided target. This copy should use the same ffx daemon but run
 // commands with the new target.
@@ -467,7 +480,7 @@ func (f *FFXInstance) GetPBArtifacts(ctx context.Context, pbPath string, artifac
 func processPBArtifactsResult(raw string, err error) ([]string, error) {
 
 	if raw == "" {
-		if err == nil {
+		if err != nil {
 			return nil, err
 		}
 		return nil, fmt.Errorf("No output received from command")
@@ -491,7 +504,7 @@ func processPBArtifactsResult(raw string, err error) ([]string, error) {
 
 // GetImageFromPB returns an image from a product bundle.
 func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot string, imageType string, bootloader string) (*bootserver.Image, error) {
-	args := []string{"--config", "ffx_product_get_image_path=true", "product", "get-image-path", pbPath, "-r"}
+	args := []string{"--machine", "json", "product", "get-image-path", pbPath, "-r"}
 	if slot != "" && imageType != "" && bootloader == "" {
 		args = append(args, "--slot", slot, "--image-type", imageType)
 	} else if bootloader != "" && slot == "" && imageType == "" {
@@ -500,21 +513,38 @@ func (f *FFXInstance) GetImageFromPB(ctx context.Context, pbPath string, slot st
 		return nil, fmt.Errorf("either slot and image type should be provided or bootloader "+
 			"should be provided, not both: slot: %s, imageType: %s, bootloader: %s", slot, imageType, bootloader)
 	}
-	relImagePath, err := f.RunAndGetOutput(ctx, args...)
+	raw, err := f.RunAndGetOutput(ctx, args...)
+
+	return processImageFromPBResult(pbPath, raw, err)
+}
+
+func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver.Image, error) {
+	if raw == "" {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("No output received from command")
+
+	}
+
+	var result ProductImagePath
+	err = json.Unmarshal([]byte(raw), &result)
 	if err != nil {
+		return nil, fmt.Errorf("Error parsing output %s: %v", raw, err)
+	}
+
+	if result.UnexpectedError.Message != "" || result.UserError.Message != "" {
 		// An error is returned if the image cannot be found in the product bundle
 		// which is ok.
 		return nil, nil
 	}
 
-	imagePath := filepath.Join(pbPath, relImagePath)
-	buildImg := build.Image{Name: relImagePath, Path: imagePath}
-
+	imagePath := filepath.Join(pbPath, result.Ok.Path)
+	buildImg := build.Image{Name: result.Ok.Path, Path: imagePath}
 	reader, err := os.Open(imagePath)
 	if err != nil {
 		return nil, err
 	}
-
 	fi, err := reader.Stat()
 	if err != nil {
 		return nil, err

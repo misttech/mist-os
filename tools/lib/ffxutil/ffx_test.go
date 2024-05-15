@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 )
@@ -158,6 +159,93 @@ func TestFFXPBArtifacts(t *testing.T) {
 			for i := range paths {
 				if paths[i] != testcase.wantPaths[i] {
 					t.Errorf("mismatch index %d. Got  %v want %v", i, paths, testcase.wantPaths)
+				}
+			}
+		})
+
+	}
+}
+
+func TestFFXPBImagePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	imageDir := filepath.Join(tmpDir, "pb/relpath")
+	imagePath := filepath.Join(imageDir, "image")
+	err := os.MkdirAll(imageDir, 0777)
+	if err != nil {
+		t.Errorf("Test error: %q", err)
+	}
+	err = os.WriteFile(imagePath, []byte("Some bytes to have a size"), 0644)
+	if err != nil {
+		t.Errorf("Test error: %q", err)
+	}
+
+	for _, testcase := range []struct {
+		name      string
+		output    string
+		errOutput string
+		exitCode  int
+		wantImage *bootserver.Image
+		wantError error
+	}{
+		{
+			name:      "OK path",
+			output:    `{"ok": {"path": "relpath/image"}}`,
+			errOutput: "",
+			exitCode:  0,
+			wantImage: &bootserver.Image{
+				Image: build.Image{Name: "relpath/image", Path: imagePath},
+				Size:  25,
+			},
+			wantError: nil,
+		},
+		{
+			name:      "pb not found paths",
+			output:    `{"user_error": {"message": "path not found"}}`,
+			errOutput: "path not found",
+			exitCode:  1,
+			wantImage: nil,
+			wantError: nil,
+		},
+		{
+			name:      "unexpected error",
+			output:    `{"unexpected_error": {"message": "somthing went wrong"}}`,
+			errOutput: "exception processing metadata",
+			exitCode:  1,
+			wantImage: nil,
+			wantError: nil,
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			var testErr error = nil
+			if testcase.exitCode != 0 {
+				testErr = fmt.Errorf("Exit Code %d: %s", testcase.exitCode, testcase.errOutput)
+			}
+			image, err := processImageFromPBResult(filepath.Join(tmpDir, "pb"), testcase.output, testErr)
+			if err != nil {
+				if testcase.wantError != nil {
+					if err.Error() != testcase.wantError.Error() {
+						t.Errorf("Got error %q wanted error: %q", err, testcase.wantError)
+					}
+				} else if err != nil {
+					t.Errorf("Test error: %s", err)
+				}
+			}
+
+			if image == nil && testcase.wantImage != nil {
+				t.Errorf("Unexpected nil image")
+			} else if image != nil && testcase.wantImage == nil {
+				t.Errorf("Unexpected non-nil image")
+			}
+			if image != nil {
+
+				if image.Image.Name != testcase.wantImage.Image.Name {
+					t.Errorf("Image name mismatch Got  %v want %v", image.Image, testcase.wantImage.Image)
+				}
+				if image.Image.Path != testcase.wantImage.Image.Path {
+					t.Errorf("Image name mismatch Got  %v want %v", image.Path, testcase.wantImage.Path)
+				}
+				if image.Size != testcase.wantImage.Size {
+					t.Errorf("Image size mismatch Got  %v want %v", image.Size, testcase.wantImage.Size)
 				}
 			}
 		})
