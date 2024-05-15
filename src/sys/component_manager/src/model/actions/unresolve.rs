@@ -258,7 +258,7 @@ pub mod tests {
 
         // Register the UnresolveAction.
         let nf = {
-            let mut actions = component_a.lock_actions().await;
+            let actions = component_a.lock_actions().await;
             actions.register_no_wait(UnresolveAction::new()).await
         };
 
@@ -271,7 +271,7 @@ pub mod tests {
 
         // Now attempt to unresolve again with another UnresolveAction.
         let nf2 = {
-            let mut actions = component_a.lock_actions().await;
+            let actions = component_a.lock_actions().await;
             actions.register_no_wait(UnresolveAction::new()).await
         };
         // The component is not resolved anymore, so the unresolve will have no effect.

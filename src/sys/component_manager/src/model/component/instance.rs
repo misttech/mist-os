@@ -1133,7 +1133,7 @@ impl ProgramRuntime {
         let exit_listener = fasync::Task::spawn(async move {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
-                let mut actions = component.lock_actions().await;
+                let actions = component.lock_actions().await;
                 let stop_nf = actions.register_no_wait(StopAction::new(false)).await;
                 drop(actions);
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {

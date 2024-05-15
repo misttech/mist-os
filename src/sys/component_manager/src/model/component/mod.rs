@@ -317,7 +317,11 @@ impl ComponentInstance {
             persistent_storage,
             execution_scope: ExecutionScope::new(),
         });
-        self_.lock_actions().await.set_component_reference(WeakComponentInstance::new(&self_));
+        self_
+            .lock_actions()
+            .await
+            .set_component_reference(WeakComponentInstance::new(&self_))
+            .await;
         self_
     }
 

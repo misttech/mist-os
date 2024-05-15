@@ -51,6 +51,7 @@
 //!   child and marks `DestroyChild` finished, which will notify the client that the action is
 //!   complete.
 
+mod coordinator;
 mod destroy;
 mod discover;
 pub mod resolve;
@@ -71,17 +72,19 @@ use {
     crate::model::component::{ComponentInstance, WeakComponentInstance},
     async_trait::async_trait,
     cm_util::AbortHandle,
+    coordinator::{ActionCoordinator, ActionExecutor, Command},
     errors::ActionError,
+    fuchsia_async as fasync,
     futures::{
-        channel::oneshot,
+        channel::{mpsc, oneshot},
         future::{BoxFuture, FutureExt, Shared},
         task::{Context, Poll},
-        Future,
+        Future, SinkExt,
     },
     std::fmt::Debug,
     std::hash::Hash,
     std::pin::Pin,
-    std::sync::{Arc, Mutex},
+    std::sync::Arc,
 };
 
 /// A action on a component that must eventually be fulfilled.
@@ -151,26 +154,35 @@ impl Future for ActionNotifier {
 }
 
 pub struct ActionsManager {
-    action_set: Arc<Mutex<set::ActionSet>>,
-    component: WeakComponentInstance,
+    _coordinator_task: fasync::Task<()>,
+    command_sender: mpsc::UnboundedSender<Command>,
 }
 
 impl ActionsManager {
     pub fn new() -> Self {
-        Self {
-            action_set: Arc::new(Mutex::new(set::ActionSet::new())),
-            component: WeakComponentInstance::invalid(),
-        }
+        let (coordinator_task, command_sender) = ActionCoordinator::new();
+        Self { _coordinator_task: coordinator_task, command_sender }
     }
 
-    /// Sets the component reference against which actions on this component will be run. If an
-    /// action is registered on this component before this function is called, it will panic.
-    pub fn set_component_reference(&mut self, component: WeakComponentInstance) {
-        self.component = component;
+    /// Sets the component reference against which actions on this component will be run. This must
+    /// be called before any actions are scheduled on this component, or the action coordinator
+    /// will panic.
+    pub async fn set_component_reference(&self, component: WeakComponentInstance) {
+        let (sender, receiver) = oneshot::channel();
+        self.command_sender
+            .clone()
+            .send(Command::SetComponentReference(component, sender))
+            .await
+            .unwrap();
+        receiver.await.unwrap();
     }
 
+    /// Returns `true` if the action coordinator is currently running or planning on running an
+    /// action with a matching key.
     pub async fn contains(&self, key: ActionKey) -> bool {
-        self.action_set.lock().unwrap().contains(key)
+        let (sender, receiver) = oneshot::channel();
+        self.command_sender.clone().send(Command::Contains(key, sender)).await.unwrap();
+        receiver.await.unwrap()
     }
 
     /// Registers an action in the set, returning when the action is finished (which may represent
@@ -183,29 +195,39 @@ impl ActionsManager {
         A: Action,
     {
         let rx = {
-            let mut actions = component.lock_actions().await;
+            let actions = component.lock_actions().await;
             actions.register_no_wait(action).await
         };
         rx.await
     }
 
-    /// Registers an action in the set, but does not wait for it to complete, instead returning a
-    /// future that can be used to wait on the task. This function is a no-op if the task is
-    /// already registered.
+    /// Registers an action to run with the action coordinator. Actions with matching keys may be
+    /// deduplicated, such that if the action coordinator is already planning on running an action
+    /// with the given key then this action will be dropped and this function will return when the
+    /// other matching action completes.
     ///
-    /// REQUIRES: `self` is the `ActionSet` contained in `component`.
-    pub async fn register_no_wait<A>(&mut self, action: A) -> ActionNotifier
+    /// Returns a future which will complete once the action finishes, with the output of the
+    /// action.
+    pub async fn register_no_wait<A>(&self, action: A) -> ActionNotifier
     where
         A: Action,
     {
-        let component =
-            self.component.upgrade().expect("tried to register action on nonexistent component");
-        set::ActionSet::register_no_wait(self.action_set.clone(), &component, action)
+        let (sender, receiver) = oneshot::channel();
+        self.command_sender
+            .clone()
+            .send(Command::RunAction(ActionExecutor::new(action), sender))
+            .await
+            .unwrap();
+        let notifier = receiver.await.unwrap();
+        notifier
     }
 
-    /// Returns a future that waits for the given action to complete, if one exists.
+    /// Returns a future that waits for the given action to complete, if the action coordinator is
+    /// currently running or planning on running an action with a matching key.
     pub async fn wait(&self, action_key: ActionKey) -> Option<ActionNotifier> {
-        self.action_set.lock().unwrap().wait(action_key)
+        let (sender, receiver) = oneshot::channel();
+        self.command_sender.clone().send(Command::GetNotifier(action_key, sender)).await.unwrap();
+        receiver.await.unwrap()
     }
 }
 

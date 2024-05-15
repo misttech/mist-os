@@ -379,7 +379,7 @@ pub mod tests {
 
         // Spawn a mock action on 'a' that stalls
         let action_notifier = {
-            let mut actions = component_a.lock_actions().await;
+            let actions = component_a.lock_actions().await;
             actions.register_no_wait(mock_action).await
         };
 
@@ -486,7 +486,7 @@ pub mod tests {
 
         // Spawn a mock action on 'a' that stalls
         let action_notifier = {
-            let mut actions = component_a.lock_actions().await;
+            let actions = component_a.lock_actions().await;
             actions.register_no_wait(mock_action).await
         };
 

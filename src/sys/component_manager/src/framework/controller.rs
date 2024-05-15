@@ -148,7 +148,7 @@ async fn execution_controller_task(
                     return;
                 }
                 let component = component.unwrap();
-                let mut action_set = component.lock_actions().await;
+                let action_set = component.lock_actions().await;
                 let _ = action_set.register_no_wait(StopAction::new(false)).await;
             }
             fcomponent::ExecutionControllerRequest::_UnknownMethod { ordinal, .. } => {

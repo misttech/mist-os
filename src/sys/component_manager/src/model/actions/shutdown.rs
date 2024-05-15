@@ -2436,7 +2436,7 @@ mod tests {
     async fn action_shutdown_blocks_stop() {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
-        let mut action_set = component.lock_actions().await;
+        let action_set = component.lock_actions().await;
 
         let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
 
@@ -2461,7 +2461,7 @@ mod tests {
     async fn action_shutdown_stop_stop() {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
-        let mut action_set = component.lock_actions().await;
+        let action_set = component.lock_actions().await;
         let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
 
         // Register some actions, and get notifications.
