@@ -107,4 +107,9 @@ LdLoadZirconProcessTestsBase::~LdLoadZirconProcessTestsBase() {
   }
 }
 
+zx::vmo LdLoadZirconProcessTestsBase::GetExecutableVmo(std::string_view executable_name) {
+  const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
+  return elfldltl::testing::GetTestLibVmo(executable_path);
+}
+
 }  // namespace ld::testing

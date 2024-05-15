@@ -27,6 +27,7 @@ test("ld-unittests") {
   deps = [
     "..:headers",
     "../testing",
+    "//src/lib/elfldltl/testing",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/symbolizer-markup",
     "//third_party/googletest:gmock",

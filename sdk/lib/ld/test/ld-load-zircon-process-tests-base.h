@@ -31,6 +31,8 @@ class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
   const char* process_name() const;
 
  protected:
+  static zx::vmo GetExecutableVmo(std::string_view executable_name);
+
   const zx::process& process() const { return process_; }
 
   void set_process(zx::process process);

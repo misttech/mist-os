@@ -65,6 +65,7 @@ class MockLoaderService {
 
  private:
   class MockServer;
+  friend class MockLoaderServiceForTest;
 
   std::unique_ptr<::testing::StrictMock<MockServer>> mock_server_;
   fidl::ClientEnd<fuchsia_ldsvc::Loader> mock_client_;
@@ -99,12 +100,12 @@ class MockLoaderServiceForTest {
   void Needed(std::initializer_list<std::string_view> names);
 
   // Similar to above, except that a boolean `found` is paired with the
-  // dependency name to potentially prime the mock loader to return a 'not found'
-  // error when it receives the LoadObject request for that dependency.
+  // dependency name to potentially prime the mock loader to return a 'not
+  // found' error when it receives the LoadObject request for that dependency.
   void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
-  // A generic interface to prime the mock loader with the `expected_result` for
-  // when it receives a LoadObject request for the given `name`.
+  // A generic interface to prime the mock loader with the `expected_result`
+  // for when it receives a LoadObject request for the given `name`.
   void ExpectLoadObject(std::string_view name, zx::result<zx::vmo> expected_result);
 
   // This is an overload that will check the validity of the VMO before priming
@@ -115,17 +116,18 @@ class MockLoaderServiceForTest {
   // mock loader that it will receive a LoadObject request for that dependency.
   void ExpectDependency(std::string_view name);
 
-  // Prime the mock loader with a root module VMO and add the expectation on the
-  // mock loader that it will receive a LoadObject request for that root module.
+  // Prime the mock loader with a root module VMO and add the expectation on
+  // the mock loader that it will receive a LoadObject request for that root
+  // module.
   void ExpectRootModule(std::string_view name);
 
-  // Prime the mock loader with a 'not found' error for `name` and add the
+  // Prime the mock loader with a "not found" error for `name` and add the
   // expectation that it will receive a LoadObject request for a VMO with the
   // given `name`.
   void ExpectMissing(std::string_view name);
 
-  // Prime the mock loader with config and add the expectation on the mock loader
-  // that it will receive a Config request.
+  // Prime the mock loader with config and add the expectation on the mock
+  // loader that it will receive a Config request.
   void ExpectConfig(std::string_view config);
 
   // Return a reference to the client end to the MockLoader's FIDL server. This
@@ -146,14 +148,17 @@ class MockLoaderServiceForTest {
   // satisfied and then clear its expectations list.
   void VerifyAndClearExpectations();
 
- private:
-  // Fetch a dependency VMO from a specific path in the test package.
-  static zx::vmo GetDepVmo(std::string_view name);
-
   // Fetch a the root module VMO from a specific path in the test package.
   static zx::vmo GetRootModuleVmo(std::string_view name);
 
+  // Short-circuit the FIDL protocol and just do what the protocol call would.
+  zx::result<zx::vmo> LoadObject(std::string_view name);
+
+ private:
   void ReadyMock();
+
+  // Fetch a dependency VMO from a specific path in the test package.
+  static zx::vmo GetDepVmo(std::string_view name);
 
   std::unique_ptr<MockLoaderService> mock_loader_;
 };

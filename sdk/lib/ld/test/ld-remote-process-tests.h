@@ -12,7 +12,9 @@
 #include <lib/ld/remote-abi.h>
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-load-module.h>
+#include <lib/ld/testing/mock-loader-service.h>
 #include <lib/ld/testing/test-vmo.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -32,6 +34,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
  public:
   static constexpr bool kCanCollectLog = false;
 
+  inline static const size_t kPageSize = zx_system_get_page_size();
+
   LdRemoteProcessTests();
 
   ~LdRemoteProcessTests() override;
@@ -39,9 +43,13 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});
 
-  void Needed(std::initializer_list<std::string_view> names);
+  void Needed(std::initializer_list<std::string_view> names) { mock_loader_.Needed(names); }
 
-  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+    mock_loader_.Needed(name_found_pairs);
+  }
+
+  void VerifyAndClearNeeded() { mock_loader_.VerifyAndClearExpectations(); }
 
   void Load(std::string_view executable_name) {
     elfldltl::testing::ExpectOkDiagnostics diag;
@@ -57,6 +65,35 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   }
 
  protected:
+  using Linker = RemoteDynamicLinker<>;
+  using RemoteModule = RemoteLoadModule<>;
+
+  // This returns a closure usable as the `get_dep` function for calling
+  // ld::RuntimeDynamicLinker::Init.  It captures the Diagnostics reference and
+  // the this pointer; when called it uses LoadObject on the MockLoaderService
+  // to find files (or not) according to the Needed calls priming the expected
+  // sequence of names.
+  template <class Diagnostics>
+  auto GetDepFunction(Diagnostics& diag) {
+    return [this, &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
+      RemoteModule::Decoded::Ptr decoded;
+      auto vmo = mock_loader_.LoadObject(soname.str());
+      if (vmo.is_ok()) [[likely]] {
+        // If it returned fit::ok(zx::vmo{}), keep going without this module.
+        if (*vmo) [[likely]] {
+          decoded = RemoteModule::Decoded::Create(diag, *std::move(vmo), kPageSize);
+        }
+      } else if (vmo.error_value() == ZX_ERR_NOT_FOUND
+                     ? !diag.MissingDependency(soname.str())
+                     : !diag.SystemError("cannot open dependency ", soname.str(), ": ",
+                                         elfldltl::ZirconError{vmo.error_value()})) {
+        // Diagnostics said to bail out now.
+        return std::nullopt;
+      }
+      return std::move(decoded);
+    };
+  }
+
   const zx::vmar& root_vmar() { return root_vmar_; }
 
   void set_entry(uintptr_t entry) { entry_ = entry; }
@@ -66,22 +103,14 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 
  private:
-  class MockLoader;
-
-  using Linker = RemoteDynamicLinker<>;
-  using RemoteModule = RemoteLoadModule<>;
-
-  zx::vmo GetDepVmo(const RemoteModule::Soname& soname);
-
   template <class Diagnostics>
   void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
     const size_t page_size = zx_system_get_page_size();
     Linker linker;
 
     // Decode the main executable.
-    const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
     zx::vmo vmo;
-    ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(executable_path));
+    ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo(executable_name));
     std::array initial_modules = {Linker::InitModule{
         .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size),
     }};
@@ -144,17 +173,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     EXPECT_EQ(tlsdesc_entrypoints.size(), kTlsdescRuntimeCount);
 
     // First just decode all the modules: the executable and dependencies.
-    auto get_dep = [this, page_size,
-                    &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
-      RemoteModule::Decoded::Ptr decoded;
-      if (zx::vmo vmo = GetDepVmo(soname)) [[likely]] {
-        decoded = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size);
-      } else if (!diag.MissingDependency(soname.str())) {
-        return std::nullopt;
-      }
-      return std::move(decoded);
-    };
-    auto init_result = linker.Init(diag, initial_modules, get_dep, std::move(predecoded_modules));
+    auto init_result =
+        linker.Init(diag, initial_modules, GetDepFunction(diag), std::move(predecoded_modules));
     ASSERT_TRUE(init_result);
     auto& modules = linker.modules();
     ASSERT_FALSE(modules.empty());
@@ -262,8 +282,9 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   std::optional<size_t> stack_size_;
   zx::vmar root_vmar_;
   zx::thread thread_;
-  std::unique_ptr<MockLoader> mock_loader_;
+  MockLoaderServiceForTest mock_loader_;
 };
+
 }  // namespace ld::testing
 
 #endif  // LIB_LD_TEST_LD_REMOTE_PROCESS_TESTS_H_

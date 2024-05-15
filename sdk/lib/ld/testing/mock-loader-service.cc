@@ -204,4 +204,12 @@ void MockLoaderServiceForTest::ReadyMock() {
   }
 }
 
+zx::result<zx::vmo> MockLoaderServiceForTest::LoadObject(std::string_view name) {
+  ReadyMock();
+  if (!mock_loader_->mock_server_) {
+    return zx::error{ZX_ERR_INTERNAL};
+  }
+  return mock_loader_->mock_server_->MockLoadObject(std::string(name));
+}
+
 }  // namespace ld::testing
