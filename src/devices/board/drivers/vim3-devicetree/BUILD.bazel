@@ -31,6 +31,7 @@ fuchsia_package_resource_collection(
     name = "vim3-devicetree-visitors",
     resources = [
         "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
+        "@internal_sdk//pkg/devicetree-amlogic-canvas-visitor",
         "@internal_sdk//pkg/devicetree-arm-gicv2",
         "@internal_sdk//pkg/devicetree-clockimpl-visitor",
         "@internal_sdk//pkg/devicetree-dwc2-visitor",

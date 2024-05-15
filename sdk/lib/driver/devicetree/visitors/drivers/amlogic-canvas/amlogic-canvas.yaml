@@ -4,7 +4,7 @@
 
 %YAML 1.2
 ---
-$id: http://devicetree.org/schemas/mali-gpu.yaml#
+$id: http://devicetree.org/schemas/amlogic-canvas.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
 title: Amlogic canvas

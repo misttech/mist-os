@@ -25,6 +25,27 @@
 			boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS*/
 		};
 
+		video-decoder@ffd00000 {
+			compatible = "amlogic,g12b-vdec";
+			reg = <0x0 A311D_FULL_CBUS_BASE 0x0 A311D_FULL_CBUS_LENGTH>,
+				<0x0 A311D_DOS_BASE 0x0 A311D_DOS_LENGTH>,
+				<0x0 A311D_HIU_BASE 0x0 A311D_HIU_LENGTH>,
+				<0x0 A311D_AOBUS_BASE 0x0 A311D_AOBUS_LENGTH>,
+				<0x0 A311D_DMC_BASE 0x0 A311D_DMC_LENGTH>;
+			iommus = <&dummy_iommu 10>;
+			interrupts = <GIC_SPI 23 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 32 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 43 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 44 GIC_IRQ_MODE_EDGE_RISING>;
+
+			fuchsia,sysmem = <&sysmem>;
+			amlogic,canvas = <&canvas>;
+
+			clocks = <&clock 0x10005>,
+				 <&clock 0x10007>;
+			clock-names = "DOS_GCLK_VDEC", "DOS";
+		};
+
 		ethmac: ethernet-phy@ff634000 {
 			compatible = "amlogic,ethernet-phy";
 			reg = <0x0 0xff634000 0x0 0x1000>,

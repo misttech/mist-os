@@ -69,6 +69,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-9/pwm_a0_d-regulator_group/pwm_vreg_little",
       "sys/platform/register-controller-1000",
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
+      "sys/platform/video-decoder-ffd00000",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
