@@ -45,6 +45,11 @@ class FuchsiaTaskTestEnumeratedComponents(FuchsiaTask):
             required=True,
         )
         parser.add_argument(
+            "--match-component-name",
+            help="The regex allowlist used to filter for component names used for testing.",
+            default=r".+",
+        )
+        parser.add_argument(
             "--target",
             help="Optionally specify the target fuchsia device.",
             required=False,
@@ -84,15 +89,41 @@ class FuchsiaTaskTestEnumeratedComponents(FuchsiaTask):
                 ],
                 text=True,
             )
-            meta_components = re.findall(r"\bmeta/\S+\.cm\b", contents)
+            component_names = re.findall(r"\bmeta/(\S+)\.cm\b", contents)
         except subprocess.CalledProcessError as e:
             raise TaskExecutionException(
                 f"Failed to enumerate components for testing!"
             )
 
+        test_component_names = []
+        skipped_component_names = []
+        for component_name in component_names:
+            if re.match(args.match_component_name, component_name):
+                test_component_names.append(component_name)
+            else:
+                skipped_component_names.append(component_name)
+
+        if skipped_component_names:
+            print(
+                Terminal.warn(
+                    f"Skipping {len(skipped_component_names)} enumerated components: {', '.join(skipped_component_names)}"
+                )
+            )
+        else:
+            print("No enumerated components were skipped.")
+
+        print(
+            f"Testing {len(test_component_names)} enumerated components: {', '.join(test_component_names)}"
+        )
+
         failing_tests = []
-        for meta_component in meta_components:
-            url = url_template.replace("{{META_COMPONENT}}", meta_component)
+        for i, component_name in enumerate(test_component_names):
+            url = url_template.replace(
+                "{{META_COMPONENT}}", f"meta/{component_name}.cm"
+            )
+            print(
+                f"Testing enumerated component {i + 1} of {len(test_component_names)}: {url}"
+            )
             try:
                 subprocess.check_call(
                     [
