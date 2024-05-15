@@ -601,7 +601,7 @@ class FfxTests(unittest.TestCase):
             [
                 _BINARY_PATH,
                 "-t",
-                _IPV6,
+                str(_TARGET_SSH_ADDRESS),
                 "--isolate-dir",
                 _ISOLATE_DIR,
             ]
@@ -640,7 +640,7 @@ class FfxTests(unittest.TestCase):
             [
                 _BINARY_PATH,
                 "-t",
-                _IPV6,
+                str(_TARGET_SSH_ADDRESS),
                 "--isolate-dir",
                 _ISOLATE_DIR,
                 "test",
@@ -674,7 +674,7 @@ class FfxTests(unittest.TestCase):
             [
                 _BINARY_PATH,
                 "-t",
-                _IPV6,
+                str(_TARGET_SSH_ADDRESS),
                 "--isolate-dir",
                 _ISOLATE_DIR,
                 "test",
@@ -712,7 +712,7 @@ class FfxTests(unittest.TestCase):
             [
                 _BINARY_PATH,
                 "-t",
-                _IPV6,
+                str(_TARGET_SSH_ADDRESS),
                 "--isolate-dir",
                 _ISOLATE_DIR,
             ]

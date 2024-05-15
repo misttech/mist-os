@@ -262,9 +262,9 @@ class FFX(ffx_interface.FFX):
 
         self._target_ip_port: custom_types.IpPort | None = target_ip_port
 
-        self._target: ipaddress.IPv4Address | ipaddress.IPv6Address | str
+        self._target: str
         if self._target_ip_port:
-            self._target = self._target_ip_port.ip
+            self._target = str(self._target_ip_port)
         else:
             self._target = self._target_name
 

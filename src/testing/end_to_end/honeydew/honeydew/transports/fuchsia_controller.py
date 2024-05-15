@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller."""
 
-import ipaddress
 import logging
 
 import fuchsia_controller_py as fuchsia_controller
@@ -22,7 +21,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
     """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller.
 
     Args:
-        device_name: Fuchsia device name.
+        target_name: Fuchsia device name.
         config: Configuration associated with FuchsiaController, FFX and FFX daemon.
         device_ip: Fuchsia device IP Address.
 
@@ -33,26 +32,25 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
 
     def __init__(
         self,
-        device_name: str,
+        target_name: str,
         config: custom_types.FFXConfig,
-        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        target_ip_port: custom_types.IpPort | None = None,
     ) -> None:
-        self._name: str = device_name
+        self._target_name: str = target_name
         self._config: custom_types.FFXConfig = config
 
-        self._ip_address: (
-            ipaddress.IPv4Address | ipaddress.IPv6Address | None
-        ) = device_ip
+        self._target_ip_port: custom_types.IpPort | None = target_ip_port
+
         self._target: str
-        if self._ip_address:
-            self._target = str(self._ip_address)
+        if self._target_ip_port:
+            self._target = str(self._target_ip_port)
         else:
-            self._target = self._name
+            self._target = self._target_name
 
         self.ctx: fuchsia_controller.Context
 
         self.create_context()
-        if self._ip_address:
+        if self._target_ip_port:
             self.add_target()
         self.check_connection()
 
@@ -117,18 +115,18 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 "Waiting for %s sec for Fuchsia-Controller to check the "
                 "connection from host to %s...",
                 timeout,
-                self._name,
+                self._target_name,
             )
             self.ctx.target_wait(timeout)
             _LOGGER.debug(
                 "Fuchsia-Controller completed the connection check from host "
                 "to %s...",
-                self._name,
+                self._target_name,
             )
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FuchsiaControllerConnectionError(
-                f"Fuchsia-Controller connection check failed for {self._name} "
-                f"with error: {err}"
+                f"Fuchsia-Controller connection check failed for "
+                f"{self._target_name} with error: {err}"
             )
 
     def connect_device_proxy(
@@ -165,10 +163,10 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
             errors.FuchsiaControllerError: Failed to add target
         """
         try:
-            _LOGGER.debug("Adding target '%s'", self._ip_address)
-            self.ctx.target_add(target=str(self._ip_address), wait=True)
-            _LOGGER.debug("Target '%s' has been added", self._ip_address)
+            _LOGGER.debug("Adding target '%s'", self._target_ip_port)
+            self.ctx.target_add(target=str(self._target_ip_port), wait=True)
+            _LOGGER.debug("Target '%s' has been added", self._target_ip_port)
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FuchsiaControllerError(
-                f"Failed to add the target {self._ip_address} "
+                f"Failed to add the target {self._target_ip_port} "
             ) from err

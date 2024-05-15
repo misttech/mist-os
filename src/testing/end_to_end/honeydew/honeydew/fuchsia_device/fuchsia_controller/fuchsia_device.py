@@ -301,9 +301,9 @@ class FuchsiaDevice(
         fuchsia_controller_obj: (
             fuchsia_controller_transport_interface.FuchsiaController
         ) = fuchsia_controller_transport.FuchsiaController(
-            device_name=self.device_name,
-            device_ip=self._ip_address,
+            target_name=self.device_name,
             config=self._ffx_config,
+            target_ip_port=self._ip_address_port,
         )
         return fuchsia_controller_obj
 

@@ -23,6 +23,13 @@ from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 
+_TARGET_NAME: str = "fuchsia-emulator"
+
+_REMOTE_TARGET_IP_PORT: str = "[::1]:8088"
+_REMOTE_TARGET_IP_PORT_OBJ: custom_types.IpPort = (
+    custom_types.IpPort.create_using_ip_and_port(_REMOTE_TARGET_IP_PORT)
+)
+
 _INPUT_ARGS: dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
@@ -32,6 +39,8 @@ _INPUT_ARGS: dict[str, Any] = {
         mdns_enabled=False,
         subtools_search_path=None,
     ),
+    "target_name": _TARGET_NAME,
+    "target_ip_port": _REMOTE_TARGET_IP_PORT_OBJ,
 }
 
 
@@ -65,7 +74,7 @@ class InitTests(unittest.TestCase):
         Fuchsia-Controller based fuchsia device object."""
         self.assertIsInstance(
             honeydew.create_device(
-                device_name="fuchsia-emulator",
+                device_name=_INPUT_ARGS["target_name"],
                 ssh_private_key="/tmp/pkey",
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
@@ -80,7 +89,7 @@ class InitTests(unittest.TestCase):
                 "daemon.autostart": "false",
             },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
-            target="fuchsia-emulator",
+            target=_INPUT_ARGS["target_name"],
         )
         mock_fc_check_connection.assert_called()
 
@@ -121,13 +130,11 @@ class InitTests(unittest.TestCase):
         from an IpPort."""
         self.assertIsInstance(
             honeydew.create_device(
-                device_name="fuchsia-1234",
+                device_name=_INPUT_ARGS["target_name"],
                 ssh_private_key="/tmp/pkey",
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
-                device_ip_port=custom_types.IpPort.create_using_ip_and_port(
-                    "[::1]:8088"
-                ),
+                device_ip_port=_INPUT_ARGS["target_ip_port"],
             ),
             fc_fuchsia_device.FuchsiaDevice,
         )
@@ -139,7 +146,7 @@ class InitTests(unittest.TestCase):
                 "daemon.autostart": "false",
             },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
-            target="::1",
+            target=str(_INPUT_ARGS["target_ip_port"]),
         )
         mock_fc_add_target.assert_called()
         mock_fc_check_connection.assert_called()
@@ -162,12 +169,10 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it raises an error."""
         with self.assertRaises(errors.FuchsiaDeviceError):
             honeydew.create_device(
-                device_name="fuchsia-1234",
+                device_name=_INPUT_ARGS["target_name"],
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ssh_private_key="/tmp/pkey",
-                device_ip_port=custom_types.IpPort.create_using_ip_and_port(
-                    "[::1]:8088"
-                ),
+                device_ip_port=_INPUT_ARGS["target_ip_port"],
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 

@@ -17,14 +17,19 @@ from honeydew.transports import (
 )
 from honeydew.typing import custom_types
 
-_IPV4: str = "11.22.33.44"
-_IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
+_TARGET_NAME: str = "fuchsia-emulator"
 
-_DEVICE_NAME: str = "fuchsia-emulator"
+_IPV6: str = "fe80::4fce:3102:ef13:888c%qemu"
+_IPV6_OBJ: ipaddress.IPv6Address = ipaddress.IPv6Address(_IPV6)
+
+_SSH_ADDRESS: ipaddress.IPv6Address = _IPV6_OBJ
+_SSH_PORT = 8022
+_TARGET_IP_PORT = custom_types.IpPort(ip=_SSH_ADDRESS, port=_SSH_PORT)
+
 
 _INPUT_ARGS: dict[str, Any] = {
-    "device_name": _DEVICE_NAME,
-    "device_ip_v4": _IPV4_OBJ,
+    "target_name": _TARGET_NAME,
+    "target_ip_port": _TARGET_IP_PORT,
     "BuildInfo": custom_types.FidlEndpoint(
         "/core/build-info", "fuchsia.buildinfo.Provider"
     ),
@@ -56,7 +61,7 @@ class FuchsiaControllerTests(unittest.TestCase):
         ) as mock_target_wait:
             self.fuchsia_controller_obj_wo_device_ip = (
                 fuchsia_controller_transport.FuchsiaController(
-                    device_name=_INPUT_ARGS["device_name"],
+                    target_name=_INPUT_ARGS["target_name"],
                     config=_MOCK_ARGS["ffx_config"],
                 )
             )
@@ -78,8 +83,8 @@ class FuchsiaControllerTests(unittest.TestCase):
         ):
             self.fuchsia_controller_obj_with_device_ip = (
                 fuchsia_controller_transport.FuchsiaController(
-                    device_name=_INPUT_ARGS["device_name"],
-                    device_ip=_INPUT_ARGS["device_ip_v4"],
+                    target_name=_INPUT_ARGS["target_name"],
+                    target_ip_port=_INPUT_ARGS["target_ip_port"],
                     config=_MOCK_ARGS["ffx_config"],
                 )
             )
