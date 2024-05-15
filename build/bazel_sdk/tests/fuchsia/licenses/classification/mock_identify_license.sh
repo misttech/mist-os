@@ -8,7 +8,7 @@
 # when applied to 'input.spdx.json'.
 # It then outputs a mock json output that is processed by the rule.
 
-echoerr() { echo "ERROR in mock_classifier.sh: $@" 1>&2; }
+echoerr() { echo "ERROR in mock_identify_license.sh: $@" 1>&2; }
 
 verify_arg () {
     local arg_title=$1
@@ -39,7 +39,9 @@ read_arg_value () {
 verify_arg "1st argument" "$1" "-headers"
 output_json_path=$(read_arg_value "2st argument" "$2" "-json=")
 verify_arg "3rd argument" "$3" "-include_text=true"
-verify_arg "4th argument" "$4" "input_licenses"
+verify_arg "4th argument" "$4" "-ignorable=true"
+verify_arg "5th argument" "$5" "-copyright=true"
+verify_arg "6th argument" "$6" "input_licenses"
 
 verify_file_exists () {
     local file_path=$1
@@ -52,7 +54,8 @@ verify_file_exists () {
 # There are 5 unique license texts in input.spdx.json
 verify_file_exists input_licenses/LicenseRef-A-known.txt
 verify_file_exists input_licenses/LicenseRef-B-dedupped.txt
-verify_file_exists input_licenses/LicenseRef-C-unknown.txt
+verify_file_exists input_licenses/LicenseRef-C-ignorable.txt
+verify_file_exists input_licenses/LicenseRef-C-copyright.txt
 verify_file_exists input_licenses/LicenseRef-D-multiple-conditions.txt
 verify_file_exists input_licenses/LicenseRef-E-multiple-conditions-enough-overriden.txt
 verify_file_exists input_licenses/LicenseRef-F-multiple-conditions-not-enough-overriden.txt
@@ -74,7 +77,7 @@ write '                "Name": "License Class 1",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
 write '                "EndLine": 2,'
-write '                "Conditions": "allowed-condition"'
+write '                "Condition": "allowed-condition"'
 write '            },'
 write '            {'
 write '                "Name": "License Class 2",'
@@ -105,8 +108,26 @@ write '            }'
 write '        ]'
 write '    },'
 write '    {'
-write '        "Filepath": "input_licenses/LicenseRef-C-unknown.txt",'
-write '        "Classifications": []'
+write '        "Filepath": "input_licenses/LicenseRef-C-ignorable.txt",'
+write '        "Classifications": ['
+write '            {'
+write '                "Name": "Ignorable",'
+write '                "Confidence": 1,'
+write '                "StartLine": 1,'
+write '                "EndLine": 2'
+write '            }'
+write '        ]'
+write '    },'
+write '    {'
+write '        "Filepath": "input_licenses/LicenseRef-C-copyright.txt",'
+write '        "Classifications": ['
+write '            {'
+write '                "Name": "Copyright",'
+write '                "Confidence": 1,'
+write '                "StartLine": 1,'
+write '                "EndLine": 2'
+write '            }'
+write '        ]'
 write '    },'
 write '    {'
 write '        "Filepath": "input_licenses/LicenseRef-D-multiple-conditions.txt",'

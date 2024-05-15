@@ -52,7 +52,6 @@ def _invoke_identify_license(
     identify_license_output_path: str,
     license_files_dir: str,
     license_files_by_id: Dict[str, str],
-    default_condition: str,
 ) -> LicensesClassifications:
     """Invokes identify_license tool, returning an LicensesClassifications."""
 
@@ -70,18 +69,28 @@ def _invoke_identify_license(
         "-headers",
         f"-json={identify_license_output_path}",
         "-include_text=true",
+        "-ignorable=true",
+        "-copyright=true",
         license_files_dir,
     ]
 
     _log(f"identify_license invocation = {command}")
-    subprocess.check_output(command, text=True)
+    result = subprocess.run(command, text=True, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"""Failed to invoke {command}
+Returncode={result.returncode}.
+Output=`{result.stdout}`
+Error=`{result.stderr}`"""
+        )
 
     assert os.path.exists(
         identify_license_output_path
     ), f"{identify_license_output_path} doesn't exist"
 
     classifications = LicensesClassifications.from_identify_license_output_json(
-        identify_license_output_path, license_files_by_id, default_condition
+        identify_license_output_path,
+        license_files_by_id,
     )
 
     _log(
@@ -91,22 +100,24 @@ def _invoke_identify_license(
     return classifications
 
 
-def _add_missing_identifications(
+def _check_for_missing_identifications(
     spdx_doc: SpdxDocument,
     classifications: LicensesClassifications,
-    default_condition: str,
 ) -> LicensesClassifications:
     extra_classifications = []
+    unclassified_licenses = []
     for l in spdx_doc.extracted_licenses:
         if l.license_id not in classifications.license_ids():
-            identification = IdentifiedSnippet.create_empty(
-                l.extracted_text_lines(), condition=default_condition
+            unclassified_licenses.append(l.license_id)
+    if unclassified_licenses:
+        raise RuntimeError(
+            """
+License files without any identification:
+{license_names}
+""".format(
+                license_names="\n".join(sorted(unclassified_licenses))
             )
-            extra_classifications.append(
-                LicenseClassification(
-                    license_id=l.license_id, identifications=[identification]
-                )
-            )
+        )
     return classifications.add_classifications(extra_classifications)
 
 
@@ -194,12 +205,6 @@ def main():
         default=[],
     )
     parser.add_argument(
-        "--default_condition",
-        help="Default condition for unmapped or unidentified licenses",
-        required=False,
-        default=None,
-    )
-    parser.add_argument(
         "--default_is_project_shipped",
         help="Default value for whether OSS projects are shipped",
         type=bool,
@@ -278,11 +283,11 @@ allowing downstream customers to provide project specific instructions.
         identify_license_output_path=args.identify_license_output,
         license_files_dir=licenses_dir,
         license_files_by_id=license_files_by_id,
-        default_condition=args.default_condition,
     )
 
-    classification = _add_missing_identifications(
-        spdx_doc, classification, default_condition=args.default_condition
+    classification = _check_for_missing_identifications(
+        spdx_doc,
+        classification,
     )
     classification = classification.set_is_shipped_defaults(
         is_project_shipped=args.default_is_project_shipped,
