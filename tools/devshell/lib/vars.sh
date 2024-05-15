@@ -866,15 +866,13 @@ function fx-uuid {
 }
 
 function fx-choose-build-concurrency {
-  # If any remote execution is enabled (e.g. via Goma or RBE),
+  # If any remote execution is enabled (e.g. via RBE),
   # allow ninja to launch many more concurrent actions than what local
   # resources can support.
   # This covers GN args: cxx_rbe_enable, rust_rbe_enable, link_rbe_enable.
   # Kludge: grep-ing the args.gn like this is admittedly brittle, and prone
   # to error when we enable remote execution on new tools.
-  if grep -q -e "use_goma = true" \
-      -e "_rbe_enable = true" \
-      "${FUCHSIA_BUILD_DIR}/args.gn"; then
+  if grep -q -e "_rbe_enable = true" "${FUCHSIA_BUILD_DIR}/args.gn"; then
     # The recommendation from the Goma team is to use 10*cpu-count for C++.
     local cpus
     cpus="$(fx-cpu-count)"
@@ -1016,16 +1014,9 @@ function fx-run-ninja {
   # TERM is passed for the pretty ninja UI
   # PATH is passed through.  The ninja actions should invoke tools without
   # relying on PATH.
-  # TMPDIR is passed for Goma on macOS.
+  # TMPDIR was passed for Goma on macOS, but it might have other uses.
   # NINJA_STATUS, NINJA_STATUS_MAX_COMMANDS and NINJA_STATUS_REFRESH_MILLIS
   # are passed to control Ninja progress status.
-  # GOMA_DISABLED is passed to forcefully disabling Goma.
-  #
-  # GOMA_DISABLED and TMPDIR must be set, or unset, not empty. Some Dart
-  # build tools have been observed writing into source paths
-  # when TMPDIR="" - it is deliberately unquoted and using the ${+} expansion
-  # expression). GOMA_DISABLED will forcefully disable Goma even if it's set to
-  # empty.
   #
   # rbe_wrapper is used to auto-start/stop a (reclient) proxy process for the
   # duration of the build, so that RBE-enabled build actions can operate
@@ -1067,7 +1058,6 @@ function fx-run-ninja {
     # Forward the following only if the environment already sets them:
     ${NINJA_PERSISTENT_TIMEOUT_SECONDS+"NINJA_PERSISTENT_TIMEOUT_SECONDS=$NINJA_PERSISTENT_TIMEOUT_SECONDS"}
     ${NINJA_PERSISTENT_LOG_FILE+"NINJA_PERSISTENT_LOG_FILE=$NINJA_PERSISTENT_LOG_FILE"}
-    ${GOMA_DISABLED+"GOMA_DISABLED=$GOMA_DISABLED"}
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}

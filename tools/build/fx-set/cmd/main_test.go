@@ -154,21 +154,6 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
-			name:      "rejects --goma and --ccache",
-			args:      []string{"core.x64", "--goma", "--ccache"},
-			expectErr: true,
-		},
-		{
-			name:      "rejects --goma and --cxx-rbe",
-			args:      []string{"core.x64", "--goma", "--cxx-rbe"},
-			expectErr: true,
-		},
-		{
-			name:      "rejects --goma and --no-goma",
-			args:      []string{"core.x64", "--goma", "--no-goma"},
-			expectErr: true,
-		},
-		{
 			name:      "rejects --cxx-rbe and --no-cxx-rbe",
 			args:      []string{"core.x64", "--cxx-rbe", "--no-cxx-rbe"},
 			expectErr: true,
@@ -338,7 +323,6 @@ func TestConstructStaticSpec(t *testing.T) {
 				ideFiles:         []string{"json"},
 				jsonIDEScripts:   []string{"foo.py"},
 				gnArgs:           []string{"args"},
-				noGoma:           true,
 				disableCxxRbe:    true,
 			},
 			expected: &fintpb.Static{
@@ -353,7 +337,6 @@ func TestConstructStaticSpec(t *testing.T) {
 				IdeFiles:         []string{"json"},
 				JsonIdeScripts:   []string{"foo.py"},
 				GnArgs:           []string{"args"},
-				UseGoma:          false,
 			},
 		},
 		{
@@ -362,33 +345,7 @@ func TestConstructStaticSpec(t *testing.T) {
 				useCcache: true,
 			},
 			expected: &fintpb.Static{
-				GnArgs:  []string{"use_ccache=true"},
-				UseGoma: false,
-			},
-		},
-		{
-			name: "goma enabled",
-			args: &setArgs{
-				useGoma: true,
-			},
-			expected: &fintpb.Static{
-				UseGoma: true,
-			},
-		},
-		{
-			name: "goma default",
-			args: &setArgs{},
-			expected: &fintpb.Static{
-				UseGoma:      false, // deprecated
-				CxxRbeEnable: rbeSupported,
-			},
-		},
-		{
-			name:   "goma disabled if goma auth fails",
-			args:   &setArgs{useGoma: true},
-			runner: fakeSubprocessRunner{fail: true},
-			expected: &fintpb.Static{
-				UseGoma: false,
+				GnArgs: []string{"use_ccache=true"},
 			},
 		},
 		{
@@ -483,7 +440,6 @@ func TestConstructStaticSpec(t *testing.T) {
 				disableCxxRbe:  true,
 			},
 			expected: &fintpb.Static{
-				UseGoma:  false,
 				Variants: append(fuzzerVariants("asan"), fuzzerVariants("ubsan")...),
 			},
 		},
@@ -494,8 +450,7 @@ func TestConstructStaticSpec(t *testing.T) {
 				disableCxxRbe: true,
 			},
 			expected: &fintpb.Static{
-				UseGoma: false,
-				GnArgs:  []string{"enable_netboot=true"},
+				GnArgs: []string{"enable_netboot=true"},
 			},
 		},
 		{
@@ -506,7 +461,6 @@ func TestConstructStaticSpec(t *testing.T) {
 				disableCxxRbe: true,
 			},
 			expected: &fintpb.Static{
-				UseGoma:      false,
 				BasePackages: []string{"foo"},
 				HostLabels:   []string{"//build/rust:cargo_toml_gen"},
 			},

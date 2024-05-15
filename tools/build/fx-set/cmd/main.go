@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -152,13 +151,6 @@ func mainImpl(ctx context.Context) error {
 		return fmt.Errorf("failed to set build directory: %w", err)
 	}
 
-	if staticSpec.UseGoma && !args.noEnsureGoma {
-		// Make sure Goma is set up.
-		if err := fx.run(ctx, "goma"); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -167,16 +159,12 @@ type setArgs struct {
 	fintParamsPath string
 
 	checkoutDir   string
-	noEnsureGoma  bool
 	buildDir      string
 	skipLocalArgs bool
 
 	// Flags passed to GN.
 	board     string
 	product   string
-	useGoma   bool
-	noGoma    bool
-	gomaDir   string
 	useCcache bool
 	noCcache  bool
 	ccacheDir string
@@ -237,14 +225,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.StringVar(&cmd.fintParamsPath, "fint-params-path", "", "")
 	flagSet.BoolVar(&cmd.useCcache, "ccache", false, "")
 	flagSet.BoolVar(&cmd.noCcache, "no-ccache", false, "")
-	flagSet.BoolVar(&cmd.useGoma, "goma", false, "")
-	flagSet.BoolVar(&cmd.noGoma, "no-goma", false, "")
-	flagSet.BoolVar(&cmd.noEnsureGoma, "no-ensure-goma", false, "")
 	flagSet.BoolVar(&cmd.includeClippy, "include-clippy", true, "")
-	// TODO(haowei): Remove --goma-dir once no other scripts use it.
-	// We don't bother validating its value because the value isn't used
-	// anywhere.
-	flagSet.StringVar(&cmd.gomaDir, "goma-dir", "", "")
 
 	flagSet.MarkDeprecated("rbe", "Use tool-specific controls like --rust-rbe instead")
 	flagSet.BoolVar(&cmd.enableRustRbe, "rust-rbe", false, "")
@@ -289,26 +270,15 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		return cmd, nil
 	}
 
-	if cmd.useCcache && cmd.useGoma {
-		return nil, fmt.Errorf("--goma and --ccache are mutually exclusive")
-	}
 	if cmd.useCcache && cmd.noCcache {
 		return nil, fmt.Errorf("--ccache and --no-ccache are mutually exclusive")
 	}
 
-	if cmd.useGoma && cmd.noGoma {
-		return nil, fmt.Errorf("--goma and --no-goma are mutually exclusive")
-	} else if cmd.noGoma && cmd.gomaDir != "" {
-		return nil, fmt.Errorf("--goma-dir and --no-goma are mutually exclusive")
-	}
 	if cmd.enableRbe {
 		return nil, fmt.Errorf("--rbe (deprecated) was renamed to --rust-rbe.")
 	}
 	if cmd.enableCxxRbe && cmd.useCcache {
 		return nil, fmt.Errorf("--cxx-rbe and --use-ccache are mutually exclusive")
-	}
-	if cmd.enableCxxRbe && cmd.useGoma {
-		return nil, fmt.Errorf("--cxx-rbe and --use-goma are mutually exclusive")
 	}
 	if cmd.enableCxxRbe && cmd.disableCxxRbe {
 		return nil, fmt.Errorf("--cxx-rbe and --no-cxx-rbe are mutually exclusive")
@@ -389,7 +359,6 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		// These variables eventually represent our final decisions of whether
 		// to use rbe/goma/ccache, since the logic is somewhat convoluted.
 		useCxxRbeFinal bool
-		useGomaFinal   bool
 		useCcacheFinal bool
 	)
 
@@ -407,42 +376,21 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		}
 	}
 
-	// Goma is deprecated, so do not automatically enable it.
-	if args.useGoma || args.gomaDir != "" {
-		// User explicitly tries to enable Goma (deprecated).
-		// Allow this for a limited time before removing this option.
-		fmt.Printf("Goma is deprecated and shutting down. This will be disabled in the near future. See go/fuchsia-goma-shutdown-psa.")
-		if rbeSupported && canUseRbe {
-			fmt.Printf("On this platform, you can build C++ on RBE using '--cxx-rbe'.")
-		}
-		gomaAuth, err := isGomaAuthenticated(ctx, fx)
-		if err != nil {
-			return nil, err
-		}
-		if gomaAuth {
-			useGomaFinal = true
-		}
-	} else if args.noGoma {
-		useGomaFinal = false
-	}
-
 	// The old behavior enabled Goma by default, but now that Goma
 	// is deprecated, we replace it by enabling --cxx-rbe by default
 	// only on supported platforms.
 	if args.enableCxxRbe {
 		useCxxRbeFinal = true
 	} else if !args.disableCxxRbe {
-		if rbeSupported && canUseRbe && !args.useGoma && !args.useCcache {
+		if rbeSupported && canUseRbe && !args.useCcache {
 			useCxxRbeFinal = true
 		}
 	}
 
-	if !useGomaFinal {
-		if args.useCcache {
-			useCcacheFinal = true
-		} else if args.noCcache {
-			useCcacheFinal = false
-		}
+	if args.useCcache {
+		useCcacheFinal = true
+	} else if args.noCcache {
+		useCcacheFinal = false
 	}
 
 	gnArgs := args.gnArgs
@@ -476,7 +424,6 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		DeveloperTestLabels: args.testLabels,
 		Variants:            variants,
 		GnArgs:              gnArgs,
-		UseGoma:             useGomaFinal,
 		RustRbeEnable:       args.enableRustRbe,
 		CxxRbeEnable:        useCxxRbeFinal,
 		LinkRbeEnable:       args.enableLinkRbe,
@@ -561,17 +508,4 @@ func canAccessRbe(checkoutDir string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func isGomaAuthenticated(ctx context.Context, fx fxRunner) (bool, error) {
-	if err := fx.runWithNoStdio(ctx, "goma_auth", "info"); err != nil {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			// The command failed, which probably means the user isn't logged
-			// into Goma.
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
 }
