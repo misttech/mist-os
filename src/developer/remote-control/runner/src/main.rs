@@ -134,8 +134,14 @@ async fn main() -> Result<()> {
     futures::pin_mut!(in_fut);
     futures::pin_mut!(out_fut);
     match select(in_fut, out_fut).await {
-        future::Either::Left((v, _)) => v.context("stdin copy"),
-        future::Either::Right((v, _)) => v.context("stdout copy"),
+        future::Either::Left((v, _)) => {
+            tracing::warn!("stdin copy: {v:?}");
+            v.context("stdin copy")
+        }
+        future::Either::Right((v, _)) => {
+            tracing::warn!("stdout copy: {v:?}");
+            v.context("stdout copy")
+        }
     }
     .map(|_| ())
 }
