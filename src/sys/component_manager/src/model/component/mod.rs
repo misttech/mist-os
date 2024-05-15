@@ -11,8 +11,8 @@ use {
         framework::controller,
         model::{
             actions::{
-                start, ActionKey, ActionsManager, DestroyAction, ResolveAction, ShutdownAction,
-                ShutdownType, StartAction, UnresolveAction,
+                start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType,
+                StartAction, UnresolveAction,
             },
             context::ModelContext,
             environment::Environment,
@@ -353,6 +353,12 @@ impl ComponentInstance {
         self: &'a Arc<Self>,
     ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ActionError> {
         loop {
+            // Resolve is idempotent; it'll exit early if the component is already resolved. To
+            // ensure that the component is resolved, we call it here without bothering to check
+            // the component's current state. Once it returns successfully we know that the
+            // component is resolved, even if the action did no actual work.
+            self.resolve().await?;
+
             /// Returns Ok(Some(_)) when the component is in a resolved state, Ok(None) when the
             /// component is in a state from which it can be resolved, and Err(_) when the
             /// component is in a state from which it cannot be resolved.
@@ -382,28 +388,11 @@ impl ComponentInstance {
                 }
                 Ok(None)
             }
-
-            // A resolve action will set the resolved state on a component before finishing its
-            // work (such as sending events). If there's an in-progress resolve action, let's
-            // wait for that to complete before proceeding (as opposed to just checking what
-            // state the component is in). See https://fxbug.dev/320698181#comment21 for why.
-            let maybe_notifier = {
-                let actions = self.lock_actions().await;
-                actions.wait(ActionKey::Resolve).await
-            };
-            if let Some(notifier) = maybe_notifier {
-                notifier.await?;
-            }
-
-            if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
-                return Ok(mapped_guard);
-            }
-            self.resolve().await?;
             if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
                 return Ok(mapped_guard);
             }
             // If we've reached here, then the component must have been unresolved in-between our
-            // calls to resolved and get_mapped_mutex_or_error. Our mission here remains to resolve
+            // calls to resolve and get_mapped_mutex_or_error. Our mission here remains to resolve
             // the component if necessary and then return the resolved state, so let's loop and try
             // to resolve it again.
         }
