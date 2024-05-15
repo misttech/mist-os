@@ -51,6 +51,8 @@ enum arm64_microarch {
   CAVIUM_CN88XX,
   CAVIUM_CN99XX,
 
+  APPLE_UNKNOWN,
+
   QEMU_TCG,
 };
 

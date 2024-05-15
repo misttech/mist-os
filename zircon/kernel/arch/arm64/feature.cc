@@ -228,6 +228,12 @@ enum arm64_microarch midr_to_microarch(uint32_t midr) {
       default:
         return UNKNOWN;
     }
+  } else if (implementer == 0x61) {
+    // Apple
+    // For the moment, qemu via HVF does not seem to return
+    // a meaningful part number.
+    return APPLE_UNKNOWN;
+
   } else if (implementer == 0) {
     // software implementation
     switch (partnum) {
@@ -343,6 +349,9 @@ static void midr_to_core_string(uint32_t midr, char* str, size_t len) {
       break;
     case CAVIUM_CN99XX:
       partnum_str = "Cavium CN99XX";
+      break;
+    case APPLE_UNKNOWN:
+      partnum_str = "Unknown Apple Silicon";
       break;
     case QEMU_TCG:
       partnum_str = "QEMU TCG";
