@@ -4,15 +4,11 @@
 
 //! Declares types and functionality related to the state of raw IP sockets.
 
-use lock_order::lock::RwLockFor;
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{Ip, IpVersionMarker};
 use packet_formats::ip::IpProtoExt;
 
-use crate::{
-    ip::raw::RawIpSocketsBindingsTypes,
-    lock_ordering,
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use crate::{ip::raw::RawIpSocketsBindingsTypes, sync::RwLock};
 
 /// State for a raw IP socket that can be modified, and is lock protected.
 #[derive(Default)]
@@ -51,20 +47,12 @@ impl<I: IpProtoExt, BT: RawIpSocketsBindingsTypes> RawIpSocketState<I, BT> {
     }
 }
 
-impl<I: IpProtoExt, BT: RawIpSocketsBindingsTypes> RwLockFor<lock_ordering::RawIpSocketState<I>>
+impl<I: IpProtoExt, BT: RawIpSocketsBindingsTypes> OrderedLockAccess<RawIpSocketLockedState<I>>
     for RawIpSocketState<I, BT>
 {
-    type Data = RawIpSocketLockedState<I>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data>
-        where Self: 'l;
+    type Lock = RwLock<RawIpSocketLockedState<I>>;
 
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.locked_state.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.locked_state.write()
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.locked_state)
     }
 }

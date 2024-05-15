@@ -5,14 +5,14 @@
 //! Implementations for raw IP sockets that integrate with traits/types from
 //! foreign modules.
 
-use lock_order::{relation::LockBefore, wrap::LockedWrapperApi};
+use lock_order::{lock::LockLevelFor, relation::LockBefore, wrap::LockedWrapperApi};
 
 use crate::{
     ip::{
         base::IpLayerIpExt,
         raw::{
             RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
-            RawIpSocketStateContext,
+            RawIpSocketState, RawIpSocketStateContext,
         },
     },
     lock_ordering, BindingsTypes, CoreCtx,
@@ -53,4 +53,10 @@ impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSo
         let mut sockets = self.write_lock::<lock_ordering::AllRawIpSockets<I>>();
         cb(&mut sockets)
     }
+}
+
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<RawIpSocketState<I, BT>>
+    for lock_ordering::RawIpSocketState<I>
+{
+    type Data = RawIpSocketLockedState<I>;
 }
