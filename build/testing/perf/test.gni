@@ -67,17 +67,11 @@ template("python_perf_test") {
     _runtime_deps_target = "${_test_target_name}_runtime_deps"
     _runtime_deps_dir = "${target_out_dir}/${_test_target_name}/runtime_deps"
     host_test_data(_runtime_deps_target) {
-      sources = [
-        "${root_out_dir}/catapult_converter",
-        "${root_out_dir}/trace2json",
-      ]
+      sources = [ "${root_out_dir}/catapult_converter" ]
       sources += invoker.expected_metric_names_filepaths
 
       outputs = [ "${_runtime_deps_dir}/{{source_file_part}}" ]
-      deps = [
-        "//src/performance/trace2json:bin",
-        "//src/testing/catapult_converter:converter_bin",
-      ]
+      deps = [ "//src/testing/catapult_converter:converter_bin" ]
     }
 
     # This action checks that expected_metric_names_filepath refers to a file

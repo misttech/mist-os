@@ -7,15 +7,16 @@ import json
 import logging
 import math
 import os
+import stat
 import pathlib
 import subprocess
 import types
+from importlib.resources import as_file, files
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Self, TextIO, Tuple
 
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
 from perf_test_utils import utils
+from trace_processing import data, trace_model, trace_time
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
@@ -198,27 +199,24 @@ def convert_trace_file_to_json(
         base_path, _ = os.path.splitext(base_path)
     output_path = base_path + output_extension
 
-    if trace2json_path is None:
-        # Locate trace2json via runtime_deps. The python_perf_test template will
-        # ensure that trace2json is available via the runtime_deps directory.
-        runtime_deps_dir: pathlib.Path = pathlib.Path(
-            utils.get_associated_runtime_deps_dir(__file__)
+    with as_file(files(data).joinpath("trace2json")) as f:
+        if trace2json_path is None:
+            f.chmod(f.stat().st_mode | stat.S_IEXEC)
+            trace2json_path = f
+
+        args: List[str] = [
+            str(trace2json_path),
+            f"--input-file={trace_path}",
+            f"--output-file={output_path}",
+        ]
+        if compressed_input or trace_path.suffix == compressed_ext:
+            args.append("--compressed-input")
+
+        _LOGGER.info(f"Running {args}")
+        conversion_output = subprocess.check_output(
+            args, text=True, stderr=subprocess.STDOUT
         )
-        trace2json_path = runtime_deps_dir / "trace2json"
-
-    args: List[str] = [
-        str(trace2json_path),
-        f"--input-file={trace_path}",
-        f"--output-file={output_path}",
-    ]
-    if compressed_input or trace_path.suffix == compressed_ext:
-        args.append("--compressed-input")
-
-    _LOGGER.info(f"Running {args}")
-    conversion_output = subprocess.check_output(
-        args, text=True, stderr=subprocess.STDOUT
-    )
-    _LOGGER.debug("Output of running %s: %s", args, conversion_output)
+        _LOGGER.debug("Output of running %s: %s", args, conversion_output)
 
     return output_path
 

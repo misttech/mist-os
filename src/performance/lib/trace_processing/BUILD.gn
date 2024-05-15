@@ -25,7 +25,13 @@ python_library("trace_processing") {
     "trace_time.py",
     "trace_utils.py",
   ]
-  library_deps = [ "//src/performance/lib/py_test_utils:perf_test_utils" ]
+  library_deps = [
+    "//src/performance/lib/py_test_utils:perf_test_utils",
+    "//src/performance/trace2json:bin",
+  ]
+
+  data_package_name = "data"
+  data_sources = [ "${root_out_dir}/trace2json" ]
 }
 
 group("tests") {
