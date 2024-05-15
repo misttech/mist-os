@@ -261,6 +261,7 @@ rustc_library("starnix_core") {
     "vfs/socket/socket_generic_netlink/messages.rs",
     "vfs/socket/socket_generic_netlink/mod.rs",
     "vfs/socket/socket_generic_netlink/nl80211.rs",
+    "vfs/socket/socket_generic_netlink/taskstats.rs",
     "vfs/socket/socket_netlink.rs",
     "vfs/socket/socket_types.rs",
     "vfs/socket/socket_unix.rs",
