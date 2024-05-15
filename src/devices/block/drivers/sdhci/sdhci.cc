@@ -23,6 +23,7 @@
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
 
+#include <bind/fuchsia/hardware/sdmmc/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
@@ -943,37 +944,6 @@ zx_status_t Sdhci::Init() {
   }
   info_.caps |= SDMMC_HOST_CAP_AUTO_CMD12;
 
-  // Set controller preferences
-  uint64_t speed_capabilities = 0;
-  if (quirks_ & SDHCI_QUIRK_NON_STANDARD_TUNING) {
-    // Disable HS200 and HS400 if tuning cannot be performed as per the spec.
-    speed_capabilities =
-        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200) |
-        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400);
-  }
-  if (quirks_ & SDHCI_QUIRK_NO_DDR) {
-    speed_capabilities =
-        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr) |
-        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400);
-  }
-
-  fidl::Arena<> fidl_arena;
-  fit::result metadata =
-      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
-                        .speed_capabilities(speed_capabilities)
-                        .Build());
-  if (!metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
-           metadata.error_value().FormatDescription().c_str());
-    return metadata.error_value().status();
-  }
-  status = device_add_metadata(zxdev(), DEVICE_METADATA_SDMMC, metadata.value().data(),
-                               metadata.value().size());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add SDMMC metadata: %s", zx_status_get_string(status));
-    return status;
-  }
-
   // allocate and setup DMA descriptor
   if (SupportsAdma2()) {
     auto host_control1 = HostControl1::Get().ReadFrom(&regs_mmio_buffer_);
@@ -1057,6 +1027,66 @@ zx_status_t Sdhci::Init() {
   return ZX_OK;
 }
 
+void Sdhci::DdkInit(ddk::InitTxn txn) {
+  // Set controller preferences
+  fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities{};
+  if (quirks_ & SDHCI_QUIRK_NON_STANDARD_TUNING) {
+    // Disable HS200 and HS400 if tuning cannot be performed as per the spec.
+    speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200 |
+                          fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
+  }
+  if (quirks_ & SDHCI_QUIRK_NO_DDR) {
+    speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr |
+                          fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
+  }
+
+  fidl::Arena<> fidl_arena;
+  auto builder = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena).use_fidl(false);
+
+  auto existing_metadata = ddk::GetEncodedMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
+      parent(), DEVICE_METADATA_SDMMC);
+  if (existing_metadata.is_error()) {
+    builder.speed_capabilities(speed_capabilities);
+  } else {
+    if (existing_metadata->has_max_frequency()) {
+      builder.max_frequency(existing_metadata->max_frequency());
+    }
+
+    if (existing_metadata->has_speed_capabilities()) {
+      // OR the speed capabilities reported by the parent with the ones reported by the host
+      // controller, which limits us to speed modes supported by both.
+      builder.speed_capabilities(existing_metadata->speed_capabilities() | speed_capabilities);
+    } else {
+      builder.speed_capabilities(speed_capabilities);
+    }
+
+    if (existing_metadata->has_enable_cache()) {
+      builder.enable_cache(existing_metadata->enable_cache());
+    }
+
+    if (existing_metadata->has_removable()) {
+      builder.removable(existing_metadata->removable());
+    }
+
+    if (existing_metadata->has_max_command_packing()) {
+      builder.max_command_packing(existing_metadata->max_command_packing());
+    }
+  }
+
+  fit::result metadata = fidl::Persist(builder.Build());
+  if (!metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           metadata.error_value().FormatDescription().c_str());
+    return txn.Reply(metadata.error_value().status());
+  }
+  zx_status_t status = device_add_metadata(zxdev(), DEVICE_METADATA_SDMMC, metadata.value().data(),
+                                           metadata.value().size());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add SDMMC metadata: %s", zx_status_get_string(status));
+  }
+  txn.Reply(status);
+}
+
 zx_status_t Sdhci::Create(void* ctx, zx_device_t* parent) {
   ddk::SdhciProtocolClient sdhci(parent);
   if (!sdhci.is_valid()) {
@@ -1118,7 +1148,14 @@ zx_status_t Sdhci::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd(ddk::DeviceAddArgs("sdhci").forward_metadata(parent, DEVICE_METADATA_SDMMC));
+  const zx_device_str_prop_t props[] = {
+      {
+          .key = bind_fuchsia_hardware_sdmmc::SDMMCSERVICE.c_str(),
+          .property_value =
+              str_prop_str_val(bind_fuchsia_hardware_sdmmc::SDMMCSERVICE_DRIVERTRANSPORT.c_str()),
+      },
+  };
+  status = dev->DdkAdd(ddk::DeviceAddArgs("sdhci").set_str_props(props));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: SDMMC device_add failed.", __func__);
     dev->irq_.destroy();
