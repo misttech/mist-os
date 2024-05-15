@@ -46,13 +46,34 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
 
   {
     fuchsia_hardware_sdio::Service::InstanceHandler handler({
-        .device = fit::bind_member<&SdioFunctionDevice::Serve>(this),
+        .device =
+            [this](fidl::ServerEnd<fuchsia_hardware_sdio::Device> request) {
+              fidl::BindServer(sdio_parent_->parent()->driver_async_dispatcher(),
+                               std::move(request), &zircon_transport_impl_);
+            },
     });
     auto result =
         sdio_parent_->parent()->driver_outgoing()->AddService<fuchsia_hardware_sdio::Service>(
             std::move(handler), sdio_function_name_);
     if (result.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to add SDIO service: %s", result.status_string());
+      return result.status_value();
+    }
+  }
+
+  {
+    fuchsia_hardware_sdio::DriverService::InstanceHandler handler({
+        .device =
+            [this](fdf::ServerEnd<fuchsia_hardware_sdio::DriverDevice> request) {
+              fdf::BindServer(sdio_parent_->parent()->driver_dispatcher()->get(),
+                              std::move(request), &driver_transport_impl_);
+            },
+    });
+    auto result =
+        sdio_parent_->parent()->driver_outgoing()->AddService<fuchsia_hardware_sdio::DriverService>(
+            std::move(handler), sdio_function_name_);
+    if (result.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to add SDIO driver service: %s", result.status_string());
       return result.status_value();
     }
   }
@@ -72,6 +93,8 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
 
   std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdio::Service>(arena, sdio_function_name_));
+  offers.push_back(
+      fdf::MakeOffer2<fuchsia_hardware_sdio::DriverService>(arena, sdio_function_name_));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, sdio_function_name_)
@@ -88,10 +111,6 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
   }
 
   return ZX_OK;
-}
-
-void SdioFunctionDevice::Serve(fidl::ServerEnd<fuchsia_hardware_sdio::Device> request) {
-  fidl::BindServer(sdio_parent_->parent()->driver_async_dispatcher(), std::move(request), this);
 }
 
 zx_status_t SdioFunctionDevice::SdioGetDevHwInfo(sdio_hw_info_t* out_hw_info) {
@@ -141,171 +160,6 @@ zx_status_t SdioFunctionDevice::SdioDoVendorControlRwByte(bool write, uint8_t ad
   return sdio_parent_->SdioDoVendorControlRwByte(write, addr, write_byte, out_read_byte);
 }
 
-void SdioFunctionDevice::GetDevHwInfo(GetDevHwInfoCompleter::Sync& completer) {
-  sdio_hw_info_t hw_info = {};
-  SdioHwInfo fidl_hw_info = {};
-  zx_status_t status = SdioGetDevHwInfo(&hw_info);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-
-  static_assert(sizeof(fidl_hw_info) == sizeof(hw_info));
-  memcpy(&fidl_hw_info, &hw_info, sizeof(fidl_hw_info));
-  completer.ReplySuccess(fidl_hw_info);
-}
-
-void SdioFunctionDevice::EnableFn(EnableFnCompleter::Sync& completer) {
-  zx_status_t status = SdioEnableFn();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::DisableFn(DisableFnCompleter::Sync& completer) {
-  zx_status_t status = SdioDisableFn();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::EnableFnIntr(EnableFnIntrCompleter::Sync& completer) {
-  zx_status_t status = SdioEnableFnIntr();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::DisableFnIntr(DisableFnIntrCompleter::Sync& completer) {
-  zx_status_t status = SdioDisableFnIntr();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::UpdateBlockSize(UpdateBlockSizeRequestView request,
-                                         UpdateBlockSizeCompleter::Sync& completer) {
-  zx_status_t status = SdioUpdateBlockSize(request->blk_sz, request->deflt);
-  if (status != ZX_OK)
-    completer.ReplyError(status);
-  else
-    completer.ReplySuccess();
-}
-
-void SdioFunctionDevice::GetBlockSize(GetBlockSizeCompleter::Sync& completer) {
-  uint16_t cur_blk_size;
-  zx_status_t status = SdioGetBlockSize(&cur_blk_size);
-  if (status != ZX_OK)
-    completer.ReplyError(status);
-  else
-    completer.ReplySuccess(cur_blk_size);
-}
-
-void SdioFunctionDevice::DoRwTxn(DoRwTxnRequestView request, DoRwTxnCompleter::Sync& completer) {
-  const SdioControllerDevice::SdioRwTxn<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> txn{
-      .addr = request->txn.addr,
-      .incr = request->txn.incr,
-      .write = request->txn.write,
-      .buffers = {request->txn.buffers.data(), request->txn.buffers.count()},
-  };
-
-  if (zx_status_t status = sdio_parent_->SdioDoRwTxn(function_, txn); status == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(status);
-  }
-}
-
-void SdioFunctionDevice::DoRwByte(DoRwByteRequestView request, DoRwByteCompleter::Sync& completer) {
-  zx_status_t status =
-      SdioDoRwByte(request->write, request->addr, request->write_byte, &request->write_byte);
-  if (status != ZX_OK)
-    completer.ReplyError(status);
-  else
-    completer.ReplySuccess(request->write_byte);
-}
-
-void SdioFunctionDevice::GetInBandIntr(GetInBandIntrCompleter::Sync& completer) {
-  zx::interrupt irq;
-  zx_status_t status = SdioGetInBandIntr(&irq);
-  if (status != ZX_OK)
-    completer.ReplyError(status);
-  else
-    completer.ReplySuccess(std::move(irq));
-}
-
-void SdioFunctionDevice::IoAbort(IoAbortCompleter::Sync& completer) {
-  zx_status_t status = SdioIoAbort();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::IntrPending(IntrPendingCompleter::Sync& completer) {
-  bool pending;
-  zx_status_t status = SdioIntrPending(&pending);
-  if (status == ZX_OK)
-    completer.ReplySuccess(pending);
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::DoVendorControlRwByte(DoVendorControlRwByteRequestView request,
-                                               DoVendorControlRwByteCompleter::Sync& completer) {
-  zx_status_t status = SdioDoVendorControlRwByte(request->write, request->addr, request->write_byte,
-                                                 &request->write_byte);
-  if (status == ZX_OK)
-    completer.ReplySuccess(request->write_byte);
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::AckInBandIntr(AckInBandIntrCompleter::Sync& completer) {
-  SdioAckInBandIntr();
-}
-
-void SdioFunctionDevice::RegisterVmo(RegisterVmoRequestView request,
-                                     RegisterVmoCompleter::Sync& completer) {
-  zx_status_t status = SdioRegisterVmo(request->vmo_id, std::move(request->vmo), request->offset,
-                                       request->size, request->vmo_rights);
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::UnregisterVmo(UnregisterVmoRequestView request,
-                                       UnregisterVmoCompleter::Sync& completer) {
-  zx::vmo out_vmo;
-
-  zx_status_t status = SdioUnregisterVmo(request->vmo_id, &out_vmo);
-  if (status != ZX_OK)
-    completer.ReplyError(status);
-  else
-    completer.ReplySuccess(std::move(out_vmo));
-}
-
-void SdioFunctionDevice::RequestCardReset(RequestCardResetCompleter::Sync& completer) {
-  zx_status_t status = SdioRequestCardReset();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
-void SdioFunctionDevice::PerformTuning(PerformTuningCompleter::Sync& completer) {
-  zx_status_t status = SdioPerformTuning();
-  if (status == ZX_OK)
-    completer.ReplySuccess();
-  else
-    completer.ReplyError(status);
-}
-
 zx_status_t SdioFunctionDevice::SdioRegisterVmo(uint32_t vmo_id, zx::vmo vmo, uint64_t offset,
                                                 uint64_t size, uint32_t vmo_rights) {
   return sdio_parent_->SdioRegisterVmo(function_, vmo_id, std::move(vmo), offset, size, vmo_rights);
@@ -324,6 +178,329 @@ zx_status_t SdioFunctionDevice::SdioRequestCardReset() {
 }
 
 zx_status_t SdioFunctionDevice::SdioPerformTuning() { return sdio_parent_->SdioPerformTuning(); }
+
+void SdioFunctionDevice::DriverTransportImpl::GetDevHwInfo(fdf::Arena& arena,
+                                                           GetDevHwInfoCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceGetDevHwInfoResponse response{};
+  completer.buffer(arena).Reply(parent_->GetDevHwInfo(&response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::EnableFn(fdf::Arena& arena,
+                                                       EnableFnCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->EnableFn());
+}
+
+void SdioFunctionDevice::DriverTransportImpl::DisableFn(fdf::Arena& arena,
+                                                        DisableFnCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->DisableFn());
+}
+
+void SdioFunctionDevice::DriverTransportImpl::EnableFnIntr(fdf::Arena& arena,
+                                                           EnableFnIntrCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->EnableFnIntr());
+}
+
+void SdioFunctionDevice::DriverTransportImpl::DisableFnIntr(
+    fdf::Arena& arena, DisableFnIntrCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->DisableFnIntr());
+}
+
+void SdioFunctionDevice::DriverTransportImpl::UpdateBlockSize(
+    fuchsia_hardware_sdio::wire::DeviceUpdateBlockSizeRequest* request, fdf::Arena& arena,
+    UpdateBlockSizeCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->UpdateBlockSize(request));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::GetBlockSize(fdf::Arena& arena,
+                                                           GetBlockSizeCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceGetBlockSizeResponse response{};
+  completer.buffer(arena).Reply(parent_->GetBlockSize(&response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::DoRwByte(
+    fuchsia_hardware_sdio::wire::DeviceDoRwByteRequest* request, fdf::Arena& arena,
+    DoRwByteCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceDoRwByteResponse response{};
+  completer.buffer(arena).Reply(parent_->DoRwByte(request, &response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::GetInBandIntr(
+    fdf::Arena& arena, GetInBandIntrCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceGetInBandIntrResponse response{};
+  completer.buffer(arena).Reply(parent_->GetInBandIntr(&response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::AckInBandIntr(
+    fdf::Arena& arena, AckInBandIntrCompleter::Sync& completer) {
+  parent_->AckInBandIntr();
+}
+
+void SdioFunctionDevice::DriverTransportImpl::IoAbort(fdf::Arena& arena,
+                                                      IoAbortCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->IoAbort());
+}
+
+void SdioFunctionDevice::DriverTransportImpl::IntrPending(fdf::Arena& arena,
+                                                          IntrPendingCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceIntrPendingResponse response{};
+  completer.buffer(arena).Reply(parent_->IntrPending(&response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::DoVendorControlRwByte(
+    fuchsia_hardware_sdio::wire::DeviceDoVendorControlRwByteRequest* request, fdf::Arena& arena,
+    DoVendorControlRwByteCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceDoVendorControlRwByteResponse response{};
+  completer.buffer(arena).Reply(parent_->DoVendorControlRwByte(request, &response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::RegisterVmo(
+    fuchsia_hardware_sdio::wire::DeviceRegisterVmoRequest* request, fdf::Arena& arena,
+    RegisterVmoCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->RegisterVmo(request));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::UnregisterVmo(
+    fuchsia_hardware_sdio::wire::DeviceUnregisterVmoRequest* request, fdf::Arena& arena,
+    UnregisterVmoCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceUnregisterVmoResponse response{};
+  completer.buffer(arena).Reply(parent_->UnregisterVmo(request, &response));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::DoRwTxn(
+    fuchsia_hardware_sdio::wire::DeviceDoRwTxnRequest* request, fdf::Arena& arena,
+    DoRwTxnCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->DoRwTxn(request));
+}
+
+void SdioFunctionDevice::DriverTransportImpl::RequestCardReset(
+    fdf::Arena& arena, RequestCardResetCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->RequestCardReset());
+}
+
+void SdioFunctionDevice::DriverTransportImpl::PerformTuning(
+    fdf::Arena& arena, PerformTuningCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(parent_->PerformTuning());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::GetDevHwInfo(GetDevHwInfoCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceGetDevHwInfoResponse response{};
+  completer.Reply(parent_->GetDevHwInfo(&response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::EnableFn(EnableFnCompleter::Sync& completer) {
+  completer.Reply(parent_->EnableFn());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::DisableFn(DisableFnCompleter::Sync& completer) {
+  completer.Reply(parent_->DisableFn());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::EnableFnIntr(EnableFnIntrCompleter::Sync& completer) {
+  completer.Reply(parent_->EnableFnIntr());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::DisableFnIntr(
+    DisableFnIntrCompleter::Sync& completer) {
+  completer.Reply(parent_->DisableFnIntr());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::UpdateBlockSize(
+    UpdateBlockSizeRequestView request, UpdateBlockSizeCompleter::Sync& completer) {
+  completer.Reply(parent_->UpdateBlockSize(request));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::GetBlockSize(GetBlockSizeCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceGetBlockSizeResponse response{};
+  completer.Reply(parent_->GetBlockSize(&response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::DoRwByte(DoRwByteRequestView request,
+                                                       DoRwByteCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceDoRwByteResponse response{};
+  completer.Reply(parent_->DoRwByte(request, &response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::GetInBandIntr(
+    GetInBandIntrCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceGetInBandIntrResponse response{};
+  completer.Reply(parent_->GetInBandIntr(&response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::AckInBandIntr(
+    AckInBandIntrCompleter::Sync& completer) {
+  parent_->AckInBandIntr();
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::IoAbort(IoAbortCompleter::Sync& completer) {
+  completer.Reply(parent_->IoAbort());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::IntrPending(IntrPendingCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceIntrPendingResponse response{};
+  completer.Reply(parent_->IntrPending(&response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::DoVendorControlRwByte(
+    DoVendorControlRwByteRequestView request, DoVendorControlRwByteCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceDoVendorControlRwByteResponse response{};
+  completer.Reply(parent_->DoVendorControlRwByte(request, &response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::RegisterVmo(RegisterVmoRequestView request,
+                                                          RegisterVmoCompleter::Sync& completer) {
+  completer.Reply(parent_->RegisterVmo(request));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::UnregisterVmo(
+    UnregisterVmoRequestView request, UnregisterVmoCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceUnregisterVmoResponse response{};
+  completer.Reply(parent_->UnregisterVmo(request, &response));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::DoRwTxn(DoRwTxnRequestView request,
+                                                      DoRwTxnCompleter::Sync& completer) {
+  completer.Reply(parent_->DoRwTxn(request));
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::RequestCardReset(
+    RequestCardResetCompleter::Sync& completer) {
+  completer.Reply(parent_->RequestCardReset());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::PerformTuning(
+    PerformTuningCompleter::Sync& completer) {
+  completer.Reply(parent_->PerformTuning());
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceGetDevHwInfoResponse*>
+SdioFunctionDevice::GetDevHwInfo(
+    fuchsia_hardware_sdio::wire::DeviceGetDevHwInfoResponse* response) {
+  sdio_hw_info_t info{};
+  zx_status_t status = sdio_parent_->SdioGetDevHwInfo(function_, &info);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  response->hw_info = {
+      .dev_hw_info =
+          {
+              .num_funcs = info.dev_hw_info.num_funcs,
+              .sdio_vsn = info.dev_hw_info.sdio_vsn,
+              .cccr_vsn = info.dev_hw_info.cccr_vsn,
+              .caps =
+                  static_cast<fuchsia_hardware_sdio::SdioDeviceCapabilities>(info.dev_hw_info.caps),
+          },
+      .func_hw_info =
+          {
+              .manufacturer_id = info.func_hw_info.manufacturer_id,
+              .product_id = info.func_hw_info.product_id,
+              .max_blk_size = info.func_hw_info.max_blk_size,
+              .max_tran_speed = info.func_hw_info.max_tran_speed,
+              .fn_intf_code = info.func_hw_info.fn_intf_code,
+          },
+      .host_max_transfer_size = info.host_max_transfer_size,
+  };
+
+  return zx::ok(response);
+}
+
+zx::result<> SdioFunctionDevice::EnableFn() {
+  return zx::make_result(sdio_parent_->SdioEnableFn(function_));
+}
+
+zx::result<> SdioFunctionDevice::DisableFn() {
+  return zx::make_result(sdio_parent_->SdioDisableFn(function_));
+}
+
+zx::result<> SdioFunctionDevice::EnableFnIntr() {
+  return zx::make_result(sdio_parent_->SdioEnableFnIntr(function_));
+}
+
+zx::result<> SdioFunctionDevice::DisableFnIntr() {
+  return zx::make_result(sdio_parent_->SdioDisableFnIntr(function_));
+}
+
+zx::result<> SdioFunctionDevice::UpdateBlockSize(
+    fuchsia_hardware_sdio::wire::DeviceUpdateBlockSizeRequest* request) {
+  return zx::make_result(
+      sdio_parent_->SdioUpdateBlockSize(function_, request->blk_sz, request->deflt));
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceGetBlockSizeResponse*>
+SdioFunctionDevice::GetBlockSize(
+    fuchsia_hardware_sdio::wire::DeviceGetBlockSizeResponse* response) {
+  return zx::make_result(sdio_parent_->SdioGetBlockSize(function_, &response->cur_blk_size),
+                         response);
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceDoRwByteResponse*> SdioFunctionDevice::DoRwByte(
+    fuchsia_hardware_sdio::wire::DeviceDoRwByteRequest* request,
+    fuchsia_hardware_sdio::wire::DeviceDoRwByteResponse* response) {
+  return zx::make_result(sdio_parent_->SdioDoRwByte(request->write, function_, request->addr,
+                                                    request->write_byte, &response->read_byte),
+                         response);
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceGetInBandIntrResponse*>
+SdioFunctionDevice::GetInBandIntr(
+    fuchsia_hardware_sdio::wire::DeviceGetInBandIntrResponse* response) {
+  return zx::make_result(sdio_parent_->SdioGetInBandIntr(function_, &response->irq), response);
+}
+
+void SdioFunctionDevice::AckInBandIntr() { sdio_parent_->SdioAckInBandIntr(function_); }
+
+zx::result<> SdioFunctionDevice::IoAbort() {
+  return zx::make_result(sdio_parent_->SdioIoAbort(function_));
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceIntrPendingResponse*> SdioFunctionDevice::IntrPending(
+    fuchsia_hardware_sdio::wire::DeviceIntrPendingResponse* response) {
+  return zx::make_result(sdio_parent_->SdioIntrPending(function_, &response->pending), response);
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceDoVendorControlRwByteResponse*>
+SdioFunctionDevice::DoVendorControlRwByte(
+    fuchsia_hardware_sdio::wire::DeviceDoVendorControlRwByteRequest* request,
+    fuchsia_hardware_sdio::wire::DeviceDoVendorControlRwByteResponse* response) {
+  return zx::make_result(
+      sdio_parent_->SdioDoVendorControlRwByte(request->write, request->addr, request->write_byte,
+                                              &response->read_byte),
+      response);
+}
+
+zx::result<> SdioFunctionDevice::RegisterVmo(
+    fuchsia_hardware_sdio::wire::DeviceRegisterVmoRequest* request) {
+  return zx::make_result(sdio_parent_->SdioRegisterVmo(function_, request->vmo_id,
+                                                       std::move(request->vmo), request->offset,
+                                                       request->size, request->vmo_rights));
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceUnregisterVmoResponse*>
+SdioFunctionDevice::UnregisterVmo(
+    fuchsia_hardware_sdio::wire::DeviceUnregisterVmoRequest* request,
+    fuchsia_hardware_sdio::wire::DeviceUnregisterVmoResponse* response) {
+  return zx::make_result(
+      sdio_parent_->SdioUnregisterVmo(function_, request->vmo_id, &response->vmo), response);
+}
+
+zx::result<> SdioFunctionDevice::DoRwTxn(
+    fuchsia_hardware_sdio::wire::DeviceDoRwTxnRequest* request) {
+  const SdioControllerDevice::SdioRwTxn<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> txn{
+      .addr = request->txn.addr,
+      .incr = request->txn.incr,
+      .write = request->txn.write,
+      .buffers = {request->txn.buffers.data(), request->txn.buffers.count()},
+  };
+  return zx::make_result(sdio_parent_->SdioDoRwTxn(function_, txn));
+}
+
+zx::result<> SdioFunctionDevice::RequestCardReset() {
+  return zx::make_result(sdio_parent_->SdioRequestCardReset());
+}
+
+zx::result<> SdioFunctionDevice::PerformTuning() {
+  return zx::make_result(sdio_parent_->SdioPerformTuning());
+}
 
 fdf::Logger& SdioFunctionDevice::logger() { return sdio_parent_->logger(); }
 

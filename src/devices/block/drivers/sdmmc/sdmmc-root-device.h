@@ -33,6 +33,9 @@ class SdmmcRootDevice : public fdf::DriverBase {
   const std::shared_ptr<fdf::Namespace>& driver_incoming() const { return incoming(); }
   std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() { return outgoing(); }
   async_dispatcher_t* driver_async_dispatcher() const { return dispatcher(); }
+  const fdf::UnownedSynchronizedDispatcher& driver_dispatcher() const {
+    return fdf::DriverBase::driver_dispatcher();
+  }
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
 
   // Visible for testing.
