@@ -156,8 +156,6 @@ function unmount_repo() {
   if findmnt --raw --noheadings --output 'SOURCE' --mountpoint "$MOUNTPOINT" >/dev/null; then
     echo "Trying to unmount $MOUNTPOINT" >&2
     if ! sudo umount "$MOUNTPOINT" ; then
-      echo "Stopping goma" >&2
-      (cd "$MOUNTPOINT" && ./scripts/fx goma_ctl ensure_stop)
       echo "Stopping ffx daemon" >&2
       (cd "$MOUNTPOINT" && ./scripts/fx ffx emu stop --all)
       (cd "$MOUNTPOINT" && ./scripts/fx ffx daemon stop)
@@ -521,11 +519,6 @@ function cmd_enter_helper() {
     bind_mount "$checkout"
     cd "$MOUNTPOINT"
     export PATH="$MOUNTPOINT/.jiri_root/bin:$PATH"
-
-    readonly goma_tmp_dir="$(./prebuilt/third_party/goma/linux-x64/gomacc tmp_dir)"
-    mount -t tmpfs isolated_goma "$goma_tmp_dir"
-    # goma complains about excessive permissions on this dir
-    chmod go-rwx "$goma_tmp_dir"
   else
     cd "$checkout"
     export PATH="$checkout/.jiri_root/bin:$PATH"
@@ -533,16 +526,6 @@ function cmd_enter_helper() {
   fi
 
   export MULTIFUCHSIA_ENTER_ENV="$(basename "$checkout")"
-  # pick alternate ports so we don't interfere with the outside goma
-  # default ports: 8089 19080
-  # cron job ports: 8088 19081
-  export GOMA_COMPILER_PROXY_PORT=8087
-  export GOMACTL_PROXY_PORT=19082
-  # only start goma if it looks like the build wants it
-  # grep command courtesy of https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/devshell/build;l=177;drc=84563a2c5e3f92d8d1a29e78bab504ea1fe93324
-  if grep -q "^ *use_goma = true" "$(./scripts/fx get-build-dir)/args.gn"; then
-    ./scripts/fx goma_ctl start
-  fi
   local retcode=0
   if [ "$#" -gt 0 ]; then
     if "$@" ; then
@@ -577,10 +560,6 @@ function cmd_enter_helper() {
         return 1
         ;;
     esac
-  fi
-
-  if grep -q "^ *use_goma = true" "$(./scripts/fx get-build-dir)/args.gn"; then
-    ./scripts/fx goma_ctl ensure_stop
   fi
 
   return "$retcode"

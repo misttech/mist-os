@@ -72,15 +72,6 @@ fi
 
   ./.jiri_root/bin/jiri update -gc
 
-  if grep -q "^ *use_goma = true" "$(./scripts/fx get-build-dir)/args.gn"; then
-    readonly goma_tmp_dir="$(./prebuilt/third_party/goma/linux-x64/gomacc "tmp_dir")"
-    mount -t tmpfs isolated_goma "$goma_tmp_dir"
-    # goma complains about excessive permissions on this dir
-    chmod go-rwx "$goma_tmp_dir"
-    # pick alternate ports so we don't interfere with the outside goma
-    GOMA_COMPILER_PROXY_PORT=8088 GOMACTL_PROXY_PORT=19081 ./scripts/fx goma_ctl start
-  fi
-
   ./scripts/fx build
 )
 
@@ -104,18 +95,5 @@ echo "snapshots/build.success updated" >&2
     cd "${CLEAN_DIR}"
   else
     cd "${MOUNTPOINT}"
-  fi
-
-  if grep -q "^ *use_goma = true" "$(./scripts/fx get-build-dir)/args.gn"; then
-    goma_stop_output="$(./scripts/fx goma_ctl ensure_stop 2>&1)"
-    goma_status="$(./scripts/fx goma_ctl status 2>&1 || true)"
-    if echo "$goma_status" | grep -q "goma is not running"; then
-      echo "goma stopped." >&2
-    else
-      echo "failed to stop goma:" >&2
-      echo "$goma_status" >&2
-      echo "$goma_stop_output" >&2
-      exit 1
-    fi
   fi
 )
