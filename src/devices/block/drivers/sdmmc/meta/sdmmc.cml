@@ -20,6 +20,11 @@
         { service: "fuchsia.hardware.sdio.DriverService" },
     ],
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
         { protocol: "fuchsia.power.broker.Topology" },
 
         // Used by //sdk/lib/driver/power/cpp

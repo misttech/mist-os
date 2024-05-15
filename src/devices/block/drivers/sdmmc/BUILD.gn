@@ -19,6 +19,7 @@ driver_bind_rules("sdmmc-bind") {
 
 common_deps = [
   ":sdmmc-bind",
+  ":sdmmc-config",
   "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
   "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
   "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
@@ -77,17 +78,33 @@ fuchsia_driver("sdmmc-driver") {
   deps = common_deps
 }
 
+fuchsia_component_manifest("sdmmc-manifest") {
+  component_name = "sdmmc"
+  manifest = "meta/sdmmc.cml"
+}
+
 fuchsia_driver_component("sdmmc") {
   visibility = [ ":*" ]
-  component_name = "sdmmc"
+  cm_label = ":sdmmc-manifest"
   deps = [ ":sdmmc-driver" ]
   info = "sdmmc-info.json"
-  manifest = "meta/sdmmc.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("sdmmc-config") {
+  cm_label = ":sdmmc-manifest"
+}
+
+fuchsia_structured_config_values("sc-values") {
+  cm_label = ":sdmmc-manifest"
+  values = {
+    enable_suspend = false
+  }
 }
 
 fuchsia_driver_package("package") {
   package_name = "sdmmc"
   driver_components = [ ":sdmmc" ]
+  deps = [ ":sc-values" ]
 }
 
 test("sdmmc-block-test-bin") {

@@ -258,9 +258,7 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
       parent_->driver_async_dispatcher(),
       {.inspector = inspector_, .client_end = std::move(inspect_sink.value())}));
 
-  // TODO(b/332392662): Use fuchsia.power.SuspendEnabled config cap to determine whether to
-  // expect Power Framework.
-  if (!is_sd_) {
+  if (!is_sd_ && parent_->config().enable_suspend()) {
     zx::result result = ConfigurePowerManagement();
     if (!result.is_ok()) {
       FDF_LOGL(ERROR, logger(), "Failed to configure power management: %s", result.status_string());
@@ -374,8 +372,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs());
   if (power_configs.count() == 0) {
     FDF_LOGL(INFO, logger(), "No power configs found.");
-    // Do not fail driver initialization if there aren't any power configs.
-    return zx::success();
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   auto power_broker = parent_->driver_incoming()->Connect<fuchsia_power_broker::Topology>();
@@ -389,13 +386,9 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   for (const auto& config : power_configs) {
     auto tokens = fdf_power::GetDependencyTokens(*parent_->driver_incoming(), config);
     if (tokens.is_error()) {
-      // TODO(b/309152899): Use fuchsia.power.SuspendEnabled config cap to determine whether to
-      // expect Power Framework.
-      FDF_LOGL(WARNING, logger(),
-               "Failed to get power dependency tokens: %u. Perhaps the product does not have Power "
-               "Framework?",
+      FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u.",
                static_cast<uint8_t>(tokens.error_value()));
-      return zx::success();
+      return zx::error(ZX_ERR_INTERNAL);
     }
 
     fdf_power::ElementDesc description =

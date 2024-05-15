@@ -12,6 +12,7 @@
 
 #include "sdio-controller-device.h"
 #include "sdmmc-block-device.h"
+#include "src/devices/block/drivers/sdmmc/sdmmc_config.h"
 
 namespace sdmmc {
 
@@ -20,7 +21,8 @@ class SdmmcDevice;
 class SdmmcRootDevice : public fdf::DriverBase {
  public:
   SdmmcRootDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("sdmmc", std::move(start_args), std::move(dispatcher)) {}
+      : fdf::DriverBase("sdmmc", std::move(start_args), std::move(dispatcher)),
+        config_(take_config<sdmmc_config::Config>()) {}
 
   zx::result<> Start() override;
 
@@ -37,6 +39,7 @@ class SdmmcRootDevice : public fdf::DriverBase {
     return fdf::DriverBase::driver_dispatcher();
   }
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
+  const sdmmc_config::Config& config() const { return config_; }
 
   // Visible for testing.
   const std::variant<std::monostate, std::unique_ptr<SdioControllerDevice>,
@@ -62,6 +65,8 @@ class SdmmcRootDevice : public fdf::DriverBase {
   zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(
       const std::string& name, std::unique_ptr<SdmmcDevice> sdmmc,
       const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
+
+  sdmmc_config::Config config_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
