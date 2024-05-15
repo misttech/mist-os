@@ -139,6 +139,14 @@ fuchsia_driver_package("aml-g12-tdm-dai-package") {
 bazel_driver_package("aml-g12-composite-bazel-package") {
   bazel_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite"
   package_name = "aml-g12-composite"
+  inputs = [
+    "aml-tdm-config-device.cc",
+    "aml-tdm-config-device.h",
+    "composite.cc",
+    "composite.h",
+    "composite-server.cc",
+    "composite-server.h",
+  ]
 }
 
 driver_bind_rules("aml-g12-composite-bind") {
@@ -158,6 +166,15 @@ driver_bind_rules("aml-g12-composite-bind") {
 
 bazel_fuchsia_test_package("aml-g12-composite-test-package") {
   test_package_name = "aml-g12-composite-test"
+  inputs = [
+    "aml-tdm-config-device.cc",
+    "aml-tdm-config-device.h",
+    "composite.cc",
+    "composite.h",
+    "composite-server.cc",
+    "composite-server.h",
+    "test/composite-test.cc",
+  ]
   test_component_names = [ "aml-g12-composite-test-bin" ]
   test_specs = {
     environments = basic_envs

@@ -87,6 +87,7 @@ template("bazel_fuchsia_test_package") {
                              "deps",
                              "visibility",
                              "bazel_inputs",
+                             "inputs",
                            ])
     package_name = test_package_name
     testonly = true

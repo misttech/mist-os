@@ -9,6 +9,14 @@ import("//build/bind/bind.gni")
 bazel_driver_package("bazel_package") {
   bazel_target = "//src/devices/gpio/drivers/aml-gpio:aml-gpio"
   package_name = "aml-gpio"
+  inputs = [
+    "a1-blocks.h",
+    "a113-blocks.h",
+    "a5-blocks.h",
+    "aml-gpio.cc",
+    "aml-gpio.h",
+    "s905d2-blocks.h",
+  ]
 }
 
 bazel_fuchsia_test_package("aml-gpio-test-package") {
@@ -20,6 +28,15 @@ bazel_fuchsia_test_package("aml-gpio-test-package") {
       max_severity = "ERROR"
     }
   }
+  inputs = [
+    "a1-blocks.h",
+    "a113-blocks.h",
+    "a5-blocks.h",
+    "aml-gpio.cc",
+    "aml-gpio.h",
+    "aml-gpio-test.cc",
+    "s905d2-blocks.h",
+  ]
 }
 
 driver_bind_rules("aml-gpio-bind") {

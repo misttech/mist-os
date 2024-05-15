@@ -35,9 +35,20 @@ bazel_fuchsia_test_package("aml-i2c-test-package") {
       max_severity = "ERROR"
     }
   }
+  inputs = [
+    "aml-i2c.cc",
+    "aml-i2c.h",
+    "aml-i2c-regs.h",
+    "aml-i2c-test.cc",
+  ]
 }
 
 bazel_driver_package("bazel_package") {
   bazel_target = "//src/devices/i2c/drivers/aml-i2c:aml-i2c"
   package_name = "aml-i2c"
+  inputs = [
+    "aml-i2c.cc",
+    "aml-i2c.h",
+    "aml-i2c-regs.h",
+  ]
 }
