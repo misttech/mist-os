@@ -194,10 +194,7 @@ impl ActionsManager {
     where
         A: Action,
     {
-        let rx = {
-            let actions = component.lock_actions().await;
-            actions.register_no_wait(action).await
-        };
+        let rx = component.actions().register_no_wait(action).await;
         rx.await
     }
 

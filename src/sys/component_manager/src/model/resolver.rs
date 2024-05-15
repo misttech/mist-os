@@ -351,8 +351,7 @@ mod tests {
         .await;
         // We don't care about waiting for the discover action to complete, just that it's started.
         let _ = component
-            .lock_actions()
-            .await
+            .actions()
             .register_no_wait(DiscoverAction::new(ComponentInput::default()))
             .await;
         component
@@ -385,8 +384,7 @@ mod tests {
         .await;
         // We don't care about waiting for the discover action to complete, just that it's started.
         let _ = component
-            .lock_actions()
-            .await
+            .actions()
             .register_no_wait(DiscoverAction::new(ComponentInput::default()))
             .await;
         component

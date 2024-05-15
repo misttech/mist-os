@@ -257,10 +257,7 @@ pub mod tests {
             setup_unresolve_test_event_stream(&test, vec![EventType::Unresolved]).await;
 
         // Register the UnresolveAction.
-        let nf = {
-            let actions = component_a.lock_actions().await;
-            actions.register_no_wait(UnresolveAction::new()).await
-        };
+        let nf = component_a.actions().register_no_wait(UnresolveAction::new()).await;
 
         // Component a is then unresolved.
         event_stream
@@ -270,10 +267,7 @@ pub mod tests {
         nf.await.unwrap();
 
         // Now attempt to unresolve again with another UnresolveAction.
-        let nf2 = {
-            let actions = component_a.lock_actions().await;
-            actions.register_no_wait(UnresolveAction::new()).await
-        };
+        let nf2 = component_a.actions().register_no_wait(UnresolveAction::new()).await;
         // The component is not resolved anymore, so the unresolve will have no effect.
         nf2.await.unwrap();
         assert!(is_discovered(&component_a).await);

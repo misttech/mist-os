@@ -770,8 +770,7 @@ mod tests {
             test_topology.model.root().find(&TEST_CHILD_NAME.try_into().unwrap()).await.unwrap();
 
         let start_fut = child
-            .lock_actions()
-            .await
+            .actions()
             .register_no_wait(StartAction::new(
                 StartReason::Debug,
                 None,
@@ -783,7 +782,7 @@ mod tests {
         resolved_rx.await.unwrap();
 
         // Stop should cancel start.
-        let stop_fut = child.lock_actions().await.register_no_wait(StopAction::new(false)).await;
+        let stop_fut = child.actions().register_no_wait(StopAction::new(false)).await;
         assert_matches!(
             start_fut.await.unwrap_err(),
             ActionError::StartError { err: StartActionError::Aborted { .. } }

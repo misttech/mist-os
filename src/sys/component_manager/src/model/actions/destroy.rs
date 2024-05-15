@@ -107,13 +107,8 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
                 nf.await;
             }
         }
-        let resolve_shutdown;
-        let start_shutdown;
-        {
-            let actions = component.lock_actions().await;
-            resolve_shutdown = wait(actions.wait(ActionKey::Resolve).await);
-            start_shutdown = wait(actions.wait(ActionKey::Start).await);
-        }
+        let resolve_shutdown = wait(component.actions().wait(ActionKey::Resolve).await);
+        let start_shutdown = wait(component.actions().wait(ActionKey::Start).await);
         let execution_scope = &component.execution_scope;
         execution_scope.shutdown();
         join_all([
@@ -378,10 +373,7 @@ pub mod tests {
             MockAction::new(mock_action_key.clone(), mock_action_result);
 
         // Spawn a mock action on 'a' that stalls
-        let action_notifier = {
-            let actions = component_a.lock_actions().await;
-            actions.register_no_wait(mock_action).await
-        };
+        let action_notifier = component_a.actions().register_no_wait(mock_action).await;
 
         // Spawn a task to destroy the child `a` under root.
         // This eventually leads to a destroy action on `a`.
@@ -392,8 +384,7 @@ pub mod tests {
 
         // Check that the destroy action is waiting on the mock action.
         loop {
-            let actions = component_a.lock_actions().await;
-            assert!(actions.contains(mock_action_key).await);
+            assert!(component_a.actions().contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
             let refcount = action_notifier.get_reference_count().unwrap();
@@ -403,13 +394,12 @@ pub mod tests {
             // - 1 for destroy action to wait on the mock action
             // - 1 for the notifier we're holding to check the reference count
             if refcount == 3 {
-                assert!(actions.contains(ActionKey::Destroy).await);
+                assert!(component_a.actions().contains(ActionKey::Destroy).await);
                 break;
             }
 
             // The destroy action hasn't blocked on the mock action yet.
             // Wait for that to happen and check again.
-            drop(actions);
             fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
         }
 
@@ -485,10 +475,7 @@ pub mod tests {
             MockAction::new(mock_action_key.clone(), Ok(()));
 
         // Spawn a mock action on 'a' that stalls
-        let action_notifier = {
-            let actions = component_a.lock_actions().await;
-            actions.register_no_wait(mock_action).await
-        };
+        let action_notifier = component_a.actions().register_no_wait(mock_action).await;
 
         // Spawn a task to destroy the child `a` under root.
         // This eventually leads to a destroy action on `a`.
@@ -499,8 +486,7 @@ pub mod tests {
 
         // Check that the destroy action is waiting on the mock action.
         loop {
-            let actions = component_a.lock_actions().await;
-            assert!(actions.contains(mock_action_key).await);
+            assert!(component_a.actions().contains(mock_action_key).await);
 
             // Check the reference count on the notifier of the mock action
             let refcount = action_notifier.get_reference_count().unwrap();
@@ -510,13 +496,12 @@ pub mod tests {
             // - 1 for destroy action to wait on the mock action
             // - 1 for the notifier we're holding to check the reference count
             if refcount == 3 {
-                assert!(actions.contains(ActionKey::Destroy).await);
+                assert!(component_a.actions().contains(ActionKey::Destroy).await);
                 break;
             }
 
             // The destroy action hasn't blocked on the mock action yet.
             // Wait for that to happen and check again.
-            drop(actions);
             fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
         }
 
@@ -861,7 +846,7 @@ pub mod tests {
             let (destroy_completer, mock_destroy_action) =
                 TestUtilsMockAction::new(ActionKey::Destroy);
             let _destroy_notifier =
-                component_d.lock_actions().await.register_no_wait(mock_destroy_action).await;
+                component_d.actions().register_no_wait(mock_destroy_action).await;
 
             // Register destroy action on "a", and wait for it. but "d"'s destroy action is blocked
             // until we use destroy_completer. Move this into another task, so that this can run

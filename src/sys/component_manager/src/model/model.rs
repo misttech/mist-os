@@ -118,8 +118,7 @@ impl Model {
                 // If we fail to start the root, but the root is being shutdown, or already
                 // shutdown, that's ok. The system is tearing down, so it doesn't matter any more
                 // if we never got everything started that we wanted to.
-                let action_set = self.root.lock_actions().await;
-                if !action_set.contains(ActionKey::Shutdown).await {
+                if !self.root.actions().contains(ActionKey::Shutdown).await {
                     if !self.root.lock_state().await.is_shut_down() {
                         panic!(
                             "failed to start root component {}: {:?}",
@@ -200,8 +199,7 @@ pub mod tests {
                 let _ = self
                     .model
                     .root()
-                    .lock_actions()
-                    .await
+                    .actions()
                     .register_no_wait(ShutdownAction::new(ShutdownType::Instance))
                     .await;
                 Ok(())

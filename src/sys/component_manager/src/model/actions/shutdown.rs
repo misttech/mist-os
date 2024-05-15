@@ -2436,15 +2436,12 @@ mod tests {
     async fn action_shutdown_blocks_stop() {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
-        let action_set = component.lock_actions().await;
 
         let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
 
         // Register some actions, and get notifications.
-        let shutdown_notifier = action_set.register_no_wait(mock_shutdown_action).await;
-        let stop_notifier = action_set.register_no_wait(StopAction::new(false)).await;
-
-        drop(action_set);
+        let shutdown_notifier = component.actions().register_no_wait(mock_shutdown_action).await;
+        let stop_notifier = component.actions().register_no_wait(StopAction::new(false)).await;
 
         // The stop action should be blocked on the shutdown action completing.
         assert!(stop_notifier.fut.peek().is_none());
@@ -2461,15 +2458,12 @@ mod tests {
     async fn action_shutdown_stop_stop() {
         let test = ActionsTest::new("root", vec![], None).await;
         let component = test.model.root().clone();
-        let action_set = component.lock_actions().await;
         let (mock_shutdown_barrier, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
 
         // Register some actions, and get notifications.
-        let shutdown_notifier = action_set.register_no_wait(mock_shutdown_action).await;
-        let stop_notifier_1 = action_set.register_no_wait(StopAction::new(false)).await;
-        let stop_notifier_2 = action_set.register_no_wait(StopAction::new(false)).await;
-
-        drop(action_set);
+        let shutdown_notifier = component.actions().register_no_wait(mock_shutdown_action).await;
+        let stop_notifier_1 = component.actions().register_no_wait(StopAction::new(false)).await;
+        let stop_notifier_2 = component.actions().register_no_wait(StopAction::new(false)).await;
 
         // The stop action should be blocked on the shutdown action completing.
         assert!(stop_notifier_1.fut.peek().is_none());
@@ -4003,14 +3997,13 @@ mod tests {
             // Mock a failure to shutdown "d".
             let (shutdown_completer, mock_shutdown_action) = MockAction::new(ActionKey::Shutdown);
             let _shutdown_notifier =
-                component_d.lock_actions().await.register_no_wait(mock_shutdown_action).await;
+                component_d.actions().register_no_wait(mock_shutdown_action).await;
 
             // Register shutdown action on "a", and wait for it. "d" fails to shutdown, so "a"
             // fails too. The state of "c" is unknown at this point. The shutdown of stop targets
             // occur simultaneously. "c" could've shutdown before "d" or it might not have.
             let a_shutdown_notifier = component_a
-                .lock_actions()
-                .await
+                .actions()
                 .register_no_wait(ShutdownAction::new(ShutdownType::Instance))
                 .await;
 

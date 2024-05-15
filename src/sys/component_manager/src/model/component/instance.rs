@@ -1133,9 +1133,7 @@ impl ProgramRuntime {
         let exit_listener = fasync::Task::spawn(async move {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
-                let actions = component.lock_actions().await;
-                let stop_nf = actions.register_no_wait(StopAction::new(false)).await;
-                drop(actions);
+                let stop_nf = component.actions().register_no_wait(StopAction::new(false)).await;
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
                     let _ = stop_nf.await.map_err(
                         |err| warn!(%err, "Watching for program termination: Stop failed"),

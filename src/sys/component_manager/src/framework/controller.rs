@@ -147,9 +147,7 @@ async fn execution_controller_task(
                 if component.is_err() {
                     return;
                 }
-                let component = component.unwrap();
-                let action_set = component.lock_actions().await;
-                let _ = action_set.register_no_wait(StopAction::new(false)).await;
+                component.unwrap().actions().register_no_wait(StopAction::new(false)).await;
             }
             fcomponent::ExecutionControllerRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component/ExecutionController received unknown method");

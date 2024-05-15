@@ -224,9 +224,8 @@ pub mod tests {
         let component_a = component_root.find(&vec!["a"].try_into().unwrap()).await.unwrap();
         let resolve_action = ResolveAction::new();
         let resolve_abort_handle = resolve_action.abort_handle().unwrap();
-        let resolve_fut = component_a.lock_actions().await.register_no_wait(resolve_action).await;
-        let resolve_fut_2 =
-            component_a.lock_actions().await.wait(ActionKey::Resolve).await.unwrap();
+        let resolve_fut = component_a.actions().register_no_wait(resolve_action).await;
+        let resolve_fut_2 = component_a.actions().wait(ActionKey::Resolve).await.unwrap();
 
         // Wait until routing reaches resolution.
         let _ = resolved_rx.await.unwrap();

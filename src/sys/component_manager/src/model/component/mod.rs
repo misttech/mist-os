@@ -252,7 +252,7 @@ pub struct ComponentInstance {
     /// The component's mutable state.
     state: Mutex<InstanceState>,
     /// Actions on the instance that must eventually be completed.
-    actions: Mutex<ActionsManager>,
+    actions: ActionsManager,
     /// Tasks owned by this component instance that will be cancelled if the component is
     /// destroyed.
     nonblocking_task_group: TaskGroup,
@@ -311,17 +311,13 @@ impl ComponentInstance {
             context,
             parent,
             state: Mutex::new(InstanceState::New),
-            actions: Mutex::new(ActionsManager::new()),
+            actions: ActionsManager::new(),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
             persistent_storage,
             execution_scope: ExecutionScope::new(),
         });
-        self_
-            .lock_actions()
-            .await
-            .set_component_reference(WeakComponentInstance::new(&self_))
-            .await;
+        self_.actions().set_component_reference(WeakComponentInstance::new(&self_)).await;
         self_
     }
 
@@ -332,9 +328,8 @@ impl ComponentInstance {
     }
 
     /// Locks and returns the instance's action set.
-    // TODO(b/309656051): Remove this method from ComponentInstance's public API
-    pub async fn lock_actions(&self) -> MutexGuard<'_, ActionsManager> {
-        self.actions.lock().await
+    pub fn actions(&self) -> &ActionsManager {
+        &self.actions
     }
 
     /// Returns a group for this instance where tasks can be run scoped to this instance. Tasks run
