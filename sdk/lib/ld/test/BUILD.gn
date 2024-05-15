@@ -37,7 +37,10 @@ test("ld-unittests") {
     deps += [ ":load-tests" ]
   }
   if (is_fuchsia) {
-    sources += [ "mock-loader-service-tests.cc" ]
+    sources += [
+      "mock-loader-service-tests.cc",
+      "remote-tests.cc",
+    ]
   }
 }
 

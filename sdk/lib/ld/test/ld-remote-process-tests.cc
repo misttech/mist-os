@@ -15,6 +15,10 @@ namespace ld::testing {
 
 LdRemoteProcessTests::LdRemoteProcessTests() = default;
 
+void LdRemoteProcessTests::SetUp() {
+  ASSERT_NO_FATAL_FAILURE(stub_ld_vmo_ = elfldltl::testing::GetTestLibVmo("ld-stub.so"));
+}
+
 LdRemoteProcessTests::~LdRemoteProcessTests() = default;
 
 void LdRemoteProcessTests::Init(std::initializer_list<std::string_view> args,

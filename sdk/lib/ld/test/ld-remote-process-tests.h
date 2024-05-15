@@ -40,6 +40,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
   ~LdRemoteProcessTests() override;
 
+  void SetUp() override;
+
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});
 
@@ -63,6 +65,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     ASSERT_NO_FATAL_FAILURE(Load(diag, name, true));
     ASSERT_NO_FATAL_FAILURE(ExpectLog(""));
   }
+
+  zx::vmo TakeStubLdVmo() { return std::move(stub_ld_vmo_); }
 
  protected:
   using Linker = RemoteDynamicLinker<>;
@@ -105,27 +109,23 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
  private:
   template <class Diagnostics>
   void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
-    const size_t page_size = zx_system_get_page_size();
     Linker linker;
 
     // Decode the main executable.
     zx::vmo vmo;
     ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo(executable_name));
     std::array initial_modules = {Linker::InitModule{
-        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size),
+        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), kPageSize),
     }};
     ASSERT_TRUE(initial_modules.front().decoded_module);
 
     // Pre-decode the vDSO.
-    zx::vmo stub_ld_vmo;
-    ASSERT_NO_FATAL_FAILURE(stub_ld_vmo = elfldltl::testing::GetTestLibVmo("ld-stub.so"));
-
     zx::vmo vdso_vmo;
     zx_status_t status = GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
     std::array predecoded_modules = {Linker::PredecodedModule{
-        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), page_size),
+        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), kPageSize),
     }};
 
     // Acquire the layout details from the stub.  The same values collected
@@ -133,44 +133,9 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // for creating and populating the RemoteLoadModule for the passive ABI of
     // any number of separate dynamic linking domains in however many
     // processes.
-    RemoteAbiStub<>::Ptr abi_stub =
-        RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), page_size);
+    RemoteAbiStub<>::Ptr abi_stub = RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
     EXPECT_TRUE(abi_stub);
-    EXPECT_GE(abi_stub->data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_LT(abi_stub->data_size(), page_size);
-    EXPECT_LE(abi_stub->abi_offset(), abi_stub->data_size() - sizeof(ld::abi::Abi<>));
-    EXPECT_LE(abi_stub->rdebug_offset(), abi_stub->data_size() - sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_NE(abi_stub->rdebug_offset(), abi_stub->abi_offset())
-        << "with data_size() " << abi_stub->data_size();
-
     linker.set_abi_stub(abi_stub);
-
-    // Verify that the TLSDESC entry points were found in the stub and that
-    // their addresses pass some basic smell tests.
-    std::set<elfldltl::Elf<>::size_type> tlsdesc_entrypoints;
-    const auto segment_is_executable = [](const auto& segment) -> bool {
-      return segment.executable();
-    };
-    const RemoteModule::Decoded& stub_module = *abi_stub->decoded_module();
-    for (const elfldltl::Elf<>::size_type entry : abi_stub->tlsdesc_runtime()) {
-      // Must be nonzero.
-      EXPECT_NE(entry, 0u);
-
-      // Must lie within the module bounds.
-      EXPECT_GT(entry, stub_module.load_info().vaddr_start());
-      EXPECT_LT(entry - stub_module.load_info().vaddr_start(),
-                stub_module.load_info().vaddr_size());
-
-      // Must be inside an executable segment.
-      auto segment = stub_module.load_info().FindSegment(entry);
-      ASSERT_NE(segment, stub_module.load_info().segments().end());
-      EXPECT_TRUE(std::visit(segment_is_executable, *segment));
-
-      // Must be unique.
-      auto [it, inserted] = tlsdesc_entrypoints.insert(entry);
-      EXPECT_TRUE(inserted) << "duplicate entry point " << entry;
-    }
-    EXPECT_EQ(tlsdesc_entrypoints.size(), kTlsdescRuntimeCount);
 
     // First just decode all the modules: the executable and dependencies.
     auto init_result =
@@ -280,6 +245,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   uintptr_t entry_ = 0;
   uintptr_t vdso_base_ = 0;
   std::optional<size_t> stack_size_;
+  zx::vmo stub_ld_vmo_;
   zx::vmar root_vmar_;
   zx::thread thread_;
   MockLoaderServiceForTest mock_loader_;
