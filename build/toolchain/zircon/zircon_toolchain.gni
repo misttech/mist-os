@@ -524,6 +524,25 @@ template("zircon_toolchain") {
         _strip = true
       }
 
+      if (_link_rbe_enable) {
+        # TODO(https://fxbug.dev/42083070): disable remote stripping when config includes //build/config:no_remote_link.
+        _remote_strip_list =
+            [
+              rebase_path(python_exe_src, root_build_dir),
+              "-S",
+              rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            ] + _link_rbe_exec_strategy_flags +
+            [
+              "--inputs",
+              "\"$unstripped_outfile\"",
+              "--output_files",
+              "\"$outfile\"",
+              "--preserve_unchanged_output_mtime",
+              "-- ",
+            ]
+        strip_command += string_join(" ", _remote_strip_list)
+      }
+
       if (_strip == true) {
         if (invoker.os == "mac") {
           # Only the host native tool works on macOS.
@@ -532,25 +551,6 @@ template("zircon_toolchain") {
           strip_tool = "$dir_prefix${tc.tool_prefix}strip"
         }
 
-        _remote_strip_list = []
-        if (_link_rbe_enable) {
-          # TODO(https://fxbug.dev/42083070): disable remote stripping when config includes //build/config:no_remote_link.
-          _remote_strip_list +=
-              [
-                rebase_path(python_exe_src, root_build_dir),
-                "-S",
-                rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
-              ] + _link_rbe_exec_strategy_flags +
-              [
-                "--inputs",
-                "\"$unstripped_outfile\"",
-                "--output_files",
-                "\"$outfile\"",
-                "--preserve_unchanged_output_mtime",
-                "-- ",
-              ]
-        }
-        strip_command += string_join(" ", _remote_strip_list)
         strip_command += "$strip_tool -o \"$outfile\" \"$unstripped_outfile\""
       } else {
         strip_command += "$dir_prefix${tc.tool_prefix}objcopy ${_strip}" +
