@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.bluetooth") {
   sdk_category = "internal"
+  sdk_area = "Bluetooth"
   sources = [
     "hci.fidl",
     "host.fidl",
