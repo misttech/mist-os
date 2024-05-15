@@ -257,80 +257,6 @@ impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
     }
 }
 
-/// An incoming IP packet that has been parsed into its constituent parts for
-/// either local delivery or forwarding.
-#[derive(GenericOverIp)]
-#[generic_over_ip(I, Ip)]
-pub struct RxPacket<'a, I: IpExt> {
-    src_addr: I::Addr,
-    dst_addr: I::Addr,
-    protocol: I::Proto,
-    body: &'a mut [u8],
-}
-
-impl<'a, I: IpExt> RxPacket<'a, I> {
-    /// Create a new [`RxPacket`] from its IP header fields and payload.
-    pub fn new(
-        src_addr: I::Addr,
-        dst_addr: I::Addr,
-        protocol: I::Proto,
-        body: &'a mut [u8],
-    ) -> Self {
-        Self { src_addr, dst_addr, protocol, body }
-    }
-}
-
-impl<I: IpExt> IpPacket<I> for RxPacket<'_, I> {
-    type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
-    type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, I>> where Self: 'a;
-
-    fn src_addr(&self) -> I::Addr {
-        self.src_addr
-    }
-
-    fn dst_addr(&self) -> I::Addr {
-        self.dst_addr
-    }
-
-    fn protocol(&self) -> I::Proto {
-        self.protocol
-    }
-
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
-        I::map_ip(
-            self,
-            |RxPacket { protocol, body, .. }| {
-                parse_transport_header_in_ipv4_packet(*protocol, Buf::new(body, ..))
-            },
-            |RxPacket { protocol, body, .. }| {
-                parse_transport_header_in_ipv6_packet(*protocol, Buf::new(body, ..))
-            },
-        )
-    }
-
-    fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
-        I::map_ip(
-            self,
-            |RxPacket { src_addr, dst_addr, protocol, body }| {
-                ParsedTransportHeaderMut::parse_in_ipv4_packet(
-                    *src_addr,
-                    *dst_addr,
-                    *protocol,
-                    SliceBufViewMut::new(body),
-                )
-            },
-            |RxPacket { src_addr, dst_addr, protocol, body }| {
-                ParsedTransportHeaderMut::parse_in_ipv6_packet(
-                    *src_addr,
-                    *dst_addr,
-                    *protocol,
-                    SliceBufViewMut::new(body),
-                )
-            },
-        )
-    }
-}
-
 /// An outgoing IP packet that has not yet been wrapped into an outer serializer
 /// type.
 #[derive(GenericOverIp)]
@@ -381,11 +307,9 @@ impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, 
 
 /// An incoming IP packet that is being forwarded.
 ///
-/// NB: this type is distinct from [`RxPacket`] (used on ingress) and
-/// [`TxPacket`] (used on egress) in that it implements `Serializer` by holding
-/// the parse metadata from parsing the IP header and undoing that parsing when
-/// it is serialized. This allows the buffer to be reused on the egress path in
-/// its entirety.
+/// NB: this type implements `Serializer` by holding the parse metadata from
+/// parsing the IP header and undoing that parsing when it is serialized. This
+/// allows the buffer to be reused on the egress path in its entirety.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct ForwardedPacket<I: IpExt, B> {

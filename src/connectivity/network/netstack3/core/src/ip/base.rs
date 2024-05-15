@@ -1871,8 +1871,6 @@ fn dispatch_receive_ipv4_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    src_ip: Ipv4Addr,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
     mut packet: Ipv4Packet<&mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv4>>,
@@ -1891,11 +1889,7 @@ fn dispatch_receive_ipv4_packet<
 
     let proto = packet.proto();
 
-    match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, packet.body_mut()),
-        device,
-        &mut packet_metadata,
-    ) {
+    match core_ctx.filter_handler().local_ingress_hook(&mut packet, device, &mut packet_metadata) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
             return Ok(());
@@ -1904,6 +1898,18 @@ fn dispatch_receive_ipv4_packet<
     }
     packet_metadata.acknowledge_drop();
 
+    let src_ip = packet.src_ip();
+    // `dst_ip` is validated to be specified before a packet is provided to this
+    // function, but it's possible for the LOCAL_INGRESS hook to rewrite the packet,
+    // so we have to re-verify this.
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        debug!(
+            "dispatch_receive_ipv4_packet: Received packet with unspecified destination IP address \
+            after the LOCAL_INGRESS hook; dropping"
+        );
+        return Ok(());
+    };
     let buffer = Buf::new(packet.body_mut(), ..);
 
     core_ctx
@@ -1938,8 +1944,6 @@ fn dispatch_receive_ipv6_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    src_ip: Ipv6SourceAddr,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
     mut packet: Ipv6Packet<&mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv6>>,
@@ -1964,11 +1968,7 @@ fn dispatch_receive_ipv6_packet<
 
     let proto = packet.proto();
 
-    match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, packet.body_mut()),
-        device,
-        &mut packet_metadata,
-    ) {
+    match core_ctx.filter_handler().local_ingress_hook(&mut packet, device, &mut packet_metadata) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
             return Ok(());
@@ -1976,6 +1976,26 @@ fn dispatch_receive_ipv6_packet<
         crate::filter::Verdict::Accept => {}
     }
 
+    // These invariants are validated by the caller of this function, but it's
+    // possible possible for the LOCAL_INGRESS hook to rewrite the packet, so we
+    // have to check them again.
+    let Some(src_ip) = packet.src_ipv6() else {
+        debug!(
+            "dispatch_receive_ipv6_packet: received packet from non-unicast source {} after the \
+            LOCAL_INGRESS hook; dropping",
+            packet.src_ip()
+        );
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
+        return Ok(());
+    };
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        debug!(
+            "dispatch_receive_ipv6_packet: Received packet with unspecified destination IP address \
+            after the LOCAL_INGRESS hook; dropping"
+        );
+        return Ok(());
+    };
     let buffer = Buf::new(packet.body_mut(), ..);
 
     let result = core_ctx
@@ -2052,7 +2072,7 @@ macro_rules! drop_packet_and_undo_parse {
 /// ready to do so. If the packet isn't fragmented, or a packet was reassembled,
 /// attempt to dispatch the packet.
 macro_rules! process_fragment {
-    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $src_ip:expr, $dst_ip:expr, $ip:ident, $packet_metadata:expr) => {{
+    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $ip:ident, $packet_metadata:expr) => {{
         match FragmentHandler::<$ip, _>::process_fragment::<&mut [u8]>(
             $core_ctx,
             $bindings_ctx,
@@ -2068,8 +2088,6 @@ macro_rules! process_fragment {
                     $bindings_ctx,
                     $device,
                     $frame_dst,
-                    $src_ip,
-                    $dst_ip,
                     packet,
                     $packet_metadata,
                     None,
@@ -2110,8 +2128,6 @@ macro_rules! process_fragment {
                             $bindings_ctx,
                             $device,
                             $frame_dst,
-                            $src_ip,
-                            $dst_ip,
                             packet,
                             packet_metadata,
                             None,
@@ -2317,14 +2333,11 @@ pub(crate) fn receive_ipv4_packet<
             // Short-circuit the routing process and override local demux, providing a local
             // address and port to which the packet should be transparently delivered at the
             // transport layer.
-            let src_ip = packet.src_ip();
             dispatch_receive_ipv4_packet(
                 core_ctx,
                 bindings_ctx,
                 device,
                 frame_dst,
-                src_ip,
-                dst_ip,
                 packet,
                 packet_metadata,
                 Some(TransparentLocalDelivery { addr, port }),
@@ -2342,7 +2355,6 @@ pub(crate) fn receive_ipv4_packet<
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
             trace!("receive_ipv4_packet: delivering locally");
-            let src_ip = packet.src_ip();
 
             // Process a potential IPv4 fragment if the destination is this
             // host.
@@ -2365,8 +2377,6 @@ pub(crate) fn receive_ipv4_packet<
                 frame_dst,
                 buffer,
                 packet,
-                src_ip,
-                dst_ip,
                 Ipv4,
                 packet_metadata
             );
@@ -2618,8 +2628,6 @@ pub(crate) fn receive_ipv6_packet<
                 bindings_ctx,
                 device,
                 frame_dst,
-                src_ip,
-                dst_ip,
                 packet,
                 packet_metadata,
                 Some(TransparentLocalDelivery { addr, port }),
@@ -2675,8 +2683,6 @@ pub(crate) fn receive_ipv6_packet<
                         bindings_ctx,
                         device,
                         frame_dst,
-                        src_ip,
-                        dst_ip,
                         packet,
                         packet_metadata,
                         None,
@@ -2714,8 +2720,6 @@ pub(crate) fn receive_ipv6_packet<
                         frame_dst,
                         buffer,
                         packet,
-                        src_ip,
-                        dst_ip,
                         Ipv6,
                         packet_metadata
                     );

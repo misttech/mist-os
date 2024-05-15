@@ -30,7 +30,7 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{
-    ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket, RxPacket,
+    ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
     TransportPacketSerializer, TxPacket,
 };
 pub use state::{
