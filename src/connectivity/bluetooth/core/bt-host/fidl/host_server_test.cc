@@ -213,6 +213,12 @@ class HostServerTest : public bthost::testing::AdapterTestFixture {
     EXPECT_TRUE(called);
   }
 
+  fidl::InterfacePtr<fhost::PeerWatcher> SetPeerWatcher() {
+    fidl::InterfaceHandle<fhost::PeerWatcher> handle;
+    host_server()->SetPeerWatcher(handle.NewRequest());
+    return handle.Bind();
+  }
+
  private:
   std::unique_ptr<HostServer> host_server_;
   std::unique_ptr<bt::gatt::GATT> gatt_;
@@ -827,31 +833,35 @@ TEST_F(HostServerTest, InitiateBrEdrPairingLePeerFails) {
   ASSERT_EQ(pair_result->err(), fsys::Error::PEER_NOT_FOUND);
 }
 
-TEST_F(HostServerTest, WatchPeersHangsOnFirstCallWithNoExistingPeers) {
+TEST_F(HostServerTest, PeerWatcherGetNextHangsOnFirstCallWithNoExistingPeers) {
   // By default the peer cache contains no entries when HostServer is first constructed. The first
-  // call to WatchPeers should hang.
+  // call to GetNext should hang.
   bool replied = false;
-  host_server()->WatchPeers([&](auto) { replied = true; });
+  fidl::InterfacePtr<fhost::PeerWatcher> client = SetPeerWatcher();
+  client->GetNext([&](auto) { replied = true; });
+  RunLoopUntilIdle();
   EXPECT_FALSE(replied);
 }
 
-TEST_F(HostServerTest, WatchPeersRepliesOnFirstCallWithExistingPeers) {
+TEST_F(HostServerTest, PeerWatcherGetNextRepliesOnFirstCallWithExistingPeers) {
   [[maybe_unused]] bt::gap::Peer* peer =
       adapter()->peer_cache()->NewPeer(kLeTestAddr, /*connectable=*/true);
   ResetHostServer();
 
-  // The first call to WatchPeers immediately resolves with the contents of the peer cache.
+  // The first call to GetNext immediately resolves with the contents of the peer cache.
   bool replied = false;
-  host_server()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+  fidl::InterfacePtr<fhost::PeerWatcher> client = SetPeerWatcher();
+  client->GetNext([&](fhost::PeerWatcher_GetNext_Result result) {
     ASSERT_TRUE(result.is_response());
-    EXPECT_EQ(1u, result.response().updated.size());
-    EXPECT_TRUE(result.response().removed.empty());
+    ASSERT_TRUE(result.response().is_updated());
+    EXPECT_EQ(1u, result.response().updated().size());
     replied = true;
   });
+  RunLoopUntilIdle();
   EXPECT_TRUE(replied);
 }
 
-TEST_F(HostServerTest, WatchPeersHandlesNonEnumeratedAppearanceInPeer) {
+TEST_F(HostServerTest, PeerWatcherHandlesNonEnumeratedAppearanceInPeer) {
   using namespace ::testing;
   bt::gap::Peer* const peer = adapter()->peer_cache()->NewPeer(kLeTestAddr, /*connectable=*/true);
   ASSERT_TRUE(peer);
@@ -866,61 +876,61 @@ TEST_F(HostServerTest, WatchPeersHandlesNonEnumeratedAppearanceInPeer) {
   ResetHostServer();
 
   bool replied = false;
-  host_client()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+  fidl::InterfacePtr<fhost::PeerWatcher> client = SetPeerWatcher();
+  client->GetNext([&](fhost::PeerWatcher_GetNext_Result result) {
     // Client should still receive updates to this peer.
     replied = true;
     const fbt::PeerId id = {peer->identifier().value()};
     ASSERT_TRUE(result.is_response());
-    ASSERT_THAT(result.response().updated, Contains(Property(&fsys::Peer::id, id)));
-    EXPECT_FALSE(result.response().updated.front().has_appearance());
+    ASSERT_THAT(result.response().updated(), Contains(Property(&fsys::Peer::id, id)));
+    EXPECT_FALSE(result.response().updated().front().has_appearance());
   });
   RunLoopUntilIdle();
   EXPECT_TRUE(replied);
 }
 
-TEST_F(HostServerTest, WatchPeersStateMachine) {
-  std::optional<std::vector<fsys::Peer>> updated;
-  std::optional<std::vector<fbt::PeerId>> removed;
+TEST_F(HostServerTest, PeerWatcherStateMachine) {
+  std::optional<fhost::PeerWatcher_GetNext_Response> response;
 
   // Initial watch call hangs as the cache is empty.
-  host_server()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+  fidl::InterfacePtr<fhost::PeerWatcher> client = SetPeerWatcher();
+  client->GetNext([&](fhost::PeerWatcher_GetNext_Result result) {
     ASSERT_TRUE(result.is_response());
-    updated = std::move(result.response().updated);
-    removed = std::move(result.response().removed);
+    response = std::move(result.response());
   });
-  ASSERT_FALSE(updated.has_value());
-  ASSERT_FALSE(removed.has_value());
+  ASSERT_FALSE(response.has_value());
 
   // Adding a new peer should resolve the hanging get.
   bt::gap::Peer* peer = adapter()->peer_cache()->NewPeer(kLeTestAddr, /*connectable=*/true);
-  ASSERT_TRUE(updated.has_value());
-  ASSERT_TRUE(removed.has_value());
-  EXPECT_EQ(1u, updated->size());
-  EXPECT_TRUE(fidl::Equals(fidl_helpers::PeerToFidl(*peer), (*updated)[0]));
-  EXPECT_TRUE(removed->empty());
-  updated.reset();
-  removed.reset();
+  RunLoopUntilIdle();
+  ASSERT_TRUE(response.has_value());
+  ASSERT_TRUE(response->is_updated());
+  EXPECT_EQ(1u, response->updated().size());
+  EXPECT_TRUE(fidl::Equals(fidl_helpers::PeerToFidl(*peer), response->updated()[0]));
+  response.reset();
 
   // The next call should hang.
-  host_server()->WatchPeers([&](fhost::Host_WatchPeers_Result result) {
+  client->GetNext([&](fhost::PeerWatcher_GetNext_Result result) {
     ASSERT_TRUE(result.is_response());
-    updated = std::move(result.response().updated);
-    removed = std::move(result.response().removed);
+    response = std::move(result.response());
   });
-  ASSERT_FALSE(updated.has_value());
-  ASSERT_FALSE(removed.has_value());
+  RunLoopUntilIdle();
+  ASSERT_FALSE(response.has_value());
 
   // Removing the peer should resolve the hanging get.
   auto peer_id = peer->identifier();
   [[maybe_unused]] auto result = adapter()->peer_cache()->RemoveDisconnectedPeer(peer_id);
-  ASSERT_TRUE(updated.has_value());
-  ASSERT_TRUE(removed.has_value());
-  EXPECT_TRUE(updated->empty());
-  EXPECT_EQ(1u, removed->size());
-  EXPECT_TRUE(fidl::Equals(fbt::PeerId{peer_id.value()}, (*removed)[0]));
+  RunLoopUntilIdle();
+  ASSERT_TRUE(response.has_value());
+  ASSERT_TRUE(response->is_removed());
+  EXPECT_EQ(1u, response->removed().size());
+  EXPECT_TRUE(fidl::Equals(fbt::PeerId{peer_id.value()}, response->removed()[0]));
 }
 
 TEST_F(HostServerTest, WatchPeersUpdatedThenRemoved) {
+  fidl::InterfacePtr<fhost::PeerWatcher> client = SetPeerWatcher();
+  RunLoopUntilIdle();
+
   // Add then remove a peer. The watcher should only report the removal.
   bt::PeerId id;
   {
@@ -933,13 +943,14 @@ TEST_F(HostServerTest, WatchPeersUpdatedThenRemoved) {
   }
 
   bool replied = false;
-  host_server()->WatchPeers([&replied, id](fhost::Host_WatchPeers_Result result) {
+  client->GetNext([&](fhost::PeerWatcher_GetNext_Result result) {
     ASSERT_TRUE(result.is_response());
-    EXPECT_TRUE(result.response().updated.empty());
-    EXPECT_EQ(1u, result.response().removed.size());
-    EXPECT_TRUE(fidl::Equals(fbt::PeerId{id.value()}, result.response().removed[0]));
+    ASSERT_TRUE(result.response().is_removed());
+    EXPECT_EQ(1u, result.response().removed().size());
+    EXPECT_TRUE(fidl::Equals(fbt::PeerId{id.value()}, result.response().removed()[0]));
     replied = true;
   });
+  RunLoopUntilIdle();
   EXPECT_TRUE(replied);
 }
 

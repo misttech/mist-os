@@ -9,7 +9,7 @@ use async_helpers::hanging_get::asynchronous as hanging_get;
 use fidl::endpoints::{self, Responder};
 use fidl_fuchsia_bluetooth_gatt2::Server_Request;
 use fidl_fuchsia_bluetooth_host::{
-    HostMarker, HostRequest, HostRequestStream, ProtocolRequest, ReceiverMarker,
+    HostMarker, HostRequest, HostRequestStream, PeerWatcherMarker, ProtocolRequest, ReceiverMarker,
 };
 use fidl_fuchsia_bluetooth_sys::{HostInfo as FidlHostInfo, TechnologyType};
 use fuchsia_async as fasync;
@@ -21,7 +21,7 @@ use tracing::info;
 
 async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
     let mut first_state_req = true;
-    let mut first_peers_req = true;
+    let mut peer_watcher_server: Option<fidl::endpoints::ServerEnd<PeerWatcherMarker>> = None;
     while let Some(request) = stream.try_next().await.expect("Invalid Host request") {
         match request {
             HostRequest::WatchState { responder } => {
@@ -83,14 +83,10 @@ async fn handle_host_requests(id: HostId, mut stream: HostRequestStream) {
                     x => panic!("Unexpected GATT server request: {:?}", x),
                 }
             }
-            HostRequest::WatchPeers { responder, .. } => {
-                if first_peers_req {
-                    info!("WatchPeers request");
-                    assert_matches::assert_matches!(responder.send(&[], &[]), Ok(()));
-                    first_peers_req = false;
-                    continue;
-                }
-                responder.drop_without_shutdown();
+            HostRequest::SetPeerWatcher { peer_watcher, .. } => {
+                info!("SetPeerWatcher");
+                assert!(!peer_watcher_server.is_some());
+                peer_watcher_server = Some(peer_watcher);
             }
             x => panic!("Unexpected host server request: {:?}", x),
         }

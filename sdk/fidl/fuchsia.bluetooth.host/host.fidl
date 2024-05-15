@@ -37,6 +37,19 @@ open protocol DiscoverySession {
     flexible Stop();
 };
 
+open protocol PeerWatcher {
+    /// Get the next peer update. The request will hang until the next update.
+    flexible GetNext() -> (flexible union {
+        /// Peers are added and updated as new information is obtained during discovery, connection
+        /// establishment, and bonding procedures.
+        1: updated vector<sys.Peer>:MAX;
+        /// Peers are removed either:
+        ///   a. explicitly via [`fuchsia.bluetooth.host.Host/Forget`], or
+        ///   b. bt-host has not seen the peer recently and the peer is not bonded or connected
+        2: removed vector<bt.PeerId>:MAX;
+    });
+};
+
 /// Interface for interacting with a Bluetooth host device (bt-host)
 open protocol Host {
     /// Fulfills a given protocol request. bt-host will start processing FIDL messages. If the
@@ -74,22 +87,11 @@ open protocol Host {
     /// Assigns local data to this host.
     strict SetLocalData(sys.HostData);
 
-    /// Monitors updates for connectable peers known to the system. Replies only when
-    /// peers have been added, modified, or removed since the most recent call to WatchPeers().
-    ///
-    /// Peers are added and updated as new information is obtained during discovery, connection
-    /// establishment, and bonding procedures.
-    ///
-    /// Peers are removed either:
-    ///   a. explicitly via [`fuchsia.bluetooth.host.Host/Forget`], or
-    ///   b. no transmission has been received from the peer for an internally determined duration
-    ///      of time and the peer is neither connected nor bonded.
-    ///
-    /// - response `updated` Peers that were added or updated since the last call to WatchPeers().
-    /// - response `removed` Ids of peers that were removed since the last call to WatchPeers().
-    flexible WatchPeers() -> (struct {
-        updated vector<sys.Peer>:MAX;
-        removed vector<bt.PeerId>:MAX;
+    /// Sets a PeerWatcher protocol that will be notified of changes to peers.
+    /// Only 1 PeerWatcher can be configured at a time.
+    // TODO(https://fxbug.dev/340585537): Support multiple PeerWatchers.
+    flexible SetPeerWatcher(resource struct {
+        peer_watcher server_end:PeerWatcher;
     });
 
     /// Sets the local name for this host device.

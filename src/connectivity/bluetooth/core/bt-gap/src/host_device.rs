@@ -6,6 +6,7 @@ use anyhow::{format_err, Context};
 use fidl_fuchsia_bluetooth::{self as fbt, DeviceClass};
 use fidl_fuchsia_bluetooth_host::{
     DiscoverySessionMarker, DiscoverySessionProxy, HostEvent, HostProxy, HostStartDiscoveryRequest,
+    PeerWatcherGetNextResponse, PeerWatcherMarker,
 };
 use fidl_fuchsia_bluetooth_sys as sys;
 use fuchsia_async as fasync;
@@ -277,13 +278,27 @@ impl HostDevice {
     ) -> impl Future<Output = types::Result<()>> {
         let proxy = self.0.proxy.clone();
         async move {
+            let (peer_watcher_proxy, peer_watcher_server) =
+                fidl::endpoints::create_proxy::<PeerWatcherMarker>().unwrap();
+            proxy.set_peer_watcher(peer_watcher_server)?;
             loop {
-                let (updated, removed) = proxy.watch_peers().await?;
-                for peer in updated.into_iter() {
-                    listener.on_peer_updated(peer.try_into()?).await;
-                }
-                for id in removed.into_iter() {
-                    listener.on_peer_removed(id.into()).await;
+                match peer_watcher_proxy.get_next().await {
+                    Ok(PeerWatcherGetNextResponse::Updated(updated)) => {
+                        for peer in updated.into_iter() {
+                            listener.on_peer_updated(peer.try_into()?).await;
+                        }
+                    }
+                    Ok(PeerWatcherGetNextResponse::Removed(removed)) => {
+                        for id in removed.into_iter() {
+                            listener.on_peer_removed(id.into()).await;
+                        }
+                    }
+                    Ok(_) => {
+                        debug!("ignoring unknown PeerWatcher response");
+                    }
+                    Err(err) => {
+                        return Err(format_err!("PeerWatcher error: {:?}", err).into());
+                    }
                 }
             }
         }
@@ -413,9 +428,9 @@ pub(crate) mod test {
 
     use {
         async_helpers::maybe_stream::MaybeStream,
-        fidl::endpoints::Responder,
         fidl_fuchsia_bluetooth_host::{
             DiscoverySessionRequest, DiscoverySessionRequestStream, HostRequest, HostRequestStream,
+            PeerWatcherRequestStream,
         },
         fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
         futures::select,
@@ -425,13 +440,14 @@ pub(crate) mod test {
         host_stream: HostRequestStream,
         host_info: Arc<RwLock<HostInfo>>,
         discovery_stream: MaybeStream<DiscoverySessionRequestStream>,
+        peer_watcher_stream: MaybeStream<PeerWatcherRequestStream>,
     }
 
     impl FakeHostServer {
         async fn run(&mut self) -> Result<(), anyhow::Error> {
             loop {
                 select! {
-                    req = self.discovery_stream.next() => {
+                req = self.discovery_stream.next() => {
                          info!("FakeHostServer: discovery_stream: {:?}", req);
                          match req {
                             Some(Ok(DiscoverySessionRequest::Stop { .. })) | None => {
@@ -458,9 +474,9 @@ pub(crate) mod test {
                                      Ok(())
                                  );
                              }
-                             Some(Ok(HostRequest::WatchPeers { responder, .. })) => {
-                                 info!("FakeHostServer: Got watch peers, never responding..");
-                                 responder.drop_without_shutdown();
+                             Some(Ok(HostRequest::SetPeerWatcher {peer_watcher, ..})) => {
+                                assert!(!self.peer_watcher_stream.is_some());
+                                self.peer_watcher_stream.set(peer_watcher.into_stream().unwrap());
                              }
                              None => {
                                  return Ok(());
@@ -482,6 +498,7 @@ pub(crate) mod test {
             host_stream: server,
             host_info,
             discovery_stream: MaybeStream::default(),
+            peer_watcher_stream: MaybeStream::default(),
         };
         host_server.run().await
     }

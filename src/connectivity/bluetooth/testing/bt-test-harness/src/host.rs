@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_bluetooth_host::HostProxy,
+    anyhow::{format_err, Context, Error},
+    fidl_fuchsia_bluetooth_host::{HostProxy, PeerWatcherGetNextResponse},
     fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
     fuchsia_bluetooth::{
         expectation::{
@@ -170,18 +170,27 @@ async fn new_host_harness(realm: Arc<HostRealm>) -> Result<(HostHarness, Emulato
 async fn watch_peers(harness: HostHarness) -> Result<(), Error> {
     // Clone the proxy so that the aux() lock is not held while waiting.
     let proxy = harness.aux().host.clone();
+    let (peer_watcher, server) = fidl::endpoints::create_proxy().unwrap();
+    proxy.set_peer_watcher(server)?;
     loop {
-        let (updated, removed) = proxy.watch_peers().await?;
-        for peer in updated.into_iter() {
-            let peer: Peer = peer.try_into()?;
-            let _ = harness.write_state().peers.insert(peer.id.clone(), peer);
-            harness.notify_state_changed();
-        }
-        for id in removed.into_iter() {
-            let id = id.into();
-            if harness.write_state().peers.remove(&id).is_none() {
-                warn!(%id, "HostHarness: Removed id that wasn't present");
+        let response = peer_watcher.get_next().await?;
+        match response {
+            PeerWatcherGetNextResponse::Updated(updated) => {
+                for peer in updated.into_iter() {
+                    let peer: Peer = peer.try_into()?;
+                    let _ = harness.write_state().peers.insert(peer.id.clone(), peer);
+                    harness.notify_state_changed();
+                }
             }
+            PeerWatcherGetNextResponse::Removed(removed) => {
+                for id in removed.into_iter() {
+                    let id = id.into();
+                    if harness.write_state().peers.remove(&id).is_none() {
+                        warn!(%id, "HostHarness: Removed id that wasn't present");
+                    }
+                }
+            }
+            _ => return Err(format_err!("unknown PeerWatcher.GetNext response")),
         }
     }
 }
