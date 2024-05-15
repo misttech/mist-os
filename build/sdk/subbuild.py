@@ -26,7 +26,6 @@ is_debug = false
 
 cxx_rbe_enable = {cxx_rbe_enable}
 rust_rbe_enable = {rust_rbe_enable}
-use_goma = {use_goma}
 universe_package_labels = [{sdk_labels_list}]
 """
 
@@ -171,13 +170,6 @@ def main():
         help="Enable remote builds with RBE for Rust targets.",
     )
     parser.add_argument(
-        "--use-goma", action="store_true", help="Whether to use goma or not."
-    )
-    parser.add_argument(
-        "--goma-dir",
-        help="Optional goma directory path, only used with --use-goma.",
-    )
-    parser.add_argument(
         "--parallelism",
         type=int,
         default=multiprocessing.cpu_count(),
@@ -269,11 +261,8 @@ def main():
         cpu=target_cpu,
         cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
         rust_rbe_enable="true" if args.rust_rbe_enable else "false",
-        use_goma="true" if args.use_goma else "false",
         sdk_labels_list=f'"{args.sdk_collection_label}"',
     )
-    if args.use_goma and args.goma_dir:
-        args_gn_content += f'goma_dir = "{args.goma_dir}"\n'
     if args.sdk_id:
         args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
 
