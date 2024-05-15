@@ -60,6 +60,8 @@
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/drivers/coordinator/post-display-task.h"
+#include "src/graphics/display/drivers/coordinator/post-task.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -1745,21 +1747,13 @@ void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
 void ClientProxy::CloseTest() { handler_.TearDownTest(); }
 
 void ClientProxy::CloseOnControllerLoop() {
-  auto task = new async::Task();
-  task->set_handler([client_handler = &handler_](async_dispatcher_t* dispatcher,
-                                                 async::Task* task_ptr, zx_status_t status) {
-    // Ensures that `task` gets deleted when the handler completes.
-    std::unique_ptr<async::Task> task(task_ptr);
-    client_handler->TearDown();
-  });
-
-  if (task->Post(controller_->async_dispatcher()) != ZX_OK) {
-    // Tasks only fail to post if the looper is dead. That can happen if the controller is unbinding
-    // and shutting down active clients, but if it does then it's safe to call Reset on this thread
-    // anyway.
-    delete task;
-    handler_.TearDown();
-  }
+  // Tasks only fail to post if the looper is dead. That can happen if the
+  // controller is unbinding and shutting down active clients, but if it does
+  // then it's safe to call Reset on this thread anyway.
+  [[maybe_unused]] zx::result<> post_task_result = PostTask<kDisplayTaskTargetSize>(
+      *controller_->async_dispatcher(),
+      // Client::TearDown() must be called even if the task fails to post.
+      [_ = CallFromDestructor([this]() { handler_.TearDown(); })]() {});
 }
 
 zx_status_t ClientProxy::Init(inspect::Node* parent_node,

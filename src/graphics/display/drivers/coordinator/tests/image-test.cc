@@ -16,6 +16,8 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/fence.h"
+#include "src/graphics/display/drivers/coordinator/post-display-task.h"
+#include "src/graphics/display/drivers/coordinator/post-task.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
@@ -108,18 +110,15 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
       image->ResetFences();
       image->PrepareFences(nullptr, signal_fence->GetReference());
     }
-    auto lifecycle_task = new async::Task(
-        [image, &retire_count](async_dispatcher_t*, async::Task* task_ptr, zx_status_t) {
-          // Ensures that `task` gets deleted when the handler completes.
-          std::unique_ptr<async::Task> task(task_ptr);
-
+    zx::result<> post_task_result =
+        PostTask<kDisplayTaskTargetSize>(*loop.dispatcher(), [image, &retire_count]() {
           fbl::AutoLock l(image->mtx());
           image->StartPresent();
           retire_count++;
           image->StartRetire();
           image->OnRetire();
         });
-    EXPECT_OK(lifecycle_task->Post(loop.dispatcher()));
+    ASSERT_OK(post_task_result.status_value());
 
     async::WaitOnce signal_event_wait(signal_event.get(), ZX_EVENT_SIGNALED, /*options=*/0);
     bool signal_event_signaled = false;
