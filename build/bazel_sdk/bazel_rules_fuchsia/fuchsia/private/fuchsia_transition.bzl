@@ -5,13 +5,13 @@
 """Utilities for changing the build configuration to fuchsia."""
 
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
+load("//common:transition_utils.bzl", "set_command_line_option_value")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
     "k8": "x86_64",
     "x86_64": "x86_64",
-    "armeabi-v7a": "aarch64",
     "aarch64": "aarch64",
     "darwin_arm64": "aarch64",
     "darwin_x86_64": "x86_64",
@@ -100,9 +100,9 @@ def _fuchsia_transition_impl(settings, attr):
         # TODO(https://fxbug.dev/335442302): Get the numeric values for these
         # special API levels from a better source of truth.
         FUCHSIA_HEAD_VALUE = 4292870144
-        copt.append(
-            "-ffuchsia-api-level={}".format(FUCHSIA_HEAD_VALUE if fuchsia_api_level == "HEAD" else int(fuchsia_api_level)),
-        )
+
+        api_level = FUCHSIA_HEAD_VALUE if fuchsia_api_level == "HEAD" else int(fuchsia_api_level)
+        copt = set_command_line_option_value(copt, "-ffuchsia-api-level=", str(api_level))
 
     return {
         "//command_line_option:cpu": output_cpu,

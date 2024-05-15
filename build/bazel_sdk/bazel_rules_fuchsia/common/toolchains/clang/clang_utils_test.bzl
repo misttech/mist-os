@@ -31,6 +31,7 @@ load(
     "to_clang_target_tuple",
 )
 load("//platforms:utils_test.bzl", "platforms_utils_test")
+load("//:transition_utils_test.bzl", "transition_utils_test")
 
 def _process_clang_builtins_output_test(ctx):
     response = """Fuchsia clang version 16.0.0 (https://llvm.googlesource.com/llvm-project 039b969b32b64b64123dce30dd28ec4e343d893f)
@@ -204,6 +205,7 @@ def include_clang_utils_test_suite(name):
     unittest.suite(
         name,
         platforms_utils_test,
+        transition_utils_test,
         process_clang_builtins_output_test,
         to_clang_target_tuple_test,
         format_target_tag_labels_dict_test,
