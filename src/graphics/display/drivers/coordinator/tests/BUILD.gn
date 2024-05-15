@@ -14,6 +14,7 @@ test("display-coordinator-unittests") {
     "inspect-test.cc",
     "integration-test.cc",
     "layer-test.cc",
+    "post-task-test.cc",
   ]
   include_dirs = [ ".." ]
   deps = [

@@ -72,6 +72,7 @@ source_set("shared") {
     "layer.h",
     "migration-util.cc",
     "migration-util.h",
+    "post-task.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
   ]
