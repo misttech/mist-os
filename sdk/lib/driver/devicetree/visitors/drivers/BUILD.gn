@@ -35,6 +35,7 @@ devicetree_visitor_collection("all-driver-visitors") {
     "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/pwm-controllers/pwm:pwm-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/pwm-controllers/pwm-init:pwm-init-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/regulator/regulator:regulator-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",

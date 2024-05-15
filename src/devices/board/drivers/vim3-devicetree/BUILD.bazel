@@ -39,6 +39,7 @@ fuchsia_package_resource_collection(
         "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
         "@internal_sdk//pkg/devicetree-i2c-bus-visitor",
         "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
+        "@internal_sdk//pkg/devicetree-pwm-init-visitor",
         "@internal_sdk//pkg/devicetree-pwm-visitor",
         "@internal_sdk//pkg/devicetree-registers-visitor",
         "@internal_sdk//pkg/devicetree-regulator-visitor",

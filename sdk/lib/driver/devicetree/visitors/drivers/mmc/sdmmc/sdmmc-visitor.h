@@ -16,7 +16,8 @@ class SdmmcVisitor : public fdf_devicetree::Visitor {
   static constexpr char kNoMmcHs400[] = "no-mmc-hs400";
   static constexpr char kNoMmcHs200[] = "no-mmc-hs200";
   static constexpr char kNoMmcHsDdr[] = "no-mmc-hsddr";
-  static constexpr char KNonRemovable[] = "non-removable";
+  static constexpr char kNonRemovable[] = "non-removable";
+  static constexpr char kUseFidl[] = "use-fidl";
 
   SdmmcVisitor();
 

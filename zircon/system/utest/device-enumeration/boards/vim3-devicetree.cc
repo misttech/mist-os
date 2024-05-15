@@ -31,6 +31,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
 
+      // SDIO
+      "sys/platform/mmc-ffe03000/mmc-ffe03000_group/aml-sd-emmc/sdmmc",
+
       // SD card
       "sys/platform/mmc-ffe05000/mmc-ffe05000_group/aml-sd-emmc/sdmmc",
 

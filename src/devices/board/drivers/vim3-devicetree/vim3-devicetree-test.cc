@@ -50,6 +50,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
       "sys/platform/interrupt-controller-ffc01000",
+      "sys/platform/mmc-ffe03000",
       "sys/platform/mmc-ffe05000",
       "sys/platform/mmc-ffe07000",
       "sys/platform/nna-ff100000",
