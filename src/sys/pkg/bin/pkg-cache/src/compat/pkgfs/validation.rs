@@ -6,10 +6,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{
-        collections::{BTreeMap, HashSet},
-        sync::Arc,
-    },
+    std::{collections::HashSet, sync::Arc},
     tracing::{error, info},
     vfs::{
         directory::{
@@ -228,8 +225,8 @@ impl vfs::directory::entry_container::Directory for Validation {
         (TraversalPosition, Box<(dyn vfs::directory::dirents_sink::Sealed + 'static)>),
         zx::Status,
     > {
-        super::read_dirents(
-            &BTreeMap::from([("missing".to_string(), fio::DirentType::File)]),
+        vfs::directory::read_dirents::read_dirents(
+            &[(EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File), "missing".into())],
             pos,
             sink,
         )
@@ -386,19 +383,68 @@ mod tests {
         );
     }
 
+    /// Implementation of vfs::directory::dirents_sink::Sink.
+    /// Sink::append begins to fail (returns Sealed) after `max_entries` entries have been appended.
+    #[derive(Clone)]
+    struct FakeSink {
+        max_entries: usize,
+        entries: Vec<(String, EntryInfo)>,
+        sealed: bool,
+    }
+
+    impl FakeSink {
+        fn new(max_entries: usize) -> Self {
+            FakeSink { max_entries, entries: Vec::with_capacity(max_entries), sealed: false }
+        }
+
+        fn from_sealed(sealed: Box<dyn vfs::directory::dirents_sink::Sealed>) -> Box<FakeSink> {
+            sealed.into()
+        }
+    }
+
+    impl From<Box<dyn vfs::directory::dirents_sink::Sealed>> for Box<FakeSink> {
+        fn from(sealed: Box<dyn vfs::directory::dirents_sink::Sealed>) -> Self {
+            sealed.open().downcast::<FakeSink>().unwrap()
+        }
+    }
+
+    impl vfs::directory::dirents_sink::Sink for FakeSink {
+        fn append(
+            mut self: Box<Self>,
+            entry: &EntryInfo,
+            name: &str,
+        ) -> vfs::directory::dirents_sink::AppendResult {
+            assert!(!self.sealed);
+            if self.entries.len() == self.max_entries {
+                vfs::directory::dirents_sink::AppendResult::Sealed(self.seal())
+            } else {
+                self.entries.push((name.to_owned(), entry.clone()));
+                vfs::directory::dirents_sink::AppendResult::Ok(self)
+            }
+        }
+
+        fn seal(mut self: Box<Self>) -> Box<dyn vfs::directory::dirents_sink::Sealed> {
+            self.sealed = true;
+            self
+        }
+    }
+
+    impl vfs::directory::dirents_sink::Sealed for FakeSink {
+        fn open(self: Box<Self>) -> Box<dyn std::any::Any> {
+            self
+        }
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_read_dirents() {
         let (_env, validation) = TestEnv::new().await;
 
         let (pos, sealed) = validation
-            .read_dirents(
-                &TraversalPosition::Start,
-                Box::new(crate::compat::pkgfs::testing::FakeSink::new(3)),
-            )
+            .read_dirents(&TraversalPosition::Start, Box::new(FakeSink::new(3)))
             .await
             .expect("read_dirents failed");
         assert_eq!(
-            crate::compat::pkgfs::testing::FakeSink::from_sealed(sealed).entries,
+            FakeSink::from_sealed(sealed).entries,
             vec![
                 (".".to_string(), EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)),
                 ("missing".to_string(), EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)),
