@@ -440,10 +440,10 @@ impl SceneManagerTrait for SceneManager {
     }
 }
 
-const DISPLAY_DEBUG_NAME: &str = "SceneManager Display";
+const ROOT_VIEW_DEBUG_NAME: &str = "SceneManager Display";
 const POINTER_INJECTOR_DEBUG_NAME: &str = "SceneManager PointerInjector";
 const SCENE_DEBUG_NAME: &str = "SceneManager Scene";
-const DISPLAY_PRESENT_TRACING_NAME: &CStr = c"Flatland::PerAppPresent[SceneManager Display]";
+const ROOT_VIEW_PRESENT_TRACING_NAME: &CStr = c"Flatland::PerAppPresent[SceneManager Display]";
 const POINTER_INJECTOR_PRESENT_TRACING_NAME: &CStr =
     c"Flatland::PerAppPresent[SceneManager PointerInjector]";
 const SCENE_TRACING_NAME: &CStr = c"Flatland::PerAppPresent[SceneManager Scene]";
@@ -473,7 +473,7 @@ impl SceneManager {
         let a11y_viewport_transform_id = id_generator.next_transform_id();
         let a11y_viewport_content_id = id_generator.next_content_id();
 
-        root_flatland.set_debug_name(DISPLAY_DEBUG_NAME)?;
+        root_flatland.set_debug_name(ROOT_VIEW_DEBUG_NAME)?;
         pointerinjector_flatland.set_debug_name(POINTER_INJECTOR_DEBUG_NAME)?;
         scene_flatland.set_debug_name(SCENE_DEBUG_NAME)?;
 
@@ -648,19 +648,19 @@ impl SceneManager {
         start_flatland_presentation_loop(
             root_receiver,
             Arc::downgrade(&root_flatland.flatland),
-            "root_view".to_string(),
+            ROOT_VIEW_DEBUG_NAME.to_string(),
         );
         let (pointerinjector_flatland_presentation_sender, pointerinjector_receiver) = unbounded();
         start_flatland_presentation_loop(
             pointerinjector_receiver,
             Arc::downgrade(&pointerinjector_flatland.flatland),
-            "pointerinjector_view".to_string(),
+            POINTER_INJECTOR_DEBUG_NAME.to_string(),
         );
         let (scene_flatland_presentation_sender, scene_receiver) = unbounded();
         start_flatland_presentation_loop(
             scene_receiver,
             Arc::downgrade(&scene_flatland.flatland),
-            "scene_view".to_string(),
+            SCENE_DEBUG_NAME.to_string(),
         );
 
         let mut pingback_channels = Vec::new();
@@ -915,8 +915,8 @@ pub fn start_flatland_presentation_loop(
                                      "debug_name" => &*debug_name);
 
                     match debug_name.as_str() {
-                        DISPLAY_DEBUG_NAME => {
-                            trace::flow_begin!(c"gfx", DISPLAY_PRESENT_TRACING_NAME, present_count.into());
+                        ROOT_VIEW_DEBUG_NAME => {
+                            trace::flow_begin!(c"gfx", ROOT_VIEW_PRESENT_TRACING_NAME, present_count.into());
                         }
                         POINTER_INJECTOR_DEBUG_NAME => {
                             trace::flow_begin!(c"gfx", POINTER_INJECTOR_PRESENT_TRACING_NAME, present_count.into());
