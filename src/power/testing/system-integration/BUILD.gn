@@ -2,12 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# These are included from //bundles/buildbot/bringup:tests
-group("tests") {
+# These are included from //bundles/buildbot/bringup:e2e_tests
+group("e2e_tests") {
   testonly = true
   deps = []
   if (current_cpu == "arm64") {
-    deps += [ "storage:tests" ]
+    deps += [ "storage:e2e_tests" ]
   }
 }
 

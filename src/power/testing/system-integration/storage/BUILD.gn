@@ -6,7 +6,7 @@ assert(
     current_cpu == "arm64",
     "The storage system integration tests can only be defined in an arm64 toolchain.")
 
-group("tests") {
+group("e2e_tests") {
   testonly = true
   deps = [
     "custom-product:product_bundle",

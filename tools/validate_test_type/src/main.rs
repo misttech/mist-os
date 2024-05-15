@@ -35,6 +35,7 @@ mod opts;
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct TestsJsonEntry {
     test: TestEntry,
+    product_bundle: Option<String>,
     environments: Vec<Environments>,
 }
 
@@ -348,6 +349,41 @@ fn categorize_tests(tests_json: Vec<TestsJsonEntry>) -> Result<Vec<CategorizedTe
                                     }
                                 }
                             }
+                        }
+                    }
+                    Some("fuchsia") => {
+                        match entry.product_bundle {
+                            Some(_pb_name) => {
+                                match entry.environments.pop() {
+                                    None => Err(anyhow!(
+                                        "Unable to categorize test: {:?}",
+                                        entry.test.test_label
+                                    )),
+                                    Some(Environments { dimensions, tags, .. }) => {
+                                        match dimensions.device_type {
+                                            Some(device_type) =>
+                                            // It's an e2e test.
+                                            {
+                                                Ok(E2eTestInfo::try_from((
+                                                    entry.test,
+                                                    device_type,
+                                                    tags,
+                                                ))
+                                                .with_context(|| format!("test: {}", label))?
+                                                .into())
+                                            }
+                                            None => Err(anyhow!(
+                                                "Unable to categorize test: {:?}",
+                                                entry.test.test_label
+                                            )),
+                                        }
+                                    }
+                                }
+                            }
+                            None => Err(anyhow!(
+                                "Unable to categorize test: {:?}",
+                                entry.test.test_label
+                            )),
                         }
                     }
                     _ => Err(anyhow!("Unable to categorize test: {:?}", entry.test.test_label)),
@@ -676,7 +712,31 @@ mod tests {
                 "path": "host_x64/obj/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.sh",
                 "runtime_deps": "host_x64/gen/src/tests/end_to_end/fidlcat/fidlcat_e2e_tests.deps.json"
             }
-          }]);
+          },
+          {
+            "environments": [
+              {
+                "dimensions": {
+                  "device_type": "Vim3"
+                }
+              }
+            ],
+            "product_bundle": "some_product.some_board_vim3",
+            "test": {
+              "build_rule": "bootfs_test",
+              "cpu": "arm64",
+              "isolated": true,
+              "label": "//src/some/path/to/test:test(//build/toolchain/fuchsia:arm64)",
+              "log_settings": {
+                "max_severity": "WARN"
+              },
+              "name": "/boot/test/the-test",
+              "os": "fuchsia",
+              "path": "/boot/test/the-test",
+              "runtime_deps": "gen/src/some/path/to/test/bootfs_test.deps.json"
+            }
+          }
+          ]);
         let parsed: Vec<TestsJsonEntry> = serde_json::from_value(json).unwrap();
 
         let categorized = categorize_tests(parsed).unwrap();
@@ -753,7 +813,28 @@ mod tests {
                 device_type: "QEMU".into(),
                 tags: vec!["tag1".into(), "tag2".into()]
             })
-        )
+        );
+
+        let e2e_test_bootfs: &CategorizedTestInfo = &categorized[3];
+        assert_eq!(e2e_test_bootfs.name(), "/boot/test/the-test");
+        assert_eq!(
+            e2e_test_bootfs.label(),
+            "//src/some/path/to/test:test(//build/toolchain/fuchsia:arm64)"
+        );
+        assert_eq!(
+            e2e_test_bootfs,
+            &CategorizedTestInfo::E2e(E2eTestInfo {
+                basic_info: BasicTestInfo {
+                    name: "/boot/test/the-test".into(),
+                    test_label: "//src/some/path/to/test:test(//build/toolchain/fuchsia:arm64)"
+                        .into(),
+                },
+                path: "/boot/test/the-test".into(),
+                runtime_deps: Some("gen/src/some/path/to/test/bootfs_test.deps.json".into()),
+                device_type: "Vim3".into(),
+                tags: vec![]
+            })
+        );
     }
 
     #[test]

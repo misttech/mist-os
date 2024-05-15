@@ -21,7 +21,9 @@ group("bringup") {
   ]
 }
 
-group("tests") {
+# For use with the 'e2e_test_labels' GN build argument.
+# WARNING: Known to infrastructure
+group("e2e_tests") {
   testonly = true
-  deps = [ "//src/power/testing/system-integration:tests" ]
+  deps = [ "//src/power/testing/system-integration:e2e_tests" ]
 }
