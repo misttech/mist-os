@@ -194,9 +194,8 @@ pub trait IcmpPacketType<B: ByteSliceMut, I: Ip>:
 
 impl<B: ByteSliceMut> IcmpPacketType<B, Ipv4> for Icmpv4Packet<B> {
     /// Update the checksum to reflect an updated address in the pseudo header.
-    fn update_checksum_pseudo_header_address(&mut self, old: Ipv4Addr, new: Ipv4Addr) {
-        let checksum = &mut self.header_prefix_mut().checksum;
-        *checksum = internet_checksum::update(*checksum, old.bytes(), new.bytes());
+    fn update_checksum_pseudo_header_address(&mut self, _: Ipv4Addr, _: Ipv4Addr) {
+        // ICMPv4 does not have a pseudo header.
     }
 }
 

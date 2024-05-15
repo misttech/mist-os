@@ -1172,6 +1172,8 @@ pub mod testutil {
         pub trait TestIpExt: IpExt {
             const SRC_IP: Self::Addr;
             const DST_IP: Self::Addr;
+            const SRC_IP_2: Self::Addr;
+            const DST_IP_2: Self::Addr;
             const IP_OUTSIDE_SUBNET: Self::Addr;
             const SUBNET: Subnet<Self::Addr>;
         }
@@ -1179,6 +1181,8 @@ pub mod testutil {
         impl TestIpExt for Ipv4 {
             const SRC_IP: Self::Addr = net_ip_v4!("192.0.2.1");
             const DST_IP: Self::Addr = net_ip_v4!("192.0.2.2");
+            const SRC_IP_2: Self::Addr = net_ip_v4!("192.0.2.8");
+            const DST_IP_2: Self::Addr = net_ip_v4!("192.0.2.9");
             const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v4!("192.0.2.4");
             const SUBNET: Subnet<Self::Addr> = net_subnet_v4!("192.0.2.0/30");
         }
@@ -1186,6 +1190,8 @@ pub mod testutil {
         impl TestIpExt for Ipv6 {
             const SRC_IP: Self::Addr = net_ip_v6!("2001:db8::1");
             const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
+            const SRC_IP_2: Self::Addr = net_ip_v6!("2001:db8::8");
+            const DST_IP_2: Self::Addr = net_ip_v6!("2001:db8::9");
             const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v6!("2001:db8::4");
             const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/126");
         }
@@ -1488,13 +1494,13 @@ mod tests {
             },
         )
         .expect("parse transport header");
-        packet.update_pseudo_header_src_addr(I::SRC_IP, I::DST_IP);
-        packet.update_pseudo_header_dst_addr(I::DST_IP, I::SRC_IP);
+        packet.update_pseudo_header_src_addr(I::SRC_IP, I::SRC_IP_2);
+        packet.update_pseudo_header_dst_addr(I::DST_IP, I::DST_IP_2);
         // Drop the packet because it's holding a mutable borrow of `buf` which
         // we need to assert equality later.
         drop(packet);
 
-        let equivalent = proto.make_packet::<I>(I::DST_IP, I::SRC_IP);
+        let equivalent = proto.make_packet::<I>(I::SRC_IP_2, I::DST_IP_2);
 
         assert_eq!(equivalent, buf);
     }
