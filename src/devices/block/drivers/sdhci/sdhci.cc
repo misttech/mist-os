@@ -193,53 +193,52 @@ bool Sdhci::CmdStageComplete() {
   const uint32_t response_3 = Response::Get(3).ReadFrom(&regs_mmio_buffer_).reg_value();
 
   // Read the response data.
-  if (pending_request_.cmd_flags & SDMMC_RESP_LEN_136) {
+  if (pending_request_->cmd_flags & SDMMC_RESP_LEN_136) {
     if (quirks_ & SDHCI_QUIRK_STRIP_RESPONSE_CRC) {
-      pending_request_.response[0] = (response_3 << 8) | ((response_2 >> 24) & 0xFF);
-      pending_request_.response[1] = (response_2 << 8) | ((response_1 >> 24) & 0xFF);
-      pending_request_.response[2] = (response_1 << 8) | ((response_0 >> 24) & 0xFF);
-      pending_request_.response[3] = (response_0 << 8);
+      pending_request_->response[0] = (response_3 << 8) | ((response_2 >> 24) & 0xFF);
+      pending_request_->response[1] = (response_2 << 8) | ((response_1 >> 24) & 0xFF);
+      pending_request_->response[2] = (response_1 << 8) | ((response_0 >> 24) & 0xFF);
+      pending_request_->response[3] = (response_0 << 8);
     } else if (quirks_ & SDHCI_QUIRK_STRIP_RESPONSE_CRC_PRESERVE_ORDER) {
-      pending_request_.response[0] = (response_0 << 8);
-      pending_request_.response[1] = (response_1 << 8) | ((response_0 >> 24) & 0xFF);
-      pending_request_.response[2] = (response_2 << 8) | ((response_1 >> 24) & 0xFF);
-      pending_request_.response[3] = (response_3 << 8) | ((response_2 >> 24) & 0xFF);
+      pending_request_->response[0] = (response_0 << 8);
+      pending_request_->response[1] = (response_1 << 8) | ((response_0 >> 24) & 0xFF);
+      pending_request_->response[2] = (response_2 << 8) | ((response_1 >> 24) & 0xFF);
+      pending_request_->response[3] = (response_3 << 8) | ((response_2 >> 24) & 0xFF);
     } else {
-      pending_request_.response[0] = response_0;
-      pending_request_.response[1] = response_1;
-      pending_request_.response[2] = response_2;
-      pending_request_.response[3] = response_3;
+      pending_request_->response[0] = response_0;
+      pending_request_->response[1] = response_1;
+      pending_request_->response[2] = response_2;
+      pending_request_->response[3] = response_3;
     }
-  } else if (pending_request_.cmd_flags & (SDMMC_RESP_LEN_48 | SDMMC_RESP_LEN_48B)) {
-    pending_request_.response[0] = response_0;
+  } else if (pending_request_->cmd_flags & (SDMMC_RESP_LEN_48 | SDMMC_RESP_LEN_48B)) {
+    pending_request_->response[0] = response_0;
   }
 
-  pending_request_.cmd_done = true;
+  pending_request_->cmd_complete = true;
 
-  // We're done if the command has no data stage or if the data stage completed early
-  if (pending_request_.data_done) {
-    CompleteRequest();
+  if (pending_request_->cmd_flags & (SDMMC_RESP_DATA_PRESENT | SDMMC_RESP_LEN_48B)) {
+    return false;
   }
 
-  return pending_request_.data_done;
+  // We're done if the command has no data or busy stage
+  CompleteRequest();
+  return true;
 }
 
-bool Sdhci::TransferComplete() {
-  pending_request_.data_done = true;
-  if (pending_request_.cmd_done) {
+void Sdhci::TransferComplete() {
+  if (!pending_request_->cmd_complete) {
+    zxlogf(ERROR, "Transfer complete interrupt received before command complete");
+    pending_request_->status.set_error(1).set_command_timeout_error(1);
+    ErrorRecovery();
+  } else {
     CompleteRequest();
   }
-
-  return pending_request_.cmd_done;
 }
 
 bool Sdhci::DataStageReadReady() {
-  if ((pending_request_.cmd_idx == MMC_SEND_TUNING_BLOCK) ||
-      (pending_request_.cmd_idx == SD_SEND_TUNING_BLOCK)) {
-    // This is the final interrupt expected for tuning transfers, so mark both command and data
-    // phases complete.
-    pending_request_.cmd_done = true;
-    pending_request_.data_done = true;
+  if ((pending_request_->cmd_idx == MMC_SEND_TUNING_BLOCK) ||
+      (pending_request_->cmd_idx == SD_SEND_TUNING_BLOCK)) {
+    // This is the final interrupt expected for tuning transfers.
     CompleteRequest();
     return true;
   }
@@ -263,6 +262,7 @@ void Sdhci::ErrorRecovery() {
 }
 
 void Sdhci::CompleteRequest() {
+  pending_request_->request_complete = true;
   DisableInterrupts();
   sync_completion_signal(&req_completion_);
 }
@@ -285,7 +285,7 @@ int Sdhci::IrqThread() {
            InterruptSignalEnable::Get().ReadFrom(&regs_mmio_buffer_).reg_value());
 
     std::lock_guard<std::mutex> lock(mtx_);
-    if (pending_request_.is_pending()) {
+    if (pending_request_ && !pending_request_->request_complete) {
       HandleTransferInterrupt(status);
     }
 
@@ -306,14 +306,14 @@ int Sdhci::IrqThread() {
 
 void Sdhci::HandleTransferInterrupt(const InterruptStatus status) {
   if (status.ErrorInterrupt()) {
-    pending_request_.status = status;
-    pending_request_.status.set_error(1);
+    pending_request_->status = status;
+    pending_request_->status.set_error(1);
     ErrorRecovery();
     return;
   }
 
   // Clear the interrupt status to indicate that a normal interrupt was handled.
-  pending_request_.status = InterruptStatus::Get().FromValue(0);
+  pending_request_->status = InterruptStatus::Get().FromValue(0);
   if (status.buffer_read_ready() && DataStageReadReady()) {
     return;
   }
@@ -386,12 +386,14 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
     std::lock_guard<std::mutex> lock(mtx_);
 
     // one command at a time
-    if (pending_request_.is_pending()) {
+    if (pending_request_) {
       return ZX_ERR_SHOULD_WAIT;
     }
 
-    if (zx_status_t status = StartRequest(*req, builder); status != ZX_OK) {
-      return status;
+    if (zx::result pending_request = StartRequest(*req, builder); pending_request.is_ok()) {
+      pending_request_.emplace(*pending_request);
+    } else {
+      return pending_request.status_value();
     }
   }
 
@@ -399,11 +401,14 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
   sync_completion_reset(&req_completion_);
 
   std::lock_guard<std::mutex> lock(mtx_);
-  return FinishRequest(*req, out_response);
+
+  PendingRequest pending_request = *std::move(pending_request_);
+  pending_request_.reset();
+  return FinishRequest(*req, out_response, pending_request);
 }
 
-zx_status_t Sdhci::StartRequest(const sdmmc_req_t& request,
-                                DmaDescriptorBuilder<OwnedVmoInfo>& builder) {
+zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request,
+                                                      DmaDescriptorBuilder<OwnedVmoInfo>& builder) {
   using BlockSizeType = decltype(BlockSize::Get().FromValue(0).reg_value());
   using BlockCountType = decltype(BlockCount::Get().FromValue(0).reg_value());
 
@@ -419,7 +424,7 @@ zx_status_t Sdhci::StartRequest(const sdmmc_req_t& request,
   // Wait for the inhibit masks from above to become 0 before issuing the command.
   zx_status_t status = WaitForInhibit(inhibit_mask);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   TransferMode transfer_mode = TransferMode::Get().FromValue(0);
@@ -436,20 +441,20 @@ zx_status_t Sdhci::StartRequest(const sdmmc_req_t& request,
     BlockCount::Get().FromValue(0).WriteTo(&regs_mmio_buffer_);
   } else if (request.cmd_flags & SDMMC_RESP_DATA_PRESENT) {
     if (request.blocksize > std::numeric_limits<BlockSizeType>::max()) {
-      return ZX_ERR_OUT_OF_RANGE;
+      return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
     if (request.blocksize == 0) {
-      return ZX_ERR_INVALID_ARGS;
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
     if (const zx_status_t status = SetUpDma(request, builder); status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
 
     if (builder.block_count() > std::numeric_limits<BlockCountType>::max()) {
       zxlogf(ERROR, "Block count (%lu) exceeds the maximum (%u)", builder.block_count(),
              std::numeric_limits<BlockCountType>::max());
-      return ZX_ERR_OUT_OF_RANGE;
+      return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
     transfer_mode.set_dma_enable(1).set_multi_block(builder.block_count() > 1 ? 1 : 0);
@@ -472,8 +477,6 @@ zx_status_t Sdhci::StartRequest(const sdmmc_req_t& request,
   auto irq_mask = InterruptSignalEnable::Get().ReadFrom(&regs_mmio_buffer_);
   InterruptStatus::Get().FromValue(irq_mask.reg_value()).WriteTo(&regs_mmio_buffer_);
 
-  pending_request_.Init(request);
-
   // Unmask and enable interrupts
   EnableInterrupts();
 
@@ -481,7 +484,7 @@ zx_status_t Sdhci::StartRequest(const sdmmc_req_t& request,
   transfer_mode.WriteTo(&regs_mmio_buffer_);
   command.WriteTo(&regs_mmio_buffer_);
 
-  return ZX_OK;
+  return zx::ok(PendingRequest{request});
 }
 
 zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
@@ -522,9 +525,11 @@ zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
   return ZX_OK;
 }
 
-zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4]) {
-  if (pending_request_.cmd_done) {
-    memcpy(out_response, pending_request_.response, sizeof(uint32_t) * 4);
+zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4],
+                                 const PendingRequest& pending_request) {
+  constexpr uint32_t kResponseMask = SDMMC_RESP_LEN_136 | SDMMC_RESP_LEN_48 | SDMMC_RESP_LEN_48B;
+  if (pending_request.cmd_complete && request.cmd_flags & kResponseMask) {
+    memcpy(out_response, pending_request.response, sizeof(uint32_t) * 4);
   }
 
   if (request.cmd_flags & SDMMC_CMD_TYPE_ABORT) {
@@ -552,8 +557,7 @@ zx_status_t Sdhci::FinishRequest(const sdmmc_req_t& request, uint32_t out_respon
     }
   }
 
-  const InterruptStatus interrupt_status = pending_request_.status;
-  pending_request_.Reset();
+  const InterruptStatus interrupt_status = pending_request.status;
 
   if (!interrupt_status.error()) {
     return ZX_OK;

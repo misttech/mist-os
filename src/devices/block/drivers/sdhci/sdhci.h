@@ -17,6 +17,7 @@
 #include <zircon/threads.h>
 
 #include <mutex>
+#include <optional>
 
 #include <ddktl/device.h>
 
@@ -118,11 +119,11 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
 
   RequestStatus GetRequestStatus() TA_EXCL(&mtx_) {
     std::lock_guard<std::mutex> lock(mtx_);
-    if (pending_request_.is_pending()) {
-      const bool has_data = pending_request_.cmd_flags & SDMMC_RESP_DATA_PRESENT;
-      const bool busy_response = pending_request_.cmd_flags & SDMMC_RESP_LEN_48B;
+    if (pending_request_ && !pending_request_->request_complete) {
+      const bool has_data = pending_request_->cmd_flags & SDMMC_RESP_DATA_PRESENT;
+      const bool busy_response = pending_request_->cmd_flags & SDMMC_RESP_LEN_48B;
 
-      if (!pending_request_.cmd_done) {
+      if (!pending_request_->cmd_complete) {
         return RequestStatus::COMMAND;
       }
       if (has_data) {
@@ -150,6 +151,34 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
     uint32_t rights;
   };
 
+  // Used to synchronize the request thread(s) with the interrupt thread for requests through
+  // SdmmcRequest. See above for SdmmcRequest requests.
+  struct PendingRequest {
+    explicit PendingRequest(const sdmmc_req_t& request)
+        : cmd_idx(request.cmd_idx),
+          cmd_flags(request.cmd_flags),
+          status(InterruptStatus::Get().FromValue(0).set_error(1)) {}
+
+    const uint32_t cmd_idx;
+    const uint32_t cmd_flags;
+
+    // If false, a command is in progress on the bus, and the interrupt thread is waiting for the
+    // command complete interrupt.
+    bool cmd_complete = false;
+
+    // If true, all stages of the request have completed, and the main thread has been signaled.
+    bool request_complete = false;
+
+    // The 0-, 32-, or 128-bit response (unused fields set to zero). Set by the interrupt thread and
+    // read by the request thread.
+    uint32_t response[4] = {};
+
+    // If an error occurred, the interrupt thread sets this field to the value of the status
+    // register (and always sets the general error bit). If no error  occurred the interrupt thread
+    // sets this field to zero.
+    InterruptStatus status;
+  };
+
   using SdmmcVmoStore = DmaDescriptorBuilder<OwnedVmoInfo>::VmoStore;
 
   static void PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Command* command);
@@ -167,11 +196,12 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   int IrqThread() TA_EXCL(mtx_);
   void HandleTransferInterrupt(InterruptStatus status) TA_REQ(mtx_);
 
-  zx_status_t StartRequest(const sdmmc_req_t& request, DmaDescriptorBuilder<OwnedVmoInfo>& builder)
-      TA_REQ(mtx_);
+  zx::result<PendingRequest> StartRequest(const sdmmc_req_t& request,
+                                          DmaDescriptorBuilder<OwnedVmoInfo>& builder) TA_REQ(mtx_);
   zx_status_t SetUpDma(const sdmmc_req_t& request, DmaDescriptorBuilder<OwnedVmoInfo>& builder)
       TA_REQ(mtx_);
-  zx_status_t FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4]) TA_REQ(mtx_);
+  zx_status_t FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4],
+                            const PendingRequest& pending_request) TA_REQ(mtx_);
 
   void CompleteRequest() TA_REQ(mtx_);
 
@@ -180,7 +210,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
 
   // These return true if the main thread was signaled and no further processing is needed.
   bool CmdStageComplete() TA_REQ(mtx_);
-  bool TransferComplete() TA_REQ(mtx_);
+  void TransferComplete() TA_REQ(mtx_);
   bool DataStageReadReady() TA_REQ(mtx_);
 
   zx::interrupt irq_;
@@ -212,52 +242,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   // Keep one SdmmcVmoStore for each possible client ID (IDs are in [0, SDMMC_MAX_CLIENT_ID]).
   std::array<SdmmcVmoStore, SDMMC_MAX_CLIENT_ID + 1> registered_vmo_stores_;
 
-  // Used to synchronize the request thread(s) with the interrupt thread for requests through
-  // SdmmcRequest. See above for SdmmcRequest requests.
-  struct PendingRequest {
-    PendingRequest() { Reset(); }
-
-    // Initializes the PendingRequest based on the command index and flags. cmd_done is set to false
-    // to indicate that there is now a request pending.
-    void Init(const sdmmc_req_t& request) {
-      cmd_idx = request.cmd_idx;
-      cmd_flags = request.cmd_flags;
-      cmd_done = false;
-      // No data phase if there is no data present and no busy response.
-      data_done = !(cmd_flags & (SDMMC_RESP_DATA_PRESENT | SDMMC_RESP_LEN_48B));
-      status = InterruptStatus::Get().FromValue(0).set_error(1);
-    }
-
-    uint32_t cmd_idx;
-    // If false, a command is in progress on the bus, and the interrupt thread is waiting for the
-    // command complete interrupt.
-    bool cmd_done;
-    // If false, data is being transferred on the bus, and the interrupt thread is waiting for the
-    // transfer complete interrupt. Set to true for requests that have no data transfer.
-    bool data_done;
-    // The flags for the current request, used to determine what response (if any) is expected from
-    // this command.
-    uint32_t cmd_flags;
-    // The 0-, 32-, or 128-bit response (unused fields set to zero). Set by the interrupt thread and
-    // read by the request thread.
-    uint32_t response[4];
-    // If an error occurred, the interrupt thread sets this field to the value of the status
-    // register (and always sets the general error bit). If no error  occurred the interrupt thread
-    // sets this field to zero.
-    InterruptStatus status;
-
-    bool is_pending() const { return !cmd_done || !data_done; }
-
-    void Reset() {
-      cmd_done = true;
-      data_done = true;
-      cmd_idx = 0;
-      cmd_flags = 0;
-      memset(response, 0, sizeof(response));
-    }
-  };
-
-  PendingRequest pending_request_ TA_GUARDED(mtx_);
+  std::optional<PendingRequest> pending_request_ TA_GUARDED(mtx_);
 };
 
 }  // namespace sdhci
