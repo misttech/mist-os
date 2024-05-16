@@ -16,24 +16,29 @@ namespace bt::controllers {
 
 class VendorEventHandler : public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Vendor> {
  public:
-  VendorEventHandler(std::function<void(zx_status_t)> callback);
+  VendorEventHandler(
+      std::function<void(zx_status_t)> unbind_callback,
+      std::function<void(fuchsia_hardware_bluetooth::VendorFeatures)> on_vendor_connected_callback);
   void on_fidl_error(fidl::UnbindInfo error) override;
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Vendor> metadata) override;
 
+  void OnFeatures(fidl::Event<fuchsia_hardware_bluetooth::Vendor::OnFeatures>& event) override;
+
  private:
-  std::function<void(zx_status_t)> callback_;
+  std::function<void(zx_status_t)> unbind_callback_;
+  std::function<void(fuchsia_hardware_bluetooth::VendorFeatures)> on_vendor_connected_callback_;
 };
 
 class HciEventHandler : public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Hci> {
  public:
-  HciEventHandler(std::function<void(zx_status_t)> callback);
+  HciEventHandler(std::function<void(zx_status_t)> unbind_callback);
   void on_fidl_error(fidl::UnbindInfo error) override;
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Hci> metadata) override;
 
  private:
-  std::function<void(zx_status_t)> callback_;
+  std::function<void(zx_status_t)> unbind_callback_;
 };
 
 class FidlController final : public pw::bluetooth::Controller {
@@ -78,6 +83,10 @@ class FidlController final : public pw::bluetooth::Controller {
       pw::Callback<void(pw::Result<pw::span<const std::byte>>)> callback) override;
 
  private:
+  // When both |get_features_callback_| and |vendor_features_| have values, call
+  // |get_features_callback_| to report the stored features.
+  void ReportVendorFeaturesIfAvailable();
+
   // Cleanup and call |error_cb_| with |status|
   void OnError(zx_status_t status);
 
@@ -113,6 +122,12 @@ class FidlController final : public pw::bluetooth::Controller {
 
   VendorEventHandler vendor_event_handler_;
   HciEventHandler hci_event_handler_;
+
+  // |get_features_callback_| stores the callback that current object receives from GetFeatures
+  // call. |vendor_features_| stores the features that are reported from the vendor driver through
+  // fuchsia_hardware_bluetooth::Vendor::OnVendorConnected event.
+  std::optional<pw::Callback<void(FidlController::FeaturesBits)>> get_features_callback_;
+  std::optional<fuchsia_hardware_bluetooth::VendorFeatures> vendor_features_;
 
   async_dispatcher_t* dispatcher_;
 

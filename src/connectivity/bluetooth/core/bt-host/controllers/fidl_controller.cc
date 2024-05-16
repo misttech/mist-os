@@ -18,35 +18,36 @@ namespace fhbt = fuchsia_hardware_bluetooth;
 
 namespace {
 pw::bluetooth::Controller::FeaturesBits VendorFeaturesToFeaturesBits(
-    fhbt::BtVendorFeatures features) {
+    fhbt::VendorFeatures features) {
   pw::bluetooth::Controller::FeaturesBits out{0};
-  if (features & fhbt::BtVendorFeatures::kSetAclPriorityCommand) {
+  if (features.acl_priority_command().has_value() && features.acl_priority_command()) {
     out |= pw::bluetooth::Controller::FeaturesBits::kSetAclPriorityCommand;
   }
-  if (features & fhbt::BtVendorFeatures::kAndroidVendorExtensions) {
+  if (features.android_vendor_extensions().has_value()) {
+    // Ignore the content of android_vendor_extension field now.
     out |= pw::bluetooth::Controller::FeaturesBits::kAndroidVendorExtensions;
   }
   return out;
 }
 
-fhbt::BtVendorAclPriority AclPriorityToFidl(pw::bluetooth::AclPriority priority) {
+fhbt::VendorAclPriority AclPriorityToFidl(pw::bluetooth::AclPriority priority) {
   switch (priority) {
     case pw::bluetooth::AclPriority::kNormal:
-      return fhbt::BtVendorAclPriority::kNormal;
+      return fhbt::VendorAclPriority::kNormal;
     case pw::bluetooth::AclPriority::kSource:
     case pw::bluetooth::AclPriority::kSink:
-      return fhbt::BtVendorAclPriority::kHigh;
+      return fhbt::VendorAclPriority::kHigh;
   }
 }
 
-fhbt::BtVendorAclDirection AclPriorityToFidlAclDirection(pw::bluetooth::AclPriority priority) {
+fhbt::VendorAclDirection AclPriorityToFidlAclDirection(pw::bluetooth::AclPriority priority) {
   switch (priority) {
     // The direction for kNormal is arbitrary.
     case pw::bluetooth::AclPriority::kNormal:
     case pw::bluetooth::AclPriority::kSource:
-      return fhbt::BtVendorAclDirection::kSource;
+      return fhbt::VendorAclDirection::kSource;
     case pw::bluetooth::AclPriority::kSink:
-      return fhbt::BtVendorAclDirection::kSink;
+      return fhbt::VendorAclDirection::kSink;
   }
 }
 
@@ -86,8 +87,11 @@ fhbt::ScoSampleRate ScoSampleRateToFidl(pw::bluetooth::Controller::ScoSampleRate
 
 }  // namespace
 
-VendorEventHandler::VendorEventHandler(std::function<void(zx_status_t)> callback)
-    : callback_(callback) {}
+VendorEventHandler::VendorEventHandler(
+    std::function<void(zx_status_t)> unbind_callback,
+    std::function<void(fuchsia_hardware_bluetooth::VendorFeatures)> on_vendor_connected_callback)
+    : unbind_callback_(unbind_callback),
+      on_vendor_connected_callback_(on_vendor_connected_callback) {}
 
 void VendorEventHandler::handle_unknown_event(
     fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Vendor> metadata) {
@@ -96,10 +100,16 @@ void VendorEventHandler::handle_unknown_event(
 
 void VendorEventHandler::on_fidl_error(fidl::UnbindInfo error) {
   bt_log(ERROR, "controllers", "Vendor protocol closed: %s", error.FormatDescription().c_str());
-  callback_(ZX_ERR_PEER_CLOSED);
+  unbind_callback_(ZX_ERR_PEER_CLOSED);
 }
 
-HciEventHandler::HciEventHandler(std::function<void(zx_status_t)> callback) : callback_(callback) {}
+void VendorEventHandler::OnFeatures(
+    fidl::Event<fuchsia_hardware_bluetooth::Vendor::OnFeatures>& event) {
+  on_vendor_connected_callback_(event);
+}
+
+HciEventHandler::HciEventHandler(std::function<void(zx_status_t)> unbind_callback)
+    : unbind_callback_(unbind_callback) {}
 
 void HciEventHandler::handle_unknown_event(
     fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Hci> metadata) {
@@ -108,13 +118,17 @@ void HciEventHandler::handle_unknown_event(
 
 void HciEventHandler::on_fidl_error(fidl::UnbindInfo error) {
   bt_log(ERROR, "controllers", "Hci protocol closed: %s", error.FormatDescription().c_str());
-  callback_(ZX_ERR_PEER_CLOSED);
+  unbind_callback_(ZX_ERR_PEER_CLOSED);
 }
 
 FidlController::FidlController(
     fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end,
     async_dispatcher_t* dispatcher)
-    : vendor_event_handler_([this](zx_status_t status) { OnError(status); }),
+    : vendor_event_handler_([this](zx_status_t status) { OnError(status); },
+                            [this](fuchsia_hardware_bluetooth::VendorFeatures features) {
+                              vendor_features_ = features;
+                              ReportVendorFeaturesIfAvailable();
+                            }),
       hci_event_handler_([this](zx_status_t status) { OnError(status); }),
       dispatcher_(dispatcher) {
   BT_ASSERT(vendor_client_end.is_valid());
@@ -327,21 +341,8 @@ void FidlController::ResetSco(pw::Callback<void(pw::Status)> callback) {
 }
 
 void FidlController::GetFeatures(pw::Callback<void(FidlController::FeaturesBits)> callback) {
-  if (!vendor_) {
-    callback(pw::bluetooth::Controller::FeaturesBits{0});
-    return;
-  }
-
-  vendor_->GetFeatures().ThenExactlyOnce(
-      [cb = std::move(callback),
-       this](fidl::Result<fuchsia_hardware_bluetooth::Vendor::GetFeatures>& result) mutable {
-        FidlController::FeaturesBits features_bits =
-            VendorFeaturesToFeaturesBits(result->features());
-        if (iso_channel_.is_valid()) {
-          features_bits |= FeaturesBits::kHciIso;
-        }
-        cb(features_bits);
-      });
+  get_features_callback_ = std::move(callback);
+  ReportVendorFeaturesIfAvailable();
 }
 
 void FidlController::EncodeVendorCommand(
@@ -357,17 +358,17 @@ void FidlController::EncodeVendorCommand(
   pw::bluetooth::SetAclPriorityCommandParameters params =
       std::get<pw::bluetooth::SetAclPriorityCommandParameters>(parameters);
 
-  fhbt::BtVendorSetAclPriorityParams priority_params;
-  priority_params.connection_handle() = params.connection_handle;
-  priority_params.priority() = AclPriorityToFidl(params.priority);
-  priority_params.direction() = AclPriorityToFidlAclDirection(params.priority);
+  fhbt::VendorSetAclPriorityParams priority_params;
+  priority_params.connection_handle(params.connection_handle);
+  priority_params.priority(AclPriorityToFidl(params.priority));
+  priority_params.direction(AclPriorityToFidlAclDirection(params.priority));
 
-  auto command = fhbt::BtVendorCommand::WithSetAclPriority(priority_params);
+  auto command = fhbt::VendorCommand::WithSetAclPriority(priority_params);
 
-  vendor_->EncodeCommand(std::move(command))
+  vendor_->NewEncodeCommand(std::move(command))
       .ThenExactlyOnce(
           [cb = std::move(callback)](
-              fidl::Result<fuchsia_hardware_bluetooth::Vendor::EncodeCommand>& result) mutable {
+              fidl::Result<fuchsia_hardware_bluetooth::Vendor::NewEncodeCommand>& result) mutable {
             if (!result.is_ok()) {
               bt_log(ERROR, "controllers", "Failed to encode vendor command: %s",
                      result.error_value().FormatDescription().c_str());
@@ -381,6 +382,22 @@ void FidlController::EncodeVendorCommand(
             auto span = pw::as_bytes(pw::span(result->encoded()));
             cb(span);
           });
+}
+
+void FidlController::ReportVendorFeaturesIfAvailable() {
+  if (!get_features_callback_ || !vendor_features_) {
+    return;
+  }
+
+  FidlController::FeaturesBits features_bits = VendorFeaturesToFeaturesBits(*vendor_features_);
+  if (iso_channel_.is_valid()) {
+    features_bits |= FeaturesBits::kHciIso;
+  }
+
+  (*get_features_callback_)(features_bits);
+  get_features_callback_.reset();
+  // Don't reset |vendor_features_| so that the controller reports the same features until it's
+  // updated from the driver.
 }
 
 void FidlController::OnError(zx_status_t status) {

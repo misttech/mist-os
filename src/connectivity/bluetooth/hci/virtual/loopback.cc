@@ -67,6 +67,17 @@ void LoopbackDevice::Shutdown() {
 void LoopbackDevice::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
   vendor_binding_group_.AddBinding(dispatcher_, std::move(request), this,
                                    fidl::kIgnoreBindingClosure);
+
+  vendor_binding_group_.ForEachBinding(
+      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
+        fidl::Arena arena;
+        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
+        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
+
+        if (status.status() != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
+        }
+      });
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -430,12 +441,8 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
   }
 }
 
-void LoopbackDevice::GetFeatures(GetFeaturesCompleter::Sync& completer) {
-  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures{});
-}
-
-void LoopbackDevice::EncodeCommand(EncodeCommandRequestView request,
-                                   EncodeCommandCompleter::Sync& completer) {
+void LoopbackDevice::NewEncodeCommand(NewEncodeCommandRequestView request,
+                                      NewEncodeCommandCompleter::Sync& completer) {
   // This interface is not implemented.
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }

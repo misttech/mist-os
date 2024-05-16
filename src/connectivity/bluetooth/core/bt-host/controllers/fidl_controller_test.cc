@@ -49,13 +49,14 @@ class FidlControllerTest : public bt::testing::TestLoopFixture {
 
   std::optional<pw::Status> controller_error() const { return controller_error_; }
 
-  fhbt::BtVendorFeatures FeaturesBitsToVendorFeatures(FidlController::FeaturesBits bits) {
-    fhbt::BtVendorFeatures out{0};
+  fhbt::VendorFeatures FeaturesBitsToVendorFeatures(FidlController::FeaturesBits bits) {
+    fhbt::VendorFeatures out = {};
     if (bits & FidlController::FeaturesBits::kSetAclPriorityCommand) {
-      out |= fhbt::BtVendorFeatures::kSetAclPriorityCommand;
+      out.acl_priority_command(true);
     }
     if (bits & FidlController::FeaturesBits::kAndroidVendorExtensions) {
-      out |= fhbt::BtVendorFeatures::kAndroidVendorExtensions;
+      fhbt::AndroidVendorSupport android_vendor_support = {};
+      out.android_vendor_extensions(android_vendor_support);
     }
     return out;
   }
@@ -388,12 +389,12 @@ TEST_F(FidlControllerTest, VendorGetFeatures) {
   RunLoopUntilIdle();
   ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
 
-  std::optional<fhbt::BtVendorFeatures> features;
+  std::optional<fhbt::VendorFeatures> features;
   controller()->GetFeatures(
       [&](FidlController::FeaturesBits bits) { features = FeaturesBitsToVendorFeatures(bits); });
   RunLoopUntilIdle();
   ASSERT_TRUE(features.has_value());
-  EXPECT_EQ(features.value(), fhbt::BtVendorFeatures::kSetAclPriorityCommand);
+  EXPECT_EQ(features.value().acl_priority_command(), true);
 
   std::optional<pw::Status> close_status;
   controller()->Close([&](pw::Status status) { close_status = status; });

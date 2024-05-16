@@ -43,6 +43,7 @@ static constexpr uint16_t legacy_firmware_loading_ids[] = {
 Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure,
                bool legacy_firmware_loading)
     : DeviceType(device),
+      devfs_connector_(fit::bind_member<&Device::Connect>(this)),
       hci_(hci),
       secure_(secure),
       firmware_loaded_(false),
@@ -246,11 +247,8 @@ void Device::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Device::GetFeatures(GetFeaturesCompleter::Sync& completer) {
-  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
-}
-void Device::EncodeCommand(EncodeCommandRequestView request,
-                           EncodeCommandCompleter::Sync& completer) {
+void Device::NewEncodeCommand(NewEncodeCommandRequestView request,
+                              NewEncodeCommandCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 void Device::OpenHci(OpenHciCompleter::Sync& completer) {
@@ -270,6 +268,24 @@ void Device::handle_unknown_method(
     fidl::UnknownMethodCompleter::Sync& completer) {
   zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+// driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor>
+void Device::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+  vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   std::move(request), this, fidl::kIgnoreBindingClosure);
+
+  vendor_binding_group_.ForEachBinding(
+      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
+        fidl::Arena arena;
+        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
+        builder.acl_priority_command(false);
+        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
+
+        if (status.status() != ZX_OK) {
+          zxlogf(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
+        }
+      });
 }
 
 zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {

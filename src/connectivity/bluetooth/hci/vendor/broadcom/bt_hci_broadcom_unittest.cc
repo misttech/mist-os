@@ -266,6 +266,21 @@ class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
   }
 
   void OpenVendor() {
+    class EventHandler : public fidl::WireSyncEventHandler<fuchsia_hardware_bluetooth::Vendor> {
+     public:
+      void OnFeatures(
+          fidl::WireEvent<fuchsia_hardware_bluetooth::Vendor::OnFeatures>* event) override {
+        EXPECT_TRUE(event->acl_priority_command());
+        on_vendor_connect_handled_ = true;
+      }
+
+      void handle_unknown_event(
+          fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Vendor> metadata) override {}
+
+      bool on_vendor_connect_handled_ = false;
+    };
+
+    EventHandler event_handler;
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
     zx::result connect_result =
         ConnectThroughDevfs<fuchsia_hardware_bluetooth::Vendor>("bt-hci-broadcom");
@@ -273,6 +288,8 @@ class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
 
     // Bind the channel to a Vendor client end.
     vendor_client_.Bind(std::move(connect_result.value()));
+    EXPECT_TRUE(vendor_client_.HandleOneEvent(event_handler).ok());
+    EXPECT_TRUE(event_handler.on_vendor_connect_handled_);
   }
 
   void OpenVendorWithHciClient() {
@@ -409,27 +426,31 @@ TEST_F(BtHciBroadcomTest, HciProtocolUnknownMethod) {
       open_hci_result->value()->channel.TakeChannel());
   fidl::WireSyncClient vendor_client(std::move(vendor_client_end));
 
-  auto result = vendor_client->GetFeatures();
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams::Builder(arena);
+  builder.connection_handle(0);
+  builder.priority(fuchsia_hardware_bluetooth::wire::VendorAclPriority::kNormal);
+  builder.direction(fuchsia_hardware_bluetooth::wire::VendorAclDirection::kSource);
+
+  auto command =
+      fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
+  auto result = vendor_client->NewEncodeCommand(command);
 
   ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST_F(BtHciBroadcomInitializedTest, GetFeatures) {
-  auto result = vendor_client_->GetFeatures();
-  ASSERT_TRUE(result.ok());
-
-  EXPECT_EQ(result->features, fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
-}
-
 TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHighSink) {
   std::array<uint8_t, kBcmSetAclPriorityCmdSize> result_buffer;
-  auto command = fuchsia_hardware_bluetooth::wire::BtVendorCommand::WithSetAclPriority({
-      .connection_handle = 0xFF00,
-      .priority = fuchsia_hardware_bluetooth::wire::BtVendorAclPriority::kHigh,
-      .direction = fuchsia_hardware_bluetooth::wire::BtVendorAclDirection::kSink,
-  });
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams::Builder(arena);
+  builder.connection_handle(0xFF00);
+  builder.priority(fuchsia_hardware_bluetooth::wire::VendorAclPriority::kHigh);
+  builder.direction(fuchsia_hardware_bluetooth::wire::VendorAclDirection::kSink);
 
-  auto result = vendor_client_->EncodeCommand(command);
+  auto command =
+      fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
+
+  auto result = vendor_client_->NewEncodeCommand(command);
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
 
@@ -449,12 +470,15 @@ TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHi
 
 TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersNormalSource) {
   std::array<uint8_t, kBcmSetAclPriorityCmdSize> result_buffer;
-  auto command = fuchsia_hardware_bluetooth::wire::BtVendorCommand::WithSetAclPriority({
-      .connection_handle = 0xFF00,
-      .priority = fuchsia_hardware_bluetooth::wire::BtVendorAclPriority::kNormal,
-      .direction = fuchsia_hardware_bluetooth::wire::BtVendorAclDirection::kSource,
-  });
-  auto result = vendor_client_->EncodeCommand(command);
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams::Builder(arena);
+  builder.connection_handle(0xFF00);
+  builder.priority(fuchsia_hardware_bluetooth::wire::VendorAclPriority::kNormal);
+  builder.direction(fuchsia_hardware_bluetooth::wire::VendorAclDirection::kSource);
+
+  auto command =
+      fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
+  auto result = vendor_client_->NewEncodeCommand(command);
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
 
