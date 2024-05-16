@@ -45,7 +45,7 @@ type SessionEndpoints = resource table {
     6: mouse_source server_end:fuchsia.ui.pointer.MouseSource;
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol Scenic {
     /// Create a new Session, which is the primary way to interact with Scenic.
     strict CreateSession(resource struct {
