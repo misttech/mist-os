@@ -393,10 +393,7 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
         }
 
         consume_outcome(
-            self.ctx
-                .bindings_ctx()
-                .apply_main_table_route_change::<I>(routes::Change::RemoveSet(self.weak_set_id()))
-                .await,
+            self.apply_route_change(routes::Change::RemoveSet(self.weak_set_id())).await,
         );
 
         let UserRouteSet { ctx: _, set, authorization_set: _, route_work_sink: _ } = &mut self;
@@ -509,12 +506,16 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
         &self,
         op: routes::RouteOp<I::Addr>,
     ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
+        self.apply_route_change(routes::Change::RouteOp(op, self.set())).await
+    }
+
+    async fn apply_route_change(
+        &self,
+        change: routes::Change<I::Addr>,
+    ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
         let sender = self.route_work_sink();
         let (responder, receiver) = oneshot::channel();
-        let work_item = RouteWorkItem {
-            change: routes::Change::RouteOp(op, self.set()),
-            responder: Some(responder),
-        };
+        let work_item = RouteWorkItem { change, responder: Some(responder) };
         match sender.unbounded_send(work_item) {
             Ok(()) => receiver.await.expect("responder should not be dropped"),
             Err(e) => {
