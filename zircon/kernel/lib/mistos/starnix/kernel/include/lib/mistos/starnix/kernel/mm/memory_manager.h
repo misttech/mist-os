@@ -21,7 +21,6 @@
 #include <utility>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/canary.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
@@ -64,7 +63,7 @@ pub enum DumpPolicy {
 
 struct MemoryManagerForkableState {
   /// State for the brk and sbrk syscalls.
-  std::optional<ProgramBreak> brk;
+  ktl::optional<ProgramBreak> brk;
 
   /// The namespace node that represents the executable associated with this task.
   // executable_node: Option<NamespaceNode>,
@@ -90,7 +89,7 @@ enum class DesiredAddressType { Any, Hint, Fixed, FixedOverwrite };
 // The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
 struct DesiredAddress {
   DesiredAddressType type;
-  UserAddress address = 0;
+  UserAddress address;
 };
 
 // Define MappingName enum
@@ -103,6 +102,7 @@ struct MappingName {
 };
 
 struct PrivateAnonymous {};
+
 struct MappingBackingVmo {
   // The base address of this mapping.
   //
@@ -141,7 +141,7 @@ struct MappingBacking {
   std::variant<MappingBackingVmo, PrivateAnonymous> variant;
 
   // Constructor for MappingBackingVmo
-  MappingBacking(MappingBackingVmo vmo) : variant(std::move(vmo)) {}
+  MappingBacking(MappingBackingVmo vmo) : variant(ktl::move(vmo)) {}
 
   // Constructor for PrivateAnonymous
   MappingBacking() : variant(PrivateAnonymous{}) {}
@@ -319,30 +319,56 @@ class CurrentTask;
 
 class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccessorExt {
  public:
+  // The root VMAR for the child process.
+  //
+  // Instead of mapping memory directly in this VMAR, we map the memory in
+  // `state.user_vmar`.
+  const zx::vmar root_vmar;
+
+  // The base address of the root_vmar.
+  UserAddress base_addr;
+
+ public:
   static zx_status_t New(zx::vmar root_vmar, fbl::RefPtr<MemoryManager>* out);
 
-  bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
-    return root_vmar_ == other->root_vmar_;
-  }
+  // pub fn new_empty() -> Self;
+
+  // fn from_vmar(root_vmar: zx::Vmar, user_vmar: zx::Vmar, user_vmar_info: zx::VmarInfo)
+
+  fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
+
+  // pub fn snapshot_to<L>
+
+  // fn snapshot_vmo
 
   fit::result<zx_status_t> exec(/*NamespaceNode exe_node*/);
 
+  // private:
   static Errno get_errno_for_map_err(zx_status_t status);
-  size_t get_mapping_count();
 
-  fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
-  fit::result<Errno> unmap(UserAddress, size_t length);
+ public:
+  fit::result<Errno, UserAddress> map_vmo(DesiredAddress addr, zx::ArcVmo vmo, uint64_t vmo_offset,
+                                          size_t length, ProtectionFlags prot_flags,
+                                          MappingOptionsFlags options, MappingName name);
 
   fit::result<Errno, UserAddress> map_anonymous(DesiredAddress addr, size_t length,
                                                 ProtectionFlags prot_flags,
                                                 MappingOptionsFlags options, MappingName name);
 
-  Lock<Mutex>* mm_state_rw_lock() const TA_RET_CAP(mm_state_rw_lock_) { return &mm_state_rw_lock_; }
+  // pub fn remap
+
+  fit::result<Errno> unmap(UserAddress, size_t length);
 
   fit::result<Errno> protect(UserAddress addr, size_t length, ProtectionFlags prot_flags);
 
-  MemoryManagerState& state() TA_REQ(mm_state_rw_lock_) { return state_; }
-  const MemoryManagerState& state() const TA_REQ_SHARED(mm_state_rw_lock_) { return state_; }
+  bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
+    return root_vmar == other->root_vmar;
+  }
+
+  // #[cfg(test)]
+  size_t get_mapping_count();
+
+  UserAddress get_random_base(size_t length);
 
   // impl MemoryAccessor for MemoryManager
   fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
@@ -364,22 +390,18 @@ class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccess
   fit::result<Errno, size_t> vmo_write_memory(UserAddress addr,
                                               const ktl::span<const uint8_t>& bytes) const;
 
+ public:
+  Lock<Mutex>* mm_state_rw_lock() const TA_RET_CAP(mm_state_rw_lock_) { return &mm_state_rw_lock_; }
+
+  MemoryManagerState& state() TA_REQ(mm_state_rw_lock_) { return state_; }
+  const MemoryManagerState& state() const TA_REQ_SHARED(mm_state_rw_lock_) { return state_; }
+
  private:
   ZXTEST_FRIEND_TEST(MemoryManager, test_get_contiguous_mappings_at);
   ZXTEST_FRIEND_TEST(MemoryManager, test_read_write_crossing_mappings);
   ZXTEST_FRIEND_TEST(MemoryManager, test_read_write_errors);
 
   MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t user_vmar_info);
-
-  fbl::Canary<fbl::magic("MMGR")> canary_;
-  // The root VMAR for the child process.
-  //
-  // Instead of mapping memory directly in this VMAR, we map the memory in
-  // `state.user_vmar`.
-  const zx::vmar root_vmar_;
-
-  // The base address of the root_vmar.
-  UserAddress base_addr_;
 
   /// The futexes in this address space.
   // pub futex: FutexTable<PrivateFutexKey>,
@@ -437,7 +459,7 @@ fit::result<E, fbl::Vector<T>> read_to_vec(
 
 /// Creates a VMO that can be used in an anonymous mapping for the `mmap`
 /// syscall.
-fit::result<Errno, zx::ArcVmo> create_anonymous_mapping_vmo(size_t size);
+fit::result<Errno, zx::ArcVmo> create_anonymous_mapping_vmo(uint64_t size);
 
 }  // namespace starnix
 

@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -32,19 +33,9 @@ TEST(MemoryManager, test_brk) {
 
   auto get_range = [&mm](const UserAddress& addr) -> util::Range<UserAddress> {
     Guard<Mutex> lock(mm->mm_state_rw_lock());
-#if 0
-    const fbl::RefPtr<VmAddressRegionOrMapping> region_or_mapping =
-        mm->state().user_vmar().get()->FindRegion(addr);
-    if (region_or_mapping && region_or_mapping->is_mapping()) {
-      Guard<CriticalMutex> mlock(region_or_mapping->lock());
-      auto base = region_or_mapping->base_locked();
-      return util::Range<UserAddress>({base, base + region_or_mapping->size_locked()});
-    }
-#else
     if (auto opt = mm->state().mappings().get(addr); opt) {
       return opt->first;
     }
-#endif
     EXPECT_TRUE(true, "failed to find mapping");
     return util::Range<UserAddress>({0, 0});
   };
@@ -135,17 +126,15 @@ TEST(MemoryManager, test_mm_exec) {
 }
 
 TEST(MemoryManager, test_get_contiguous_mappings_at) {
-  auto result = starnix::testing::create_kernel_and_task();
-  auto [kernel, current_task] = result;
-
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
   auto mm = current_task->mm();
 
   // Create four one-page mappings with a hole between the third one and the fourth one.
   size_t page_size = PAGE_SIZE;
-  size_t addr_a = mm->base_addr_.ptr() + 10 * page_size;
-  size_t addr_b = mm->base_addr_.ptr() + 11 * page_size;
-  size_t addr_c = mm->base_addr_.ptr() + 12 * page_size;
-  size_t addr_d = mm->base_addr_.ptr() + 14 * page_size;
+  size_t addr_a = mm->base_addr.ptr() + 10 * page_size;
+  size_t addr_b = mm->base_addr.ptr() + 11 * page_size;
+  size_t addr_c = mm->base_addr.ptr() + 12 * page_size;
+  size_t addr_d = mm->base_addr.ptr() + 14 * page_size;
 
   ASSERT_EQ(map_memory(*current_task, addr_a, PAGE_SIZE).ptr(), addr_a);
   ASSERT_EQ(map_memory(*current_task, addr_b, PAGE_SIZE).ptr(), addr_b);
@@ -161,18 +150,18 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     // Verify that requesting zero bytes returns an empty iterator.
     ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a, 0)->is_empty());
 
-// Verify errors.
-#if 0
-    ASSERT_EQ(mm->state().get_contiguous_mappings_at(UserAddress(100), SIZE_MAX).error_value(),
-              errno(EFAULT));
+    // Verify errors
+    ASSERT_EQ(errno(EFAULT),
+              mm->state().get_contiguous_mappings_at(UserAddress(100), SIZE_MAX).error_value());
 
     ASSERT_EQ(
-        mm->state().get_contiguous_mappings_at(mm->state().max_address() + 1, 0).error_value(),
-        errno(EFAULT));
-#endif
+        errno(EFAULT),
+        mm->state().get_contiguous_mappings_at(mm->state().max_address() + 1ul, 0).error_value());
   }
+
 #if STARNIX_ANON_ALLOCS
-  {}
+  {
+  }
 #else
   {
     ASSERT_EQ(mm->get_mapping_count(), 4);
@@ -188,10 +177,10 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
       return std::make_tuple((*it).second, (*++it).second, (*++it).second, (*++it).second);
     }();
 
-    // Verify result when requesting a whole mapping or portions of it.
-
     fbl::AllocChecker ac;
     fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>> expected;
+
+    // Verify result when requesting a whole mapping or portions of it.
     expected.push_back({map_a, page_size}, &ac);
     ASSERT(ac.check());
 
@@ -214,13 +203,13 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
         expected[0],
         mm->state().get_contiguous_mappings_at(addr_a + page_size / 4, page_size / 8).value()[0]);
 
+    // Verify result when requesting a range spanning more than one mapping.
     expected.reset();
     expected.push_back({map_a, page_size / 2}, &ac);
     ASSERT(ac.check());
     expected.push_back({map_b, page_size / 2}, &ac);
     ASSERT(ac.check());
 
-    // Verify result when requesting a range spanning more than one mapping.
     ASSERT_EQ(expected[0],
               mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[0]);
     ASSERT_EQ(expected[1],
@@ -286,7 +275,6 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
                   .value()[1]);
 
     // Verify that results stop if there is a hole.
-
     expected.reset();
     expected.push_back({map_a, page_size / 2}, &ac);
     ASSERT(ac.check());
@@ -306,7 +294,6 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
         mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[2]);
 
     // Verify that results stop at the last mapped page.
-
     expected.reset();
     expected.push_back({map_d, page_size}, &ac);
     ASSERT(ac.check());
@@ -324,7 +311,7 @@ TEST(MemoryManager, test_read_write_crossing_mappings) {
 
   // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
   size_t page_size = PAGE_SIZE;
-  auto addr = mm->base_addr_ + 10 * page_size;
+  auto addr = mm->base_addr + 10 * page_size;
   ASSERT_EQ(addr, map_memory(*current_task, addr, page_size));
   ASSERT_EQ(addr + page_size, map_memory(*current_task, addr + page_size, page_size));
 #if STARNIX_ANON_ALLOCS

@@ -18,6 +18,7 @@
 #include <lib/mistos/util/range-map.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
+#include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -28,15 +29,15 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <ktl/algorithm.h>
+#include <object/thread_dispatcher.h>
 
 #include "../kernel_priv.h"
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 constexpr size_t PRIVATE_ASPACE_BASE = USER_ASPACE_BASE;
-// TODO (Herrera) Check if we ever need to user restricted user space / shared process
-// constexpr size_t PRIVATE_ASPACE_SIZE = USER_RESTRICTED_ASPACE_SIZE;
 constexpr size_t PRIVATE_ASPACE_SIZE = USER_ASPACE_SIZE;
 
 namespace {
@@ -57,7 +58,7 @@ fit::result<zx_status_t, zx::vmar> create_user_vmar(const zx::vmar& vmar,
     return fit::error(status);
   }
   ASSERT(child_addr == vmar_info.base);
-  return fit::ok(std::move(child));
+  return fit::ok(ktl::move(child));
 }
 
 fit::result<Errno, UserAddress> map_in_vmar(const zx::vmar& vmar, const zx_info_vmar_t& vmar_info,
@@ -68,19 +69,20 @@ fit::result<Errno, UserAddress> map_in_vmar(const zx::vmar& vmar, const zx_info_
   auto base_addr = UserAddress::from_ptr(vmar_info.base);
   auto mflags = MappingFlagsImpl(flags);
 
-  auto match_addr = [mflags, base_addr](starnix::DesiredAddress addr) -> std::pair<uint64_t, int> {
+  auto match_addr =
+      [mflags, base_addr](starnix::DesiredAddress addr) -> ktl::pair<uint64_t, zx_vm_option_t> {
     switch (addr.type) {
       case starnix::DesiredAddressType::Any: {
         if (mflags.contains(MappingFlagsEnum::LOWER_32BIT)) {
-          return std::make_pair(0x80000000 - base_addr.ptr(), ZX_VM_OFFSET_IS_UPPER_LIMIT);
+          return ktl::pair(0x80000000 - base_addr.ptr(), ZX_VM_OFFSET_IS_UPPER_LIMIT);
         }
-        return std::make_pair(0, 0);
+        return ktl::pair(0, 0);
       }
       case starnix::DesiredAddressType::Hint:
       case starnix::DesiredAddressType::Fixed:
-        return std::make_pair(addr.address - base_addr, ZX_VM_SPECIFIC);
+        return ktl::pair(addr.address - base_addr, ZX_VM_SPECIFIC);
       case starnix::DesiredAddressType::FixedOverwrite:
-        return std::make_pair(addr.address - base_addr, ZX_VM_SPECIFIC_OVERWRITE);
+        return ktl::pair(addr.address - base_addr, ZX_VM_SPECIFIC_OVERWRITE);
     };
   };
   auto [vmar_offset, vmar_extra_flags] = match_addr(addr);
@@ -100,20 +102,20 @@ fit::result<Errno, UserAddress> map_in_vmar(const zx::vmar& vmar, const zx_info_
     // "The mmap() call doesn't fail if the mapping cannot be populated."
   }
 
-  int vmar_maybe_map_range =
-      populate && !((ZX_VM_SPECIFIC_OVERWRITE & vmar_extra_flags) == ZX_VM_SPECIFIC_OVERWRITE)
-          ? ZX_VM_MAP_RANGE
-          : 0;
+  bool contains_specific_overwrite =
+      (ZX_VM_SPECIFIC_OVERWRITE & vmar_extra_flags) == ZX_VM_SPECIFIC_OVERWRITE;
+
+  int vmar_maybe_map_range = (populate && !contains_specific_overwrite) ? ZX_VM_MAP_RANGE : 0;
 
   auto vmar_flags = mflags.prot_flags().to_vmar_flags() | ZX_VM_ALLOW_FAULTS | vmar_extra_flags |
                     vmar_maybe_map_range;
 
-  LTRACEF("vmar map: flag 0x%x, vmar_offset %lu, vmo_offset %lu, length %lu\n", vmar_flags,
-          vmar_offset, vmo_offset, length);
+  LTRACEF("flags 0x%x vmar_offset %lu vmo_offset %lu length %lu\n", vmar_flags, vmar_offset,
+          vmo_offset, length);
   zx_vaddr_t map_result;
   zx_status_t result = vmar.map(vmar_flags, vmar_offset, vmo, vmo_offset, length, &map_result);
   if (result != ZX_OK) {
-    // Retry mapping if the target address was a Hint.
+    LTRACEF("Retry mapping if the target address was a Hint\n");
     if (addr.type == starnix::DesiredAddressType::Hint) {
       // let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
       result = vmar.map(vmar_flags, 0, vmo, vmo_offset, length, &map_result);
@@ -199,7 +201,6 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_vmo(
   }
   DEBUG_ASSERT(mapping);
   mapping->name() = name;
-
   mappings_.insert({mapped_addr.value(), end}, mapping);
 
   if (flags.contains(MappingFlagsEnum::GROWSDOWN)) {
@@ -280,7 +281,7 @@ MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) 
         continue;
       } else {
         // This mapping can be returned.
-        auto mapping_length = std::min(length, range.end - addr) - offset;
+        auto mapping_length = ktl::min(length, range.end - addr) - offset;
         offset += mapping_length;
         prev_range_end = range.end;
         fbl::AllocChecker ac;
@@ -291,6 +292,7 @@ MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) 
       }
     }
   }
+  LTRACEF_LEVEL(2, "found %zu mappings\n", result.size());
   return fit::ok(ktl::move(result));
 }
 
@@ -402,9 +404,7 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(
   ktl::copy(vec.begin(), vec.end(), util::back_inserter(released_mappings));
 
   if (truncated_tail) {
-    util::Range<UserAddress> range;
-    fbl::RefPtr<Mapping> mapping;
-    std::tie(range, mapping) = truncated_tail.value();
+    auto [range, mapping] = truncated_tail.value();
 
     auto& backing = std::get<MappingBackingVmo>(mapping->backing().variant);
     // Create and map a child COW VMO mapping that represents the truncated tail.
@@ -554,6 +554,7 @@ fit::result<Errno> MappingBackingVmo::write_memory(UserAddress addr,
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
   if (zx_status_t status = vmo->as_ref().write(bytes.data(), address_to_offset(addr), bytes.size());
       status != ZX_OK) {
+    LTRACEF("error to write in vmo %d\n", status);
     return fit::error(errno(EFAULT));
   }
   return fit::ok();
@@ -565,7 +566,7 @@ uint64_t MappingBackingVmo::address_to_offset(UserAddress addr) {
 
 zx_status_t Mapping::New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
                          MappingFlagsImpl flags, fbl::RefPtr<Mapping>* out) {
-  LTRACEF("base 0x%lx, vmo %p, vmo_offset %lu, flags0x%x\n", base.ptr(), vmo.get(), vmo_offset,
+  LTRACEF("base 0x%lx vmo %p vmo_offset %lu flags 0x%x\n", base.ptr(), vmo.get(), vmo_offset,
           flags.bits());
   fbl::AllocChecker ac;
   fbl::RefPtr<Mapping> mapping = fbl::AdoptRef(
@@ -573,7 +574,7 @@ zx_status_t Mapping::New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  *out = std::move(mapping);
+  *out = ktl::move(mapping);
   return ZX_OK;
 }
 
@@ -602,6 +603,26 @@ Errno MemoryManager::get_errno_for_map_err(zx_status_t status) {
     default:
       PANIC("encountered impossible error: %d", status);
   }
+}
+
+fit::result<Errno, UserAddress> MemoryManager::map_vmo(DesiredAddress addr, zx::ArcVmo vmo,
+                                                       uint64_t vmo_offset, size_t length,
+                                                       ProtectionFlags prot_flags,
+                                                       MappingOptionsFlags options,
+                                                       MappingName name) {
+  auto flags = MappingFlagsImpl::from_prot_flags_and_options(prot_flags, options);
+  //  Unmapped mappings must be released after the state is unlocked.
+  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  Guard<Mutex> lock(mm_state_rw_lock());
+  auto result = state_.map_vmo(addr, vmo, vmo_offset, length, flags,
+                               options.contains(MappingOptions::POPULATE), name, released_mappings);
+
+  // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+  // in `DirEntry`'s `drop`.
+  lock.Release();
+  released_mappings.reset();
+
+  return result;
 }
 
 zx_status_t MemoryManager::New(zx::vmar root_vmar, fbl::RefPtr<MemoryManager>* out) {
@@ -639,8 +660,7 @@ zx_status_t MemoryManager::New(zx::vmar root_vmar, fbl::RefPtr<MemoryManager>* o
 }
 
 MemoryManager::MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t user_vmar_info)
-    : root_vmar_(std::move(root)),
-      base_addr_(/*UserAddress::from_ptr(user_vmar_info.base)*/ user_vmar_info.base) {
+    : root_vmar(ktl::move(root)), base_addr(UserAddress::from_ptr(user_vmar_info.base)) {
   LTRACE;
   state_.Initialize(std::move(user_vmar), user_vmar_info,
                     MemoryManagerForkableState{{}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
@@ -732,7 +752,7 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
                        [&](MappingBackingVmo& m) TA_REQ(mm_state_rw_lock_) {
                          return state_.user_vmar().map(
                              ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC,
-                             old_end - base_addr_, m.vmo->as_ref(), vmo_offset, delta, nullptr);
+                             old_end - base_addr, m.vmo->as_ref(), vmo_offset, delta, nullptr);
                        },
                    },
                    mapping->backing().variant);
@@ -756,7 +776,7 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
   {
     Guard<Mutex> lock(&mm_state_rw_lock_);
     zx_info_vmar_t info;
-    zx_status_t status = root_vmar_.get_info(ZX_INFO_VMAR, &info, sizeof(info), nullptr, nullptr);
+    zx_status_t status = root_vmar.get_info(ZX_INFO_VMAR, &info, sizeof(info), nullptr, nullptr);
     if (status != ZX_OK) {
       return fit::error(status);
     }
@@ -767,7 +787,7 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
       return fit::error(status);
     }
 
-    auto user_vmar = create_user_vmar(root_vmar_, info);
+    auto user_vmar = create_user_vmar(root_vmar, info);
     if (user_vmar.is_error()) {
       return user_vmar.take_error();
     }
@@ -803,17 +823,19 @@ fit::result<Errno, size_t> MemoryManager::write_memory(
 fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory(
     const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const {
   DEBUG_ASSERT(has_same_address_space(current_task->mm()));
-#if 0
-  user_in_ptr<uint8_t> user_ptr = make_user_out_ptr(reinterpret_cast<uint8_t*>(addr.ptr()));
-  printf("dst %p src %p size %zu\n", user_ptr.get(), bytes.data(), bytes.size());
-  if (zx_status_t status = user_ptr.copy_array_from_user(bytes.data(), bytes.size());
-      status != ZX_OK) {
-    return fit::error(errno(from_status_like_fdio(status)));
+
+  if (ThreadDispatcher::GetCurrent()) {
+    user_in_ptr<const uint8_t> user_ptr =
+        make_user_in_ptr(reinterpret_cast<const uint8_t*>(addr.ptr()));
+
+    if (zx_status_t status = user_ptr.copy_array_from_user(bytes.data(), bytes.size());
+        status != ZX_OK) {
+      return fit::error(errno(from_status_like_fdio(status)));
+    }
+    return fit::ok(bytes);
+  } else {
+    return vmo_read_memory(addr, bytes);
   }
-  return fit::ok(bytes.size());
-#else
-  return vmo_read_memory(addr, bytes);
-#endif
 }
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManager::vmo_read_memory(
@@ -827,17 +849,16 @@ fit::result<Errno, size_t> MemoryManager::unified_write_memory(
     const ktl::span<const uint8_t>& bytes) const {
   DEBUG_ASSERT(has_same_address_space(current_task->mm()));
 
-#if 0
-  user_out_ptr<uint8_t> user_ptr = make_user_out_ptr(reinterpret_cast<uint8_t*>(addr.ptr()));
-  printf("dst %p src %p size %zu\n", user_ptr.get(), bytes.data(), bytes.size());
-  if (zx_status_t status = user_ptr.copy_array_to_user(bytes.data(), bytes.size());
-      status != ZX_OK) {
-    return fit::error(errno(from_status_like_fdio(status)));
+  if (ThreadDispatcher::GetCurrent()) {
+    user_out_ptr<uint8_t> user_ptr = make_user_out_ptr(reinterpret_cast<uint8_t*>(addr.ptr()));
+    if (zx_status_t status = user_ptr.copy_array_to_user(bytes.data(), bytes.size());
+        status != ZX_OK) {
+      return fit::error(errno(from_status_like_fdio(status)));
+    }
+    return fit::ok(bytes.size());
+  } else {
+    return vmo_write_memory(addr, bytes);
   }
-  return fit::ok(bytes.size());
-#else
-  return vmo_write_memory(addr, bytes);
-#endif
 }
 
 fit::result<Errno, size_t> MemoryManager::vmo_write_memory(
@@ -873,9 +894,22 @@ size_t MemoryManager::get_mapping_count() {
   return state_.mappings_.iter().size();
 }
 
+UserAddress MemoryManager::get_random_base(size_t length) {
+  Guard<Mutex> lock(&mm_state_rw_lock_);
+  // Allocate a vmar of the correct size, get the random location, then immediately destroy it.
+  // This randomizes the load address without loading into a sub-vmar and breaking mprotect.
+  // This is different from how Linux actually lays out the address space. We might need to
+  // rewrite it eventually.
+  zx::vmar temp_vmar;
+  uintptr_t base;
+  ASSERT(state_.user_vmar().allocate(0, 0, length, &temp_vmar, &base) == ZX_OK);
+  ASSERT(temp_vmar.destroy() == ZX_OK);
+  return UserAddress::from_ptr(base);
+}
+
 // Creates a VMO that can be used in an anonymous mapping for the `mmap`
 // syscall.
-fit::result<Errno, zx::ArcVmo> create_anonymous_mapping_vmo(size_t size) {
+fit::result<Errno, zx::ArcVmo> create_anonymous_mapping_vmo(uint64_t size) {
   LTRACEF("size 0x%lx\n", size);
   // mremap can grow memory regions, so make sure the VMO is resizable.
   zx::vmo vmo;
