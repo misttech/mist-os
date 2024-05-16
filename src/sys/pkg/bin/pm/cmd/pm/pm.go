@@ -19,7 +19,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/update"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/verify"
 )
 
 const usage = `Usage: %s [-k key] [-m manifest] [-o output dir] [-t tempdir] <command> [-help]
@@ -32,7 +31,6 @@ Package Commands:
     build    - perform update and seal in order
     update   - update the merkle roots in meta/contents
     seal     - seal package metadata into a meta.far
-    verify   - verify metadata
     archive  - construct a single .far representation of the package
 
 Repository Commands:
@@ -121,7 +119,8 @@ func doMain() int {
 		err = update.Run(cfg, flag.Args()[1:])
 
 	case "verify":
-		err = verify.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "verify is deprecated without replacement")
+		err = nil
 
 	case "newrepo":
 		fmt.Fprintf(os.Stderr, "please use 'ffx repository create' instead")
