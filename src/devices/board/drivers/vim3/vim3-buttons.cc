@@ -21,6 +21,7 @@
 #include <soc/aml-a311d/a311d-hw.h>
 
 #include "src/devices/board/drivers/vim3/vim3-adc.h"
+#include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 
 namespace vim3 {
@@ -57,6 +58,7 @@ zx::result<> Vim3::ButtonsInit() {
   const std::vector<fuchsia_driver_framework::BindRule> kPowerButtonRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_a311d::GPIOAO_PIN_ID_PIN_7)};
   const std::vector<fuchsia_driver_framework::NodeProperty> kPowerButtonProps = {

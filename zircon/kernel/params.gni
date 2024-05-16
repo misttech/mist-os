@@ -73,9 +73,6 @@ declare_args() {
   # TODO(johngro): document
   futex_block_tracing_enabled = false
 
-  # Enables kernel tracing of futex interactions
-  futex_tracing_enabled = false
-
   # Enables tracing of wait queue depths.  Used for post-processing analysis of
   # how deep wait queues tend to be under various loads, as well as how
   # frequently the change depth.
@@ -164,6 +161,7 @@ kernel_test_device_types = [
   "Astro",
   "QEMU",
   "Intel NUC Kit NUC7i5DNHE",
+  "Intel NUC Kit NUC11TNHv5",
   "Sherlock",
   "Vim3",
 ]

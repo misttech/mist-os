@@ -21,7 +21,8 @@ use {
 
 #[fuchsia::test]
 async fn open() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         open_per_package_source(source).await
     }
 }
@@ -674,7 +675,8 @@ async fn verify_open_failed(node: fio::NodeProxy) -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn clone() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         clone_per_package_source(source).await
     }
 }
@@ -836,7 +838,8 @@ async fn assert_clone_directory_overflow(
 
 #[fuchsia::test]
 async fn read_dirents() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         read_dirents_per_package_source(source).await
     }
 }
@@ -982,7 +985,8 @@ async fn assert_read_dirents_no_overflow(
 
 #[fuchsia::test]
 async fn rewind() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         rewind_per_package_source(source).await
     }
 }
@@ -1070,7 +1074,8 @@ async fn assert_rewind_no_overflow(dir: &fio::DirectoryProxy) {
 
 #[fuchsia::test]
 async fn get_token() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         get_token_per_package_source(source).await
     }
 }
@@ -1091,7 +1096,8 @@ async fn get_token_per_package_source(source: PackageSource) {
 
 #[fuchsia::test]
 async fn get_flags() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         get_flags_per_package_source(source).await
     }
 }
@@ -1142,7 +1148,8 @@ async fn assert_get_flags_directory_calls(
 
 #[fuchsia::test]
 async fn unsupported() {
-    for source in dirs_to_test().await {
+    let (_ns, dirs) = dirs_to_test().await;
+    for source in dirs {
         unsupported_per_package_source(source).await
     }
 }

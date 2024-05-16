@@ -25,6 +25,27 @@
 			boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS*/
 		};
 
+		video-decoder@ffd00000 {
+			compatible = "amlogic,g12b-vdec";
+			reg = <0x0 A311D_FULL_CBUS_BASE 0x0 A311D_FULL_CBUS_LENGTH>,
+				<0x0 A311D_DOS_BASE 0x0 A311D_DOS_LENGTH>,
+				<0x0 A311D_HIU_BASE 0x0 A311D_HIU_LENGTH>,
+				<0x0 A311D_AOBUS_BASE 0x0 A311D_AOBUS_LENGTH>,
+				<0x0 A311D_DMC_BASE 0x0 A311D_DMC_LENGTH>;
+			iommus = <&dummy_iommu 10>;
+			interrupts = <GIC_SPI 23 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 32 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 43 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 44 GIC_IRQ_MODE_EDGE_RISING>;
+
+			fuchsia,sysmem = <&sysmem>;
+			amlogic,canvas = <&canvas>;
+
+			clocks = <&clock 0x10005>,
+				 <&clock 0x10007>;
+			clock-names = "DOS_GCLK_VDEC", "DOS";
+		};
+
 		ethmac: ethernet-phy@ff634000 {
 			compatible = "amlogic,ethernet-phy";
 			reg = <0x0 0xff634000 0x0 0x1000>,
@@ -117,6 +138,30 @@
 			sdcard_cmd_cfg: sdcard-cmd-cfg{
 				pins = <A311D_GPIOC(5)>;
 				function = <0 1>;
+			};
+
+			sdio_d0_d3_cfg: sdio-d0-d3-cfg{
+				pins = <A311D_GPIOX(0) A311D_GPIOX(1) A311D_GPIOX(2) A311D_GPIOX(3)>;
+				input-enable;
+				bias-disable;
+				function = <0 1>;
+				drive-strength-microamp = <0 4000>;
+			};
+
+			sdio_clk_cfg: sdio-clk-cfg{
+				pins = <A311D_GPIOX(4)>;
+				input-enable;
+				bias-disable;
+				function = <0 1>;
+				drive-strength-microamp = <0 4000>;
+			};
+
+			sdio_cmd_cfg: sdio-cmd-cfg{
+				pins = <A311D_GPIOX(5)>;
+				input-enable;
+				bias-disable;
+				function = <0 1>;
+				drive-strength-microamp = <0 4000>;
 			};
 
 			ethernet_phy_cfg: ethernet-phy-cfg {
@@ -235,7 +280,7 @@
 			#pwm-cells = <3>;
 		};
 
-		pwm-init {
+		pwm_init: pwm-init {
 			pwms = <&pwm 4 0 0>; //A311D_PWM_E
 			gpios = <&gpio A311D_GPIOX(16) 0 &gpio A311D_GPIOX(17) 0>;
 			gpio-names = "WIFI_LPO", "BT_REG_ON";
@@ -283,6 +328,18 @@
 			phy-names = "xhci-phy";
 		};
 
+		sd_emmc_a: mmc@ffe03000 {
+			compatible = "amlogic,meson-axg-mmc";
+			reg = <0x0 0xffe03000 0x0 0x2000>;
+			interrupts = <GIC_SPI 189 GIC_IRQ_MODE_EDGE_RISING>;
+			iommus = <&dummy_iommu 10>;
+			gpios = <&gpio A311D_GPIOX(6) 0>;
+			gpio-names = "SDMMC_RESET";
+			pinctrl-0 = <&sdio_d0_d3_cfg &sdio_clk_cfg &sdio_cmd_cfg>;
+			max-frequency = <100000000>;
+			pwm-init = <&pwm_init>;
+		};
+
 		sd_emmc_b: mmc@ffe05000 {
 			compatible = "amlogic,meson-axg-mmc";
 			reg = <0x0 0xffe05000 0x0 0x2000>;
@@ -306,6 +363,7 @@
 			max-frequency = <120000000>;
 			non-removable;
 			no-mmc-hs400;
+			use-fidl;
 		};
 
 		aml_gpu: gpu@ffe40000 {

@@ -57,11 +57,11 @@ namespace amlogic_decoder {
         18: OutputBufferAllocationFailure
 #endif
 
-// TODO(https://fxbug.dev/42084549): Currently there's one frame of latency imposed by the need for another
-// NALU after the last byte of a frame for that frame to generate a pic data done interrupt.  A
-// client can mitigate this by queueing an access unit delimeter NALU after each input frame's slice
-// NALU(s), but we should consider paying attention to access unit flags on the packet so that a
-// client delivering complete frames and never putting data from more than one frame in a single
+// TODO(https://fxbug.dev/42084549): Currently there's one frame of latency imposed by the need for
+// another NALU after the last byte of a frame for that frame to generate a pic data done interrupt.
+// A client can mitigate this by queueing an access unit delimeter NALU after each input frame's
+// slice NALU(s), but we should consider paying attention to access unit flags on the packet so that
+// a client delivering complete frames and never putting data from more than one frame in a single
 // packet can set the flag on the last packet of a frame and not see 1 frame latency.  The argument
 // against doing this is that nal_unit_type 9 is the h264 way to avoid the 1 frame latency, and
 // isn't very difficult for clients to add after each complete frame.
@@ -481,7 +481,7 @@ zx_status_t H264MultiDecoder::LoadSecondaryFirmware(const uint8_t* data, uint32_
     on_deck_secondary_firmware.reset();
   } else {
     auto result = InternalBuffer::CreateAligned(
-        "H264MultiSecondaryFirmware", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(),
+        "H264MultiSecondaryFirmware", &owner_->SysmemAllocatorSync(), owner_->bti(),
         kSecondaryFirmwareBufferSize, 1 << kBufferAlignShift, /*is_secure*/ false,
         /*is_writable=*/true, /*is_mapping_needed*/ true);
     if (!result.is_ok()) {
@@ -521,8 +521,8 @@ zx_status_t H264MultiDecoder::InitializeBuffers() {
 
   // If the TEE is available, we'll do secure loading of the firmware in InitializeHardware().
   if (!owner_->is_tee_available()) {
-    // TODO(https://fxbug.dev/42119806): Fix this up in "CL4" to filter to the current SoC as we're loading
-    // video_ucode.bin, similar to how the video_firmware TA does filtering.  That way
+    // TODO(https://fxbug.dev/42119806): Fix this up in "CL4" to filter to the current SoC as we're
+    // loading video_ucode.bin, similar to how the video_firmware TA does filtering.  That way
     // kDec_H264_Multi will be for the correct SoC (assuming new video_ucode.bin).  At the moment,
     // if we were to take this path (which we won't for now), we'd likely get the wrong firmware
     // since there will be more than one firmware that matches kDec_H264_Multi, for different
@@ -556,7 +556,7 @@ zx_status_t H264MultiDecoder::InitializeBuffers() {
       on_deck_firmware.reset();
     } else {
       auto create_result = InternalBuffer::CreateAligned(
-          "H264MultiFirmware", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(), kFirmwareSize,
+          "H264MultiFirmware", &owner_->SysmemAllocatorSync(), owner_->bti(), kFirmwareSize,
           1 << kBufferAlignShift, /*is_secure=*/kFirmwareIsSecure,
           /*is_writable=*/kFirmwareIsWritable,
           /*is_mapping_needed=*/kFirmwareIsMappingNeeded);
@@ -598,7 +598,7 @@ zx_status_t H264MultiDecoder::InitializeBuffers() {
     on_deck_codec_data.reset();
   } else {
     auto codec_data_create_result = InternalBuffer::CreateAligned(
-        "H264MultiCodecData", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(), kCodecDataSize,
+        "H264MultiCodecData", &owner_->SysmemAllocatorSync(), owner_->bti(), kCodecDataSize,
         kCodecDataAlignment, is_secure(),
         /*is_writable=*/kCodecDataIsWritable, /*is_mapping_needed*/ kCodecDataIsMappingNeeded);
     if (!codec_data_create_result.is_ok()) {
@@ -626,8 +626,8 @@ zx_status_t H264MultiDecoder::InitializeBuffers() {
     on_deck_aux_buf.reset();
   } else {
     auto aux_buf_create_result = InternalBuffer::CreateAligned(
-        "H264AuxBuf", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(), kAuxBufSize,
-        kAuxBufAlignment, /*is_secure=*/kAuxBufIsSecure,
+        "H264AuxBuf", &owner_->SysmemAllocatorSync(), owner_->bti(), kAuxBufSize, kAuxBufAlignment,
+        /*is_secure=*/kAuxBufIsSecure,
         /*is_writable=*/kAuxBufIsWritable, /*is_mapping_needed*/ kAuxBufIsMappingNeeded);
     if (!aux_buf_create_result.is_ok()) {
       LogEvent(media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_AllocationError);
@@ -653,7 +653,7 @@ zx_status_t H264MultiDecoder::InitializeBuffers() {
     on_deck_lmem.reset();
   } else {
     auto lmem_create_result = InternalBuffer::CreateAligned(
-        "H264Lmem", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(), kLmemSize, kLmemAlignment,
+        "H264Lmem", &owner_->SysmemAllocatorSync(), owner_->bti(), kLmemSize, kLmemAlignment,
         /*is_secure=*/kLmemIsSecure,
         /*is_writable=*/kLmemIsWritable, /*is_mapping_needed*/ kLmemIsMappingNeeded);
     if (!lmem_create_result.is_ok()) {
@@ -1150,7 +1150,8 @@ void H264MultiDecoder::ConfigureDpb() {
 
     video_frames_.clear();
 
-    // TODO(https://fxbug.dev/42084549): Reset initial I frame tracking if FW doesn't do that itself.
+    // TODO(https://fxbug.dev/42084549): Reset initial I frame tracking if FW doesn't do that
+    // itself.
 
     // This is doing the same thing as the amlogic code, but it's unlikely to matter.  This has
     // basically nothing to do with the DPB size, and is just round-tripping a number back to the HW
@@ -2549,8 +2550,8 @@ void H264MultiDecoder::InitializedFrames(std::vector<CodecFrame> frames, uint32_
       on_deck_mv_buffer.reset();
     } else {
       auto create_result = InternalBuffer::Create(
-          "H264ReferenceMvs", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(),
-          colocated_buffer_size, is_secure_,
+          "H264ReferenceMvs", &owner_->SysmemAllocatorSync(), owner_->bti(), colocated_buffer_size,
+          is_secure_,
           /*is_writable=*/kMvBufferIsWritable, /*is_mapping_needed*/ kMvBufferIsMappingNeeded);
       if (!create_result.is_ok()) {
         LogEvent(media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_AllocationError);
@@ -2681,18 +2682,19 @@ void H264MultiDecoder::SubmitDataToHardware(const uint8_t* data, size_t length,
       // Also, we don't want to overwrite any portion of the stream buffer which we may later need
       // to re-decode.
       //
-      // TODO(https://fxbug.dev/42084549): Handle copying only as much as can fit, then copying more in later
-      // from the same input packet (a TODO for PumpDecoder()).  Convert this case into an assert.
+      // TODO(https://fxbug.dev/42084549): Handle copying only as much as can fit, then copying more
+      // in later from the same input packet (a TODO for PumpDecoder()).  Convert this case into an
+      // assert.
       //
       // This may happen if a stream fails to provide any decode-able data within the size of the
       // stream buffer.  This is currently how we partially mitigate the cost of the re-decode
       // strategy should a client provide no useful input data.
       //
-      // TODO(https://fxbug.dev/42084549): Test, and possibly mitigate better, a hostile client providing 1
-      // byte of useless data at a time, causing repeated re-decode of the whole stream buffer as it
-      // slowly grows to maximum size, before finally hitting this case and failing the stream.  The
-      // test should verify that the decoder remains reasonably avaialble to a competing concurrent
-      // well-behaved client providing a well-behaved stream.
+      // TODO(https://fxbug.dev/42084549): Test, and possibly mitigate better, a hostile client
+      // providing 1 byte of useless data at a time, causing repeated re-decode of the whole stream
+      // buffer as it slowly grows to maximum size, before finally hitting this case and failing the
+      // stream.  The test should verify that the decoder remains reasonably avaialble to a
+      // competing concurrent well-behaved client providing a well-behaved stream.
       LogEvent(
           media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_InputBufferFullError);
       LOG(ERROR, "Empty space in stream buffer %u too small for video data (0x%zx)",
@@ -2758,8 +2760,8 @@ bool H264MultiDecoder::CanBeSwappedIn() {
 }
 
 bool H264MultiDecoder::CanBeSwappedOut() const {
-  // TODO(https://fxbug.dev/42084549): kWaitingForConfigChange ideally would allow swapping out decoder; VP9
-  // doesn't yet either, so punt for the moment.
+  // TODO(https://fxbug.dev/42084549): kWaitingForConfigChange ideally would allow swapping out
+  // decoder; VP9 doesn't yet either, so punt for the moment.
   return force_swap_out_ ||
          (!is_async_pump_pending_ && state_ == DecoderState::kWaitingForInputOrOutput);
 }
@@ -2992,10 +2994,10 @@ void H264MultiDecoder::PumpDecoder() {
   // of an AU that splits across multiple packets.  At the moment none of these are supported.
   SubmitDataToHardware(current_input.data.data(), current_input.length, current_input.codec_buffer,
                        current_input.buffer_start_offset);
-  // TODO(https://fxbug.dev/42084549): We need padding here or else the decoder may stall forever in some
-  // circumstances (e.g. if the input ends between 768 and 832 bytes in the buffer). The padding
-  // will cause corruption if the input data isn't NAL unit aligned, but that works with existing
-  // clients. In the future we could try either detecting that padding was read and caused
+  // TODO(https://fxbug.dev/42084549): We need padding here or else the decoder may stall forever in
+  // some circumstances (e.g. if the input ends between 768 and 832 bytes in the buffer). The
+  // padding will cause corruption if the input data isn't NAL unit aligned, but that works with
+  // existing clients. In the future we could try either detecting that padding was read and caused
   // corruption, which would trigger redecoding of the frame, or we could continually feed as much
   // input as is available and let the H264Decoder lag a bit behind.  Editing out the padding seems
   // less feasible since the fifo (whether in HW or in save/restore context) has potentially already

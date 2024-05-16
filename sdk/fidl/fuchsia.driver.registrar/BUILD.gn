@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.driver.registrar") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Driver SDK"
   api = "fuchsia.driver.registrar.api"
   sources = [
     "driver-registrar.fidl",

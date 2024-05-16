@@ -51,8 +51,8 @@ to accomplish in `make`:
    subset that compilers emit in `.d` files and consumes them directly when
    directed to by GN.
  - Run with `-j$(getconf _NPROCESSORS_ONLN)` by default.  You can pass `-j1`
-   to serialize or `-j1024` when using Goma, but out of the box it does the
-   parallelism you usually want.
+   to serialize or `-j1024` when using a remote build service, but out of the
+   box it does the parallelism you usually want.
  - Prevent interleaved `stdout`/`stderr` output from parallel jobs.  Ninja
    buffers the output so that error messages don't get garbled by spew from
    multiple processes.

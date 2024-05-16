@@ -5,6 +5,7 @@
 library fuchsia.device.fs;
 
 using zx;
+using fuchsia.io;
 
 @available(added=16)
 type ConnectionType = flexible bits : uint8 {
@@ -26,4 +27,38 @@ closed protocol Connector {
     strict Connect(resource struct {
         server zx.Handle:CHANNEL;
     });
+};
+
+// Arguments for adding a node to the devfs filesystem.
+@available(added=HEAD)
+type DevfsAddArgs = resource table {
+    /// This is the connector to be installed in devfs.
+    /// `Connect()` will be called when a client connects to this node in the filesystem.
+    /// Optional: If this is not provided then an empty node will appear in devfs.
+    1: connector client_end:Connector;
+
+    /// This is the class name for installing this node in devfs.
+    /// The node will be placed within /dev/class/{class_name}.
+    /// If `class_name` does not exist under /dev/class/ it will be created.
+    /// Optional: If this is not provided then the node will only be added via topological path.
+    2: class_name string:fuchsia.io.MAX_NAME_LENGTH;
+
+    /// This is a vmo of inspect data that will be installed in devfs.
+    /// Optional: If this is not provided then the devfs's inspect data will be empty.
+    3: inspect zx.Handle:VMO;
+
+    /// The connection types that are supported by the |connector| given.
+    /// The driver framework should handle connection types that are not supported by the
+    /// connector.
+    /// If not provided, only the device type is assumed as supported by the connector.
+    @available(added=HEAD)
+    4: connector_supports ConnectionType;
+
+    /// This is the controller connector to be installed in devfs.
+    /// `Connect()` will be called when a client connects to the device_controller connection
+    /// for this node in the filesystem.
+    /// Optional: If this is not provided then the Node will handle the connection natively.
+    /// This option should only be used by the compat shim or in tests
+    @available(added=HEAD)
+    5: controller_connector client_end:Connector;
 };

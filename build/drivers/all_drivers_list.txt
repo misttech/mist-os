@@ -75,7 +75,7 @@
 //src/devices/bin/driver_host:test_not_driver_driver
 //src/devices/block/drivers/ahci:ahci-driver
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver
-//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-driver
+//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-bazel-package.bazel_build
 //src/devices/block/drivers/block-verity:block-verity-driver
 //src/devices/block/drivers/bootpart:bootpart-driver
 //src/devices/block/drivers/core:core-driver
@@ -298,6 +298,7 @@
 //src/graphics/display/drivers/intel-i915:intel-i915-driver
 //src/graphics/display/drivers/simple:simple.bochs-driver
 //src/graphics/display/drivers/simple:simple.intel-driver
+//src/graphics/display/drivers/vim3-display-detect:vim3-display-detect-driver
 //src/graphics/display/drivers/virtio-guest:virtio_gpu-driver
 //src/graphics/drivers/aml-gpu:aml-gpu-driver
 //src/graphics/drivers/misc/goldfish:goldfish_driver-driver
@@ -344,7 +345,6 @@
 //src/power/power-manager/testing/fake_driver:fake-temperature2
 //src/power/power-manager/testing/fake_driver:nelson-fake-driver
 //src/power/power-manager/testing/fake_root:root_driver
-//src/power/system-activity-governor/integration/testing/fake-suspend:driver
 //src/storage/fvm/driver:fuchsia_driver
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver

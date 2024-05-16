@@ -3,10 +3,8 @@
 # found in the LICENSE file.
 
 import fuchsia_controller_internal
-import tempfile
-import shutil
-import os
 import typing
+
 
 from fuchsia_controller_internal import ZxStatus
 

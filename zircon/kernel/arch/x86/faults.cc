@@ -22,6 +22,7 @@
 
 #include <arch/exception.h>
 #include <arch/regs.h>
+#include <arch/thread.h>
 #include <arch/user_copy.h>
 #include <arch/x86.h>
 #include <arch/x86/apic.h>

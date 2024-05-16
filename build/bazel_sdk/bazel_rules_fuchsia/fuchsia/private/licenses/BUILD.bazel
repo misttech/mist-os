@@ -2,15 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-exports_files(
-    glob([
-        "*.bzl",
-    ]),
-    visibility = ["//:__subpackages__"],
-)
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
-filegroup(
-    name = "all_starlark_files",
-    srcs = glob(["*.bzl"]),
-    visibility = ["//:__subpackages__"],
+# All of the starlark files that are exported for documentation.
+bzl_library(
+    name = "starlark_files",
+    srcs =
+        glob(["*.bzl"]) + [
+            "@rules_license//rules:standard_package",
+            "@rules_license//rules_gathering:standard_package",
+        ],
+    visibility = [
+        "//doc_gen:__pkg__",
+    ],
 )

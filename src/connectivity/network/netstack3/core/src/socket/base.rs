@@ -19,7 +19,7 @@ use crate::{
     data_structures::socketmap::{
         Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
     },
-    device,
+    device::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier},
     error::{ExistsError, NotFoundError},
     ip::{device::state::IpDeviceStateIpExt, socket::SocketIpExt, IpLayerIpExt},
     socket::address::{
@@ -158,8 +158,8 @@ pub(crate) fn must_have_zone<A: IpAddress>(addr: &SpecifiedAddr<A>) -> bool {
 /// addresses.
 pub(crate) fn can_device_change<
     A: IpAddress,
-    W: device::WeakId<Strong = S>,
-    S: device::StrongId,
+    W: WeakDeviceIdentifier<Strong = S>,
+    S: StrongDeviceIdentifier,
 >(
     local_ip: Option<&SpecifiedAddr<A>>,
     remote_ip: Option<&SpecifiedAddr<A>>,
@@ -219,7 +219,7 @@ pub struct ListenerAddrInfo {
     pub(crate) specified_addr: bool,
 }
 
-impl<A: IpAddress, D: device::Id, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
+impl<A: IpAddress, D: DeviceIdentifier, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
     pub(crate) fn info(&self) -> ListenerAddrInfo {
         let Self { device, ip: ListenerIpAddr { addr, identifier: _ } } = self;
         ListenerAddrInfo { has_device: device.is_some(), specified_addr: addr.is_some() }
@@ -342,8 +342,13 @@ pub(crate) trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
     ) -> Result<(), IncompatibleError>;
 }
 
-pub trait SocketMapConflictPolicy<Addr, SharingState, I: Ip, D: device::Id, A: SocketMapAddrSpec>:
-    SocketMapStateSpec
+pub trait SocketMapConflictPolicy<
+    Addr,
+    SharingState,
+    I: Ip,
+    D: DeviceIdentifier,
+    A: SocketMapAddrSpec,
+>: SocketMapStateSpec
 {
     /// Checks whether a new socket with the provided state can be inserted at
     /// the given address in the existing socket map, returning an error
@@ -360,7 +365,7 @@ pub trait SocketMapConflictPolicy<Addr, SharingState, I: Ip, D: device::Id, A: S
     ) -> Result<(), InsertError>;
 }
 
-pub(crate) trait SocketMapUpdateSharingPolicy<Addr, SharingState, I: Ip, D: device::Id, A>:
+pub(crate) trait SocketMapUpdateSharingPolicy<Addr, SharingState, I: Ip, D: DeviceIdentifier, A>:
     SocketMapConflictPolicy<Addr, SharingState, I, D, A>
 where
     A: SocketMapAddrSpec,
@@ -407,7 +412,7 @@ pub enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
     Conn(ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>),
 }
 
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized>
+impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized>
     Tagged<AddrVec<I, D, A>> for Bound<S>
 {
     type Tag = S::AddrVecTag;
@@ -427,7 +432,7 @@ impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized>
     }
 }
 
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec> IterShadows for AddrVec<I, D, A> {
+impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec> IterShadows for AddrVec<I, D, A> {
     type IterShadows = AddrVecIter<I, D, A>;
 
     fn iter_shadows(&self) -> Self::IterShadows {
@@ -518,11 +523,13 @@ pub(crate) enum SocketId<S: SocketMapStateSpec> {
 /// address).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct BoundSocketMap<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
+pub struct BoundSocketMap<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
     addr_to_state: SocketMap<AddrVec<I, D, A>, Bound<S>>,
 }
 
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> BoundSocketMap<I, D, A, S> {
+impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec>
+    BoundSocketMap<I, D, A, S>
+{
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.addr_to_state.len()
@@ -540,7 +547,7 @@ pub(crate) struct Sockets<AddrToStateMap, SocketType>(AddrToStateMap, PhantomDat
 impl<
         'a,
         I: Ip,
-        D: device::Id,
+        D: DeviceIdentifier,
         SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
@@ -582,7 +589,7 @@ where
 pub(crate) struct SocketStateEntry<
     'a,
     I: Ip,
-    D: device::Id,
+    D: DeviceIdentifier,
     A: SocketMapAddrSpec,
     S: SocketMapStateSpec,
     SocketType,
@@ -595,7 +602,7 @@ pub(crate) struct SocketStateEntry<
 impl<
         'a,
         I: Ip,
-        D: device::Id,
+        D: DeviceIdentifier,
         SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec
@@ -703,7 +710,7 @@ pub(crate) struct UpdateSharingError;
 impl<
         'a,
         I: Ip,
-        D: device::Id,
+        D: DeviceIdentifier,
         SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
@@ -806,7 +813,7 @@ where
     }
 }
 
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S> BoundSocketMap<I, D, A, S>
+impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S> BoundSocketMap<I, D, A, S>
 where
     AddrVec<I, D, A>: IterShadows,
     S: SocketMapStateSpec,
@@ -916,7 +923,7 @@ pub(crate) trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: Socket
     fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id;
 }
 
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
+impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec>
     ConvertSocketMapState<I, D, A, S> for Listener
 {
     type Id = S::ListenerId;
@@ -962,7 +969,7 @@ impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
     }
 }
 
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
+impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec>
     ConvertSocketMapState<I, D, A, S> for Connection
 {
     type Id = S::ConnId;

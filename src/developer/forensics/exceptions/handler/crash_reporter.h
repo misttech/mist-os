@@ -16,8 +16,6 @@
 
 #include <memory>
 
-#include "lib/fit/function.h"
-
 namespace forensics {
 namespace exceptions {
 namespace handler {

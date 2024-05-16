@@ -23,16 +23,27 @@ void* fdf_arena::Allocate(size_t bytes) {
 
   if (available_size_ < bytes) {
     // The data doesn't fit within the current block => allocate a new block.
-    // Note: the data available at the end of the current block is lost forever (until the
-    // deallocation of the arena).
-    available_size_ = (bytes > ExtraBlock::kExtraSize) ? bytes : ExtraBlock::kExtraSize;
-    size_t extra_bytes = available_size_ + FIDL_ALIGN(sizeof(ExtraBlockNode));
-    auto extra_block = new (new uint8_t[extra_bytes]) ExtraBlock();
-    next_data_available_ = extra_block->data();
-    extra_blocks_.push_front(extra_block);
+    size_t block_size = (bytes > ExtraBlock::kExtraSize) ? bytes : ExtraBlock::kExtraSize;
+    size_t extra_bytes = block_size + FIDL_ALIGN(sizeof(ExtraBlockNode));
 
-    uintptr_t data = reinterpret_cast<uintptr_t>(next_data_available_);
-    allocated_ranges_.insert({data, available_size_});
+    // Account for the new block
+    auto extra_block = new (new uint8_t[extra_bytes]) ExtraBlock();
+    extra_blocks_.push_front(extra_block);
+    uint8_t* data = extra_block->data();
+    allocated_ranges_.insert({reinterpret_cast<uintptr_t>(data), block_size});
+
+    if (bytes < ExtraBlock::kExtraSize) {
+      // If the allocation is smaller than the extra block size, use the new block
+      // for further allocations.
+      // Note: the data available at the end of the current block is lost forever (until the
+      // deallocation of the arena).
+      next_data_available_ = current_block_ = data;
+      available_size_ = block_size;
+    } else {
+      // Otherwise, just return the block and continue using the one we already
+      // have allocated.
+      return data;
+    }
   }
   // At this point we have enough space within the current block (either because there was enough
   // space within the existing block or because we allocate a new block).
@@ -82,7 +93,7 @@ bool fdf_arena::Contains(const void* data, size_t num_bytes) {
 
   // If we are checking against the newest buffer, part of it might actually not have been allocated
   // to the user yet.
-  if (allocated_addr == reinterpret_cast<uintptr_t>(NewestBufferLocked())) {
+  if (allocated_addr == reinterpret_cast<uintptr_t>(current_block_)) {
     ZX_ASSERT(allocated_size >= available_size_);
     allocated_size -= available_size_;
   }

@@ -17,7 +17,6 @@ from fuchsia_controller_py import Channel
 from fuchsia_controller_py import Context
 from fuchsia_controller_py import IsolateDir
 
-
 SDK_ROOT = "./sdk/exported/core"
 # For Linux this handles the gamut of options.
 # This map is derived from //build/rbe/fuchsia.py

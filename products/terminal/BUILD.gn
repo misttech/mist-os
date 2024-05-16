@@ -28,19 +28,6 @@ product_assembly_configuration("terminal") {
       snoop = "lazy"
     }
 
-    storage = {
-      filesystems = {
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
-        }
-      }
-    }
-
     development_support = {
       include_sl4f = true
 

@@ -6,8 +6,8 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.component.sandbox") {
   sdk_category = "partner"
-  stable = false
-  sdk_area = "Unknown"
+  stable = true
+  sdk_area = "Component Framework"
 
   sources = [
     "availability.fidl",
@@ -16,7 +16,6 @@ fidl("fuchsia.component.sandbox") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.io",
-    "//sdk/fidl/fuchsia.unknown",
     "//zircon/vdso/zx",
   ]
 

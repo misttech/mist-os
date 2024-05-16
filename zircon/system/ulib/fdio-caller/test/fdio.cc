@@ -4,21 +4,15 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fd.h>
-#include <lib/sync/completion.h>
 #include <unistd.h>
 
-#include <future>
 #include <utility>
 
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-#include "src/storage/memfs/memfs.h"
-#include "src/storage/memfs/vnode_dir.h"
+#include "src/lib/files/scoped_temp_dir.h"
 
 namespace fio = fuchsia_io;
 
@@ -64,38 +58,16 @@ void TryFilesystemOperations(const fdio_cpp::UnownedFdioCaller& caller) {
 class FdioCallerTest : public zxtest::Test {
  protected:
   void SetUp() override {
-    zx::result result = memfs::Memfs::Create(loop_.dispatcher(), "<tmp>");
-    ASSERT_OK(result);
-    auto& [memfs, root] = result.value();
-
-    auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
-
-    ASSERT_OK(memfs->ServeDirectory(std::move(root), std::move(server)));
-    memfs_ = std::move(memfs);
-
-    zx::channel ch0, ch1;
-    ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
-
-    ASSERT_OK(fidl::WireCall(client)->Open(
-        fio::OpenFlags::kCreate | fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable,
-        {}, "my-file", fidl::ServerEnd<fio::Node>{std::move(ch0)}));
-
-    ASSERT_OK(loop_.StartThread());
-
-    ASSERT_OK(fdio_fd_create(ch1.release(), fd_.reset_and_get_address()));
-  }
-
-  void TearDown() override {
-    std::promise<zx_status_t> promise;
-    memfs_->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
-    ASSERT_OK(promise.get_future().get());
+    std::string path;
+    ASSERT_TRUE(temp_dir_.NewTempFile(&path));
+    fd_.reset(open(path.c_str(), O_CREAT | O_RDWR));
+    ASSERT_TRUE(fd_.is_valid());
   }
 
   fbl::unique_fd& fd() { return fd_; }
 
  private:
-  async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  std::unique_ptr<memfs::Memfs> memfs_;
+  files::ScopedTempDir temp_dir_;
   fbl::unique_fd fd_;
 };
 

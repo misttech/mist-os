@@ -80,6 +80,8 @@ ConsoleImpl::ConsoleImpl(Session* session, line_input::ModalLineInput::Factory l
 
   // Set stdin to async mode or OnStdinReadable will block.
   fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL, 0) | O_NONBLOCK);
+
+  session->analytics().ReportConsoleType(ConsoleType::Type::kCommandLine);
 }
 
 ConsoleImpl::~ConsoleImpl() {

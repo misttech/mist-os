@@ -23,8 +23,6 @@ class AnonymousPageRequester : public PageRequestInterface {
   // Fills in the given request such that it can be waited on. This is similar to
   // PageSource::GetPage except that all the unnecessary parameters are removed since the page
   // request will wait generically on the PMM, and not for any particular page to be provided.
-  // For batched requests this will always finalize the request, since no useful information is
-  // gained by attempting to find additional pages.
   zx_status_t FillRequest(PageRequest* req);
 
   // Requests the singleton instance.
@@ -39,7 +37,6 @@ class AnonymousPageRequester : public PageRequestInterface {
   // PageRequestInterface methods
   void CancelRequest(PageRequest* request) override { request->offset_ = UINT64_MAX; }
   zx_status_t WaitOnRequest(PageRequest* request) override;
-  zx_status_t FinalizeRequest(PageRequest* request) override { return ZX_ERR_SHOULD_WAIT; }
 
   friend void vm_init_preheap();
   friend lazy_init::Access;

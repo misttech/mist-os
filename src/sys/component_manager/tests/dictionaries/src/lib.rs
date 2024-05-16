@@ -29,6 +29,12 @@ async fn protocols() {
         let out = trigger.run().await.unwrap();
         assert_eq!(&out, "Triggered c");
     }
+    {
+        let trigger =
+            client::connect_to_protocol_at_path::<ftest::TriggerMarker>(&path("d")).unwrap();
+        let out = trigger.run().await.unwrap();
+        assert_eq!(&out, "Triggered d");
+    }
 }
 
 // TODO(https://fxbug.dev/301674053): Add tests for more capability types.

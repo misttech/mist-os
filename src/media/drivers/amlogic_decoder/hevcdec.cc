@@ -45,7 +45,7 @@ std::optional<InternalBuffer> HevcDec::LoadFirmwareToBuffer(const uint8_t* data,
   TRACE_DURATION("media", "HevcDec::LoadFirmwareToBuffer");
   const uint32_t kBufferAlignShift = 16;
   auto create_result = InternalBuffer::CreateAligned(
-      "Vdec1Firmware", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(), kFirmwareSize,
+      "Vdec1Firmware", &owner_->SysmemAllocatorSync(), owner_->bti(), kFirmwareSize,
       1 << kBufferAlignShift, /*is_secure=*/false, /*is_writable=*/true,
       /*is_mapping_needed=*/true);
   if (!create_result.is_ok()) {
@@ -385,7 +385,7 @@ uint32_t HevcDec::GetReadOffset() {
 
 zx_status_t HevcDec::InitializeInputContext(InputContext* context, bool is_secure) {
   constexpr uint32_t kInputContextSize = 4096;
-  auto create_result = InternalBuffer::Create("HevcDecInputCtx", &owner_->SysmemAllocatorSyncPtr(),
+  auto create_result = InternalBuffer::Create("HevcDecInputCtx", &owner_->SysmemAllocatorSync(),
                                               owner_->bti(), kInputContextSize, is_secure,
                                               /*is_writable=*/true, /*is_mapping_needed_=*/false);
   if (!create_result.is_ok()) {

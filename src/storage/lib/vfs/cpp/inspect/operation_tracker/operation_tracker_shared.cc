@@ -32,13 +32,6 @@ OperationTracker::TrackerEvent OperationTracker::NewEvent() {
   return OperationTracker::TrackerEvent(this);
 }
 
-zx_status_t OperationTracker::Track(const std::function<zx_status_t()>& operation) {
-  auto tracker = NewEvent();
-  zx_status_t result = operation();
-  tracker.SetStatus(result);
-  return result;
-}
-
 OperationTracker::TrackerEvent::TrackerEvent(OperationTracker* tracker)
     : tracker_(tracker), start_(GetCurrentTime()), status_(std::nullopt) {
   ZX_ASSERT(tracker != nullptr);

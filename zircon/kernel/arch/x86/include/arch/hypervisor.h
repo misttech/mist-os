@@ -113,7 +113,8 @@ class Vcpu {
 
   Vcpu(Guest& guest, uint16_t vpid, Thread* thread);
 
-  void Migrate(Thread* thread, Thread::MigrateStage stage) TA_REQ(ThreadLock::Get());
+  void Migrate(Thread* thread, Thread::MigrateStage stage)
+      TA_REQ(chainlock_transaction_token, thread->get_lock());
   void ContextSwitch(bool include_gs);
   void LoadExtendedRegisters(AutoVmcs& vmcs);
   void SaveExtendedRegisters(AutoVmcs& vmcs);
@@ -123,6 +124,40 @@ class Vcpu {
   template <typename PreEnterFn, typename PostExitFn>
   zx::result<> EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit, zx_port_packet_t& packet);
 
+  // Some explanation is required for why we disable static lock analysis here.
+  // `thread_` is initially set during our construction in a context where the
+  // caller guarantees that `thread_`'s instance cannot exit.  After this, there
+  // will only ever be one more assignment made to this variable, when the thread
+  // exits and calls the registered migration function.  This happens with the
+  // global Thread list_lock held, and is what is used to make sure that the
+  // thread cannot exit out from under us during operations like Kick and
+  // Interrupt.
+  //
+  // There are many other places in the code, however, where the code simply
+  // wants to check to see the calling thread is the same as `thread_`.  There
+  // are only two options here.
+  //
+  // 1) The calling thread (A) is not the same as thread as our thread.  If our
+  //    initial thread was B, then thread_ can only ever have two values; either B
+  //    or nullptr.  A will never match, regardless of whether or not B has
+  //    exited or not yet.  We need the `thread_` member to be atomic in order
+  //    to avoid a formal C++ data race, but nothing more.
+  // 2) The calling thread (A) *is* the same as our thread.  This means that our
+  //    thread is currently running, and cannot exit out from under us.  We
+  //    don't even need the atomic load in this case, since it is A who will
+  //    eventually perform the mutation setting thread_ to nullptr, so no
+  //    concurrent write is possible.
+  //
+  // In either case, we don't actually need to hold the Thread::list_lock_ in
+  // order to simply check to see if a calling thread is our thread.  All we
+  // need is a relaxed atomic load to deal with case 1 (above).
+  //
+  bool ThreadIsOurThread(Thread* thread) const TA_NO_THREAD_SAFETY_ANALYSIS {
+    return thread == ktl::atomic_ref{thread_}.load(ktl::memory_order_relaxed);
+  }
+
+  void InterruptCpu();
+
   Guest& guest_;
   const uint16_t vpid_;
   // |last_cpu_| contains the CPU dedicated to holding the guest's VMCS state,
@@ -131,9 +166,11 @@ class Vcpu {
   //
   // The VMCS state of this Vcpu must not be loaded prior to |last_cpu_| being
   // set, nor must |last_cpu_| be modified prior to the VMCS state being cleared.
-  cpu_num_t last_cpu_ TA_GUARDED(ThreadLock::Get());
-  // |thread_| will be set to nullptr when the thread exits.
-  ktl::atomic<Thread*> thread_;
+  cpu_num_t last_cpu_ TA_GUARDED(thread_->get_lock());
+
+  // |thread_| will be set to nullptr when the thread exits during the Exiting
+  // stage of our migration function callback.
+  Thread* thread_ TA_GUARDED(Thread::get_list_lock());
   ktl::atomic<bool> kicked_ = false;
   ktl::atomic<bool> entered_ = false;
   VmxPage vmcs_page_;

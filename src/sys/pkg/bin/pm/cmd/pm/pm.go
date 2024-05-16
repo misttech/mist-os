@@ -15,9 +15,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/expand"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/genkey"
-	initcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/init"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
@@ -32,7 +29,6 @@ IMPORTANT: Please note that pm is being sunset and will be removed.
            through ffx. Please adapt workflows accordingly.
 
 Package Commands:
-    init     - initialize a package meta directory in the standard form
     build    - perform update and seal in order
     update   - update the merkle roots in meta/contents
     seal     - seal package metadata into a meta.far
@@ -42,7 +38,6 @@ Package Commands:
 Repository Commands:
     publish  - publish a package to a local repository
     serve    - serve a local repository
-    expand   - (deprecated) expand an archive
 
 For help with individual commands run "pm <command> --help"
 `
@@ -93,13 +88,17 @@ func doMain() int {
 		err = nil
 
 	case "expand":
-		err = expand.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx package archive extract' instead")
+		err = nil
 
 	case "genkey":
-		err = genkey.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "genkey is deprecated without replacement")
+		err = nil
 
 	case "init":
-		err = initcmd.Run(cfg, flag.Args()[1:])
+		url := "https://fuchsia.dev/fuchsia-src/development/idk/documentation/packages"
+		fmt.Fprintf(os.Stderr, "please create the meta directory and the meta package file according to %v", url)
+		err = nil
 
 	case "publish":
 		err = publish.Run(cfg, flag.Args()[1:])

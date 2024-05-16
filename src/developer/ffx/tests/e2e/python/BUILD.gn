@@ -15,7 +15,8 @@ python_mobly_test("ffx_host_tool_e2e_test") {
   transport = "fuchsia-controller"
   environments = [
     emu_env,
-    nuc_env,
+    nuc7_env,
+    nuc11_env,
   ]
 }
 

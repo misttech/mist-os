@@ -6,6 +6,7 @@ import("//build/devicetree/devicetree_visitor.gni")
 
 group("tests") {
   deps = [
+    "amlogic-canvas:tests",
     "clock-controllers:tests",
     "ethernet:tests",
     "gpio-controllers:tests",
@@ -16,6 +17,7 @@ group("tests") {
     "pwm-controllers:tests",
     "registers:tests",
     "regulator:tests",
+    "sysmem:tests",
     "thermal:tests",
     "usb:tests",
   ]
@@ -24,6 +26,7 @@ group("tests") {
 
 devicetree_visitor_collection("all-driver-visitors") {
   deps = [
+    "//sdk/lib/driver/devicetree/visitors/drivers/amlogic-canvas:amlogic-canvas-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/ethernet/ethernet-phy:ethernet-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor",
@@ -32,6 +35,7 @@ devicetree_visitor_collection("all-driver-visitors") {
     "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/pwm-controllers/pwm:pwm-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/pwm-controllers/pwm-init:pwm-init-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/regulator/regulator:regulator-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",

@@ -20,6 +20,7 @@ use core::{
 use assert_matches::assert_matches;
 
 use crate::{
+    context::CtxPair,
     ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
     time::{
         Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
@@ -35,8 +36,8 @@ pub struct FakeInstant {
 }
 
 impl crate::inspect::InspectableValue for FakeInstant {
-    fn record<I: crate::inspect::Inspector>(&self, _name: &str, _inspector: &mut I) {
-        unimplemented!()
+    fn record<I: crate::inspect::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_uint(name, self.offset.as_nanos() as u64)
     }
 }
 
@@ -126,16 +127,6 @@ impl InstantBindingsTypes for FakeInstantCtx {
 impl InstantContext for FakeInstantCtx {
     fn now(&self) -> FakeInstant {
         self.time
-    }
-}
-
-impl<T: AsRef<FakeInstantCtx>> InstantBindingsTypes for T {
-    type Instant = FakeInstant;
-}
-
-impl<T: AsRef<FakeInstantCtx>> InstantContext for T {
-    fn now(&self) -> FakeInstant {
-        self.as_ref().now()
     }
 }
 
@@ -365,9 +356,13 @@ impl<Id: PartialEq> FakeTimerCtx<Id> {
     }
 }
 
-impl<Id> AsRef<FakeInstantCtx> for FakeTimerCtx<Id> {
-    fn as_ref(&self) -> &FakeInstantCtx {
-        &self.instant
+impl<Id> InstantBindingsTypes for FakeTimerCtx<Id> {
+    type Instant = FakeInstant;
+}
+
+impl<Id> InstantContext for FakeTimerCtx<Id> {
+    fn now(&self) -> FakeInstant {
+        self.instant.now()
     }
 }
 
@@ -426,6 +421,22 @@ impl<TimerId> WithFakeTimerContext<TimerId> for FakeTimerCtx<TimerId> {
         f: F,
     ) -> O {
         f(self)
+    }
+}
+
+impl<TimerId, CC, BC> WithFakeTimerContext<TimerId> for CtxPair<CC, BC>
+where
+    BC: WithFakeTimerContext<TimerId>,
+{
+    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
+        self.bindings_ctx.with_fake_timer_ctx(f)
+    }
+
+    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        self.bindings_ctx.with_fake_timer_ctx_mut(f)
     }
 }
 

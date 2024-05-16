@@ -4,13 +4,11 @@
 # found in the LICENSE file.
 """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller."""
 
-import ipaddress
 import logging
 
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import errors
-from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_interface,
 )
@@ -23,54 +21,57 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
     """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller.
 
     Args:
-        device_name: Fuchsia device name.
-        ffx_transport: Object to FFX transport interface implementation.
+        target_name: Fuchsia device name.
+        config: Configuration associated with FuchsiaController, FFX and FFX daemon.
         device_ip: Fuchsia device IP Address.
+
+    Raises:
+        errors.FuchsiaControllerConnectionError: If target is not ready.
+        errors.FuchsiaControllerError: Failed to instantiate.
     """
 
     def __init__(
         self,
-        device_name: str,
-        ffx_transport: ffx_interface.FFX,
-        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        target_name: str,
+        config: custom_types.FFXConfig,
+        target_ip_port: custom_types.IpPort | None = None,
     ) -> None:
-        self._name: str = device_name
+        self._target_name: str = target_name
+        self._config: custom_types.FFXConfig = config
 
-        self._ip_address: (
-            ipaddress.IPv4Address | ipaddress.IPv6Address | None
-        ) = device_ip
+        self._target_ip_port: custom_types.IpPort | None = target_ip_port
+
         self._target: str
-        if self._ip_address:
-            self._target = str(self._ip_address)
+        if self._target_ip_port:
+            self._target = str(self._target_ip_port)
         else:
-            self._target = self._name
-
-        self._ffx_transport: ffx_interface.FFX = ffx_transport
+            self._target = self._target_name
 
         self.ctx: fuchsia_controller.Context
+
         self.create_context()
+        if self._target_ip_port:
+            self.add_target()
+        self.check_connection()
 
     def create_context(self) -> None:
-        """Creates the fuchsia-controller context and waits for the target to
-        be ready.
+        """Creates the fuchsia-controller context.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            errors.FuchsiaControllerError: Failed to create FuchsiaController Context.
             errors.FuchsiaControllerConnectionError: If target is not ready.
         """
         try:
-            ffx_config: custom_types.FFXConfig = self._ffx_transport.config
-
             # To run Fuchsia-Controller in isolation
             isolate_dir: fuchsia_controller.IsolateDir | None = (
-                ffx_config.isolate_dir
+                self._config.isolate_dir
             )
 
             # To collect Fuchsia-Controller logs
             config: dict[str, str] = {}
-            if ffx_config.logs_dir:
-                config["log.dir"] = ffx_config.logs_dir
-                config["log.level"] = ffx_config.logs_level
+            if self._config.logs_dir:
+                config["log.dir"] = self._config.logs_dir
+                config["log.level"] = self._config.logs_level
 
             # Do not autostart the daemon if it is not running.
             # If Fuchsia-Controller need to start a daemon then it needs to know
@@ -97,8 +98,6 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 "Failed to create Fuchsia-Controller context"
             ) from err
 
-        self.check_connection()
-
     def check_connection(
         self,
         timeout: float = fuchsia_controller_interface.TIMEOUTS["TARGET_WAIT"],
@@ -116,18 +115,18 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 "Waiting for %s sec for Fuchsia-Controller to check the "
                 "connection from host to %s...",
                 timeout,
-                self._name,
+                self._target_name,
             )
             self.ctx.target_wait(timeout)
             _LOGGER.debug(
                 "Fuchsia-Controller completed the connection check from host "
                 "to %s...",
-                self._name,
+                self._target_name,
             )
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FuchsiaControllerConnectionError(
-                f"Fuchsia-Controller connection check failed for {self._name} "
-                f"with error: {err}"
+                f"Fuchsia-Controller connection check failed for "
+                f"{self._target_name} with error: {err}"
             )
 
     def connect_device_proxy(
@@ -153,3 +152,21 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
             raise errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status
+
+    def add_target(
+        self,
+    ) -> None:
+        """Adds a target to the ffx daemon manually and wait for the target to
+           connect to RCS.
+
+        Raises:
+            errors.FuchsiaControllerError: Failed to add target
+        """
+        try:
+            _LOGGER.debug("Adding target '%s'", self._target_ip_port)
+            self.ctx.target_add(target=str(self._target_ip_port), wait=True)
+            _LOGGER.debug("Target '%s' has been added", self._target_ip_port)
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FuchsiaControllerError(
+                f"Failed to add the target {self._target_ip_port} "
+            ) from err

@@ -148,7 +148,10 @@ pub mod tests {
     use {
         super::*,
         crate::backend_test::{BackendController, BackendTest},
-        std::io::{Read, Seek, SeekFrom, Write},
+        std::{
+            io::{Read, Seek, SeekFrom, Write},
+            os::fd::AsFd,
+        },
         tempfile::tempfile,
     };
 
@@ -183,7 +186,10 @@ pub mod tests {
         ) -> Result<(FileBackend, FileBackendController), Error> {
             let file = tempfile()?;
             file.set_len(size)?;
-            Ok((FileBackend::new(fdio::clone_channel(&file)?.into())?, FileBackendController(file)))
+            Ok((
+                FileBackend::new(fdio::clone_channel(file.as_fd())?.into())?,
+                FileBackendController(file),
+            ))
         }
     }
 

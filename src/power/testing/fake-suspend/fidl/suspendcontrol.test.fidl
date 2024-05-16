@@ -12,6 +12,7 @@ type SuspendResult = table {
     3: suspend_overhead zx.Duration;
 };
 
+@discoverable
 closed protocol Device {
     strict SetSuspendStates(table {
         1: suspend_states

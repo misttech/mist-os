@@ -26,6 +26,11 @@ ImagePtr NaiveImage::AdoptVkImage(ResourceManager* image_owner, ImageInfo info, 
   auto size_required = mem_requirements.size;
   auto alignment_required = mem_requirements.alignment;
 
+  if (!mem->base()) {
+    FX_LOGS(ERROR) << "AdoptVkImage failed: Memory has null handle.";
+    return nullptr;
+  }
+
   if (mem->size() < size_required) {
     FX_LOGS(ERROR) << "AdoptVkImage failed: Image requires " << size_required
                    << " bytes of memory, while the provided mem size is " << mem->size()

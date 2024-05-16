@@ -553,11 +553,12 @@ zx_status_t Driver::GetProperties(device_props_args_t* out_args,
   for (auto& prop : props) {
     switch (prop.key().Which()) {
       case fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue:
-        if (prop_count > out_args->prop_count) {
+        if (prop_count >= out_args->prop_count) {
           out_args->actual_prop_count = prop_count;
           out_args->actual_str_prop_count = str_prop_count;
           return ZX_ERR_BUFFER_TOO_SMALL;
         }
+        prop_count++;
         out_args->props[prop_count - 1].id = static_cast<uint16_t>(prop.key().int_value().value());
         if (!prop.value().int_value().has_value()) {
           return ZX_ERR_INVALID_ARGS;
@@ -565,11 +566,12 @@ zx_status_t Driver::GetProperties(device_props_args_t* out_args,
         out_args->props[prop_count - 1].value = prop.value().int_value().value();
         break;
       case fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue:
-        if (str_prop_count > out_args->str_prop_count) {
+        if (str_prop_count >= out_args->str_prop_count) {
           out_args->actual_prop_count = prop_count;
           out_args->actual_str_prop_count = str_prop_count;
           return ZX_ERR_BUFFER_TOO_SMALL;
         }
+        str_prop_count++;
         out_args->str_props[str_prop_count - 1].key = prop.key().string_value()->data();
         out_args->str_props[str_prop_count - 1].property_value = set_str_prop_value(prop.value());
         break;

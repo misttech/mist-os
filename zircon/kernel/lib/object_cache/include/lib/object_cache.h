@@ -267,6 +267,19 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
     for (Slab& slab : partial_list_) {
       Guard<Mutex> guard{&slab.control.lock};
     }
+
+    // Finally, wait until the slab_free_ops_in_flight_ count hits zero.  There
+    // is an extremely small chance that there is a thread still in the process
+    // of releasing our lock_ which we contested during the "orphan" pass above.
+    // If we failed to synchronize with this thread (because we had already
+    // moved our slab to the free list, or removed it entirely), the
+    // slab_free_ops_in_flight_ count provides us one last way to make sure that
+    // this thread has completely exited our lock before we allow it to become
+    // destructed.  Acq/Rel semantics here guarantee that we will properly see
+    // the full release of the lock as we destruct.
+    while (slab_free_ops_in_flight_.load(ktl::memory_order_acquire) != 0) {
+      arch::Yield();
+    }
   }
 
   // ObjectCache is not copiable.
@@ -563,28 +576,53 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
         // reference to the orphan slab.
         control.free_list.push_front(entry);
       } else {
-        control.object_cache->canary_.Assert();
-        Guard<Mutex> guard{&control.object_cache->lock_};
-
-        const bool was_full = is_full();
-        control.free_list.push_front(entry);
-
-        // This slab may have been orphaned while blocking on the cache lock
-        // above if the cache destructor ran concurrently with this free
+        // Our Object Cache instance was alive while we held our lock, and our
+        // slab must be a member of either the full or partial lists (meaning
+        // that a Object Cache in the process of destructing will need to bounce
+        // through our lock on its way out).
+        //
+        // Increment the free operation in-flight count in our OC.  This
+        // guarantees that we will have a chance to fully release our OC's lock
+        // and properly synchronize with the OC destructor in the case that we
+        // end up moving our slab to the free list, or removing it entirely from
+        // the object cache, just before we drop the lock.  Disable preemption
+        // while we do this.  We don't want the destructor spinning waiting for
+        // us to drop the in-flight count if we become preempted during this
         // operation.
-        if (!is_orphan()) {
-          if (was_full || is_empty()) {
-            SlabList& from_list =
-                was_full ? control.object_cache->full_list_ : control.object_cache->partial_list_;
-            SlabList& to_list = is_empty() ? control.object_cache->empty_list_
-                                           : control.object_cache->partial_list_;
-            to_list.push_front(from_list.erase(*this));
-          }
+        control.object_cache->canary_.Assert();
+        AutoPreemptDisabler preempt_disable;
+        control.object_cache->slab_free_ops_in_flight_.fetch_add(1u, ktl::memory_order_release);
 
-          if (is_empty() && control.object_cache->should_trim()) {
-            control.object_cache->RemoveSlab(this);
+        {  // Explicit scope for the OC guard.
+          Guard<Mutex> guard{&control.object_cache->lock_};
+
+          const bool was_full = is_full();
+          control.free_list.push_front(entry);
+
+          // This slab may have been orphaned while blocking on the cache lock
+          // above if the cache destructor ran concurrently with this free
+          // operation.
+          if (!is_orphan()) {
+            if (was_full || is_empty()) {
+              SlabList& from_list =
+                  was_full ? control.object_cache->full_list_ : control.object_cache->partial_list_;
+              SlabList& to_list = is_empty() ? control.object_cache->empty_list_
+                                             : control.object_cache->partial_list_;
+              to_list.push_front(from_list.erase(*this));
+            }
+
+            if (is_empty() && control.object_cache->should_trim()) {
+              control.object_cache->RemoveSlab(this);
+            }
           }
         }
+
+        // Drop the in-flight count back to what it was, and never attempt to
+        // touch our object cache again.  It might already be in the process of
+        // destructing.
+        [[maybe_unused]] uint32_t prev =
+            control.object_cache->slab_free_ops_in_flight_.fetch_sub(1u, ktl::memory_order_release);
+        DEBUG_ASSERT(prev != 0);
       }
 
       Allocator::CountObjectFree();
@@ -650,6 +688,7 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
 
   mutable DECLARE_MUTEX(ObjectCache) lock_;
   size_t slab_count_ TA_GUARDED(lock_){0};
+  ktl::atomic<uint32_t> slab_free_ops_in_flight_{0};
 
   // Lists of slabs in the object cache with the following functions:
   //  - The partial list contains slabs with some allocated objects and some

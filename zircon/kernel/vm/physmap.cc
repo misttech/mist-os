@@ -24,23 +24,39 @@ namespace {
 // Permissions & flags for regions of the physmap backed by memory. Execute permissions
 // are not included - we do not ever execute from physmap addresses.
 constexpr uint kPhysmapMmuFlags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;
+
 // Permissions & flags for regions of the physmap that are not backed by memory; they
 // may represent MMIOs or non-allocatable (ACPI NVS) memory. The kernel may access
 // some peripherals in these addresses (such as MMIO-based UARTs) in early boot.
+#if defined(__aarch64__)
+// ARM has its own periphmap area for peripherals and can tolerate a full unmap.
+constexpr uint kGapMmuFlags = 0;
+#else
 constexpr uint kGapMmuFlags =
     ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_UNCACHED_DEVICE;
+#endif
 
-// Protect the region [ |base|, |base| + |size| ) from the physmap.
-void physmap_protect_region(vaddr_t base, size_t size, uint mmu_flags) {
+// Changes the flags for the region [ |base|, |base| + |size| ) in the physmap.
+// If |mmu_flags| is 0, the region is unmapped.
+void physmap_modify_region(vaddr_t base, size_t size, uint mmu_flags) {
   DEBUG_ASSERT(base % PAGE_SIZE == 0);
   DEBUG_ASSERT(size % PAGE_SIZE == 0);
   const size_t page_count = size / PAGE_SIZE;
   LTRACEF("base=0x%" PRIx64 "; page_count=0x%" PRIx64 "\n", base, page_count);
 
-  // This code only runs during the init stages before other CPUs are brought only, and so we are
-  // safe to allow temporary enlargement of the operation.
-  zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Protect(
-      base, page_count, mmu_flags, ArchVmAspace::EnlargeOperation::Yes);
+  zx_status_t status;
+  if (mmu_flags != 0) {
+    // This code only runs during the init stages before other CPUs are brought only, and so we are
+    // safe to allow temporary enlargement of the operation.
+    status = VmAspace::kernel_aspace()->arch_aspace().Protect(base, page_count, mmu_flags,
+                                                              ArchVmAspace::EnlargeOperation::Yes);
+  } else {
+    // This code only runs during the init stages before other CPUs are brought only, and so we are
+    // safe to allow temporary enlargement of the operation.
+    size_t unmapped;
+    status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
+        base, page_count, ArchVmAspace::EnlargeOperation::Yes, &unmapped);
+  }
   ASSERT(status == ZX_OK);
 }
 
@@ -49,7 +65,7 @@ void physmap_protect_gap(vaddr_t base, size_t size) {
   // on peripherals being mapped in.
   //
   // TODO(https://fxbug.dev/42124648): Remove these regions completely.
-  physmap_protect_region(base, size, kGapMmuFlags);
+  physmap_modify_region(base, size, kGapMmuFlags);
 }
 
 }  // namespace
@@ -112,7 +128,7 @@ void physmap_protect_arena_regions_noexecute() {
   ASSERT(status == ZX_OK);
 
   for (uint i = 0; i < num_arenas; i++) {
-    physmap_protect_region(reinterpret_cast<vaddr_t>(paddr_to_physmap(arenas[i].base)),
-                           /*size=*/arenas[i].size, /*mmu_flags=*/kPhysmapMmuFlags);
+    physmap_modify_region(reinterpret_cast<vaddr_t>(paddr_to_physmap(arenas[i].base)),
+                          /*size=*/arenas[i].size, /*mmu_flags=*/kPhysmapMmuFlags);
   }
 }

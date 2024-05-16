@@ -344,6 +344,7 @@ def fuchsia_prebuilt_test_package(
         files = [],
         test_components = [],
         test_realm = None,
+        enumerated_component_filter = None,
         **kwargs):
     _make_prebuilt_package(
         name = name,
@@ -361,6 +362,7 @@ def fuchsia_prebuilt_test_package(
         component_run_tags = [_component_basename(c) for c in test_components],
         is_test = True,
         enumerate_test_components = True,
+        enumerated_component_filter = enumerated_component_filter,
         test_realm = test_realm,
         testonly = True,
         **kwargs

@@ -97,6 +97,12 @@ fuchsia_test_package("verity-benchmarks") {
     "//src/starnix/kernel:starnix_kernel_package",
     "//src/starnix/containers/debian:debian_package",
   ]
+
+  # We don't enable this test on Astro because of the potential for it to cause extra flash wear
+  # on that device type.
+  test_specs = {
+    environments = performance_testing_environments - [ astro_env ]
+  }
 }
 
 if (is_linux) {
@@ -155,6 +161,10 @@ fuchsia_component_perf_test("verity-benchmarks-perf") {
   test_type = "system"
   expected_metric_names_filepath =
       "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.verity.txt"
+
+  # We don't enable this test on Astro because of the potential for it to cause extra flash wear
+  # on that device type.
+  environments = performance_testing_environments - [ astro_env ]
 }
 
 group("benchmarks") {

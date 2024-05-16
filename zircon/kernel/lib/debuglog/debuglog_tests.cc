@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/debuglog.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 #include <zircon/types.h>
@@ -548,6 +549,37 @@ struct DebuglogTests {
 
     END_TEST;
   }
+
+  // Test that we can call write with an active chainlock transaction.
+  static bool write_with_active_chainlock_transaction() {
+    BEGIN_TEST;
+
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<DLog> log = ktl::make_unique<DLog>(&ac);
+    ASSERT_TRUE(ac.check());
+
+    char msg[] = "Message!";
+
+    ChainLock lock;
+    {
+      SingletonChainLockGuardIrqSave guard{lock, CLT_TAG("DebuglogTests")};
+      ASSERT_EQ(ZX_OK, log->Write(DEBUGLOG_WARNING, 0, {msg, sizeof(msg)}));
+    }
+
+    log->Shutdown(ZX_TIME_INFINITE);
+
+    // See that the message is in the DLog.
+    DlogReader reader;
+    reader.Initialize(nullptr, nullptr, log.get());
+    size_t got;
+    dlog_record_t rec{};
+    ASSERT_EQ(ZX_OK, reader.Read(0, &rec, &got));
+    ASSERT_EQ(sizeof(dlog_header) + sizeof(msg), got);
+    ASSERT_EQ(ZX_ERR_SHOULD_WAIT, reader.Read(0, &rec, &got));
+    reader.Disconnect();
+
+    END_TEST;
+  }
 };
 
 #define DEBUGLOG_UNITTEST(fname) UNITTEST(#fname, fname)
@@ -561,4 +593,5 @@ DEBUGLOG_UNITTEST(DebuglogTests::log_dumper_test)
 DEBUGLOG_UNITTEST(DebuglogTests::render_to_crashlog)
 DEBUGLOG_UNITTEST(DebuglogTests::read_record)
 DEBUGLOG_UNITTEST(DebuglogTests::shutdown)
+DEBUGLOG_UNITTEST(DebuglogTests::write_with_active_chainlock_transaction)
 UNITTEST_END_TESTCASE(debuglog_tests, "debuglog_tests", "Debuglog test")

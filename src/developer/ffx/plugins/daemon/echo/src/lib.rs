@@ -2,64 +2,127 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
+use async_trait::async_trait;
 use ffx_echo_args::EchoCommand;
+use fho::{daemon_protocol, return_bug, FfxMain, FfxTool, Result, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::EchoProxy;
-use std::io::{stdout, Write};
+use schemars::JsonSchema;
+use serde::Serialize;
 
-#[ffx_plugin(EchoProxy = "daemon::protocol")]
-pub async fn echo(echo_proxy: EchoProxy, cmd: EchoCommand) -> Result<()> {
-    echo_impl(echo_proxy, cmd, Box::new(stdout())).await
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum EchoResult {
+    /// Success
+    Ok(String),
+    /// Unexpected error with string denoting error message.
+    UnexpectedError(String),
 }
 
-async fn echo_impl<W: Write>(echo_proxy: EchoProxy, cmd: EchoCommand, mut writer: W) -> Result<()> {
+#[derive(FfxTool)]
+pub struct EchoTool {
+    #[command]
+    cmd: EchoCommand,
+    #[with(daemon_protocol())]
+    echo_proxy: EchoProxy,
+}
+
+fho::embedded_plugin!(EchoTool);
+
+#[async_trait(?Send)]
+impl FfxMain for EchoTool {
+    type Writer = VerifiedMachineWriter<EchoResult>;
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
+        match echo_impl(self.echo_proxy, self.cmd).await {
+            Ok(message) => {
+                writer.machine_or(&EchoResult::Ok(message.clone()), message)?;
+                return Ok(());
+            }
+            Err(e) => {
+                writer.machine_or(&EchoResult::UnexpectedError(e.to_string()), &e)?;
+                return Err(e);
+            }
+        }
+    }
+}
+
+async fn echo_impl(echo_proxy: EchoProxy, cmd: EchoCommand) -> Result<String> {
     let echo_text = cmd.text.unwrap_or("Ffx".to_string());
     match echo_proxy.echo_string(&echo_text).await {
-        Ok(r) => {
-            writeln!(writer, "SUCCESS: received {:?}", r)?;
-            Ok(())
-        }
-        Err(e) => panic!("ERROR: {:?}", e),
+        Ok(r) => Ok(format!("SUCCESS: received {r:?}")),
+        Err(e) => return_bug!("ERROR: {e:?}"),
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Context;
-    use fidl_fuchsia_developer_ffx::EchoRequest;
+    use fho::{Format, TestBuffers};
+    use fidl_fuchsia_developer_ffx as ffx;
+    use futures_lite::stream::StreamExt;
+    use serde_json::json;
 
-    fn setup_fake_service() -> EchoProxy {
-        setup_fake_echo_proxy(|req| match req {
-            EchoRequest::EchoString { value, responder } => {
-                responder
-                    .send(value.as_ref())
-                    .context("error sending response")
-                    .expect("should send");
+    fn setup_fake_echo_proxy() -> ffx::EchoProxy {
+        let (proxy, mut stream) =
+            fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>().unwrap();
+        fuchsia_async::Task::local(async move {
+            while let Ok(Some(req)) = stream.try_next().await {
+                match req {
+                    ffx::EchoRequest::EchoString { value, responder } => {
+                        responder.send(value.as_ref()).unwrap();
+                    }
+                }
             }
         })
+        .detach();
+        proxy
     }
 
     async fn run_echo_test(cmd: EchoCommand) -> String {
-        let mut output = Vec::new();
-        let proxy = setup_fake_service();
-        let result = echo_impl(proxy, cmd, &mut output).await;
+        let echo_proxy = setup_fake_echo_proxy();
+
+        let tool = EchoTool { cmd, echo_proxy };
+        let buffers = TestBuffers::default();
+        let writer = <EchoTool as FfxMain>::Writer::new_test(None, &buffers);
+
+        let result = tool.main(writer).await;
+
         assert!(result.is_ok());
-        String::from_utf8(output).expect("Invalid UTF-8 bytes")
+        buffers.into_stdout_str()
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_echo_with_no_text() -> Result<()> {
         let output = run_echo_test(EchoCommand { text: None }).await;
         assert_eq!("SUCCESS: received \"Ffx\"\n".to_string(), output);
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_echo_with_text() -> Result<()> {
         let output = run_echo_test(EchoCommand { text: Some("test".to_string()) }).await;
         assert_eq!("SUCCESS: received \"test\"\n".to_string(), output);
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_echo_with_text_machine() {
+        let echo_proxy = setup_fake_echo_proxy();
+
+        let tool = EchoTool { cmd: EchoCommand { text: Some("test".to_string()) }, echo_proxy };
+        let buffers = TestBuffers::default();
+        let writer = <EchoTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+
+        let result = tool.main(writer).await;
+
+        assert!(result.is_ok());
+        let output = buffers.into_stdout_str();
+
+        let err = format!("schema not valid {output}");
+        let json = serde_json::from_str(&output).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <EchoTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
+
+        let want = EchoResult::Ok("SUCCESS: received \"test\"".into());
+        assert_eq!(json, json!(want))
     }
 }

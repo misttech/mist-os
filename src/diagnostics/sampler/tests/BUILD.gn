@@ -94,6 +94,7 @@ resource("validation-fire-projects") {
   sources = [
     "configs/fire_1.json5",
     "configs/fire_2.json5",
+    "configs/fire_3.json5",
   ]
   outputs = [ "data/config/fire/any_name/projects/{{source_file_part}}" ]
 }

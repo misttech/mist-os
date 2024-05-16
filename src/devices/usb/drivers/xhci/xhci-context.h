@@ -43,8 +43,11 @@ struct TRBContext : fbl::DoublyLinkedListable<std::unique_ptr<TRBContext>>,
   // the TRB that will pointed to by a transfer event on completion.
   TRB* trb = nullptr;
 
-  // The first TRB in the TD.
+  // The first data TRB in the TD.
   TRB* first_trb = nullptr;
+
+  // The setup TRB for control transfers if it exists.
+  TRB* setup_trb = nullptr;
 
   // When the TD includes a short TRB, this will be set to the actual length of data transferred.
   std::optional<size_t> short_transfer_len;

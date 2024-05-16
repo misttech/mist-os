@@ -7,6 +7,10 @@ import("//build/cpp/sdk_source_set.gni")
 group("cpp") {
   public_deps = [
     ":cpp_library",
+
+    # TODO(https://fxbug.dev/340905704): suppress container-overflow detection
+    # due to false-positive with libc++ header code.
+    "//build/config/sanitizers:suppress-asan-container-overflow",
     "//src/lib/fuchsia-component-test:includes",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
   ]

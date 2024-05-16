@@ -6,9 +6,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // Netstack3 does not support SO_REUSEADDR and only partially supports
-                // SO_REUSEPORT for UDP sockets.
-                "AllUDPSockets/UDPSocketPairTest.ReuseAddrDefault/*",
+                // Netstack3 does not support SO_REUSEADDR and SO_REUSEPORT on bound sockets.
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddr/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddrReusePort/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReusePort/*",
@@ -57,7 +55,6 @@
                 // Netstack3 does not support many UDP socket options or operations
                 "AllUDPSockets/AllSocketPairTest.BasicRecvmmsg/*",
                 "AllUDPSockets/AllSocketPairTest.BasicSendmmsg/*",
-                "AllUDPSockets/AllSocketPairTest.GetSndBufSucceeds/*",
                 "AllUDPSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
                 "AllUDPSockets/AllSocketPairTest.GetSocketRcvbufOption/*",
                 "AllUDPSockets/AllSocketPairTest.KeepAliveSocketOption/*",
@@ -67,7 +64,6 @@
                 "AllUDPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
                 "AllUDPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
                 "AllUDPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
-                "AllUDPSockets/NonStreamSocketPairTest.SendMsgTooLarge/*",
                 "AllUDPSockets/UDPSocketPairTest.GetSocketAcceptConn/*",
                 "AllUDPSockets/UDPSocketPairTest.IPPKTINFODefault/*",
                 "AllUDPSockets/UDPSocketPairTest.RecvTosDefault/*",

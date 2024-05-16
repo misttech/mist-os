@@ -5,6 +5,7 @@
 #define SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_
 
 #include <stdint.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <functional>
@@ -13,6 +14,9 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <linux/genetlink.h>
+#include <linux/netlink.h>
+#include <linux/taskstats.h>
 
 #include "syscall_matchers.h"
 
@@ -203,6 +207,102 @@ struct MemoryMapping {
   std::string device;
   size_t inode;
   std::string pathname;
+};
+
+// Encoder for serializing netlink messages
+class NetlinkEncoder {
+ public:
+  // Writes a value to the buffer at the current offset
+  template <typename T>
+  void Write(const T &value) {
+    Write(&value, sizeof(T));
+  }
+
+  // Writes a value to the buffer at a specified offset
+  template <typename T>
+  void Write(T &value, size_t offset) {
+    Write(&value, offset, sizeof(T));
+  }
+
+  // Reads a value from the buffer at a specified offset
+  template <typename T>
+  void Read(T &out, size_t offset) {
+    Read(&out, offset, sizeof(T));
+  }
+
+  NetlinkEncoder(__u16 type, __u16 flags) { StartMessage(type, flags); }
+
+  // Starts a new netlink message
+  void StartMessage(__u16 type, __u16 flags) {
+    nlmsghdr header = {};
+    header.nlmsg_type = type;
+    // Length is encoded when the message is finalized
+    header.nlmsg_len = sizeof(nlmsghdr);
+    header.nlmsg_flags = flags;
+    header.nlmsg_pid = getpid();
+    header.nlmsg_seq = sequence_;
+    netlink_header = offset_;
+    Write(header);
+  }
+
+  // Begins a genetlink message
+  void BeginGenetlinkHeader(__u8 cmd) {
+    genlmsghdr hdr = {};
+    hdr.cmd = cmd;
+    hdr.version = 1;
+    genetlink_header = offset_;
+    Write(hdr);
+  }
+
+  // Starts encoding an NLA
+  void BeginNla(__u16 type) {
+    nlattr attr = {};
+    attr.nla_type = type;
+    // Updated when the NLA is finalized
+    attr.nla_len = 0;
+    nla_start = offset_;
+    Write(attr);
+  }
+
+  // Finishes encoding an NLA
+  void EndNla() {
+    nlattr attr;
+    Read(attr, nla_start);
+    attr.nla_len += static_cast<__u16>(offset_ - nla_start);
+    Write(attr, nla_start);
+  }
+
+  // Finalizes the message, allowing it to be sent using sendmsg.
+  void Finalize(iovec &out) {
+    nlmsghdr hdr;
+    Read(hdr, netlink_header);
+    out.iov_base = data_.data() + netlink_header;
+    hdr.nlmsg_len += offset_ - genetlink_header;
+    out.iov_len = hdr.nlmsg_len;
+    sequence_++;
+    Write(hdr, netlink_header);
+  }
+
+  // Clears the buffer, invalidating any iovecs that were
+  // obtained from this encoder.
+  void Clear() { offset_ = 0; }
+
+ private:
+  void Write(const void *data, size_t len) {
+    data_.resize(data_.size() + len);
+    memcpy(data_.data() + offset_, data, len);
+    offset_ += len;
+  }
+  void Read(void *data, size_t offset, size_t len) { memcpy(data, data_.data() + offset, len); }
+  void Write(const void *data, size_t offset, size_t len) {
+    memcpy(data_.data() + offset, data, len);
+  }
+  __u32 sequence_ = 0;
+  size_t offset_ = 0;
+  size_t nla_start;
+  size_t netlink_header;
+  size_t genetlink_header;
+  std::vector<uint8_t> data_;
 };
 
 // Returns the first memory mapping that matches the given predicate.

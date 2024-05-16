@@ -15,6 +15,7 @@ group("drivers") {
     "drivers/intel-i915",
     "drivers/simple:simple.bochs",
     "drivers/simple:simple.intel",
+    "drivers/vim3-display-detect:vim3-display-detect",
     "drivers/virtio-guest:virtio_gpu",
   ]
 }

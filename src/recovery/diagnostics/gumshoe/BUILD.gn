@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 resource("templates") {
   sources = [
@@ -65,12 +64,6 @@ fuchsia_package_with_single_component("gumshoe") {
     ":static",
     ":templates",
   ]
-}
-
-# Core shard added to core_realm_shards of product,
-# Example: /products/core.gni
-core_shard("gumshoe-core-shard") {
-  shard_file = "meta/gumshoe.core_shard.cml"
 }
 
 resource("test_inaccessible") {

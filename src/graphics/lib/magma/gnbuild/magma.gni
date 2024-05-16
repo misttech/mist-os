@@ -19,7 +19,10 @@ declare_args() {
 }
 
 # Target environments with an Intel GPU.
-magma_intel_gpu_envs = [ nuc_env ]
+magma_intel_gpu_envs = [
+  nuc7_env,
+  nuc11_env,
+]
 
 # Target environments with an ARM Mali GPU.
 magma_arm_gpu_envs = [

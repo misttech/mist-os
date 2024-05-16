@@ -129,7 +129,10 @@ network_unified_binary("bin") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [ "core:netstack3-core" ] + common_deps
+  deps = [
+           "core:netstack3-core",
+           "fuchsia:netstack3-fuchsia",
+         ] + common_deps
 
   test_deps = common_test_deps
 
@@ -187,7 +190,10 @@ rustc_binary("bin-instrumented") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [ "core:netstack3-core-instrumented" ] + common_deps
+  deps = [
+           "core:netstack3-core-instrumented",
+           "fuchsia:netstack3-fuchsia-instrumented",
+         ] + common_deps
   features = [ "instrumented" ]
 
   test_deps = common_test_deps

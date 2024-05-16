@@ -132,7 +132,8 @@ impl Into<zx::Status> for CreateRealmError {
                 ) => zx::Status::INTERNAL,
                 fcomponent::error::Error::DestroyWaiterTaken
                 | fcomponent::error::Error::MissingSource
-                | fcomponent::error::Error::CannotStartRootComponent(_) => zx::Status::INTERNAL,
+                | fcomponent::error::Error::CannotStartRootComponent(_)
+                | fcomponent::error::Error::FromDictionaryNotSupported(_) => zx::Status::INTERNAL,
             },
         }
     }

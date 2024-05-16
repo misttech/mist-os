@@ -4,11 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//src/sys/core/build/core_shard.gni")
-
-core_shard("adb-shard") {
-  shard_file = "meta/adb.core_shard.cml"
-}
 
 group("common") {
   public_deps = [

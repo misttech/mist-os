@@ -25,6 +25,8 @@ def _fuchsia_task_test_enumerated_components_impl(ctx, make_fuchsia_task):
         package_manifest,
         "--package-archive",
         package_archive,
+        "--match-component-name",
+        ctx.attr.component_name_filter,
     ]
     if ctx.attr.test_realm:
         args += [
@@ -50,6 +52,10 @@ def _fuchsia_task_test_enumerated_components_impl(ctx, make_fuchsia_task):
     implementation = _fuchsia_task_test_enumerated_components_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
+        "component_name_filter": attr.string(
+            doc = "A regex filter allowlist applied to component names; used to filter components for testing.",
+            default = ".+",
+        ),
         "repository": attr.string(
             doc = "The repository that has the published package.",
             mandatory = True,

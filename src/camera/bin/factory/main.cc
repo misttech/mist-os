@@ -13,7 +13,7 @@ int main() {
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   // Connect to required services.
-  fuchsia::sysmem::AllocatorHandle allocator;
+  fuchsia::sysmem2::AllocatorHandle allocator;
   zx_status_t status = context->svc()->Connect(allocator.NewRequest());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to request Allocator service.";

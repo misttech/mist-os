@@ -10,8 +10,6 @@
 
 namespace fidlc {
 
-static const SizeValue kMaxSize = SizeValue::Max();
-
 static std::optional<PrimitiveSubtype> BuiltinToPrimitiveSubtype(Builtin::Identity id) {
   switch (id) {
     case Builtin::Identity::kBool:
@@ -150,9 +148,6 @@ class Typespace::Creator {
 Type* Typespace::Create(TypeResolver* resolver, const Reference& layout,
                         const LayoutParameterList& parameters, const TypeConstraints& constraints,
                         bool compile_decls, LayoutInvocation* out_params) {
-  // TODO(https://fxbug.dev/42156099): lookup whether we've already created the type, and
-  // return it rather than create a new one. Lookup must be by name, arg_type,
-  // size, and nullability.
   return Creator(this, resolver, layout, parameters, constraints, compile_decls, out_params)
       .Create();
 }

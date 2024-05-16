@@ -5,22 +5,19 @@ library fuchsia.component.sandbox;
 
 using zx;
 using fuchsia.io;
-using fuchsia.unknown;
 
 /// Maximum number of bytes in a [DataCapability].
 const MAX_DATA_LENGTH uint32 = 8192;
 
-/// Maximum number of items returned by [DictionaryIterator].
+/// Maximum number of items returned by [DictionaryItemIterator].
 const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
 
+/// Maximum number of items returned by [DictionaryKeyIterator].
+const MAX_DICTIONARY_KEYS_CHUNK uint32 = 128;
+
 @available(added=HEAD)
-closed protocol HandleCapability {
-    compose fuchsia.unknown.Cloneable;
-    strict GetHandle() -> (resource struct {
-        handle zx.Handle;
-    }) error @generated_name("HandleCapabilityError") strict enum {
-        UNAVAILABLE = 1;
-    };
+type OneShotHandle = resource struct {
+    token zx.Handle:EVENTPAIR;
 };
 
 @available(added=HEAD)
@@ -32,17 +29,17 @@ type DataCapability = flexible union {
 };
 
 @available(added=HEAD)
-type SenderCapability = resource struct {
+type Connector = resource struct {
     token zx.Handle:EVENTPAIR;
 };
 
 @available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
-    2: handle client_end:HandleCapability;
+    2: handle OneShotHandle;
     3: data DataCapability;
     4: dictionary client_end:Dictionary;
-    5: sender SenderCapability;
+    5: connector Connector;
     6: directory client_end:fuchsia.io.Directory;
     7: router client_end:Router;
 };
@@ -115,15 +112,6 @@ open protocol Dictionary {
         capability Capability;
     }) error DictionaryError;
 
-    /// Returns all items in this dictionary, sorted by key in natural order.
-    ///
-    /// This operation creates shallow clones of values.
-    // TODO(b/314361448): Remove once callers use Dictionary.Enumerate instead
-    @available(added=HEAD)
-    flexible Read() -> (resource struct {
-        items vector<DictionaryItem>:MAX;
-    });
-
     /// Creates a new connection to the same underlying dictionary.
     ///
     /// Use `Copy` to a new dictionary with clones of all the exiting entries.
@@ -143,13 +131,20 @@ open protocol Dictionary {
         dictionary client_end:Dictionary;
     });
 
-    /// Enumerates the entries in this dictionary.
+    /// Enumerates the items in this dictionary.
     ///
     /// Creates a clone of each item during enumeration.
     @available(added=HEAD)
     flexible Enumerate(resource struct {
-        contents server_end:DictionaryIterator;
+        iterator server_end:DictionaryItemIterator;
     });
+
+    /// Enumerates the keys in this dictionary.
+    @available(added=HEAD)
+    flexible Keys(resource struct {
+        iterator server_end:DictionaryKeyIterator;
+    });
+
 
     /// Removes all the entries in this dictionary.
     ///
@@ -157,24 +152,22 @@ open protocol Dictionary {
     /// enumerating them.
     @available(added=HEAD)
     flexible Drain(resource struct {
-        contents server_end:<DictionaryIterator, optional>;
+        iterator server_end:<DictionaryItemIterator, optional>;
     });
 };
 
 @available(added=HEAD)
-open protocol DictionaryIterator {
+open protocol DictionaryItemIterator {
     flexible GetNext() -> (resource struct {
         items vector<DictionaryItem>:MAX_DICTIONARY_ITEMS_CHUNK;
     });
 };
 
-/// A sender allows a client to send a channel to the framework
-/// so that it can be connected.
-@discoverable
 @available(added=HEAD)
-open protocol Sender {
-    /// Sends a channel over this sender.
-    flexible Send(ProtocolPayload);
+open protocol DictionaryKeyIterator {
+    flexible GetNext() -> (resource struct {
+        keys vector<DictionaryKey>:MAX_DICTIONARY_KEYS_CHUNK;
+    });
 };
 
 /// This represents a component within the framework.
@@ -203,6 +196,7 @@ type RouterError = flexible enum : uint32 {
 };
 
 /// A router allows a client to request a capability.
+@discoverable
 @available(added=HEAD)
 open protocol Router {
     flexible Route(RouteRequest) -> (resource struct {
@@ -225,6 +219,15 @@ type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
 };
 
+@available(added=HEAD)
+type FactoryError = flexible enum : uint32 {
+    /// An invalid argument was passed.
+    INVALID_ARGS = 1;
+
+    /// The requested resource was unavailable.
+    UNAVAILABLE = 2;
+};
+
 /// The [`Factory`] protocol handles:
 ///
 /// - Instantiation of sandbox types.
@@ -233,22 +236,41 @@ type ProtocolPayload = resource struct {
 @discoverable
 @available(added=HEAD)
 open protocol Factory {
-    /// Operate on the provided sender capability.
+    /// Open a connection from the provided [Connector] capability.
     ///
-    /// Consumes a token referencing a bedrock object and serves the
-    /// corresponding FIDL representation on `server_end`. The peer of the
-    /// `server_end` is another reference to the bedrock object. Dropping the
-    /// control channel decreases one reference on the object.
-    flexible ConnectToSender(resource struct {
-        capability SenderCapability;
-        server_end server_end:Sender;
+    /// If there is an error, it will be reported as a zx.Status epitaph on `server_end`.
+    /// Errors:
+    ///
+    /// - `INVALID_ARGS`: `capability` is not a recognized [Connector].
+    flexible OpenConnector(resource struct {
+        capability Connector;
+        server_end zx.Handle:CHANNEL;
     });
 
-    /// Creates a `Sender` from a client served `Receiver`.
-    flexible CreateSender(resource struct {
+    /// Extract the handle owned by the underlying `capability`, if it wasn't taken already.
+    ///
+    /// Errors:
+    ///
+    /// - `INVALID_ARGS`: `capability` does not contain a recognized [OneShotHandle] token.
+    /// - `UNAVAILABLE`: The underlying handle was already taken.h
+    flexible TakeHandle(resource struct {
+        capability OneShotHandle;
+    }) -> (resource struct {
+        handle zx.Handle;
+    }) error FactoryError;
+
+    /// Creates a `Connector` from a client served `Receiver`.
+    flexible CreateConnector(resource struct {
         receiver client_end:Receiver;
     }) -> (resource struct {
-        capability SenderCapability;
+        capability Connector;
+    });
+
+    /// Creates a `OneShotHandle` from the provided `handle`.
+    flexible CreateOneShotHandle(resource struct {
+        handle zx.Handle;
+    }) -> (resource struct {
+        capability OneShotHandle;
     });
 
     /// Creates a new empty [`Dictionary`].

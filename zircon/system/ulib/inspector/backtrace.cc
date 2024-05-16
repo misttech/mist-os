@@ -30,7 +30,7 @@
 #include "src/lib/unwinder/unwind.h"
 
 __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread) {
-  static constexpr int kBacktraceFrameLimit = 50;
+  static constexpr int kBacktraceFrameLimit = 200;
 
   // Setup memory and modules.
   unwinder::FuchsiaMemory memory(process);

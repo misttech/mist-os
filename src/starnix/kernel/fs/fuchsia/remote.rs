@@ -10,7 +10,7 @@ use crate::{
     vfs::{
         buffers::{with_iovec_segments, InputBuffer, OutputBuffer},
         default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-        fileops_impl_seekable, fs_args, fs_node_impl_not_dir, fs_node_impl_symlink,
+        fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
         fsverity::FsVerityState,
         Anon, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
@@ -18,7 +18,7 @@ use crate::{
         ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
     },
 };
-use bstr::{ByteSlice, B};
+use bstr::ByteSlice;
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
@@ -50,6 +50,7 @@ use syncio::{
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
     DirentIterator, OpenOptions, XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
 };
+use vfs::ProtocolsExt;
 
 pub struct RemoteFs {
     supports_open2: bool,
@@ -176,6 +177,16 @@ impl RemoteFs {
                 ".",
                 &fio::ConnectionProtocols::Node(fio::NodeOptions {
                     flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                    protocols: Some(fio::NodeProtocols {
+                        directory: Some(fio::DirectoryProtocolOptions {
+                            // Optional rights will be negotiated. By setting `optional_rights` to
+                            // the full set of rights, this connection will have rights that the
+                            // `root_proxy` connection have.
+                            optional_rights: Some(fio::Operations::all()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
                     attributes: Some(fio::NodeAttributesQuery::ID),
                     ..Default::default()
                 }),
@@ -231,22 +242,12 @@ impl RemoteFs {
         // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
         // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
         // selinux support is further along, we might want to remove this mount option.
-        let context: Option<FsString> = if kernel.has_fake_selinux() {
-            fs_args::generic_parse_mount_options(options.params.as_ref())?
-                .get(B("defcontext"))
-                .map(|v| v.to_owned())
-        } else {
-            None
-        };
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached(CacheConfig::default()),
             RemoteFs { supports_open2, use_remote_ids, root_proxy },
             options,
-        );
-        if let Some(context) = context {
-            fs.selinux_context.set(context).unwrap();
-        }
+        )?;
         let mut root_node = FsNode::new_root(remote_node);
         if use_remote_ids {
             root_node.node_id = node_id;
@@ -415,6 +416,9 @@ impl FsNodeOps for RemoteNode {
 
         let zxio;
         let mut node_id;
+        let open_flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE;
         if fs_ops.supports_open2 {
             if !(mode.is_reg()
                 || mode.is_chr()
@@ -428,6 +432,7 @@ impl FsNodeOps for RemoteNode {
                 has: zxio_node_attr_has_t { id: true, ..Default::default() },
                 ..Default::default()
             };
+            let io2_rights = open_flags.rights().unwrap_or(fio::Operations::empty());
             zxio = Arc::new(
                 self.zxio
                     .open2(
@@ -438,6 +443,7 @@ impl FsNodeOps for RemoteNode {
                                 ..Default::default()
                             }),
                             mode: CreationMode::Always,
+                            rights: io2_rights,
                             create_attr: Some(zxio_node_attributes_t {
                                 mode: mode.bits(),
                                 uid: owner.uid,
@@ -463,9 +469,6 @@ impl FsNodeOps for RemoteNode {
             if !mode.is_reg() || dev.bits() != 0 {
                 return error!(EINVAL, name);
             }
-            let open_flags = fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_READABLE;
             zxio = Arc::new(
                 self.zxio
                     .open(open_flags, name)
@@ -519,11 +522,16 @@ impl FsNodeOps for RemoteNode {
 
         let zxio;
         let mut node_id;
+        let open_flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::DIRECTORY;
         if fs_ops.supports_open2 {
             let mut attrs = zxio_node_attributes_t {
                 has: zxio_node_attr_has_t { id: true, ..Default::default() },
                 ..Default::default()
             };
+            let io2_rights = open_flags.rights().unwrap_or(fio::Operations::empty());
             zxio = Arc::new(
                 self.zxio
                     .open2(
@@ -534,6 +542,7 @@ impl FsNodeOps for RemoteNode {
                                 ..Default::default()
                             }),
                             mode: CreationMode::Always,
+                            rights: io2_rights,
                             create_attr: Some(zxio_node_attributes_t {
                                 mode: mode.bits(),
                                 uid: owner.uid,
@@ -554,10 +563,6 @@ impl FsNodeOps for RemoteNode {
             );
             node_id = attrs.id;
         } else {
-            let open_flags = fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::DIRECTORY;
             zxio = Arc::new(
                 self.zxio
                     .open(open_flags, name)
@@ -617,6 +622,7 @@ impl FsNodeOps for RemoteNode {
                 },
                 ..Default::default()
             };
+            let io2_rights = self.rights.rights().unwrap_or(fio::Operations::empty());
             zxio = Arc::new(
                 self.zxio
                     .open2(
@@ -628,6 +634,7 @@ impl FsNodeOps for RemoteNode {
                                 symlink: Some(Default::default()),
                                 ..Default::default()
                             }),
+                            rights: io2_rights,
                             ..Default::default()
                         },
                         Some(&mut attrs),
@@ -1705,31 +1712,25 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn test_blocking_io() -> Result<(), anyhow::Error> {
+    async fn test_blocking_io() {
         let (kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)?;
-
-        let thread = kernel.kthreads.spawner().spawn_and_get_result({
-            move |locked, current_task| {
-                assert_eq!(
-                    64,
-                    pipe.read(locked, &current_task, &mut VecOutputBuffer::new(64)).unwrap()
-                );
-            }
-        });
-
-        // Wait for the thread to become blocked on the read.
-        zx::Duration::from_seconds(2).sleep();
+        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR).unwrap();
 
         let bytes = [0u8; 64];
-        assert_eq!(64, server.write(&bytes)?);
+        assert_eq!(bytes.len(), server.write(&bytes).unwrap());
 
-        // The thread should unblock and join us here.
-        thread.await.expect("join");
+        // Spawn a kthread to get the right lock context.
+        let bytes_read = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result_sync(move |locked, current_task| {
+                pipe.read(locked, &current_task, &mut VecOutputBuffer::new(64)).unwrap()
+            })
+            .unwrap();
 
-        Ok(())
+        assert_eq!(bytes_read, bytes.len());
     }
 
     #[::fuchsia::test]

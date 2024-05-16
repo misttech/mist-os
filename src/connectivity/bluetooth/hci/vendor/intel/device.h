@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/ddk/driver.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <optional>
 
@@ -21,11 +22,11 @@ namespace btintel {
 
 class Device;
 
-using DeviceType = ddk::Device<Device, ddk::Initializable, ddk::GetProtocolable, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
+using DeviceType = ddk::Device<Device, ddk::Initializable, ddk::GetProtocolable, ddk::Unbindable>;
 
 class Device : public DeviceType,
                public ddk::BtHciProtocol<Device, ddk::base_protocol>,
+               public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor>,
                public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
   Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure, bool legacy_firmware_loading);
@@ -77,13 +78,19 @@ class Device : public DeviceType,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
-  void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override;
+  void NewEncodeCommand(NewEncodeCommandRequestView request,
+                        NewEncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // Deprecating interfaces.
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {}
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override {}
+
+  void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
 
   zx_status_t LoadSecureFirmware(zx::channel* cmd, zx::channel* acl);
   zx_status_t LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl);
@@ -102,7 +109,10 @@ class Device : public DeviceType,
   // |fw_size| receives the size of the firmware if valid.
   zx_handle_t MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw_size);
 
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
+
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
 
   ddk::BtHciProtocolClient hci_;
   bool secure_;

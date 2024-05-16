@@ -169,26 +169,8 @@ void DumpCommonDiagnostics(cpu_num_t cpu, FILE* output_target, FailureSeverity s
   fprintf(output_target, "timer_ints: %lu, interrupts: %lu\n", percpu.stats.timer_ints,
           percpu.stats.interrupts);
 
-  if (ThreadLock::Get()->lock().HolderCpu() == cpu) {
-    fprintf(output_target,
-            "thread lock is held by cpu %u, skipping thread and scheduler diagnostics\n", cpu);
-    return;
-  }
-
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-  percpu.scheduler.DumpThreadLocked(output_target);
-  Thread* thread = percpu.scheduler.active_thread();
-  if (thread != nullptr) {
-    fprintf(output_target, "thread: pid=%lu tid=%lu\n", thread->pid(), thread->tid());
-    ThreadDispatcher* user_thread = thread->user_thread();
-    if (user_thread != nullptr) {
-      ProcessDispatcher* process = user_thread->process();
-      char name[ZX_MAX_NAME_LEN]{};
-      [[maybe_unused]] zx_status_t status = process->get_name(name);
-      DEBUG_ASSERT(status == ZX_OK);
-      fprintf(output_target, "process: name=%s\n", name);
-    }
-  }
+  percpu.scheduler.Dump(output_target);
+  percpu.scheduler.DumpActiveThread(output_target);
 
   if (severity == FailureSeverity::Fatal) {
     fprintf(output_target, "\n");

@@ -58,7 +58,10 @@ group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
   testonly = true
-  public_deps = [ "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging" ]
+  public_deps = [
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
+    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
+  ]
 }
 
 group("workbench_emulator_staging_tests") {
@@ -75,6 +78,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
+    "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
     "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
   ]
@@ -85,6 +89,7 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
     "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
+    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
   ]
 }
 
@@ -116,6 +121,7 @@ group("workbench_nuc_staging_tests") {
   public_deps = [
     ":workbench_nuc_stable_tests",
     ":workbench_nuc_unstable_tests",
+    "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
   ]
 }
 
@@ -147,12 +153,12 @@ group("minimal_vim3_staging_tests") {
 # Note - workbench does not support SL4F
 group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "//src/storage/blackout/host:blackout_emulator" ]
 }
 
 group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
   testonly = true
-  public_deps = [ "//src/storage/blackout/host:blackout_emulator" ]
+  public_deps = []
 }
 
 group("workbench_emulator_staging_packages") {

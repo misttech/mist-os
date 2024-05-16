@@ -442,6 +442,15 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			&stringInLogCheck{String: "double fault, halting", Type: lt},
 			// This string can show up in some boot tests.
 			&stringInLogCheck{String: "entering panic shell loop", Type: lt, ExceptStrings: []string{"Boot-test-successful!"}},
+			// For https://fxbug.dev/42067738. This should track all boot test failures
+			// where either the success string shows up in one of the logs but we fail
+			// to read it, or the test times out before the success string gets written.
+			&stringInLogCheck{
+				String:             "Boot-test-successful!",
+				Type:               lt,
+				SkipAllPassedTests: true,
+				AlwaysFlake:        true,
+			},
 		}...)
 	}
 
@@ -518,6 +527,14 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToServeMsg),
 			Type:   swarmingOutputType,
 		},
+		// For failures to resolve packages.
+		// LINT.IfChange(tuf_error)
+		&stringInLogCheck{
+			String:         "rust tuf error",
+			Type:           swarmingOutputType,
+			SkipPassedTask: true,
+		},
+		// LINT.ThenChange(/src/sys/pkg/bin/pkg-resolver/src/error.rs:tuf_error)
 		// For https://fxbug.dev/42143746.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.SerialReadErrorMsg),
@@ -737,6 +754,12 @@ func infraToolLogChecks() []FailureModeCheck {
 		// This error usually happens due to an SSH failure, so that error should take precedence.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToRunSnapshotMsg),
+			Type:   swarmingOutputType,
+		},
+		// For https://fxbug.dev/338520852 and similar issues.
+		// This is caused by lacewing tests which fail to harness the device.
+		&stringInLogCheck{
+			String: "Termination Signal Type: FuchsiaDeviceError",
 			Type:   swarmingOutputType,
 		},
 	}

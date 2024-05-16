@@ -7081,6 +7081,201 @@ extern "C" {
     #[doc = " Get the region code.\n\n The radio region format is the 2-bytes ascii representation of the ISO 3166 alpha-2 code.\n\n @param[in]  aInstance    The OpenThread instance structure.\n @param[out] aRegionCode  The radio region code. The `aRegionCode >> 8` is first ascii char\n                          and the `aRegionCode & 0xff` is the second ascii char.\n\n @retval  OT_ERROR_INVALID_ARGS     @p aRegionCode is nullptr.\n @retval  OT_ERROR_FAILED           Other platform specific errors.\n @retval  OT_ERROR_NONE             Successfully got region code.\n @retval  OT_ERROR_NOT_IMPLEMENTED  The feature is not implemented.\n"]
     pub fn otLinkGetRegion(aInstance: *mut otInstance, aRegionCode: *mut u16) -> otError;
 }
+#[doc = " Represents the result (value) for a Link Metrics query.\n"]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct otLinkMetricsValues {
+    #[doc = "< Specifies which metrics values are present/included."]
+    pub mMetrics: otLinkMetrics,
+    #[doc = "< The value of Pdu Count."]
+    pub mPduCountValue: u32,
+    #[doc = "< The value LQI."]
+    pub mLqiValue: u8,
+    #[doc = "< The value of Link Margin."]
+    pub mLinkMarginValue: u8,
+    #[doc = "< The value of Rssi."]
+    pub mRssiValue: i8,
+}
+#[doc = " Represents which frames are accounted in a Forward Tracking Series.\n"]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct otLinkMetricsSeriesFlags {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+}
+impl otLinkMetricsSeriesFlags {
+    #[inline]
+    pub fn mLinkProbe(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mLinkProbe(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mMacData(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mMacData(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(1usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mMacDataRequest(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mMacDataRequest(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(2usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mMacAck(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(3usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mMacAck(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(3usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        mLinkProbe: bool,
+        mMacData: bool,
+        mMacDataRequest: bool,
+        mMacAck: bool,
+    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 1u8, {
+            let mLinkProbe: u8 = unsafe { ::std::mem::transmute(mLinkProbe) };
+            mLinkProbe as u64
+        });
+        __bindgen_bitfield_unit.set(1usize, 1u8, {
+            let mMacData: u8 = unsafe { ::std::mem::transmute(mMacData) };
+            mMacData as u64
+        });
+        __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let mMacDataRequest: u8 = unsafe { ::std::mem::transmute(mMacDataRequest) };
+            mMacDataRequest as u64
+        });
+        __bindgen_bitfield_unit.set(3usize, 1u8, {
+            let mMacAck: u8 = unsafe { ::std::mem::transmute(mMacAck) };
+            mMacAck as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+#[doc = "< Clear."]
+pub const OT_LINK_METRICS_ENH_ACK_CLEAR: otLinkMetricsEnhAckFlags = 0;
+#[doc = "< Register."]
+pub const OT_LINK_METRICS_ENH_ACK_REGISTER: otLinkMetricsEnhAckFlags = 1;
+#[doc = " Enhanced-ACK Flags.\n\n These are used in Enhanced-ACK Based Probing to indicate whether to register or clear the probing.\n"]
+pub type otLinkMetricsEnhAckFlags = ::std::os::raw::c_uint;
+pub const OT_LINK_METRICS_STATUS_SUCCESS: otLinkMetricsStatus = 0;
+pub const OT_LINK_METRICS_STATUS_CANNOT_SUPPORT_NEW_SERIES: otLinkMetricsStatus = 1;
+pub const OT_LINK_METRICS_STATUS_SERIESID_ALREADY_REGISTERED: otLinkMetricsStatus = 2;
+pub const OT_LINK_METRICS_STATUS_SERIESID_NOT_RECOGNIZED: otLinkMetricsStatus = 3;
+pub const OT_LINK_METRICS_STATUS_NO_MATCHING_FRAMES_RECEIVED: otLinkMetricsStatus = 4;
+pub const OT_LINK_METRICS_STATUS_OTHER_ERROR: otLinkMetricsStatus = 254;
+#[doc = " Link Metrics Status values.\n"]
+pub type otLinkMetricsStatus = ::std::os::raw::c_uint;
+#[doc = " Pointer is called when a Link Metrics report is received.\n\n @param[in]  aSource         A pointer to the source address.\n @param[in]  aMetricsValues  A pointer to the Link Metrics values (the query result).\n @param[in]  aStatus         The status code in the report (only useful when @p aMetricsValues is NULL).\n @param[in]  aContext        A pointer to application-specific context.\n"]
+pub type otLinkMetricsReportCallback = ::std::option::Option<
+    unsafe extern "C" fn(
+        aSource: *const otIp6Address,
+        aMetricsValues: *const otLinkMetricsValues,
+        aStatus: otLinkMetricsStatus,
+        aContext: *mut ::std::os::raw::c_void,
+    ),
+>;
+#[doc = " Pointer is called when a Link Metrics Management Response is received.\n\n @param[in]  aSource         A pointer to the source address.\n @param[in]  aStatus         The status code in the response.\n @param[in]  aContext        A pointer to application-specific context.\n"]
+pub type otLinkMetricsMgmtResponseCallback = ::std::option::Option<
+    unsafe extern "C" fn(
+        aSource: *const otIp6Address,
+        aStatus: otLinkMetricsStatus,
+        aContext: *mut ::std::os::raw::c_void,
+    ),
+>;
+#[doc = " Pointer is called when Enh-ACK Probing IE is received.\n\n @param[in] aShortAddress     The Mac short address of the Probing Subject.\n @param[in] aExtAddress       A pointer to the Mac extended address of the Probing Subject.\n @param[in] aMetricsValues    A pointer to the Link Metrics values obtained from the IE.\n @param[in] aContext          A pointer to application-specific context.\n"]
+pub type otLinkMetricsEnhAckProbingIeReportCallback = ::std::option::Option<
+    unsafe extern "C" fn(
+        aShortAddress: otShortAddress,
+        aExtAddress: *const otExtAddress,
+        aMetricsValues: *const otLinkMetricsValues,
+        aContext: *mut ::std::os::raw::c_void,
+    ),
+>;
+extern "C" {
+    #[doc = " Sends an MLE Data Request to query Link Metrics.\n\n It could be either Single Probe or Forward Tracking Series.\n\n @param[in]  aInstance            A pointer to an OpenThread instance.\n @param[in]  aDestination         A pointer to the destination address.\n @param[in]  aSeriesId            The Series ID to query about, 0 for Single Probe.\n @param[in]  aLinkMetricsFlags    A pointer to flags specifying what metrics to query.\n @param[in]  aCallback            A pointer to a function that is called when Link Metrics report is received.\n @param[in]  aCallbackContext     A pointer to application-specific context.\n\n @retval OT_ERROR_NONE              Successfully sent a Link Metrics query message.\n @retval OT_ERROR_NO_BUFS           Insufficient buffers to generate the MLE Data Request message.\n @retval OT_ERROR_UNKNOWN_NEIGHBOR  @p aDestination is not link-local or the neighbor is not found.\n @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.\n"]
+    pub fn otLinkMetricsQuery(
+        aInstance: *mut otInstance,
+        aDestination: *const otIp6Address,
+        aSeriesId: u8,
+        aLinkMetricsFlags: *const otLinkMetrics,
+        aCallback: otLinkMetricsReportCallback,
+        aCallbackContext: *mut ::std::os::raw::c_void,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Sends an MLE Link Metrics Management Request to configure or clear a Forward Tracking Series.\n\n @param[in] aInstance          A pointer to an OpenThread instance.\n @param[in] aDestination       A pointer to the destination address.\n @param[in] aSeriesId          The Series ID to operate with.\n @param[in] aSeriesFlags       The Series Flags that specifies which frames are to be accounted.\n @param[in] aLinkMetricsFlags  A pointer to flags specifying what metrics to query. Should be `NULL` when\n                               `aSeriesFlags` is `0`.\n @param[in]  aCallback         A pointer to a function that is called when Link Metrics Management Response is\n                               received.\n @param[in]  aCallbackContext  A pointer to application-specific context.\n\n @retval OT_ERROR_NONE              Successfully sent a Link Metrics Management Request message.\n @retval OT_ERROR_NO_BUFS           Insufficient buffers to generate the MLE Link Metrics Management Request message.\n @retval OT_ERROR_INVALID_ARGS      @p aSeriesId is not within the valid range.\n @retval OT_ERROR_UNKNOWN_NEIGHBOR  @p aDestination is not link-local or the neighbor is not found.\n @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.\n"]
+    pub fn otLinkMetricsConfigForwardTrackingSeries(
+        aInstance: *mut otInstance,
+        aDestination: *const otIp6Address,
+        aSeriesId: u8,
+        aSeriesFlags: otLinkMetricsSeriesFlags,
+        aLinkMetricsFlags: *const otLinkMetrics,
+        aCallback: otLinkMetricsMgmtResponseCallback,
+        aCallbackContext: *mut ::std::os::raw::c_void,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Sends an MLE Link Metrics Management Request to configure/clear an Enhanced-ACK Based Probing.\n This functionality requires OT_LINK_METRICS_INITIATOR feature enabled.\n\n @param[in] aInstance          A pointer to an OpenThread instance.\n @param[in] aDestination       A pointer to the destination address.\n @param[in] aEnhAckFlags       Enh-ACK Flags to indicate whether to register or clear the probing. `0` to clear and\n                               `1` to register. Other values are reserved.\n @param[in] aLinkMetricsFlags  A pointer to flags specifying what metrics to query. Should be `NULL` when\n                               `aEnhAckFlags` is `0`.\n @param[in] aCallback          A pointer to a function that is called when an Enhanced Ack with Link Metrics is\n                               received.\n @param[in] aCallbackContext   A pointer to application-specific context.\n\n @retval OT_ERROR_NONE              Successfully sent a Link Metrics Management Request message.\n @retval OT_ERROR_NO_BUFS           Insufficient buffers to generate the MLE Link Metrics Management Request message.\n @retval OT_ERROR_INVALID_ARGS      @p aEnhAckFlags is not a valid value or @p aLinkMetricsFlags isn't correct.\n @retval OT_ERROR_UNKNOWN_NEIGHBOR  @p aDestination is not link-local or the neighbor is not found.\n @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.\n"]
+    pub fn otLinkMetricsConfigEnhAckProbing(
+        aInstance: *mut otInstance,
+        aDestination: *const otIp6Address,
+        aEnhAckFlags: otLinkMetricsEnhAckFlags,
+        aLinkMetricsFlags: *const otLinkMetrics,
+        aCallback: otLinkMetricsMgmtResponseCallback,
+        aCallbackContext: *mut ::std::os::raw::c_void,
+        aEnhAckCallback: otLinkMetricsEnhAckProbingIeReportCallback,
+        aEnhAckCallbackContext: *mut ::std::os::raw::c_void,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Sends an MLE Link Probe message.\n\n @param[in] aInstance       A pointer to an OpenThread instance.\n @param[in] aDestination    A pointer to the destination address.\n @param[in] aSeriesId       The Series ID [1, 254] which the Probe message aims at.\n @param[in] aLength         The length of the data payload in Link Probe TLV, [0, 64] (per Thread 1.2 spec, 4.4.37).\n\n @retval OT_ERROR_NONE              Successfully sent a Link Probe message.\n @retval OT_ERROR_NO_BUFS           Insufficient buffers to generate the MLE Link Probe message.\n @retval OT_ERROR_INVALID_ARGS      @p aSeriesId or @p aLength is not within the valid range.\n @retval OT_ERROR_UNKNOWN_NEIGHBOR  @p aDestination is not link-local or the neighbor is not found.\n @retval OT_ERROR_NOT_CAPABLE       The neighbor is not a Thread 1.2 device and does not support Link Metrics.\n"]
+    pub fn otLinkMetricsSendLinkProbe(
+        aInstance: *mut otInstance,
+        aDestination: *const otIp6Address,
+        aSeriesId: u8,
+        aLength: u8,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " If Link Metrics Manager is enabled.\n\n @param[in] aInstance       A pointer to an OpenThread instance.\n\n @retval TRUE   Link Metrics Manager is enabled.\n @retval FALSE  Link Metrics Manager is not enabled.\n"]
+    pub fn otLinkMetricsManagerIsEnabled(aInstance: *mut otInstance) -> bool;
+}
+extern "C" {
+    #[doc = " Enable or disable Link Metrics Manager.\n\n @param[in] aInstance       A pointer to an OpenThread instance.\n @param[in] aEnable         A boolean indicating to enable or disable.\n"]
+    pub fn otLinkMetricsManagerSetEnabled(aInstance: *mut otInstance, aEnable: bool);
+}
+extern "C" {
+    #[doc = " Get Link Metrics data of a neighbor by its extended address.\n\n @param[in]  aInstance           A pointer to an OpenThread instance.\n @param[in]  aExtAddress         A pointer to the Mac extended address of the Probing Subject.\n @param[out] aLinkMetricsValues  A pointer to the Link Metrics values of the subject.\n\n @retval OT_ERROR_NONE              Successfully got the Link Metrics data.\n @retval OT_ERROR_INVALID_ARGS      The arguments are invalid.\n @retval OT_ERROR_NOT_FOUND         No neighbor with the given extended address is found.\n"]
+    pub fn otLinkMetricsManagerGetMetricsValueByExtAddr(
+        aInstance: *mut otInstance,
+        aExtAddress: *const otExtAddress,
+        aLinkMetricsValues: *mut otLinkMetricsValues,
+    ) -> otError;
+}
 #[doc = " Pointer on receipt of a IEEE 802.15.4 frame.\n\n @param[in]  aInstance    A pointer to an OpenThread instance.\n @param[in]  aFrame       A pointer to the received frame or NULL if the receive operation was aborted.\n @param[in]  aError       OT_ERROR_NONE when successfully received a frame.\n                          OT_ERROR_ABORT when reception was aborted and a frame was not received.\n"]
 pub type otLinkRawReceiveDone = ::std::option::Option<
     unsafe extern "C" fn(aInstance: *mut otInstance, aFrame: *mut otRadioFrame, aError: otError),

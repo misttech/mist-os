@@ -10,7 +10,9 @@ pub trait GraphObject {
     fn write_to_node(node: &inspect::Node, id: &Self::Id);
 }
 
+#[derive(Debug)]
 pub struct VertexMarker<T>(PhantomData<T>);
+#[derive(Debug)]
 pub struct EdgeMarker;
 
 impl GraphObject for EdgeMarker {

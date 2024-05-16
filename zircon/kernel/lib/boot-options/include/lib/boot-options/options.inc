@@ -727,17 +727,13 @@ anonymous pages. Enabling this makes the "kernel.page-scanner.zero-page-scans-pe
 have no effect, and it is an error to enable this without enabling "kernel.compression.reclaim_anonymous".
 )""")
 
-DEFINE_OPTION("kernel.pmm-checker.action", SmallString, pmm_checker_action, {"oops"}, R"""(
-Supported actions:
-- `oops`
-- `panic`
-
+DEFINE_OPTION("kernel.pmm-checker.action", CheckFailAction, pmm_checker_action, {CheckFailAction::kOops}, R"""(
 This option specifies which action is taken when the PMM checker detects
-corruption.
-
-When `oops`, a non-fatal kernel OOPS will be emitted when corruption is detected.
-
-When `panic` a fatal kernel panic will occur when corruption is detected.
+corruption.  Values must be one of:
+ * `oops`
+   - A non-fatal kernel OOPS will be emitted when corruption is detected.
+ * `panic`
+   - A fatal kernel panic will occur when corruption is detected.
 )""")
 
 DEFINE_OPTION("kernel.pmm-checker.enable", bool, pmm_checker_enabled, {false},
@@ -846,6 +842,16 @@ this option trades off improved performance in favor of reduced power consumptio
 
 DEPRECATED - This option is scheduled to be removed in an upcoming release.  Do not take any
 critical dependencies on it.
+)""")
+
+DEFINE_OPTION("kernel.ubsan.action", CheckFailAction, ubsan_action, {CheckFailAction::kPanic}, R"""(
+When the kernel is instrumented with UndefinedBehaviorSanitizer, problems
+it detects are reported on the serial console.  These can be fatal or not.
+Values must be one of:
+ * `oops`
+   - Detected undefined behavior causes a non-fatal kernel OOPS.
+ * `panic`
+   - Detected undefined behavior causes a fatal kernel panic.
 )""")
 
 // Machine-specific options are included here for all the kernel places.

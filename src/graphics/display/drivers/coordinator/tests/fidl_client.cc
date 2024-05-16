@@ -237,12 +237,14 @@ TestFidlClient::~TestFidlClient() {
     sync_completion_t done;
     auto task = new async::Task();
     task->set_handler(
-        [this, task, done_ptr = &done](async_dispatcher_t*, async::Task*, zx_status_t) {
+        [this, done_ptr = &done](async_dispatcher_t*, async::Task* task_ptr, zx_status_t) {
+          // Ensures that `task` gets deleted when the handler completes.
+          std::unique_ptr<async::Task> task(task_ptr);
+
           event_msg_wait_event_.Cancel();
           event_msg_wait_event_.set_object(ZX_HANDLE_INVALID);
 
           sync_completion_signal(done_ptr);
-          delete task;
         });
     if (task->Post(dispatcher_) != ZX_OK) {
       delete task;

@@ -27,12 +27,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-        },
-        {
-            directory: "dev-class-test",
-            rights: [ "r*" ],
-            path: "/dev/class/test",
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "test.suspendcontrol.Device",
+            ],
         },
         {
             protocol: [
@@ -53,10 +51,9 @@
             to: [ "#system-activity-governor" ],
         },
         {
-            directory: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "parent",
             to: "#system-activity-governor",
-            rights: [ "r*" ],
         },
     ],
     expose: [

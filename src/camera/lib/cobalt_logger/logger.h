@@ -121,6 +121,10 @@ class Logger {
   // We need to be able to cancel a posted reconnection task when |Logger| is destroyed.
   fxl::CancelableClosure reconnect_task_;
 
+  // Batch up dropped event log messages, to prevent flooding the logs
+  uint64_t dropped_events_since_last_report_ = 0;
+  zx::time droped_events_next_report_permitted_;
+
   uint64_t next_event_id_ = 0;
   bool shut_down_ = false;
 };

@@ -3,39 +3,12 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load(":providers.bzl", "FuchsiaDriverToolInfo", "FuchsiaPackageResourcesInfo")
-
-def _find_binary_resource(resources, tool_entry_point):
-    bin = None
-    if tool_entry_point:
-        for resource in resources:
-            if resource.dest == tool_entry_point:
-                bin = resource
-                break
-    else:
-        for resource in resources:
-            if resource.dest.startswith("bin"):
-                if bin != None:
-                    fail("Multiple binaries found. Please specify a single binary.")
-                bin = resource
-
-    if bin == None:
-        fail("Unable to find a suitable binary in the given resources.")
-
-    return bin
+load(":providers.bzl", "FuchsiaDriverToolInfo", "FuchsiaUnstrippedBinaryInfo")
 
 def _fuchsia_driver_tool_impl(ctx):
-    if FuchsiaPackageResourcesInfo in ctx.attr.binary:
-        resources = ctx.attr.binary[FuchsiaPackageResourcesInfo].resources
-    else:
-        resources = []
-
-    bin = _find_binary_resource(resources, ctx.attr.tool_entry_point)
-
     return [
         FuchsiaDriverToolInfo(
-            binary = bin,
-            resources = resources,
+            tool_path = ctx.attr.binary[FuchsiaUnstrippedBinaryInfo].dest,
         ),
     ]
 
@@ -68,19 +41,9 @@ fuchsia_driver_tool = rule(
     implementation = _fuchsia_driver_tool_impl,
     attrs = {
         "binary": attr.label(
-            doc = "The binary and its resources.",
+            doc = "The tool's fuchsia_cc_binary() target.",
             mandatory = True,
-            providers = [[FuchsiaPackageResourcesInfo]],
-        ),
-        "tool_entry_point": attr.string(
-            doc = """The path to the binaries entry point in the package.
-
-            The path to the entry point will be inferred by the passed in binary
-            if this value is not set. By default, the rule will look for a binary
-            in bin/ and use that value. If the package containing the tool does
-            not put the executable in bin/ or if bin/ contains multiple entries
-            then this attribute must be set.
-        """,
+            providers = [[FuchsiaUnstrippedBinaryInfo]],
         ),
     },
 )

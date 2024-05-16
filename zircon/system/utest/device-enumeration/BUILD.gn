@@ -42,7 +42,8 @@ test("device-enumeration") {
     "boards/astro.cc",
     "boards/gce_arm64.cc",
     "boards/nelson.cc",
-    "boards/nuc.cc",
+    "boards/nuc11.cc",
+    "boards/nuc7.cc",
     "boards/qemu_arm64.cc",
     "boards/qemu_riscv64.cc",
     "boards/qemu_x64.cc",
@@ -98,8 +99,12 @@ _boards = [
     nelson_env,
   ],
   [
-    "nuc",
-    nuc_env,
+    "nuc7",
+    nuc7_env,
+  ],
+  [
+    "nuc11",
+    nuc11_env,
   ],
   [
     "qemu_arm64",

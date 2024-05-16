@@ -3,9 +3,9 @@
 
 #include "src/developer/forensics/exceptions/process_limbo_manager.h"
 
+#include <fuchsia/exception/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "fuchsia/exception/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace forensics {

@@ -10,7 +10,6 @@ import("//build/toolchain/breakpad.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/default_tools.gni")
-import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/zircon/clang.gni")
 import("//build/toolchain/zircon/gcc.gni")
@@ -89,12 +88,6 @@ _buildidtool =
 #     If defined, override the global value of the same name.
 #     If true, link and strip remotely using re-client on RBE.
 #     Type: bool
-#
-#   use_goma
-#     Optional: If defined, overrides the $use_goma build argument.
-#     If true, compilation commands are prefixed with "$goma_dir/gomacc".
-#     Type: bool
-#     Default: $use_goma
 #
 #   use_ccache
 #     Optional: If defined, overrides the $use_ccache build argument.
@@ -177,9 +170,6 @@ template("zircon_toolchain") {
     _cxx_rbe_enable = invoker.cxx_rbe_enable
   } else {
     _cxx_rbe_enable = cxx_rbe_enable
-  }
-  if (defined(invoker.use_goma)) {
-    use_goma = invoker.use_goma
   }
   if (defined(invoker.link_rbe_enable)) {
     _link_rbe_enable = invoker.link_rbe_enable
@@ -272,10 +262,6 @@ template("zircon_toolchain") {
       compiler_prefix_list += [ "--preserve_unchanged_output_mtime" ]
     }
     compiler_prefix_list += [ "--" ]
-    not_needed([ "use_goma" ])
-  } else if (use_goma) {
-    compiler_prefix_list = [ rebase_path(goma_dir, root_build_dir) + "/gomacc" ]
-    _cxx_concurrent_jobs = concurrent_jobs.remote
   } else {
     if (defined(invoker.use_ccache)) {
       use_ccache = invoker.use_ccache
@@ -452,10 +438,6 @@ template("zircon_toolchain") {
 
   if (tc.tool_dir == "") {
     dir_prefix = ""
-    if (use_goma) {
-      # GOMA requires an absolute path to the compiler.
-      compiler_prefix = ""
-    }
   } else {
     dir_prefix = rebase_path(tc.tool_dir, root_build_dir) + "/"
   }
@@ -527,6 +509,25 @@ template("zircon_toolchain") {
         _strip = true
       }
 
+      if (_link_rbe_enable) {
+        # TODO(https://fxbug.dev/42083070): disable remote stripping when config includes //build/config:no_remote_link.
+        _remote_strip_list =
+            [
+              rebase_path(python_exe_src, root_build_dir),
+              "-S",
+              rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            ] + _link_rbe_exec_strategy_flags +
+            [
+              "--inputs",
+              "\"$unstripped_outfile\"",
+              "--output_files",
+              "\"$outfile\"",
+              "--preserve_unchanged_output_mtime",
+              "-- ",
+            ]
+        strip_command += string_join(" ", _remote_strip_list)
+      }
+
       if (_strip == true) {
         if (invoker.os == "mac") {
           # Only the host native tool works on macOS.
@@ -535,25 +536,6 @@ template("zircon_toolchain") {
           strip_tool = "$dir_prefix${tc.tool_prefix}strip"
         }
 
-        _remote_strip_list = []
-        if (_link_rbe_enable) {
-          # TODO(https://fxbug.dev/42083070): disable remote stripping when config includes //build/config:no_remote_link.
-          _remote_strip_list +=
-              [
-                rebase_path(python_exe_src, root_build_dir),
-                "-S",
-                rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
-              ] + _link_rbe_exec_strategy_flags +
-              [
-                "--inputs",
-                "\"$unstripped_outfile\"",
-                "--output_files",
-                "\"$outfile\"",
-                "--preserve_unchanged_output_mtime",
-                "-- ",
-              ]
-        }
-        strip_command += string_join(" ", _remote_strip_list)
         strip_command += "$strip_tool -o \"$outfile\" \"$unstripped_outfile\""
       } else {
         strip_command += "$dir_prefix${tc.tool_prefix}objcopy ${_strip}" +
@@ -608,6 +590,14 @@ template("zircon_toolchain") {
           _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
+        if (!link_rbe_download_unstripped_outputs) {
+          _linker_prefix_list += [
+            "--download_outputs=false",
+            "--output-is-executable",  # workaround for b/285030257
+          ]
+          # The remote link wrapper will download everything except the main output.
+        }
+
         _linker_prefix_list += [
           "--preserve_unchanged_output_mtime",
           "--",
@@ -842,7 +832,23 @@ template("zircon_toolchain") {
             depend_output,
             link_output,
           ]
-          command += " && $llvm_ifs --write-if-changed --output-ifs=$depend_output --output-elf=$link_output $unstripped_output"
+          _remote_ifs_prefix = ""
+          if (_link_rbe_enable) {
+            _remote_ifs_prefix_list =
+                [
+                  rebase_path(python_exe_src, root_build_dir),
+                  "-S",
+                  rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+                  "--inputs",
+                  "\"$unstripped_output\"",
+                  "--output_files",
+                  "\"$depend_output,$link_output\"",
+                  "--preserve_unchanged_output_mtime",  # only overwrite if
+                                                        # changed
+                ] + _link_rbe_exec_strategy_flags + [ "--" ]
+            _remote_ifs_prefix = string_join(" ", _remote_ifs_prefix_list)
+          }
+          command += " && $_remote_ifs_prefix $llvm_ifs --write-if-changed --output-ifs=$depend_output --output-elf=$link_output $unstripped_output"
 
           if (ifs_extra_switches != []) {
             command += " " + string_join(" ", ifs_extra_switches)

@@ -45,6 +45,34 @@ class UsbVirtualDevice : public UsbVirtualDeviceType,
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
                          ConnectToEndpointCompleter::Sync& completer) override;
 
+  void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void ConfigureEndpoint(ConfigureEndpointRequest& request,
+                         ConfigureEndpointCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void DisableEndpoint(DisableEndpointRequest& request,
+                       DisableEndpointCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void EndpointSetStall(EndpointSetStallRequest& request,
+                        EndpointSetStallCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void EndpointClearStall(EndpointClearStallRequest& request,
+                          EndpointClearStallCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualDevice);
 

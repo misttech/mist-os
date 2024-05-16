@@ -117,17 +117,24 @@ type AddedDisplayArgs = resource struct {
 @transport("Banjo")
 @banjo_layout("ddk-interface")
 closed protocol DisplayControllerInterface {
-    /// Callbacks which are invoked when displays are added or removed. |added_display_list| and
-    /// |removed_display_list| point to arrays of the display ids which were added and removed. If
-    /// |added_display_count| or |removed_display_count| is 0, the corresponding array can be NULL.
+    /// Emitted when a display is connected.
     ///
-    /// The driver must be done accessing any images which were on the removed displays.
+    /// Display Engine drivers must emit this event for all displays connected
+    /// prior to initialization.
+    strict OnDisplayAdded(resource struct {
+        added_display AddedDisplayArgs;
+    });
+
+    /// Emitted when a display is removed.
     ///
-    /// The driver should call this function when the callback is registered if any displays
-    /// are present.
-    strict OnDisplaysChanged(resource struct {
-        added_displays vector<AddedDisplayArgs>:MAX;
-        removed_display_ids vector<uint64>:MAX;
+    /// `display_id` must be a valid display ID that occurred in a previous
+    /// `OnDisplayAdded()` event.
+    ///
+    /// Display Engine drivers must have finished accessing all images which
+    /// were on the removed display before emitting the `OnDisplayRemoved()`
+    /// event.
+    strict OnDisplayRemoved(struct {
+        display_id uint64;
     });
 
     /// Events which are invoked when display vsync occurs.
@@ -496,19 +503,6 @@ closed protocol DisplayControllerImpl {
         /// Identifies the configuration to be applied. Must be a valid value.
         /// Must be strictly increasing across calls.
         config_stamp ConfigStamp;
-    }) -> ();
-
-    /// Set ELD for one display.
-    ///
-    /// This method is called independently from the CheckConfiguration and ApplyConfiguration
-    /// methods. The display_id may be unconfigured at the time this method is called.
-    /// raw_eld is the ELD raw data formatted according to the HDA specification version 1.0a
-    /// section 7.3.3.34.1.
-    /// https://www.intel.com/content/dam/www/public/us/en/documents/product-specifications/high-definition-audio-specification.pdf
-    /// The driver must not retain references to the ELD after this function returns.
-    strict SetEld(struct {
-        display_id uint64;
-        raw_eld vector<uint8>:MAX;
     }) -> ();
 
     /// Conveys the display hardware's limitations on image buffers to sysmem.

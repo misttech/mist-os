@@ -39,7 +39,7 @@ const MAX_REBOOT_WATCHER_RESPONSE_TIME_SECONDS uint32 = 5;
 /// and [`fuchsia.hardware.power.statecontrol/RebootMethodsWatcher.OnReboot`].
 /// Alternatively, the caller could choose to use an asynchronous FIDL client with this protocol to
 /// avoid blocking their calling thread.
-@discoverable
+@discoverable(server="platform")
 closed protocol Admin {
     /// Asks the device to enter a fully on state.
     strict PowerFullyOn() -> () error zx.Status;
@@ -79,7 +79,7 @@ closed protocol Admin {
 /// method is called. The main purpose of this protocol is to be able to track
 /// reboot reasons. Consider relying on Component Framework's orderly shutdown
 /// if you're looking at using this protocol.
-@discoverable
+@discoverable(server="platform")
 closed protocol RebootMethodsWatcherRegister {
     /// Register a watcher to be notified when a Reboot method is called. The
     /// Register channel will be used at most once to notify the watcher of an

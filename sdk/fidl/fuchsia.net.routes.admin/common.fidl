@@ -82,13 +82,14 @@ closed protocol BaseRouteTable {
     /// Clients may duplicate this `EVENT` to make multiple API calls, or
     /// transfer the `EVENT` to other clients.
     ///
-    /// - response `table_id` the table ID of the table.
-    /// - response `token` the kernel event object used to authenticate.
-    strict GetAuthorizationForRouteTable() -> (@generated_name("GrantForRouteTableAuthorization") resource struct {
-        /// The ID of the table this credential is authenticating.
-        table_id fuchsia.net.routes.TableId;
-        /// The `EVENT` providing authentication over this route table.
-        token zx.Handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
+    /// - response `credential` the authorization credential for this table.
+    strict GetAuthorizationForRouteTable() -> (resource struct {
+        credential @generated_name("GrantForRouteTableAuthorization") resource struct {
+            /// The ID of the table this credential is authenticating.
+            table_id fuchsia.net.routes.TableId;
+            /// The `EVENT` providing authentication over this route table.
+            token zx.Handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
+        };
     });
 };
 

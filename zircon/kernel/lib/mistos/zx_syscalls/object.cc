@@ -24,7 +24,6 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mp.h>
 #include <kernel/stats.h>
-#include <kernel/thread_lock.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
 #include <object/bus_transaction_initiator_dispatcher.h>

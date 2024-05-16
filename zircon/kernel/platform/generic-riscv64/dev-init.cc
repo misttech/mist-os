@@ -6,9 +6,11 @@
 
 #include <lib/boot-options/boot-options.h>
 
+#include <arch/riscv64/timer.h>
 #include <dev/hw_watchdog/generic32/init.h>
 #include <dev/init.h>
 #include <dev/interrupt/arm_gicv2_init.h>
+#include <dev/interrupt/plic.h>
 #include <dev/uart/dw8250/init.h>
 #include <dev/uart/motmot/init.h>
 #include <ktl/type_traits.h>
@@ -16,11 +18,6 @@
 #include <phys/arch/arch-handoff.h>
 
 #include <ktl/enforce.h>
-
-// TODO-rvbringup: move these into header files
-extern void PLICInitEarly(const zbi_dcfg_riscv_plic_driver_t& config);
-extern void PLICInitLate();
-extern void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t& config);
 
 void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
   if (arch_handoff.plic_driver) {

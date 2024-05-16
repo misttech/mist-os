@@ -29,8 +29,13 @@
         },
         {
             directory: "read_exec",
-            rights: [ "rx*" ],
+            rights: [ "r*" ],
             path: "/read_exec",
+        },
+        {
+            directory: "read_exec",
+            rights: [ "r*" ],
+            path: "/nested/read_exec",
         },
         {
             directory: "read_only_after_scoped",

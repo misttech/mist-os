@@ -39,8 +39,6 @@ use std::{
     num::NonZeroU16,
     ops::Deref,
     pin::pin,
-    // TODO(https://fxbug.dev/42076296): Use RC types exported from Core, after
-    // we make sockets reference-backed.
     sync::Arc,
     time::Duration,
 };
@@ -49,6 +47,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter as _;
 use fuchsia_zircon as zx;
@@ -75,9 +74,9 @@ use netstack3_core::{
     device::{
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
         EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
-        PureIpDeviceId, WeakDeviceId,
+        PureIpDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
     },
-    error::NetstackError,
+    error::ExistsError,
     filter::FilterBindingsTypes,
     icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
     inspect::{InspectableValue, Inspector},
@@ -236,6 +235,24 @@ impl DeviceIdExt for DeviceId<BindingsCtx> {
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
             DeviceId::PureIp(d) => DeviceSpecificInfo::PureIp(d.external_state()),
         }
+    }
+}
+
+impl DeviceIdExt for EthernetDeviceId<BindingsCtx> {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
+        DeviceSpecificInfo::Ethernet(self.external_state())
+    }
+}
+
+impl DeviceIdExt for LoopbackDeviceId<BindingsCtx> {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
+        DeviceSpecificInfo::Loopback(self.external_state())
+    }
+}
+
+impl DeviceIdExt for PureIpDeviceId<BindingsCtx> {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
+        DeviceSpecificInfo::PureIp(self.external_state())
     }
 }
 
@@ -473,20 +490,24 @@ impl DeviceLayerStateTypes for BindingsCtx {
     type DeviceIdentifier = DeviceIdAndName;
 }
 
-impl DeviceLayerEventDispatcher for BindingsCtx {
+impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {
     fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self>) {
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             device.external_state();
         rx_notifier.schedule()
     }
+}
 
-    fn wake_tx_task(&mut self, device: &DeviceId<BindingsCtx>) {
+impl<D: DeviceIdExt> TransmitQueueBindingsContext<D> for BindingsCtx {
+    fn wake_tx_task(&mut self, device: &D) {
         let external_state = device.external_state();
         let StaticCommonInfo { tx_notifier, authorization_token: _ } =
             external_state.static_common_info();
         tx_notifier.schedule()
     }
+}
 
+impl DeviceLayerEventDispatcher for BindingsCtx {
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,
@@ -632,13 +653,13 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>,
         // observing the result, so we just discard the result receiver.
         match event {
             netstack3_core::ip::IpLayerEvent::AddRoute(entry) => {
-                self.routes.fire_change_and_forget(routes::Change::RouteOp(
+                self.routes.fire_main_table_route_change_and_forget(routes::Change::RouteOp(
                     routes::RouteOp::Add(entry.map_device_id(|d| d.downgrade())),
                     routes::SetMembership::CoreNdp,
                 ))
             }
             netstack3_core::ip::IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
-                self.routes.fire_change_and_forget(routes::Change::RouteOp(
+                self.routes.fire_main_table_route_change_and_forget(routes::Change::RouteOp(
                     routes::RouteOp::RemoveMatching {
                         subnet,
                         device: device.downgrade(),
@@ -800,20 +821,24 @@ impl BindingsCtx {
         })
     }
 
-    pub(crate) async fn apply_route_change<I: Ip>(
+    pub(crate) async fn apply_main_table_route_change<I: Ip>(
         &self,
         change: routes::Change<I::Addr>,
-    ) -> Result<routes::ChangeOutcome, routes::Error> {
-        self.routes.send_change(change).await
+    ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
+        self.routes.send_main_table_route_change(change).await
     }
 
-    pub(crate) async fn apply_route_change_either(
+    pub(crate) async fn apply_main_table_route_change_either(
         &self,
         change: routes::ChangeEither,
-    ) -> Result<routes::ChangeOutcome, routes::Error> {
+    ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
         match change {
-            routes::ChangeEither::V4(change) => self.apply_route_change::<Ipv4>(change).await,
-            routes::ChangeEither::V6(change) => self.apply_route_change::<Ipv6>(change).await,
+            routes::ChangeEither::V4(change) => {
+                self.apply_main_table_route_change::<Ipv4>(change).await
+            }
+            routes::ChangeEither::V6(change) => {
+                self.apply_main_table_route_change::<Ipv6>(change).await
+            }
         }
     }
 
@@ -821,8 +846,12 @@ impl BindingsCtx {
         &self,
         device: &netstack3_core::device::WeakDeviceId<Self>,
     ) {
+        // TODO(https://fxbug.dev/337065118): Remove all routes across route
+        // tables.
         match self
-            .apply_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(device.clone()))
+            .apply_main_table_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(
+                device.clone(),
+            ))
             .await
             .expect("deleting routes on device during removal should succeed")
         {
@@ -830,8 +859,12 @@ impl BindingsCtx {
                 // We don't care whether there were any routes on the device or not.
             }
         }
+        // TODO(https://fxbug.dev/337065118): Remove all routes across route
+        // tables.
         match self
-            .apply_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(device.clone()))
+            .apply_main_table_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(
+                device.clone(),
+            ))
             .await
             .expect("deleting routes on device during removal should succeed")
         {
@@ -845,7 +878,7 @@ impl BindingsCtx {
 fn add_loopback_ip_addrs(
     ctx: &mut Ctx,
     loopback: &DeviceId<BindingsCtx>,
-) -> Result<(), NetstackError> {
+) -> Result<(), ExistsError> {
     for addr_subnet in [
         AddrSubnetEither::V4(
             AddrSubnet::from_witness(Ipv4::LOOPBACK_ADDRESS, Ipv4::LOOPBACK_SUBNET.prefix())
@@ -858,7 +891,7 @@ fn add_loopback_ip_addrs(
     ] {
         ctx.api().device_ip_any().add_ip_addr_subnet(loopback, addr_subnet).map_err(
             |e| match e {
-                AddIpAddrSubnetError::Exists => NetstackError::Exists,
+                AddIpAddrSubnetError::Exists => ExistsError,
                 AddIpAddrSubnetError::InvalidAddr => {
                     panic!("loopback address should not be invalid")
                 }
@@ -911,7 +944,7 @@ async fn add_loopback_routes(bindings_ctx: &BindingsCtx, loopback: &DeviceId<Bin
 
     for change in v4_changes.chain(v6_changes) {
         bindings_ctx
-            .apply_route_change_either(change)
+            .apply_main_table_route_change_either(change)
             .await
             .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("adding loopback routes should succeed");
@@ -1086,8 +1119,10 @@ pub(crate) enum Service {
     RoutesState(fidl_fuchsia_net_routes::StateRequestStream),
     RoutesStateV4(fidl_fuchsia_net_routes::StateV4RequestStream),
     RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
-    RoutesAdminV4(fidl_fuchsia_net_routes_admin::RouteTableV4RequestStream),
-    RoutesAdminV6(fidl_fuchsia_net_routes_admin::RouteTableV6RequestStream),
+    RoutesAdminV4(fnet_routes_admin::RouteTableV4RequestStream),
+    RoutesAdminV6(fnet_routes_admin::RouteTableV6RequestStream),
+    RouteTableProviderV4(fnet_routes_admin::RouteTableProviderV4RequestStream),
+    RouteTableProviderV6(fnet_routes_admin::RouteTableProviderV6RequestStream),
     RootRoutesV4(fidl_fuchsia_net_root::RoutesV4RequestStream),
     RootRoutesV6(fidl_fuchsia_net_root::RoutesV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
@@ -1294,7 +1329,7 @@ impl NetstackSeed {
         let interfaces_watcher_sink_ref = &interfaces_watcher_sink;
         let neighbor_watcher_sink_ref = &neighbor_watcher_sink;
 
-        let (route_set_waitgroup, route_set_spawner) = TaskWaitGroup::new();
+        let (route_waitgroup, route_spawner) = TaskWaitGroup::new();
 
         let filter_update_dispatcher = filter::UpdateDispatcher::default();
 
@@ -1368,33 +1403,57 @@ impl NetstackSeed {
                         Service::RoutesStateV6(rs) => {
                             routes::state::serve_state_v6(rs, &route_update_dispatcher_v6).await
                         }
-                        Service::RoutesAdminV4(rs) => routes::admin::serve_route_table_v4(
+                        Service::RoutesAdminV4(rs) => routes::admin::serve_route_table::<
+                            Ipv4,
+                            routes::admin::MainRouteTable,
+                            _,
+                        >(
                             rs,
-                            route_set_spawner.clone(),
-                            &netstack.ctx,
+                            route_spawner.clone(),
+                            routes::admin::MainRouteTable::new(netstack.ctx.clone()),
                         )
-                        .await
-                        .unwrap_or_else(|e| {
-                            tracing::error!(
-                                "error serving {}: {e:?}",
-                                fidl_fuchsia_net_routes_admin::RouteTableV4Marker::DEBUG_NAME
-                            );
-                        }),
-                        Service::RoutesAdminV6(rs) => routes::admin::serve_route_table_v6(
+                        .await,
+                        Service::RoutesAdminV6(rs) => routes::admin::serve_route_table::<
+                            Ipv6,
+                            routes::admin::MainRouteTable,
+                            _,
+                        >(
                             rs,
-                            route_set_spawner.clone(),
-                            &netstack.ctx,
+                            route_spawner.clone(),
+                            routes::admin::MainRouteTable::new(netstack.ctx.clone()),
                         )
-                        .await
-                        .unwrap_or_else(|e| {
-                            tracing::error!(
-                                "error serving {}: {e:?}",
-                                fidl_fuchsia_net_routes_admin::RouteTableV6Marker::DEBUG_NAME
-                            );
-                        }),
+                        .await,
+                        Service::RouteTableProviderV4(stream) => {
+                            routes::admin::serve_route_table_provider_v4(
+                                stream,
+                                route_spawner.clone(),
+                                &netstack.ctx,
+                            )
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!(
+                                    "error serving {}: {e:?}",
+                                    fnet_routes_admin::RouteTableProviderV4Marker::DEBUG_NAME
+                                );
+                            })
+                        }
+                        Service::RouteTableProviderV6(stream) => {
+                            routes::admin::serve_route_table_provider_v6(
+                                stream,
+                                route_spawner.clone(),
+                                &netstack.ctx,
+                            )
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!(
+                                    "error serving {}: {e:?}",
+                                    fnet_routes_admin::RouteTableProviderV6Marker::DEBUG_NAME
+                                );
+                            })
+                        }
                         Service::RootRoutesV4(rs) => root_fidl_worker::serve_routes_v4(
                             rs,
-                            route_set_spawner.clone(),
+                            route_spawner.clone(),
                             &netstack.ctx,
                         )
                         .await
@@ -1406,7 +1465,7 @@ impl NetstackSeed {
                         }),
                         Service::RootRoutesV6(rs) => root_fidl_worker::serve_routes_v6(
                             rs,
-                            route_set_spawner.clone(),
+                            route_spawner.clone(),
                             &netstack.ctx,
                         )
                         .await
@@ -1522,7 +1581,7 @@ impl NetstackSeed {
         std::mem::drop(neighbor_watcher_sink);
 
         // Collect the routes admin waitgroup.
-        route_set_waitgroup.await;
+        route_waitgroup.await;
 
         // We've signalled all long running tasks, now we can collect them.
         no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;

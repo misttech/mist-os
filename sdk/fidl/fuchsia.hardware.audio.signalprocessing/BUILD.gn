@@ -11,8 +11,8 @@ fidl("fuchsia.hardware.audio.signalprocessing") {
 
   sources = [
     "connector.fidl",
+    "dai_interconnect.fidl",
     "dynamics.fidl",
-    "endpoint.fidl",
     "equalizer.fidl",
     "gain.fidl",
     "overview.fidl",

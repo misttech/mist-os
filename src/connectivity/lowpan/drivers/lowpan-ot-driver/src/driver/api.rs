@@ -1015,6 +1015,26 @@ where
             ..Default::default()
         };
 
+        // Get link metrics manager related fields
+        let neighbor_ext_addrs =
+            ot.iter_neighbor_info().map(|x| x.ext_address()).collect::<Vec<_>>();
+
+        let link_metrics_entries: Vec<fidl_fuchsia_lowpan_experimental::LinkMetricsEntry> =
+            neighbor_ext_addrs
+                .iter()
+                .filter_map(|x| {
+                    if let Ok(y) = ot.link_metrics_manager_get_metrics_value_by_ext_addr(x) {
+                        Some(fidl_fuchsia_lowpan_experimental::LinkMetricsEntry {
+                            link_margin: Some(y.link_margin()),
+                            rssi: Some(y.rssi()),
+                            ..Default::default()
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
         Ok(Telemetry {
             rssi: Some(ot.get_rssi()),
             partition_id: Some(ot.get_partition_id()),
@@ -1064,6 +1084,7 @@ where
                 hashed_pd_prefix: None,
                 ..Default::default()
             }),
+            link_metrics_entries: Some(link_metrics_entries),
             ..Default::default()
         })
     }
@@ -1079,6 +1100,12 @@ where
             detailed_logging_enabled: Some(detailed_logging_enabled),
             detailed_logging_level: Some(detailed_logging_level.into()),
             dhcpv6_pd_enabled: Some(driver_state.is_dhcpv6_pd_enabled()),
+            dns_upstream_query_enabled: Some(
+                driver_state.ot_instance.dnssd_upstream_query_is_enabled(),
+            ),
+            link_metrics_manager_enabled: Some(
+                driver_state.ot_instance.link_metrics_manager_is_enabled(),
+            ),
             ..Default::default()
         })
     }
@@ -1102,6 +1129,10 @@ where
 
         if let Some(dns_upstream_query_enabled) = config.dns_upstream_query_enabled {
             driver_state.ot_instance.dnssd_upstream_query_set_enabled(dns_upstream_query_enabled);
+        }
+
+        if let Some(link_metrics_manager_enabled) = config.link_metrics_manager_enabled {
+            driver_state.ot_instance.link_metrics_manager_set_enabled(link_metrics_manager_enabled);
         }
 
         if let Err(e) = driver_state.detailed_logging.process_detailed_logging_set(

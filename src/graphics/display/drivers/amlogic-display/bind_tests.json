@@ -71,5 +71,29 @@
                 }
             }
         ]
+    },
+    {
+        "node": "mipi-dsi-display",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.display.OUTPUT": "fuchsia.display.OUTPUT.MIPI_DSI"
+                }
+            }
+        ]
+    },
+    {
+        "node": "hdmi-display",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.display.OUTPUT": "fuchsia.display.OUTPUT.HDMI"
+                }
+            }
+        ]
     }
 ]

@@ -5,8 +5,8 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/starnix/build/starnix_linux_executable.gni")
 import("//src/starnix/kernel/starnix.gni")
-import("//src/starnix/tests/build/starnix_linux_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -58,7 +58,8 @@ fuchsia_component("container") {
   manifest = "//src/starnix/containers/debian/meta/debian_container.cml"
 }
 
-starnix_linux_test_executable("linux_scheduler_puppet") {
+starnix_linux_executable("linux_scheduler_puppet") {
+  testonly = true
   sources = [ "src/puppet.cc" ]
 }
 

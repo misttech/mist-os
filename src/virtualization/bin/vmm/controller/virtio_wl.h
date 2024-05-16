@@ -24,7 +24,7 @@ class VirtioWl
   explicit VirtioWl(const PhysMem& phys_mem);
 
   zx_status_t Start(const zx::guest& guest, zx::vmar vmar,
-                    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+                    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
                     fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
                     ::sys::ComponentContext* context, async_dispatcher_t* dispatcher);
   zx_status_t GetImporter(

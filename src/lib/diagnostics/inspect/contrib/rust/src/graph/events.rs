@@ -7,12 +7,13 @@ use crate::{
     inspect_log,
     nodes::{BoundedListNode, NodeExt},
 };
-use fuchsia_inspect as inspect;
+use fuchsia_inspect::{self as inspect, ArrayProperty};
 use std::{
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
 
+#[derive(Debug)]
 pub struct GraphEventsTracker {
     buffer: Arc<Mutex<BoundedListNode>>,
 }
@@ -27,6 +28,7 @@ impl GraphEventsTracker {
     }
 }
 
+#[derive(Debug)]
 pub struct GraphObjectEventTracker<T> {
     buffer: Arc<Mutex<BoundedListNode>>,
     _phantom: PhantomData<T>,
@@ -47,7 +49,7 @@ where
         self.buffer.lock().unwrap().add_entry(|node| {
             node.record_time("@time");
             node.record_string("event", "add_vertex");
-            node.record_string("id", id.get_id().as_ref());
+            node.record_string("vertex_id", id.get_id().as_ref());
             let meta_node = node.create_child("meta");
             record_metadata_items(&meta_node, initial_metadata.into_iter());
             node.record(meta_node);
@@ -58,7 +60,7 @@ where
         let mut buffer = self.buffer.lock().unwrap();
         inspect_log!(buffer, {
             event: "remove_vertex",
-            id: id,
+            vertex_id: id,
         });
     }
 }
@@ -74,7 +76,7 @@ impl GraphObjectEventTracker<EdgeMarker> {
             node.record_string("event", "add_edge");
             node.record_string("from", from);
             node.record_string("to", to);
-            node.record_uint("id", id);
+            node.record_uint("edge_id", id);
             let meta_node = node.create_child("meta");
             record_metadata_items(&meta_node, initial_metadata.into_iter());
             node.record(meta_node);
@@ -85,7 +87,7 @@ impl GraphObjectEventTracker<EdgeMarker> {
         let mut buffer = self.buffer.lock().unwrap();
         inspect_log!(buffer, {
             event: "remove_edge",
-            id: id,
+            edge_id: id,
         });
     }
 }
@@ -122,6 +124,30 @@ where
                 node.record_string(meta_item.key.as_ref(), value.as_ref())
             }
             MetadataValue::Bool(value) => node.record_bool(meta_item.key.as_ref(), value),
+            MetadataValue::IntVec(ref value) => {
+                node.atomic_update(|node| {
+                    let property = node.create_int_array(meta_item.key.as_ref(), value.len());
+                    for (idx, v) in value.iter().enumerate() {
+                        property.set(idx, *v);
+                    }
+                });
+            }
+            MetadataValue::UintVec(ref value) => {
+                node.atomic_update(|node| {
+                    let property = node.create_uint_array(meta_item.key.as_ref(), value.len());
+                    for (idx, v) in value.iter().enumerate() {
+                        property.set(idx, *v);
+                    }
+                });
+            }
+            MetadataValue::DoubleVec(ref value) => {
+                node.atomic_update(|node| {
+                    let property = node.create_double_array(meta_item.key.as_ref(), value.len());
+                    for (idx, v) in value.iter().enumerate() {
+                        property.set(idx, *v);
+                    }
+                });
+            }
         }
     }
 }
@@ -161,7 +187,7 @@ mod tests {
                 "0": {
                     "@time": AnyProperty,
                     event: "add_vertex",
-                    id: "123",
+                    vertex_id: "123",
                     meta: {
                         string_property: "i'm a string",
                         int_property: 2i64,
@@ -185,7 +211,7 @@ mod tests {
                 "0": {
                     "@time": AnyProperty,
                     event: "remove_vertex",
-                    id: "20",
+                    vertex_id: "20",
                 }
             }
         });
@@ -236,7 +262,7 @@ mod tests {
                     event: "add_edge",
                     from: "src",
                     to: "dst",
-                    id: 10u64,
+                    edge_id: 10u64,
                     meta: {
                         string_property: "i'm a string",
                         int_property: 2i64,
@@ -261,7 +287,7 @@ mod tests {
                 "0": {
                     "@time": AnyProperty,
                     event: "remove_edge",
-                    id: 20u64,
+                    edge_id: 20u64,
                 }
             }
         });
@@ -300,12 +326,12 @@ mod tests {
                 "1": {
                     "@time": AnyProperty,
                     event: "remove_vertex",
-                    id: "30",
+                    vertex_id: "30",
                 },
                 "2": {
                     "@time": AnyProperty,
                     event: "remove_vertex",
-                    id: "40",
+                    vertex_id: "40",
                 }
             }
         });

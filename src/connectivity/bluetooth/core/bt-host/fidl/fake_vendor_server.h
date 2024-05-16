@@ -12,19 +12,22 @@
 #include <cstdint>
 #include <string>
 
-#include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "lib/fidl/cpp/interface_request.h"
 #include "lib/fpromise/result.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_server.h"
 
 namespace bt::fidl::testing {
 
-class FakeVendorServer final : public fuchsia::hardware::bluetooth::testing::Vendor_TestBase {
+class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
  public:
-  FakeVendorServer(::fidl::InterfaceRequest<fuchsia::hardware::bluetooth::Vendor> request,
+  FakeVendorServer(::fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> server_end,
                    async_dispatcher_t* dispatcher)
-      : dispatcher_(dispatcher) {
-    binding_.Bind(std::move(request));
+      : binding_(::fidl::BindServer(dispatcher, std::move(server_end), this)),
+        dispatcher_(dispatcher) {
+    fuchsia_hardware_bluetooth::VendorFeatures features;
+    features.acl_priority_command(true);
+    auto result = ::fidl::SendEvent(binding_)->OnFeatures(features);
+    EXPECT_TRUE(result.is_ok());
   }
 
   void Unbind() { binding_.Unbind(); }
@@ -34,34 +37,39 @@ class FakeVendorServer final : public fuchsia::hardware::bluetooth::testing::Ven
   void set_open_hci_error(bool val) { open_hci_error_ = val; }
 
  private:
-  void GetFeatures(GetFeaturesCallback callback) override {
-    auto features = fuchsia::hardware::bluetooth::BtVendorFeatures::SET_ACL_PRIORITY_COMMAND;
-    callback(fpromise::ok(features));
+  void NewEncodeCommand(NewEncodeCommandRequest& request,
+                        NewEncodeCommandCompleter::Sync& completer) override {
+    BT_ASSERT(request.set_acl_priority()->priority().has_value());
+    BT_ASSERT(request.set_acl_priority()->direction().has_value());
+    std::vector<uint8_t> tmp{static_cast<unsigned char>(
+        WhichSetAclPriority(request.set_acl_priority()->priority().value(),
+                            request.set_acl_priority()->direction().value()))};
+    completer.Reply(fit::success(tmp));
   }
 
-  void EncodeCommand(::fuchsia::hardware::bluetooth::BtVendorCommand command,
-                     EncodeCommandCallback callback) override {
-    ::fidl::Encoder encoder;
-    size_t offset = encoder.Alloc(sizeof(fidl_string_t));
-    command.Encode(&encoder, offset);
-    std::vector<uint8_t> tmp{static_cast<unsigned char>(WhichSetAclPriority(
-        command.set_acl_priority().priority, command.set_acl_priority().direction))};
-    callback(fpromise::ok(tmp));
-  }
-
-  void OpenHci(OpenHciCallback callback) override {
+  void OpenHci(OpenHciCompleter::Sync& completer) override {
     if (open_hci_error_) {
-      callback(fpromise::error(ZX_ERR_INTERNAL));
+      completer.Reply(fit::error(ZX_ERR_INTERNAL));
       return;
     }
 
-    ::fidl::InterfaceHandle<::fuchsia::hardware::bluetooth::Hci> hci;
-    fake_hci_server_.emplace(hci.NewRequest(), dispatcher_);
+    auto [hci_client_end, hci_server_end] =
+        ::fidl::Endpoints<fuchsia_hardware_bluetooth::Hci>::Create();
 
-    callback(fpromise::ok(std::move(hci)));
+    fake_hci_server_.emplace(std::move(hci_server_end), dispatcher_);
+    completer.Reply(fit::success(std::move(hci_client_end)));
   }
 
-  void NotImplemented_(const std::string& name) override { FAIL() << name << " not implemented"; }
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override {
+    // Not implemented
+  }
+
+  // Deprecating interfaces.
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {}
+  void EncodeCommand(EncodeCommandRequest& request,
+                     EncodeCommandCompleter::Sync& completer) override {}
 
   void InitializeWait(async::WaitBase& wait, zx::channel& channel) {
     BT_ASSERT(channel.is_valid());
@@ -71,10 +79,10 @@ class FakeVendorServer final : public fuchsia::hardware::bluetooth::testing::Ven
     BT_ASSERT(wait.Begin(dispatcher_) == ZX_OK);
   }
 
-  uint8_t WhichSetAclPriority(fuchsia::hardware::bluetooth::BtVendorAclPriority priority,
-                              fuchsia::hardware::bluetooth::BtVendorAclDirection direction) {
-    if (priority == fuchsia::hardware::bluetooth::BtVendorAclPriority::HIGH) {
-      if (direction == fuchsia::hardware::bluetooth::BtVendorAclDirection::SOURCE) {
+  uint8_t WhichSetAclPriority(fuchsia_hardware_bluetooth::VendorAclPriority priority,
+                              fuchsia_hardware_bluetooth::VendorAclDirection direction) {
+    if (priority == fuchsia_hardware_bluetooth::VendorAclPriority::kHigh) {
+      if (direction == fuchsia_hardware_bluetooth::VendorAclDirection::kSource) {
         return static_cast<uint8_t>(pw::bluetooth::AclPriority::kSource);
       }
       return static_cast<uint8_t>(pw::bluetooth::AclPriority::kSink);
@@ -87,7 +95,7 @@ class FakeVendorServer final : public fuchsia::hardware::bluetooth::testing::Ven
 
   std::optional<fidl::testing::FakeHciServer> fake_hci_server_;
 
-  ::fidl::Binding<fuchsia::hardware::bluetooth::Vendor> binding_{this};
+  ::fidl::ServerBindingRef<fuchsia_hardware_bluetooth::Vendor> binding_;
 
   async_dispatcher_t* dispatcher_;
 };

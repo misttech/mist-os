@@ -47,6 +47,10 @@ driver_bind_rules("vim3-devicetree-bind") {
 bazel_driver_package("bazel_package") {
   bazel_target = "//src/devices/board/drivers/vim3-devicetree:vim3-devicetree"
   package_name = "vim3-devicetree"
+  inputs = [
+    "vim3-devicetree.cc",
+    "vim3-devicetree.h",
+  ]
 }
 
 bazel_fuchsia_test_package("vim3-devicetree-test-package") {
@@ -60,6 +64,11 @@ bazel_fuchsia_test_package("vim3-devicetree-test-package") {
   bazel_inputs = [
     ":vim3-dtb",
     "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
+  ]
+  inputs = [
+    "vim3-devicetree-test.cc",
+    "vim3-devicetree.cc",
+    "vim3-devicetree.h",
   ]
 }
 

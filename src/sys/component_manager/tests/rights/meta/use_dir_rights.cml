@@ -32,6 +32,11 @@
             path: "/read_exec",
         },
         {
+            directory: "read_exec",
+            rights: [ "rx*" ],
+            path: "/nested/read_exec",
+        },
+        {
             directory: "read_only_after_scoped",
             rights: [ "r*" ],
             path: "/read_only_after_scoped",

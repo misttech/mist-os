@@ -28,7 +28,13 @@ zx_status_t DriverCtx::Bind(void* ctx, zx_device_t* parent) {
 
   amlogic_decoder::AmlogicVideo* video = device->video();
 
-  zx_status_t status = video->InitRegisters(parent);
+  zx_status_t status = video->SetDeviceType(parent);
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to determine device type - %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = video->InitRegisters(parent);
   if (status != ZX_OK) {
     DECODE_ERROR("Failed to initialize registers");
     return status;

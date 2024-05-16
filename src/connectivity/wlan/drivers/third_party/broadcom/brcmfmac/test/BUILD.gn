@@ -164,12 +164,11 @@ executable("timer_test") {
   testonly = true
   sources = [ "timer_test.cc" ]
   deps = [
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:timer",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/public",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

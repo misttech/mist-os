@@ -236,8 +236,16 @@ impl NetlinkSocketInner {
         message
     }
 
-    fn read_datagram(&mut self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
-        let mut info = self.messages.read_datagram(data)?;
+    fn read_datagram(
+        &mut self,
+        data: &mut dyn OutputBuffer,
+        flags: SocketMessageFlags,
+    ) -> Result<MessageReadInfo, Errno> {
+        let mut info = if flags.contains(SocketMessageFlags::PEEK) {
+            self.messages.peek_datagram(data)
+        } else {
+            self.messages.read_datagram(data)
+        }?;
         if info.message_length == 0 {
             return error!(EAGAIN);
         }
@@ -614,9 +622,9 @@ impl SocketOps for UEventNetlinkSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-        _flags: SocketMessageFlags,
+        flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        self.lock().read_datagram(data)
+        self.lock().read_datagram(data, flags)
     }
 
     fn write(
@@ -884,10 +892,10 @@ impl SocketOps for RouteNetlinkSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-        _flags: SocketMessageFlags,
+        flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
         let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
-        inner.lock().read_datagram(data)
+        inner.lock().read_datagram(data, flags)
     }
 
     fn write(
@@ -1049,9 +1057,9 @@ impl SocketOps for DiagnosticNetlinkSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-        _flags: SocketMessageFlags,
+        flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        self.inner.lock().read_datagram(data)
+        self.inner.lock().read_datagram(data, flags)
     }
 
     fn write(
@@ -1214,9 +1222,9 @@ impl SocketOps for GenericNetlinkSocket {
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-        _flags: SocketMessageFlags,
+        flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        self.lock().read_datagram(data)
+        self.lock().read_datagram(data, flags)
     }
 
     fn write(

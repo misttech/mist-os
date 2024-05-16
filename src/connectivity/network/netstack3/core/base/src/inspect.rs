@@ -161,6 +161,10 @@ pub trait Inspectable {
     fn record<I: Inspector>(&self, inspector: &mut I);
 }
 
+impl Inspectable for () {
+    fn record<I: Inspector>(&self, _inspector: &mut I) {}
+}
+
 /// A trait that marks a type as inspectable.
 ///
 /// This trait is used for types that are exposed to [`Inspector`]s many times

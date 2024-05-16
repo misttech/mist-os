@@ -51,6 +51,9 @@ message Context {
   bool collect_coverage = 11;
 
   // Use this many jobs if building with Goma (ignored otherwise).
+  // Note: Goma is deprecated, but this variable still applies to other remote
+  // build enabled work environments.
+  // TODO(b/340581192): rename this
   int32 goma_job_count = 12;
 
   // If true, skip doing a Ninja no-op check even if the static spec indicates

@@ -288,6 +288,10 @@ pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
 #[derive(Debug, Default)]
 pub struct ConntrackExternalData {}
 
+impl Inspectable for ConntrackExternalData {
+    fn record<I: netstack3_base::Inspector>(&self, _inspector: &mut I) {}
+}
+
 /// IP version-specific filtering routine state.
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -327,7 +331,7 @@ impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
 
 impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
-        let Self { installed_routines, uninstalled_routines, conntrack: _ } = self;
+        let Self { installed_routines, uninstalled_routines, conntrack } = self;
         // TODO(https://fxbug.dev/318717702): when we implement NAT, report NAT
         // routines in inspect data.
         let Routines { ip, nat: _ } = installed_routines.get();
@@ -348,6 +352,10 @@ impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
             for routine in uninstalled_routines {
                 inspector.delegate_inspectable(routine);
             }
+        });
+
+        inspector.record_child("conntrack", |inspector| {
+            inspector.delegate_inspectable(conntrack);
         });
     }
 }

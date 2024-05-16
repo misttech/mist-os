@@ -9,25 +9,41 @@ use std::ops::{Deref, DerefMut};
 // defined lifetime bounds, we use this wrapper type.
 pub struct ExtBuffer<T> {
     inner: *mut T,
-    size: usize,
+    len: usize,
 }
 
 impl<T> ExtBuffer<T> {
-    pub fn new(ptr: *mut T, size: usize) -> Self {
-        Self { inner: ptr, size }
+    /// # Safety
+    ///
+    /// Full requirements are defined at [std::slice::from_raw_parts_mut], as this is the most
+    /// restrictively used function internally. Generally speaking, though:
+    ///
+    /// - `ptr` must point to a contiguous block of memory aligned to `T` of length
+    ///   `mem::size_of::<T>() * len` bytes.
+    /// - The contiguous memory space that `ptr` must point to must be a single allocated object.
+    /// - Each object `T` must be properly initialized.
+    /// - `ptr` must not be aliased with any other live pointers during the lifetime of this
+    ///   struct.
+    /// - `ptr` must not be null even if `len` is `0`.
+    /// - `ptr` must be [valid] for reads and writes.
+    /// - The data pointed to by `ptr` must outlive this struct.
+    ///
+    /// [valid]: std::ptr#safety
+    pub unsafe fn new(ptr: *mut T, len: usize) -> Self {
+        Self { inner: ptr, len }
     }
 }
 
 impl<T: Send + Sized> Deref for ExtBuffer<T> {
     type Target = [T];
     fn deref(&self) -> &[T] {
-        unsafe { std::slice::from_raw_parts(self.inner, self.size) }
+        unsafe { std::slice::from_raw_parts(self.inner, self.len) }
     }
 }
 
 impl<T: Send + Sized> DerefMut for ExtBuffer<T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        unsafe { std::slice::from_raw_parts_mut(self.inner, self.size) }
+        unsafe { std::slice::from_raw_parts_mut(self.inner, self.len) }
     }
 }
 

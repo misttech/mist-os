@@ -121,6 +121,12 @@ if (is_linux || is_mac) {
         }
         tags = [ "e2e-isolated-recovery" ]
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
+        }
+        tags = [ "e2e-isolated-recovery" ]
+      },
     ]
     timeout = "10m"
     cycle_count = "5"
@@ -132,6 +138,12 @@ if (is_linux || is_mac) {
       {
         dimensions = {
           device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+        tags = [ "e2e-isolated-longevity" ]
+      },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
         }
         tags = [ "e2e-isolated-longevity" ]
       },
@@ -179,6 +191,12 @@ if (is_linux || is_mac) {
         }
         tags = [ "e2e-isolated-longevity" ]
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
+        }
+        tags = [ "e2e-isolated-longevity" ]
+      },
     ]
     timeout = "4h"
     pave_timeout = "10m"
@@ -194,6 +212,12 @@ if (is_linux || is_mac) {
       {
         dimensions = {
           device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+        tags = [ "e2e-isolated-omaha" ]
+      },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
         }
         tags = [ "e2e-isolated-omaha" ]
       },

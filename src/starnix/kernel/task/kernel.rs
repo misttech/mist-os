@@ -4,8 +4,11 @@
 
 use crate::{
     device::{
+        android::bootloader_message_store::AndroidBootloaderMessageStore,
+        device_mapper::DeviceMapperRegistry,
         framebuffer::{AspectRatio, Framebuffer},
         loop_device::LoopDeviceRegistry,
+        remote_block_device::RemoteBlockDeviceRegistry,
         sync_fence_registry::SyncFenceRegistry,
         BinderDevice, DeviceMode, DeviceRegistry,
     },
@@ -13,9 +16,9 @@ use crate::{
     mm::{FutexTable, SharedFutexKey},
     power::SuspendResumeManagerHandle,
     task::{
-        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
-        KernelStats, KernelThreads, NetstackDevices, PidTable, StopState, Syslog, UtsNamespace,
-        UtsNamespaceHandle,
+        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
+        HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
+        StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
     },
     vdso::vdso_loader::Vdso,
     vfs::{
@@ -24,7 +27,7 @@ use crate::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
-        DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString,
+        DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
     },
 };
 use bstr::BString;
@@ -132,6 +135,18 @@ pub struct Kernel {
     /// See <https://man7.org/linux/man-pages/man4/loop.4.html>
     pub loop_device_registry: Arc<LoopDeviceRegistry>,
 
+    /// The registry of active device mapper devices.
+    pub device_mapper_registry: Arc<DeviceMapperRegistry>,
+
+    /// The registry of block devices backed by a remote fuchsia.io file.
+    pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
+
+    /// If a remote block device named "misc" is created, keep track of it; this is used by Android
+    /// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
+    /// for Android, we need to be able to peek into these messages.
+    /// Note that this might never be initialized (if the "misc" device never gets registered).
+    pub bootloader_message_store: OnceCell<AndroidBootloaderMessageStore>,
+
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
     ///
@@ -225,6 +240,12 @@ pub struct Kernel {
 
     /// The syslog manager.
     pub syslog: Syslog,
+
+    /// All mounts.
+    pub mounts: Mounts,
+
+    /// The manager for creating and managing high-resolution timers.
+    pub hrtimer_manager: HrTimerManagerHandle,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -317,6 +338,9 @@ impl Kernel {
             container_svc,
             container_data_dir,
             loop_device_registry: Default::default(),
+            device_mapper_registry: Default::default(),
+            remote_block_device_registry: Default::default(),
+            bootloader_message_store: OnceCell::new(),
             framebuffer,
             sync_fence_registry: SyncFenceRegistry::new(),
             binders: Default::default(),
@@ -344,6 +368,8 @@ impl Kernel {
             delayed_releaser: Default::default(),
             role_manager,
             syslog: Default::default(),
+            mounts: Mounts::new(),
+            hrtimer_manager: HrTimerManager::new(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

@@ -44,7 +44,7 @@ void PowerManager::PowerDownWhileIdle() {
     MAGMA_LOG(ERROR, "Waiting for shader disable timed out");
   }
   power_down_on_idle_ = false;
-  owner_->ReportPowerChangeComplete(success);
+  owner_->ReportPowerChangeComplete(false, success);
 }
 
 void PowerManager::PowerUpAfterIdle() {
@@ -56,7 +56,7 @@ void PowerManager::PowerUpAfterIdle() {
     success = false;
     MAGMA_LOG(ERROR, "Waiting for shader enable timed out");
   }
-  owner_->ReportPowerChangeComplete(success);
+  owner_->ReportPowerChangeComplete(true, success);
 }
 
 void PowerManager::EnableCores(uint64_t shader_bitmask) {

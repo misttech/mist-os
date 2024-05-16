@@ -156,6 +156,10 @@ TEST_fx-pave-remote-args-given() {
   } >> "${BT_TEMP_DIR}/tools/devshell/lib/fx-remote.sh"
 
   echo "${testhost}:${testdir}" > "${BT_TEMP_DIR}/.fx-remote-config"
+
+  # mock ffx serving on port 12345
+  BT_ASSERT _create_mock_ffx 12345
+
   BT_EXPECT ${fx} pave-remote --no-pave "$anotherhost" "${testdir}" >>${out} 2>&1
   BT_EXPECT_FILE_CONTAINS "${BT_TEMP_DIR}/.fx-remote-config" "${anotherhost}:${testdir}:"
   btf::does-mock-args-contain "${ssh_mock}.mock_state.1" "$anotherhost"
@@ -177,6 +181,10 @@ TEST_fx-pave-remote-args-given-with-product-bundle() {
   } >> "${BT_TEMP_DIR}/tools/devshell/lib/fx-remote.sh"
 
   echo "${testhost}:${testdir}" > "${BT_TEMP_DIR}/.fx-remote-config"
+
+  # mock ffx serving on port 12345
+  BT_ASSERT _create_mock_ffx 12345
+
   BT_EXPECT ${fx} pave-remote --no-pave "$anotherhost" "${testdir}" >>${out} 2>&1
   BT_EXPECT_FILE_CONTAINS "${BT_TEMP_DIR}/.fx-remote-config" "${anotherhost}:${testdir}:"
   btf::does-mock-args-contain "${ssh_mock}.mock_state.1" "$anotherhost"

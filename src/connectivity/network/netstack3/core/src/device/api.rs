@@ -14,7 +14,7 @@ use tracing::debug;
 use crate::{
     context::{
         ContextPair, CoreTimerContext, RecvFrameContext, ReferenceNotifiers,
-        ResourceCounterContext, TimerContext,
+        ReferenceNotifiersExt as _, ResourceCounterContext, TimerContext,
     },
     device::{
         config::{
@@ -39,7 +39,7 @@ use crate::{
         },
         types::RawMetric,
     },
-    sync::{PrimaryRc, RemoveResourceResult, RemoveResourceResultWithContext},
+    sync::RemoveResourceResultWithContext,
     Inspector,
 };
 
@@ -168,30 +168,20 @@ where
         // for the device that would otherwise hold references to defunct device
         // state.
         let (core_ctx, bindings_ctx) = self.contexts();
-        let debug_references = {
+        {
             let device = device.clone().into();
             crate::ip::device::clear_ipv4_device_state(core_ctx, bindings_ctx, &device);
             crate::ip::device::clear_ipv6_device_state(core_ctx, bindings_ctx, &device);
-            device.downgrade().debug_references()
         };
 
         tracing::debug!("removing {device:?}");
         let primary = core_ctx.remove(&device).expect("tried to remove device not in stack");
         assert_eq!(device, primary);
         core::mem::drop(device);
-        match PrimaryRc::unwrap_or_notify_with(primary.into_inner(), || {
-            let (notifier, receiver) = C::BindingsContext::new_reference_notifier::<
-                D::External<C::BindingsContext>,
-            >(debug_references);
-            let notifier =
-                crate::sync::MapRcNotifier::new(notifier, |state: BaseDeviceState<_, _>| {
-                    state.external_state
-                });
-            (notifier, receiver)
-        }) {
-            Ok(s) => RemoveResourceResult::Removed(s.external_state),
-            Err(receiver) => RemoveResourceResult::Deferred(receiver),
-        }
+        C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(
+            primary.into_inner(),
+            |state: BaseDeviceState<_, _>| state.external_state,
+        )
     }
 
     /// Receive a device layer frame from the network.

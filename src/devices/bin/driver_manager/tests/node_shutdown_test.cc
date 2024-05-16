@@ -225,7 +225,8 @@ class NodeShutdownTest : public DriverManagerTestBase {
       ASSERT_NE(nodes_.find(parent_name), nodes_.end());
       parent_nodes.push_back(nodes_[parent_name]);
     }
-    nodes_[composite_name] = CreateCompositeNode(composite_name, parent_nodes, {},
+    std::vector<fuchsia_driver_framework::NodePropertyEntry> parent_properties(parents.size());
+    nodes_[composite_name] = CreateCompositeNode(composite_name, parent_nodes, parent_properties,
                                                  /* is_legacy */ false, /* primary_index */ 0);
   }
 

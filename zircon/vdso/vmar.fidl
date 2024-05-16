@@ -580,6 +580,10 @@ closed protocol Vmar {
     ///
     /// `ZX_VMO_OP_DECOMMIT` - Deprecated. Use `ZX_VMAR_OP_DECOMMIT` instead.
     ///
+    /// `ZX_VMAR_OP_PREFETCH` - Requires that *handle*, and the VMO handles used to create any affected
+    /// mappings, have the `ZX_RIGHT_READ`. The operation's semantics are otherwise as described by
+    /// [`zx_vmo_op_range()`](/docs/reference/syscalls/vmo_op_range.md) `ZX_VMO_OP_PREFETCH`.
+    ///
     /// `ZX_VMAR_OP_DECOMMIT` - Requires that *handle*, and the VMO handles used to create any affected
     /// mappings, have the `ZX_RIGHT_WRITE` right and that the address range must not have any child VMARs.
     /// The operation's semantics are otherwise as described by
@@ -610,6 +614,8 @@ closed protocol Vmar {
     /// If *op* is `ZX_VMAR_OP_DECOMMIT`, *handle* must have `ZX_RIGHT_WRITE`.
     ///
     /// If *op* is `ZX_VMAR_OP_COMMIT`, *handle* must have `ZX_RIGHT_WRITE`.
+    ///
+    /// If *op* is `ZX_VMAR_OP_PREFETCH`, *handle* must have `ZX_RIGHT_READ`.
     ///
     /// ## Return value
     ///

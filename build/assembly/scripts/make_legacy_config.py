@@ -10,6 +10,7 @@ removing any other configuration sets from it.
 
 import argparse
 from collections import defaultdict
+from dataclasses import dataclass
 import json
 import os
 import sys
@@ -25,13 +26,15 @@ from assembly import (
     KernelInfo,
 )
 from assembly.assembly_input_bundle import (
-    CompiledPackageAdditionalShards,
+    CompiledPackageDefinitionFromGN,
+    CompiledComponentDefinition,
     DuplicatePackageException,
     PackageDetails,
     PackageManifestParsingException,
 )
 from depfile import DepFile
-from serialization import json_load
+import serialization
+from serialization import instance_from_dict, json_load
 
 logger = logging.getLogger()
 
@@ -42,6 +45,19 @@ BlobList = List[Tuple[Merkle, FilePath]]
 FileEntryList = List[FileEntry]
 FileEntrySet = Set[FileEntry]
 DepSet = Set[FilePath]
+
+
+@dataclass
+@serialization.serialize_dict
+class ConfigDataEntryFromGN:
+    """The GN metadata written for config-data entries"""
+
+    label: str
+    source: FilePath
+    destination: FilePath
+
+    def as_file_entry(self) -> FileEntry:
+        return FileEntry(self.source, self.destination)
 
 
 def copy_to_assembly_input_bundle(
@@ -122,10 +138,13 @@ def copy_to_assembly_input_bundle(
 
     if core_realm_shards:
         # Pass the compiled_package_shards
-        additional_shards = CompiledPackageAdditionalShards(
-            "core", {"core": set(core_realm_shards)}
+        package = CompiledPackageDefinitionFromGN(
+            name="core",
+            components=[
+                CompiledComponentDefinition("core", set(core_realm_shards))
+            ],
         )
-        aib_creator.compiled_package_shards.append(additional_shards)
+        aib_creator.compiled_packages.append(package)
 
     return aib_creator.build()
 
@@ -175,7 +194,7 @@ def main():
     # Read in the config_data entries if available.
     if args.config_data_entries:
         config_data_entries = [
-            FileEntry.from_dict(entry)
+            instance_from_dict(ConfigDataEntryFromGN, entry)
             for entry in json.load(args.config_data_entries)
         ]
     else:
@@ -273,7 +292,7 @@ def main():
         bootfs_packages,
         kernel,
         boot_args,
-        config_data_entries,
+        [entry.as_file_entry() for entry in config_data_entries],
         args.outdir,
         base_driver_packages_list,
         base_driver_components_files_list,

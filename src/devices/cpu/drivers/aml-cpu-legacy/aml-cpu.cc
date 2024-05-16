@@ -315,6 +315,15 @@ void AmlCpu::GetLogicalCoreId(GetLogicalCoreIdRequestView request,
   completer.Reply(0);
 }
 
+void AmlCpu::GetDomainId(GetDomainIdCompleter::Sync& completer) {
+  completer.Reply(PowerDomainIndex());
+}
+
+void AmlCpu::GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) {
+  // Platform does not provide this information.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void AmlCpu::SetCpuInfo(uint32_t cpu_version_packed) {
   const uint8_t major_revision = (cpu_version_packed >> 24) & 0xff;
   const uint8_t minor_revision = (cpu_version_packed >> 8) & 0xff;

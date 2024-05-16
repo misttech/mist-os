@@ -107,12 +107,26 @@ PackageDetailsList = List[PackageDetails]
 
 @dataclass
 @serialize_json
-class CompiledPackageMainDefinition:
+class CompiledComponentDefinition:
+    """
+    The definition of component to be compiled by Assembly
+    """
+
+    # Name of the component
+    component_name: str = field()
+    # Component shards to compile together
+    shards: Set[FilePath] = field(default_factory=set)
+
+
+@dataclass
+@serialize_json
+class CompiledPackageDefinition:
     """Primary definition of a compiled package which is created by Assembly"""
 
-    name: str = field()  # Name of the package
+    # Name of the package
+    name: str = field()
     # Dictionary mapping components to cml files by name
-    components: Dict[str, FilePath] = field(default_factory=dict)
+    components: List[CompiledComponentDefinition] = field(default_factory=list)
     # Other files to include in the compiled package
     contents: Set[FileEntry] = field(default_factory=set)
     # CML files included by the component cml
@@ -123,15 +137,24 @@ class CompiledPackageMainDefinition:
 
 @dataclass
 @serialize_json
-class CompiledPackageAdditionalShards:
-    """
-    Additional contents for a package defined by a CompiledPackageMainDefinition
+class CompiledPackageDefinitionFromGN:
+    """The CompilePackageDefinition which is written by GN for consuming by this tool.
+
+    The key difference is that the 'includes' field has a different name and has
+    a different type of objects (FileEntry vs source paths).  This is so that
+    they can be copied to their proper path within the include dir.
     """
 
     # Name of the package
     name: str = field()
-    # Additional component shards
-    component_shards: Dict[str, Set[FilePath]] = field(default_factory=dict)
+    # Dictionary mapping components to cml files by name
+    components: List[CompiledComponentDefinition] = field(default_factory=list)
+    # Other files to include in the compiled package
+    contents: Set[FileEntry] = field(default_factory=set)
+    # CML files included by the component cml
+    component_includes: Set[FileEntry] = field(default_factory=set)
+    # Whether to extract the contents of this package into bootfs
+    bootfs_package: bool = field(default=False)
 
 
 @dataclass
@@ -281,9 +304,9 @@ class AssemblyInputBundle:
     shell_commands: Dict[str, List[str]] = field(
         default_factory=functools.partial(defaultdict, list)
     )
-    packages_to_compile: List[
-        Union[CompiledPackageMainDefinition, CompiledPackageAdditionalShards]
-    ] = field(default_factory=list)
+    packages_to_compile: List[CompiledPackageDefinition] = field(
+        default_factory=list
+    )
     bootfs_files_package: Optional[FilePath] = None
 
     def __repr__(self) -> str:
@@ -313,19 +336,10 @@ class AssemblyInputBundle:
             file_paths.extend(self.blobs)
 
         for package in self.packages_to_compile:
-            if isinstance(package, CompiledPackageMainDefinition):
-                file_paths.extend(package.includes)
-                file_paths.extend(package.components.values())
-                file_paths.extend([entry.source for entry in package.contents])
-            if isinstance(package, CompiledPackageAdditionalShards):
-                file_paths.extend(
-                    [
-                        # flatten
-                        component_path
-                        for shards in package.component_shards.values()
-                        for component_path in shards
-                    ]
-                )
+            file_paths.extend(package.includes)
+            file_paths.extend([entry.source for entry in package.contents])
+            for component in package.components:
+                file_paths.extend(component.shards)
 
         return file_paths
 
@@ -445,12 +459,9 @@ class AIBCreator:
         # which subpackages have already been copied.
         self.subpackages: Set[Merkle] = set()
 
-        # A list of CompiledPackageMainDefinitions from either a parsed json GN
+        # A list of CompiledPackageDefinitions from either a parsed json GN
         # scope, or directly set by the legacy AIB creator.
-        self.compiled_packages: List[CompiledPackageMainDefinition] = list()
-
-        # Additional component cml shards to include in package's components
-        self.compiled_package_shards: List[CompiledPackageAdditionalShards] = []
+        self.compiled_packages: List[CompiledPackageDefinitionFromGN] = list()
 
     def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
         """
@@ -611,22 +622,28 @@ class AIBCreator:
             local_kernel_dst_path = os.path.join(self.outdir, kernel_dst_path)
             deps.add(fast_copy_makedirs(kernel_src_path, local_kernel_dst_path))
 
-        all_copied_include_entries: Set[FilePath] = set()
+        # Track all the FileEntries for includes, to make sure that we don't get
+        # any duplicate destination paths with different source paths.
+        all_copied_include_entries: Set[FileEntry] = set()
         for package in self.compiled_packages:
-            copied_component_cmls = {}
-            for component_name, cml_file in package.components.items():
-                copied_cml, component_deps = self._copy_component_shard(
-                    cml_file,
+            components: List[CompiledComponentDefinition] = []
+            for component_def in package.components:
+                copied_shards, component_deps = self._copy_component_shards(
+                    component_def.shards,
                     package_name=package.name,
-                    component_name=component_name,
+                    component_name=component_def.component_name,
                 )
-                copied_component_cmls[component_name] = copied_cml
-
+                components.append(
+                    CompiledComponentDefinition(
+                        component_name=component_def.component_name,
+                        shards=set(copied_shards),
+                    )
+                )
                 deps.update(component_deps)
 
             # This assumes that package.includes has actually been passed to the
             # AIB creator as Set[FileEntry] instead of a Set[FilePath].  This is
-            # not ideal, but it allows the reuse of the MainPackageDefinition
+            # not ideal, but it allows the reuse of the CompiledPackageDefinition
             # type without any other changes.
             #
             # The FileEntries are only needed because of the SDK include paths
@@ -647,7 +664,7 @@ class AIBCreator:
                 copied_include_entries,
                 component_includes_deps,
             ) = self._copy_component_includes(
-                package.includes, all_copied_include_entries
+                package.component_includes, all_copied_include_entries
             )
             deps.update(component_includes_deps)
 
@@ -667,9 +684,9 @@ class AIBCreator:
                 os.path.join("compiled_packages", package.name, "files"),
             )
 
-            copied_definition = CompiledPackageMainDefinition(
+            copied_definition = CompiledPackageDefinition(
                 name=package.name,
-                components=copied_component_cmls,
+                components=components,
                 includes=copied_includes,
                 contents=set(copied_package_files),
                 bootfs_package=package.bootfs_package,
@@ -677,22 +694,6 @@ class AIBCreator:
             result.packages_to_compile.append(copied_definition)
 
             deps.update(package_deps)
-
-        for package in self.compiled_package_shards:
-            copied_component_shards = {}
-            for name, shards in package.component_shards.items():
-                copied_shards, component_deps = self._copy_component_shards(
-                    shards, package_name=package.name, component_name=name
-                )
-
-                deps.update(component_deps)
-                copied_component_shards[name] = set(copied_shards)
-
-            result.packages_to_compile.append(
-                CompiledPackageAdditionalShards(
-                    name=package.name, component_shards=copied_component_shards
-                )
-            )
 
         # Copy the config_data entries into the out-of-tree layout
         (config_data, config_data_deps) = self._copy_config_data_entries()
@@ -785,7 +786,7 @@ class AIBCreator:
     def _copy_packages(
         self,
         package_details_list: PackageDetailsList = None,
-    ) -> Tuple[PackageManifestList, BlobList, DepSet]:
+    ) -> Tuple[PackageDetailsList, BlobList, DepSet]:
         """Copy package manifests to the assembly bundle outdir, returning the set of blobs
         that need to be copied as well (so that they blob copying can be done in a
         single, deduplicated step).
@@ -1034,7 +1035,7 @@ class AIBCreator:
 
     def _copy_component_includes(
         self,
-        component_includes: Union[FileEntrySet, FileEntryList],
+        component_includes: FileEntrySet,
         existing_shard_includes: FileEntrySet,
     ) -> Tuple[FileEntrySet, DepSet]:
         deps: DepSet = set()

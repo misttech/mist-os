@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   edition = "2021"
@@ -58,12 +57,6 @@ rustc_binary("bin") {
 fuchsia_package_with_single_component("bt-snoop") {
   deps = [ ":bin" ]
   manifest = "meta/bt-snoop.cml"
-}
-
-# The core realm shard to be used by product integrators.
-# When this shard is included, `bt-snoop` will be started on device boot.
-core_shard("eager-core-shard") {
-  shard_file = "meta/bt-snoop-eager.core_shard.cml"
 }
 
 fuchsia_unittest_package("bt-snoop-unittests") {

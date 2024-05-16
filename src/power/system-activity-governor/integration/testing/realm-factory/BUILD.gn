@@ -11,9 +11,6 @@ rustc_binary("bin") {
   name = "system_activity_governor_realm_factory"
   sources = [ "src/main.rs" ]
   deps = [
-    "//sdk/lib/device-watcher/rust",
-    "//sdk/lib/driver_test_realm/realm_builder/rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -21,7 +18,6 @@ rustc_binary("bin") {
     "//src/power/broker:component",
     "//src/power/system-activity-governor:component",
     "//src/power/system-activity-governor/integration/testing/fidl:test.systemactivitygovernor_rust",
-    "//src/power/testing/fake-suspend:test.suspendcontrol_rust",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -41,7 +37,6 @@ fuchsia_package("realm-factory") {
   testonly = true
   deps = [
     ":realm-factory-component",
-    "//src/devices/misc/drivers/test-parent",
-    "//src/power/system-activity-governor/integration/testing/fake-suspend",
+    "//src/power/testing/fake-suspend",
   ]
 }

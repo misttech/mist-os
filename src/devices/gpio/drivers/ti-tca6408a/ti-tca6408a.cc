@@ -36,19 +36,12 @@ zx::result<> TiTca6408aDevice::Start() {
     i2c.WriteSyncRetries(write_buf, sizeof(write_buf), kI2cRetries, kI2cRetryDelay);
   }
 
-  zx::result pin_index_offset =
-      compat::GetMetadata<uint32_t>(incoming(), DEVICE_METADATA_PRIVATE, "pdev");
-  if (pin_index_offset.is_error()) {
-    FDF_LOG(ERROR, "Failed to get pin_index_offset  %s", pin_index_offset.status_string());
-    return pin_index_offset.take_error();
-  }
-
   ZX_ASSERT(compat_server_
                 .Initialize(incoming(), outgoing(), node_name(), kDeviceName,
                             compat::ForwardMetadata::All())
                 .is_ok());
 
-  device_ = std::make_unique<TiTca6408a>(std::move(i2c), *pin_index_offset.value());
+  device_ = std::make_unique<TiTca6408a>(std::move(i2c));
 
   auto result = outgoing()->AddService<fuchsia_hardware_gpioimpl::Service>(
       fuchsia_hardware_gpioimpl::Service::InstanceHandler({
@@ -196,7 +189,7 @@ void TiTca6408a::GetInitSteps(GetInitStepsCompleter::Sync& completer) {}
 void TiTca6408a::GetControllerId(GetControllerIdCompleter::Sync& completer) { completer.Reply(0); }
 
 zx::result<uint8_t> TiTca6408a::ReadBit(Register reg, uint32_t index) {
-  const auto bit = static_cast<uint8_t>(1 << (index - pin_index_offset_));
+  const auto bit = static_cast<uint8_t>(1 << index);
   const auto address = static_cast<uint8_t>(reg);
 
   uint8_t value = 0;
@@ -211,7 +204,7 @@ zx::result<uint8_t> TiTca6408a::ReadBit(Register reg, uint32_t index) {
 }
 
 zx::result<> TiTca6408a::SetBit(Register reg, uint32_t index) {
-  const auto bit = static_cast<uint8_t>(1 << (index - pin_index_offset_));
+  const auto bit = static_cast<uint8_t>(1 << index);
   const auto address = static_cast<uint8_t>(reg);
 
   uint8_t value = 0;
@@ -233,7 +226,7 @@ zx::result<> TiTca6408a::SetBit(Register reg, uint32_t index) {
 }
 
 zx::result<> TiTca6408a::ClearBit(Register reg, uint32_t index) {
-  const auto bit = static_cast<uint8_t>(1 << (index - pin_index_offset_));
+  const auto bit = static_cast<uint8_t>(1 << index);
   const auto address = static_cast<uint8_t>(reg);
 
   uint8_t value = 0;

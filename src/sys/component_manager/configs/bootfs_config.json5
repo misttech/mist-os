@@ -17,7 +17,6 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.kernel.CpuResource",

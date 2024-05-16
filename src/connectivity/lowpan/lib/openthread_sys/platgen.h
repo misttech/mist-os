@@ -36,6 +36,7 @@
 #include <openthread/jam_detection.h>
 #include <openthread/joiner.h>
 #include <openthread/link.h>
+#include <openthread/link_metrics.h>
 #include <openthread/link_raw.h>
 #include <openthread/logging.h>
 #include <openthread/message.h>

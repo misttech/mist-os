@@ -5,7 +5,7 @@
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
-    AdditionalPackageContents, AssemblyConfigWrapperForOverrides, CompiledPackageDefinition,
+    AssemblyConfigWrapperForOverrides, CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
 use assembly_config_schema::platform_config::PlatformConfig;
@@ -18,7 +18,6 @@ use assembly_tool::SdkToolProvider;
 use assembly_util::{read_config, BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageMode, PackageValidationHandling, ProductArgs};
-use std::collections::BTreeMap;
 use tracing::info;
 
 mod assembly_builder;
@@ -174,6 +173,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
                 developer_overrides.developer_only_options,
                 developer_overrides.kernel,
                 developer_overrides.packages,
+                developer_overrides.packages_to_compile,
             )
             .context("Setting developer overrides")?;
     }
@@ -230,14 +230,16 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Add the core shards.
     if !configuration.core_shards.is_empty() {
-        let compiled_package_def =
-            CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::Core),
-                component_shards: BTreeMap::from([(
-                    "core".to_string(),
-                    configuration.core_shards.clone(),
-                )]),
-            });
+        let compiled_package_def: CompiledPackageDefinition = CompiledPackageDefinition {
+            name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::Core),
+            components: vec![CompiledComponentDefinition {
+                component_name: "core".to_string(),
+                shards: configuration.core_shards.iter().map(Into::into).collect(),
+            }],
+            contents: Default::default(),
+            includes: Default::default(),
+            bootfs_package: Default::default(),
+        };
         builder
             .add_compiled_package(&compiled_package_def, "".into())
             .context("Adding core shards")?;
@@ -254,6 +256,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Add product-specified packages and configuration
     builder.add_product_packages(product.packages).context("Adding product-provided packages")?;
+
+    // Add any packages compiled by the assembly process itself
+    for package in configuration.compiled_packages.values() {
+        builder
+            .add_compiled_package(package, "".into())
+            .context("adding configuration-generated package")?;
+    }
 
     builder
         .add_product_base_drivers(product.base_drivers)
@@ -368,6 +377,26 @@ fn print_developer_overrides_banner(
         println!("  Additional packages:");
         for details in &overrides.packages {
             println!("    {} -> {}", details.set, details.package);
+        }
+    }
+
+    if !overrides.packages_to_compile.is_empty() {
+        println!();
+        println!("  Additions to compiled packages:");
+        for package in &overrides.packages_to_compile {
+            println!("    package: \"{}\"", package.name);
+            for component in &package.components {
+                println!("      component: \"meta/{}.cm\"", component.component_name);
+                for shard in &component.shards {
+                    println!("        {shard}");
+                }
+            }
+            if !package.contents.is_empty() {
+                println!("      contents:");
+                for content in &package.contents {
+                    println!("        {}  (from: {})", content.destination, content.source);
+                }
+            }
         }
     }
     println!();

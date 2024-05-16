@@ -125,9 +125,6 @@ class BlockDeviceAdapter : public DeviceRef {
   // Returns ZX_OK if the device became visible before the deadlines.
   zx_status_t WaitUntilVisible() const;
 
-  // Returns ZX_OK if the driver Rebind completed within a deadline.
-  zx_status_t Rebind();
-
   virtual const DeviceRef* device() const { return this; }
   virtual DeviceRef* device() { return this; }
 };
@@ -207,7 +204,6 @@ class FvmAdapter : public DeviceRef {
   FvmAdapter(FvmAdapter&&) = delete;
   FvmAdapter& operator=(const FvmAdapter&) = delete;
   FvmAdapter& operator=(FvmAdapter&&) = delete;
-  ~FvmAdapter() override;
 
   zx_status_t AddPartition(const fbl::unique_fd& devfs_root, const std::string& name,
                            const Guid& guid, const Guid& type, uint64_t slice_count,

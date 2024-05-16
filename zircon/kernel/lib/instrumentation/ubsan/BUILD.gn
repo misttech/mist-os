@@ -9,6 +9,7 @@ source_set("runtime") {
     sources = [ "runtime.cc" ]
     deps = [
       "//src/lib/ubsan-custom:handlers",
+      "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/crashlog",
     ]
   }

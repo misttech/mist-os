@@ -490,7 +490,8 @@ impl FileSystemOps for TestFs {
 }
 
 pub fn create_fs(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
-    let test_fs = FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default());
+    let test_fs = FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default())
+        .expect("testfs constructed with valid options");
     let bus_dir_node = FsNode::new_root(ops);
     test_fs.set_root_node(bus_dir_node);
     test_fs

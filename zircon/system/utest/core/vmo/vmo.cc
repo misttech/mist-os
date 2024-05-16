@@ -2520,4 +2520,44 @@ TEST(VmoTestCase, ProtectToWrite) {
   ProtectToWriteTestHelper(&vmo, len);
 }
 
+// Prefetch on an anonymous VMO only has an effect of decompressing pages, which we cannot trigger
+// and check here in userspace, so this test just validates general syscall errors.
+TEST(VmoTestCase, Prefetch) {
+  auto check_vmo = [](zx::vmo &vmo, uint64_t size) {
+    // simple smoke test.
+    EXPECT_OK(vmo.op_range(ZX_VMO_OP_PREFETCH, 0, zx_system_get_page_size(), nullptr, 0));
+    // zero lengths should work.
+    EXPECT_OK(vmo.op_range(ZX_VMO_OP_PREFETCH, 0, 0, nullptr, 0));
+    // unaligned test.
+    EXPECT_OK(vmo.op_range(ZX_VMO_OP_PREFETCH, 4, 2, nullptr, 0));
+    // unaligned spanning pages test.
+    EXPECT_OK(vmo.op_range(ZX_VMO_OP_PREFETCH, zx_system_get_page_size() - 1, 2, nullptr, 0));
+    // out of range should fail.
+    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+              vmo.op_range(ZX_VMO_OP_PREFETCH, 0, size + PAGE_SIZE, nullptr, 0));
+    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+              vmo.op_range(ZX_VMO_OP_PREFETCH, size + PAGE_SIZE, 0, nullptr, 0));
+
+    // duplicate a handle without read permissions.
+    zx::vmo vmo_dup;
+    zx_info_handle_basic_t info;
+    EXPECT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    ASSERT_OK(vmo.duplicate(info.rights & ~ZX_RIGHT_READ, &vmo_dup));
+    // prefetch should fail with insufficient rights.
+    EXPECT_EQ(ZX_ERR_ACCESS_DENIED,
+              vmo_dup.op_range(ZX_VMO_OP_PREFETCH, 0, zx_system_get_page_size(), nullptr, 0));
+  };
+
+  {
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &vmo));
+    check_vmo(vmo, zx_system_get_page_size() * 2);
+  }
+
+  // Check if physical VMOs work.
+  if (auto res = vmo_test::GetTestPhysVmo(); res.is_ok()) {
+    check_vmo((*res).vmo, (*res).size);
+  }
+}
+
 }  // namespace

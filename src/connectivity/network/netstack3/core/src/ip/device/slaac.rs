@@ -22,17 +22,16 @@ use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
 use rand::{distributions::Uniform, Rng as _, RngCore};
 use tracing::{debug, error, trace};
 
-pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
-    algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
     context::{
         CoreTimerContext, CounterContext, HandleableTimer, InstantBindingsTypes, InstantContext,
         RngContext, TimerBindingsTypes, TimerContext,
     },
     counters::Counter,
-    device::{self, AnyDevice, DeviceIdContext, Id, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, DeviceIdentifier, WeakDeviceIdentifier},
     error::{ExistsError, NotFoundError},
     ip::device::{
+        opaque_iid::{OpaqueIid, OpaqueIidNonce, StableIidSecret},
         state::{Lifetime, SlaacConfig, TemporarySlaacConfig},
         AddressRemovedReason, Ipv6DeviceAddr,
     },
@@ -68,7 +67,7 @@ pub struct SlaacState<BT: SlaacBindingsTypes> {
 }
 
 impl<BC: SlaacBindingsTypes + TimerContext> SlaacState<BC> {
-    pub fn new<D: device::WeakId, CC: CoreTimerContext<SlaacTimerId<D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<SlaacTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {
@@ -88,11 +87,11 @@ impl<BC: SlaacBindingsTypes + TimerContext> SlaacState<BC> {
 
 /// A timer ID for SLAAC.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
-pub struct SlaacTimerId<D: device::WeakId> {
+pub struct SlaacTimerId<D: WeakDeviceIdentifier> {
     device_id: D,
 }
 
-impl<D: device::WeakId> SlaacTimerId<D> {
+impl<D: WeakDeviceIdentifier> SlaacTimerId<D> {
     pub(super) fn device_id(&self) -> &D {
         let Self { device_id } = self;
         device_id
@@ -563,7 +562,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     )
 }
 
-fn apply_slaac_update_to_addr<D: Id, BC: SlaacBindingsContext>(
+fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     address_entry: SlaacAddressEntryMut<'_, BC::Instant>,
     state: &mut SlaacState<BC>,
     subnet: Subnet<Ipv6Addr>,
@@ -982,7 +981,7 @@ pub struct TemporarySlaacAddressConfiguration {
     /// The secret to use when generating new temporary addresses. This should
     /// be initialized from a random number generator before generating any
     /// temporary addresses.
-    pub secret_key: [u8; STABLE_IID_SECRET_KEY_BYTES],
+    pub secret_key: StableIidSecret,
 }
 
 impl TemporarySlaacAddressConfiguration {
@@ -1004,7 +1003,7 @@ impl TemporarySlaacAddressConfiguration {
     pub const DEFAULT_TEMP_IDGEN_RETRIES: u8 = 3;
 
     /// Constructs a new instance with default values and the given secret key.
-    pub fn default_with_secret_key(secret_key: [u8; STABLE_IID_SECRET_KEY_BYTES]) -> Self {
+    pub fn default_with_secret_key(secret_key: StableIidSecret) -> Self {
         Self {
             temp_valid_lifetime: Self::DEFAULT_TEMP_VALID_LIFETIME,
             temp_preferred_lifetime: Self::DEFAULT_TEMP_PREFERRED_LIFETIME,
@@ -1359,14 +1358,14 @@ fn generate_global_temporary_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8; 8],
     seed: u64,
-    secret_key: &[u8; STABLE_IID_SECRET_KEY_BYTES],
+    secret_key: &StableIidSecret,
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     let prefix_len = usize::from(prefix.prefix() / 8);
 
     assert_eq!(usize::from(Ipv6Addr::BYTES) - prefix_len, iid.len());
     let mut address = prefix.network().ipv6_bytes();
 
-    let interface_identifier = generate_opaque_interface_identifier(
+    let interface_identifier = OpaqueIid::new(
         /* prefix */ *prefix,
         /* net_iface */ iid,
         /* net_id */ [],
@@ -1728,8 +1727,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _,
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt as _},
+            CtxPair,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -1745,7 +1745,7 @@ mod tests {
             testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
-            assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
+            assert_empty, CtxPairExt as _, FakeCryptoRng, TestAddrs, TestIpExt as _,
             DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
@@ -1877,9 +1877,9 @@ mod tests {
                 retrans_timer,
                 iid,
                 slaac_addrs,
-                ip_device_id_ctx: _,
                 slaac_state,
-            } = self.get_mut();
+                ..
+            } = &mut self.state;
             let mut slaac_addrs = slaac_addrs;
             cb(
                 SlaacAddrsMutAndConfig {
@@ -1910,8 +1910,8 @@ mod tests {
         slaac_addrs: FakeSlaacAddrs,
         dad_transmits: Option<NonZeroU16>,
         retrans_timer: Duration,
-    ) -> crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
-        FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+    ) -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeSlaacContext {
                 config,
                 dad_transmits,
@@ -1952,7 +1952,7 @@ mod tests {
         valid_lifetime_secs: u32,
         enable_stable_addresses: bool,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses, ..Default::default() },
             Default::default(),
             None,
@@ -1967,7 +1967,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(preferred_lifetime_secs),
             NonZeroNdpLifetime::from_u32_with_infinite(valid_lifetime_secs),
         );
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -1983,7 +1983,7 @@ mod tests {
     #[test_case(0; "deprecated")]
     #[test_case(1; "preferred")]
     fn generate_stable_address(preferred_lifetime_secs: u32) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             Default::default(),
             None,
@@ -2010,7 +2010,7 @@ mod tests {
             config: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
             deprecated: address_created_deprecated,
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry],);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry],);
         let deprecate_timer_id = InnerSlaacTimerId::DeprecateSlaacAddress { addr: addr_sub.addr() };
         let invalidate_timer_id =
             InnerSlaacTimerId::InvalidateSlaacAddress { addr: addr_sub.addr() };
@@ -2023,13 +2023,13 @@ mod tests {
             // Trigger the deprecation timer.
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()));
             let entry = SlaacAddressEntry { deprecated: true, ..entry };
-            assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+            assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         }
         core_ctx.state.slaac_state.timers.assert_timers([(invalidate_timer_id, (), valid_until)]);
 
         // Trigger the invalidation timer.
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()));
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2037,7 +2037,7 @@ mod tests {
     fn stable_address_conflict() {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             FakeSlaacAddrs {
                 slaac_addrs: Default::default(),
@@ -2061,7 +2061,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(LIFETIME_SECS),
             NonZeroNdpLifetime::from_u32_with_infinite(LIFETIME_SECS),
         );
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2070,7 +2070,7 @@ mod tests {
     fn remove_stable_address(reason: AddressRemovedReason) {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             Default::default(),
             None,
@@ -2095,7 +2095,7 @@ mod tests {
             config: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
             deprecated: false,
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
 
         let deprecate_timer_id = InnerSlaacTimerId::DeprecateSlaacAddress { addr: addr_sub.addr() };
         let invalidate_timer_id =
@@ -2108,7 +2108,7 @@ mod tests {
         // Remove the address and let SLAAC know the address was removed
         let config = {
             let SlaacAddressEntry { addr_sub: got_addr_sub, config, deprecated } =
-                core_ctx.get_mut().slaac_addrs.slaac_addrs.remove(0);
+                core_ctx.state.slaac_addrs.slaac_addrs.remove(0);
             assert_eq!(addr_sub, got_addr_sub);
             assert!(!deprecated);
             config
@@ -2238,7 +2238,7 @@ mod tests {
             effective_new_vl_secs,
         }: RefreshStableAddressTimersTest,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration { enable_stable_addresses: true, ..Default::default() },
             Default::default(),
             None,
@@ -2284,7 +2284,7 @@ mod tests {
             config: SlaacConfig::Static { valid_until },
             deprecated: address_created_deprecated,
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
 
         // Refresh timers.
@@ -2319,11 +2319,11 @@ mod tests {
             deprecated: ndp_pl.is_none(),
             ..entry
         };
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
         core_ctx.state.slaac_state.timers.assert_timers(expected_timers);
     }
 
-    const SECRET_KEY: [u8; STABLE_IID_SECRET_KEY_BYTES] = [1; STABLE_IID_SECRET_KEY_BYTES];
+    const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;
 
     const ONE_HOUR: NonZeroDuration =
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));
@@ -2440,7 +2440,7 @@ mod tests {
             enable,
         }: DontGenerateTemporaryAddressTest,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
                 temporary_address_configuration: enable.then(|| {
                     TemporarySlaacAddressConfiguration {
@@ -2468,7 +2468,7 @@ mod tests {
             NonZeroNdpLifetime::from_u32_with_infinite(preferred_lifetime_secs),
             NonZeroNdpLifetime::from_u32_with_infinite(valid_lifetime_secs),
         );
-        assert_empty(core_ctx.get_ref().iter_slaac_addrs());
+        assert_empty(core_ctx.state.iter_slaac_addrs());
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
@@ -2576,7 +2576,7 @@ mod tests {
         let pl_config = Duration::from_secs(pl_config.into());
         let regen_advance = regen_advance(temp_idgen_retries, retrans_timer, dad_transmits);
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context(
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
             SlaacConfiguration {
                 temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
                     temp_valid_lifetime: NonZeroDuration::new(Duration::from_secs(
@@ -2667,7 +2667,7 @@ mod tests {
             invalidate_timer_id: first_invalidate_timer_id,
             regenerate_timer_id: first_regenerate_timer_id,
         } = addr_props(&mut dup_rng, bindings_ctx.now(), Duration::ZERO);
-        assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [first_entry]);
+        assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [first_entry]);
         core_ctx.state.slaac_state.timers.assert_timers([
             (first_deprecate_timer_id, (), first_preferred_until),
             (first_invalidate_timer_id, (), first_valid_until),
@@ -2687,7 +2687,7 @@ mod tests {
             regenerate_timer_id: second_regenerate_timer_id,
         } = addr_props(&mut dup_rng, bindings_ctx.now(), first_desync_factor);
         assert_eq!(
-            core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
+            core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [first_entry, second_entry]
         );
         let second_regen_at = second_preferred_until - regen_advance.get();
@@ -2703,7 +2703,7 @@ mod tests {
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(new_timer_id()),);
         let first_entry = SlaacAddressEntry { deprecated: true, ..first_entry };
         assert_eq!(
-            core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
+            core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [first_entry, second_entry]
         );
         core_ctx.state.slaac_state.timers.assert_timers([
@@ -2749,7 +2749,7 @@ mod tests {
         } = addr_props(&mut dup_rng, third_created_at, first_desync_factor + second_desync_factor);
         let second_entry = SlaacAddressEntry { deprecated: true, ..second_entry };
         assert_eq!(
-            core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
+            core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(),
             [second_entry, third_entry]
         );
         core_ctx.state.slaac_state.timers.assert_timers([
@@ -2798,13 +2798,8 @@ mod tests {
 
     #[test]
     fn integration_remove_all_addresses_on_ipv6_disable() {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+        let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         const ONE_HOUR: NonZeroDuration =
             const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(ONE_HOUR_AS_SECS as u64));

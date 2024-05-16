@@ -430,6 +430,7 @@ struct ProgramBreak {
     // client address space from the underlying |vmo|.
     current: UserAddress,
 
+    #[cfg(not(feature = "alternate_anon_allocs"))]
     /// Placeholder VMO mapped to pages reserved for program break growth.
     placeholder_vmo: Arc<zx::Vmo>,
 }
@@ -2652,7 +2653,12 @@ impl MemoryManager {
                     /* populate= */ false,
                 )?;
 
-                let brk = ProgramBreak { base, current: base, placeholder_vmo: Arc::new(vmo) };
+                let brk = ProgramBreak {
+                    base,
+                    current: base,
+                    #[cfg(not(feature = "alternate_anon_allocs"))]
+                    placeholder_vmo: Arc::new(vmo),
+                };
                 state.brk = Some(brk.clone());
                 brk
             }
@@ -2674,21 +2680,41 @@ impl MemoryManager {
                 // affected range, regardless of whether they were actually program
                 // break pages, or other mappings.
                 let delta = old_end - new_end;
-                let vmo_offset = (new_end - brk.base) as u64;
 
-                // Overwrite the released address range with the program break placeholder.
-                if state
-                    .map_internal(
-                        DesiredAddress::FixedOverwrite(new_end),
-                        &*brk.placeholder_vmo,
-                        vmo_offset,
-                        delta,
-                        MappingFlags::ANONYMOUS,
-                        /* populate= */ false,
-                    )
-                    .is_err()
+                // Overwrite the released range with a placeholder Zircon mapping, without
+                // reflecting the change in `mappings`.
+                #[cfg(feature = "alternate_anon_allocs")]
                 {
-                    return Ok(brk.current);
+                    if state
+                        .private_anonymous
+                        .allocate_address_range(
+                            &state.user_vmar,
+                            &state.user_vmar_info,
+                            DesiredAddress::FixedOverwrite(new_end),
+                            delta,
+                            MappingOptions::ANONYMOUS,
+                        )
+                        .is_err()
+                    {
+                        return Ok(brk.current);
+                    }
+                }
+                #[cfg(not(feature = "alternate_anon_allocs"))]
+                {
+                    let vmo_offset = (new_end - brk.base) as u64;
+                    if state
+                        .map_internal(
+                            DesiredAddress::FixedOverwrite(new_end),
+                            &*brk.placeholder_vmo,
+                            vmo_offset,
+                            delta,
+                            MappingFlags::ANONYMOUS,
+                            /* populate= */ false,
+                        )
+                        .is_err()
+                    {
+                        return Ok(brk.current);
+                    }
                 }
 
                 // Remove `mappings` in the released range, and zero any pages that were mapped
@@ -2707,45 +2733,10 @@ impl MemoryManager {
                     return Ok(brk.current);
                 }
 
-                // If there was previously at least one page of program break then we can
-                // extend that mapping, rather than making a new allocation.
-                let existing = if old_end > brk.base {
-                    let last_page = old_end - *PAGE_SIZE;
-                    state.mappings.get(&last_page).filter(|(_, m)| m.name == MappingName::Heap)
-                } else {
-                    None
-                };
-
-                if let Some((range, _)) = existing {
-                    let range_start = range.start;
-                    let old_length = range.end - range.start;
-                    if state
-                        .try_remap_in_place(
-                            range_start,
-                            old_length,
-                            old_length + delta,
-                            &mut released_mappings,
-                        )
-                        .unwrap_or_default()
-                        .is_none()
-                    {
-                        return Ok(brk.current);
-                    }
-                } else {
-                    // Otherwise, allocating fresh anonymous pages is good-enough.
-                    if state
-                        .map_anonymous(
-                            DesiredAddress::FixedOverwrite(old_end),
-                            delta,
-                            ProtectionFlags::READ | ProtectionFlags::WRITE,
-                            MappingOptions::ANONYMOUS,
-                            MappingName::Heap,
-                            &mut released_mappings,
-                        )
-                        .is_err()
-                    {
-                        return Ok(brk.current);
-                    }
+                // TODO(b/310255065): Call `map_anonymous()` directly once
+                // `alternate_anon_allocs` is always on.
+                if !Self::extend_brk(&mut state, old_end, delta, brk.base, &mut released_mappings) {
+                    return Ok(brk.current);
                 }
             }
             _ => {}
@@ -2756,6 +2747,57 @@ impl MemoryManager {
         new_brk.current = addr;
         state.brk = Some(new_brk);
         Ok(addr)
+    }
+
+    fn extend_brk(
+        state: &mut MemoryManagerState,
+        old_end: UserAddress,
+        delta: usize,
+        brk_base: UserAddress,
+        released_mappings: &mut Vec<Mapping>,
+    ) -> bool {
+        #[cfg(not(feature = "alternate_anon_allocs"))]
+        {
+            // If there was previously at least one page of program break then we can
+            // extend that mapping, rather than making a new allocation.
+            let existing = if old_end > brk_base {
+                let last_page = old_end - *PAGE_SIZE;
+                state.mappings.get(&last_page).filter(|(_, m)| m.name == MappingName::Heap)
+            } else {
+                None
+            };
+
+            if let Some((range, _)) = existing {
+                let range_start = range.start;
+                let old_length = range.end - range.start;
+                return state
+                    .try_remap_in_place(
+                        range_start,
+                        old_length,
+                        old_length + delta,
+                        released_mappings,
+                    )
+                    .unwrap_or_default()
+                    .is_some();
+            }
+        }
+
+        #[cfg(feature = "alternate_anon_allocs")]
+        {
+            let _ = brk_base;
+        }
+
+        // Otherwise, allocating fresh anonymous pages is good-enough.
+        state
+            .map_anonymous(
+                DesiredAddress::FixedOverwrite(old_end),
+                delta,
+                ProtectionFlags::READ | ProtectionFlags::WRITE,
+                MappingOptions::ANONYMOUS,
+                MappingName::Heap,
+                released_mappings,
+            )
+            .is_ok()
     }
 
     pub fn snapshot_to<L>(

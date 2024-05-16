@@ -7,7 +7,6 @@
 use alloc::fmt::Debug;
 use core::time::Duration;
 
-use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, Witness as _,
@@ -26,16 +25,14 @@ use crate::{
     },
     counters::Counter,
     device::{
-        self,
         link::{LinkDevice, LinkUnicastAddress},
-        DeviceIdContext, FrameDestination,
+        DeviceIdContext, FrameDestination, WeakDeviceIdentifier,
     },
     ip::device::nud::{
         self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
         NudBindingsTypes, NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState,
         NudTimerId, NudUserConfig,
     },
-    BindingsContext, CoreCtx, StackState,
 };
 
 // NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
@@ -98,21 +95,6 @@ pub struct ArpCounters {
     pub tx_requests_dropped_no_local_addr: Counter,
     /// Count of ARP response packets sent.
     pub tx_responses: Counter,
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for StackState<BC> {
-    type Data = ArpCounters;
-    type Guard<'l> = &'l ArpCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.arp_counters()
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<ArpCounters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::ArpCounters>())
-    }
 }
 
 /// An execution context for the ARP protocol that allows sending IP packets to
@@ -632,7 +614,10 @@ pub struct ArpState<D: ArpDevice, BT: NudBindingsTypes<D>> {
 }
 
 impl<D: ArpDevice, BC: NudBindingsTypes<D> + TimerContext> ArpState<D, BC> {
-    pub fn new<DeviceId: device::WeakId, CC: CoreTimerContext<ArpTimerId<D, DeviceId>, BC>>(
+    pub fn new<
+        DeviceId: WeakDeviceIdentifier,
+        CC: CoreTimerContext<ArpTimerId<D, DeviceId>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device_id: DeviceId,
     ) -> Self {
@@ -658,9 +643,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
+                FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeNetworkSpec, WithFakeFrameContext,
             },
-            InstantContext as _, SendableFrameMeta, TimerHandler,
+            CtxPair, InstantContext as _, TimerHandler,
         },
         device::{
             ethernet::EthernetLinkDevice,
@@ -733,40 +718,25 @@ mod tests {
         FakeDeviceId,
     >;
 
-    fn new_context() -> crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
-        FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+    fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeArpCtx::new(bindings_ctx))
         })
     }
 
-    impl SendableFrameMeta<FakeCoreCtxImpl, FakeBindingsCtxImpl>
-        for ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>
-    {
-        fn send_meta<S>(
-            self,
-            core_ctx: &mut FakeCoreCtxImpl,
-            bindings_ctx: &mut FakeBindingsCtxImpl,
-            frame: S,
-        ) -> Result<(), S>
-        where
-            S: Serializer,
-            S::Buffer: BufferMut,
-        {
-            self.send_meta(&mut core_ctx.frames, bindings_ctx, frame)
-        }
-    }
-
-    impl FakeNetworkContext for crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+    enum ArpNetworkSpec {}
+    impl FakeNetworkSpec for ArpNetworkSpec {
+        type Context = CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
         type TimerId = ArpTimerId<EthernetLinkDevice, FakeWeakDeviceId<FakeLinkDeviceId>>;
         type SendMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
         type RecvMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
 
         fn handle_frame(
-            &mut self,
+            ctx: &mut Self::Context,
             ArpFrameMetadata { device_id, .. }: Self::RecvMeta,
             data: Buf<Vec<u8>>,
         ) {
-            let Self { core_ctx, bindings_ctx } = self;
+            let CtxPair { core_ctx, bindings_ctx } = ctx;
             handle_packet(
                 core_ctx,
                 bindings_ctx,
@@ -775,12 +745,17 @@ mod tests {
                 data,
             )
         }
-        fn handle_timer(&mut self, timer: Self::TimerId) {
-            let Self { core_ctx, bindings_ctx } = self;
+        fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
+            let CtxPair { core_ctx, bindings_ctx } = ctx;
             TimerHandler::handle_timer(core_ctx, bindings_ctx, timer)
         }
-        fn process_queues(&mut self) -> bool {
+
+        fn process_queues(_ctx: &mut Self::Context) -> bool {
             false
+        }
+
+        fn fake_frames(ctx: &mut Self::Context) -> &mut impl WithFakeFrameContext<Self::SendMeta> {
+            &mut ctx.core_ctx
         }
     }
 
@@ -810,8 +785,8 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let state = self.get_mut();
-            cb(&mut state.arp_state, &mut state.inner)
+            let FakeArpCtx { arp_state, inner, .. } = &mut self.state;
+            cb(arp_state, inner)
         }
 
         fn with_arp_state<O, F: FnOnce(&ArpState<EthernetLinkDevice, FakeBindingsCtxImpl>) -> O>(
@@ -819,8 +794,7 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let state = self.get_ref();
-            cb(&state.arp_state)
+            cb(&self.state.arp_state)
         }
 
         fn get_protocol_addr(
@@ -828,7 +802,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> Option<Ipv4Addr> {
-            self.get_ref().proto_addr
+            self.state.proto_addr
         }
 
         fn get_hardware_addr(
@@ -836,7 +810,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> UnicastAddr<Mac> {
-            self.get_ref().hw_addr
+            self.state.hw_addr
         }
 
         fn with_arp_state_mut<
@@ -850,15 +824,7 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let FakeArpCtx {
-                arp_state,
-                config,
-                proto_addr: _,
-                hw_addr: _,
-                inner: _,
-                counters: _,
-                nud_counters: _,
-            } = self.get_mut();
+            let FakeArpCtx { arp_state, config, .. } = &mut self.state;
             cb(arp_state, config)
         }
     }
@@ -899,15 +865,15 @@ mod tests {
         }
     }
 
-    impl CounterContext<ArpCounters> for FakeCoreCtxImpl {
+    impl CounterContext<ArpCounters> for FakeArpCtx {
         fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-            cb(&self.get_ref().counters)
+            cb(&self.counters)
         }
     }
 
-    impl CounterContext<NudCounters<Ipv4>> for FakeCoreCtxImpl {
+    impl CounterContext<NudCounters<Ipv4>> for FakeArpCtx {
         fn with_counters<O, F: FnOnce(&NudCounters<Ipv4>) -> O>(&self, cb: F) -> O {
-            cb(&self.get_ref().nud_counters)
+            cb(&self.nud_counters)
         }
     }
 
@@ -973,7 +939,7 @@ mod tests {
         // Test that, when we receive a gratuitous ARP request, we cache the
         // sender's address information, and we do not send a response.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -1001,7 +967,7 @@ mod tests {
         // Test that, when we receive a gratuitous ARP response, we cache the
         // sender's address information, and we do not send a response.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
         send_arp_packet(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -1030,7 +996,7 @@ mod tests {
         // a gratuitous ARP for the same host, we cancel the timer and notify
         // the device layer.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Trigger link resolution.
         assert_neighbor_unknown(
@@ -1078,7 +1044,7 @@ mod tests {
         // Test that, when we receive an ARP request, we cache the sender's
         // address information and send an ARP response.
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         send_arp_packet(
             &mut core_ctx,
@@ -1160,14 +1126,14 @@ mod tests {
             .chain(iter::once(&requested_remote_cfg))
             .chain(iter::once(&LOCAL_HOST_CFG));
 
-        let mut network = FakeNetwork::new(
+        let mut network = ArpNetworkSpec::new_network(
             {
                 host_iter.clone().map(|cfg| {
                     let ArpHostConfig { name, proto_addr, hw_addr } = cfg;
                     let mut ctx = new_context();
-                    let FakeCtx { core_ctx, bindings_ctx: _ } = &mut ctx;
-                    core_ctx.get_mut().hw_addr = UnicastAddr::new(*hw_addr).unwrap();
-                    core_ctx.get_mut().proto_addr = Some(*proto_addr);
+                    let CtxPair { core_ctx, bindings_ctx: _ } = &mut ctx;
+                    core_ctx.state.hw_addr = UnicastAddr::new(*hw_addr).unwrap();
+                    core_ctx.state.proto_addr = Some(*proto_addr);
                     (*name, ctx)
                 })
             },
@@ -1199,7 +1165,7 @@ mod tests {
         } = requested_remote_cfg;
 
         // Trigger link resolution.
-        network.with_context(local_name, |FakeCtx { core_ctx, bindings_ctx }| {
+        network.with_context(local_name, |CtxPair { core_ctx, bindings_ctx }| {
             assert_neighbor_unknown(
                 core_ctx,
                 FakeLinkDeviceId,
@@ -1241,7 +1207,7 @@ mod tests {
 
         // The requested remote should have populated its ARP cache with the local's
         // information.
-        network.with_context(requested_remote_name, |FakeCtx { core_ctx, bindings_ctx: _ }| {
+        network.with_context(requested_remote_name, |CtxPair { core_ctx, bindings_ctx: _ }| {
             assert_dynamic_neighbor_with_addr(
                 core_ctx,
                 FakeLinkDeviceId,
@@ -1269,7 +1235,7 @@ mod tests {
 
         // The local should have populated its cache with the remote's
         // information.
-        network.with_context(local_name, |FakeCtx { core_ctx, bindings_ctx: _ }| {
+        network.with_context(local_name, |CtxPair { core_ctx, bindings_ctx: _ }| {
             assert_dynamic_neighbor_with_addr(
                 core_ctx,
                 FakeLinkDeviceId,
@@ -1283,7 +1249,7 @@ mod tests {
                 // The non-requested_remote should not have populated its ARP cache.
                 network.with_context(
                     *unrequested_remote_name,
-                    |FakeCtx { core_ctx, bindings_ctx: _ }| {
+                    |CtxPair { core_ctx, bindings_ctx: _ }| {
                         // The non-requested_remote should not have sent an ARP response.
                         assert_empty(core_ctx.frames().iter());
 
@@ -1310,7 +1276,7 @@ mod tests {
         frame_dst: FrameDestination,
         expect_solicited: bool,
     ) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Trigger link resolution.
         assert_neighbor_unknown(

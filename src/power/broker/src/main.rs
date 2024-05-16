@@ -56,7 +56,9 @@ struct BrokerSvc {
 impl BrokerSvc {
     fn new() -> Self {
         Self {
-            broker: Rc::new(RefCell::new(Broker::new())),
+            broker: Rc::new(RefCell::new(Broker::new(
+                component::inspector().root().create_child("broker"),
+            ))),
             element_handlers: Rc::new(RefCell::new(HashMap::new())),
         }
     }

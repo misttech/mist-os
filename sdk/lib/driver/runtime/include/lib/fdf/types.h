@@ -5,7 +5,7 @@
 #ifndef LIB_FDF_TYPES_H_
 #define LIB_FDF_TYPES_H_
 
-#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
 __BEGIN_CDECLS
 

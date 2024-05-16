@@ -43,8 +43,8 @@ class AnalyticsReporter {
   void ReportSessionStarted() const;
   void ReportSessionConnected(bool is_minidump, bool local_agent) const;
   void ReportSessionEnded() const;
-
   void ReportCommand(const CommandReport& report) const;
+  void ReportConsoleType(ConsoleType::Type type) const;
 
  private:
   Session* session_ = nullptr;  // non-owning.

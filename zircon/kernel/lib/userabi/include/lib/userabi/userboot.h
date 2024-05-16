@@ -29,7 +29,6 @@ enum HandleIndex : uint32_t {
 
   // Essential job and resource handles.
   kRootJob,
-  kRootResource,
   kMmioResource,
   kIrqResource,
 #if __x86_64__

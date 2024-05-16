@@ -24,6 +24,7 @@ fuchsia_board_input_bundle(
         "//src/devices/gpio/drivers/aml-gpio",
         "//src/devices/i2c/drivers/aml-i2c",
         "//src/devices/usb/drivers/aml-usb-phy",
+        "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo",
     ],
 )
 

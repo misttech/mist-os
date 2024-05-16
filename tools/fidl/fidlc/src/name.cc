@@ -75,39 +75,21 @@ Name NamingContext::ToName(Library* library, SourceSpan declaration_span) {
 
 std::optional<SourceSpan> Name::span() const {
   return std::visit(
-      [](auto&& name_context) -> std::optional<SourceSpan> {
-        using T = std::decay_t<decltype(name_context)>;
-        if constexpr (std::is_same_v<T, SourcedNameContext>) {
-          return std::optional(name_context.span);
-        } else if constexpr (std::is_same_v<T, AnonymousNameContext>) {
-          return std::optional(name_context.span);
-        } else if constexpr (std::is_same_v<T, IntrinsicNameContext>) {
-          return std::nullopt;
-        } else {
-          abort();
-        }
-      },
-      name_context_);
+      overloaded{
+          [](const Sourced& sourced) -> std::optional<SourceSpan> { return sourced.span; },
+          [](const Anonymous& anonymous) -> std::optional<SourceSpan> { return anonymous.span; },
+          [](const Intrinsic& intrinsic) -> std::optional<SourceSpan> { return std::nullopt; }},
+      value_);
 }
 
 std::string_view Name::decl_name() const {
   return std::visit(
-      [](auto&& name_context) -> std::string_view {
-        using T = std::decay_t<decltype(name_context)>;
-        if constexpr (std::is_same_v<T, SourcedNameContext>) {
-          return name_context.span.data();
-        } else if constexpr (std::is_same_v<T, AnonymousNameContext>) {
-          // since decl_name() is used in Name::Key, using the flattened name
-          // here ensures that the flattened name will cause conflicts if not
-          // unique
-          return std::string_view(name_context.flattened_name);
-        } else if constexpr (std::is_same_v<T, IntrinsicNameContext>) {
-          return name_context.name;
-        } else {
-          abort();
-        }
-      },
-      name_context_);
+      overloaded{[](const Sourced& sourced) -> std::string_view { return sourced.span.data(); },
+                 [](const Anonymous& anonymous) -> std::string_view {
+                   return anonymous.context->flattened_name();
+                 },
+                 [](const Intrinsic& intrinsic) -> std::string_view { return intrinsic.name; }},
+      value_);
 }
 
 std::string Name::full_name() const {
@@ -115,7 +97,6 @@ std::string Name::full_name() const {
   if (member_name_.has_value()) {
     constexpr std::string_view kSeparator = ".";
     name.reserve(name.size() + kSeparator.size() + member_name_.value().size());
-
     name.append(kSeparator);
     name.append(member_name_.value());
   }

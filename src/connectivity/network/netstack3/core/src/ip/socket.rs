@@ -16,8 +16,8 @@ use packet::{BufferMut, SerializeError};
 use thiserror::Error;
 
 use crate::{
-    context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    context::{CounterContext, InstantContext, TracingContext},
+    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier as _},
     filter::{
         FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
     },
@@ -77,7 +77,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         O: SendOptions<I>;
 
@@ -115,7 +115,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
         O: SendOptions<I>,
@@ -143,7 +143,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         mtu: Option<u32>,
     ) -> Result<(), IpSockCreateAndSendError>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         F: FnOnce(SocketIpAddr<I::Addr>) -> S,
         O: SendOptions<I>,
@@ -377,15 +377,21 @@ where
         packet_metadata: IpLayerPacketMetadata<I, BC>,
     ) -> Result<(), S>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
 }
+
+/// Enables a blanket implementation of [`IpSocketHandler`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `IpSocketHandler` given the other requirements are met.
+pub trait UseIpSocketHandlerBlanket {}
 
 impl<I, BC, CC> IpSocketHandler<I, BC> for CC
 where
     I: IpLayerIpExt + IpDeviceStateIpExt,
     BC: IpSocketBindingsContext,
-    CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>> + NonTestCtxMarker,
+    CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>> + UseIpSocketHandlerBlanket,
     CC::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
     fn new_ip_socket(
@@ -419,7 +425,7 @@ where
         options: &O,
     ) -> Result<(), (S, IpSockSendError)>
     where
-        S: TransportPacketSerializer,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         O: SendOptions<I>,
     {
@@ -464,7 +470,7 @@ fn new_ip_socket<I, D>(
 ) -> IpSock<I, D::Weak>
 where
     I: IpLayerIpExt,
-    D: device::StrongId,
+    D: StrongDeviceIdentifier,
 {
     // TODO(https://fxbug.dev/323389672): Cache a reference to the route to
     // avoid the route lookup on send as long as the routing table hasn't
@@ -495,13 +501,13 @@ fn send_ip_packet<I, S, BC, CC, O>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     socket: &IpSock<I, CC::WeakDeviceId>,
-    body: S,
+    mut body: S,
     mtu: Option<u32>,
     options: &O,
 ) -> Result<(), (S, IpSockSendError)>
 where
     I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
-    S: TransportPacketSerializer,
+    S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
     BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
@@ -526,7 +532,8 @@ where
 
     // TODO(https://fxbug.dev/318717702): when we implement NAT, perform re-routing
     // after the LOCAL_EGRESS hook since the packet may have been changed.
-    let mut packet = crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &body);
+    let mut packet =
+        crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     match core_ctx.filter_handler().local_egress_hook(&mut packet, &device, &mut packet_metadata) {
@@ -561,11 +568,17 @@ where
     .map_err(|s| (s, IpSockSendError::Mtu))
 }
 
-impl<
-        I: IpLayerIpExt + IpDeviceStateIpExt,
-        BC: IpSocketBindingsContext,
-        CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + NonTestCtxMarker,
-    > DeviceIpSocketHandler<I, BC> for CC
+/// Enables a blanket implementation of [`DeviceIpSocketHandler`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `DeviceIpSocketHandler` given the other requirements are met.
+pub trait UseDeviceIpSocketHandlerBlanket {}
+
+impl<I, BC, CC> DeviceIpSocketHandler<I, BC> for CC
+where
+    I: IpLayerIpExt + IpDeviceStateIpExt,
+    BC: IpSocketBindingsContext,
+    CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
 {
     fn get_mms(
         &mut self,
@@ -1018,7 +1031,7 @@ pub(crate) mod testutil {
             _options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1047,7 +1060,7 @@ pub(crate) mod testutil {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.get_mut().as_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.state.as_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
         }
 
         fn send_ip_packet<S, O>(
@@ -1059,7 +1072,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1109,14 +1122,12 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<
-            I: IpLayerIpExt,
-            BC: InstantContext + TracingContext + FilterBindingsTypes,
-            D: FakeStrongDeviceId,
-            State: TransportIpContext<I, BC, DeviceId = D>,
-            Meta,
-        > TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
+    impl<I, BC, D, State, Meta> TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
+        I: IpLayerIpExt,
+        BC: InstantContext + TracingContext + FilterBindingsTypes,
+        D: FakeStrongDeviceId,
+        State: TransportIpContext<I, BC, DeviceId = D>,
         Self: IpSocketHandler<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,
     {
         type DevicesWithAddrIter<'a> = State::DevicesWithAddrIter<'a>
@@ -1126,11 +1137,11 @@ pub(crate) mod testutil {
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(self.get_mut(), addr)
+            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(&mut self.state, addr)
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(self.get_mut(), device)
+            TransportIpContext::<I, BC>::get_default_hop_limits(&mut self.state, device)
         }
 
         fn confirm_reachable_with_destination(
@@ -1140,7 +1151,7 @@ pub(crate) mod testutil {
             device: Option<&Self::DeviceId>,
         ) {
             TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                self.get_mut(),
+                &mut self.state,
                 bindings_ctx,
                 dst,
                 device,
@@ -1288,7 +1299,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1317,7 +1328,7 @@ pub(crate) mod testutil {
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.get_mut().new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.state.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
         }
 
         fn send_ip_packet<S, O>(
@@ -1329,7 +1340,7 @@ pub(crate) mod testutil {
             options: &O,
         ) -> Result<(), (S, IpSockSendError)>
         where
-            S: TransportPacketSerializer,
+            S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
             O: SendOptions<I>,
         {
@@ -1765,12 +1776,11 @@ mod tests {
         }; "new remote to local")]
     #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     fn test_new<I: Ip + IpSocketIpExt + crate::IpExt>(test_case: NewSocketTestCase) {
-        let cfg = I::FAKE_CONFIG;
+        let cfg = I::TEST_ADDRS;
         let proto = I::ICMP_IP_PROTO;
 
-        let FakeEventDispatcherConfig { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } =
-            cfg;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(cfg).build();
+        let TestAddrs { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } = cfg;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(cfg).build();
         let loopback_device_id = ctx
             .core_api()
             .device::<LoopbackDevice>()
@@ -1857,15 +1867,10 @@ mod tests {
 
         use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder};
 
-        let FakeEventDispatcherConfig::<I::Addr> {
-            subnet,
-            local_ip,
-            remote_ip,
-            local_mac,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs::<I::Addr> { subnet, local_ip, remote_ip, local_mac, remote_mac: _ } =
+            I::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
@@ -1947,7 +1952,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(handle_queued_rx_packets(&mut ctx));
+        assert!(ctx.test_api().handle_queued_rx_packets());
 
         assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
@@ -1965,15 +1970,14 @@ mod tests {
         // Test various edge cases of the
         // IpSocketContext::send_ip_packet` method.
 
-        let cfg = I::FAKE_CONFIG;
+        let cfg = I::TEST_ADDRS;
         let proto = I::ICMP_IP_PROTO;
         let socket_options = WithHopLimit(Some(const_unwrap_option(NonZeroU8::new(1))));
 
-        let FakeEventDispatcherConfig::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } =
-            cfg;
+        let TestAddrs::<_> { local_mac, remote_mac, local_ip, remote_ip, subnet } = cfg;
 
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(cfg).build();
+            FakeCtxBuilder::with_addrs(cfg).build();
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut core_ctx.context(),
@@ -2117,15 +2121,10 @@ mod tests {
             }
         }
 
-        let FakeEventDispatcherConfig::<I::Addr> {
-            local_ip,
-            remote_ip: _,
-            local_mac,
-            subnet: _,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
+            I::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
@@ -2211,15 +2210,10 @@ mod tests {
     {
         set_logger_for_test();
 
-        let FakeEventDispatcherConfig::<I::Addr> {
-            local_ip,
-            remote_ip: _,
-            local_mac,
-            subnet: _,
-            remote_mac: _,
-        } = I::FAKE_CONFIG;
+        let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =
+            I::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let eth_device_id = device_ids[device_idx].clone();

@@ -41,7 +41,6 @@ source_set("fidl_controller") {
   public_deps = [
     "$dir_pw_bluetooth",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
-    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_hlcpp",
     "//zircon/system/ulib/async",
   ]
 }

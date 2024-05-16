@@ -31,7 +31,6 @@ fuchsia_test_component("component") {
   manifest = "meta/http_client_integration_test.cml"
   deps = [ ":http_client_integration_test" ]
   test_type = "system"
-  restricted_features = [ "config_capabilities" ]
 }
 
 fuchsia_test_package("http-client-integration-tests") {
@@ -50,7 +49,6 @@ fuchsia_test_package("http-client-integration-tests") {
 fuchsia_component_manifest("config_never_idle") {
   component_name = "http-client-config-never-idle"
   manifest = "meta/config_never_idle.cml"
-  restricted_features = [ "config_capabilities" ]
 }
 
 # A component providing configuration that the http client should stop itself if it did not
@@ -58,7 +56,6 @@ fuchsia_component_manifest("config_never_idle") {
 fuchsia_component_manifest("config_idle_1ms") {
   component_name = "http-client-config-idle-1ms"
   manifest = "meta/config_idle_1ms.cml"
-  restricted_features = [ "config_capabilities" ]
 }
 
 group("tests") {

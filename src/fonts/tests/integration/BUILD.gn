@@ -10,7 +10,6 @@ import("//tools/cmc/build/cmc.gni")
 # different configuration.
 ALL_COMPONENTS = [
   "fonts_with_aliases_fonts",
-  "fonts_with_ephemeral_fonts",
   "fonts_with_large_fonts",
   "fonts_with_medium_fonts",
   "fonts_with_small_fonts",
@@ -35,12 +34,14 @@ rustc_test("font_provider_integration_tests_bin") {
     "//sdk/fidl/fuchsia.fonts.experimental:fuchsia.fonts.experimental_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:tracing",
   ]
   visibility = [ ":*" ]
 
@@ -52,7 +53,6 @@ rustc_test("font_provider_integration_tests_bin") {
     "src/experimental_api/util/mod.rs",
     "src/lib.rs",
     "src/old_api/mod.rs",
-    "src/reviewed_api/ephemeral.rs",
     "src/reviewed_api/get_font_family_info.rs",
     "src/reviewed_api/get_typeface.rs",
     "src/reviewed_api/mod.rs",
@@ -69,14 +69,6 @@ cmc_merge("fonts_with_aliases_fonts_cml") {
     rebase_path("meta/aliases_fonts_shard.cml"),
   ]
   output_name = "fonts_with_aliases_fonts.cml"
-}
-
-cmc_merge("fonts_with_ephemeral_fonts_cml") {
-  sources = [
-    rebase_path("../../meta/fonts.cml"),
-    rebase_path("meta/ephemeral_fonts_shard.cml"),
-  ]
-  output_name = "fonts_with_ephemeral_fonts.cml"
 }
 
 cmc_merge("fonts_with_small_fonts_cml") {
@@ -105,10 +97,7 @@ cmc_merge("fonts_with_large_fonts_cml") {
 
 # Integration test font collections
 resource("testdata") {
-  sources = [
-    "aliases.font_manifest.json",
-    "ephemeral.font_manifest.json",
-  ]
+  sources = [ "aliases.font_manifest.json" ]
   outputs = [ "data/testdata/{{source_file_part}}" ]
 }
 
@@ -131,8 +120,6 @@ foreach(comp, ALL_COMPONENTS) {
     ]
 
     if (comp == "fonts_with_aliases_fonts") {
-      # No change.
-    } else if (comp == "fonts_with_ephemeral_fonts") {
       # No change.
     } else if (comp == "fonts_with_large_fonts") {
       deps += [ "//src/fonts/collections:test-fonts-large-collection" ]

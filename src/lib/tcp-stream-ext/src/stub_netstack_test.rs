@@ -50,7 +50,7 @@ fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
             }),
         )
     });
-    let () = f(fdio::create_fd(client.into_handle()).expect("endpoint into handle"));
+    let () = f(fdio::create_fd(client.into_handle()).expect("endpoint into handle").into());
     handle.join().expect("thread join")
 }
 

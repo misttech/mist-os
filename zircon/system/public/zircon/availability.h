@@ -104,9 +104,7 @@
 
 // Do NOT use this value directly. Use one of the macros above instead.
 // The value of __Fuchsia_API_level__ when the target API level is HEAD.
-// LINT.IfChange(fuchsia_head_value)
 #define FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_() 4292870144
-// LINT.ThenChange(//build/config/fuchsia/target_api_level.gni:fuchsia_head_value)
 
 // Obsolete mechanism for determining whether the target API level is HEAD.
 // Use one of the macros above instead.

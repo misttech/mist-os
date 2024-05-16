@@ -2,177 +2,71 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/dart/dart_library.gni")
-import("//build/dart/test.gni")
-import("//build/testing/environments.gni")
-import("//build/testing/host_test_data.gni")
 import("//build/testing/perf/test.gni")
 
-# This directory contains Dart wrappers for running performance tests
-# that are defined elsewhere in the Fuchsia tree.
-#
-# The test wrappers in this directory are split into multiple test
-# executables (dart_test targets here) because the Fuchsia Infra tools
-# for retrying tests and tracking flakes operate on the granularity of
-# test executables.
-
-test_list = [
-  # keep-sorted start
-  "flatland_benchmarks_test",
-  # keep-sorted end
-]
-
-foreach(target_name, test_list) {
-  dart_test(target_name) {
-    sources = [
-      "$target_name.dart",
-      "helpers.dart",
-    ]
-
-    deps = [
-      "//sdk/testing/sl4f/client",
-      "//third_party/dart-pkg/pub/logging",
-      "//third_party/dart-pkg/pub/meta",
-      "//third_party/dart-pkg/pub/test",
-    ]
-
-    non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
-
-    environments = [
-      nuc_env,
-      vim3_env,
-    ]
-  }
-}
-
-_tests = [
-  {
-    name = "flatland_benchmark"
-    expected_metric_filenames = [ "fuchsia.app_render_latency.txt" ]
-    libraries = [
-      "//src/performance/lib/trace_processing",
-      "//src/performance/lib/perf_publish",
-    ]
-  },
-  {
-    name = "input_latency_benchmark"
-    expected_metric_filenames = [ "fuchsia.input_latency.simplest_app.txt" ]
-    libraries = [
-      "//src/performance/lib/trace_processing",
-      "//src/performance/lib/perf_publish",
-    ]
-  },
-  {
-    name = "perf_publish_example"
-    expected_metric_filenames = [ "fuchsia.example.txt" ]
-    libraries = [ "//src/performance/lib/perf_publish" ]
-  },
-  {
-    name = "perftest_trace_events_test"
-    expected_metric_filenames = []
-    libraries = [ "//src/performance/lib/trace_processing" ]
-  },
-  {
-    name = "tracing_microbenchmarks_test"
-    expected_metric_filenames = [
-      "fuchsia.microbenchmarks.tracing.txt",
-      "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
-      "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
-      "fuchsia.trace_records.rust.tracing_disabled.txt",
-    ]
-    libraries = [
-      "//src/performance/lib/perf_publish",
-      "//src/performance/lib/py_test_utils:perf_test_utils",
-      "//src/performance/lib/trace_processing",
-    ]
-    target_deps = [
-      "//src/lib/trace/rust/bench",
-      "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
-    ]
-  },
-]
-
-_python_benchmarks = []
-foreach(test, _tests) {
-  _name = test.name
-  _test_name = "py_${_name}"
-  if (is_host) {
-    python_perf_test(_test_name) {
-      main_source = "test/${_name}.py"
-      forward_variables_from(test,
-                             [
-                               "transport",
-                               "target_deps",
-                             ])
-      expected_metric_names_filepaths = []
-      foreach(filename, test.expected_metric_filenames) {
-        expected_metric_names_filepaths +=
-            [ "//src/tests/end_to_end/perf/expected_metric_names/${filename}" ]
-      }
-      libraries =
-          [ "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test" ]
-      if (defined(test.libraries)) {
-        libraries += test.libraries
-      }
-    }
-  }
-  _python_benchmarks += [ ":${_test_name}($host_toolchain)" ]
-}
-
-if (is_host) {
-  metric_files = [
-    # keep-sorted start
-    "fuchsia.flatland_latency.txt",
-    # keep-sorted end
+python_perf_test("perf_publish_example") {
+  main_source = "test/perf_publish_example.py"
+  expected_metric_names_filepaths = [
+    "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.example.txt",
   ]
-
-  host_test_data("runtime_deps") {
-    sources = [
-      "$root_out_dir/catapult_converter",
-      "$root_out_dir/trace2json",
-    ]
-    foreach(filename, metric_files) {
-      sources += [ "expected_metric_names/$filename" ]
-    }
-    outputs = [ "$target_gen_dir/runtime_deps/{{source_file_part}}" ]
-
-    deps = [
-      "//src/performance/trace2json:bin",
-      "//src/testing/catapult_converter:converter_bin",
-    ]
-  }
+  libraries = [
+    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    "//src/performance/lib/perf_publish",
+  ]
 }
 
-_python_benchmarks += [
-  "//src/connectivity/network:benchmarks",
-  "//src/devices/bin/driver_runtime/microbenchmarks",
-  "//src/diagnostics:benchmarks",
-  "//src/lib/diagnostics:benchmarks",
-  "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
-  "//src/starnix:benchmarks",
-  "//src/storage/benchmarks/fuchsia:benchmarks",
-  "//src/storage/benchmarks/verity:benchmarks",
-  "//src/storage/benchmarks/starnix:benchmarks",
-  "//src/tests/benchmarks",
-  "//src/tests/microbenchmarks:benchmarks",
-]
+python_perf_test("perftest_trace_events_test") {
+  main_source = "test/perftest_trace_events_test.py"
+  expected_metric_names_filepaths = []
+  libraries = [
+    "//src/performance/lib/trace_processing",
+    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+  ]
+}
+
+python_perf_test("tracing_microbenchmarks_test") {
+  main_source = "test/tracing_microbenchmarks_test.py"
+  expected_metric_names_filepaths = [
+    "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.tracing.txt",
+    "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.tracing_categories_disabled.txt",
+    "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.trace_records.rust.tracing_categories_disabled.txt",
+    "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.trace_records.rust.tracing_disabled.txt",
+  ]
+  libraries = [
+    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    "//src/performance/lib/perf_publish",
+    "//src/performance/lib/py_test_utils:perf_test_utils",
+    "//src/performance/lib/trace_processing",
+  ]
+  target_deps = [
+    "//src/lib/trace/rust/bench",
+    "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
+  ]
+}
 
 group("test") {
   testonly = true
 
-  deps = _python_benchmarks
+  deps = [
+    ":perf_publish_example($host_toolchain)",
+    ":perftest_trace_events_test($host_toolchain)",
+    ":tracing_microbenchmarks_test($host_toolchain)",
+    "//src/connectivity/network:benchmarks",
+    "//src/devices/bin/driver_runtime/microbenchmarks",
+    "//src/diagnostics:benchmarks",
+    "//src/graphics/benchmarks",
+    "//src/lib/diagnostics:benchmarks",
+    "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
+    "//src/starnix:benchmarks",
+    "//src/storage/benchmarks/fuchsia:benchmarks",
+    "//src/storage/benchmarks/starnix:benchmarks",
+    "//src/storage/benchmarks/verity:benchmarks",
+    "//src/tests/benchmarks",
+    "//src/tests/microbenchmarks:benchmarks",
 
-  deps += [
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
-
-    # These are used by flatland_benchmarks and input_latency_benchmarks
-    "//src/ui/examples:flatland-examples",
   ]
-
-  foreach(target_name, test_list) {
-    deps += [ ":$target_name($host_toolchain)" ]
-  }
 }
 
 group("tests_to_run_on_internal_builders") {

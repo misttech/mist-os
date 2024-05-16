@@ -153,3 +153,63 @@ function syncRow(tableId, rowId) {
 
   Area120Tables.Tables.Rows.patch({ values: patchedValues }, rowName);
 }
+
+// Returns {[change_id]: true, ...}
+function _getExistingRfcsFromAppSheet() {
+  const rows = callAppSheetAPI({
+    "Action": "Find",
+    "Properties": {},
+  });
+
+  const res = {};
+  for (const row of rows) {
+    res[row['Change ID']] = true;
+  }
+
+  return res;
+}
+
+// Gets the list of open RFC CLs from gerrit and compares that to the set of
+// RFCs in the AppSheet tracker. For any CLs missing from the tracker, creates
+// stub rows with just the change_id filled in.
+function addNewRfcsToAppSheet() {
+  const gerritCls = _fetchOpenRfcsCls();
+  const trackerCls = _getExistingRfcsFromAppSheet();
+
+  // Accumulate create requests so that requests can be batched.
+  let createRows = [];
+  for (const changeId of gerritCls) {
+    if (!(changeId in trackerCls)) {
+      createRows.push({ [CHANGE_ID_COL]: changeId });
+    }
+  }
+
+  if (createRows.length != 0) {
+    appScriptApiCall({
+      "Action": "Add",
+      "Properties": {},
+      Rows: createRows,
+    });
+  }
+}
+
+// Call the gerrit API and return some specific information about the named CL.
+function getClInfo(changeId) {
+  const cl = parseGerritResponse(UrlFetchApp.fetch(
+    // include _account_id, email and username fields when referencing accounts.
+    GERRIT_API_URL + `/changes/${changeId}?o=DETAILED_ACCOUNTS`
+  ));
+
+  // Remove subject prefix tags (e.g. '[rfc][docs]')
+  const title = cl.subject.replace(/^(\S+]\s)/i, '');
+
+  return {
+    title,
+    number: cl._number,
+    author: cl.owner.email,
+    created: cl.created,
+    updated: cl.updated,
+    status: cl.status,
+    work_in_progress: Boolean(cl.work_in_progress),
+  };
+}

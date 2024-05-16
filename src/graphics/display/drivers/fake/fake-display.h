@@ -90,8 +90,6 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   void DisplayControllerImplApplyConfiguration(const display_config_t* display_configs,
                                                size_t display_count,
                                                const config_stamp_t* banjo_config_stamp);
-  void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
-                                   size_t raw_eld_count);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
@@ -134,10 +132,9 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
  private:
   enum class BufferCollectionUsage : int32_t;
 
-  zx_status_t SetupDisplayInterface();
+  zx_status_t InitializeCapture();
   int VSyncThread();
   int CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
-  void PopulateAddedDisplayArgs(added_display_args_t* args);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
   // collection tokens.

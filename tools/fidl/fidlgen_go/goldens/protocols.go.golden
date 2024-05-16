@@ -1114,13 +1114,13 @@ func NewPlatformServerWithCtxInterfaceRequest() (PlatformServerWithCtxInterfaceR
 
 // Implements ServiceRequest.
 func (_ PlatformServerWithCtxInterfaceRequest) Name() string {
-	return "platform"
+	return "test.protocols.PlatformServer"
 }
 func (c PlatformServerWithCtxInterfaceRequest) ToChannel() _zx.Channel {
 	return c.Channel
 }
 
-const PlatformServerName = "platform"
+const PlatformServerName = "test.protocols.PlatformServer"
 
 type PlatformServerWithCtxStub struct {
 	Impl PlatformServerWithCtx

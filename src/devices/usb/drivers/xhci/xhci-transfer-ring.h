@@ -43,8 +43,9 @@ class TransferRing {
   zx_status_t AddTRB(const TRB& trb, std::unique_ptr<TRBContext> context);
 
   // Assign a TRBContext to trb, and record that first_trb is the first TRB in the TD. trb should be
-  // the last TRB in the TD.
-  zx_status_t AssignContext(TRB* trb, std::unique_ptr<TRBContext> context, TRB* first_trb);
+  // the last TRB in the TD. setup_trb is only used for control transfers.
+  zx_status_t AssignContext(TRB* trb, std::unique_ptr<TRBContext> context, TRB* first_trb,
+                            TRB* setup_trb = nullptr);
 
   // Handles a short packet. This will walk the TRBs corresponding to the next pending TD. If it
   // finds short_trb it will set short_transfer_len to the total transfer length which is equal to
@@ -133,7 +134,18 @@ class TransferRing {
   // The dma_buffer::Buffer is owned by this TransferRing.
   zx_status_t AllocBuffer(dma_buffer::ContiguousBuffer** out) __TA_REQUIRES(mutex_);
   // Advances the enqueue pointer after a new element has been added to the transfer ring
-  void AdvancePointer() __TA_REQUIRES(mutex_);
+  void AdvancePointer() __TA_REQUIRES(mutex_) { trbs_ = AdvancePointerHelper(nullptr); }
+  // Advances the pointer `trb` to the next valid trb in the ring. Should not change state
+  // of ring. Used only for iterating.
+  void AdvancePointer(TRB*& trb) __TA_REQUIRES(mutex_) { trb = AdvancePointerHelper(trb); }
+  // Helper to advance a pointer. Should not be directly used. Use a variant of AdvancePointer
+  // instead.
+  // Returns next TRB. Return value must be used!
+  // If trb is not nullptr, only advances trb, but makes no changes to the ring.
+  // If trb is nullptr, advances trbs_ and makes changes to the ring.
+  TRB* AdvancePointerHelper(TRB* trb) __TA_REQUIRES(mutex_);
+  // Checks if TRB is in range, start and end inclusive.
+  bool IsTRBInRange(TRB* trb, TRB* start, TRB* end) __TA_REQUIRES(mutex_);
   fbl::Mutex mutex_;
   uint64_t token_ = 0;
   AllocatorType trb_context_allocator_ __TA_GUARDED(mutex_);

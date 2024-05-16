@@ -42,7 +42,7 @@ impl ComponentDefs {
 pub struct IssueTemplate<'a> {
     // Settings
     filter: &'a [String],
-    codesearch_tag: Option<&'a str>,
+    codesearch_ref: Option<&'a str>,
     template: Option<String>,
     blocking_issue: Option<&'a str>,
     max_cc_users: usize,
@@ -54,14 +54,14 @@ pub struct IssueTemplate<'a> {
 impl<'a> IssueTemplate<'a> {
     pub fn new(
         filter: &'a [String],
-        codesearch_tag: Option<&'a str>,
+        codesearch_ref: Option<&'a str>,
         template: Option<String>,
         blocking_issue: Option<&'a str>,
         max_cc_users: usize,
     ) -> Self {
         Self {
             filter,
-            codesearch_tag,
+            codesearch_ref,
             template,
             blocking_issue,
             max_cc_users,
@@ -107,7 +107,7 @@ impl<'a> IssueTemplate<'a> {
     fn codesearch_url(&self, path: &str, line: Option<usize>) -> String {
         let mut link = format!(
             "https://cs.opensource.google/fuchsia/fuchsia/+/{}:{}",
-            self.codesearch_tag.unwrap_or("main"),
+            self.codesearch_ref.unwrap_or("main"),
             path
         );
         if let Some(line) = line {

@@ -11,25 +11,13 @@ group("tests") {
   deps = [ ":power_testing_client_test" ]
 }
 
+fuchsia_component_manifest("realm_base_manifest") {
+  component_name = "realm_base"
+  manifest = "meta/realm_base.cml"
+}
+
 expect_includes("client_includes") {
   includes = [ "meta/client.shard.cml" ]
-}
-
-executable("test-suspend-bin") {
-  sources = [ "test-suspend.cc" ]
-  deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/power/testing/fake-suspend:cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-fuchsia_component("test-suspend") {
-  manifest = "meta/test-suspend.cml"
-  deps = [ ":test-suspend-bin" ]
 }
 
 test("power_testing_client_test_bin") {

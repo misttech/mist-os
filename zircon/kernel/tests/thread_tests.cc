@@ -747,7 +747,7 @@ __NO_INLINE static void affinity_test() {
 
 static int prio_test_thread(void* arg) {
   Thread* volatile t = Thread::Current::Get();
-  SchedulerState::BaseProfile bp = t->scheduler_state().SnapshotBaseProfile();
+  SchedulerState::BaseProfile bp = t->SnapshotBaseProfile();
   ASSERT(bp.discipline == SchedDiscipline::Fair);
   ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(LOW_PRIORITY));
 
@@ -757,7 +757,7 @@ static int prio_test_thread(void* arg) {
   // Busy loop until our priority changes.
   int count = 0;
   for (;;) {
-    bp = t->scheduler_state().SnapshotBaseProfile();
+    bp = t->SnapshotBaseProfile();
     ASSERT(bp.discipline == SchedDiscipline::Fair);
     if (bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY)) {
       break;
@@ -769,7 +769,7 @@ static int prio_test_thread(void* arg) {
 
   // And then when it changes again.
   for (;;) {
-    bp = t->scheduler_state().SnapshotBaseProfile();
+    bp = t->SnapshotBaseProfile();
     ASSERT(bp.discipline == SchedDiscipline::Fair);
     if (bp.fair.weight == SchedulerState::ConvertPriorityToWeight(HIGH_PRIORITY)) {
       break;
@@ -784,7 +784,7 @@ __NO_INLINE static void priority_test() {
   printf("starting priority tests\n");
 
   Thread* t = Thread::Current::Get();
-  SchedulerState::BaseProfile bp = t->scheduler_state().SnapshotBaseProfile();
+  SchedulerState::BaseProfile bp = t->SnapshotBaseProfile();
 
   if (!bp.IsFair() ||
       (bp.fair.weight != SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY))) {
@@ -794,13 +794,13 @@ __NO_INLINE static void priority_test() {
 
   t->SetBaseProfile(SchedulerState::BaseProfile{DEFAULT_PRIORITY + 2});
   Thread::Current::SleepRelative(ZX_MSEC(1));
-  bp = t->scheduler_state().SnapshotBaseProfile();
+  bp = t->SnapshotBaseProfile();
   ASSERT(bp.IsFair());
   ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY + 2));
 
   t->SetBaseProfile(SchedulerState::BaseProfile{DEFAULT_PRIORITY - 2});
   Thread::Current::SleepRelative(ZX_MSEC(1));
-  bp = t->scheduler_state().SnapshotBaseProfile();
+  bp = t->SnapshotBaseProfile();
   ASSERT(bp.IsFair());
   ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY - 2));
 

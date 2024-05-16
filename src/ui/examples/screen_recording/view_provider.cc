@@ -4,7 +4,7 @@
 
 #include "src/ui/examples/screen_recording/view_provider.h"
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/composition/internal/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
@@ -86,9 +86,9 @@ void ViewProviderImpl::CreateView2(fuchsia::ui::app::CreateView2Args args) {
     RegisterBufferCollectionUsages usage_types =
         RegisterBufferCollectionUsages::DEFAULT | RegisterBufferCollectionUsages::SCREENSHOT;
 
-    fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info_ =
+    fuchsia::sysmem2::BufferCollectionInfo sc_buffer_collection_info_ =
         CreateBufferCollectionInfo2WithConstraints(
-            utils::CreateDefaultConstraints(num_buffers_, half_display_width_, display_height_),
+            utils::CreateDefaultConstraints2(num_buffers_, half_display_width_, display_height_),
             std::move(scr_ref_pair.export_token), flatland_allocator_.get(),
             sysmem_allocator_.get(), usage_types);
 

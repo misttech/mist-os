@@ -6,7 +6,7 @@
 
 use core::convert::Infallible as Never;
 
-use crate::sync::{DynDebugReferences, RcNotifier};
+use crate::sync::{DynDebugReferences, MapRcNotifier, PrimaryRc, RcNotifier};
 
 /// A context trait determining the types to be used for reference
 /// notifications.
@@ -101,3 +101,33 @@ impl<R> RemoveResourceResult<R, Never> {
 /// the bindings context.
 pub type RemoveResourceResultWithContext<S, BT> =
     RemoveResourceResult<S, <BT as ReferenceNotifiers>::ReferenceReceiver<S>>;
+
+/// An extension of [`ReferenceNotifiers`] providing extra functionality.
+pub trait ReferenceNotifiersExt: ReferenceNotifiers {
+    /// Unwraps a [`PrimaryRc`] if it has no pending references, otherwise
+    /// notifying with [`Self::ReferenceNotifier`].
+    ///
+    /// S: Is the state held behind the [`PrimaryRc`].
+    /// O: Is the desired output state, once references have been destructed.
+    /// F: Is a function that converts S to O.
+    fn unwrap_or_notify_with_new_reference_notifier<
+        S: Send + Sync + 'static,
+        O: Send,
+        F: Send + Copy + 'static + FnOnce(S) -> O,
+    >(
+        primary: PrimaryRc<S>,
+        map: F,
+    ) -> RemoveResourceResultWithContext<O, Self> {
+        let debug_references = PrimaryRc::debug_references(&primary).into_dyn();
+        match PrimaryRc::unwrap_or_notify_with(primary, || {
+            let (notifier, receiver) = Self::new_reference_notifier::<O>(debug_references);
+            let notifier = MapRcNotifier::new(notifier, map);
+            (notifier, receiver)
+        }) {
+            Ok(state) => RemoveResourceResult::Removed(map(state)),
+            Err(receiver) => RemoveResourceResult::Deferred(receiver),
+        }
+    }
+}
+
+impl<N: ReferenceNotifiers> ReferenceNotifiersExt for N {}

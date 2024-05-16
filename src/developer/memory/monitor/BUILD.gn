@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 source_set("lib") {
@@ -140,8 +139,4 @@ fuchsia_package("monitor_with_memory_sampler") {
     ":component_with_memory_sampler",
     ":memory_monitor_with_memory_sampler_default_config",
   ]
-}
-
-core_shard("memory_monitor_core_shard") {
-  shard_file = "meta/memory_monitor.core_shard.cml"
 }

@@ -57,6 +57,9 @@ type Context struct {
 	// Whether to build for the purposes of collecting coverage.
 	CollectCoverage bool `protobuf:"varint,11,opt,name=collect_coverage,json=collectCoverage,proto3" json:"collect_coverage,omitempty"`
 	// Use this many jobs if building with Goma (ignored otherwise).
+	// Note: Goma is deprecated, but this variable still applies to other remote
+	// build enabled work environments.
+	// TODO(b/340581192): rename this
 	GomaJobCount int32 `protobuf:"varint,12,opt,name=goma_job_count,json=gomaJobCount,proto3" json:"goma_job_count,omitempty"`
 	// If true, skip doing a Ninja no-op check even if the static spec indicates
 	// that we should do the check. This is to let the caller skip doing the check

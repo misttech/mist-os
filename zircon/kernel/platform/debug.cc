@@ -77,13 +77,21 @@ struct UartSyncPolicy {
 
   class Waiter {
    public:
+    enum class Blocking {
+      // `Wait` is allowed to block callers, e.g. wait on an event.
+      kYes,
+      // `Wait` is not allowed to block callers, should spin instead.
+      kNo,
+    };
+
     template <typename Guard, typename T>
-    void Wait(Guard& guard, T&& enable_tx_interrupt) TA_REQ(guard) {
-      if (is_tx_irq_enabled) {
+    void Wait(Guard& guard, T&& enable_tx_interrupt, Blocking blocking) TA_REQ(guard) {
+      if (blocking == Blocking::kYes && is_tx_irq_enabled) {
         enable_tx_interrupt();
         guard.CallUnlocked([this]() { tx_fifo_not_full_.Wait(); });
       } else {
-        arch::Yield();
+        // Drop the spinlock while spinning.
+        guard.CallUnlocked([]() { arch::Yield(); });
       }
     }
 
@@ -267,7 +275,9 @@ void platform_dputs_thread(const char* str, size_t len) {
     return;
   }
 
-  gUart.Visit([str, len](auto& driver) { driver.template Write<IrqSave>({str, len}); });
+  gUart.Visit([str, len](auto& driver) {
+    driver.template Write<IrqSave>({str, len}, UartSyncPolicy::Waiter::Blocking::kYes);
+  });
 }
 
 void platform_dputs_irq(const char* str, size_t len) {
@@ -280,7 +290,9 @@ void platform_dputs_irq(const char* str, size_t len) {
     return;
   }
 
-  gUart.Visit([str, len](auto& driver) { driver.template Write<NoIrqSave>({str, len}); });
+  gUart.Visit([str, len](auto& driver) {
+    driver.template Write<IrqSave>({str, len}, UartSyncPolicy::Waiter::Blocking::kNo);
+  });
 }
 
 int platform_dgetc(char* c, bool wait) {
@@ -352,5 +364,5 @@ void platform_pputc(char c) {
     return;
   }
 
-  gUart.Visit([c](auto& driver) { driver.Write({&c, 1}); });
+  gUart.Visit([c](auto& driver) { driver.Write({&c, 1}, UartSyncPolicy::Waiter::Blocking::kNo); });
 }

@@ -129,4 +129,23 @@ void CommandEvent::FromCommandReport(const CommandReport& report) {
   SetParameter("error_message", ObfuscateUser(report.err.msg()));
 }
 
+// ConsoleType -------------------------------------------------------------------------------------
+ConsoleType::ConsoleType(const std::string& session_id)
+    : AnalyticsEvent("console_type", session_id) {}
+
+void ConsoleType::SetConsoleType(Type type) {
+  std::string console_type_string;
+
+  switch (type) {
+    case Type::kCommandLine: {
+      console_type_string = "command_line";
+      break;
+    }
+    case Type::kDebugAdapter: {
+      console_type_string = "debug_adapter";
+      break;
+    }
+  }
+  SetParameter("type", console_type_string);
+}
 }  // namespace zxdb

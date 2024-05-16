@@ -51,7 +51,7 @@ type InstalledRouteV4 = table {
 };
 
 /// Provides observability to the system's IPv4 routing state.
-@discoverable
+@discoverable(server="platform")
 @available(added=HEAD)
 closed protocol StateV4 {
     /// Initialize a watcher for IPv4 routing state.

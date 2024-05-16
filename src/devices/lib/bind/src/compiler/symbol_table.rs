@@ -470,6 +470,7 @@ pub fn get_deprecated_key_identifier(key: u32) -> Option<String> {
 
         // GPIO binding variables at 0x0A1X.
         0x0A10 => Some("fuchsia.BIND_GPIO_PIN".to_string()),
+        0x0A11 => Some("fuchsia.BIND_GPIO_CONTROLLER".to_string()),
 
         // POWER binding variables at 0x0A2X.
         0x0A20 => Some("fuchsia.BIND_POWER_DOMAIN".to_string()),
@@ -567,6 +568,7 @@ pub fn get_deprecated_key_value(key: &str) -> Option<u32> {
 
         // GPIO binding variables at 0x0A1X
         "fuchsia.BIND_GPIO_PIN" => Some(0x0A10),
+        "fuchsia.BIND_GPIO_CONTROLLER" => Some(0x0A11),
 
         // POWER binding variables at 0x0A2X
         "fuchsia.BIND_POWER_DOMAIN" => Some(0x0A20),

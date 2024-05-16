@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 #include "src/ui/examples/simplest_sysmem/sysmem_helper.h"
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/images2/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/eventpair.h>
@@ -19,41 +20,38 @@ BufferCollectionImportExportTokens BufferCollectionImportExportTokens::New() {
 }
 
 BufferCollectionConstraints CreateDefaultConstraints(BufferConstraint buffer_constraint) {
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints.cpu_domain_supported = true;
-  constraints.buffer_memory_constraints.ram_domain_supported = true;
-  constraints.usage.cpu = fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
-  constraints.min_buffer_count = buffer_constraint.buffer_count;
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
+  constraints.mutable_buffer_memory_constraints()->set_cpu_domain_supported(true);
+  constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN |
+                                       fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
+  constraints.set_min_buffer_count(buffer_constraint.buffer_count);
 
-  constraints.image_format_constraints_count = 1;
-  auto& image_constraints = constraints.image_format_constraints[0];
-  image_constraints.color_spaces_count = 1;
-  image_constraints.color_space[0] =
-      fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
-  image_constraints.pixel_format.type = buffer_constraint.pixel_format_type;
-  image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+  constraints.mutable_image_format_constraints()->reserve(1);
+  auto& image_constraints = constraints.mutable_image_format_constraints()->at(0);
+  image_constraints.mutable_color_spaces()->push_back(fuchsia::images2::ColorSpace::SRGB);
+  image_constraints.set_pixel_format(buffer_constraint.pixel_format_type);
+  image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
 
-  image_constraints.required_min_coded_width = buffer_constraint.image_width;
-  image_constraints.required_min_coded_height = buffer_constraint.image_height;
-  image_constraints.required_max_coded_width = buffer_constraint.image_width;
-  image_constraints.required_max_coded_height = buffer_constraint.image_height;
-  image_constraints.bytes_per_row_divisor = buffer_constraint.bytes_per_pixel;
+  image_constraints.set_required_min_size(
+      {.width = buffer_constraint.image_width, .height = buffer_constraint.image_height});
+  image_constraints.set_required_max_size(
+      {.width = buffer_constraint.image_width, .height = buffer_constraint.image_height});
+  image_constraints.set_bytes_per_row_divisor(buffer_constraint.bytes_per_pixel);
 
   return constraints;
 }
 
-void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
-                    uint32_t vmo_idx, std::function<void(uint8_t*, uint32_t)> callback) {
+void MapHostPointer(const fuchsia::sysmem2::BufferCollectionInfo& collection_info, uint32_t vmo_idx,
+                    std::function<void(uint8_t*, uint64_t)> callback) {
   // If the vmo idx is out of bounds pass in a nullptr and 0 bytes back to the caller.
-  if (vmo_idx >= collection_info.buffer_count) {
+  if (vmo_idx >= collection_info.buffers().size()) {
     callback(nullptr, 0);
     return;
   }
 
-  const zx::vmo& vmo = collection_info.buffers[vmo_idx].vmo;
-  auto vmo_bytes = collection_info.settings.buffer_settings.size_bytes;
+  const zx::vmo& vmo = collection_info.buffers().at(vmo_idx).vmo();
+  auto vmo_bytes = collection_info.settings().buffer_settings().size_bytes();
   FX_DCHECK(vmo_bytes > 0);
 
   uint8_t* vmo_host = nullptr;

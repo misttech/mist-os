@@ -431,7 +431,8 @@ async fn create_child(
                 | fcomponent::Error::InstanceNotFound
                 | fcomponent::Error::Internal
                 | fcomponent::Error::ResourceNotFound
-                | fcomponent::Error::Unsupported => {
+                | fcomponent::Error::Unsupported
+                | fcomponent::ErrorUnknown!() => {
                     error!("create_child error: {:?}", e);
                     fntr::Error::Internal
                 }
@@ -488,7 +489,8 @@ async fn destroy_child(
             | fcomponent::Error::Internal
             | fcomponent::Error::ResourceNotFound
             | fcomponent::Error::ResourceUnavailable
-            | fcomponent::Error::Unsupported => {
+            | fcomponent::Error::Unsupported
+            | fcomponent::ErrorUnknown!() => {
                 error!("destroy_child error: {:?}", e);
                 DestroyChildError::Internal
             }

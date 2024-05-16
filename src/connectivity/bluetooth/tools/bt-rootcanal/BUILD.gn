@@ -14,6 +14,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora_rust",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_rust",
     "//sdk/lib/device-watcher/rust",
+    "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

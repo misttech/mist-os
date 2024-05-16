@@ -4,6 +4,7 @@
 
 #include "da7219-server.h"
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/wire_types.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
@@ -344,7 +345,7 @@ void Server::SetBridgedMode(SetBridgedModeRequestView request,
 }
 
 void Server::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware.
+  // TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware
   fidl::Arena arena;
   static std::vector<uint32_t> kChannels = {2};
   static std::vector<fuchsia_hardware_audio::wire::DaiSampleFormat> kSampleFormats = {
@@ -504,7 +505,7 @@ void Server::GetElements(GetElementsCompleter::Sync& completer) {
 
     fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::Element> elements(arena, 1);
     elements[0] = element.Build();
-    completer.ReplySuccess(std::move(elements));
+    completer.ReplySuccess(elements);
   } else {
     DA7219_LOG(ERROR, "Get elements is not supported on input");
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -520,30 +521,38 @@ void Server::WatchElementState(WatchElementStateRequestView request,
       return;
     }
 
-    if (!last_gain_update_reported_) {
-      last_gain_update_reported_ = true;
-
-      fidl::Arena arena;
-      auto gain_param =
-          fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
-      gain_param.gain(gain_);
-      auto type_specific_gain =
-          fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
-              arena, gain_param.Build());
-      auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
-      gain_state.type_specific(type_specific_gain);
-      completer.Reply(gain_state.Build());
-    } else if (!gain_completer_) {
-      gain_completer_.emplace(completer.ToAsync());
-    } else {
+    if (gain_completer_) {
       // The client called WatchElementState when another hanging get was pending.
       // This is an error condition and hence we unbind the channel.
       signal_->Close(ZX_ERR_BAD_STATE);
       signal_.reset();
+      return;
     }
+    gain_completer_.emplace(completer.ToAsync());
+
+    MaybeCompleteWatchElementState();
   } else {
     DA7219_LOG(ERROR, "Watch element state is not supported on input");
     completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+void Server::MaybeCompleteWatchElementState() {
+  if (!last_gain_update_reported_ && gain_completer_.has_value()) {
+    last_gain_update_reported_ = true;
+
+    fidl::Arena arena;
+    auto gain_param =
+        fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
+    gain_param.gain(gain_);
+    auto type_specific_gain =
+        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+            arena, gain_param.Build());
+    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    gain_state.type_specific(type_specific_gain);
+    auto completer = std::move(*gain_completer_);
+    gain_completer_.reset();
+    completer.Reply(gain_state.Build());
   }
 }
 
@@ -575,11 +584,11 @@ void Server::GetTopologies(GetTopologiesCompleter::Sync& completer) {
     fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::EdgePair> pairs(arena, 1);
     pairs[0] = {.processing_element_id_from = kHeadphoneGainPeId,
                 .processing_element_id_to = kHeadphoneGainPeId};
-    topology.processing_elements_edge_pairs(std::move(pairs));
+    topology.processing_elements_edge_pairs(pairs);
 
     fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::Topology> topologies(arena, 1);
     topologies[0] = topology.Build();
-    completer.ReplySuccess(std::move(topologies));
+    completer.ReplySuccess(topologies);
   } else {
     DA7219_LOG(ERROR, "Get topologies is not supported on input");
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -619,13 +628,9 @@ void Server::SetElementState(SetElementStateRequestView request,
     uint8_t gain_reg = static_cast<uint8_t>(static_cast<int32_t>(gain_) + kRegDeltaFrom0dB);
     HpLGain::Get().set_hp_l_amp_gain(gain_reg).Write(core_->i2c());
     HpRGain::Get().set_hp_r_amp_gain(gain_reg).Write(core_->i2c());
-    if (gain_completer_) {
-      gain_completer_->Reply(std::move(request->state));
-      gain_completer_.reset();
-      last_gain_update_reported_ = true;
-    } else {
-      last_gain_update_reported_ = false;
-    }
+
+    last_gain_update_reported_ = false;
+    MaybeCompleteWatchElementState();
     completer.ReplySuccess();
   } else {
     DA7219_LOG(ERROR, "Set elements is not supported on input");

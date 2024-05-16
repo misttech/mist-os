@@ -7,13 +7,13 @@
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <zircon/syscalls/exception.h>
+#include <zircon/system/ulib/inspector/gwp-asan.h>
 
 #include <third_party/crashpad/src/minidump/minidump_file_writer.h>
 #include <third_party/crashpad/src/snapshot/fuchsia/process_snapshot_fuchsia.h>
 #include <third_party/crashpad/src/util/fuchsia/scoped_task_suspend.h>
 
 #include "src/lib/fsl/handles/object_info.h"
-#include "zircon/system/ulib/inspector/gwp-asan.h"
 
 namespace forensics {
 namespace exceptions {

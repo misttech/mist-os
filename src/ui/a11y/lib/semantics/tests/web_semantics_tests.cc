@@ -184,7 +184,8 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
          .source = ChildRef{kMockCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}});
-    realm()->AddRoute({.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
+    realm()->AddRoute({.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
+                                        Protocol{fuchsia::sysmem2::Allocator::Name_}},
                        .source = ParentRef(),
                        .targets = {ChildRef{kMemoryPressureProvider}, ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_},

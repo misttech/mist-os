@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/sys/core/build/core_shard.gni")
 import("gn/build_rules.gni")
 
 #
@@ -53,9 +52,6 @@ group("tests") {
 #
 # Support for `ffx component explore /core/compute-benchmarks`
 #
-core_shard("compute-benchmarks-shard") {
-  shard_file = "meta/compute-benchmarks.core_shard.cml"
-}
 
 fuchsia_component("compute-benchmarks-cmp") {
   manifest = "meta/compute-benchmarks.cml"

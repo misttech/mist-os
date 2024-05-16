@@ -27,7 +27,7 @@ namespace {
 
 std::string ExtractHandlerIndex(const std::string& process_name) {
   // The process name should be of the form "exception_handler_001".
-  auto first_num = process_name.find_last_of("_");
+  auto first_num = process_name.find_last_of('_');
   FX_CHECK(first_num != std::string::npos);
   FX_CHECK((++first_num) != std::string::npos);
   return process_name.substr(first_num);

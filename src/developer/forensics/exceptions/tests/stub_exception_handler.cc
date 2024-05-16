@@ -16,7 +16,7 @@ namespace {
 // Handle an exception by immediately executing the received callback.
 class StubCrashReporter : public fuchsia::exception::internal::CrashReporter {
  public:
-  StubCrashReporter(fit::closure on_done) : on_done_(std::move(on_done)) {}
+  explicit StubCrashReporter(fit::closure on_done) : on_done_(std::move(on_done)) {}
 
   virtual void Send(zx::exception exception, zx::process process, zx::thread thread,
                     SendCallback callback) override {

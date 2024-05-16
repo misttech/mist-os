@@ -135,7 +135,7 @@ fn translate_handle(cap: Capability, info: &HandleInfo) -> Result<StartupHandle,
         Capability::OneShotHandle(h) => h,
         c => return Err(DeliveryError::UnsupportedCapability(c)),
     };
-    let handle = one_shot.get_handle().map_err(|_| DeliveryError::UnsupportedCapability(cap))?;
+    let handle = one_shot.take().ok_or_else(|| DeliveryError::UnsupportedCapability(cap))?;
 
     Ok(StartupHandle { handle, info: *info })
 }
@@ -160,8 +160,8 @@ fn visit_map(
             None => return Err(DeliveryError::NotInDict(key.to_owned())),
         }
     }
-    if dict.enumerate().count() > 0 {
-        let keys = dict.enumerate().map(|(key, _)| key).collect();
+    let keys: Vec<_> = dict.keys().collect();
+    if !keys.is_empty() {
         return Err(DeliveryError::UnusedCapabilities(keys));
     }
     Ok(())
@@ -181,7 +181,7 @@ mod test_util {
     use {
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        sandbox::{Receiver, Sender},
+        sandbox::{Connector, Receiver},
         std::sync::Arc,
         vfs::{
             directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
@@ -191,7 +191,7 @@ mod test_util {
         },
     };
 
-    pub fn multishot() -> (Sender, Receiver) {
+    pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Receiver::new();
         (sender, receiver)
     }

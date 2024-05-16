@@ -15,8 +15,17 @@ ffx_plugin("ffx_echo") {
 
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//third_party/rust_crates:anyhow",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
 
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures-lite",
+    "//third_party/rust_crates:serde_json",
+  ]
 }

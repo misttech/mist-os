@@ -594,7 +594,10 @@ fuchsia_test_package("virtualization_magma_tests_pkg") {
   test_components = [ ":virtualization_magma_tests_cmp" ]
   subpackages = guest_packages
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }
@@ -634,7 +637,10 @@ fuchsia_test_package("termina_container_tests_pkg") {
       # See https://fxbug.dev/42062247 for test timeouts when starting the container.
       timeout_secs = 420
     }
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }

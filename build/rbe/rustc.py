@@ -10,6 +10,7 @@ import collections
 import dataclasses
 import enum
 import os
+import tempfile
 
 import cl_utils
 
@@ -153,6 +154,234 @@ def find_compiler_from_command(command: Iterable[str]) -> Path:
         if "rustc" in tok:
             return Path(tok)
     return None  # or raise error
+
+
+class _ScanDepsCommandTransformer(object):
+    """Implementation detail of rustc_dep_only_command()."""
+
+    def __init__(self, emit_metadata: bool, depfile_name: str):
+        self._emit_metadata = emit_metadata
+        self._depfile_name = depfile_name
+        self._replaced_emit = False
+        self._aux_rspfiles = []
+
+    @property
+    def emit_metadata(self) -> bool:
+        return self._emit_metadata
+
+    @property
+    def depfile_name(self) -> str:
+        return self._depfile_name
+
+    @property
+    def _replacement_emit_args(self) -> Sequence[str]:
+        # Remove outputs like emit=link.
+        if self.emit_metadata:
+            # Need to tell the compiler driver that we are only interested
+            # in the deps needed for generating metadata.
+            return [
+                f"--emit=metadata,dep-info={self.depfile_name}",
+                "-Z",
+                "binary-dep-depinfo",
+            ]
+        else:
+            return [
+                f"--emit=dep-info={self.depfile_name}",
+                "-Z",
+                "binary-dep-depinfo",
+            ]
+
+    def _rustc_dep_only_command_impl(
+        self, command_tokens: Iterable[str]
+    ) -> Iterable[str]:
+        """Generate a command that only produces a depfile.
+
+        This also accumulates a set of temporary transformed rspfiles
+        that the caller is responsible for cleaning up.
+
+        Yields:
+          possibly transformed command token
+        """
+
+        handle_optarg = None
+        output_arg = False
+        # Use the original command (without response files expanded)
+        # to avoid command length limits.
+        # Because of this, this transformation on --emit only works
+        # when the --emit argument is not buried inside a response file.
+        # When targeting metadata, for --externs, replace .rlib with
+        # corresponding .rmeta if it exists (not required).
+        for tok in command_tokens:
+            if handle_optarg == "--extern":
+                handle_optarg = None
+                if not self.emit_metadata:
+                    yield tok
+                    continue
+
+                lib, sep, path = tok.partition("=")
+                if sep != "=":  # --extern foo (without path)
+                    yield tok
+                    continue
+
+                # Assume .so files are proc_macros, which are needed for
+                # dep scanning; rmeta alone won't suffice.
+                if path.endswith(".so"):
+                    yield tok
+                    continue
+
+                rmeta = Path(path).with_suffix(".rmeta")
+                # evaluating metadata only requires other .rmeta files
+                if rmeta.exists():
+                    yield f"{lib}={rmeta}"
+                else:
+                    yield tok
+
+                continue
+
+            if handle_optarg == "-o":
+                handle_optarg = None
+                if self.emit_metadata:
+                    yield str(Path(tok).with_suffix(".rmeta"))
+                else:
+                    yield tok
+                continue
+
+            # Replace the first --emit encountered in the original command tokens
+            if tok.startswith("--emit"):
+                if self._replaced_emit:
+                    pass
+                else:
+                    self._replaced_emit = True
+                    for arg in self._replacement_emit_args:
+                        yield arg
+                continue
+
+            if tok in {"--extern", "-o"}:
+                handle_optarg = tok
+                yield tok
+                continue
+
+            # Check for response files, recursively descend into them.
+            prefix_matched = False
+            for prefix in ("@shell:", "@"):
+                # Apparently shell-argfiles do not want a trailing newline,
+                # because that will result in an '' filename arg.
+                if tok.startswith(prefix):
+                    prefix_matched = True
+                    # recursively descend into response files, and rewrite them
+                    # into new copies as needed.
+                    orig_rspfile = Path(tok.removeprefix(prefix))
+
+                    yield self._transform_rspfile_arg(prefix, orig_rspfile)
+                    break
+
+            if prefix_matched:
+                continue
+
+            # else
+            yield tok
+
+    def _transform_rspfile_arg(self, prefix: str, orig_rspfile: Path) -> str:
+        """Transform the contents of a @rspfile into a new one.
+
+        Args:
+          prefix: either "@" or "@shell:" part of the response file argument.
+          orig_rspfile: the original response file referenced.
+
+        Returns:
+          Possibly modified command-line argument for a response file.
+        """
+        rspfile_contents = orig_rspfile.read_text()
+        if not rspfile_contents:
+            # Don't bother changing empty files.
+            # This also avoids accidentally adding a blank line
+            # which the compiler may interpret as ''.
+            return f"{prefix}{orig_rspfile}"
+
+        new_rspfile_lines = list(
+            self._rustc_dep_only_command_rspfile_lines(
+                rspfile_contents.splitlines()
+            )
+        )
+
+        # Use a temporary file with a random suffix, in case
+        # multiple concurrent invocations reference the same rspfile.
+        # It is the caller's responsibility to clean up each of these
+        # tempfiles.
+        _, new_rspfile = tempfile.mkstemp(
+            dir=str(orig_rspfile.parent),
+            prefix=orig_rspfile.name + ".aux.",
+            text=True,
+        )
+
+        # Keep absolute/relative path consistent with original.
+        new_rspfile_path = Path(new_rspfile)
+        if not orig_rspfile.is_absolute():
+            new_rspfile_path = cl_utils.relpath(new_rspfile_path, Path("."))
+        new_rspfile_path.write_text("\n".join(new_rspfile_lines) + "\n")
+
+        # Tell the caller to clean-up this transformed rspfile.
+        self._aux_rspfiles.append(new_rspfile_path)
+        return f"{prefix}{new_rspfile_path}"
+
+    def _rustc_dep_only_command_rspfile_lines(
+        self,
+        rspfile_lines: Iterable[str],
+    ) -> Iterable[str]:
+        new_lines = []
+        # transform rspfile one line at a time
+        for line in rspfile_lines:
+            yield self._rustc_dep_only_command_rspfile_line(line)
+
+    def _rustc_dep_only_command_rspfile_line(
+        self,
+        rspfile_line: str,
+    ) -> str:
+        """Transforms a single line of a rspfile for a dep-scanning command."""
+        # Note: use space split instead of shlex.split because quotes
+        # are to be interpreted literally.
+        return " ".join(
+            self._rustc_dep_only_command_impl(
+                command_tokens=rspfile_line.split(" ")
+            )
+        )
+
+
+def rustc_dep_only_command(
+    command_tokens: Iterable[str],
+    emit_metadata: bool,
+    depfile_name: str,
+) -> Tuple[Sequence[str], Sequence[Path]]:
+    """Generate a command that only produces a depfile.
+
+    This implementation handles response files recursively,
+    by transforming them as they are encountered into new auxiliary
+    response files referenced in the new command.
+
+    Args:
+      command_tokens: original rustc command
+      emit_metadata: if True, command is expected to generate
+        separate metadata.
+      depfile_name: name of the new depfile to emit (different
+        from the depfile in the original command).
+
+    Returns:
+      * transformed command tokens, for dep-scanning
+      * paths of rewritten temporary response files (containing
+        possibly transformed command tokens), that the caller should
+        clean up automatically.
+    """
+    transformer = _ScanDepsCommandTransformer(
+        emit_metadata=emit_metadata,
+        depfile_name=depfile_name,
+    )
+    aux_toks = list(transformer._rustc_dep_only_command_impl(command_tokens))
+    aux_rspfiles = transformer._aux_rspfiles
+
+    if not transformer._replaced_emit:
+        return aux_toks + transformer._replacement_emit_args, aux_rspfiles
+
+    return aux_toks, aux_rspfiles
 
 
 class RustAction(object):
@@ -460,87 +689,20 @@ class RustAction(object):
         if link_map:
             yield link_map
 
-    def dep_only_command(self, depfile_name: str) -> Iterable[str]:
-        """Generate a command that only produces a depfile."""
-        emit_metadata = self.emit_metadata
-        # Remove outputs like emit=link.
-        if emit_metadata:
-            # Need to tell the compiler driver that we are only interested
-            # in the deps needed for generating metadata.
-            new_emit_args = [
-                f"--emit=metadata,dep-info={depfile_name}",
-                "-Z",
-                "binary-dep-depinfo",
-            ]
-        else:
-            new_emit_args = [
-                f"--emit=dep-info={depfile_name}",
-                "-Z",
-                "binary-dep-depinfo",
-            ]
+    def dep_only_command_with_rspfiles(
+        self, depfile_name: str
+    ) -> Tuple[Sequence[str], Sequence[Path]]:
+        """Generate a command that only produces a depfile.
 
-        replaced_emit = False
-        handle_optarg = None
-        output_arg = False
-        # Use the original command (without response files expanded)
-        # to avoid command length limits.
-        # Because of this, this transformation on --emit only works
-        # when the --emit argument is not buried inside a response file.
-        # When targeting metadata, for --externs, replace .rlib with
-        # corresponding .rmeta if it exists (not required).
-        for tok in self.original_command:
-            if handle_optarg == "--extern":
-                handle_optarg = None
-                if not emit_metadata:
-                    yield tok
-                    continue
-
-                lib, sep, path = tok.partition("=")
-                if sep != "=":  # --extern foo (without path)
-                    yield tok
-                    continue
-
-                # Assume .so files are proc_macros, which are needed for
-                # dep scanning; rmeta alone won't suffice.
-                if path.endswith(".so"):
-                    yield tok
-                    continue
-
-                rmeta = Path(path).with_suffix(".rmeta")
-                # evaluating metadata only requires other .rmeta files
-                if rmeta.exists():
-                    yield f"{lib}={rmeta}"
-                else:
-                    yield tok
-
-                continue
-
-            if handle_optarg == "-o":
-                handle_optarg = None
-                if emit_metadata:
-                    yield str(Path(tok).with_suffix(".rmeta"))
-                else:
-                    yield tok
-                continue
-
-            if tok.startswith("--emit"):  # replace the original emit
-                if replaced_emit:
-                    pass
-                else:
-                    replaced_emit = True
-                    yield from new_emit_args
-                continue
-
-            if tok in {"--extern", "-o"}:
-                handle_optarg = tok
-                yield tok
-                continue
-
-            yield tok
-
-        # if we haven't seen emit yet, add it
-        if not replaced_emit:
-            yield from new_emit_args
+        Returns:
+          modified command
+          rewritten response files (which appear in the modified command)
+        """
+        return rustc_dep_only_command(
+            command_tokens=self.original_command,
+            emit_metadata=self.emit_metadata,
+            depfile_name=depfile_name,
+        )
 
 
 # TODO: write a main() routine just for printing debug info about a compile

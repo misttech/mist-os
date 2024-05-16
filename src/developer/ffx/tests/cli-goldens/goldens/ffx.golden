@@ -134,6 +134,18 @@
       "short": "v",
       "description": "logs ffx output to stdio according to log level",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "log-output"
+        }
+      },
+      "optionality": "optional",
+      "long": "--log-output",
+      "short": "o",
+      "description": "specify destination of log output. \"-\" or \"stdout\" for stdout, \"stderr\" for stderr. If no destination is specified, log.dir will be used. If a destination is specified, then log.dir will be ignored.",
+      "hidden": false
     }
   ],
   "notes": [],

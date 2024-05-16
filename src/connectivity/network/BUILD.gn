@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
   enable_netstack2_tracing = false
@@ -96,10 +95,6 @@ network_unified_binary_regular_and_gub_packages("netstack-migration") {
 
 # TODO(https://fxbug.dev/42073789) Remove transitional labels
 group("virtualization-core-shard") {
-}
-
-core_shard("persistence-core-shard") {
-  shard_file = "meta/persistence.core_shard.cml"
 }
 
 group("drivers") {

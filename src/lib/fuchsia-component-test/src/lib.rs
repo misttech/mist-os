@@ -6,9 +6,11 @@ use {
     crate::{error::Error, local_component_runner::LocalComponentRunnerBuilder},
     anyhow::{format_err, Context as _},
     cm_rust::{
-        CapabilityDecl, DirectoryDecl, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
-        ExposeSource, ExposeTarget, FidlIntoNative, NativeIntoFidl, ProtocolDecl,
+        Availability, CapabilityDecl, DependencyType, DirectoryDecl, ExposeDecl,
+        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, FidlIntoNative,
+        NativeIntoFidl, ProtocolDecl, SourceName, UseDecl, UseProtocolDecl, UseSource,
     },
+    cm_types::{Path, RelativePath},
     component_events::{events::Started, matcher::EventMatcher},
     fidl::endpoints::{
         self, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
@@ -37,6 +39,10 @@ pub const DEFAULT_COLLECTION_NAME: &'static str = "realm_builder";
 /// The default path of the remote directory through which a nested component
 /// manager serves capabilities exposed by the root component.
 const ROOT_CAPABILITY_PATH: &'static str = "/root-exposed";
+
+/// The default path of the directory in the nested component manager's
+/// namespace where capabilities offered by the realm builder client are placed.
+const CLIENT_CAPABILITY_PASSTHROUGH_PATH: &'static str = "/parent-offered";
 
 const REALM_BUILDER_SERVER_CHILD_NAME: &'static str = "realm_builder_server";
 
@@ -70,6 +76,20 @@ enum RefInner {
 impl Ref {
     pub fn capability(name: impl Into<String>) -> Ref {
         Ref { value: RefInner::Capability(name.into()), scope: None }
+    }
+
+    /// A reference to a dictionary defined by this component as the target of the route.
+    /// `path` must have the form `"self/<dictionary_name>`.
+    pub fn dictionary(path: impl Into<String>) -> Ref {
+        let path: String = path.into();
+        let parts: Vec<_> = path.split('/').collect();
+        if parts.len() != 2 || parts[0] != "self" {
+            panic!(
+                "Input to dictionary() must have the form \"self/<dictionary_name>\", \
+                    was: {path}"
+            );
+        }
+        Self::capability(parts[1])
     }
 
     pub fn child(name: impl Into<String>) -> Ref {
@@ -292,6 +312,11 @@ impl Capability {
     /// Creates a new event_stream capability.
     pub fn event_stream(name: impl Into<String>) -> EventStream {
         EventStream { name: name.into(), rename: None, path: None, scope: None }
+    }
+
+    /// Creates a new dictionary capability.
+    pub fn dictionary(name: impl Into<String>) -> DictionaryCapability {
+        DictionaryCapability { name: name.into(), as_: None, availability: None }
     }
 }
 
@@ -575,17 +600,60 @@ impl Into<ftest::Capability> for EventStream {
     }
 }
 
+/// A dictionary capability, which may be routed between components. Created by
+/// `Capability::dictionary`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictionaryCapability {
+    name: String,
+    as_: Option<String>,
+    availability: Option<fdecl::Availability>,
+}
+
+impl DictionaryCapability {
+    /// The name the targets will see the dictionary capability as.
+    pub fn as_(mut self, as_: impl Into<String>) -> Self {
+        self.as_ = Some(as_.into());
+        self
+    }
+
+    /// Marks the availability of this capability as "optional", which allows either this or a
+    /// parent offer to have a source of `void`.
+    pub fn optional(mut self) -> Self {
+        self.availability = Some(fdecl::Availability::Optional);
+        self
+    }
+
+    /// Marks the availability of this capability to be the same as the availability expectations
+    /// set in the target.
+    pub fn availability_same_as_target(mut self) -> Self {
+        self.availability = Some(fdecl::Availability::SameAsTarget);
+        self
+    }
+}
+
+impl Into<ftest::Capability> for DictionaryCapability {
+    fn into(self) -> ftest::Capability {
+        ftest::Capability::Dictionary(ftest::Dictionary {
+            name: Some(self.name),
+            as_: self.as_,
+            availability: self.availability,
+            ..Default::default()
+        })
+    }
+}
+
 /// A route of one or more capabilities from one point in the realm to one or more targets.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Route {
     capabilities: Vec<ftest::Capability>,
     from: Option<Ref>,
+    from_dictionary: Option<String>,
     to: Vec<Ref>,
 }
 
 impl Route {
     pub fn new() -> Self {
-        Self { capabilities: vec![], from: None, to: vec![] }
+        Self { capabilities: vec![], from: None, from_dictionary: None, to: vec![] }
     }
 
     /// Adds a capability to this route. Must be called at least once.
@@ -601,6 +669,29 @@ impl Route {
             panic!("from is already set for this route");
         }
         self.from = Some(from.into());
+        self
+    }
+
+    /// Adds a source dictionary to this route. When this option is used, the source given by
+    /// `from` is expected to provide a dictionary whose name is the first path segment of
+    /// `from_dictionary`, and `capability` is expected to exist within this dictionary at
+    /// the `from_dictionary` path.
+    ///
+    /// Must be called exactly once. Will panic if called a second time.
+    ///
+    /// This is the RealmBuilder equivalent of cml's `from` when used with a path. That is, if
+    /// `from` contains the path `"parent/a/b"`, that is equivalent to the following construction:
+    ///
+    /// ```
+    /// Route::new()
+    ///     .from(Ref::parent)
+    ///     .from_dictionary("a/b")
+    /// ```
+    pub fn from_dictionary(mut self, from_dictionary: impl Into<String>) -> Self {
+        if self.from_dictionary.is_some() {
+            panic!("from_dictionary is already set for this route");
+        }
+        self.from_dictionary = Some(from_dictionary.into());
         self
     }
 
@@ -916,25 +1007,47 @@ impl RealmBuilder {
         Ok(realm)
     }
 
-    /// Initializes the created realm under an instance of component manager, specified by the
-    /// given fragment-only URL. Returns the realm containing component manager.
+    /// Initializes the created realm under an instance of component manager,
+    /// specified by the given fragment-only URL. Returns the realm containing
+    /// component manager.
     ///
-    /// This function should be used to modify the component manager realm. Otherwise, to directly
-    /// build the created realm under an instance of component manager, use
-    /// `build_in_nested_component_manager()`.
+    /// This function should be used to modify the component manager realm.
+    /// Otherwise, to directly build the created realm under an instance of
+    /// component manager, use `build_in_nested_component_manager()`.
     ///
-    /// Note that any routes with a source of `parent` in the root realm will need to also be `use`d
-    /// in component manager's manifest and listed in `namespace_capabilities` in the config file
-    /// passed to `component_manager`'s `--config` arg.
-    ///
-    /// Note that any routes with a target of `parent` from the root realm will result in exposing
-    /// the capability to component manager, which is rather useless by itself. Component manager
-    /// does expose the hub though, which could be traversed to find an exposed capability.
-    ///
-    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until realm teardown.
+    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until
+    /// realm teardown.
     pub async fn with_nested_component_manager(
         self,
         component_manager_fragment_only_url: &str,
+    ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
+        self.with_nested_component_manager_with_passthrough_offers(
+            component_manager_fragment_only_url,
+            Vec::new(),
+        )
+        .await
+    }
+
+    /// Initializes the created realm under an instance of component manager,
+    /// specified by the given fragment-only URL. Protocol capability offers to
+    /// be passed through to the nested component manager from the parent must
+    /// be specified in `passthrough_protocol_offers`. (Non-protocol capability
+    /// types are not supported for passthrough.) Returns the realm containing
+    /// component manager.
+    ///
+    /// This function should be used to modify the component manager realm.
+    /// Otherwise, to directly build the created realm under an instance of
+    /// component manager, use `build_in_nested_component_manager()`.
+    ///
+    /// Note that any routes passed through from the parent need to be routed to
+    /// "#realm_builder" in the test component's CML file.
+    ///
+    /// Note that the returned `fuchsia_async::Task` _must_ be kept alive until
+    /// realm teardown.
+    async fn with_nested_component_manager_with_passthrough_offers(
+        self,
+        component_manager_fragment_only_url: &str,
+        passthrough_protocol_offers: Vec<cm_types::Name>,
     ) -> Result<(RealmBuilder, fasync::Task<()>), Error> {
         let collection_name = self.collection_name.clone();
         let root_decl = self.root_realm.get_realm_decl().await?;
@@ -1018,6 +1131,21 @@ impl RealmBuilder {
                 }
             }
         }).collect::<Vec<ExposeDecl>>();
+        let passthrough_use_decls = passthrough_protocol_offers
+            .into_iter()
+            .map(|source_name| UseProtocolDecl {
+                source: UseSource::Parent,
+                source_name: source_name.clone(),
+                target_path: Path::new(format!(
+                    "{CLIENT_CAPABILITY_PASSTHROUGH_PATH}/{source_name}"
+                ))
+                .expect("unable to create path from capability name"),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::default(),
+                source_dictionary: RelativePath::dot(),
+            })
+            .map(|d| UseDecl::Protocol(d))
+            .collect::<Vec<UseDecl>>();
         let (root_url, nested_local_component_runner_task) = self.initialize().await?;
 
         // We now have a root URL we could create in a collection, but instead we want to launch a
@@ -1062,6 +1190,7 @@ impl RealmBuilder {
         }
         component_manager_decl.capabilities.append(&mut passthrough_cap_decls.clone());
         component_manager_decl.exposes.append(&mut passthrough_expose_decls.clone());
+        component_manager_decl.uses.append(&mut passthrough_use_decls.clone());
         component_manager_realm
             .replace_component_decl("component_manager", component_manager_decl)
             .await?;
@@ -1131,26 +1260,52 @@ impl RealmBuilder {
                 }
             }
         }
+        for use_decl in passthrough_use_decls {
+            component_manager_realm
+                .add_route(
+                    Route::new()
+                        .capability(Capability::protocol_by_name(use_decl.source_name().as_str()))
+                        .from(Ref::parent())
+                        .to(Ref::child("component_manager")),
+                )
+                .await?;
+        }
         Ok((component_manager_realm, nested_local_component_runner_task))
     }
 
-    /// Launches a nested component manager which will run the created realm (along with any local
-    /// components in the realm). This component manager _must_ be referenced by a fragment-only
-    /// URL.
-    ///
-    /// Note that any routes with a source of `parent` in the root realm will need to also be `use`d
-    /// in component manager's manifest and listed in `namespace_capabilities` in the config file
-    /// passed to `component_manager`'s `--config` arg.
-    ///
-    /// Note that any routes with a target of `parent` from the root realm will result in exposing
-    /// the capability to component manager, which is rather useless by itself. Component manager
-    /// does expose the hub though, which could be traversed to find an exposed capability.
+    /// Launches a nested component manager which will run the created realm
+    /// (along with any local components in the realm). This component manager
+    /// _must_ be referenced by a fragment-only URL.
     pub async fn build_in_nested_component_manager(
         self,
         component_manager_fragment_only_url: &str,
     ) -> Result<RealmInstance, Error> {
-        let (component_manager_realm, nested_local_component_runner_task) =
-            self.with_nested_component_manager(component_manager_fragment_only_url).await?;
+        self.build_in_nested_component_manager_with_passthrough_offers(
+            component_manager_fragment_only_url,
+            Vec::new(),
+        )
+        .await
+    }
+
+    /// Launches a nested component manager which will run the created realm
+    /// (along with any local components in the realm). This component manager
+    /// _must_ be referenced by a fragment-only URL.
+    ///
+    /// Note that any protocol capabilities with a source of `parent` in the
+    /// root realm will need to be listed in `passthrough_protocol_offers`.
+    /// (Non-protocol capability types are not supported for passthrough from
+    /// the parent.)
+    pub async fn build_in_nested_component_manager_with_passthrough_offers(
+        self,
+        component_manager_fragment_only_url: &str,
+        passthrough_protocol_offers: Vec<cm_types::Name>,
+    ) -> Result<RealmInstance, Error> {
+        let (component_manager_realm, nested_local_component_runner_task) = self
+            .with_nested_component_manager_with_passthrough_offers(
+                component_manager_fragment_only_url,
+                passthrough_protocol_offers,
+            )
+            .await?;
         let mut cm_instance = component_manager_realm.build().await?;
 
         // There are no local components alongside the nested component manager.
@@ -1460,20 +1615,45 @@ impl SubRealmBuilder {
 
     /// Adds a route between components within the realm
     pub async fn add_route(&self, route: Route) -> Result<(), Error> {
+        let mut capabilities = route.capabilities;
         if let Some(source) = &route.from {
             source.check_scope(&self.realm_path)?;
         }
         for target in &route.to {
             target.check_scope(&self.realm_path)?;
         }
-        if !route.capabilities.is_empty() {
+        if let Some(from_dictionary) = route.from_dictionary {
+            for c in &mut capabilities {
+                match c {
+                    ftest::Capability::Protocol(c) => {
+                        c.from_dictionary = Some(from_dictionary.clone());
+                    }
+                    ftest::Capability::Directory(c) => {
+                        c.from_dictionary = Some(from_dictionary.clone());
+                    }
+                    ftest::Capability::Service(c) => {
+                        c.from_dictionary = Some(from_dictionary.clone());
+                    }
+                    ftest::Capability::Dictionary(c) => {
+                        c.from_dictionary = Some(from_dictionary.clone());
+                    }
+                    ftest::Capability::Storage(_)
+                    | ftest::Capability::Config(_)
+                    | ftest::Capability::EventStream(_) => {
+                        return Err(Error::FromDictionaryNotSupported(c.clone()));
+                    }
+                    ftest::CapabilityUnknown!() => {}
+                }
+            }
+        }
+        if !capabilities.is_empty() {
             let route_targets = route.to.into_iter().map(Into::into).collect::<Vec<fdecl::Ref>>();
             // If we don't name the future with `let` and then await it in a second step, rustc
             // will decide this function is not Send and then Realm Builder won't be usable on
             // multi-threaded executors. This is caused by the mutable references held in the
             // future generated by `add_route`.
             let fut = self.realm_proxy.add_route(
-                &route.capabilities,
+                &capabilities,
                 &route.from.ok_or(Error::MissingSource)?.into(),
                 &route_targets,
             );
@@ -2473,6 +2653,38 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn dictionary_capability_construction() {
+        assert_eq!(
+            Capability::dictionary("test"),
+            DictionaryCapability { name: "test".to_string(), as_: None, availability: None },
+        );
+        assert_eq!(
+            Capability::dictionary("test").as_("test2"),
+            DictionaryCapability {
+                name: "test".to_string(),
+                as_: Some("test2".to_string()),
+                availability: None,
+            },
+        );
+        assert_eq!(
+            Capability::dictionary("test").optional(),
+            DictionaryCapability {
+                name: "test".to_string(),
+                as_: None,
+                availability: Some(fdecl::Availability::Optional),
+            },
+        );
+        assert_eq!(
+            Capability::dictionary("test").availability_same_as_target(),
+            DictionaryCapability {
+                name: "test".to_string(),
+                as_: None,
+                availability: Some(fdecl::Availability::SameAsTarget),
+            },
+        );
+    }
+
+    #[fuchsia::test]
     async fn route_construction() {
         assert_eq!(
             Route::new()
@@ -2487,6 +2699,7 @@ mod tests {
                     Capability::protocol_by_name("test2").into(),
                 ],
                 from: Some(Ref::child("a").into()),
+                from_dictionary: None,
                 to: vec![Ref::collection("b").into(), Ref::parent().into(),],
             },
         );
@@ -2981,7 +3194,9 @@ mod tests {
                 Route::new()
                     .capability(Capability::protocol_by_name("test"))
                     .capability(Capability::directory("test2"))
-                    .capability(Capability::configuration("test3"))
+                    .capability(Capability::service_by_name("test3"))
+                    .capability(Capability::configuration("test4"))
+                    .capability(Capability::dictionary("test5"))
                     .from(&child_a)
                     .to(Ref::parent()),
             )
@@ -2999,8 +3214,132 @@ mod tests {
                 if capabilities == vec![
                     Capability::protocol_by_name("test").into(),
                     Capability::directory("test2").into(),
-                    Capability::configuration("test3").into(),
+                    Capability::service_by_name("test3").into(),
+                    Capability::configuration("test4").into(),
+                    Capability::dictionary("test5").into(),
                 ]
+                    && from == Ref::child("a").into()
+                    && to == vec![Ref::parent().into()]
+        );
+        assert_matches!(receive_server_requests.next().now_or_never(), None);
+    }
+
+    #[fuchsia::test]
+    async fn add_route_to_dictionary() {
+        let (builder, _server_task, mut receive_server_requests) =
+            new_realm_builder_and_server_task();
+        let child_a = builder.add_child("a", "test://a", ChildOptions::new()).await.unwrap();
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
+                name: "my_dict".parse().unwrap(),
+                source: None,
+                source_dictionary: None,
+            }))
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("test"))
+                    .capability(Capability::directory("test2"))
+                    .capability(Capability::service_by_name("test3"))
+                    .capability(Capability::dictionary("test4"))
+                    .from(&child_a)
+                    .to(Ref::dictionary("self/my_dict")),
+            )
+            .await
+            .unwrap();
+
+        assert_matches!(
+            receive_server_requests.next().await,
+            Some(ServerRequest::AddChild { name, url, options })
+                if &name == "a" && &url == "test://a" && options == ChildOptions::new().into()
+        );
+        assert_matches!(
+            receive_server_requests.next().await,
+            Some(ServerRequest::AddCapability { .. })
+        );
+        assert_matches!(
+            receive_server_requests.next().await,
+            Some(ServerRequest::AddRoute { capabilities, from, to })
+                if capabilities == vec![
+                    Capability::protocol_by_name("test").into(),
+                    Capability::directory("test2").into(),
+                    Capability::service_by_name("test3").into(),
+                    Capability::dictionary("test4").into(),
+                ]
+                    && from == Ref::child("a").into()
+                    && to == vec![Ref::dictionary("self/my_dict").into()]
+        );
+        assert_matches!(receive_server_requests.next().now_or_never(), None);
+    }
+
+    #[fuchsia::test]
+    async fn add_route_from_dictionary() {
+        let (builder, _server_task, mut receive_server_requests) =
+            new_realm_builder_and_server_task();
+        let child_a = builder.add_child("a", "test://a", ChildOptions::new()).await.unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("test"))
+                    .capability(Capability::directory("test2"))
+                    .capability(Capability::service_by_name("test3"))
+                    .capability(Capability::dictionary("test4"))
+                    .from(&child_a)
+                    .from_dictionary("source/dict")
+                    .to(Ref::parent()),
+            )
+            .await
+            .unwrap();
+
+        assert_matches!(
+            receive_server_requests.next().await,
+            Some(ServerRequest::AddChild { name, url, options })
+                if &name == "a" && &url == "test://a" && options == ChildOptions::new().into()
+        );
+
+        let mut expected_capabilities = vec![];
+        expected_capabilities.push({
+            let mut c: ftest::Capability = Capability::protocol_by_name("test").into();
+            if let ftest::Capability::Protocol(ref mut c) = c {
+                c.from_dictionary = Some("source/dict".into());
+            } else {
+                unreachable!();
+            }
+            c
+        });
+        expected_capabilities.push({
+            let mut c: ftest::Capability = Capability::directory("test2").into();
+            if let ftest::Capability::Directory(ref mut c) = c {
+                c.from_dictionary = Some("source/dict".into());
+            } else {
+                unreachable!();
+            }
+            c
+        });
+        expected_capabilities.push({
+            let mut c: ftest::Capability = Capability::service_by_name("test3").into();
+            if let ftest::Capability::Service(ref mut c) = c {
+                c.from_dictionary = Some("source/dict".into());
+            } else {
+                unreachable!();
+            }
+            c
+        });
+        expected_capabilities.push({
+            let mut c: ftest::Capability = Capability::dictionary("test4").into();
+            if let ftest::Capability::Dictionary(ref mut c) = c {
+                c.from_dictionary = Some("source/dict".into());
+            } else {
+                unreachable!();
+            }
+            c
+        });
+        assert_matches!(
+            receive_server_requests.next().await,
+            Some(ServerRequest::AddRoute { capabilities, from, to })
+                if capabilities == expected_capabilities
                     && from == Ref::child("a").into()
                     && to == vec![Ref::parent().into()]
         );

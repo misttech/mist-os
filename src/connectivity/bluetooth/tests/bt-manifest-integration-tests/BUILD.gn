@@ -311,6 +311,13 @@ fuchsia_test_component("bt-init-smoke-test-component") {
 
 fuchsia_test_package("bt-init-smoke-test") {
   test_components = [ ":bt-init-smoke-test-component" ]
+  test_specs = {
+    log_settings = {
+      # Test teardown may cause some errors to be logged that do not impact the test
+      # validity. See b/339072885 for more information.
+      max_severity = "ERROR"
+    }
+  }
   deps = [
     ":test-bt-init",
     ":test-bt-init-config",

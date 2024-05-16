@@ -5,7 +5,12 @@
 import("//build/components.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/test.gni")
-import("//src/sys/core/build/core_shard.gni")
+
+#import("//src/sys/core/build/core_shard.gni")
+### Shards
+#core_shard("core_shard") {
+#  shard_file = "meta/audio_device_registry.core_shard.cml"
+#}
 
 ## Groups
 group("tests") {
@@ -15,11 +20,6 @@ group("tests") {
     ":audio_services_device_registry_warning_unittests",
     "testing",
   ]
-}
-
-## Shards
-core_shard("core_shard") {
-  shard_file = "meta/audio_device_registry.core_shard.cml"
 }
 
 ## Packages

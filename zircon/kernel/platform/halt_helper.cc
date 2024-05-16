@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/debuglog.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <zircon/boot/crash-reason.h>
 
 #include <kernel/mp.h>
@@ -46,8 +47,12 @@ void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_rea
 
 zx_status_t platform_halt_secondary_cpus(zx_time_t deadline) {
   // Ensure the current thread is pinned to the boot CPU.
-  DEBUG_ASSERT(Thread::Current::Get()->scheduler_state().hard_affinity() ==
-               cpu_num_to_mask(BOOT_CPU_ID));
+  {
+    Thread* current_thread = Thread::Current::Get();
+    SingletonChainLockGuardIrqSave guard{current_thread->get_lock(),
+                                         CLT_TAG("platform_halt_secondary_cpus")};
+    DEBUG_ASSERT(current_thread->scheduler_state().hard_affinity() == cpu_num_to_mask(BOOT_CPU_ID));
+  }
 
   // It's possible that the one or more secondary CPUs is still in the process
   // of booting up.  Wait for all the started CPUs to check-in before shutting

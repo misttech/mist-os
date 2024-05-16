@@ -15,6 +15,7 @@ if (is_fuchsia) {
     source_root = "main.rs"
     deps = [
       "//src/connectivity/network/netstack3/core:netstack3-core-benchmarks",
+      "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
       "//src/developer/fuchsia-criterion",
     ]
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]

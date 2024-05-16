@@ -54,6 +54,7 @@ template("bazel_driver_package") {
                              "metadata",
                              "testonly",
                              "visibility",
+                             "inputs",
                            ])
     command = "build"
     output_groups = [ "+build_id_dir" ]

@@ -10,41 +10,6 @@ assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
-# LINT.IfChange
-product_assembly_configuration("minimal") {
-  platform = {
-    build_type = "eng"
-    fonts = {
-      # minimal is headless, so ostensibly does not need fonts.
-      enabled = false
-    }
-    ui = {
-      supported_input_devices = [
-        "button",
-        "touchscreen",
-      ]
-    }
-
-    # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
-    # as part of the platform configuration.
-    if (authorized_ssh_keys_path != false) {
-      development_support = {
-        authorized_ssh_keys_path =
-            rebase_path(authorized_ssh_keys_path, root_build_dir)
-      }
-    }
-  }
-  product = {
-    build_info = default_product_build_info
-  }
-  deps = [
-    ":board_assembly_artifacts",
-    "//build/info:build_info_files",
-  ]
-}
-
-# LINT.ThenChange(//products/minimal/BUILD.bazel)
-
 if (current_cpu == "x64") {
   bazel_product_bundle("product_bundle.x64") {
     testonly = true

@@ -245,6 +245,15 @@ tests=tests.json
             "unknown:label\nunknown_path\n",
         )
 
+        # Test that labels are properly qualified before looking into the database.
+        self.assert_output(
+            [
+                "gn_label_to_ninja_paths",
+                "//bar(//build/toolchain/fuchsia:aRm64)",
+            ],
+            "obj/bar.output\nobj/bar.stamp\n",
+        )
+
         # Test that --allow_unknown does not pass unknown GN labels or absolute file paths.
         self.assert_error(
             [
@@ -261,7 +270,7 @@ tests=tests.json
                 "--allow-unknown",
                 "/unknown/path",
             ],
-            "ERROR: Unknown GN label (not in the configured graph): /unknown/path\n",
+            "ERROR: Absolute path is not a valid GN label or Ninja path: /unknown/path\n",
         )
 
     def test_fx_build_args_to_labels(self):

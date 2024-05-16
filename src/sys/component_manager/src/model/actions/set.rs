@@ -11,9 +11,10 @@ use {
     futures::{
         channel::oneshot,
         future::{join_all, BoxFuture, FutureExt},
+        select,
     },
-    std::collections::{HashMap, HashSet},
-    std::sync::Arc,
+    std::collections::HashMap,
+    std::sync::{Arc, Mutex},
 };
 
 /// Represents a task that implements an action.
@@ -51,45 +52,16 @@ struct ActionController {
 /// Each action is mapped to a future that returns when the action is complete.
 pub struct ActionSet {
     rep: HashMap<ActionKey, ActionController>,
-    history: HashSet<ActionKey>,
     passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
 }
 
 impl ActionSet {
     pub fn new() -> Self {
-        ActionSet { rep: HashMap::new(), history: HashSet::new(), passive_waiters: HashMap::new() }
+        ActionSet { rep: HashMap::new(), passive_waiters: HashMap::new() }
     }
 
-    pub async fn contains(&self, key: ActionKey) -> bool {
+    pub fn contains(&self, key: ActionKey) -> bool {
         self.rep.contains_key(&key)
-    }
-
-    #[cfg(test)]
-    pub fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
-        let (sender, receiver) = oneshot::channel();
-        sender.send(result).unwrap();
-        let notifier = ActionNotifier::new(receiver);
-        self.rep.insert(key, ActionController { notifier, maybe_abort_handle: None });
-    }
-
-    #[cfg(test)]
-    pub fn remove_notifier(&mut self, key: ActionKey) {
-        self.rep.remove(&key).expect("No notifier found with that key");
-    }
-
-    /// Returns a oneshot receiver that will receive a message once the component has finished
-    /// performing an action with the given key. The oneshot will receive a message immediately if
-    /// the component has ever finished such an action. Does not cause any new actions to be
-    /// started.
-    pub async fn wait_for_action(&mut self, action_key: ActionKey) -> oneshot::Receiver<()> {
-        let (sender, receiver) = oneshot::channel();
-        if self.history.contains(&action_key) {
-            sender.send(()).unwrap();
-            receiver
-        } else {
-            self.passive_waiters.entry(action_key).or_insert(vec![]).push(sender);
-            receiver
-        }
     }
 
     /// Registers an action in the set, but does not wait for it to complete, instead returning a
@@ -97,15 +69,15 @@ impl ActionSet {
     /// already registered.
     ///
     /// REQUIRES: `self` is the `ActionSet` contained in `component`.
-    pub async fn register_no_wait<A>(
-        &mut self,
+    pub fn register_no_wait<A>(
+        action_set: Arc<Mutex<ActionSet>>,
         component: &Arc<ComponentInstance>,
         action: A,
     ) -> ActionNotifier
     where
         A: Action,
     {
-        let (task, rx) = self.register_inner(component, action);
+        let (task, rx) = Self::register_inner(action_set.clone(), component, action);
         if let Some(task) = task {
             task.spawn();
         }
@@ -118,9 +90,8 @@ impl ActionSet {
     }
 
     /// Removes an action from the set, completing it.
-    pub(super) fn finish<'a>(&mut self, key: &'a ActionKey) {
+    fn finish<'a>(&mut self, key: &'a ActionKey) {
         self.rep.remove(key);
-        self.history.insert(key.clone());
         for sender in self.passive_waiters.entry(key.clone()).or_insert(vec![]).drain(..) {
             let _ = sender.send(());
         }
@@ -133,35 +104,47 @@ impl ActionSet {
     ///   should call spawn() on it.
     /// - A future to listen on the completion of the action.
     #[must_use]
-    pub(crate) fn register_inner<'a, A>(
-        &'a mut self,
+    fn register_inner<'a, A>(
+        action_set: Arc<Mutex<ActionSet>>,
         component: &Arc<ComponentInstance>,
         action: A,
     ) -> (Option<ActionTask>, ActionNotifier)
     where
         A: Action,
     {
+        let mut self_ = action_set.lock().unwrap();
         let key = action.key();
         // If this Action is already running, just subscribe to the result
-        if let Some(action_controller) = self.rep.get(&key) {
+        if let Some(action_controller) = self_.rep.get(&key) {
             return (None, action_controller.notifier.clone());
         }
 
         // Otherwise we spin up the new Action
         let maybe_abort_handle = action.abort_handle();
-        let prereqs = self.get_prereq_action(action.key());
-        let abort_handles = self.get_abort_action(action.key());
+        let prereqs = self_.get_prereq_action(action.key());
+        let abort_handles = self_.get_abort_action(action.key());
 
         let component = component.clone();
 
+        let action_set_clone = action_set.clone();
         let action_fut = async move {
             for abort in abort_handles {
                 abort.abort();
             }
             _ = join_all(prereqs).await;
             let key = action.key();
-            let res = action.handle(component.clone()).await;
-            component.lock_actions().await.finish(&key);
+            let mut action_fut = action.handle(component.clone()).fuse();
+            let mut timer = fasync::Timer::new(std::time::Duration::from_secs(300)).fuse();
+            let res = select! {
+                res = action_fut => {
+                    res
+                }
+                _ = timer => {
+                    tracing::warn!("action {:?} has been running for over 5 minutes on component {}", key, component.moniker);
+                    action_fut.await
+                }
+            };
+            action_set_clone.lock().unwrap().finish(&key);
             res
         }
         .boxed();
@@ -169,7 +152,7 @@ impl ActionSet {
         let (notifier_completer, notifier_receiver) = oneshot::channel();
         let task = ActionTask::new(notifier_completer, action_fut);
         let notifier = ActionNotifier::new(notifier_receiver);
-        self.rep.insert(
+        self_.rep.insert(
             key.clone(),
             ActionController { notifier: notifier.clone(), maybe_abort_handle },
         );
@@ -236,7 +219,7 @@ pub mod tests {
     async fn register_action_in_new_task<A>(
         action: A,
         component: Arc<ComponentInstance>,
-        action_set: &mut ActionSet,
+        action_set: Arc<Mutex<ActionSet>>,
         responder: oneshot::Sender<Result<(), ActionError>>,
         res: Result<(), ActionError>,
     ) where
@@ -244,7 +227,7 @@ pub mod tests {
     {
         // Register action, and get the future. Use `register_inner` so that we can control
         // when to notify the listener.
-        let (task, rx) = action_set.register_inner(&component, action);
+        let (task, rx) = ActionSet::register_inner(action_set.clone(), &component, action);
 
         fasync::Task::spawn(async move {
             if let Some(task) = task {
@@ -269,13 +252,13 @@ pub mod tests {
         // new one here. This works because no actions are scheduled on the component's `Actions`
         // and thus collisions are avoided, making our action set here the de-facto only action set
         // for the component, .
-        let mut action_set = ActionSet::new();
+        let action_set = Arc::new(Mutex::new(ActionSet::new()));
 
         let (tx1, rx1) = oneshot::channel();
         register_action_in_new_task(
             DestroyAction::new(),
             component.clone(),
-            &mut action_set,
+            action_set.clone(),
             tx1,
             Ok(()),
         )
@@ -284,7 +267,7 @@ pub mod tests {
         register_action_in_new_task(
             ShutdownAction::new(ShutdownType::Instance),
             component.clone(),
-            &mut action_set,
+            action_set.clone(),
             tx2,
             Err(ActionError::StopError { err: StopActionError::GetParentFailed }), // Some random error.
         )
@@ -293,18 +276,18 @@ pub mod tests {
         register_action_in_new_task(
             DestroyAction::new(),
             component.clone(),
-            &mut action_set,
+            action_set.clone(),
             tx3,
             Ok(()),
         )
         .await;
 
         // Complete actions, while checking notifications.
-        action_set.finish(&ActionKey::Destroy);
+        action_set.lock().unwrap().finish(&ActionKey::Destroy);
         assert_matches!(rx1.await.expect("Unable to receive result of Notification"), Ok(()));
         assert_matches!(rx3.await.expect("Unable to receive result of Notification"), Ok(()));
 
-        action_set.finish(&ActionKey::Shutdown);
+        action_set.lock().unwrap().finish(&ActionKey::Shutdown);
         assert_matches!(
             rx2.await.expect("Unable to receive result of Notification"),
             Err(ActionError::StopError { err: StopActionError::GetParentFailed })

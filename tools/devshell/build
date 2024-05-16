@@ -313,13 +313,6 @@ function main {
     echo -e "\\n------ RUNNING ${tool} ------"
   fi
 
-  # Moving the goma-check before we actually start the build.
-  # We used to check goma only when build failed but the user pays a few seconds
-  # to kick off the build and wait for the failure.
-  if [[ -z "${no_checks}" ]]; then
-    goma-check
-  fi
-
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
     "$FUCHSIA_DIR/tools/integration/bootstrap.sh" -o "$fint" || exit $?
@@ -383,35 +376,6 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   status=$?
 
   exit-with-message
-}
-
-function goma-check {
-  if grep -q "^ *use_goma = true" "${FUCHSIA_BUILD_DIR}/args.gn"; then
-    cat <<EOF
-**************** NOTICE ****************
-Goma is deprecated and will be shutting down for Fuchsia soon.
-You can replace it with re-client (linux-x64 only right now)
-with the following steps.
-
-  * In args.gn (fx args), set:
-
-    cxx_rbe_enable = true
-    use_goma = false
-
-  * Make sure you have valid 'gcert' credentials.
-  * Resume your typical workflows.
-
-See the go/fuchsia-goma-shutdown-psa announcement.
-****************************************
-EOF
-    if ! fx-command-run goma_ctl status >/dev/null 2>&1; then
-      fx-warn "Goma is enabled but not started."
-      fx-info "Starting Goma..."
-      # We may be able to get away with running `goma_ctl ensure_start`
-      # but it is safer to run the goma helper script which runs more checks.
-      fx-command-run goma
-    fi
-  fi
 }
 
 function exit-with-message {

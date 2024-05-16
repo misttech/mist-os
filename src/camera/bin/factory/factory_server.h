@@ -32,7 +32,7 @@ class FactoryServer : public fuchsia::factory::camera::Controller, WebUIControl 
   // Returns:
   //  A FactoryServer object which provides an interface to the factory API.
   static fpromise::result<std::unique_ptr<FactoryServer>, zx_status_t> Create(
-      fuchsia::sysmem::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
+      fuchsia::sysmem2::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
       fit::closure stop_callback = nullptr);
 
   // Returns the class request handler.

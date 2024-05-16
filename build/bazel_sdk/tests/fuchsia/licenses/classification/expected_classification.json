@@ -15,7 +15,7 @@
             {
                 "identified_as": "License Class 1",
                 "conditions": [
-                    "default-condition"
+                    "allowed-condition"
                 ],
                 "verified": true,
                 "verified_conditions": [
@@ -193,51 +193,34 @@
             {
                 "identified_as": "[UNIDENTIFIED]",
                 "conditions": [
-                    "default-condition"
+                    "unidentified"
                 ],
-                "verified": true,
-                "verified_conditions": [
-                    "allowed-condition"
-                ],
-                "overriden_conditions": [
-                    "allowed-condition"
-                ],
-                "overriding_rules": [
-                    {
-                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
-                        "public_source_mirrors": [
-                            "http://mirror1",
-                            "http://mirror2"
+                "verified": false,
+                "verification_message": "'unidentified' condition is not an allowed.",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "License B Dedupped"
                         ],
-                        "override_condition_to": "allowed-condition",
-                        "bug": "https://fxbug.dev/42073939",
-                        "comment": [
-                            "Test override rule"
+                        "identifications": [
+                            "[UNIDENTIFIED]"
                         ],
-                        "match_criteria": {
-                            "license_names": [
-                                "License B*"
-                            ],
-                            "identifications": [
-                                "*"
-                            ],
-                            "conditions": [
-                                "disallowed-condition",
-                                "default-condition"
-                            ],
-                            "snippet_checksums": [
-                                "*"
-                            ],
-                            "dependents": [
-                                "*"
-                            ]
-                        }
+                        "conditions": [
+                            "unidentified"
+                        ],
+                        "snippet_checksums": [
+                            "88dd87ea111c2ab80ff5a826d2c75c68"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
                     }
-                ],
-                "public_source_mirrors": [
-                    "http://mirror1",
-                    "http://mirror2"
-                ],
+                },
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 3,
@@ -319,51 +302,34 @@
             {
                 "identified_as": "[UNIDENTIFIED]",
                 "conditions": [
-                    "default-condition"
+                    "unidentified"
                 ],
-                "verified": true,
-                "verified_conditions": [
-                    "allowed-condition"
-                ],
-                "overriden_conditions": [
-                    "allowed-condition"
-                ],
-                "overriding_rules": [
-                    {
-                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
-                        "public_source_mirrors": [
-                            "http://mirror1",
-                            "http://mirror2"
+                "verified": false,
+                "verification_message": "'unidentified' condition is not an allowed.",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "License B (copy)"
                         ],
-                        "override_condition_to": "allowed-condition",
-                        "bug": "https://fxbug.dev/42073939",
-                        "comment": [
-                            "Test override rule"
+                        "identifications": [
+                            "[UNIDENTIFIED]"
                         ],
-                        "match_criteria": {
-                            "license_names": [
-                                "License B*"
-                            ],
-                            "identifications": [
-                                "*"
-                            ],
-                            "conditions": [
-                                "disallowed-condition",
-                                "default-condition"
-                            ],
-                            "snippet_checksums": [
-                                "*"
-                            ],
-                            "dependents": [
-                                "*"
-                            ]
-                        }
+                        "conditions": [
+                            "unidentified"
+                        ],
+                        "snippet_checksums": [
+                            "88dd87ea111c2ab80ff5a826d2c75c68"
+                        ],
+                        "dependents": [
+                            "Package B"
+                        ]
                     }
-                ],
-                "public_source_mirrors": [
-                    "http://mirror1",
-                    "http://mirror2"
-                ],
+                },
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 3,
@@ -378,8 +344,8 @@
         }
     },
     {
-        "license_id": "LicenseRef-C-unknown",
-        "name": "License C unknown",
+        "license_id": "LicenseRef-C-copyright",
+        "name": "License C copyright",
         "links": [],
         "dependents": [
             "Package A"
@@ -389,12 +355,12 @@
         "is_source_code_shipped": false,
         "identifications": [
             {
-                "identified_as": "[UNIDENTIFIED]",
+                "identified_as": "[COPYRIGHT]",
                 "conditions": [
-                    "default-condition"
+                    "copyright"
                 ],
                 "verified": false,
-                "verification_message": "'default-condition' condition is not an allowed.",
+                "verification_message": "'copyright' condition is not an allowed.",
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
                     "bug": "<INSERT TICKET URL>",
@@ -403,16 +369,16 @@
                     ],
                     "match_criteria": {
                         "license_names": [
-                            "License C unknown"
+                            "License C copyright"
                         ],
                         "identifications": [
-                            "[UNIDENTIFIED]"
+                            "[COPYRIGHT]"
                         ],
                         "conditions": [
-                            "default-condition"
+                            "copyright"
                         ],
                         "snippet_checksums": [
-                            "86406c53db40703267d15be0c58321d7"
+                            "2f81a62cffcf4b9b782aa31e0aa0c8d5"
                         ],
                         "dependents": [
                             "Package A"
@@ -422,12 +388,67 @@
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
-                "snippet_checksum": "86406c53db40703267d15be0c58321d7",
-                "snippet_text": "Some unknown\ntest license C"
+                "snippet_checksum": "2f81a62cffcf4b9b782aa31e0aa0c8d5",
+                "snippet_text": "Some copyright\ntext"
             }
         ],
         "identification_stats": {
-            "size_bytes": 27,
+            "size_bytes": 19,
+            "size_lines": 2,
+            "unidentified_lines": 0
+        }
+    },
+    {
+        "license_id": "LicenseRef-C-ignorable",
+        "name": "License C ignorable",
+        "links": [],
+        "dependents": [
+            "Package A"
+        ],
+        "is_project_shipped": true,
+        "is_notice_shipped": false,
+        "is_source_code_shipped": false,
+        "identifications": [
+            {
+                "identified_as": "[IGNORABLE]",
+                "conditions": [
+                    "ignorable"
+                ],
+                "verified": false,
+                "verification_message": "'ignorable' condition is not an allowed.",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "License C ignorable"
+                        ],
+                        "identifications": [
+                            "[IGNORABLE]"
+                        ],
+                        "conditions": [
+                            "ignorable"
+                        ],
+                        "snippet_checksums": [
+                            "0b3d6fbeca7e3e8203349ba55180bef5"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "0b3d6fbeca7e3e8203349ba55180bef5",
+                "snippet_text": "Some ignorable\ntext"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 19,
             "size_lines": 2,
             "unidentified_lines": 0
         }

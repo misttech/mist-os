@@ -63,8 +63,9 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   Vout& operator=(Vout&&) = delete;
   Vout& operator=(const Vout&) = delete;
 
-  void PopulateAddedDisplayArgs(
-      added_display_args_t* args, display::DisplayId display_id,
+  // `pixel_formats` must outlive the returned added_display_args_t.
+  added_display_args_t CreateAddedDisplayArgs(
+      display::DisplayId display_id,
       cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
 
   VoutType type() { return type_; }

@@ -127,17 +127,24 @@ int Info(SdioClient client) {
 
   const SdioHwInfo& info = result.value()->hw_info;
   const SdioDeviceHwInfo& dev_info = info.dev_hw_info;
+  const uint32_t caps(dev_info.caps);
   printf("Host:\n    Max transfer size: %u\n\n", info.host_max_transfer_size);
   printf("Card:\n");
   printf(
       "    SDIO version: %u\n"
       "    CCCR version: %u\n"
       "    Functions:    %u\n"
-      "    Capabilities: 0x%08x\n",
-      dev_info.sdio_vsn, dev_info.cccr_vsn, dev_info.num_funcs, dev_info.caps);
+      "    Capabilities: 0x%08x\n"
+      "    Max transfer speed: ",
+      dev_info.sdio_vsn, dev_info.cccr_vsn, dev_info.num_funcs, caps);
+  if (dev_info.max_tran_speed > 1000) {
+    printf("%.1f Mb/s\n", static_cast<double>(dev_info.max_tran_speed) / 1000.0);
+  } else {
+    printf("%u kb/s\n", dev_info.max_tran_speed);
+  }
 
   for (size_t i = 0; i < std::size(kCapabilityStrings); i++) {
-    if (dev_info.caps & static_cast<uint32_t>(kCapabilityStrings[i].capability)) {
+    if (dev_info.caps & kCapabilityStrings[i].capability) {
       printf("        %s\n", kCapabilityStrings[i].string);
     }
   }
@@ -147,16 +154,10 @@ int Info(SdioClient client) {
   printf(
       "        Manufacturer ID:    0x%04x\n"
       "        Product ID:         0x%04x\n"
-      "        Max block size:     %u\n",
-      func_info.manufacturer_id, func_info.product_id, func_info.max_blk_size);
-
-  printf("        Max transfer speed: ");
-  if (func_info.max_tran_speed > 1000) {
-    printf("%.1f Mb/s\n", static_cast<double>(func_info.max_tran_speed) / 1000.0);
-  } else {
-    printf("%u kb/s\n", func_info.max_tran_speed);
-  }
-  printf("        Interface code:     0x%02x\n", func_info.fn_intf_code);
+      "        Max block size:     %u\n"
+      "        Interface code:     0x%02x\n",
+      func_info.manufacturer_id, func_info.product_id, func_info.max_blk_size,
+      func_info.fn_intf_code);
 
   return 0;
 }

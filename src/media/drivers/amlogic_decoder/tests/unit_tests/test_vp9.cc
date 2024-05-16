@@ -113,8 +113,8 @@ class FakeOwner : public VideoDecoder::Owner {
     }
     return ZX_OK;
   }
-  fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() override {
-    return video_->SysmemAllocatorSyncPtr();
+  fidl::SyncClient<fuchsia_sysmem2::Allocator>& SysmemAllocatorSync() override {
+    return video_->SysmemAllocatorSync();
   }
 
   bool IsDecoderCurrent(VideoDecoder* decoder) override { return true; }
@@ -150,6 +150,7 @@ class Vp9UnitTest {
     FakeVideoOwner video_owner;
     auto video = std::make_unique<AmlogicVideo>(&video_owner);
     ASSERT_TRUE(video);
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
 
     DosRegisterIo dosbus(fdf_testing::CreateMmioBuffer(kDosbusMemorySize));
@@ -166,6 +167,7 @@ class Vp9UnitTest {
     FakeVideoOwner video_owner;
     auto video = std::make_unique<AmlogicVideo>(&video_owner);
     ASSERT_TRUE(video);
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
 
     auto zeroed_memory = std::unique_ptr<uint32_t[]>(new uint32_t[kDosbusMemorySize]);

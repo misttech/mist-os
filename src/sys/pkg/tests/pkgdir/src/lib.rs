@@ -5,10 +5,12 @@
 #![allow(clippy::let_unit_value)]
 
 use {
+    anyhow::Result,
+    fidl::endpoints,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_test::{RealmFactoryMarker, RealmOptions},
-    fio::DirectoryMarker,
     fuchsia_component::client::connect_to_protocol,
+    realm_client::{extend_namespace, InstalledNamespace},
 };
 
 mod directory;
@@ -19,21 +21,29 @@ fn repeat_by_n(seed: char, n: usize) -> String {
     std::iter::repeat(seed).take(n).collect()
 }
 
-async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
+async fn create_realm(options: RealmOptions) -> Result<InstalledNamespace> {
+    let realm_factory = connect_to_protocol::<RealmFactoryMarker>()?;
+    let dict_client =
+        realm_factory.create_realm(options).await?.map_err(realm_client::Error::OperationError)?;
+    let ns = extend_namespace(realm_factory, dict_client).await?;
+    Ok(ns)
+}
+
+async fn dirs_to_test() -> (InstalledNamespace, impl Iterator<Item = PackageSource>) {
     // Bind to parent to ensure driver test realm is started
     let _ = connect_to_protocol::<fcomponent::BinderMarker>().unwrap();
-    let realm_factory =
-        connect_to_protocol::<RealmFactoryMarker>().expect("connect to realm_factory");
-    let (directory, server_end) =
-        fidl::endpoints::create_proxy::<DirectoryMarker>().expect("create proxy");
-    realm_factory
-        .create_realm(RealmOptions { pkg_directory_server: Some(server_end), ..Default::default() })
-        .await
-        .expect("create_realm fidl failed")
-        .expect("create_realm failed");
+    let test_ns =
+        create_realm(RealmOptions { ..Default::default() }).await.expect("create_realm failed");
+    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    fdio::open(
+        &format!("{}/pkg", test_ns.prefix()),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        server_end.into_channel(),
+    )
+    .unwrap();
 
-    let connect = || async move { PackageSource { dir: directory } };
-    IntoIterator::into_iter([connect().await])
+    let connect = || async move { PackageSource { dir } };
+    (test_ns, IntoIterator::into_iter([connect().await]))
 }
 
 struct PackageSource {

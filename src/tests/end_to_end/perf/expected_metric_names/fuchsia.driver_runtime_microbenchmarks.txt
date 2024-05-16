@@ -8,6 +8,16 @@ fuchsia.driver_runtime: Arena/AllocFree/65536bytes.alloc
 fuchsia.driver_runtime: Arena/AllocFree/65536bytes.free
 fuchsia.driver_runtime: Arena/AllocFree/8192bytes.alloc
 fuchsia.driver_runtime: Arena/AllocFree/8192bytes.free
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/16384bytes.fifty_small_blocks
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/16384bytes.one_large_block
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/32768bytes.fifty_small_blocks
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/32768bytes.one_large_block
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/4096bytes.fifty_small_blocks
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/4096bytes.one_large_block
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/65536bytes.fifty_small_blocks
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/65536bytes.one_large_block
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/8192bytes.fifty_small_blocks
+fuchsia.driver_runtime: Arena/AllocLargeThenSmall/8192bytes.one_large_block
 fuchsia.driver_runtime: Arena/Contains/1024blocks
 fuchsia.driver_runtime: Arena/Contains/16blocks
 fuchsia.driver_runtime: Arena/Contains/1blocks

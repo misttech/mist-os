@@ -8,6 +8,7 @@
 #include <zircon/errors.h>
 
 #include <utility>
+#include <variant>
 
 #include "fuchsia/bluetooth/host/cpp/fidl.h"
 #include "gatt2_server_server.h"
@@ -47,49 +48,6 @@ using fidl_helpers::PeerIdFromString;
 using fidl_helpers::ResultToFidl;
 using fidl_helpers::SecurityLevelFromFidl;
 
-std::pair<PeerTracker::Updated, PeerTracker::Removed> PeerTracker::ToFidl(
-    const bt::gap::PeerCache* peer_cache) {
-  PeerTracker::Updated updated_fidl;
-  for (auto& id : updated_) {
-    auto* peer = peer_cache->FindById(id);
-
-    // All ids in |updated_| are assumed to be valid as they would otherwise be in |removed_|.
-    BT_ASSERT(peer);
-
-    updated_fidl.push_back(fidl_helpers::PeerToFidl(*peer));
-  }
-
-  PeerTracker::Removed removed_fidl;
-  for (auto& id : removed_) {
-    removed_fidl.push_back(fbt::PeerId{id.value()});
-  }
-
-  return std::make_pair(std::move(updated_fidl), std::move(removed_fidl));
-}
-
-void PeerTracker::Update(bt::PeerId id) {
-  updated_.insert(id);
-  removed_.erase(id);
-}
-
-void PeerTracker::Remove(bt::PeerId id) {
-  updated_.erase(id);
-  removed_.insert(id);
-}
-
-WatchPeersGetter::WatchPeersGetter(bt::gap::PeerCache* peer_cache) : peer_cache_(peer_cache) {
-  BT_DEBUG_ASSERT(peer_cache_);
-}
-
-void WatchPeersGetter::Notify(std::queue<Callback> callbacks, PeerTracker peers) {
-  auto [updated, removed] = peers.ToFidl(peer_cache_);
-  while (!callbacks.empty()) {
-    auto f = std::move(callbacks.front());
-    callbacks.pop();
-    f(fidl::Clone(updated), fidl::Clone(removed));
-  }
-}
-
 HostServer::HostServer(zx::channel channel, const bt::gap::Adapter::WeakPtr& adapter,
                        bt::gatt::GATT::WeakPtr gatt)
     : AdapterServerBase(adapter, this, std::move(channel)),
@@ -98,23 +56,11 @@ HostServer::HostServer(zx::channel channel, const bt::gap::Adapter::WeakPtr& ada
       requesting_background_scan_(false),
       requesting_discoverable_(false),
       io_capability_(IOCapability::kNoInputNoOutput),
-      watch_peers_getter_(adapter->peer_cache()),
       weak_self_(this),
       weak_pairing_(this) {
   BT_ASSERT(gatt_.is_alive());
 
   auto self = weak_self_.GetWeakPtr();
-  peer_updated_callback_id_ =
-      adapter->peer_cache()->add_peer_updated_callback([self](const auto& peer) {
-        if (self.is_alive()) {
-          self->OnPeerUpdated(peer);
-        }
-      });
-  adapter->peer_cache()->set_peer_removed_callback([self](const auto& identifier) {
-    if (self.is_alive()) {
-      self->OnPeerRemoved(identifier);
-    }
-  });
   adapter->peer_cache()->set_peer_bonded_callback([self](const auto& peer) {
     if (self.is_alive()) {
       self->OnPeerBonded(peer);
@@ -135,9 +81,6 @@ HostServer::HostServer(zx::channel channel, const bt::gap::Adapter::WeakPtr& ada
 
   // Initialize the HostInfo getter with the initial state.
   NotifyInfoChange();
-
-  // Initialize the peer watcher with all known connectable peers that are in the cache.
-  adapter->peer_cache()->ForEach([this](const bt::gap::Peer& peer) { OnPeerUpdated(peer); });
 }
 
 HostServer::~HostServer() { Shutdown(); }
@@ -184,12 +127,13 @@ void HostServer::SetLocalData(fsys::HostData host_data) {
   }
 }
 
-void HostServer::WatchPeers(WatchPeersCallback callback) {
-  watch_peers_getter_.Watch([cb = std::move(callback)](std::vector<fsys::Peer> updated,
-                                                       std::vector<fbt::PeerId> removed) {
-    cb(fhost::Host_WatchPeers_Result::WithResponse(
-        fhost::Host_WatchPeers_Response({std::move(updated), std::move(removed)})));
-  });
+void HostServer::SetPeerWatcher(
+    ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::PeerWatcher> peer_watcher) {
+  if (peer_watcher_server_.has_value()) {
+    peer_watcher.Close(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  peer_watcher_server_.emplace(std::move(peer_watcher), adapter()->peer_cache(), this);
 }
 
 void HostServer::SetLocalName(::std::string local_name, SetLocalNameCallback callback) {
@@ -777,9 +721,6 @@ void HostServer::Shutdown() {
   pairing_delegate_ = nullptr;
   ResetPairingDelegate();
 
-  // Unregister PeerCache callbacks.
-  adapter()->peer_cache()->remove_peer_updated_callback(peer_updated_callback_id_);
-
   // Send adapter state change.
   if (binding()->is_bound()) {
     NotifyInfoChange();
@@ -802,6 +743,101 @@ HostServer::DiscoverySessionServer::DiscoverySessionServer(
     : ServerBase(this, std::move(request)), host_(host) {
   binding()->set_error_handler(
       [this, host](zx_status_t /*status*/) { host->OnDiscoverySessionServerClose(this); });
+}
+
+HostServer::PeerWatcherServer::PeerWatcherServer(
+    ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::PeerWatcher> request,
+    bt::gap::PeerCache* peer_cache, HostServer* host)
+    : ServerBase(this, std::move(request)), peer_cache_(peer_cache), host_(host), weak_self_(this) {
+  auto self = weak_self_.GetWeakPtr();
+
+  peer_updated_callback_id_ = peer_cache_->add_peer_updated_callback([self](const auto& peer) {
+    if (self.is_alive()) {
+      self->OnPeerUpdated(peer);
+    }
+  });
+  peer_cache_->set_peer_removed_callback([self](const auto& identifier) {
+    if (self.is_alive()) {
+      self->OnPeerRemoved(identifier);
+    }
+  });
+
+  // Initialize the peer watcher with all known connectable peers that are in the cache.
+  peer_cache_->ForEach([this](const bt::gap::Peer& peer) { OnPeerUpdated(peer); });
+
+  binding()->set_error_handler(
+      [this](zx_status_t /*status*/) { host_->peer_watcher_server_.reset(); });
+}
+
+HostServer::PeerWatcherServer::~PeerWatcherServer() {
+  // Unregister PeerCache callbacks.
+  peer_cache_->remove_peer_updated_callback(peer_updated_callback_id_);
+  peer_cache_->set_peer_removed_callback(nullptr);
+}
+
+void HostServer::PeerWatcherServer::OnPeerUpdated(const bt::gap::Peer& peer) {
+  if (!peer.connectable()) {
+    return;
+  }
+
+  updated_.insert(peer.identifier());
+  removed_.erase(peer.identifier());
+  MaybeCallCallback();
+}
+
+void HostServer::PeerWatcherServer::OnPeerRemoved(bt::PeerId id) {
+  updated_.erase(id);
+  removed_.insert(id);
+  MaybeCallCallback();
+}
+
+void HostServer::PeerWatcherServer::MaybeCallCallback() {
+  if (!callback_) {
+    return;
+  }
+
+  if (!removed_.empty()) {
+    Removed removed_fidl;
+    for (const bt::PeerId& id : removed_) {
+      removed_fidl.push_back(fbt::PeerId{id.value()});
+    }
+    removed_.clear();
+    callback_(fhost::PeerWatcher_GetNext_Result::WithResponse(
+        fhost::PeerWatcher_GetNext_Response::WithRemoved(std::move(removed_fidl))));
+    callback_ = nullptr;
+    return;
+  }
+
+  if (!updated_.empty()) {
+    Updated updated_fidl;
+    for (const bt::PeerId& id : updated_) {
+      bt::gap::Peer* peer = peer_cache_->FindById(id);
+      // All ids in |updated_| are assumed to be valid as they would otherwise be in |removed_|.
+      BT_ASSERT(peer);
+      updated_fidl.push_back(fidl_helpers::PeerToFidl(*peer));
+    }
+    updated_.clear();
+    callback_(fhost::PeerWatcher_GetNext_Result::WithResponse(
+        fhost::PeerWatcher_GetNext_Response::WithUpdated(std::move(updated_fidl))));
+    callback_ = nullptr;
+    return;
+  }
+}
+
+void HostServer::PeerWatcherServer::GetNext(
+    ::fuchsia::bluetooth::host::PeerWatcher::GetNextCallback callback) {
+  if (callback_) {
+    binding()->Close(ZX_ERR_BAD_STATE);
+    host_->peer_watcher_server_.reset();
+    return;
+  }
+  callback_ = std::move(callback);
+  MaybeCallCallback();
+}
+
+void HostServer::PeerWatcherServer::handle_unknown_method(uint64_t ordinal,
+                                                          bool method_has_response) {
+  bt_log(WARN, "fidl", "PeerWatcher received unknown method with ordinal %lu", ordinal);
 }
 
 bt::sm::IOCapability HostServer::io_capability() const {
@@ -892,26 +928,6 @@ void HostServer::DisplayPairingRequest(bt::PeerId id, std::optional<uint32_t> pa
 void HostServer::OnConnectionError(Server* server) {
   BT_DEBUG_ASSERT(server);
   servers_.erase(server);
-}
-
-void HostServer::OnPeerUpdated(const bt::gap::Peer& peer) {
-  if (!peer.connectable()) {
-    return;
-  }
-
-  watch_peers_getter_.Transform([id = peer.identifier()](auto tracker) {
-    tracker.Update(id);
-    return tracker;
-  });
-}
-
-void HostServer::OnPeerRemoved(bt::PeerId id) {
-  // TODO(armansito): Notify only if the peer is connectable for symmetry with
-  // OnPeerUpdated?
-  watch_peers_getter_.Transform([id](auto tracker) {
-    tracker.Remove(id);
-    return tracker;
-  });
 }
 
 void HostServer::ResetPairingDelegate() {

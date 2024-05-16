@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 if (target_cpu == "x64") {
   executable("bin") {
@@ -34,10 +33,6 @@ if (target_cpu == "x64") {
   fuchsia_package_with_single_component("thermd") {
     manifest = "meta/thermd.cml"
     deps = [ ":bin" ]
-  }
-
-  core_shard("thermd-core-shard") {
-    shard_file = "meta/thermd.core_shard.cml"
   }
 }
 

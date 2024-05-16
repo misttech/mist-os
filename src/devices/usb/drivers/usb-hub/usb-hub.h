@@ -51,7 +51,7 @@ DEFINE_HARD_INT(PortNumber, uint8_t)
 DEFINE_HARD_INT(PortArrayIndex, uint8_t)
 
 struct PortStatus : public fbl::DoublyLinkedListable<PortStatus*> {
-  uint16_t status = 0;
+  usb_port_status_t status{};
   bool connected = false;
   bool reset_pending = false;
   bool enumeration_pending = false;

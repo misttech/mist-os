@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::assembly_config::CompiledPackageDefinition;
 use crate::PackageDetails;
 
 /// Developer Overrides struct that is similar to the AssemblyConfig struct,
@@ -38,6 +39,10 @@ pub struct DeveloperOverrides {
     /// Packages to add to the build.
     #[serde(default)]
     pub packages: Vec<PackageDetails>,
+
+    /// Compiled components to add to the build
+    #[serde(default)]
+    pub packages_to_compile: Vec<CompiledPackageDefinition>,
 }
 
 /// Special flags for assembly that can only be used in the context of developer

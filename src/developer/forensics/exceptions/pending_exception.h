@@ -12,8 +12,6 @@
 #include <lib/zx/time.h>
 #include <zircon/types.h>
 
-#include <string>
-
 namespace forensics {
 namespace exceptions {
 

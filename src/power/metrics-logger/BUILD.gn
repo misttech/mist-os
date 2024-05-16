@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/json/validate_json.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 # TODO(https://fxbug.dev/330204282): Migrate metrics-logger away from config-data.
 template("metrics_logger_config") {
@@ -100,10 +99,6 @@ fuchsia_package_with_single_component("metrics-logger-standalone-pkg") {
   manifest = "meta/metrics-logger-standalone.cml"
   package_name = "metrics-logger-standalone"
   deps = [ ":bin" ]
-}
-
-core_shard("metrics-logger-standalone-core-shard") {
-  shard_file = "meta/metrics-logger-standalone.core_shard.cml"
 }
 
 fuchsia_package_with_single_component("metrics-logger-pkg") {

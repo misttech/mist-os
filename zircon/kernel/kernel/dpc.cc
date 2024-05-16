@@ -46,35 +46,13 @@ zx_status_t Dpc::Queue() {
   return ZX_OK;
 }
 
-zx_status_t Dpc::QueueThreadLocked() {
-  DEBUG_ASSERT(func_);
-  DEBUG_ASSERT(arch_ints_disabled());
-
-  DpcQueue& dpc_queue = percpu::GetCurrent().dpc_queue;
-  {
-    Guard<SpinLock, NoIrqSave> guard{dpc_lock::Get()};
-
-    if (InContainer()) {
-      return ZX_ERR_ALREADY_EXISTS;
-    }
-
-    // Put this Dpc at the tail of the list and signal the worker.
-    dpc_queue.Enqueue(this);
-  }
-
-  dpc_queue.SignalLocked();
-  return ZX_OK;
-}
-
 void Dpc::Invoke() {
   if (func_)
     func_(this);
 }
 
 void DpcQueue::Enqueue(Dpc* dpc) { list_.push_back(dpc); }
-
 void DpcQueue::Signal() { event_.Signal(); }
-void DpcQueue::SignalLocked() { event_.SignalLocked(); }
 
 zx_status_t DpcQueue::Shutdown(zx_time_t deadline) {
   Thread* t;

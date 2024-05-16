@@ -21,11 +21,12 @@
 
 namespace bt_hci_broadcom {
 
-class BtHciBroadcom : public fdf::DriverBase,
-                      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
-                      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
-                      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-                      public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
+class BtHciBroadcom final
+    : public fdf::DriverBase,
+      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
+      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
+      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+      public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   explicit BtHciBroadcom(fdf::DriverStartArgs start_args,
                          fdf::UnownedSynchronizedDispatcher driver_dispatcher);
@@ -44,9 +45,8 @@ class BtHciBroadcom : public fdf::DriverBase,
   static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
 
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
-  void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override;
+  void NewEncodeCommand(NewEncodeCommandRequestView request,
+                        NewEncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
 
   void handle_unknown_method(
@@ -71,13 +71,18 @@ class BtHciBroadcom : public fdf::DriverBase,
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  // Deprecating interfaces.
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {}
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override {}
+
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
   // Truly private, internal helper methods:
   zx_status_t ConnectToHciFidlProtocol();
   zx_status_t ConnectToSerialFidlProtocol();
 
   static void EncodeSetAclPriorityCommand(
-      fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer);
+      fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer);
 
   fpromise::promise<std::vector<uint8_t>, zx_status_t> SendCommand(const void* command,
                                                                    size_t length);

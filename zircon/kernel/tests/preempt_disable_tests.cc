@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -16,7 +17,6 @@
 #include <kernel/interrupt.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <kernel/timer.h>
 #include <ktl/atomic.h>
 
@@ -59,8 +59,11 @@ static void timer_callback_func(Timer* timer, zx_time_t now, void* arg) {
   PreemptDisableTestAccess::ClearPending(&preemption_state);
   ASSERT(preemption_state.preempts_pending() == 0);
   {
-    Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    Scheduler::Reschedule();
+    Thread& current_thread = *Thread::Current::Get();
+    ChainLockTransactionIrqSave clt{CLT_TAG("PreemptDisableTests timer_callback")};
+    UnconditionalChainLockGuard guard(current_thread.get_lock());
+    clt.Finalize();
+    Scheduler::Reschedule(&current_thread);
   }
   ASSERT(preemption_state.preempts_pending() != 0);
 
@@ -444,7 +447,7 @@ static bool test_local_preempt_pending() {
     t->Resume();
     while (true) {
       Thread::Current::Yield();
-      Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+      SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("test_local_preempt_pending")};
       if (args.started.load() && t->scheduler_state().state() == THREAD_BLOCKED) {
         break;
       }

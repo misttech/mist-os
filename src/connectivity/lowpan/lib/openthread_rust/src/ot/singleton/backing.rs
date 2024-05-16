@@ -26,6 +26,8 @@ pub(crate) struct InstanceBacking {
     >,
     pub dnssd_query_sub_unsub_fn: Cell<Option<std::boxed::Box<dyn FnMut(bool, &CStr)>>>,
     pub nat64_receive_fn: Cell<Option<std::boxed::Box<dyn FnMut(OtMessageBox<'_>)>>>,
+    pub dhcp6pd_state_change_callback_fn:
+        Cell<Option<std::boxed::Box<dyn FnMut(BorderRoutingDhcp6PdState)>>>,
 }
 
 impl InstanceBacking {
@@ -44,6 +46,7 @@ impl InstanceBacking {
             dnssd_query_sub_unsub_fn: Cell::new(None),
             multicast_listener_callback: Cell::new(None),
             nat64_receive_fn: Cell::new(None),
+            dhcp6pd_state_change_callback_fn: Cell::new(None),
         }
     }
 }
@@ -52,12 +55,7 @@ impl InstanceBacking {
     unsafe fn glob() -> &'static mut Option<InstanceBacking> {
         static mut SINGLETON_BACKING: Option<InstanceBacking> = None;
         // TODO(b/319328255) -- Fix usage so lint no longer applies
-        // TODO(https://fxbug.dev//327272548): remove `static_mut_ref` when we roll the toolchain.
-        // `static_mut_refs` is the new name.
-        #[allow(renamed_and_removed_lints)]
-        #[allow(unknown_lints)]
         #[allow(static_mut_refs)]
-        #[allow(static_mut_ref)]
         &mut SINGLETON_BACKING
     }
 

@@ -9,12 +9,12 @@
 #include <lib/affine/ratio.h>
 #include <lib/affine/utils.h>
 #include <lib/arch/intrin.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/lock_trace.h>
 #include <kernel/task_runtime_timers.h>
-#include <kernel/thread_lock.h>
 #include <ktl/limits.h>
 
 #include <ktl/enforce.h>
@@ -27,12 +27,36 @@ BrwLock<PI>::~BrwLock() {
 }
 
 template <BrwLockEnablePi PI>
-void BrwLock<PI>::Block(bool write) {
+ktl::optional<BlockOpLockDetails<PI>> BrwLock<PI>::LockForBlock() {
+  Thread* const current_thread = Thread::Current::Get();
+
+  if constexpr (PI == BrwLockEnablePi::Yes) {
+    Thread* const new_owner = ktl::atomic_ref(state_.writer_).load(ktl::memory_order_relaxed);
+    ktl::optional<OwnedWaitQueue::BAAOLockingDetails> maybe_lock_details =
+        wait_.LockForBAAOOperationLocked(current_thread, new_owner);
+
+    if (maybe_lock_details.has_value()) {
+      return BlockOpLockDetails<PI>{maybe_lock_details.value()};
+    }
+  } else {
+    ChainLock::LockResult lock_res = current_thread->get_lock().Acquire();
+    if (lock_res != ChainLock::LockResult::kBackoff) {
+      current_thread->get_lock().AssertHeld();
+      return BlockOpLockDetails<PI>{};
+    }
+  }
+
+  return ktl::nullopt;
+}
+
+template <BrwLockEnablePi PI>
+void BrwLock<PI>::Block(Thread* const current_thread, const BlockOpLockDetails<PI>& lock_details,
+                        bool write) {
   zx_status_t ret;
 
   auto reason = write ? ResourceOwnership::Normal : ResourceOwnership::Reader;
 
-  Thread* current_thread = Thread::Current::Get();
+  DEBUG_ASSERT(current_thread == Thread::Current::Get());
   const uint64_t flow_id = current_thread->TakeNextLockFlowId();
   LOCK_TRACE_FLOW_BEGIN("contend_rwlock", flow_id);
 
@@ -61,12 +85,14 @@ void BrwLock<PI>::Block(bool write) {
     // thread eventually blocks, the OWQ code will make sure that all invariants
     // will be restored before the thread finally blocks (and eventually wakes
     // and unwinds).
-    AutoEagerReschedDisabler eager_resched_disabler;
-    ret = wait_.BlockAndAssignOwner(Deadline::infinite(),
-                                    ktl::atomic_ref(state_.writer_).load(ktl::memory_order_relaxed),
-                                    reason, Interruptible::No);
+    AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
+    ret = wait_.BlockAndAssignOwnerLocked(current_thread, Deadline::infinite(), lock_details,
+                                          reason, Interruptible::No);
+    current_thread->get_lock().Release();
   } else {
-    ret = wait_.BlockEtc(Deadline::infinite(), 0, reason, Interruptible::No);
+    AnnotatedAutoPreemptDisabler preempt_disable;
+    ret = wait_.BlockEtc(current_thread, Deadline::infinite(), 0, reason, Interruptible::No);
+    current_thread->get_lock().Release();
   }
 
   LOCK_TRACE_FLOW_END("contend_rwlock", flow_id);
@@ -79,69 +105,154 @@ void BrwLock<PI>::Block(bool write) {
   }
 }
 
+// A callback class used to select which threads we want to wake during a wake
+// operation. Generally, if the first waiter is a writer, we wake just the
+// writer and assign ownership to them. Otherwise, we wake as many readers as we
+// can and stop either when we run out, or when we encounter the first writer.
+class WakeOpHooks : public OwnedWaitQueue::IWakeRequeueHook {
+ public:
+  enum class Operation { None, WakeWriter, WakeReaders };
+  WakeOpHooks() = default;
+
+  // This hook is called during the locking phase of the wake operation, and
+  // allows us to determine which threads we want to wake based on their current
+  // state.  Returning true selects a thread for waking, and continues the
+  // enumeration of threads (if any).  Returning false will stop the
+  // enumeration.
+  //
+  // Note that we have not committed to waking any threads yet.  We first need
+  // to obtain all of the locks needed for the wake operation.  If we fail to
+  // obtain any of the locks, we are going to need to back off from the wake
+  // operation and try again after releasing our queue lock.
+  bool Allow(const Thread& t) TA_REQ_SHARED(t.get_lock()) override {
+    // We have not considered any threads yet, so we don't know if we are going
+    // to be waking a single writer, or a set of readers.  Figure this out now.
+    if (op_ == Operation::None) {
+      // If the first thread is blocked for writing, then we are waking a single
+      // writer.  Record this and approve this thread.
+      if (t.state() == THREAD_BLOCKED) {
+        op_ = Operation::WakeWriter;
+        return true;
+      }
+
+      // If not writing then we must be blocked for reading
+      DEBUG_ASSERT(t.state() == THREAD_BLOCKED_READ_LOCK);
+      op_ = Operation::WakeReaders;
+    }
+
+    // If we are waking readers, and the next thread is a reader, accept it,
+    // otherwise stop.
+    if (op_ == Operation::WakeReaders) {
+      return (t.state() == THREAD_BLOCKED_READ_LOCK);
+    }
+
+    // We must be waking a single writer.  Reject the next thread
+    // and stop the enumeration.
+    DEBUG_ASSERT(op_ == Operation::WakeWriter);
+    return false;
+  }
+
+  Operation op() const { return op_; }
+
+ private:
+  Operation op_{Operation::None};
+};
+
 template <BrwLockEnablePi PI>
-ResourceOwnership BrwLock<PI>::Wake() {
+ktl::optional<ResourceOwnership> BrwLock<PI>::TryWake() {
+  // If there is no one to wake by the time we make it into the queue's lock, we
+  // should fail the operation, signaling to the caller that they should retry.
+  if (wait_.IsEmpty()) {
+    return ktl::nullopt;
+  }
+
   if constexpr (PI == BrwLockEnablePi::Yes) {
-    using Action = OwnedWaitQueue::Hook::Action;
-    struct Context {
-      ResourceOwnership ownership;
-      BrwLockState<PI>& state;
-    };
-    Context context = {ResourceOwnership::Normal, state_};
-    auto cbk = [](Thread* woken, void* ctx) -> Action {
-      Context* context = reinterpret_cast<Context*>(ctx);
+    WakeOpHooks hooks{};
+    ktl::optional<Thread::UnblockList> maybe_unblock_list =
+        wait_.LockForWakeOperationLocked(ktl::numeric_limits<uint32_t>::max(), hooks);
 
-      LOCK_TRACE_FLOW_STEP("contend_rwlock", woken->lock_flow_id());
+    // We get back a list only if we succeeded in locking all of the threads we
+    // want to wake. Otherwise, we need to back off and try again.
+    if (!maybe_unblock_list.has_value()) {
+      return ktl::nullopt;
+    }
 
-      if (context->ownership == ResourceOwnership::Normal) {
-        // Check if target is blocked for writing and not reading
-        if (woken->state() == THREAD_BLOCKED) {
-          ktl::atomic_ref(context->state.writer_).store(woken, ktl::memory_order_relaxed);
-          ktl::atomic_ref(context->state.state_)
-              .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acq_rel);
-          return Action::SelectAndAssignOwner;
-        }
-        // If not writing then we must be blocked for reading
-        DEBUG_ASSERT(woken->state() == THREAD_BLOCKED_READ_LOCK);
-        context->ownership = ResourceOwnership::Reader;
-      }
-      // Our current ownership is ResourceOwnership::Reader otherwise we would
-      // have returned early
-      DEBUG_ASSERT(context->ownership == ResourceOwnership::Reader);
-      if (woken->state() == THREAD_BLOCKED_READ_LOCK) {
-        // We are waking readers and we found a reader, so we can wake them up and
-        // search for me.
-        ktl::atomic_ref(context->state.state_)
-            .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acq_rel);
-        return Action::SelectAndKeepGoing;
-      } else {
-        // We are waking readers but we have found a writer. To preserve fairness we
-        // immediately stop and do not wake this thread or any others.
-        return Action::Stop;
-      }
-    };
+    // Great, we have locked all of the threads we need to lock.
+    ChainLockTransaction::ActiveRef().Finalize();
 
-    wait_.WakeThreads(ktl::numeric_limits<uint32_t>::max(), {cbk, &context});
-    return context.ownership;
-  } else {
-    zx_time_t now = current_time();
-    Thread* next = wait_.Peek(now);
-    DEBUG_ASSERT(next != NULL);
-    if (next->state() == THREAD_BLOCKED_READ_LOCK) {
-      while (!wait_.IsEmpty()) {
-        next = wait_.Peek(now);
-        if (next->state() != THREAD_BLOCKED_READ_LOCK) {
-          break;
-        }
-        ktl::atomic_ref(state_.state_)
-            .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acq_rel);
-        wait_.UnblockThread(next, ZX_OK);
-      }
-      return ResourceOwnership::Reader;
-    } else {
+    // Fix up our state, granting the lock to the set of readers, or single
+    // writer, we are going to wake  before we actually perform the wake
+    // operation.
+    DEBUG_ASSERT(hooks.op() != WakeOpHooks::Operation::None);
+    Thread::UnblockList& unblock_list = maybe_unblock_list.value();
+    const OwnedWaitQueue::WakeOption wake_opt = (hooks.op() == WakeOpHooks::Operation::WakeWriter)
+                                                    ? OwnedWaitQueue::WakeOption::AssignOwner
+                                                    : OwnedWaitQueue::WakeOption::None;
+
+    // TODO(johngro): optimize this; we should not be doing O(n) counts here, especially since we
+    // already did one while obtaining the locks.
+    uint32_t to_wake = static_cast<uint32_t>(unblock_list.size_slow());
+    if (hooks.op() == WakeOpHooks::Operation::WakeWriter) {
+      DEBUG_ASSERT(to_wake == 1);
+      Thread* const new_owner = &unblock_list.front();
+
+      ktl::atomic_ref(state_.writer_).store(new_owner, ktl::memory_order_relaxed);
       ktl::atomic_ref(state_.state_)
           .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acq_rel);
-      wait_.UnblockThread(next, ZX_OK);
+    } else {
+      DEBUG_ASSERT(hooks.op() == WakeOpHooks::Operation::WakeReaders);
+      DEBUG_ASSERT(to_wake >= 1);
+      ktl::atomic_ref(state_.state_)
+          .fetch_add((-kBrwLockWaiter + kBrwLockReader) * to_wake, ktl::memory_order_acq_rel);
+    }
+
+    // Now actually do the wake.
+    [[maybe_unused]] const OwnedWaitQueue::WakeThreadsResult results =
+        wait_.WakeThreadsLocked(ktl::move(maybe_unblock_list).value(), hooks, wake_opt);
+    if (hooks.op() == WakeOpHooks::Operation::WakeWriter) {
+      DEBUG_ASSERT(results.woken == 1);
+      DEBUG_ASSERT(((results.still_waiting == 0) && (results.owner == nullptr)) ||
+                   (results.owner != nullptr));
+      return ResourceOwnership::Normal;
+    } else {
+      DEBUG_ASSERT(hooks.op() == WakeOpHooks::Operation::WakeReaders);
+      DEBUG_ASSERT(results.woken >= 1);
+      DEBUG_ASSERT(results.owner == nullptr);
+      return ResourceOwnership::Reader;
+    }
+  } else {
+    // Try to lock the set of threads we need to wake.  Either the next writer,
+    // or the next contiguous span of readers.
+    ktl::optional<BrwLockOps::LockForWakeResult> lock_result =
+        BrwLockOps::LockForWake(wait_, current_time());
+
+    // If we failed to lock, backoff and try again.
+    if (!lock_result.has_value()) {
+      return ktl::nullopt;
+    }
+
+    // Great, we have locked all of the threads we need to lock.  Finalize our
+    // transaction, then update our bookkeeping and send the threads off to the
+    // scheduler to finish unblocking.
+    ChainLockTransaction::ActiveRef().Finalize();
+    DEBUG_ASSERT(lock_result->count > 0);
+    DEBUG_ASSERT(!lock_result->list.is_empty());
+
+    Thread& first_wake = lock_result->list.front();
+    first_wake.get_lock().AssertHeld();
+
+    if (first_wake.state() == THREAD_BLOCKED_READ_LOCK) {
+      ktl::atomic_ref(state_.state_)
+          .fetch_add((-kBrwLockWaiter + kBrwLockReader) * lock_result->count,
+                     ktl::memory_order_acq_rel);
+      Scheduler::Unblock(ktl::move(lock_result->list));
+      return ResourceOwnership::Reader;
+    } else {
+      DEBUG_ASSERT(first_wake.state() == THREAD_BLOCKED);
+      DEBUG_ASSERT(lock_result->count == 1);
+      ktl::atomic_ref(state_.state_)
+          .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acq_rel);
+      Scheduler::Unblock(ktl::move(lock_result->list));
       return ResourceOwnership::Normal;
     }
   }
@@ -153,7 +264,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
 
   // Remember the last call to current_ticks.
   zx_ticks_t now_ticks = current_ticks();
-  Thread* current_thread = Thread::Current::Get();
+  Thread* const current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, now_ticks);
 
   const zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION;
@@ -181,40 +292,102 @@ void BrwLock<PI>::ContendedReadAcquire() {
     now_ticks = current_ticks();
   } while (now_ticks < spin_until_ticks);
 
-  // In the case where we wake other threads up we need them to not run until we're finished
-  // holding the thread_lock, so disable local rescheduling.
-  AnnotatedAutoPreemptDisabler preempt_disable;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  // Enter our wait queue's lock and figure out what to do next.  We don't really know what we need
+  // to do yet, so we need to be prepared for needing to back off and try again.
+  ChainLockTransactionEagerReschedDisableAndIrqSave clt{
+      CLT_TAG("BrwLock<PI>::ContendedReadAcquire")};
+  for (;; clt.Relax()) {
+    wait_.get_lock().AcquireUnconditionally();
 
-  // Remove our optimistic reader from the count, and put a waiter on there instead.
-  uint64_t prev = ktl::atomic_ref(state_.state_)
-                      .fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
-  // If there is a writer then we just block, they will wake us up
-  if (StateHasWriter(prev)) {
-    Block(false);
-    return;
-  }
-  // If we raced and there is in fact no one waiting then we can switch to
-  // having the lock
-  if (!StateHasWaiters(prev)) {
-    ktl::atomic_ref(state_.state_)
-        .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
-    return;
-  }
-  // If there are no current readers then we need to wake somebody up
-  if (StateReaderCount(prev) == 1) {
-    // See the comment in BrwLock<PI>::Block for why this eager reschedule
-    // disabled is important.
-    AutoEagerReschedDisabler eager_resched_disabler;
-    if (Wake() == ResourceOwnership::Reader) {
-      // Join the reader pool.
-      ktl::atomic_ref(state_.state_)
-          .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
+    auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
+      ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();
+
+      if (maybe_lock_details.has_value()) {
+        clt.Finalize();
+        current_thread->get_lock().AssertAcquired();
+        Block(current_thread, ktl::move(maybe_lock_details).value(), false);
+        return true;
+      } else {
+        // Back off and try again.
+        wait_.get_lock().Release();
+        return false;
+      }
+    };
+
+    constexpr uint64_t kReaderToWaiter = kBrwLockWaiter - kBrwLockReader;
+    constexpr uint64_t kWaiterToReader = kBrwLockReader - kBrwLockWaiter;
+
+    // Before blocking, remove our optimistic reader from the count,
+    // and put a waiter on there instead.
+    const uint64_t prev =
+        ktl::atomic_ref(state_.state_).fetch_add(kReaderToWaiter, ktl::memory_order_relaxed);
+
+    if (StateHasWriter(prev)) {
+      // Try to grab all of our needed locks and block.  If we succeed, return, otherwise loop
+      // around and try again.
+      if (TryBlock()) {
+        return;
+      }
+      // Make sure to convert our waiter back to an optimistic reader
+      ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
+      continue;
+    }
+
+    // If we raced and there is in fact no one waiting then we can switch to
+    // having the lock
+    if (!StateHasWaiters(prev)) {
+      ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
+      wait_.get_lock().Release();
       return;
     }
-  }
 
-  Block(false);
+    // If there are no current readers then we need to wake somebody up
+    if (StateReaderCount(prev) == 1) {
+      ktl::optional<ResourceOwnership> maybe_ownership = TryWake();
+      const bool woke_someone{maybe_ownership.has_value()};
+
+      // Convert our waiter count back to a reader count.  If we woke a writer instead of a reader,
+      // then this is an "optimistic" count, and we need to drop our locks before looping around to
+      // try again.  Otherwise, if we woke readers, then we are now a member of the reader pool and
+      // can return.
+      // drop the locks and loop back around to try again.
+      if (woke_someone) {
+        if (maybe_ownership.value() == ResourceOwnership::Reader) {
+          ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_acquire);
+          wait_.get_lock().Release();
+          return;
+        }
+      }
+
+      // Need to back off and try again.  If we successfully woke someone, then
+      // our transaction was finalized and we need restart it before going
+      // again.
+      ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
+      wait_.get_lock().Release();
+      if (woke_someone) {
+        clt.Restart(CLT_TAG("BrwLock<PI>::ContendedReadAcquire (restart)"));
+      }
+      continue;
+    }
+
+    // So, at this point, we know that when we converted our optimistic reader count to a writer,
+    // the state which was there indicated
+    //
+    // ++ There were no writers.
+    // ++ There were waiters (or at least threads trying to block).
+    // ++ There was at least one other thread trying to become a reader (their count is optimistic).
+    //
+    // Try to join the blocking pool.  Eventually the final optimistic reader should attempt to wake
+    // the threads who have actually managed to block, waking either a writer or a set of readers as
+    // needed.
+
+    if (TryBlock()) {
+      return;
+    }
+
+    // We failed to block, restore our optimistic reader count, drop our locks, and try again.
+    ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
+  }
 }
 
 template <BrwLockEnablePi PI>
@@ -250,40 +423,96 @@ void BrwLock<PI>::ContendedWriteAcquire() {
     now_ticks = current_ticks();
   } while (now_ticks < spin_until_ticks);
 
-  // In the case where we wake other threads up we need them to not run until we're finished
-  // holding the thread_lock, so disable local rescheduling.
-  AnnotatedAutoPreemptDisabler preempt_disable;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  // Enter our wait queue's lock and figure out what to do next.  We don't really know what we need
+  // to do yet, so we need to be prepared for needing to back off and try again.
+  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("BrwLock<PI>::ContendedWriteAcquire")};
+  for (;; clt.Relax()) {
+    wait_.get_lock().AcquireUnconditionally();
 
-  // Mark ourselves as waiting
-  uint64_t prev =
-      ktl::atomic_ref(state_.state_).fetch_add(kBrwLockWaiter, ktl::memory_order_relaxed);
-  // If there is a writer then we just block, they will wake us up
-  if (StateHasWriter(prev)) {
-    Block(true);
-    return;
-  }
-  if (!StateHasReaders(prev)) {
+    auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
+      ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();
+
+      if (maybe_lock_details.has_value()) {
+        // We got all of the locks we need, and are already marked as waiting.
+        // Drop into the block operation, when we wake again, the lock should
+        // have been assigned to us.
+        clt.Finalize();
+        current_thread->get_lock().AssertAcquired();
+        Block(current_thread, ktl::move(maybe_lock_details).value(), true);
+        return true;
+      } else {
+        // Remove our speculative waiter count, then back off and try again.
+        ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockWaiter, ktl::memory_order_relaxed);
+        wait_.get_lock().Release();
+        return false;
+      }
+    };
+
+    // There were either readers or writers just as we were attempting to
+    // acquire the lock.  Now that we are on the slow path and have obtained the
+    // queue lock, mark ourselves as a speculative waiter, then re-examine what
+    // the state of the BRW lock was as we did so.
+    const uint64_t prev =
+        ktl::atomic_ref(state_.state_).fetch_add(kBrwLockWaiter, ktl::memory_order_relaxed);
+
+    // If there were still readers or writers when we marked ourselves as
+    // waiting, we need to try to block.  If we fail to block (because of a
+    // locking conflict), we need to remove our speculative waiter count and try
+    // again.  TryBlock has already dropped the queue lock.
+    if (StateHasWriter(prev) || StateHasReaders(prev)) {
+      if (TryBlock()) {
+        return;
+      }
+      continue;
+    }
+
+    // OK, there were no readers, no writers.  Were there waiters when we tried
+    // to add ourselves to the waiter pool?
     if (!StateHasWaiters(prev)) {
+      // There were no waiters, we are done acquiring locks.
+      clt.Finalize();
+
+      // Since we have flagged ourselves as a speculative waiter, no one else
+      // can currently grab the lock for write without following the slow path
+      // and obtaining the queue lock, which we currently hold.  So, we are free
+      // to simply declare ourselves the owner of the BRW lock, convert our
+      // waiter status to writer, then get out.
       if constexpr (PI == BrwLockEnablePi::Yes) {
         ktl::atomic_ref(state_.writer_).store(Thread::Current::Get(), ktl::memory_order_relaxed);
       }
-      // Must have raced previously as turns out there's no readers or
-      // waiters, so we can convert to having the lock
       ktl::atomic_ref(state_.state_)
-          .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
+          .fetch_add(kBrwLockWriter - kBrwLockWaiter, ktl::memory_order_acq_rel);
+      wait_.get_lock().Release();
       return;
-    } else {
-      // There's no readers, but someone already waiting, wake up someone
-      // before we ourselves block
+    }
+
+    // OK, it looks like there were no readers or writers, but there were
+    // waiters who were not us.
+    if (TryWake().has_value()) {
+      // We succeeded in waking one or more threads, giving them the lock in the
+      // process.  Since someone else now owns the lock we need to try to block.
+      // If we succeed, then when we wake up, we should have been granted the
+      // lock and can just return.
       //
-      // See the comment in BrwLock<PI>::Block for why this eager reschedule
-      // disabled is important.
-      AutoEagerReschedDisabler eager_resched_disabler;
-      Wake();
+      // Note that TryWake finalized our transaction after it succeeded in
+      // obtaining the locks needed to wake up a thread.  We are still holding
+      // the wait queue's lock, but we need to restart the transaction before
+      // attempting to block (which will require holding a new set of locks).
+      clt.Restart(CLT_TAG("BrwLock<PI>::ContendedWriteAcquire (restart)"));
+      if (TryBlock()) {
+        return;
+      }
+
+      // We didn't manage to block, but TryBlock has removed our speculative
+      // wait count and dropped the queue lock for us, we don't need to do it
+      // here.
+    } else {
+      // We failed to wake anyone, remove our speculative wait count, drop the
+      // queue lock, and try again.
+      ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockWaiter, ktl::memory_order_relaxed);
+      wait_.get_lock().Release();
     }
   }
-  Block(true);
 }
 
 template <BrwLockEnablePi PI>
@@ -345,37 +574,83 @@ void BrwLock<PI>::ReleaseWakeup() {
   //
   // See the comment in BrwLock<PI>::Block for why this eager reschedule
   // disabled is important.
-  AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  ChainLockTransactionEagerReschedDisableAndIrqSave clt{
+      CLT_TAG("BrwLock<PI>::ContendedReadAcquire")};
+  for (;; clt.Relax()) {
+    bool finished{false};
+    wait_.get_lock().AcquireUnconditionally();
 
-  uint64_t count = ktl::atomic_ref(state_.state_).load(ktl::memory_order_relaxed);
-  if (StateHasWaiters(count) && !StateHasWriter(count) && !StateHasReaders(count)) {
-    Wake();
+    const uint64_t count = ktl::atomic_ref(state_.state_).load(ktl::memory_order_relaxed);
+    if (StateHasWaiters(count) && !StateHasWriter(count) && !StateHasReaders(count)) {
+      // If TryWake succeeds, it will finalize our transaction for us once it
+      // obtains all of the locks it needs.
+      finished = TryWake().has_value();
+    } else {
+      clt.Finalize();
+      finished = true;
+    }
+
+    wait_.get_lock().Release();
+    if (finished) {
+      break;
+    }
   }
 }
 
 template <BrwLockEnablePi PI>
 void BrwLock<PI>::ContendedReadUpgrade() {
   LOCK_TRACE_DURATION("ContendedReadUpgrade");
-  ContentionTimer timer(Thread::Current::Get(), current_ticks());
+  Thread* const current_thread = Thread::Current::Get();
+  ContentionTimer timer(current_thread, current_ticks());
 
-  AnnotatedAutoPreemptDisabler preempt_disable;
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("BrwLock<PI>::ContendedReadUpgrade")};
 
-  // Convert our reading into waiting
-  uint64_t prev = ktl::atomic_ref(state_.state_)
-                      .fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
-  if (StateHasExclusiveReader(prev)) {
-    if constexpr (PI == BrwLockEnablePi::Yes) {
-      ktl::atomic_ref(state_.writer_).store(Thread::Current::Get(), ktl::memory_order_relaxed);
+  auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
+    ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();
+
+    if (maybe_lock_details.has_value()) {
+      clt.Finalize();
+      current_thread->get_lock().AssertAcquired();
+      Block(current_thread, ktl::move(maybe_lock_details).value(), true);
+      return true;
+    } else {
+      // We failed to obtain the locks we needed.  Convert our waiter status
+      // back into a reader status, then drop the locks in order to try again.
+      ktl::atomic_ref(state_.state_)
+          .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
+      wait_.get_lock().Release();
+      return false;
     }
-    // There are no writers or readers. There might be waiters, but as we
-    // already have some form of lock we still have fairness even if we
-    // bypass the queue, so we convert our waiting into writing
-    ktl::atomic_ref(state_.state_)
-        .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
-  } else {
-    Block(true);
+  };
+
+  for (;; clt.Relax()) {
+    wait_.get_lock().AcquireUnconditionally();
+
+    // Convert reading state into waiting.  This way, if anyone else attempts to
+    // claim the BRW lock, they will encounter contention and need to obtain our
+    // OWQ's ChainLock lock in order to deal with it.
+    const uint64_t prev =
+        ktl::atomic_ref(state_.state_)
+            .fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
+
+    if (StateHasExclusiveReader(prev)) {
+      if constexpr (PI == BrwLockEnablePi::Yes) {
+        ktl::atomic_ref(state_.writer_).store(Thread::Current::Get(), ktl::memory_order_relaxed);
+      }
+      // There are no writers or readers. There might be waiters, but as we
+      // already have some form of lock we still have fairness even if we
+      // bypass the queue, so we convert our waiting into writing
+      ktl::atomic_ref(state_.state_)
+          .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
+
+      wait_.get_lock().Release();
+      return;
+    }
+
+    // Looks like we were not the only reader, so we need to try to block instead.
+    if (TryBlock()) {
+      return;
+    }
   }
 }
 

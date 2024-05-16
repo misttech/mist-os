@@ -199,10 +199,14 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         self.assertIsNone(r.clang_cxx_stdlibdir)
-        self.assertEqual(
-            r.dep_only_command,
-            list(r._rust_action.dep_only_command(r.local_depfile)),
-        )
+        dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles
+        (
+            internal_dep_command,
+            internal_aux_rspfiles,
+        ) = r._rust_action.dep_only_command_with_rspfiles(r.local_depfile)
+        self.assertEqual(dep_command, internal_dep_command)
+        self.assertEqual(aux_rspfiles, internal_aux_rspfiles)
+        self.assertEqual(aux_rspfiles, [])
 
         mocks = self.generate_prepare_mocks(
             depfile_contents=depfile_contents,
@@ -324,16 +328,24 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 auto_reproxy=False,
             )
 
-        mocks = self.generate_prepare_mocks(
-            depfile_contents=depfile_contents,
-            compiler_shlibs=[shlib_rel],
-        )
-        with contextlib.ExitStack() as stack:
-            for m in mocks:
-                stack.enter_context(m)
-            prepare_status = r.prepare()
+            mocks = self.generate_prepare_mocks(
+                depfile_contents=depfile_contents,
+                compiler_shlibs=[shlib_rel],
+            )
+            with contextlib.ExitStack() as stack:
+                for m in mocks:
+                    stack.enter_context(m)
+                prepare_status = r.prepare()
 
-        self.assertEqual(prepare_status, 0)  # success
+            self.assertEqual(prepare_status, 0)  # success
+
+            # Expect there was a temporary response file written next to the
+            # original one, also inside the temporary dir.
+            # It should be marked for cleanup.
+            self.assertTrue(
+                any(str(f).startswith(str(rsp)) for f in r._cleanup_files)
+            )
+
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
@@ -370,8 +382,9 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             working_dir=working_dir,
             auto_reproxy=False,
         )
-        self.assertIn("--foo=bar", r.dep_only_command)
-        self.assertNotIn("--local-only=--foo=bar", r.dep_only_command)
+        dep_command, _ = r.dep_only_command_with_rspfiles
+        self.assertIn("--foo=bar", dep_command)
+        self.assertNotIn("--local-only=--foo=bar", dep_command)
 
     def test_prepare_depfile(self):
         exec_root = Path("/home/project")

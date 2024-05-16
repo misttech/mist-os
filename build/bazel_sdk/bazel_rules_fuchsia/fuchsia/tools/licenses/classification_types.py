@@ -17,8 +17,17 @@ from typing import Any, Callable, ClassVar, Collection, Dict, Pattern, List
 class IdentifiedSnippet:
     """Information about a single license snippet (text part of a large license text)"""
 
-    # 'identified_as' value for unidentified snippets.
+    # Built-in 'identified_as' values.
     UNIDENTIFIED_IDENTIFICATION: ClassVar[str] = "[UNIDENTIFIED]"
+    IGNORABLE_IDENTIFICATION: ClassVar[str] = "[IGNORABLE]"
+    COPYRIGHT_IDENTIFICATION: ClassVar[str] = "[COPYRIGHT]"
+
+    # Condition for build-in identified_as
+    DEFAULT_CONDITION_BY_IDENTIFICATION: ClassVar[dict[str, str]] = {
+        UNIDENTIFIED_IDENTIFICATION: "unidentified",
+        IGNORABLE_IDENTIFICATION: "ignorable",
+        COPYRIGHT_IDENTIFICATION: "copyright",
+    }
 
     identified_as: str
     confidence: float
@@ -55,17 +64,9 @@ class IdentifiedSnippet:
     # A suggested override rule
     suggested_override_rule: "ConditionOverrideRule" = None
 
-    def create_empty(extracted_text_lines, condition) -> "IdentifiedSnippet":
-        return IdentifiedSnippet(
-            identified_as=IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION,
-            confidence=1.0,
-            start_line=1,
-            end_line=len(extracted_text_lines),
-            conditions=set([condition]),
-        )
-
     def from_identify_license_dict(
-        dictionary: Dict[str, Any], location: Any, default_condition: str
+        dictionary: Dict[str, Any],
+        location: Any,
     ) -> "IdentifiedSnippet":
         """
         Create a IdentifiedSnippet instance from a dictionary in the output format of
@@ -85,8 +86,13 @@ class IdentifiedSnippet:
         r = DictReader(dictionary, location)
 
         identified_as = r.get("Name")
-        if identified_as == "Unclassified":
-            identified_as = IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
+        match identified_as:
+            case "Unclassified":
+                identified_as = IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
+            case "Ignorable":
+                identified_as = IdentifiedSnippet.IGNORABLE_IDENTIFICATION
+            case "Copyright":
+                identified_as = IdentifiedSnippet.COPYRIGHT_IDENTIFICATION
 
         # Confidence could be an int or a float. Convert to a float.
         try:
@@ -97,7 +103,15 @@ class IdentifiedSnippet:
         # License classifier may return a string that is multiple conditions separated by ' '
         condition = r.get_or("Condition", expected_type=str, default=None)
         if not condition:
-            conditions = set([default_condition])
+            condition = (
+                IdentifiedSnippet.DEFAULT_CONDITION_BY_IDENTIFICATION.get(
+                    identified_as, None
+                )
+            )
+            assert (
+                condition
+            ), f"Condition not found and no default condition for identification {identified_as}"
+            conditions = set([condition])
         else:
             conditions = set(condition.split(" "))
 
@@ -206,11 +220,6 @@ class IdentifiedSnippet:
         checksum = md5(text.encode("utf-8")).hexdigest()
         return dataclasses.replace(
             self, snippet_text=text, snippet_checksum=checksum
-        )
-
-    def is_identified(self):
-        return (
-            self.identified_as != IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
         )
 
     def override_conditions(
@@ -603,7 +612,6 @@ class LicensesClassifications:
     def from_identify_license_output_json(
         identify_license_output_path: str,
         license_paths_by_license_id: Dict[str, str],
-        default_condition: str,
     ) -> "LicensesClassifications":
         json_output = json.load(open(identify_license_output_path, "r"))
 
@@ -642,7 +650,6 @@ class LicensesClassifications:
                         IdentifiedSnippet.from_identify_license_dict(
                             dictionary=match_json,
                             location=identify_license_output_path,
-                            default_condition=default_condition,
                         )
                     )
                     identifications_by_license_id[license_id].append(

@@ -10,6 +10,7 @@
 #include <lib/arch/intrin.h>
 #include <lib/backtrace.h>
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 #include <pow2.h>
@@ -310,7 +311,10 @@ bool set_migrate_fn_test() {
     Thread::MigrateStage next_stage = Thread::MigrateStage::Before;
     bool success = true;
   } migrate_state;
+
   worker->SetMigrateFn([&migrate_state](Thread* thread, Thread::MigrateStage stage) {
+    ChainLockTransaction::AssertActive();
+    thread->get_lock().AssertHeld();
     ++migrate_state.count;
 
     cpu_num_t current_cpu = arch_curr_cpu_num();
@@ -339,11 +343,6 @@ bool set_migrate_fn_test() {
         break;
       case Thread::MigrateStage::Exiting:
         break;
-    }
-
-    if (!thread_lock.IsHeld()) {
-      UNITTEST_FAIL_TRACEF("Expected the thread lock to be held.");
-      migrate_state.success = false;
     }
   });
   worker->Resume();
@@ -415,7 +414,8 @@ bool set_migrate_ready_threads_test() {
       thread_state state;
       cpu_num_t curr_cpu;
       {
-        Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        SingletonChainLockGuardIrqSave guard{worker->get_lock(),
+                                             CLT_TAG("set_migrate_ready_threads_test")};
         state = worker->state();
         curr_cpu = worker->scheduler_state().curr_cpu();
       }
@@ -446,7 +446,6 @@ bool set_migrate_ready_threads_test() {
 
 bool migrate_unpinned_threads_test() {
   BEGIN_TEST;
-
   cpu_mask_t active_cpus = mp_get_active_mask();
   if (active_cpus == 0 || ispow2(active_cpus)) {
     printf("Expected multiple CPUs to be active.\n");
@@ -454,38 +453,47 @@ bool migrate_unpinned_threads_test() {
   }
 
   const cpu_num_t kStartingCpu = 1;
-  struct Events {
-    AutounsignalEvent worker_started;
-    AutounsignalEvent event;
-  } events;
+  enum class TestState {
+    WaitingForWorkerStart,
+    WaitingForMigration,
+    MigrationDone,
+  };
+  ktl::atomic<TestState> test_state{TestState::WaitingForWorkerStart};
 
   // Setup the thread that will be migrated.
   auto worker_body = [](void* arg) -> int {
-    auto events = static_cast<Events*>(arg);
-    events->worker_started.Signal();
-    events->event.Wait();
+    ktl::atomic<TestState>& test_state = *(static_cast<ktl::atomic<TestState>*>(arg));
+
+    DEBUG_ASSERT(test_state.load() == TestState::WaitingForWorkerStart);
+    test_state.store(TestState::WaitingForMigration);
+    while (test_state.load() != TestState::MigrationDone) {
+      Thread::Current::SleepRelative(ZX_USEC(100));
+    }
     return 0;
   };
-  AutounsignalEvent* const event = &events.event;
-  auto fn = [event](Thread* thread, Thread::MigrateStage stage) {
-    thread_lock.AssertHeld();
-    event->SignalLocked();
+
+  auto fn = [&test_state](Thread* thread, Thread::MigrateStage stage) {
+    test_state.store(TestState::MigrationDone);
   };
-  Thread* worker = Thread::Create("worker", worker_body, &events, DEFAULT_PRIORITY);
+  Thread* worker = Thread::Create("worker", worker_body, &test_state, DEFAULT_PRIORITY);
   worker->SetSoftCpuAffinity(cpu_num_to_mask(kStartingCpu));
   worker->SetMigrateFn(fn);
   worker->Resume();
 
-  events.worker_started.Wait();
+  while (test_state.load() != TestState::WaitingForMigration) {
+    Thread::Current::SleepRelative(ZX_USEC(100));
+  }
 
-  // Setup the thread that will perform the migration.
-  auto migrate_body = []() TA_REQ(thread_lock) __NO_RETURN {
-    Thread* ct = Thread::Current::Get();
-    DEBUG_ASSERT(ct->scheduler_state().previous_thread() != nullptr);
-    ct->scheduler_state().previous_thread()->get_lock().AssertHeld();
+  // Setup the thread that will perform the migration.  Note that this is a
+  // trampoline function implementation.  It must call
+  // Scheduler::TrampolineLockHandoff to deal with dropping locks held across
+  // context switches while maintaining ChainLockTransaction invariants.
+  //
+  auto migrate_body = []() __NO_RETURN {
+    Scheduler::TrampolineLockHandoff();
     Scheduler::MigrateUnpinnedThreads();
     mp_set_curr_cpu_active(true);
-    Scheduler::LockHandoff();
+    arch_enable_ints();
     Thread::Current::Exit(0);
   };
   Thread* migrate = Thread::CreateEtc(nullptr, "migrate", nullptr, nullptr,
@@ -506,7 +514,7 @@ bool migrate_stress_test() {
   BEGIN_TEST;
 
   if (true) {
-    // TODO(https://fxbug.dev/42158849): Disabled until root cause of hangs on some hardware can be
+    // TODO(https://fxbug.dev/78695): Disabled until root cause of hangs on some hardware can be
     // determined.
     printf("Test disabled due to https://fxbug.dev/42158849\n");
     END_TEST;
@@ -861,7 +869,7 @@ bool backtrace_instance_method_test() {
   thread_state state = thread_state::THREAD_RUNNING;
   while (state != thread_state::THREAD_BLOCKED) {
     Thread::Current::SleepRelative(ZX_USEC(200));
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("backtrace_instance_method_test")};
     state = t->state();
   }
 

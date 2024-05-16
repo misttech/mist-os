@@ -661,6 +661,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     MapRange,
     DontNeed,
     AlwaysNeed,
+    Prefetch,
   };
 
   // Apply |op| to VMO mappings in the specified range of pages.

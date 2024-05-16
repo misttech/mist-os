@@ -172,9 +172,6 @@
                 "fuchsia.ultrasound.Factory",
                 "fuchsia.update.CommitStatusProvider",
                 "fuchsia.update.installer.Installer",
-                "fuchsia.weave.FactoryDataManager",
-                "fuchsia.weave.Provisioner",
-                "fuchsia.weave.Signer",
                 "fuchsia.web.ContextProvider",
                 "fuchsia.wlan.wlanix.Wlanix",
                 "google.cast.multizone.Leader",
@@ -188,9 +185,14 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via smart-trusted-apps.core_shard.cml
-            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
-            from: "parent/smart-trusted-apps",
+            // Routed to session-manager via trusted-apps.core_shard.cml
+            protocol: [
+                "fuchsia.weave.FactoryDataManager",
+                "fuchsia.weave.Provisioner",
+                "fuchsia.weave.Signer",
+                "google.cast.cryptokey.NamedKeyProvider",
+            ],
+            from: "parent/trusted-app-capabilities",
             to: "#session",
         },
         {

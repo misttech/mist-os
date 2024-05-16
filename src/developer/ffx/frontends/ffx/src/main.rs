@@ -5,8 +5,8 @@
 use argh::{ArgsInfo, FromArgs, SubCommands};
 use errors::ffx_error;
 use ffx_command::{
-    return_user_error, CliArgsInfo, Error, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession,
-    Optionality, Result, ToolRunner, ToolSuite,
+    return_bug, return_user_error, CliArgsInfo, Error, FfxCommandLine, FfxContext, FfxToolInfo,
+    MetricsSession, Optionality, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::{environment::ExecutableKind, EnvironmentContext};
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
@@ -114,13 +114,21 @@ impl ToolSuite for FfxSuite {
 
             let mut info = find_info_from_cmd(&args, &all_info.into());
 
-            // If info is none, then it is an external command (or an unknown command)
-            if info.is_none() {
-                let external_info = self.external_commands.get_args_info().await?;
-                info = find_info_from_cmd(&args, &external_info);
-            }
+            let args_info = match info {
+                Some(cli_info) => cli_info,
+                None => {
+                    // If info is none, then it is an external command (or an unknown command)
+                    let external_info = self.external_commands.get_args_info().await?;
+                    info = find_info_from_cmd(&args, &external_info);
+                    match info {
+                        Some(cli_info) => cli_info,
+                        None => {
+                            return_bug!("No internal or external args metadata found for {args:?}")
+                        }
+                    }
+                }
+            };
 
-            let args_info = info.ok_or(ffx_command::bug!("No args info found"))?;
             // add fake args to the command line for required parameters
             let cmd_args = match build_required_args(&args_info) {
                 Ok(fake_args) => fake_args,

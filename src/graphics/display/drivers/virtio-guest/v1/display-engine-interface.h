@@ -63,8 +63,6 @@ class DisplayEngineInterface {
   virtual void ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
                                   const config_stamp_t* banjo_config_stamp) = 0;
 
-  virtual void SetEld(display::DisplayId display_id, cpp20::span<const uint8_t> raw_eld) = 0;
-
   virtual zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId driver_buffer_collection_id) = 0;

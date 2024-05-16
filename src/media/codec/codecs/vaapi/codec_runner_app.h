@@ -8,6 +8,7 @@
 #include <fuchsia/mediacodec/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/interface_request.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/sys/cpp/component_context.h>
@@ -55,8 +56,9 @@ class CodecRunnerApp {
               // should be impossible to receive a second CodecFactory request.
               FX_DCHECK(!codec_factory_);
 
-              fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem;
-              component_context_->svc()->Connect(sysmem.NewRequest());
+              auto sysmem_result = component::Connect<fuchsia_sysmem2::Allocator>();
+              ZX_ASSERT(sysmem_result.is_ok());
+              auto sysmem = std::move(sysmem_result.value());
               codec_factory_ = std::make_unique<LocalSingleCodecFactory<Decoder, Encoder>>(
                   loop_.dispatcher(), std::move(sysmem), std::move(request),
                   [this](std::unique_ptr<CodecImpl> created_codec_instance) {

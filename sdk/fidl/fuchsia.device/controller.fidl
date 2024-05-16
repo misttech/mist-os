@@ -29,6 +29,14 @@ type DeviceSignal = strict bits : uint32 {
 };
 
 /// Interface for manipulating a device in a devhost
+///
+/// # Deprecation
+///
+/// This interface is moving to fuchsia.device.fs.
+/// Tracking bug: https://fxbug.dev/340316138
+/// Please use that version of this protocol.
+/// Also, see //sdk/fidl/fuchsia.device.fs/README.md
+/// for future plans for DevFS.
 closed protocol Controller {
     /// Connect to the underlying device's FIDL protocol.
     /// This connection will not be multiplexed with fuchsia.device.Controller

@@ -2177,8 +2177,8 @@ TEST(Pager, FailMultipleVmos) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo2, 0, &offset, &length));
 }
 
-// Tests failing a range overlapping with a page request.
-TEST(Pager, FailOverlappingRange) {
+// Tests failing a range overlapping with a page request when using commit.
+TEST(Pager, FailOverlappingRangeCommit) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2188,10 +2188,51 @@ TEST(Pager, FailOverlappingRange) {
 
   // End of the request range overlaps with the failed range.
   TestThread t1([vmo]() -> bool { return vmo->Commit(0, 2); });
-  // The entire request range overlaps with the failed range.
-  TestThread t2([vmo]() -> bool { return vmo->Commit(9, 2); });
   // The start of the request range overlaps with the failed range.
+  TestThread t2([vmo]() -> bool { return vmo->Commit(9, 2); });
+  // The entire request range overlaps with the failed range.
   TestThread t3([vmo]() -> bool { return vmo->Commit(5, 2); });
+
+  ASSERT_TRUE(t1.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 2, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(t2.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 9, 2, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(t3.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 5, 2, ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
+
+  ASSERT_TRUE(t1.WaitForFailure());
+  ASSERT_TRUE(t2.WaitForFailure());
+  ASSERT_TRUE(t3.WaitForFailure());
+
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+}
+
+// Tests failing a range overlapping with a page request when using vmo_read.
+TEST(Pager, FailOverlappingRangeRead) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr uint64_t kNumPages = 11;
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+
+  auto read_helper = [vmo](uint64_t page_offset, uint64_t page_count) -> bool {
+    uint8_t data[page_count * zx_system_get_page_size()];
+    return vmo->vmo().read(data, page_offset * zx_system_get_page_size(),
+                           page_count * zx_system_get_page_size()) == ZX_OK;
+  };
+
+  // End of the request range overlaps with the failed range.
+  TestThread t1([read_helper]() -> bool { return read_helper(0, 2); });
+  // The start of the request range overlaps with the failed range.
+  TestThread t2([read_helper]() -> bool { return read_helper(9, 2); });
+  // The entire request range overlaps with the failed range.
+  TestThread t3([read_helper]() -> bool { return read_helper(5, 2); });
 
   ASSERT_TRUE(t1.Start());
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 2, ZX_TIME_INFINITE));
@@ -3635,6 +3676,65 @@ TEST(Pager, PageRequestBatchingChecksAncestorPages) {
   ASSERT_TRUE(pager.SupplyPages(root_vmo, 3, 2));
 
   ASSERT_TRUE(t3.Wait());
+}
+
+TEST(Pager, Prefetch) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  // Test prefetching directly on the root.
+  {
+    Vmo* root_vmo;
+    ASSERT_TRUE(pager.CreateVmo(1, &root_vmo));
+
+    TestThread t([&root_vmo] { return root_vmo->Prefetch(0, 1); });
+    ASSERT_TRUE(t.Start());
+
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 0, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 0, 1));
+    pager.ReleaseVmo(root_vmo);
+  }
+
+  // Prefetch through a slice.
+  {
+    Vmo* root_vmo;
+    ASSERT_TRUE(pager.CreateVmo(2, &root_vmo));
+    std::unique_ptr<Vmo> slice =
+        root_vmo->Clone(zx_system_get_page_size(), zx_system_get_page_size(), ZX_VMO_CHILD_SLICE);
+    ASSERT_NOT_NULL(slice);
+
+    TestThread t([&slice] { return slice->Prefetch(0, 1); });
+    ASSERT_TRUE(t.Start());
+
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 1, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 1, 1));
+    pager.ReleaseVmo(root_vmo);
+  }
+
+  // Prefetch through a clone.
+  {
+    Vmo* root_vmo;
+    ASSERT_TRUE(pager.CreateVmo(2, &root_vmo));
+    std::unique_ptr<Vmo> clone = root_vmo->Clone();
+    ASSERT_NOT_NULL(clone);
+
+    TestThread t([&clone] {
+      // Perform a copy-on-write to the first page of the clone.
+      *reinterpret_cast<volatile uint64_t*>(clone->base_addr()) = 42;
+      // Now prefetch the entire clone.
+      return clone->Prefetch(0, 2);
+    });
+    ASSERT_TRUE(t.Start());
+
+    // Should expect a read for the copy-on-write page first.
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 0, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 0, 1));
+    // Now expect a read for just the second page due to the prefetch. Even if the first page got
+    // evicted due to a race, we still should not see a request for it because the clone has a CoW
+    // view of the first page, and so it should not be requested.
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 1, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 1, 1));
+  }
 }
 
 }  // namespace pager_tests

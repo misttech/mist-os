@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for the perf metric publishing code."""
 
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 import json
 import os
 import random
@@ -100,6 +100,21 @@ _MISMATCH_METRICS_FUCHSIA_PERF = json.dumps(
 )
 
 
+class Validator:
+    """Class for custom call arg validation."""
+
+    def __init__(self, validator: Callable[[str], bool]):
+        self.validator = validator
+
+    def __eq__(self, comparand: Any) -> bool:
+        return self.validator(comparand)
+
+
+_CATAPULT_CONVERTER_VALIDATOR = Validator(
+    lambda x: x.endswith("catapult_converter")
+)
+
+
 class CatapultConverterTest(unittest.TestCase):
     """Catapult converter metric publishing tests"""
 
@@ -191,7 +206,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -255,7 +270,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -297,7 +312,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -340,7 +355,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -402,7 +417,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -444,7 +459,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -544,7 +559,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                os.path.join(self._temp_dir.name, "catapult_converter"),
+                _CATAPULT_CONVERTER_VALIDATOR,
                 "--input",
                 self._expected_input_path,
                 "--output",

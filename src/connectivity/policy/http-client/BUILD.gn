@@ -41,10 +41,7 @@ network_unified_binary("http_client") {
 fuchsia_component_manifest("manifest") {
   component_name = "http-client"
   manifest = "meta/http_client.cml"
-  restricted_features = [
-    "delivery_type",
-    "config_capabilities",
-  ]
+  restricted_features = [ "delivery_type" ]
 }
 
 network_unified_binary_regular_and_gub_components("component") {

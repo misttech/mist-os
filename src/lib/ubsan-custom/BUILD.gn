@@ -36,6 +36,14 @@ config("no-ubsan") {
   }
 }
 
+# Not all code compiled in sensitive places is as fastidious with explicit
+# casts for intended integer truncattion cases as the Fuchsia codebase.
+config("allow-implicit-integer-truncation") {
+  if (!is_gcc) {
+    cflags = [ "-fno-sanitize=implicit-integer-truncation" ]
+  }
+}
+
 # This should only be in the deps of a source_set() for the single source file
 # that does `#include <lib/ubsan-custom/handlers.h>`.
 source_set("handlers") {

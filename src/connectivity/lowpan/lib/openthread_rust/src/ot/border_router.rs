@@ -4,6 +4,11 @@
 
 use crate::ot::WrongSize;
 use crate::prelude_internal::*;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fuchsia_sync::Mutex;
+use std::sync::Arc;
+use std::task::Waker;
 
 /// Iterator type for external routes.
 #[allow(missing_debug_implementations)]
@@ -72,6 +77,16 @@ pub trait BorderRouter {
     /// Functional equivalent of
     /// [`otsys::otBorderRoutingDhcp6PdGetState`](crate::otsys::otBorderRoutingDhcp6PdGetState).
     fn border_routing_dhcp6_pd_get_state(&self) -> BorderRoutingDhcp6PdState;
+
+    /// Functional equivalent of
+    /// [`otsys::otBorderRoutingDhcp6PdSetRequestCallback`](crate::otsys::otBorderRoutingDhcp6PdSetRequestCallback).
+    fn border_routing_dhcp6_pd_set_request_fn<'a, F>(&'a self, f: Option<F>)
+    where
+        F: FnMut(BorderRoutingDhcp6PdState) + 'a;
+
+    /// Get the DHCPv6 PD state change stream
+    fn border_routing_dhcp6_pd_state_change_stream(&self)
+        -> BorderRoutingDhcp6PdStateChangedStream;
 
     /// Functional equivalent of
     /// [`otsys::otBorderRoutingGetPdOmrPrefix`](crate::otsys::otBorderRoutingGetPdOmrPrefix).
@@ -165,6 +180,19 @@ impl<T: BorderRouter + Boxable> BorderRouter for ot::Box<T> {
         self.as_ref().border_routing_dhcp6_pd_get_state()
     }
 
+    fn border_routing_dhcp6_pd_set_request_fn<'a, F>(&'a self, f: Option<F>)
+    where
+        F: FnMut(BorderRoutingDhcp6PdState) + 'a,
+    {
+        self.as_ref().border_routing_dhcp6_pd_set_request_fn(f)
+    }
+
+    fn border_routing_dhcp6_pd_state_change_stream(
+        &self,
+    ) -> BorderRoutingDhcp6PdStateChangedStream {
+        self.as_ref().border_routing_dhcp6_pd_state_change_stream()
+    }
+
     fn border_routing_get_pd_omr_prefix(&self) -> Result<ot::BorderRoutingPrefixTableEntry> {
         self.as_ref().border_routing_get_pd_omr_prefix()
     }
@@ -246,6 +274,74 @@ impl BorderRouter for Instance {
         .unwrap_or(BorderRoutingDhcp6PdState::Disabled)
     }
 
+    fn border_routing_dhcp6_pd_set_request_fn<'a, F>(&'a self, f: Option<F>)
+    where
+        F: FnMut(BorderRoutingDhcp6PdState) + 'a,
+    {
+        unsafe extern "C" fn _ot_border_routing_dhcp6_pd_state_change_callback<
+            'a,
+            F: FnMut(BorderRoutingDhcp6PdState) + 'a,
+        >(
+            state: otBorderRoutingDhcp6PdState,
+            context: *mut ::std::os::raw::c_void,
+        ) {
+            trace!("_ot_border_routing_dhcp6_pd_state_change_callback");
+
+            // Convert `otBorderRoutingDhcp6PdState` to `BorderRoutingDhcp6PdState`
+            let state = BorderRoutingDhcp6PdState::from(state);
+
+            // Reconstitute a reference to our closure.
+            let sender = &mut *(context as *mut F);
+
+            sender(state)
+        }
+
+        let (fn_ptr, fn_box, cb): (_, _, otBorderRoutingRequestDhcp6PdCallback) = if let Some(f) = f
+        {
+            let mut x = Box::new(f);
+
+            (
+                x.as_mut() as *mut F as *mut ::std::os::raw::c_void,
+                Some(x as Box<dyn FnMut(BorderRoutingDhcp6PdState) + 'a>),
+                Some(_ot_border_routing_dhcp6_pd_state_change_callback::<F>),
+            )
+        } else {
+            (std::ptr::null_mut() as *mut ::std::os::raw::c_void, None, None)
+        };
+
+        unsafe {
+            otBorderRoutingDhcp6PdSetRequestCallback(self.as_ot_ptr(), cb, fn_ptr);
+
+            // Make sure our object eventually gets cleaned up.
+            // Here we must also transmute our closure to have a 'static lifetime.
+            // We need to do this because the borrow checker cannot infer the
+            // proper lifetime for the singleton instance backing, but
+            // this is guaranteed by the API.
+            self.borrow_backing().dhcp6pd_state_change_callback_fn.set(std::mem::transmute::<
+                Option<Box<dyn FnMut(BorderRoutingDhcp6PdState) + 'a>>,
+                Option<Box<dyn FnMut(BorderRoutingDhcp6PdState) + 'static>>,
+            >(fn_box));
+        }
+    }
+
+    fn border_routing_dhcp6_pd_state_change_stream(
+        &self,
+    ) -> BorderRoutingDhcp6PdStateChangedStream {
+        let state = Arc::new(Mutex::new((None, futures::task::noop_waker())));
+
+        let state_copy = state.clone();
+
+        self.border_routing_dhcp6_pd_set_request_fn(Some(
+            move |pd_state: BorderRoutingDhcp6PdState| {
+                let mut borrowed = state_copy.lock();
+                borrowed.0 = Some(pd_state);
+                borrowed.1.clone().wake();
+            },
+        ));
+
+        BorderRoutingDhcp6PdStateChangedStream(state)
+    }
+
     fn border_routing_get_pd_omr_prefix(&self) -> Result<ot::BorderRoutingPrefixTableEntry> {
         let mut ret: BorderRoutingPrefixTableEntry = Default::default();
         Error::from(unsafe {
@@ -323,6 +419,28 @@ impl BorderRouter for Instance {
                 Error::None => Some(ret),
                 err => panic!("Unexpected error from otBorderRouterGetNextOnMeshPrefix: {err:?}"),
             }
+        }
+    }
+}
+
+/// Stream for getting state changed events.
+#[derive(Debug, Clone)]
+pub struct BorderRoutingDhcp6PdStateChangedStream(
+    Arc<Mutex<(Option<BorderRoutingDhcp6PdState>, Waker)>>,
+);
+
+impl Stream for BorderRoutingDhcp6PdStateChangedStream {
+    type Item = BorderRoutingDhcp6PdState;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut state = self.0.lock();
+
+        state.1 = cx.waker().clone();
+
+        if let Some(pd_state) = state.0.take() {
+            Poll::Ready(Some(pd_state))
+        } else {
+            Poll::Pending
         }
     }
 }

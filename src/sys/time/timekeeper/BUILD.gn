@@ -140,7 +140,10 @@ fuchsia_unittest_package("timekeeper-tests") {
     "//src/connectivity/network/netstack3:component-dropin",
   ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }

@@ -161,8 +161,8 @@ type RunSuiteOptions = resource table {
 
 /// Options specifying the realm in which a test suite should be run. These options are
 /// used by clients that require non-hermetic realms or test realms with custom runners.
-/// See [https://fuchsia.dev/fuchsia-src/development/testing/components/create_test_realm?hl=en]
-/// and [https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#non-hermetic_tests]
+/// See [https://fuchsia.dev/fuchsia-src/development/testing/components/create_test_realm]
+/// and [https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework#non-hermetic_tests]
 /// for details.
 @available(added=HEAD)
 type RealmOptions = resource table {

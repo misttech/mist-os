@@ -159,7 +159,6 @@ shared_library("driver") {
     "//src/devices/serial/drivers/uart16550:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/serial/drivers/virtio-console:*",
-    "//src/devices/spi/drivers/spi:*",
     "//src/devices/sysmem/drivers/sysmem:*",
     "//src/devices/tee/drivers/optee:*",
     "//src/devices/temperature/drivers/shtv3:*",

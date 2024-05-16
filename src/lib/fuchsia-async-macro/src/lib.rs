@@ -124,7 +124,7 @@ fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStre
                     .unwrap_or(false)
             })
         {
-            return Err(Error::new(sig.ident.span(), "async entry must a 'main' or '#[test]'."));
+            return Err(Error::new(sig.ident.span(), "async entry must be named 'main' or be a '#[test]'."));
         }
         Ok(())
     })() {

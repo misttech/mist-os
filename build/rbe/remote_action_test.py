@@ -166,6 +166,40 @@ class DownloadFromStubPathTests(unittest.TestCase):
                 )
         self.assertEqual(subprocess_result.returncode, 0)
 
+    def test_stub_using_invoked_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            stub_path = tdp / "foo.exe"
+            stub_info = remote_action.DownloadStubInfo(
+                path=Path("some/where/else"),
+                type="file",
+                blob_digest="8712fed1/44",
+                action_digest="098761/145",
+                build_id="do-not-care",
+            )
+            stub_info.create(
+                working_dir_abs=tdp,
+                dest=stub_path,
+            )
+            with mock.patch.object(
+                remote_action.DownloadStubInfo,
+                "download",
+                return_value=cl_utils.SubprocessResult(0),
+            ) as mock_download:
+                subprocess_result = remote_action.download_from_stub_path(
+                    stub_path,
+                    downloader=None,  # not needed
+                    working_dir_abs=Path(td),
+                )
+            # Ensure that we use the invoked path,
+            # and not the path that is inside the stub_info.
+            mock_download.assert_called_once_with(
+                downloader=None,
+                working_dir_abs=tdp,
+                dest=stub_path,
+            )
+        self.assertEqual(subprocess_result.returncode, 0)
+
 
 class UndownloadTests(unittest.TestCase):
     def test_undownload_non_stub_ignored(self):

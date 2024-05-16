@@ -167,5 +167,14 @@
             },
             max_count: 100,
         },
+        {
+            // This is a broken transitional route, so it should see the default value.
+            from: "parent",
+            key: "my_uint16_default",
+            config: "fuchsia.config.MyUint16Default",
+            availability: "transitional",
+            type: "uint16",
+            default: 15,
+        },
     ],
 }

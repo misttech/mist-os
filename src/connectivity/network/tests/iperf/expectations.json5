@@ -9,13 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                // TODO(https://fxbug.dev/42066729): enable when Netstack3
-                // supports running iPerf in UDP mode.
-                "loopback_ns3_*::udp",
-            ],
-        },
     ],
 }

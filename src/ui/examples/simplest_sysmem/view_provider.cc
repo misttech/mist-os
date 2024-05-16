@@ -4,12 +4,13 @@
 
 #include "src/ui/examples/simplest_sysmem/view_provider.h"
 
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
+#include <zircon/rights.h>
 #include <zircon/status.h>
 
 #include <cstdint>
@@ -73,7 +74,7 @@ void ViewProviderImpl::CreateView2(fuchsia::ui::app::CreateView2Args args) {
     uint8_t* image_bytes = new uint8_t[total_bytes];
 
     GenerateColorBlockImage(image_width, image_height, image_bytes);
-    WriteToSysmem(image_bytes, image_width, image_height, fuchsia::sysmem::PixelFormatType::BGRA32);
+    WriteToSysmem(image_bytes, image_width, image_height, fuchsia::images2::PixelFormat::B8G8R8A8);
   }
 
   if (render_type_ == sysmem_example::RenderType::PNG) {
@@ -83,7 +84,7 @@ void ViewProviderImpl::CreateView2(fuchsia::ui::app::CreateView2Args args) {
     uint8_t* image_bytes;
     png_helper::LoadPngFromFile(&image_size, &image_bytes);
     WriteToSysmem(image_bytes, image_size.width, image_size.height,
-                  fuchsia::sysmem::PixelFormatType::R8G8B8A8);
+                  fuchsia::images2::PixelFormat::R8G8B8A8);
   }
 
   flatland_->Present(fuchsia::ui::composition::PresentArgs{});
@@ -91,61 +92,75 @@ void ViewProviderImpl::CreateView2(fuchsia::ui::app::CreateView2Args args) {
 
 void ViewProviderImpl::WriteToSysmem(uint8_t* write_values, uint32_t image_width,
                                      uint32_t image_height,
-                                     fuchsia::sysmem::PixelFormatType pixel_format) {
+                                     fuchsia::images2::PixelFormat pixel_format) {
   context_->svc()->Connect(sysmem_allocator_.NewRequest());
   context_->svc()->Connect(flatland_allocator_.NewRequest());
   sysmem_helper::BufferCollectionImportExportTokens ref_pair =
       sysmem_helper::BufferCollectionImportExportTokens::New();
 
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
-  zx_status_t status = sysmem_allocator_->AllocateSharedCollection(local_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_request;
+  allocate_request.set_token_request(local_token.NewRequest());
+  zx_status_t status = sysmem_allocator_->AllocateSharedCollection(std::move(allocate_request));
   FX_CHECK(status == ZX_OK) << "Cannot allocate shared collection: "
                             << zx_status_get_string(status);
 
-  status = local_token->Duplicate(std::numeric_limits<uint32_t>::max(), dup_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(dup_token.NewRequest());
+  status = local_token->Duplicate(std::move(dup_request));
   FX_CHECK(status == ZX_OK) << "Cannot duplicate token: " << zx_status_get_string(status);
-  status = local_token->Sync();
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = local_token->Sync(&sync_result);
+  FX_CHECK(sync_result.is_response());
 
   fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
   args.set_export_token(std::move(ref_pair.export_token));
-  args.set_buffer_collection_token(std::move(dup_token));
+
+  // BufferCollectionToken zircon handles are interchangeable between fuchsia::sysmem2
+  // and fuchsia::sysmem(1).
+  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+      dup_token.Unbind().TakeChannel()));
   args.set_usages(fuchsia::ui::composition::RegisterBufferCollectionUsages::DEFAULT);
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  status = sysmem_allocator_->BindSharedCollection(std::move(local_token),
-                                                   buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_request;
+  bind_request.set_token(std::move(local_token));
+  bind_request.set_buffer_collection_request(buffer_collection.NewRequest());
+  status = sysmem_allocator_->BindSharedCollection(std::move(bind_request));
   FX_CHECK(status == ZX_OK) << "Cannot bind shared collection: " << zx_status_get_string(status);
 
   const uint8_t kBytesPerPixel = 4;
-  buffer_collection->SetConstraints(
-      true, sysmem_helper::CreateDefaultConstraints(sysmem_helper::BufferConstraint{
-                1 /* buffer_count */,
-                image_width,
-                image_height,
-                kBytesPerPixel,
-                pixel_format,
-            }));
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest constraints_request;
+  constraints_request.set_constraints(
+      sysmem_helper::CreateDefaultConstraints(sysmem_helper::BufferConstraint{
+          .buffer_count = 1,
+          .image_width = image_width,
+          .image_height = image_height,
+          .bytes_per_pixel = kBytesPerPixel,
+          .pixel_format_type = pixel_format,
+      }));
+  buffer_collection->SetConstraints(std::move(constraints_request));
 
   fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(args), &result);
   FX_CHECK(!result.is_err()) << "register buffer collection errored.";
 
-  zx_status_t allocation_status;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-  status = buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
-  FX_CHECK(allocation_status == ZX_OK)
-      << "Cannot allocate buffer: " << zx_status_get_string(allocation_status);
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
+  FX_CHECK(wait_result.is_response());
   FX_CHECK(status == ZX_OK) << "WaitForBuffersAllocated failed with status: "
-                            << zx_status_get_string(allocation_status);
-  status = buffer_collection->Close();
+                            << zx_status_get_string(status);
+  status = buffer_collection->Release();
   FX_CHECK(status == ZX_OK);
 
   uint32_t buffer_collection_idx = 0;
+  const auto& buffer_collection_info = wait_result.response().buffer_collection_info();
   uint32_t bytes_per_row = fbl::round_up(
       std::max(image_width * kBytesPerPixel,
-               buffer_collection_info.settings.image_format_constraints.min_bytes_per_row),
-      buffer_collection_info.settings.image_format_constraints.bytes_per_row_divisor);
+               buffer_collection_info.settings().image_format_constraints().min_bytes_per_row()),
+      buffer_collection_info.settings().image_format_constraints().bytes_per_row_divisor());
 
   sysmem_helper::MapHostPointer(buffer_collection_info, buffer_collection_idx,
                                 [write_values, bytes_per_row, image_width, image_height](
@@ -173,11 +188,13 @@ void ViewProviderImpl::WriteToSysmem(uint8_t* write_values, uint32_t image_width
                                     }
                                   }
                                 });
-  if (buffer_collection_info.settings.buffer_settings.coherency_domain ==
-      fuchsia::sysmem::CoherencyDomain::RAM) {
-    buffer_collection_info.buffers[buffer_collection_idx].vmo.op_range(
-        ZX_VMO_OP_CACHE_CLEAN, 0, buffer_collection_info.settings.buffer_settings.size_bytes,
-        nullptr, 0);
+  if (buffer_collection_info.settings().buffer_settings().coherency_domain() ==
+      fuchsia::sysmem2::CoherencyDomain::RAM) {
+    buffer_collection_info.buffers()
+        .at(buffer_collection_idx)
+        .vmo()
+        .op_range(ZX_VMO_OP_CACHE_CLEAN, 0,
+                  buffer_collection_info.settings().buffer_settings().size_bytes(), nullptr, 0);
   }
 
   // Call flatland to show image

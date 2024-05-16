@@ -5,11 +5,11 @@
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
 use assembly_config_schema::{
-    assembly_config::{CompiledPackageDefinition, MainPackageDefinition},
+    assembly_config::{CompiledComponentDefinition, CompiledPackageDefinition},
     PackageSet,
 };
 use assembly_tool::Tool;
-use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
+use assembly_util::{DuplicateKeyError, FileEntry, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use serde::Serialize;
@@ -17,10 +17,24 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct CompiledPackageBuilder {
+    /// Name of the package to compile.
     pub name: String,
-    component_shards: BTreeMap<String, BTreeMap<String, Utf8PathBuf>>,
-    main_definition: Option<MainPackageDefinition>,
-    main_bundle_dir: Utf8PathBuf,
+
+    /// CML shards for the components to compile and add to the package.
+    /// First by component name, then by shard filename.
+    pub components: BTreeMap<String, BTreeMap<String, Utf8PathBuf>>,
+
+    /// Non-component files to add to the package.
+    pub contents: Vec<FileEntry<String>>,
+
+    /// Whether the contents of this package should go into bootfs.
+    /// Gated by allowlist -- please use this as a base package if possible.
+    ///
+    /// If never specified, the default value of 'false' will be used.
+    pub bootfs_package: Option<bool>,
+
+    /// Component includes dir for this package.  There can be only one.
+    pub includes_dir: Option<Utf8PathBuf>,
 }
 
 /// Builds `CompiledPackageDefinition`s which are specified for Assembly
@@ -34,9 +48,7 @@ impl CompiledPackageBuilder {
     ///
     /// # Arguments
     ///
-    /// * entry -- a reference to a [CompiledPackageDefinition]. Each package
-    ///     should have exactly one [MainPackageDefinition]. An error will be
-    ///     returned if a second is added.
+    /// * entry -- a reference to a [CompiledPackageDefinition].
     /// * bundle_dir -- location of this [CompiledPackageDefinition]'s AIB.
     ///     The locations of the files in the [CompiledPackageDefinition]
     ///     are defined relative to the bundle.
@@ -45,118 +57,94 @@ impl CompiledPackageBuilder {
         entry: &CompiledPackageDefinition,
         bundle_dir: impl AsRef<Utf8Path>,
     ) -> Result<&mut Self> {
-        let name = entry.name().to_string();
+        let name = entry.name.to_string();
 
         if name != self.name {
             bail!(
-                "PackageEntry name '{name}' does not match CompiledPackageDefinition name '{}'",
+                "Builder name '{}' does not match CompiledPackageDefinition name '{name}'",
                 &self.name
             );
         }
 
-        match entry {
-            CompiledPackageDefinition::MainDefinition(def) => {
-                if self.main_definition.is_some() {
-                    bail!("Duplicate main definition for package {name}");
-                }
-
-                self.main_definition = Some(def.clone());
-                self.main_bundle_dir = bundle_dir.as_ref().into();
-            }
-            CompiledPackageDefinition::Additional(def) => {
-                for (component_name, component_shards_to_add) in def.component_shards.clone() {
-                    // Get the existing shards for this component, or create a new container for them.
-                    let component_shards =
-                        self.component_shards.entry(component_name.clone()).or_default();
-
-                    // Attempt to add each of the component shards, using their filename (not their
-                    // full path) as the sorting key, so that they have a stable sort order as they
-                    // are moved around.
-                    for shard_path in component_shards_to_add {
-                        let filename = shard_path.file_name().ok_or_else(|| {
-                            anyhow!(
-                                "The component shard path does not have a filename: {}",
-                                shard_path
-                            )
-                        })?;
-                        component_shards
-                            .try_insert_unique(MapEntry(
-                                filename.to_string(),
-                                bundle_dir.as_ref().join(shard_path),
-                            ))
-                            .map_err(|shard| {
-                                anyhow!(
-                                    "Duplicate component shard found for {}/meta/{}.cm: {} \n          {}\n        and\n          {})",
-                                    &self.name,
-                                    &component_name,
-                                    shard.key(),
-                                    shard.previous_value(),
-                                    shard.new_value(),
-                                )
-                            })?;
+        if let Some(bootfs_package) = entry.bootfs_package {
+            match self.bootfs_package {
+                Some(existing_value) => {
+                    if bootfs_package != existing_value {
+                        bail!("CompiledPackageDefinitions are inconsistent about if '{name}' is a bootfs package.");
                     }
                 }
+                None => self.bootfs_package = Some(bootfs_package),
+            }
+        }
+
+        // Add the static package contents
+        for FileEntry { source, destination } in &entry.contents {
+            let rebased_entry = FileEntry {
+                source: bundle_dir.as_ref().join(source),
+                destination: destination.clone(),
+            };
+            self.contents.push(rebased_entry);
+        }
+
+        // Set the component includes dir for this package, if not already set.
+        if !entry.includes.is_empty() {
+            if let Some(existing_path) =
+                self.includes_dir.replace(bundle_dir.as_ref().join("compiled_packages/include"))
+            {
+                bail!("There can be only one AIB that provides a cml includes dir for a package, it was already set to: {existing_path}");
+            }
+        }
+
+        for CompiledComponentDefinition { component_name, shards } in &entry.components {
+            let component_shards = self.components.entry(component_name.clone()).or_default();
+
+            for shard_path in shards {
+                let filename = shard_path.as_utf8_pathbuf().file_name().ok_or_else(|| {
+                    anyhow!("The component shard path does not have a filename: {}", shard_path)
+                })?;
+                component_shards
+                .try_insert_unique(MapEntry(
+                    filename.to_string(),
+                    shard_path.as_utf8_pathbuf().clone(),
+                ))
+                .map_err(|shard| {
+                    anyhow!(
+                        "Duplicate component shard found for {}/meta/{}.cm: {} \n          {}\n        and\n          {}",
+                        &self.name,
+                        &component_name,
+                        shard.key(),
+                        shard.previous_value(),
+                        shard.new_value(),
+                    )
+                })?;
             }
         }
 
         Ok(self)
     }
 
-    fn validate(&self) -> Result<()> {
-        let main_definition = self
-            .main_definition
-            .as_ref()
-            .with_context(|| format!("main definition for package '{}' not found", &self.name))?
-            .clone();
-
-        for name in self.component_shards.keys() {
-            if !main_definition.components.contains_key(name) {
-                bail!(
-                    "component '{}' for package '{}' does not have a MainDefinition in any AIB",
-                    name,
-                    &self.name
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    fn build_component(
-        &self,
+    fn build_component<T: AsRef<Utf8Path>>(
+        shards: impl Iterator<Item = T>,
         cmc_tool: &dyn Tool,
+        component_includes_dir: &Option<Utf8PathBuf>,
         component_name: &String,
-        cml: &Utf8PathBuf,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<Utf8PathBuf> {
         let mut component_builder = ComponentBuilder::new(component_name);
-        component_builder.add_shard(self.main_bundle_dir.join(cml)).with_context(|| {
-            format!("Adding cml for component: '{component_name}' to package: '{}'", &self.name)
-        })?;
 
-        if let Some(cml_shards) = self.component_shards.get(component_name) {
-            for cml_shard in cml_shards.values() {
-                component_builder.add_shard(cml_shard.as_path()).with_context(|| {
-                    format!("Adding shard for: '{component_name}' to package '{}'", &self.name)
-                })?;
-            }
+        for cml_shard in shards {
+            component_builder.add_shard(cml_shard)?;
         }
 
-        component_builder.build(
-            &outdir,
-            cmc_tool,
-            self.main_bundle_dir.join("compiled_packages").join("include"),
-        )
+        component_builder.build(&outdir, component_includes_dir, cmc_tool)
     }
 
     /// Build the compiled package as a package
     fn build_package(
         &self,
         cmc_tool: &dyn Tool,
-        main_definition: &MainPackageDefinition,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<Utf8PathBuf> {
-        self.validate()?;
         let outdir = outdir.as_ref().join(&self.name);
 
         // Assembly-compiled packages are never produced by assembly tools from
@@ -165,10 +153,15 @@ impl CompiledPackageBuilder {
         let mut package_builder = PackageBuilder::new_platform_internal_package(&self.name);
         package_builder.repository("fuchsia.com");
 
-        for (component_name, cml) in &main_definition.components {
-            let component_manifest_path = &self
-                .build_component(cmc_tool, component_name, cml, &outdir)
-                .with_context(|| format!("building component {component_name}"))?;
+        for (component_name, shards) in &self.components {
+            let component_manifest_path = Self::build_component(
+                shards.values(),
+                cmc_tool,
+                &self.includes_dir,
+                component_name,
+                &outdir,
+            )
+            .with_context(|| format!("building component {component_name}"))?;
             let component_manifest_file_name =
                 component_manifest_path.file_name().context("component file name")?;
 
@@ -176,11 +169,8 @@ impl CompiledPackageBuilder {
             package_builder.add_file_to_far(component_path, component_manifest_path)?;
         }
 
-        for entry in &main_definition.contents {
-            package_builder.add_file_as_blob(
-                entry.destination.to_string(),
-                &self.main_bundle_dir.join(&entry.source),
-            )?;
+        for entry in &self.contents {
+            package_builder.add_file_as_blob(entry.destination.to_string(), &entry.source)?;
         }
 
         let package_manifest_path = outdir.join("package_manifest.json");
@@ -201,22 +191,21 @@ impl CompiledPackageBuilder {
         cmc_tool: &dyn Tool,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<(Utf8PathBuf, PackageSet)> {
-        let main_definition = &self.main_definition.as_ref().context("no main definition")?;
-        let package_set =
-            if main_definition.bootfs_package { PackageSet::Bootfs } else { PackageSet::Base };
-        Ok((self.build_package(cmc_tool, main_definition, outdir)?, package_set))
+        let package_set = if self.bootfs_package.unwrap_or_default() {
+            PackageSet::Bootfs
+        } else {
+            PackageSet::Base
+        };
+        Ok((self.build_package(cmc_tool, outdir)?, package_set))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_config_schema::assembly_config::AdditionalPackageContents;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
-    use assembly_util::{
-        CompiledPackageDestination, FileEntry, TestCompiledPackageDestination::ForTest,
-    };
+    use assembly_util::{CompiledPackageDestination, TestCompiledPackageDestination::ForTest};
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;
@@ -231,57 +220,63 @@ mod tests {
 
         compiled_package_builder
             .add_package_def(
-                &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
+                &CompiledPackageDefinition {
                     name: CompiledPackageDestination::Test(ForTest),
-                    components: BTreeMap::from([
-                        ("component1".into(), "cml1".into()),
-                        ("component2".into(), "cml2".into()),
-                    ]),
+                    components: vec![
+                        CompiledComponentDefinition {
+                            component_name: "component1".into(),
+                            shards: vec![outdir.join("cml1").into()],
+                        },
+                        CompiledComponentDefinition {
+                            component_name: "component2".into(),
+                            shards: vec![outdir.join("cml2").into()],
+                        },
+                    ],
                     contents: vec![FileEntry {
                         source: outdir.join("file1"),
                         destination: "file1".into(),
                     }],
-                    includes: Vec::default(),
-                    bootfs_package: false,
-                }),
+                    includes: Default::default(),
+                    bootfs_package: Default::default(),
+                },
                 outdir,
             )
             .unwrap()
             .add_package_def(
-                &CompiledPackageDefinition::Additional(AdditionalPackageContents {
+                &CompiledPackageDefinition {
                     name: CompiledPackageDestination::Test(ForTest),
-                    component_shards: BTreeMap::from([(
-                        "component2".into(),
-                        vec!["shard1".into()],
-                    )]),
-                }),
+                    components: vec![CompiledComponentDefinition {
+                        component_name: "component2".into(),
+                        shards: vec![outdir.join("shard1").into()],
+                    }],
+                    contents: Default::default(),
+                    includes: Default::default(),
+                    bootfs_package: Default::default(),
+                },
                 outdir,
             )
             .unwrap();
 
-        assert!(compiled_package_builder.main_definition.is_some());
         assert_eq!(
             compiled_package_builder,
             CompiledPackageBuilder {
                 name: "for-test".into(),
-                component_shards: BTreeMap::from([(
-                    "component2".into(),
-                    BTreeMap::from([("shard1".into(), outdir.join("shard1"))])
-                )]),
-                main_bundle_dir: outdir.into(),
-                main_definition: Some(MainPackageDefinition {
-                    name: CompiledPackageDestination::Test(ForTest),
-                    components: BTreeMap::from([
-                        ("component1".into(), "cml1".into()),
-                        ("component2".into(), "cml2".into()),
-                    ]),
-                    contents: vec![FileEntry {
-                        source: outdir.join("file1"),
-                        destination: "file1".into()
-                    }],
-                    includes: Vec::default(),
-                    bootfs_package: false,
-                })
+                components: BTreeMap::from([
+                    ("component1".into(), BTreeMap::from([("cml1".into(), outdir.join("cml1")),])),
+                    (
+                        "component2".into(),
+                        BTreeMap::from([
+                            ("cml2".into(), outdir.join("cml2")),
+                            ("shard1".into(), outdir.join("shard1"))
+                        ])
+                    )
+                ]),
+                contents: vec![FileEntry {
+                    source: outdir.join("file1"),
+                    destination: "file1".into()
+                }],
+                includes_dir: None,
+                bootfs_package: Default::default(),
             }
         );
     }
@@ -296,30 +291,39 @@ mod tests {
 
         compiled_package_builder
             .add_package_def(
-                &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
+                &CompiledPackageDefinition {
                     name: CompiledPackageDestination::Test(ForTest),
-                    components: BTreeMap::from([
-                        ("component1".into(), "cml1".into()),
-                        ("component2".into(), "cml2".into()),
-                    ]),
+                    components: vec![
+                        CompiledComponentDefinition {
+                            component_name: "component1".into(),
+                            shards: vec!["cml1".into()],
+                        },
+                        CompiledComponentDefinition {
+                            component_name: "component2".into(),
+                            shards: vec!["cml2".into()],
+                        },
+                    ],
                     contents: vec![FileEntry {
                         source: outdir.join("file1"),
                         destination: "file1".into(),
                     }],
-                    includes: Vec::default(),
-                    bootfs_package: false,
-                }),
+                    includes: Default::default(),
+                    bootfs_package: Default::default(),
+                },
                 outdir,
             )
             .unwrap()
             .add_package_def(
-                &CompiledPackageDefinition::Additional(AdditionalPackageContents {
+                &CompiledPackageDefinition {
                     name: CompiledPackageDestination::Test(ForTest),
-                    component_shards: BTreeMap::from([(
-                        "component2".into(),
-                        vec!["shard1".into()],
-                    )]),
-                }),
+                    components: vec![CompiledComponentDefinition {
+                        component_name: "component2".into(),
+                        shards: vec!["shard1".into()],
+                    }],
+                    contents: Default::default(),
+                    includes: Default::default(),
+                    bootfs_package: Default::default(),
+                },
                 outdir,
             )
             .unwrap();
@@ -344,13 +348,13 @@ mod tests {
         let mut compiled_package_builder = CompiledPackageBuilder::new("bar");
 
         let result = compiled_package_builder.add_package_def(
-            &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
+            &CompiledPackageDefinition {
                 name: CompiledPackageDestination::Test(ForTest),
-                components: BTreeMap::new(),
-                contents: Vec::default(),
-                includes: Vec::default(),
-                bootfs_package: false,
-            }),
+                components: Default::default(),
+                contents: Default::default(),
+                includes: Default::default(),
+                bootfs_package: Default::default(),
+            },
             "assembly/input/bundle/path/compiled_packages/include",
         );
 
@@ -362,64 +366,13 @@ mod tests {
         let mut compiled_package_builder = CompiledPackageBuilder::new("bar");
 
         let result = compiled_package_builder.add_package_def(
-            &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
+            &CompiledPackageDefinition {
                 name: CompiledPackageDestination::Test(ForTest),
-                components: BTreeMap::new(),
+                components: Default::default(),
                 contents: vec![FileEntry { source: "file1".into(), destination: "file1".into() }],
-                includes: Vec::default(),
-                bootfs_package: true,
-            }),
-            "assembly/input/bundle/path/compiled_packages/include",
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn validate_without_main_definition_returns_err() {
-        let mut compiled_package_builder = CompiledPackageBuilder::new("for-test");
-        compiled_package_builder
-            .add_package_def(
-                &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: CompiledPackageDestination::Test(ForTest),
-                    component_shards: BTreeMap::from([(
-                        "component2".into(),
-                        vec!["shard1".into()],
-                    )]),
-                }),
-                "assembly/input/bundle/path/compiled_packages/include",
-            )
-            .unwrap();
-
-        let result = compiled_package_builder.validate();
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn add_package_def_with_duplicate_main_definition_returns_err() {
-        let mut compiled_package_builder = CompiledPackageBuilder::new("for-test");
-        compiled_package_builder
-            .add_package_def(
-                &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: CompiledPackageDestination::Test(ForTest),
-                    components: BTreeMap::default(),
-                    contents: Vec::default(),
-                    includes: Vec::default(),
-                    bootfs_package: false,
-                }),
-                "assembly/input/bundle/path/compiled_packages/include",
-            )
-            .unwrap();
-
-        let result = compiled_package_builder.add_package_def(
-            &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: CompiledPackageDestination::Test(ForTest),
-                components: BTreeMap::default(),
-                contents: Vec::default(),
-                includes: Vec::default(),
-                bootfs_package: false,
-            }),
+                includes: Default::default(),
+                bootfs_package: Default::default(),
+            },
             "assembly/input/bundle/path/compiled_packages/include",
         );
 

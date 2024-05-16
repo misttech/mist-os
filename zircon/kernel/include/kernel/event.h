@@ -73,9 +73,9 @@ class Event {
     return WaitWorker(Deadline::no_slack(deadline), interruptible, 0);
   }
 
-  void Signal(zx_status_t wait_result = ZX_OK) TA_EXCL(thread_lock);
-  void SignalLocked() TA_REQ(thread_lock);
-  zx_status_t Unsignal() TA_EXCL(thread_lock);
+  void Signal(zx_status_t wait_result = ZX_OK) TA_EXCL(chainlock_transaction_token);
+  zx_status_t Unsignal();
+  bool is_signaled() const { return result_.load(ktl::memory_order_relaxed) != kNotSignaled; }
 
  protected:
   enum Flags : uint32_t {
@@ -85,20 +85,19 @@ class Event {
 
   // Only our AutounsignalEvent subclass can also access this, to keep the flags private.
   constexpr Event(bool initial, Flags flags)
-      : magic_(kMagic), result_(initial ? ZX_OK : kNotSignalled), flags_(flags) {}
+      : magic_(kMagic), result_(initial ? ZX_OK : kNotSignaled), flags_(flags) {}
 
  private:
-  zx_status_t WaitWorker(const Deadline& deadline, Interruptible interruptible, uint signal_mask);
-  void SignalInternal(zx_status_t wait_result) TA_REQ(thread_lock);
+  zx_status_t WaitWorker(const Deadline& deadline, Interruptible interruptible, uint signal_mask)
+      TA_EXCL(chainlock_transaction_token);
 
   static constexpr uint32_t kMagic = fbl::magic("evnt");
   uint32_t magic_;
 
-  static constexpr zx_status_t kNotSignalled = INT_MAX;
+  static constexpr zx_status_t kNotSignaled = INT_MAX;
   ktl::atomic<zx_status_t> result_;
 
   Flags flags_;
-
   WaitQueue wait_;
 };
 

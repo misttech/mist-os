@@ -70,7 +70,6 @@ rustc_library("config_schema") {
     "src/platform_config/forensics_config.rs",
     "src/platform_config/graphics_config.rs",
     "src/platform_config/icu_config.rs",
-    "src/platform_config/identity_config.rs",
     "src/platform_config/input_groups_config.rs",
     "src/platform_config/intl_config.rs",
     "src/platform_config/kernel_config.rs",

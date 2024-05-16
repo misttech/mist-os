@@ -101,6 +101,13 @@ inline constexpr auto Enum<CompressionStorageStrategy> = [](auto&& Switch) {
       .Case("tri_page", CompressionStorageStrategy::kTriPage);
 };
 
+template <>
+inline constexpr auto Enum<CheckFailAction> = [](auto&& Switch) {
+  return Switch  //
+      .Case("oops", CheckFailAction::kOops)
+      .Case("panic", CheckFailAction::kPanic);
+};
+
 #if BOOT_OPTIONS_GENERATOR || defined(__aarch64__)
 
 template <>

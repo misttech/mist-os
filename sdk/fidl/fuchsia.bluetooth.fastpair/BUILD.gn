@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.bluetooth.fastpair") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Bluetooth"
 
   sources = [ "provider.fidl" ]
 

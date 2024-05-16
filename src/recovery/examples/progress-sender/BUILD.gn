@@ -8,7 +8,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("progress-sender") {
   deps = [ ":package" ]
@@ -43,9 +42,4 @@ fuchsia_component("component") {
 fuchsia_package("package") {
   package_name = "progress-sender"
   deps = [ ":component" ]
-}
-
-# The core realm shard to be used by example users
-core_shard("progress-sender-core-shard") {
-  shard_file = "meta/progress-sender.core_shard.cml"
 }

@@ -69,6 +69,12 @@ fhcp_test_package("fhcp-sample-camera-test") {
         }
         tags = [ "fhcp-automated" ]
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
+        }
+        tags = [ "fhcp-automated" ]
+      },
     ]
   }
 }
@@ -96,6 +102,12 @@ fhcp_test_package("fhcp-sample-misc-test") {
         }
         tags = [ "fhcp-automated" ]
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
+        }
+        tags = [ "fhcp-automated" ]
+      },
     ]
   }
 }
@@ -120,6 +132,12 @@ fhcp_test_package("fhcp-sample-misc-manual-test") {
       {
         dimensions = {
           device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+        tags = [ "fhcp-manual" ]
+      },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
         }
         tags = [ "fhcp-manual" ]
       },

@@ -13,6 +13,7 @@
 #include <zircon/syscalls/object.h>
 
 #include <optional>
+#include <utility>
 
 #include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/exceptions/handler/component_lookup.h"
@@ -25,8 +26,6 @@ namespace forensics {
 namespace exceptions {
 namespace handler {
 namespace {
-
-using fuchsia::feedback::CrashReport;
 
 // Either resets the exception immediately if the process only has one thread or with a 5s delay
 // otherwise.
@@ -99,7 +98,7 @@ CrashReporter::CrashReporter(async_dispatcher_t* dispatcher,
                              zx::duration component_lookup_timeout)
     : dispatcher_(dispatcher),
       executor_(dispatcher_),
-      services_(services),
+      services_(std::move(services)),
       component_lookup_timeout_(component_lookup_timeout) {}
 
 void CrashReporter::Send(zx::exception exception, zx::process crashed_process,

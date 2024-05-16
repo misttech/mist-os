@@ -44,12 +44,13 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/clock-controller-ff63c000",
       "sys/platform/dwmac-ff3f0000",
       "sys/platform/ethernet-phy-ff634000",
-      "sys/platform/fuchsia-contiguous",
+      "sys/platform/fuchsia-sysmem",
       "sys/platform/gpio-controller-ff634400",
       "sys/platform/gpu-ffe40000",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
       "sys/platform/interrupt-controller-ffc01000",
+      "sys/platform/mmc-ffe03000",
       "sys/platform/mmc-ffe05000",
       "sys/platform/mmc-ffe07000",
       "sys/platform/nna-ff100000",
@@ -66,6 +67,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/temperature-sensor-ff634c00",
       "sys/platform/usb-ff400000",
       "sys/platform/usb-ff500000",
+      "sys/platform/video-decoder-ffd00000",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

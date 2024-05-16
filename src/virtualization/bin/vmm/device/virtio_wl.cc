@@ -5,7 +5,9 @@
 #include "src/virtualization/bin/vmm/device/virtio_wl.h"
 
 #include <drm_fourcc.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/images2/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fit/defer.h>
@@ -22,16 +24,16 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/virtualization/bin/vmm/bits.h"
 
-fuchsia::sysmem::PixelFormatType DrmFormatToSysmemFormat(uint32_t drm_format) {
+fuchsia::images2::PixelFormat DrmFormatToSysmemFormat(uint32_t drm_format) {
   switch (drm_format) {
     case DRM_FORMAT_ARGB8888:
     case DRM_FORMAT_XRGB8888:
-      return fuchsia::sysmem::PixelFormatType::BGRA32;
+      return fuchsia::images2::PixelFormat::B8G8R8A8;
     case DRM_FORMAT_ABGR8888:
     case DRM_FORMAT_XBGR8888:
-      return fuchsia::sysmem::PixelFormatType::R8G8B8A8;
+      return fuchsia::images2::PixelFormat::R8G8B8A8;
   }
-  return fuchsia::sysmem::PixelFormatType::INVALID;
+  return fuchsia::images2::PixelFormat::INVALID;
 }
 
 uint32_t MinBytesPerRow(uint32_t drm_format, uint32_t width) {
@@ -52,7 +54,7 @@ class Memory : public VirtioWl::Vfd {
  public:
   Memory(zx::unowned_handle handle, zx::vmo vmo, zx::eventpair token, uintptr_t addr, uint64_t size,
          zx::vmar* vmar, VirtioWl::VirtioImageInfo image_info,
-         fuchsia::sysmem::CoherencyDomain coherency_domain)
+         fuchsia::sysmem2::CoherencyDomain coherency_domain)
       : handle_(std::move(handle)),
         vmo_(std::move(vmo)),
         token_(std::move(token)),
@@ -96,13 +98,13 @@ class Memory : public VirtioWl::Vfd {
     zx::unowned_handle handle(token.is_valid() ? token.get() : vmo.get());
     return std::make_unique<Memory>(std::move(handle), std::move(vmo), std::move(token), addr, size,
                                     vmar, std::move(image_info),
-                                    fuchsia::sysmem::CoherencyDomain::CPU);
+                                    fuchsia::sysmem2::CoherencyDomain::CPU);
   }
 
   // Create a memory instance with Scenic import token.
   static std::unique_ptr<Memory> CreateWithImportToken(
       zx::vmo vmo, fuchsia::ui::composition::BufferCollectionImportToken import_token,
-      zx::vmar* vmar, uint32_t map_flags, fuchsia::sysmem::CoherencyDomain coherency_domain) {
+      zx::vmar* vmar, uint32_t map_flags, fuchsia::sysmem2::CoherencyDomain coherency_domain) {
     TRACE_DURATION("machina", "Memory::CreateWithImportToken");
 
     uint64_t size;
@@ -145,7 +147,7 @@ class Memory : public VirtioWl::Vfd {
   }
 
   void CacheClean() override {
-    if (coherency_domain_ == fuchsia::sysmem::CoherencyDomain::RAM) {
+    if (coherency_domain_ == fuchsia::sysmem2::CoherencyDomain::RAM) {
       zx_status_t status = vmo_.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, size_, nullptr, 0);
       if (status != ZX_OK) {
         FX_LOGS(ERROR) << "ZX_VMO_OP_CACHE_CLEAN failed: " << status;
@@ -164,7 +166,7 @@ class Memory : public VirtioWl::Vfd {
   const uint64_t size_;
   zx::vmar* const vmar_;
   const VirtioWl::VirtioImageInfo image_info_;
-  const fuchsia::sysmem::CoherencyDomain coherency_domain_;
+  const fuchsia::sysmem2::CoherencyDomain coherency_domain_;
 };
 
 // Vfd type that holds a wayland server connection.
@@ -287,7 +289,7 @@ class Pipe : public VirtioWl::Vfd {
 VirtioWl::VirtioWl(sys::ComponentContext* context) : DeviceBase(context) {}
 
 void VirtioWl::Start(fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
-                     fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+                     fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
                      fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
                      StartCallback callback) {
   auto result = WaylandServer::Create();
@@ -302,7 +304,7 @@ void VirtioWl::Start(fuchsia::virtualization::hardware::StartInfo start_info, zx
 void VirtioWl::StartWithWaylandServer(
     fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
     fidl::InterfaceHandle<fuchsia::wayland::Server> wayland_server,
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
     fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator,
     StartWithWaylandServerCallback callback) {
   remote_wayland_server_ = wayland_server.Bind();
@@ -313,13 +315,16 @@ void VirtioWl::StartWithWaylandServer(
 
 void VirtioWl::StartDevice(
     fuchsia::virtualization::hardware::StartInfo start_info, zx::vmar vmar,
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator,
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator,
     fidl::InterfaceHandle<fuchsia::ui::composition::Allocator> scenic_allocator) {
   PrepStart(std::move(start_info));
   vmar_ = std::move(vmar);
 
   sysmem_allocator_ = sysmem_allocator.BindSync();
-  sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+  fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.set_name(fsl::GetCurrentProcessName());
+  set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+  sysmem_allocator_->SetDebugClientInfo(std::move(set_debug_request));
   scenic_allocator_ = scenic_allocator.Bind();
 
   // Configure device queues.
@@ -775,8 +780,8 @@ void VirtioWl::HandleNewDmabuf(const virtio_wl_ctrl_vfd_new_t* request,
     return;
   }
 
-  fuchsia::sysmem::PixelFormatType pixel_format = DrmFormatToSysmemFormat(request_dmabuf.format);
-  if (pixel_format == fuchsia::sysmem::PixelFormatType::INVALID) {
+  fuchsia::images2::PixelFormat pixel_format = DrmFormatToSysmemFormat(request_dmabuf.format);
+  if (pixel_format == fuchsia::images2::PixelFormat::INVALID) {
     // Silent error as Sommelier use an invalid format to check for
     // DMABuf support.
     response->hdr.type = VIRTIO_WL_RESP_ERR;
@@ -786,21 +791,28 @@ void VirtioWl::HandleNewDmabuf(const virtio_wl_ctrl_vfd_new_t* request,
   uint32_t min_bytes_per_row = MinBytesPerRow(request_dmabuf.format, request_dmabuf.width);
 
   // Create single buffer collection.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token;
-  zx_status_t status = sysmem_allocator_->AllocateSharedCollection(local_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(local_token.NewRequest());
+  zx_status_t status =
+      sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "AllocateSharedCollection failed: " << status;
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
     return;
   }
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr scenic_token;
-  status = local_token->Duplicate(std::numeric_limits<uint32_t>::max(), scenic_token.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr scenic_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest duplicate_request;
+  duplicate_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  duplicate_request.set_token_request(scenic_token.NewRequest());
+  status = local_token->Duplicate(std::move(duplicate_request));
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to duplicate token: " << status;
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
     return;
   }
-  status = local_token->Sync();
+  fuchsia::sysmem2::Node_Sync_Result node_sync_result;
+  status = local_token->Sync(&node_sync_result);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to sync token: " << status;
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
@@ -818,7 +830,10 @@ void VirtioWl::HandleNewDmabuf(const virtio_wl_ctrl_vfd_new_t* request,
 
   fuchsia::ui::composition::RegisterBufferCollectionArgs args;
   args.set_export_token(std::move(export_token));
-  args.set_buffer_collection_token(std::move(scenic_token));
+  // Sysmem token channels serve both sysmem(1) and sysmem2 protocols, so we can convert here until
+  // this protocol has a sysmem2 token field.
+  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+      scenic_token.Unbind().TakeChannel()));
   scenic_allocator_->RegisterBufferCollection(
       std::move(args),
       [](fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result) {
@@ -827,9 +842,11 @@ void VirtioWl::HandleNewDmabuf(const virtio_wl_ctrl_vfd_new_t* request,
         }
       });
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  status = sysmem_allocator_->BindSharedCollection(std::move(local_token),
-                                                   buffer_collection.NewRequest());
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(local_token));
+  bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
+  status = sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "BindSharedCollection failed: " << status;
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
@@ -838,66 +855,77 @@ void VirtioWl::HandleNewDmabuf(const virtio_wl_ctrl_vfd_new_t* request,
 
   const char* kVmoName = "VirtioWl-DMABuf";
   constexpr uint32_t kNamePriority = 8;
-  buffer_collection->SetName(kNamePriority, kVmoName);
+  fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+  set_name_request.set_priority(kNamePriority);
+  set_name_request.set_name(kVmoName);
+  buffer_collection->SetName(std::move(set_name_request));
 
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
-  constraints.min_buffer_count = 1;
-  constraints.usage.cpu = fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints.ram_domain_supported = true;
-  constraints.buffer_memory_constraints.cpu_domain_supported = true;
-  constraints.image_format_constraints_count = 1;
-  fuchsia::sysmem::ImageFormatConstraints& image_constraints =
-      constraints.image_format_constraints[0];
-  image_constraints = fuchsia::sysmem::ImageFormatConstraints();
-  image_constraints.min_coded_width = request_dmabuf.width;
-  image_constraints.min_coded_height = request_dmabuf.height;
-  image_constraints.max_coded_width = request_dmabuf.width;
-  image_constraints.max_coded_height = request_dmabuf.height;
-  image_constraints.min_bytes_per_row = min_bytes_per_row;
-  image_constraints.color_spaces_count = 1;
-  image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
-  image_constraints.pixel_format.type = pixel_format;
-  image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
+  constraints.set_min_buffer_count(1);
+  auto& usage = *constraints.mutable_usage();
+  usage.set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN | fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
+  auto& bmc = *constraints.mutable_buffer_memory_constraints();
+  bmc.set_ram_domain_supported(true);
+  bmc.set_cpu_domain_supported(true);
+  auto& image_constraints_vec = *constraints.mutable_image_format_constraints();
+  auto& image_constraints = image_constraints_vec.emplace_back();
+  image_constraints.set_min_size({.width = request_dmabuf.width, .height = request_dmabuf.height});
+  image_constraints.set_max_size({.width = request_dmabuf.width, .height = request_dmabuf.height});
+  image_constraints.set_min_bytes_per_row(min_bytes_per_row);
+  image_constraints.set_color_spaces(std::vector{fuchsia::images2::ColorSpace::SRGB});
+  image_constraints.set_pixel_format(pixel_format);
+  image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
 
-  status = buffer_collection->SetConstraints(true, constraints);
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.set_constraints(std::move(constraints));
+
+  status = buffer_collection->SetConstraints(std::move(set_constraints_request));
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "SetConstraints failed: " << status;
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
     return;
   }
 
-  zx_status_t allocation_status;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
-  status = buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
-  if (status != ZX_OK || allocation_status != ZX_OK) {
-    FX_LOGS(ERROR) << "WaitForBuffersAllocated failed: " << status << ", " << allocation_status;
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "WaitForBuffersAllocated failed: " << status;
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
     return;
   }
+  if (wait_result.is_err()) {
+    if (wait_result.is_framework_err()) {
+      FX_LOGS(ERROR) << "WaitForBuffersAllocated failed: "
+                     << fidl::ToUnderlying(wait_result.framework_err());
+    } else {
+      FX_LOGS(ERROR) << "Buffer allocation failed: " << wait_result.err();
+    }
+    response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;
+    return;
+  }
+  auto& buffer_collection_info = *wait_result.response().mutable_buffer_collection_info();
 
   // Close must be called before closing the channel.
-  buffer_collection->Close();
+  buffer_collection->Release();
 
-  FX_CHECK(buffer_collection_info.buffer_count > 0);
-  FX_CHECK(buffer_collection_info.settings.has_image_format_constraints);
+  FX_CHECK(buffer_collection_info.buffers().size() > 0);
+  FX_CHECK(buffer_collection_info.settings().has_image_format_constraints());
 
-  fuchsia::sysmem::ImageFormatConstraints& actual_image_constraints =
-      buffer_collection_info.settings.image_format_constraints;
-  FX_CHECK(actual_image_constraints.pixel_format.type == image_constraints.pixel_format.type);
-  FX_CHECK(actual_image_constraints.pixel_format.has_format_modifier);
-  FX_CHECK(actual_image_constraints.pixel_format.format_modifier.value ==
-           fuchsia::sysmem::FORMAT_MODIFIER_LINEAR);
-  FX_CHECK(actual_image_constraints.bytes_per_row_divisor > 0);
+  const fuchsia::sysmem2::ImageFormatConstraints& actual_image_constraints =
+      buffer_collection_info.settings().image_format_constraints();
+  FX_CHECK(actual_image_constraints.pixel_format() == pixel_format);
+  FX_CHECK(actual_image_constraints.has_pixel_format_modifier());
+  FX_CHECK(actual_image_constraints.pixel_format_modifier() ==
+           fuchsia::images2::PixelFormatModifier::LINEAR);
+  FX_CHECK(actual_image_constraints.bytes_per_row_divisor() > 0);
 
-  uint32_t bytes_per_row = fbl::round_up(actual_image_constraints.min_bytes_per_row,
-                                         actual_image_constraints.bytes_per_row_divisor);
+  uint32_t bytes_per_row = fbl::round_up(actual_image_constraints.min_bytes_per_row(),
+                                         actual_image_constraints.bytes_per_row_divisor());
 
   std::unique_ptr<Memory> vfd = Memory::CreateWithImportToken(
-      std::move(buffer_collection_info.buffers[0].vmo), std::move(import_token), &vmar_,
-      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
-      buffer_collection_info.settings.buffer_settings.coherency_domain);
+      std::move(*buffer_collection_info.mutable_buffers()->at(0).mutable_vmo()),
+      std::move(import_token), &vmar_, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+      buffer_collection_info.settings().buffer_settings().coherency_domain());
   if (!vfd) {
     FX_LOGS(ERROR) << "Failed to create memory instance";
     response->hdr.type = VIRTIO_WL_RESP_OUT_OF_MEMORY;

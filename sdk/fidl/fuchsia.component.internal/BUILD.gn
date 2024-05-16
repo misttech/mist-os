@@ -13,5 +13,6 @@ fidl("fuchsia.component.internal") {
     "//sdk/fidl/fuchsia.component",
     "//sdk/fidl/fuchsia.component.decl",
   ]
+
   sdk_category = "internal"
 }

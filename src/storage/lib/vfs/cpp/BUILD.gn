@@ -6,6 +6,9 @@ import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
 
+# TODO(https://fxbug.dev/336617685): Once //sdk/lib/vfs is available for public use, this library
+# should be restricted with a visibility list. Most targets only use functionality that the SDK VFS
+# library provides. The SDK VFS will form the API we commit to for pseudo-filesystems.
 static_library("cpp") {
   friend = [ ":*" ]
 

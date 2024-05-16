@@ -166,7 +166,12 @@ async fn handle_runner_request(
                     (
                         None,
                         None,
-                        zx::Status::from_raw(fcomponent::Error::InstanceCannotStart as i32),
+                        zx::Status::from_raw(
+                            fcomponent::Error::InstanceCannotStart
+                                .into_primitive()
+                                .try_into()
+                                .expect("error code fits in i32"),
+                        ),
                     )
                 }
             };

@@ -10,7 +10,6 @@
 
 #include <kernel/lockdep.h>
 #include <kernel/spinlock.h>
-#include <kernel/thread_lock.h>
 
 namespace {
 
@@ -20,8 +19,12 @@ namespace {
 bool SerialWriteHoldingThreadLockTest() {
   BEGIN_TEST;
 
+  // TODO(johngro): Do we still need this test, or something similar, now that the thread lock is
+  // gone?
+#if 0  // THREAD LOCK BREAKUP TODO
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
   serial_write("this is a test message from SerialWriteHoldingThreadLockTest\n");
+#endif
 
   END_TEST;
 }

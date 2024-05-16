@@ -225,9 +225,8 @@ DirectPhysicalAspace::~DirectPhysicalAspace() {
 }
 
 VmAspace& switch_aspace(VmAspace& aspace) {
-  auto* thread = Thread::Current::Get();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  VmAspace* old_aspace = thread->switch_aspace(&aspace);
+  InterruptDisableGuard irqd;
+  VmAspace* old_aspace = Thread::Current::switch_aspace(&aspace);
   vmm_context_switch(old_aspace, &aspace);
   return *old_aspace;
 }

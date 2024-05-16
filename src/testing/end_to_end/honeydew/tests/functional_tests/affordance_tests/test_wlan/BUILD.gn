@@ -14,7 +14,7 @@ if (is_host) {
       "//third_party/antlion",
     ]
     transport = "fuchsia-controller-preferred"
-    environments = [ vim3_env ]
+    environments = [ wlan_vim3_ap_env ]
   }
 
   python_mobly_test("wlan_test_sl4f") {
@@ -25,7 +25,7 @@ if (is_host) {
       "//third_party/antlion",
     ]
     transport = "fuchsia-controller-preferred"
-    environments = [ vim3_env ]
+    environments = [ wlan_vim3_ap_env ]
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
   }
@@ -38,4 +38,32 @@ if (is_host) {
       ":wlan_test_sl4f($host_toolchain)",
     ]
   }
+
+  # Test groups for WLAN.
+  group("core_vim3_stable_sl4f_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("core_vim3_unstable_sl4f_tests") {
+    testonly = true
+    public_deps = [
+      ":wlan_policy_test_sl4f($host_toolchain)",
+      ":wlan_test_sl4f($host_toolchain)",
+    ]
+  }
+}
+
+group("core_vim3_staging_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":core_vim3_stable_sl4f_tests",
+    ":core_vim3_unstable_sl4f_tests",
+  ]
+}
+
+# Package groups for WLAN.
+group("wlan_packages") {
+  testonly = true
+  public_deps = [ "honeydew:sl4f_packages" ]
 }

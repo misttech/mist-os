@@ -968,7 +968,7 @@ impl OverlayFs {
 
         let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, overlay_fs, options);
+        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, overlay_fs, options)?;
         fs.set_root(root_node);
         Ok(fs)
     }

@@ -4776,6 +4776,10 @@ pub const STATX_ATTR_VERITY: u32 = 1048576;
 pub const STATX_ATTR_DAX: u32 = 2097152;
 pub const SYNC_IOC_MAGIC: u8 = 62u8;
 pub const SI_LOAD_SHIFT: u32 = 16;
+pub const TASKSTATS_VERSION: u32 = 14;
+pub const TS_COMM_LEN: u32 = 32;
+pub const TASKSTATS_GENL_NAME: &'static std::ffi::CStr = c"TASKSTATS";
+pub const TASKSTATS_GENL_VERSION: u32 = 1;
 pub const IGNBRK: u32 = 1;
 pub const BRKINT: u32 = 2;
 pub const IGNPAR: u32 = 4;
@@ -16596,6 +16600,92 @@ pub struct sysinfo {
     pub _f: __IncompleteArrayField<crate::types::c_char>,
     pub __bindgen_padding_1: [u8; 4usize],
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct taskstats {
+    pub version: __u16,
+    pub __bindgen_padding_0: [u8; 2usize],
+    pub ac_exitcode: __u32,
+    pub ac_flag: __u8,
+    pub ac_nice: __u8,
+    pub __bindgen_padding_1: [u8; 6usize],
+    pub cpu_count: __u64,
+    pub cpu_delay_total: __u64,
+    pub blkio_count: __u64,
+    pub blkio_delay_total: __u64,
+    pub swapin_count: __u64,
+    pub swapin_delay_total: __u64,
+    pub cpu_run_real_total: __u64,
+    pub cpu_run_virtual_total: __u64,
+    pub ac_comm: [crate::types::c_char; 32usize],
+    pub ac_sched: __u8,
+    pub ac_pad: [__u8; 3usize],
+    pub __bindgen_padding_2: [u8; 4usize],
+    pub ac_uid: __u32,
+    pub ac_gid: __u32,
+    pub ac_pid: __u32,
+    pub ac_ppid: __u32,
+    pub ac_btime: __u32,
+    pub __bindgen_padding_3: [u8; 4usize],
+    pub ac_etime: __u64,
+    pub ac_utime: __u64,
+    pub ac_stime: __u64,
+    pub ac_minflt: __u64,
+    pub ac_majflt: __u64,
+    pub coremem: __u64,
+    pub virtmem: __u64,
+    pub hiwater_rss: __u64,
+    pub hiwater_vm: __u64,
+    pub read_char: __u64,
+    pub write_char: __u64,
+    pub read_syscalls: __u64,
+    pub write_syscalls: __u64,
+    pub read_bytes: __u64,
+    pub write_bytes: __u64,
+    pub cancelled_write_bytes: __u64,
+    pub nvcsw: __u64,
+    pub nivcsw: __u64,
+    pub ac_utimescaled: __u64,
+    pub ac_stimescaled: __u64,
+    pub cpu_scaled_run_real_total: __u64,
+    pub freepages_count: __u64,
+    pub freepages_delay_total: __u64,
+    pub thrashing_count: __u64,
+    pub thrashing_delay_total: __u64,
+    pub ac_btime64: __u64,
+    pub compact_count: __u64,
+    pub compact_delay_total: __u64,
+    pub ac_tgid: __u32,
+    pub __bindgen_padding_4: [u8; 4usize],
+    pub ac_tgetime: __u64,
+    pub ac_exe_dev: __u64,
+    pub ac_exe_inode: __u64,
+    pub wpcopy_count: __u64,
+    pub wpcopy_delay_total: __u64,
+    pub irq_count: __u64,
+    pub irq_delay_total: __u64,
+}
+pub const TASKSTATS_CMD_UNSPEC: _bindgen_ty_130 = 0;
+pub const TASKSTATS_CMD_GET: _bindgen_ty_130 = 1;
+pub const TASKSTATS_CMD_NEW: _bindgen_ty_130 = 2;
+pub const __TASKSTATS_CMD_MAX: _bindgen_ty_130 = 3;
+pub type _bindgen_ty_130 = crate::types::c_uint;
+pub const TASKSTATS_TYPE_UNSPEC: _bindgen_ty_131 = 0;
+pub const TASKSTATS_TYPE_PID: _bindgen_ty_131 = 1;
+pub const TASKSTATS_TYPE_TGID: _bindgen_ty_131 = 2;
+pub const TASKSTATS_TYPE_STATS: _bindgen_ty_131 = 3;
+pub const TASKSTATS_TYPE_AGGR_PID: _bindgen_ty_131 = 4;
+pub const TASKSTATS_TYPE_AGGR_TGID: _bindgen_ty_131 = 5;
+pub const TASKSTATS_TYPE_NULL: _bindgen_ty_131 = 6;
+pub const __TASKSTATS_TYPE_MAX: _bindgen_ty_131 = 7;
+pub type _bindgen_ty_131 = crate::types::c_uint;
+pub const TASKSTATS_CMD_ATTR_UNSPEC: _bindgen_ty_132 = 0;
+pub const TASKSTATS_CMD_ATTR_PID: _bindgen_ty_132 = 1;
+pub const TASKSTATS_CMD_ATTR_TGID: _bindgen_ty_132 = 2;
+pub const TASKSTATS_CMD_ATTR_REGISTER_CPUMASK: _bindgen_ty_132 = 3;
+pub const TASKSTATS_CMD_ATTR_DEREGISTER_CPUMASK: _bindgen_ty_132 = 4;
+pub const __TASKSTATS_CMD_ATTR_MAX: _bindgen_ty_132 = 5;
+pub type _bindgen_ty_132 = crate::types::c_uint;
 pub type cc_t = crate::types::c_uchar;
 pub type speed_t = crate::types::c_uint;
 pub type tcflag_t = crate::types::c_uint;
@@ -17218,10 +17308,10 @@ pub struct usb_set_sel_req {
     pub u2_sel: __le16,
     pub u2_pel: __le16,
 }
-pub const FUNCTIONFS_DESCRIPTORS_MAGIC: _bindgen_ty_130 = 1;
-pub const FUNCTIONFS_STRINGS_MAGIC: _bindgen_ty_130 = 2;
-pub const FUNCTIONFS_DESCRIPTORS_MAGIC_V2: _bindgen_ty_130 = 3;
-pub type _bindgen_ty_130 = crate::types::c_uint;
+pub const FUNCTIONFS_DESCRIPTORS_MAGIC: _bindgen_ty_133 = 1;
+pub const FUNCTIONFS_STRINGS_MAGIC: _bindgen_ty_133 = 2;
+pub const FUNCTIONFS_DESCRIPTORS_MAGIC_V2: _bindgen_ty_133 = 3;
+pub type _bindgen_ty_133 = crate::types::c_uint;
 pub const functionfs_flags_FUNCTIONFS_HAS_FS_DESC: functionfs_flags = 1;
 pub const functionfs_flags_FUNCTIONFS_HAS_HS_DESC: functionfs_flags = 2;
 pub const functionfs_flags_FUNCTIONFS_HAS_SS_DESC: functionfs_flags = 4;

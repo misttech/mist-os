@@ -25,9 +25,17 @@ class HostComponentTest : public TestingBase {
   void SetUp() override {
     host_ = BtHostComponent::CreateForTesting(dispatcher(), DEFAULT_DEV_PATH);
 
-    fake_hci_server_.emplace(hci_.NewRequest(), dispatcher());
+    auto [vendor_client_end, vendor_server_end] =
+        fidl::Endpoints<fuchsia_hardware_bluetooth::Vendor>::Create();
 
-    fake_vendor_server_.emplace(vendor_.NewRequest(), dispatcher());
+    auto [hci_client_end, hci_server_end] =
+        fidl::Endpoints<fuchsia_hardware_bluetooth::Hci>::Create();
+
+    vendor_ = std::move(vendor_client_end);
+    hci_ = std::move(hci_client_end);
+
+    fake_hci_server_.emplace(std::move(hci_server_end), dispatcher());
+    fake_vendor_server_.emplace(std::move(vendor_server_end), dispatcher());
   }
 
   void TearDown() override {
@@ -38,9 +46,9 @@ class HostComponentTest : public TestingBase {
     TestingBase::TearDown();
   }
 
-  fuchsia::hardware::bluetooth::HciHandle hci() { return std::move(hci_); }
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci() { return std::move(hci_); }
 
-  fuchsia::hardware::bluetooth::VendorHandle vendor() { return std::move(vendor_); }
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor() { return std::move(vendor_); }
 
  protected:
   BtHostComponent* host() const { return host_.get(); }
@@ -50,9 +58,9 @@ class HostComponentTest : public TestingBase {
  private:
   std::unique_ptr<BtHostComponent> host_;
 
-  fuchsia::hardware::bluetooth::HciHandle hci_;
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci_;
 
-  fuchsia::hardware::bluetooth::VendorHandle vendor_;
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_;
 
   std::optional<bt::fidl::testing::FakeHciServer> fake_hci_server_;
 

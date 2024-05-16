@@ -9,7 +9,7 @@ use core::num::{NonZeroU16, NonZeroU8};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
 use crate::{
-    device::{AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceIdContext, DeviceIdentifier},
     ip::{
         self,
         device::{
@@ -87,7 +87,7 @@ pub struct PendingIpDeviceConfigurationUpdate<'a, I: IpDeviceIpExt, D>(
     &'a D,
 );
 
-impl<'a, I: IpDeviceIpExt, D: crate::device::Id> PendingIpDeviceConfigurationUpdate<'a, I, D> {
+impl<'a, I: IpDeviceIpExt, D: DeviceIdentifier> PendingIpDeviceConfigurationUpdate<'a, I, D> {
     /// Creates a new [`PendingIpDeviceConfigurationUpdate`] if `config` is
     /// valid for `device`.
     pub(crate) fn new(

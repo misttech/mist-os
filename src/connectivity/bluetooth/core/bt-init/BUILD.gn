@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   name = "bt_init"
@@ -84,11 +83,6 @@ fuchsia_package("bt-init-testonly") {
     ":default_config_values",
     ":testonly_component",
   ]
-}
-
-# Core shard for the #bluetooth-core subrealm.
-core_shard("core-shard") {
-  shard_file = "meta/bt-init.core_shard.cml"
 }
 
 fuchsia_unittest_package("tests") {

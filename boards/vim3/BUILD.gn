@@ -233,6 +233,12 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/amlogic-display.cm" ]
     },
     {
+      package_target =
+          "//src/graphics/display/drivers/vim3-display-detect:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-display-detect.cm" ]
+    },
+    {
       package_target = "//src/graphics/drivers/aml-gpu:aml-gpu-package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-gpu.cm" ]

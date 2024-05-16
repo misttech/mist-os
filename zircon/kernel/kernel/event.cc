@@ -28,14 +28,17 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 #include <sys/types.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <kernel/auto_preempt_disabler.h>
+#include <kernel/scheduler.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 
 /**
  * @brief  Destruct an Event object.
@@ -47,7 +50,7 @@ Event::~Event() {
   DEBUG_ASSERT(magic_ == kMagic);
 
   magic_ = 0;
-  result_.store(kNotSignalled, ktl::memory_order_relaxed);
+  result_.store(kNotSignaled, ktl::memory_order_relaxed);
   flags_ = Flags(0);
 }
 
@@ -56,42 +59,46 @@ zx_status_t Event::WaitWorker(const Deadline& deadline, Interruptible interrupti
   DEBUG_ASSERT(magic_ == kMagic);
   DEBUG_ASSERT(!arch_blocking_disallowed());
 
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  // Start by grabbing our wait queue's lock.  The state of the event is only
+  // allowed to change from un-signaled to signaled when we are holding this
+  // lock, so by holding it here, we can check the state of the signal and fast
+  // abort if we need to, or descend into the wait queue and be certain to fully
+  // block in the queue before releasing the lock.
+  ChainLockTransactionIrqSave clt{CLT_TAG("Event::WaitWorker")};
+  for (;; clt.Relax()) {
+    wait_.get_lock().AcquireUnconditionally();
 
-  zx_status_t ret = result_.load(ktl::memory_order_relaxed);
-  if (ret == kNotSignalled) {
-    /* unsignaled, block here */
-    return wait_.BlockEtc(deadline, signal_mask, ResourceOwnership::Normal, interruptible);
-  }
-
-  /* signaled, we're going to fall through */
-  if (flags_ & Event::AUTOUNSIGNAL) {
-    /* autounsignal flag lets one thread fall through before unsignaling */
-    result_.store(kNotSignalled, ktl::memory_order_relaxed);
-  }
-  return ret;
-}
-
-void Event::SignalInternal(zx_status_t wait_result) {
-  DEBUG_ASSERT(magic_ == kMagic);
-  DEBUG_ASSERT(wait_result != kNotSignalled);
-
-  if (result_.load(ktl::memory_order_relaxed) == kNotSignalled) {
-    if (flags_ & Event::AUTOUNSIGNAL) {
-      /* try to release one thread and leave unsignaled if successful */
-      if (!wait_.WakeOne(wait_result)) {
-        /*
-         * if we didn't actually find a thread to wake up, go to
-         * signaled state and let the next call to Wait
-         * unsignal the event.
-         */
-        result_.store(wait_result, ktl::memory_order_relaxed);
+    zx_status_t ret = result_.load(ktl::memory_order_relaxed);
+    if (ret == kNotSignaled) {
+      // Looks like we are not currently signaled.  Now try to obtain the
+      // current thread's lock so we can block it.
+      Thread* current_thread = Thread::Current::Get();
+      if (current_thread->get_lock().Acquire() == ChainLock::LockResult::kBackoff) {
+        wait_.get_lock().Release();
+        continue;
       }
-    } else {
-      /* release all threads and remain signaled */
-      result_.store(wait_result, ktl::memory_order_relaxed);
-      wait_.WakeAll(wait_result);
+      current_thread->get_lock().AssertAcquired();
+      clt.Finalize();
+
+      // We got the lock, go ahead and block the thread.  This will
+      // automatically release the queue's lock after the thread has been added
+      // to the queue and is committed to blocking.  We will need release the
+      // thread's lock ourselves after it wakes up, as it will be obtained as it
+      // becomes scheduled.
+      ret = wait_.BlockEtc(current_thread, deadline, signal_mask, ResourceOwnership::Normal,
+                           interruptible);
+      current_thread->get_lock().Release();
+      return ret;
     }
+
+    /* signaled, we're going to fall through */
+    if (flags_ & Event::AUTOUNSIGNAL) {
+      /* autounsignal flag lets one thread fall through before unsignaling */
+      result_.store(kNotSignaled, ktl::memory_order_relaxed);
+    }
+
+    wait_.get_lock().Release();
+    return ret;
   }
 }
 
@@ -108,14 +115,58 @@ void Event::SignalInternal(zx_status_t wait_result) {
  *                    thread or threads that are woken up.
  */
 void Event::Signal(zx_status_t wait_result) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  SignalInternal(wait_result);
-}
+  DEBUG_ASSERT(magic_ == kMagic);
+  DEBUG_ASSERT(wait_result != kNotSignaled);
 
-/* same as above, but the thread lock must already be held */
-void Event::SignalLocked() {
-  thread_lock.AssertHeld();
-  SignalInternal(ZX_OK);
+  // In order to transition from not-signaled to signaled, we must be
+  // holding our wait queue's lock.
+  ChainLockTransactionIrqSave clt{CLT_TAG("Event::Signal")};
+  auto finalize_clt = fit::defer([&clt]() TA_NO_THREAD_SAFETY_ANALYSIS { clt.Finalize(); });
+  for (;; clt.Relax()) {
+    UnconditionalChainLockGuard guard{wait_.get_lock()};
+
+    // If we are already signaled, we are finished.  We should be able to assert
+    // that there are no waiters right now.
+    if (result_.load(ktl::memory_order_relaxed) != kNotSignaled) {
+      DEBUG_ASSERT(wait_.Count() == 0);
+      break;
+    }
+
+    // If there are no threads waiting in the event, we can just mark it
+    // signaled and get out.
+    if (wait_.Count() == 0) {
+      result_.store(wait_result, ktl::memory_order_relaxed);
+      break;
+    }
+
+    // Try to lock with one or all of the threads for wake.
+    ktl::optional<Thread::UnblockList> maybe_unblock_list =
+        (flags_ & Event::AUTOUNSIGNAL) ? WaitQueueLockOps::LockForWakeOne(wait_, wait_result)
+                                       : WaitQueueLockOps::LockForWakeAll(wait_, wait_result);
+
+    // If we failed to lock, we need to drop the queue lock, then try again.
+    if (!maybe_unblock_list.has_value()) {
+      continue;
+    }
+
+    // We have all of our locks now, time to proceed with the wake operations (if any)
+    finalize_clt.call();
+
+    // Success.  If we not an auto-reset event, or we failed to find anyone to
+    // wake, make sure to set the event to the signaled state.
+    const bool has_threads_to_wake = !maybe_unblock_list.value().is_empty();
+    if (!(flags_ & Event::AUTOUNSIGNAL) || !has_threads_to_wake) {
+      result_.store(wait_result, ktl::memory_order_relaxed);
+    }
+
+    // We've finished our bookkeeping.  Go ahead and drop the queue lock, then
+    // unblock all of the threads.
+    guard.Release();
+    if (has_threads_to_wake) {
+      Scheduler::Unblock(ktl::move(maybe_unblock_list).value());
+    }
+    break;
+  }
 }
 
 /**
@@ -132,6 +183,6 @@ void Event::SignalLocked() {
  */
 zx_status_t Event::Unsignal() {
   DEBUG_ASSERT(magic_ == kMagic);
-  result_.store(kNotSignalled, ktl::memory_order_relaxed);
+  result_.store(kNotSignaled, ktl::memory_order_relaxed);
   return ZX_OK;
 }

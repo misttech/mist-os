@@ -138,9 +138,9 @@ struct Fix {}
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "allow")]
 struct Allow {
-    /// the tag to link to on codesearch
+    /// the ref to link to on codesearch
     #[argh(option)]
-    codesearch_tag: Option<String>,
+    codesearch_ref: Option<String>,
     /// path to an issue description template containing "INSERT_DETAILS_HERE"
     #[argh(option)]
     template: Option<PathBuf>,
@@ -217,7 +217,7 @@ fn main() -> Result<()> {
                     let mut api = args.api()?;
                     let mut issue_template = issues::IssueTemplate::new(
                         &lint_args.lint,
-                        allow_args.codesearch_tag.as_deref(),
+                        allow_args.codesearch_ref.as_deref(),
                         allow_args.load_template()?,
                         allow_args.blocking_issue.as_deref(),
                         allow_args.max_cc_users,

@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
     router_error::RouterError,
-    sandbox::{Capability, Dict, Message, Open, Request, Routable, Router, Sendable, Sender},
+    sandbox::{Capability, Connectable, Connector, Dict, Message, Open, Request, Routable, Router},
     std::{fmt::Debug, sync::Arc},
     tracing::warn,
     vfs::{
@@ -203,21 +203,21 @@ impl LaunchTaskOnReceive {
         Self { task_to_launch, task_group, policy, task_name: task_name.into() }
     }
 
-    pub fn into_sender(self: Arc<Self>, target: WeakComponentInstance) -> Sender {
+    pub fn into_sender(self: Arc<Self>, target: WeakComponentInstance) -> Connector {
         #[derive(Debug)]
         struct TaskAndTarget {
             task: Arc<LaunchTaskOnReceive>,
             target: WeakComponentInstance,
         }
 
-        impl Sendable for TaskAndTarget {
+        impl Connectable for TaskAndTarget {
             fn send(&self, message: Message) -> Result<(), ()> {
                 self.task.launch_task(message.channel, self.target.clone());
                 Ok(())
             }
         }
 
-        Sender::new_sendable(TaskAndTarget { task: self, target })
+        Connector::new_sendable(TaskAndTarget { task: self, target })
     }
 
     pub fn into_router(self) -> Router {

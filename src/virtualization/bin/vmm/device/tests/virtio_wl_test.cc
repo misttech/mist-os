@@ -4,7 +4,7 @@
 
 #include <drm_fourcc.h>
 #include <fuchsia/logger/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl_test_base.h>
+#include <fuchsia/sysmem2/cpp/fidl_test_base.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl_test_base.h>
 #include <fuchsia/virtualization/hardware/cpp/fidl.h>
@@ -36,8 +36,8 @@ static constexpr uint32_t kImportVmoSize = 4096;
 static constexpr uint32_t kDmabufWidth = 64;
 static constexpr uint32_t kDmabufHeight = 64;
 static constexpr uint32_t kDmabufDrmFormat = DRM_FORMAT_ARGB8888;
-static constexpr fuchsia::sysmem::PixelFormatType kDmabufSysmemFormat =
-    fuchsia::sysmem::PixelFormatType::BGRA32;
+static constexpr fuchsia::images2::PixelFormat kDmabufSysmemFormat =
+    fuchsia::images2::PixelFormat::B8G8R8A8;
 
 class TestWaylandDispatcher : public fuchsia::wayland::Server {
  public:
@@ -53,89 +53,93 @@ class TestWaylandDispatcher : public fuchsia::wayland::Server {
   fidl::Binding<fuchsia::wayland::Server> binding_{this};
 };
 
-class TestBufferCollectionToken : public fuchsia::sysmem::testing::BufferCollectionToken_TestBase {
+class TestBufferCollectionToken : public fuchsia::sysmem2::testing::BufferCollectionToken_TestBase {
  public:
-  TestBufferCollectionToken(fidl::InterfaceRequest<fuchsia::sysmem::BufferCollectionToken> request)
+  TestBufferCollectionToken(fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollectionToken> request)
       : binding_{this, std::move(request)} {}
 
  private:
-  // |fuchsia::sysmem::BufferCollection|
-  void Duplicate(uint32_t rights_attenuation_mask,
-                 fidl::InterfaceRequest<fuchsia::sysmem::BufferCollectionToken> request) override {
-    duplicates_.emplace_back(std::make_unique<TestBufferCollectionToken>(std::move(request)));
+  // |fuchsia::sysmem2::BufferCollection|
+  void Duplicate(::fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest request) override {
+    duplicates_.emplace_back(
+        std::make_unique<TestBufferCollectionToken>(std::move(*request.mutable_token_request())));
   }
-  void Sync(SyncCallback callback) override { callback(); }
-
+  void Sync(SyncCallback callback) override {
+    callback(
+        fuchsia::sysmem2::Node_Sync_Result::WithResponse(fuchsia::sysmem2::Node_Sync_Response{}));
+  }
   void NotImplemented_(const std::string& name) override {
     FAIL() << "Not Implemented BufferCollection." << name;
   }
 
   std::vector<std::unique_ptr<TestBufferCollectionToken>> duplicates_;
-  fidl::Binding<fuchsia::sysmem::BufferCollectionToken> binding_;
+  fidl::Binding<fuchsia::sysmem2::BufferCollectionToken> binding_;
 };
 
-class TestBufferCollection : public fuchsia::sysmem::testing::BufferCollection_TestBase {
+class TestBufferCollection : public fuchsia::sysmem2::testing::BufferCollection_TestBase {
  public:
-  TestBufferCollection(fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request)
+  TestBufferCollection(fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection> request)
       : binding_{this, std::move(request)} {}
 
  private:
-  // |fuchsia::sysmem::BufferCollection|
-  void Close() override { binding_.Close(ZX_OK); }
-  void SetName(uint32_t priority, std::string name) override {}
-  void SetConstraints(bool has_constraints,
-                      fuchsia::sysmem::BufferCollectionConstraints constraints) override {}
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCallback callback) override {
-    fuchsia::sysmem::BufferCollectionInfo_2 info{};
-    info.buffer_count = 1;
-    info.settings.has_image_format_constraints = true;
-    info.settings.image_format_constraints.pixel_format.type = kDmabufSysmemFormat;
-    info.settings.image_format_constraints.pixel_format.has_format_modifier = true;
-    info.settings.image_format_constraints.pixel_format.format_modifier.value =
-        fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-    info.settings.image_format_constraints.min_coded_width = kDmabufWidth;
-    info.settings.image_format_constraints.min_coded_height = kDmabufHeight;
-    info.settings.image_format_constraints.max_coded_width = kDmabufWidth;
-    info.settings.image_format_constraints.max_coded_height = kDmabufHeight;
-    info.settings.image_format_constraints.min_bytes_per_row = kDmabufWidth * 4;
-    info.settings.image_format_constraints.bytes_per_row_divisor = 1;
-    zx::vmo::create(kDmabufWidth * kDmabufHeight * 4, 0, &info.buffers[0].vmo);
-    callback(ZX_OK, std::move(info));
-  }
+  // |fuchsia::sysmem2::BufferCollection|
+  void Release() override { binding_.Close(ZX_OK); }
+  void SetName(::fuchsia::sysmem2::NodeSetNameRequest request) override {}
+  void SetConstraints(::fuchsia::sysmem2::BufferCollectionSetConstraintsRequest request) override {}
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCallback callback) override {
+    fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Response response;
+    auto& info = *response.mutable_buffer_collection_info();
+    auto& settings = *info.mutable_settings();
+    settings.mutable_buffer_settings()->set_coherency_domain(
+        fuchsia::sysmem2::CoherencyDomain::CPU);
+    auto& ifc = *settings.mutable_image_format_constraints();
+    ifc.set_pixel_format(kDmabufSysmemFormat);
+    ifc.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
+    ifc.set_min_size(fuchsia::math::SizeU{.width = kDmabufWidth, .height = kDmabufHeight});
+    ifc.set_max_size(fuchsia::math::SizeU{.width = kDmabufWidth, .height = kDmabufHeight});
+    ifc.set_min_bytes_per_row(kDmabufWidth * 4);
+    ifc.set_bytes_per_row_divisor(1);
+    zx_status_t status = zx::vmo::create(kDmabufWidth * kDmabufHeight * 4, 0,
+                                         info.mutable_buffers()->emplace_back().mutable_vmo());
+    ZX_ASSERT(status == ZX_OK);
 
+    callback(fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result::WithResponse(
+        std::move(response)));
+  }
   void NotImplemented_(const std::string& name) override {
     FAIL() << "Not Implemented BufferCollection." << name;
   }
 
-  fidl::Binding<fuchsia::sysmem::BufferCollection> binding_;
+  fidl::Binding<fuchsia::sysmem2::BufferCollection> binding_;
 };
 
-class TestSysmemAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
+class TestSysmemAllocator : public fuchsia::sysmem2::testing::Allocator_TestBase {
  public:
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> Bind(async_dispatcher_t* dispatcher) {
+  fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> Bind(async_dispatcher_t* dispatcher) {
     return binding_.NewBinding(dispatcher);
   }
 
  private:
-  // |fuchsia::sysmem::Allocator|
+  // |fuchsia::sysmem2::Allocator|
   void AllocateSharedCollection(
-      fidl::InterfaceRequest<fuchsia::sysmem::BufferCollectionToken> request) override {
-    tokens_.emplace_back(std::make_unique<TestBufferCollectionToken>(std::move(request)));
+      ::fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest request) override {
+    tokens_.emplace_back(
+        std::make_unique<TestBufferCollectionToken>(std::move(*request.mutable_token_request())));
   }
   void BindSharedCollection(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
-      fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request) override {
-    collections_.emplace_back(std::make_unique<TestBufferCollection>(std::move(request)));
+      ::fuchsia::sysmem2::AllocatorBindSharedCollectionRequest request) override {
+    collections_.emplace_back(std::make_unique<TestBufferCollection>(
+        std::move(*request.mutable_buffer_collection_request())));
   }
-  void SetDebugClientInfo(std::string name, uint64_t id) override {}
-
+  void SetDebugClientInfo(::fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest
+                              AllocatorSetDebugClientInfoRequest) override {}
   void NotImplemented_(const std::string& name) override {
     FAIL() << "Not Implemented Allocator." << name;
   }
 
   std::vector<std::unique_ptr<TestBufferCollectionToken>> tokens_;
   std::vector<std::unique_ptr<TestBufferCollection>> collections_;
-  fidl::Binding<fuchsia::sysmem::Allocator> binding_{this};
+  fidl::Binding<fuchsia::sysmem2::Allocator> binding_{this};
 };
 
 class TestAllocator : public fuchsia::ui::composition::testing::Allocator_TestBase {

@@ -4,18 +4,14 @@
 
 #include "../aml-suspend.h"
 
+#include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
 #include <gtest/gtest.h>
 #include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
-#include "fidl/fuchsia.hardware.suspend/cpp/markers.h"
 #include "lib/zx/handle.h"
 #include "lib/zx/resource.h"
 #include "lib/zx/vmo.h"
@@ -55,86 +51,54 @@ class AmlSuspendTest : public AmlSuspend {
   zx::vmo fake_resource_;
 };
 
-class TestEnvironmentWrapper {
+class TestEnvironmentWrapper : public fdf_testing::Environment {
  public:
-  fdf::DriverStartArgs Setup(fake_pdev::FakePDevFidl::Config pdev_config) {
-    zx::result start_args_result = node_.CreateStartArgsAndServe();
-    EXPECT_EQ(start_args_result.status_value(), ZX_OK);
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    pdev_.SetConfig(fake_pdev::FakePDevFidl::Config{});
 
-    EXPECT_EQ(
-        env_.Initialize(std::move(start_args_result->incoming_directory_server)).status_value(),
-        ZX_OK);
-
-    pdev_.SetConfig(std::move(pdev_config));
-
-    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-
-    auto pdev_result =
-        env_.incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-            pdev_.GetInstanceHandler(dispatcher));
-    EXPECT_EQ(pdev_result.status_value(), ZX_OK);
+    auto pdev_result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+        pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
+    if (pdev_result.is_error()) {
+      return pdev_result.take_error();
+    }
 
     compat_server_.Init("default", "topo");
-    zx_status_t status = compat_server_.Serve(dispatcher, &env_.incoming_directory());
-    ZX_ASSERT(status == ZX_OK);
-
-    return std::move(start_args_result->start_args);
+    zx_status_t status =
+        compat_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+    return zx::make_result(status);
   }
 
-  fdf_testing::TestNode& Node() { return node_; }
-
  private:
-  fdf_testing::TestNode node_{"root"};
-  fdf_testing::TestEnvironment env_;
   fake_pdev::FakePDevFidl pdev_;
   compat::DeviceServer compat_server_;
 };
 
-class AmlSuspendTestFixture : public testing::Test {
+class AmlSuspendTestConfiguration {
  public:
-  AmlSuspendTestFixture()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        dut_(driver_dispatcher_->async_dispatcher(), std::in_place,
-             AmlSuspendTest::GetDriverRegistration()),
-        test_environment_(env_dispatcher_->async_dispatcher(), std::in_place) {}
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = true;
 
+  using DriverType = AmlSuspendTest;
+  using EnvironmentType = TestEnvironmentWrapper;
+};
+
+class AmlSuspendTestFixture : public fdf_testing::DriverTestFixture<AmlSuspendTestConfiguration> {
  protected:
   void SetUp() override {
-    fake_pdev::FakePDevFidl::Config config;
-    fdf::DriverStartArgs start_args =
-        test_environment_.SyncCall(&TestEnvironmentWrapper::Setup, std::move(config));
-    zx::result start_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlSuspendTest>::Start, std::move(start_args)));
-    ASSERT_EQ(start_result.status_value(), ZX_OK);
-
-    test_environment_.SyncCall([this](TestEnvironmentWrapper* env_wrapper) {
-      auto client_channel =
-          env_wrapper->Node().children().at("aml-suspend-device").ConnectToDevice();
-      client_.Bind(
-          fidl::ClientEnd<fuchsia_hardware_suspend::Suspender>(std::move(client_channel.value())));
-      ASSERT_TRUE(client_.is_valid());
-    });
+    zx::result connect_result = Connect<fuchsia_hardware_suspend::SuspendService::Suspender>();
+    EXPECT_EQ(ZX_OK, connect_result.status_value());
+    client_.Bind(std::move(connect_result.value()));
   }
 
-  void TearDown() override {
-    zx::result run_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlSuspendTest>::PrepareStop));
-    ZX_ASSERT(run_result.is_ok());
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender> client_;
+  fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender>& client() { return client_; }
 
  private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<AmlSuspendTest>> dut_;
-  async_patterns::TestDispatcherBound<TestEnvironmentWrapper> test_environment_;
+  fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender> client_;
 };
 
 TEST_F(AmlSuspendTestFixture, TrivialGetSuspendStates) {
-  auto result = client_->GetSuspendStates();
+  auto result = client()->GetSuspendStates();
 
   ASSERT_TRUE(result.ok());
 

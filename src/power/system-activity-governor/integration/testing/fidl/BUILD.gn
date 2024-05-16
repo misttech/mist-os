@@ -7,8 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("test.systemactivitygovernor") {
   testonly = true
   sources = [ "realm_factory.test.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.testing.harness",
-    "//src/power/testing/fake-suspend:test.suspendcontrol",
-  ]
+  public_deps = [ "//sdk/fidl/fuchsia.testing.harness" ]
 }

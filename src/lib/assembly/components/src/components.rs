@@ -40,8 +40,8 @@ impl ComponentBuilder {
     pub fn build(
         self,
         outdir: impl AsRef<Utf8Path>,
+        component_includes_dir: &Option<Utf8PathBuf>,
         cmc_tool: &dyn Tool,
-        include_path: impl AsRef<Utf8Path>,
     ) -> Result<Utf8PathBuf> {
         // Write all generated files in a subdir with the name of the package.
         let outdir = outdir.as_ref().join(&self.name);
@@ -56,20 +56,22 @@ impl ComponentBuilder {
 
         let cmfile = outdir.join(format!("{}.cm", &self.name));
 
-        let args = vec![
+        let mut args = vec![
             "compile".into(),
             "--features=allow_long_names".into(),
             "--features=dictionaries".into(),
-            "--includeroot".into(),
-            include_path.as_ref().to_string(),
-            "--includepath".into(),
-            include_path.as_ref().to_string(),
             "--config-package-path".into(),
             format!("meta/{}.cvf", &self.name),
             "-o".into(),
             cmfile.to_string(),
             cmlfile.to_string(),
         ];
+        if let Some(component_includes_dir) = component_includes_dir {
+            args.push("--includeroot".into());
+            args.push(component_includes_dir.to_string());
+            args.push("--includepath".into());
+            args.push(component_includes_dir.to_string());
+        }
 
         cmc_tool
             .run(&args)
@@ -128,10 +130,6 @@ mod tests {
                         "compile",
                         "--features=allow_long_names",
                         "--features=dictionaries",
-                        "--includeroot",
-                        "include/path",
-                        "--includepath",
-                        "include/path",
                         "--config-package-path",
                         "meta/test.cvf",
                         "-o",
@@ -143,7 +141,7 @@ mod tests {
         }))
         .unwrap();
 
-        let result = builder.build(outdir, tools.get_tool("cmc").unwrap().as_ref(), "include/path");
+        let result = builder.build(outdir, &None, tools.get_tool("cmc").unwrap().as_ref());
 
         assert!(result.is_ok());
         assert_eq!(&expected_commands, tools.log());

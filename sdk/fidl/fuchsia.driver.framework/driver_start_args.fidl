@@ -34,11 +34,14 @@ type DriverStartArgs = resource table {
     /// The name of the node the driver is bound to.
     8: node_name string:MAX;
 
-    /// Node properties of the node the driver is bound to. If the node is
-    /// non-composite then the "default" entry will contain the node's own
-    /// properties. If the node is a composite then there is an entry for each
-    /// of its parents and the "default" entry will reference the primary
-    /// composite parent node's properties.
+    /// Node properties of the node the driver is bound to.
+    /// If the node is non-composite then the "default" entry will contain the
+    /// node's own properties.
+    /// If the node is a composite then there is an entry for each of its parents
+    /// and the "default" entry will reference the primary composite parent
+    /// node's properties. The composite parent node's properties are those that
+    /// were provided in the composite node specification and not the original
+    /// properties of the parent.
     @available(added=19)
     9: node_properties NodePropertyDictionary;
 

@@ -20,7 +20,7 @@ struct DriverRegistration {
   // for any reason.
   uint64_t version;
 
-  struct v1 {
+  struct driver_registration_v1 {
     // Pointer to a function that can initialize the driver server on the |server_handle|.
     //
     // Errors to initialize the driver server can be propagated by closing the |server_handle| with

@@ -212,9 +212,9 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
   if (display_attached_) {
-    added_display_args_t args;
-    vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
-    dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0);
+    const added_display_args_t added_display_args =
+        vout_->CreateAddedDisplayArgs(display_id_, kSupportedBanjoPixelFormats);
+    dc_intf_.OnDisplayAdded(&added_display_args);
   }
 }
 
@@ -990,12 +990,6 @@ void DisplayEngine::OnCaptureComplete() {
 void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
   fbl::AutoLock lock(&display_mutex_);
 
-  bool display_added = false;
-  added_display_args_t added_display_args;
-
-  bool display_removed = false;
-  display::DisplayId removed_display_id;
-
   if (current_state == HotPlugDetectionState::kDetected && !display_attached_) {
     zxlogf(INFO, "Display is connected");
 
@@ -1008,26 +1002,27 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
     current_display_timing_ = {};
 
     vout_->DisplayConnected();
-    vout_->PopulateAddedDisplayArgs(&added_display_args, display_id_, kSupportedBanjoPixelFormats);
-    display_added = true;
-  } else if (current_state == HotPlugDetectionState::kNotDetected && display_attached_) {
+
+    const added_display_args_t added_display_args =
+        vout_->CreateAddedDisplayArgs(display_id_, kSupportedBanjoPixelFormats);
+    if (dc_intf_.is_valid()) {
+      dc_intf_.OnDisplayAdded(&added_display_args);
+    }
+    return;
+  }
+
+  if (current_state == HotPlugDetectionState::kNotDetected && display_attached_) {
     zxlogf(INFO, "Display Disconnected!");
     vout_->DisplayDisconnected();
 
-    display_removed = true;
-    removed_display_id = display_id_;
+    const display::DisplayId removed_display_id = display_id_;
     display_id_++;
     display_attached_ = false;
-  }
 
-  if (dc_intf_.is_valid() && (display_removed || display_added)) {
-    const size_t added_display_count = display_added ? 1 : 0;
-    const uint64_t banjo_removed_display_id = display::ToBanjoDisplayId(removed_display_id);
-    const size_t removed_display_count = display_removed ? 1 : 0;
-
-    dc_intf_.OnDisplaysChanged(
-        /*added_display_list=*/&added_display_args, added_display_count,
-        /*removed_display_list=*/&banjo_removed_display_id, removed_display_count);
+    if (dc_intf_.is_valid()) {
+      dc_intf_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
+    }
+    return;
   }
 }
 

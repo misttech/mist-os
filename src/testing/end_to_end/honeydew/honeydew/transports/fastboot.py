@@ -4,10 +4,16 @@
 # found in the LICENSE file.
 """Provides methods for Host-(Fuchsia)Target interactions via Fastboot."""
 
+import atexit
 import ipaddress
 import logging
+import os
+import shutil
+import stat
 import subprocess
+import tempfile
 from collections.abc import Iterable
+from importlib import resources
 from typing import Any
 
 from honeydew import errors
@@ -15,6 +21,8 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import fastboot as fastboot_interface
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.utils import common, properties
+
+_FASTBOOT_PATH_ENV_VAR = "HONEYDEW_FASTBOOT_OVERRIDE"
 
 _FASTBOOT_CMDS: dict[str, list[str]] = {
     "BOOT_TO_FUCHSIA_MODE": ["reboot"],
@@ -31,6 +39,41 @@ _TIMEOUTS: dict[str, float] = {
 _NO_SERIAL = "<unknown>"
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+# List all the private methods
+def _get_fastboot_binary() -> str:
+    """Returns the path to the `fastboot` binary.
+
+    Prefers resolving from environment variable if provided; otherwise, extract
+    from Python resource, set permissions to executable, and store on disk.
+
+    Returns:
+        Absolute path to `fastboot` binary.
+    """
+    bin_path: str | None = os.getenv(_FASTBOOT_PATH_ENV_VAR)
+    if bin_path is not None:
+        return bin_path
+    try:
+        # Import resources via the data package name specified in this library's
+        # build definition.
+        # If Honeydew is run outside of the build system, this package will not
+        # be present so we wrap the import in a try-except block.
+        # pylint: disable-next=import-outside-toplevel
+        from honeydew import data  # type: ignore[attr-defined,unused-ignore]
+
+        bin_fd = tempfile.NamedTemporaryFile(suffix="fastboot", delete=False)
+        bin_path = bin_fd.name
+        with resources.as_file(resources.files(data).joinpath("fastboot")) as f:
+            f.chmod(f.stat().st_mode | stat.S_IEXEC)
+            shutil.copy2(f, bin_path)
+        atexit.register(lambda: os.unlink(bin_path))
+    except ImportError as e:
+        raise errors.HoneydewDataResourceError(
+            "Failed to import data resource. If running outside of build system,"
+            f" supply the `{_FASTBOOT_PATH_ENV_VAR}` environment variable.",
+        ) from e
+    return bin_path
 
 
 class Fastboot(fastboot_interface.Fastboot):
@@ -64,6 +107,7 @@ class Fastboot(fastboot_interface.Fastboot):
         )
         self._ffx_transport: ffx_interface.FFX = ffx_transport
         self._get_fastboot_node(fastboot_node_id)
+        self._fastboot_binary = _get_fastboot_binary()
 
     # List all the public properties
     @properties.PersistentProperty
@@ -190,8 +234,11 @@ class Fastboot(fastboot_interface.Fastboot):
             )
 
         exceptions_to_skip = tuple(exceptions_to_skip or [])
-
-        fastboot_cmd: list[str] = ["fastboot", "-s", self.node_id] + cmd
+        fastboot_cmd: list[str] = [
+            self._fastboot_binary,
+            "-s",
+            self.node_id,
+        ] + cmd
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(fastboot_cmd))
             output: str = (
@@ -220,7 +267,8 @@ class Fastboot(fastboot_interface.Fastboot):
 
             if isinstance(err, subprocess.CalledProcessError) and err.stdout:
                 _LOGGER.debug(
-                    "stdout/stderr returned by the command is: %s", err.stdout
+                    "stdout/stderr returned by the command is: %s",
+                    err.stdout,
                 )
 
             raise errors.FastbootCommandError(

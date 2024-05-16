@@ -110,12 +110,8 @@ impl Stream for NewlineChunker {
 
         loop {
             // we don't have a chunk to return, poll for reading the socket
-            match futures::ready!(this.socket.poll_readable(cx))
-                .map_err(NewlineChunkerError::PollReadable)?
-            {
-                ReadableState::Closed => return this.end_of_stream().map(|buf| buf.map(Ok)),
-                ReadableState::Readable | ReadableState::ReadableAndClosed => {}
-            }
+            let readable_state = futures::ready!(this.socket.poll_readable(cx))
+                .map_err(NewlineChunkerError::PollReadable)?;
 
             // find out how much buffer we should make available
             let bytes_in_socket = this
@@ -124,6 +120,9 @@ impl Stream for NewlineChunker {
                 .outstanding_read_bytes()
                 .map_err(NewlineChunkerError::OutstandingReadBytes)?;
             if bytes_in_socket == 0 {
+                if readable_state == ReadableState::MaybeReadableAndClosed {
+                    return this.end_of_stream().map(|buf| buf.map(Ok));
+                }
                 // if there are no bytes available this socket should not be considered readable
                 ready!(this.socket.need_readable(cx).map_err(NewlineChunkerError::NeedReadable)?);
                 continue;

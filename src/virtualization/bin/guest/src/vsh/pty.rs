@@ -7,7 +7,7 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_hardware_pty as fpty,
     fuchsia_zircon::{self as zx, HandleBased},
-    std::os::unix::io::AsRawFd,
+    std::os::fd::{AsFd, AsRawFd, BorrowedFd},
 };
 
 /// This function attempts to determine whether the given `fd` is a pty. If it is a pty then the
@@ -17,25 +17,29 @@ use {
 ///
 /// Returns Ok(None) when the `fd` has been conclusively determined to not be a pty and Err(...) if
 /// we were unable to find out more due to some failure.
-pub async fn get_pty(fd: &impl AsRawFd) -> Result<Option<(fpty::DeviceProxy, zx::EventPair)>> {
-    if unsafe { libc::isatty(fd.as_raw_fd()) == 0 } {
-        return Ok(None);
+pub async fn get_pty(f: impl AsFd) -> Result<Option<(fpty::DeviceProxy, zx::EventPair)>> {
+    async fn inner<'a>(fd: BorrowedFd<'a>) -> Result<Option<(fpty::DeviceProxy, zx::EventPair)>> {
+        if unsafe { libc::isatty(fd.as_raw_fd()) == 0 } {
+            return Ok(None);
+        }
+
+        // Clone the handle underlying this fd. Since we've already confirmed that fd is a Pty the
+        // underlying handle should be channel speaking fuchsia.hardware.pty.Device
+        let channel =
+            fdio::clone_channel(fd).context("Failed to clone underlying handle from fd")?;
+        let channel = fidl::handle::AsyncChannel::from_channel(channel);
+        let device = fpty::DeviceProxy::new(channel);
+
+        let eventpair = device
+            .describe()
+            .await
+            .context("Call to Describe failed")?
+            .event
+            .expect("Device/Describe did not contain an event");
+
+        Ok(Some((device, eventpair)))
     }
-
-    // Clone the handle underlying this fd. Since we've already confirmed that fd is a Pty the
-    // underlying handle should be channel speaking fuchsia.hardware.pty.Device
-    let channel = fdio::clone_channel(fd).context("Failed to clone underlying handle from fd")?;
-    let channel = fidl::handle::AsyncChannel::from_channel(channel);
-    let device = fpty::DeviceProxy::new(channel);
-
-    let eventpair = device
-        .describe()
-        .await
-        .context("Call to Describe failed")?
-        .event
-        .expect("Device/Describe did not contain an event");
-
-    Ok(Some((device, eventpair)))
+    inner(f.as_fd()).await
 }
 
 /// Wrapper around Device.get_window_size, collapsing the multiple failure modes into one level.

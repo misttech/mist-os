@@ -13,6 +13,12 @@ import("//build/bazel/bazel_action.gni")
 #     This target should be an `extract_bazel_doc_textproto()` target.
 #     Type: list of strings (GN labels)
 #
+#   docset_name: (required)
+#     The name of the docset to generate.
+#
+#   reference_repo_path: (required)
+#     The path to copy these documents when built in infrastructure.
+#
 #   output_name: (optional)
 #     The name of the zip file to create. This file will be created relative to
 #     the target_gen_dir.
@@ -26,6 +32,9 @@ import("//build/bazel/bazel_action.gni")
 template("bazel_docgen") {
   assert(defined(invoker.textproto_targets),
          "textproto_targets must be defined")
+  assert(defined(invoker.docset_name), "docset_name must be defined")
+  assert(defined(invoker.reference_repo_path),
+         "reference_repo_path must be defined")
 
   compiled_action(target_name) {
     tool = "//tools/bazel-docgen:bin"
@@ -54,17 +63,31 @@ template("bazel_docgen") {
     if (defined(invoker.output_name)) {
       zip_file = invoker.output_name
     }
+    out_zip = "${target_gen_dir}/${zip_file}"
 
     args = proto_args + [
              "--zip_file",
-             rebase_path("${target_gen_dir}/${zip_file}", root_build_dir),
+             rebase_path(out_zip, root_build_dir),
            ]
 
-    outputs = [ "${target_gen_dir}/${zip_file}" ]
+    outputs = [ out_zip ]
 
     deps = invoker.textproto_targets
     if (defined(invoker.deps)) {
       deps += invoker.deps
+    }
+
+    metadata = {
+      # Record metadata for the //tools/docsgen build API.
+      generated_docset = [
+        {
+          name = invoker.docset_name
+          archive = {
+            origin_file = rebase_path(out_zip, root_build_dir)
+          }
+          dest_folder = invoker.reference_repo_path
+        },
+      ]
     }
   }
 }

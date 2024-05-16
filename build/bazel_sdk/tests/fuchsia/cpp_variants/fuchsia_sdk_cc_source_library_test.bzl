@@ -37,7 +37,7 @@ def _cc_std_version_transition_impl(settings, attr):
     ] + attr.extra_cxxopts
 
     copts = settings["//command_line_option:copt"] + [
-        "-ffuchsia-api-level={}".format(attr.api_level),
+        "-ffuchsia-api-level=4292870144",
     ] + attr.extra_copts
 
     return {
@@ -45,7 +45,7 @@ def _cc_std_version_transition_impl(settings, attr):
         "//command_line_option:cxxopt": cxxopts,
         "//command_line_option:copt": copts,
         "//command_line_option:platforms": fuchsia_platform,
-        "@fuchsia_sdk//fuchsia:fuchsia_api_level": attr.api_level,
+        "@fuchsia_sdk//fuchsia:fuchsia_api_level": "HEAD",
     }
 
 cc_std_version_transition = transition(
@@ -159,10 +159,6 @@ _fuchsia_sdk_cc_source_library_test = rule(
             allow_single_file = True,
             executable = True,
             cfg = cc_std_version_transition,
-        ),
-        "api_level": attr.string(
-            # TODO: Set this to HEAD
-            default = "15",
         ),
         "cc_version": attr.string(
             mandatory = True,

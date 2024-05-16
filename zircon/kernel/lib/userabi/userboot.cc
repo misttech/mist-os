@@ -326,10 +326,6 @@ void userboot_init(uint) {
   ASSERT(vmar_handle_owner);
   handles[userboot::kProcSelf] = proc_handle_owner.release();
   handles[userboot::kVmarRootSelf] = vmar_handle_owner.release();
-
-  // It gets the root resource and job handles.
-  handles[userboot::kRootResource] = get_resource_handle(ZX_RSRC_KIND_ROOT).release();
-  ASSERT(handles[userboot::kRootResource]);
   handles[userboot::kMmioResource] = get_resource_handle(ZX_RSRC_KIND_MMIO).release();
   ASSERT(handles[userboot::kMmioResource]);
   handles[userboot::kIrqResource] = get_resource_handle(ZX_RSRC_KIND_IRQ).release();

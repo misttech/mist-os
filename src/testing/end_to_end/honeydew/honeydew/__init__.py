@@ -16,7 +16,6 @@ from honeydew.fuchsia_device.fuchsia_controller_preferred import (
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.transports import ffx
 from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -65,13 +64,6 @@ def create_device(
                 "work consistently.",
                 device_ip_port,
             )
-
-            ffx_transport: ffx.FFX = ffx.FFX(
-                target_name=device_name,
-                target_ip_port=device_ip_port,
-                config=ffx_config,
-            )
-            ffx_transport.add_target()
 
         if transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER:
             return fc_fuchsia_device.FuchsiaDevice(

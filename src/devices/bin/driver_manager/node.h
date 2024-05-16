@@ -121,7 +121,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   static zx::result<std::shared_ptr<Node>> CreateCompositeNode(
       std::string_view node_name, std::vector<std::weak_ptr<Node>> parents,
       std::vector<std::string> parents_names,
-      cpp20::span<const fuchsia_driver_framework::wire::NodeProperty> properties,
+      const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
       uint32_t primary_index = 0);
 
@@ -412,7 +412,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // Set properties to composite node properties containing a clone of the node properties of
   // `parents_`.
-  void SetCompositeParentProperties();
+  void SetCompositeParentProperties(
+      const std::vector<fuchsia_driver_framework::NodePropertyEntry>& parent_properties);
 
   // Update `properties_dict_` to identify the contents of `properties_`.
   void SynchronizePropertiesDict();

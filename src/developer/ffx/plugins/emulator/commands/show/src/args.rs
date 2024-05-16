@@ -10,7 +10,7 @@ use ffx_core::ffx_command;
 #[argh(subcommand, name = "show")]
 /// Show Fuchsia emulator details.
 pub struct ShowCommand {
-    /// show all of the available details, excluding the raw internal format.
+    /// show all of the available details, which is the default.
     #[argh(switch)]
     pub all: bool,
 
@@ -37,9 +37,4 @@ pub struct ShowCommand {
     /// switch to show network details.
     #[argh(switch)]
     pub net: bool,
-
-    /// show the entire config output. This is the default output if
-    /// no other switches are invoked.
-    #[argh(switch)]
-    pub raw: bool,
 }

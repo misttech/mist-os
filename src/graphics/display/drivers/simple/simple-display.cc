@@ -93,10 +93,6 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
-  added_display_args_t args = {};
-  args.display_id = display::ToBanjoDisplayId(kDisplayId);
-  args.panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
-
   const int64_t pixel_clock_hz = int64_t{width_} * height_ * kRefreshRateHz;
   ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
   ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
@@ -116,15 +112,22 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
       .vblank_alternates = false,
       .pixel_repetition = 0,
   };
-  args.panel.mode = display::ToBanjoDisplayMode(timing);
 
   // fuchsia.images2.PixelFormat can always cast to AnyPixelFormat safely.
   fuchsia_images2_pixel_format_enum_value_t pixel_format =
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(format_);
-  args.pixel_format_list = &pixel_format;
-  args.pixel_format_count = 1;
 
-  intf_.OnDisplaysChanged(&args, 1, nullptr, 0);
+  const added_display_args_t added_display_args = {
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
+      .panel =
+          {
+              .mode = display::ToBanjoDisplayMode(timing),
+          },
+      .pixel_format_list = &pixel_format,
+      .pixel_format_count = 1,
+  };
+  intf_.OnDisplayAdded(&added_display_args);
 }
 
 void SimpleDisplay::DisplayControllerImplResetDisplayControllerInterface() {

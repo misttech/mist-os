@@ -42,15 +42,18 @@ use tracing::{debug, error, trace};
 use crate::{
     context::{
         CoreTimerContext, CounterContext, EventContext, HandleableTimer, InstantContext,
-        NestedIntoCoreTimerCtx, NonTestCtxMarker, TimerContext, TimerHandler, TracingContext,
+        NestedIntoCoreTimerCtx, TimerContext, TimerHandler, TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
-    device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
+    device::{
+        AnyDevice, DeviceId, DeviceIdContext, DeviceIdentifier as _, FrameDestination,
+        StrongDeviceIdentifier, WeakDeviceId, WeakDeviceIdentifier,
+    },
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
         FilterHandlerProvider, FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict,
-        IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
+        IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
     },
     inspect::{Inspectable, Inspector},
     ip::{
@@ -70,6 +73,7 @@ use crate::{
         ipv6,
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
+        raw::{RawIpSocketMap, RawIpSocketsBindingsTypes},
         reassembly::{
             FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
             IpPacketFragmentCache,
@@ -386,11 +390,20 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevic
 // it. For the time being, however, we only support protocol numbers that we
 // actually use (TCP and UDP).
 
+/// Enables a blanket implementation of [`TransportIpContext`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `TransportIpContext` given the other requirements are met.
+pub trait UseTransportIpContextBlanket {}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
         I: IpExt,
         BC,
-        CC: IpDeviceContext<I, BC> + IpSocketHandler<I, BC> + IpStateContext<I, BC> + NonTestCtxMarker,
+        CC: IpDeviceContext<I, BC>
+            + IpSocketHandler<I, BC>
+            + IpStateContext<I, BC>
+            + UseTransportIpContextBlanket,
     > TransportIpContext<I, BC> for CC
 {
     type DevicesWithAddrIter<'s> = <Vec<CC::DeviceId> as IntoIterator>::IntoIter where CC: 's;
@@ -469,7 +482,7 @@ impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, 
     }
 }
 
-impl<S: Id, W: crate::device::WeakId<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
+impl<S: StrongDeviceIdentifier, W: WeakDeviceIdentifier<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
     pub(crate) fn as_strong_ref<'a>(&'a self) -> Option<Cow<'a, S>> {
         match self {
             EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
@@ -491,7 +504,7 @@ impl<S, W> EitherDeviceId<S, W> {
     }
 }
 
-impl<S: crate::device::StrongId<Weak = W>, W: crate::device::WeakId<Strong = S>>
+impl<S: StrongDeviceIdentifier<Weak = W>, W: WeakDeviceIdentifier<Strong = S>>
     EitherDeviceId<S, W>
 {
     pub(crate) fn as_strong<'a>(&'a self) -> Option<Cow<'a, S>> {
@@ -546,7 +559,7 @@ pub enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub trait IpLayerIpExt: IpExt {
     type AddressStatus;
-    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>: AsRef<
+    type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>: AsRef<
         IpStateInner<Self, StrongDeviceId, BT>,
     >;
     type PacketIdState;
@@ -557,7 +570,8 @@ pub trait IpLayerIpExt: IpExt {
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
-    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv4State<StrongDeviceId, BT>;
+    type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> =
+        Ipv4State<StrongDeviceId, BT>;
     type PacketIdState = AtomicU16;
     type PacketId = u16;
     type RxCounters = Ipv4RxCounters;
@@ -571,7 +585,8 @@ impl IpLayerIpExt for Ipv4 {
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
-    type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv6State<StrongDeviceId, BT>;
+    type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> =
+        Ipv6State<StrongDeviceId, BT>;
     type PacketIdState = ();
     type PacketId = ();
     type RxCounters = Ipv6RxCounters;
@@ -949,6 +964,12 @@ pub(crate) fn resolve_route_to_destination<
     }
 }
 
+/// Enables a blanket implementation of [`IpSocketContext`].
+///
+/// Implementing this marker trait for a type enables a blanket implementation
+/// of `IpSocketContext` given the other requirements are met.
+pub trait UseIpSocketContextBlanket {}
+
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
         BC: IpDeviceBindingsContext<I, CC::DeviceId>
@@ -957,7 +978,7 @@ impl<
         CC: IpLayerContext<I, BC>
             + IpLayerEgressContext<I, BC>
             + device::IpDeviceConfigurationContext<I, BC>
-            + NonTestCtxMarker,
+            + UseIpSocketContextBlanket,
     > IpSocketContext<I, BC> for CC
 {
     fn lookup_route(
@@ -982,7 +1003,7 @@ impl<
         packet_metadata: IpLayerPacketMetadata<I, BC>,
     ) -> Result<(), S>
     where
-        S: Serializer + MaybeTransportPacket,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta.into(), body, packet_metadata)
@@ -1053,7 +1074,7 @@ pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, BC>:
         proto: I::Proto,
         body: B,
         transport_override: Option<TransparentLocalDelivery<I>>,
-    ) -> Result<(), (B, TransportReceiveError)>;
+    ) -> Result<(), TransportReceiveError>;
 }
 
 /// A marker trait for all the contexts required for IP ingress.
@@ -1108,7 +1129,9 @@ where
     //
     // See https://github.com/rust-lang/rust/issues/20671#issuecomment-1905186183
     // for more discussion.
-    type DeviceId_: crate::filter::InterfaceProperties<BC::DeviceClass> + StrongId + Debug;
+    type DeviceId_: crate::filter::InterfaceProperties<BC::DeviceClass>
+        + StrongDeviceIdentifier
+        + Debug;
 }
 
 impl<I, BC, CC> IpLayerEgressContext<I, BC> for CC
@@ -1133,7 +1156,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         proto: Ipv4Proto,
         body: B,
         transport_override: Option<TransparentLocalDelivery<Ipv4>>,
-    ) -> Result<(), (B, TransportReceiveError)> {
+    ) -> Result<(), TransportReceiveError> {
         // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
 
@@ -1148,6 +1171,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             Ipv4Proto::Igmp => {
                 device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body);
@@ -1163,6 +1187,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             Ipv4Proto::Proto(IpProto::Tcp) => {
                 <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
@@ -1174,13 +1199,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             // TODO(joshlf): Once all IP protocol numbers are covered, remove
             // this default case.
-            _ => Err((
-                body,
-                TransportReceiveError { inner: TransportReceiveErrorInner::ProtocolUnsupported },
-            )),
+            _ => Err(TransportReceiveError {
+                inner: TransportReceiveErrorInner::ProtocolUnsupported,
+            }),
         }
     }
 }
@@ -1197,7 +1222,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         proto: Ipv6Proto,
         body: B,
         transport_override: Option<TransparentLocalDelivery<Ipv6>>,
-    ) -> Result<(), (B, TransportReceiveError)> {
+    ) -> Result<(), TransportReceiveError> {
         // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
 
@@ -1212,6 +1237,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             // A value of `Ipv6Proto::NoNextHeader` tells us that there is no
             // header whatsoever following the last lower-level header so we stop
@@ -1227,6 +1253,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             Ipv6Proto::Proto(IpProto::Udp) => {
                 <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
@@ -1238,13 +1265,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     body,
                     transport_override,
                 )
+                .map_err(|(_body, err)| err)
             }
             // TODO(joshlf): Once all IP Next Header numbers are covered, remove
             // this default case.
-            _ => Err((
-                body,
-                TransportReceiveError { inner: TransportReceiveErrorInner::ProtocolUnsupported },
-            )),
+            _ => Err(TransportReceiveError {
+                inner: TransportReceiveErrorInner::ProtocolUnsupported,
+            }),
         }
     }
 }
@@ -1264,7 +1291,7 @@ impl Ipv4StateBuilder {
 
     pub(crate) fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
-        StrongDeviceId: StrongId,
+        StrongDeviceId: StrongDeviceIdentifier,
         BC: TimerContext + IpLayerBindingsTypes,
     >(
         self,
@@ -1292,7 +1319,7 @@ pub(crate) struct Ipv6StateBuilder {
 impl Ipv6StateBuilder {
     pub(crate) fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
-        StrongDeviceId: StrongId,
+        StrongDeviceId: StrongDeviceIdentifier,
         BC: TimerContext + IpLayerBindingsTypes,
     >(
         self,
@@ -1311,14 +1338,16 @@ impl Ipv6StateBuilder {
     }
 }
 
-pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
+pub struct Ipv4State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
     pub(super) filter: RwLock<crate::filter::State<Ipv4, BT>>,
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceId, BT> {
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    Ipv4State<StrongDeviceId, BT>
+{
     pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, BT>> {
         &self.filter
     }
@@ -1332,7 +1361,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv4State<StrongDeviceI
     }
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     AsRef<IpStateInner<Ipv4, StrongDeviceId, BT>> for Ipv4State<StrongDeviceId, BT>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv4, StrongDeviceId, BT> {
@@ -1346,14 +1375,16 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
-pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
+pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
     pub(super) filter: RwLock<crate::filter::State<Ipv6, BT>>,
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceId, BT> {
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    Ipv6State<StrongDeviceId, BT>
+{
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.slaac_counters
     }
@@ -1371,7 +1402,7 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> Ipv6State<StrongDeviceI
     }
 }
 
-impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
+impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     AsRef<IpStateInner<Ipv6, StrongDeviceId, BT>> for Ipv6State<StrongDeviceId, BT>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv6, StrongDeviceId, BT> {
@@ -1440,7 +1471,7 @@ where
     }
 }
 
-impl<I: datagram::DualStackIpExt, D: crate::device::WeakId, BT: IcmpEchoBindingsTypes>
+impl<I: datagram::DualStackIpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
     RwLockFor<crate::lock_ordering::IcmpSocketState<I>> for IcmpSocketId<I, D, BT>
 {
     type Data = IcmpSocketState<I, D, BT>;
@@ -1500,6 +1531,24 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPack
 
     fn access(&self) -> Self::Guard<'_> {
         &self.ipv4.next_packet_id
+    }
+}
+
+impl<I: IpLayerIpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::AllRawIpSockets<I>>
+    for StackState<BT>
+{
+    type Data = RawIpSocketMap<I, BT>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data>
+        where Self: 'l;
+    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data>
+        where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.inner_ip_state().raw_sockets.read()
+    }
+
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.inner_ip_state().raw_sockets.write()
     }
 }
 
@@ -1614,8 +1663,14 @@ impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::
 }
 
 /// Marker trait for the bindings types required by the IP layer's inner state.
-pub trait IpStateBindingsTypes: PmtuBindingsTypes + FragmentBindingsTypes {}
-impl<BT> IpStateBindingsTypes for BT where BT: PmtuBindingsTypes + FragmentBindingsTypes {}
+pub trait IpStateBindingsTypes:
+    PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes
+{
+}
+impl<BT> IpStateBindingsTypes for BT where
+    BT: PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes
+{
+}
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -1624,6 +1679,7 @@ pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
+    raw_sockets: RwLock<RawIpSocketMap<I, BT>>,
 }
 
 impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, DeviceId, BT> {
@@ -1643,6 +1699,7 @@ impl<I: IpLayerIpExt, DeviceId, BC: TimerContext + IpStateBindingsTypes>
             ),
             pmtu_cache: Mutex::new(PmtuCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
             counters: Default::default(),
+            raw_sockets: Default::default(),
         }
     }
 }
@@ -1704,6 +1761,88 @@ where
     }
 }
 
+/// A [`TransportReceiveError`], and the metadata required to handle it.
+struct DispatchIpPacketError<I: IcmpHandlerIpExt> {
+    /// The error that occurred while dispatching to the transport layer.
+    err: TransportReceiveError,
+    /// The original source IP address of the packet (before the local-ingress
+    /// hook evaluation).
+    src_ip: I::SourceAddress,
+    /// The original destination IP address of the packet (before the
+    /// local-ingress hook evaluation).
+    dst_ip: SpecifiedAddr<I::Addr>,
+    /// The frame destination of the packet.
+    frame_dst: Option<FrameDestination>,
+    /// The metadata from the packet, allowing the packet's backing buffer to be
+    /// returned to it's pre-IP-parse state with [`GrowBuffer::undo_parse`].
+    meta: ParseMetadata,
+}
+
+impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
+    /// Generate an send an appropriate ICMP error in response to this error.
+    ///
+    /// The provided `body` must be the original buffer from which the IP
+    /// packet responsible for this error was parsed. It is expected to be in a
+    /// state that allows undoing the IP packet parse (e.g. unmodified after the
+    /// IP packet was parsed).
+    fn respond_with_icmp_error<B: BufferMut, BC, CC: IcmpErrorHandler<I, BC>>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        mut body: B,
+        device: &CC::DeviceId,
+    ) {
+        fn icmp_error_from_transport_error<I: IcmpHandlerIpExt>(
+            err: TransportReceiveError,
+            header_len: usize,
+        ) -> I::IcmpError {
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct ErrorHolder<I: Ip + IcmpHandlerIpExt>(I::IcmpError);
+
+            let ErrorHolder(err) = match err.inner {
+                TransportReceiveErrorInner::ProtocolUnsupported => I::map_ip(
+                    header_len,
+                    |header_len| {
+                        ErrorHolder(Icmpv4Error {
+                            kind: Icmpv4ErrorKind::ProtocolUnreachable,
+                            header_len,
+                        })
+                    },
+                    |header_len| ErrorHolder(Icmpv6ErrorKind::ProtocolUnreachable { header_len }),
+                ),
+                TransportReceiveErrorInner::PortUnreachable => I::map_ip(
+                    header_len,
+                    |header_len| {
+                        ErrorHolder(Icmpv4Error {
+                            kind: Icmpv4ErrorKind::PortUnreachable,
+                            header_len,
+                        })
+                    },
+                    |_header_len| ErrorHolder(Icmpv6ErrorKind::PortUnreachable),
+                ),
+            };
+            err
+        }
+
+        let DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta } = self;
+        // Undo the parsing of the IP Packet, moving the buffer's cursor so that
+        // it points at the start of the IP header. This way, the sent ICMP
+        // error will contain the entire original IP packet.
+        body.undo_parse(meta);
+
+        core_ctx.send_icmp_error_message(
+            bindings_ctx,
+            device,
+            frame_dst,
+            src_ip,
+            dst_ip,
+            body,
+            icmp_error_from_transport_error::<I>(err, meta.header_len()),
+        );
+    }
+}
+
 // TODO(joshlf): Once we support multiple extension headers in IPv6, we will
 // need to verify that the callers of this function are still sound. In
 // particular, they may accidentally pass a parse_metadata argument which
@@ -1726,21 +1865,16 @@ where
 /// `dispatch_receive_ip_packet` will also panic.
 fn dispatch_receive_ipv4_packet<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
-    B: BufferMut,
     CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    src_ip: Ipv4Addr,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
-    proto: Ipv4Proto,
-    body: B,
-    parse_metadata: Option<ParseMetadata>,
+    mut packet: Ipv4Packet<&mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv4>>,
-) {
+) -> Result<(), DispatchIpPacketError<Ipv4>> {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
@@ -1753,77 +1887,49 @@ fn dispatch_receive_ipv4_packet<
         | None => (),
     }
 
-    match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, &body),
-        device,
-        &mut packet_metadata,
-    ) {
+    let proto = packet.proto();
+
+    match core_ctx.filter_handler().local_ingress_hook(&mut packet, device, &mut packet_metadata) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
-            return;
+            return Ok(());
         }
         crate::filter::Verdict::Accept => {}
     }
     packet_metadata.acknowledge_drop();
 
-    let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
-        bindings_ctx,
-        device,
-        src_ip,
-        dst_ip,
-        proto,
-        body,
-        transport_override,
-    ) {
-        Ok(()) => return,
-        Err(e) => e,
+    let src_ip = packet.src_ip();
+    // `dst_ip` is validated to be specified before a packet is provided to this
+    // function, but it's possible for the LOCAL_INGRESS hook to rewrite the packet,
+    // so we have to re-verify this.
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        debug!(
+            "dispatch_receive_ipv4_packet: Received packet with unspecified destination IP address \
+            after the LOCAL_INGRESS hook; dropping"
+        );
+        return Ok(());
     };
-    // All branches promise to return the buffer in the same state it was in
-    // when they were executed. Thus, all we have to do is undo the parsing
-    // of the IP packet header, and the buffer will be back to containing
-    // the entire original IP packet.
-    let meta = parse_metadata.unwrap();
-    body.undo_parse(meta);
+    let buffer = Buf::new(packet.body_mut(), ..);
 
-    if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
-        match err.inner {
-            TransportReceiveErrorInner::ProtocolUnsupported => {
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv4Error {
-                        kind: Icmpv4ErrorKind::ProtocolUnreachable,
-                        header_len: meta.header_len(),
-                    },
-                );
+    core_ctx
+        .dispatch_receive_ip_packet(
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            proto,
+            buffer,
+            transport_override,
+        )
+        .or_else(|err| {
+            if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
+                let (_, _, _, meta) = packet.into_metadata();
+                Err(DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta })
+            } else {
+                Ok(())
             }
-            TransportReceiveErrorInner::PortUnreachable => {
-                // TODO(joshlf): What if we're called from a loopback
-                // handler, and device and parse_metadata are None? In other
-                // words, what happens if we attempt to send to a loopback
-                // port which is unreachable? We will eventually need to
-                // restructure the control flow here to handle that case.
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv4Error {
-                        kind: Icmpv4ErrorKind::PortUnreachable,
-                        header_len: meta.header_len(),
-                    },
-                );
-            }
-        }
-    } else {
-        trace!("dispatch_receive_ipv4_packet: Cannot send ICMP error message in response to a packet from the unspecified address");
-    }
+        })
 }
 
 /// Dispatch a received IPv6 packet to the appropriate protocol.
@@ -1832,21 +1938,16 @@ fn dispatch_receive_ipv4_packet<
 /// `dispatch_receive_ipv4_packet`, but for IPv6.
 fn dispatch_receive_ipv6_packet<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
-    B: BufferMut,
     CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    src_ip: Ipv6SourceAddr,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
-    proto: Ipv6Proto,
-    body: B,
-    parse_metadata: Option<ParseMetadata>,
+    mut packet: Ipv6Packet<&mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
     transport_override: Option<TransparentLocalDelivery<Ipv6>>,
-) {
+) -> Result<(), DispatchIpPacketError<Ipv6>> {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
     // function are still sound. In particular, they may accidentally pass a
@@ -1865,76 +1966,58 @@ fn dispatch_receive_ipv6_packet<
         | None => (),
     }
 
-    match core_ctx.filter_handler().local_ingress_hook(
-        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, &body),
-        device,
-        &mut packet_metadata,
-    ) {
+    let proto = packet.proto();
+
+    match core_ctx.filter_handler().local_ingress_hook(&mut packet, device, &mut packet_metadata) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
-            return;
+            return Ok(());
         }
         crate::filter::Verdict::Accept => {}
     }
 
-    let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
-        bindings_ctx,
-        device,
-        src_ip,
-        dst_ip,
-        proto,
-        body,
-        transport_override,
-    ) {
-        Ok(()) => {
-            packet_metadata.acknowledge_drop();
-            return;
-        }
-        Err(e) => e,
+    // These invariants are validated by the caller of this function, but it's
+    // possible possible for the LOCAL_INGRESS hook to rewrite the packet, so we
+    // have to check them again.
+    let Some(src_ip) = packet.src_ipv6() else {
+        debug!(
+            "dispatch_receive_ipv6_packet: received packet from non-unicast source {} after the \
+            LOCAL_INGRESS hook; dropping",
+            packet.src_ip()
+        );
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
+        return Ok(());
     };
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        debug!(
+            "dispatch_receive_ipv6_packet: Received packet with unspecified destination IP address \
+            after the LOCAL_INGRESS hook; dropping"
+        );
+        return Ok(());
+    };
+    let buffer = Buf::new(packet.body_mut(), ..);
 
-    // All branches promise to return the buffer in the same state it was in
-    // when they were executed. Thus, all we have to do is undo the parsing
-    // of the IP packet header, and the buffer will be back to containing
-    // the entire original IP packet.
-    let meta = parse_metadata.unwrap();
-    body.undo_parse(meta);
-
-    match err.inner {
-        TransportReceiveErrorInner::ProtocolUnsupported => {
+    let result = core_ctx
+        .dispatch_receive_ip_packet(
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            proto,
+            buffer,
+            transport_override,
+        )
+        .or_else(|err| {
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    *src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv6ErrorKind::ProtocolUnreachable { header_len: meta.header_len() },
-                );
+                let (_, _, _, meta) = packet.into_metadata();
+                Err(DispatchIpPacketError { err, src_ip: *src_ip, dst_ip, frame_dst, meta })
+            } else {
+                Ok(())
             }
-        }
-        TransportReceiveErrorInner::PortUnreachable => {
-            // TODO(joshlf): What if we're called from a loopback handler,
-            // and device and parse_metadata are None? In other words, what
-            // happens if we attempt to send to a loopback port which is
-            // unreachable? We will eventually need to restructure the
-            // control flow here to handle that case.
-            if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                core_ctx.send_icmp_error_message(
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    *src_ip,
-                    dst_ip,
-                    body,
-                    Icmpv6ErrorKind::PortUnreachable,
-                );
-            }
-        }
-    }
-
+        });
     packet_metadata.acknowledge_drop();
+    result
 }
 
 pub(crate) fn send_ip_frame<I, CC, BC, S>(
@@ -1989,7 +2072,7 @@ macro_rules! drop_packet_and_undo_parse {
 /// ready to do so. If the packet isn't fragmented, or a packet was reassembled,
 /// attempt to dispatch the packet.
 macro_rules! process_fragment {
-    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $src_ip:expr, $dst_ip:expr, $ip:ident, $packet_metadata:expr) => {{
+    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $ip:ident, $packet_metadata:expr) => {{
         match FragmentHandler::<$ip, _>::process_fragment::<&mut [u8]>(
             $core_ctx,
             $bindings_ctx,
@@ -2000,20 +2083,17 @@ macro_rules! process_fragment {
                 trace!("receive_ip_packet: not fragmented");
                 // TODO(joshlf):
                 // - Check for already-expired TTL?
-                let (_, _, proto, meta) = packet.into_metadata();
                 $dispatch(
                     $core_ctx,
                     $bindings_ctx,
                     $device,
                     $frame_dst,
-                    $src_ip,
-                    $dst_ip,
-                    proto,
-                    $buffer,
-                    Some(meta),
+                    packet,
                     $packet_metadata,
                     None,
-                );
+                ).unwrap_or_else(|err| {
+                    err.respond_with_icmp_error($core_ctx, $bindings_ctx, $buffer, $device)
+                })
             }
             // Ready to reassemble a packet.
             FragmentProcessingState::Ready { key, packet_len } => {
@@ -2037,26 +2117,23 @@ macro_rules! process_fragment {
                         trace!("receive_ip_packet: fragmented, reassembled packet: {:?}", packet);
                         // TODO(joshlf):
                         // - Check for already-expired TTL?
-                        let (_, _, proto, meta) = packet.into_metadata();
                         // Since each fragment had its own packet metadata, it's
                         // not clear what metadata to use for the reassembled
                         // packet. Resetting the metadata is the safest bet,
                         // though it means downstream consumers must be aware of
                         // this case.
                         let packet_metadata = IpLayerPacketMetadata::default();
-                        $dispatch::<_, Buf<Vec<u8>>, _,>(
+                        $dispatch::<_, _,>(
                             $core_ctx,
                             $bindings_ctx,
                             $device,
                             $frame_dst,
-                            $src_ip,
-                            $dst_ip,
-                            proto,
-                            buffer,
-                            Some(meta),
+                            packet,
                             packet_metadata,
                             None,
-                        );
+                        ).unwrap_or_else(|err| {
+                            err.respond_with_icmp_error($core_ctx, $bindings_ctx, $buffer, $device)
+                        })
                     }
                     // TODO(ghanan): Handle reassembly errors, remove
                     // `allow(unreachable_patterns)` when complete.
@@ -2256,21 +2333,18 @@ pub(crate) fn receive_ipv4_packet<
             // Short-circuit the routing process and override local demux, providing a local
             // address and port to which the packet should be transparently delivered at the
             // transport layer.
-            let src_ip = packet.src_ip();
-            let (_, _, proto, meta) = packet.into_metadata();
             dispatch_receive_ipv4_packet(
                 core_ctx,
                 bindings_ctx,
                 device,
                 frame_dst,
-                src_ip,
-                dst_ip,
-                proto,
-                buffer,
-                Some(meta),
+                packet,
                 packet_metadata,
                 Some(TransparentLocalDelivery { addr, port }),
-            );
+            )
+            .unwrap_or_else(|err| {
+                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+            });
             return;
         }
     }
@@ -2281,7 +2355,6 @@ pub(crate) fn receive_ipv4_packet<
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
             trace!("receive_ipv4_packet: delivering locally");
-            let src_ip = packet.src_ip();
 
             // Process a potential IPv4 fragment if the destination is this
             // host.
@@ -2304,8 +2377,6 @@ pub(crate) fn receive_ipv4_packet<
                 frame_dst,
                 buffer,
                 packet,
-                src_ip,
-                dst_ip,
                 Ipv4,
                 packet_metadata
             );
@@ -2552,20 +2623,18 @@ pub(crate) fn receive_ipv6_packet<
             // Short-circuit the routing process and override local demux, providing a local
             // address and port to which the packet should be transparently delivered at the
             // transport layer.
-            let (_, _, proto, meta) = packet.into_metadata();
             dispatch_receive_ipv6_packet(
                 core_ctx,
                 bindings_ctx,
                 device,
                 frame_dst,
-                src_ip,
-                dst_ip,
-                proto,
-                buffer,
-                Some(meta),
+                packet,
                 packet_metadata,
                 Some(TransparentLocalDelivery { addr, port }),
-            );
+            )
+            .unwrap_or_else(|err| {
+                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+            });
             return;
         }
     }
@@ -2609,20 +2678,18 @@ pub(crate) fn receive_ipv6_packet<
                     // - Do something with ICMP if we don't have a handler for
                     //   that protocol?
                     // - Check for already-expired TTL?
-                    let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) = packet.into_metadata();
                     dispatch_receive_ipv6_packet(
                         core_ctx,
                         bindings_ctx,
                         device,
                         frame_dst,
-                        src_ip,
-                        dst_ip,
-                        proto,
-                        buffer,
-                        Some(meta),
+                        packet,
                         packet_metadata,
                         None,
-                    );
+                    )
+                    .unwrap_or_else(|err| {
+                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+                    });
                 }
                 Ipv6PacketAction::ProcessFragment => {
                     trace!(
@@ -2653,8 +2720,6 @@ pub(crate) fn receive_ipv6_packet<
                         frame_dst,
                         buffer,
                         packet,
-                        src_ip,
-                        dst_ip,
                         Ipv6,
                         packet_metadata
                     );
@@ -3109,7 +3174,7 @@ pub(crate) trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer + MaybeTransportPacket,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
 
     /// Send an IP packet that doesn't require the encapsulation and other
@@ -3144,7 +3209,7 @@ impl<
         body: S,
     ) -> Result<(), S>
     where
-        S: Serializer + MaybeTransportPacket,
+        S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
     {
         send_ip_packet_from_device(self, bindings_ctx, meta, body, IpLayerPacketMetadata::default())
@@ -3195,7 +3260,7 @@ where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
-    S: Serializer + MaybeTransportPacket,
+    S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {
     let SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu } = meta;
@@ -3525,22 +3590,6 @@ pub(crate) mod testutil {
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
     };
 
-    impl<S, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
-        for crate::context::testutil::FakeCoreCtx<S, Meta, D>
-    where
-        FakeIpDeviceIdCtx<D>: DeviceIdContext<AnyDevice, DeviceId = D, WeakDeviceId = D::Weak>,
-    {
-        type DeviceId = D;
-        type WeakDeviceId = D::Weak;
-    }
-
-    impl<Outer, Inner: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice>
-        for crate::context::testutil::Wrapped<Outer, Inner>
-    {
-        type DeviceId = Inner::DeviceId;
-        type WeakDeviceId = Inner::WeakDeviceId;
-    }
-
     #[derive(Debug, GenericOverIp)]
     #[generic_over_ip()]
     pub(crate) enum DualStackSendIpPacketMeta<D> {
@@ -3655,7 +3704,7 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            self.get_mut().join_multicast_group(bindings_ctx, device, addr)
+            self.state.join_multicast_group(bindings_ctx, device, addr)
         }
 
         fn leave_multicast_group(
@@ -3664,14 +3713,14 @@ pub(crate) mod testutil {
             device: &Self::DeviceId,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) {
-            self.get_mut().leave_multicast_group(bindings_ctx, device, addr)
+            self.state.leave_multicast_group(bindings_ctx, device, addr)
         }
 
         fn select_device_for_multicast_group(
             &mut self,
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) -> Result<Self::DeviceId, ResolveRouteError> {
-            self.get_mut().select_device_for_multicast_group(addr)
+            self.state.select_device_for_multicast_group(addr)
         }
     }
 }
@@ -3725,9 +3774,9 @@ mod tests {
             types::{AddableEntryEither, AddableMetric, RawMetric},
         },
         testutil::{
-            new_rng, set_logger_for_test, Ctx, FakeBindingsCtx, FakeCtx,
-            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
-            FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            new_rng, set_logger_for_test, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtx,
+            FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            TEST_ADDRS_V4, TEST_ADDRS_V6,
         },
         UnlockedCoreCtx,
     };
@@ -3751,8 +3800,8 @@ mod tests {
             buffer.parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::Check).unwrap();
         let packet = buffer.parse::<<Ipv6 as packet_formats::ip::IpExt>::Packet<_>>().unwrap();
         let (src_ip, dst_ip, proto, _): (_, _, _, ParseMetadata) = packet.into_metadata();
-        assert_eq!(dst_ip, FAKE_CONFIG_V6.remote_ip.get());
-        assert_eq!(src_ip, FAKE_CONFIG_V6.local_ip.get());
+        assert_eq!(dst_ip, TEST_ADDRS_V6.remote_ip.get());
+        assert_eq!(src_ip, TEST_ADDRS_V6.local_ip.get());
         assert_eq!(proto, Ipv6Proto::Icmpv6);
         let icmp =
             buffer.parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(src_ip, dst_ip)).unwrap();
@@ -3802,14 +3851,14 @@ mod tests {
 
         bytes[6] = Ipv6ExtHdrType::DestinationOptions.into();
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
 
         if to_multicast {
             bytes[24..40].copy_from_slice(
                 &[255, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32][..],
             );
         } else {
-            bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+            bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         }
 
         Buf::new(bytes, ..)
@@ -3818,8 +3867,8 @@ mod tests {
     /// Create an IPv4 packet builder.
     fn get_ipv4_builder() -> Ipv4PacketBuilder {
         Ipv4PacketBuilder::new(
-            FAKE_CONFIG_V4.remote_ip,
-            FAKE_CONFIG_V4.local_ip,
+            TEST_ADDRS_V4.remote_ip,
+            TEST_ADDRS_V4.local_ip,
             10,
             IpProto::Udp.into(),
         )
@@ -3895,8 +3944,8 @@ mod tests {
         bytes[..4].copy_from_slice(&[0x60, 0x20, 0x00, 0x77][..]);
         bytes[6] = Ipv6ExtHdrType::Fragment.into(); // Next Header
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
+        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         bytes[40] = IpProto::Udp.into();
         bytes[42] = fragment_offset >> 5;
         bytes[43] = ((fragment_offset & 0x1F) << 3) | if m_flag { 1 } else { 0 };
@@ -3914,7 +3963,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_icmp_parameter_problem_non_must() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
 
         // Test parsing an IPv6 packet with invalid next header value which
@@ -3935,8 +3984,8 @@ mod tests {
         bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
         bytes[6] = 255; // Invalid Next Header
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
+        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         let buf = Buf::new(bytes, ..);
 
         ctx.test_api().receive_ip_packet::<Ipv6, _>(
@@ -3953,7 +4002,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_icmp_parameter_problem_must() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
 
         // Test parsing an IPv6 packet where we MUST send an ICMP parameter problem
@@ -3983,8 +4032,8 @@ mod tests {
         bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
         bytes[6] = Ipv6ExtHdrType::Routing.into();
         bytes[7] = 64;
-        bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
-        bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
+        bytes[8..24].copy_from_slice(TEST_ADDRS_V6.remote_ip.bytes());
+        bytes[24..40].copy_from_slice(TEST_ADDRS_V6.local_ip.bytes());
         let buf = Buf::new(bytes, ..);
         ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
@@ -4002,7 +4051,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_unrecognized_ext_hdr_option() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let mut expected_icmps = 0;
         let mut bytes = [0; 64];
@@ -4137,8 +4186,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt>() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+    fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt + crate::IpExt>() {
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -4153,8 +4202,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_packet_reassembly<I: Ip + TestIpExt>() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+    fn test_ip_packet_reassembly<I: Ip + TestIpExt + crate::IpExt>() {
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -4179,8 +4228,10 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: Ip + TestIpExt>() {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+    fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<
+        I: Ip + TestIpExt + crate::IpExt,
+    >() {
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -4229,11 +4280,11 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_packet_reassembly_timer<I: Ip + TestIpExt>()
+    fn test_ip_packet_reassembly_timer<I: Ip + TestIpExt + crate::IpExt>()
     where
         IpLayerTimerId: From<FragmentTimerId<I>>,
     {
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -4277,14 +4328,13 @@ mod tests {
         // packet routing for alice.
         let a = "alice";
         let b = "bob";
-        let fake_config = I::FAKE_CONFIG;
-        let (mut alice, alice_device_ids) =
-            FakeEventDispatcherBuilder::from_config(fake_config.swap()).build();
+        let fake_config = I::TEST_ADDRS;
+        let (mut alice, alice_device_ids) = FakeCtxBuilder::with_addrs(fake_config.swap()).build();
         {
             set_forwarding_enabled::<_, I>(&mut alice, &alice_device_ids[0].clone().into(), true);
         }
-        let (bob, bob_device_ids) = FakeEventDispatcherBuilder::from_config(fake_config).build();
-        let mut net = crate::context::testutil::new_simple_fake_network(
+        let (bob, bob_device_ids) = FakeCtxBuilder::with_addrs(fake_config).build();
+        let mut net = crate::testutil::new_simple_fake_network(
             a,
             alice,
             alice_device_ids[0].downgrade(),
@@ -4355,12 +4405,9 @@ mod tests {
         // that is too big to be forwarded when it isn't destined for the node
         // it arrived at.
 
-        let fake_config = Ipv6::FAKE_CONFIG;
-        let mut dispatcher_builder = FakeEventDispatcherBuilder::from_config(fake_config.clone());
-        let extra_ip = UnicastAddr::new(Ipv6Addr::from_bytes([
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 100,
-        ]))
-        .unwrap();
+        let fake_config = Ipv6::TEST_ADDRS;
+        let mut dispatcher_builder = FakeCtxBuilder::with_addrs(fake_config.clone());
+        let extra_ip = UnicastAddr::new(Ipv6::get_other_ip_address(7).get()).unwrap();
         let extra_mac = UnicastAddr::new(Mac::new([12, 13, 14, 15, 16, 17])).unwrap();
         dispatcher_builder.add_ndp_table_entry(0, extra_ip, extra_mac);
         dispatcher_builder.add_ndp_table_entry(
@@ -4466,7 +4513,7 @@ mod tests {
         .into_inner()
     }
 
-    trait GetPmtuIpExt: Ip {
+    trait GetPmtuIpExt: TestIpExt + crate::IpExt {
         fn get_pmtu<BC: BindingsContext>(
             state: &StackState<BC>,
             local_ip: Self::Addr,
@@ -4495,14 +4542,13 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_update_pmtu<I: Ip + TestIpExt + GetPmtuIpExt>() {
+    fn test_ip_update_pmtu<I: Ip + GetPmtuIpExt>() {
         // Test receiving a Packet Too Big (IPv6) or Dest Unreachable
         // Fragmentation Required (IPv4) which should update the PMTU if it is
         // less than the current value.
 
-        let fake_config = I::FAKE_CONFIG;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
+        let fake_config = I::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(fake_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4584,14 +4630,13 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_update_pmtu_too_low<I: Ip + TestIpExt + GetPmtuIpExt>() {
+    fn test_ip_update_pmtu_too_low<I: Ip + GetPmtuIpExt>() {
         // Test receiving a Packet Too Big (IPv6) or Dest Unreachable
         // Fragmentation Required (IPv4) which should not update the PMTU if it
         // is less than the min MTU.
 
-        let fake_config = I::FAKE_CONFIG;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
+        let fake_config = I::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(fake_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4634,9 +4679,8 @@ mod tests {
         // Test receiving an IPv4 Dest Unreachable Fragmentation
         // Required from a node that does not implement RFC 1191.
 
-        let fake_config = Ipv4::FAKE_CONFIG;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
+        let fake_config = Ipv4::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(fake_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4747,13 +4791,12 @@ mod tests {
 
     #[test]
     fn test_invalid_icmpv4_in_ipv6() {
-        let ip_config = Ipv6::FAKE_CONFIG;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::from_config(ip_config.clone()).build();
+        let ip_config = Ipv6::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(ip_config.clone()).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
-        let ic_config = Ipv4::FAKE_CONFIG;
+        let ic_config = Ipv4::TEST_ADDRS;
         let icmp_builder = IcmpPacketBuilder::<Ipv4, _>::new(
             ic_config.remote_ip,
             ic_config.local_ip,
@@ -4791,14 +4834,13 @@ mod tests {
 
     #[test]
     fn test_invalid_icmpv6_in_ipv4() {
-        let ip_config = Ipv4::FAKE_CONFIG;
-        let (mut ctx, device_ids) =
-            FakeEventDispatcherBuilder::from_config(ip_config.clone()).build();
+        let ip_config = Ipv4::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(ip_config.clone()).build();
         // First possible device id.
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
-        let ic_config = Ipv6::FAKE_CONFIG;
+        let ic_config = Ipv6::TEST_ADDRS;
         let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
             ic_config.remote_ip,
             ic_config.local_ip,
@@ -4842,8 +4884,8 @@ mod tests {
         // Test receiving a packet destined to a multicast IP (and corresponding
         // multicast MAC).
 
-        let config = I::FAKE_CONFIG;
-        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
+        let config = I::TEST_ADDRS;
+        let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config.clone()).build();
         let eth_device = &device_ids[0];
         let device: DeviceId<_> = eth_device.clone().into();
         let multi_addr = I::get_multicast_addr(3).get();
@@ -4931,7 +4973,7 @@ mod tests {
         // tentative address (that is performing NDP's Duplicate Address
         // Detection (DAD)) -- IPv6 only.
 
-        let config = Ipv6::FAKE_CONFIG;
+        let config = Ipv6::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -5030,8 +5072,8 @@ mod tests {
     fn test_drop_non_unicast_ipv6_source() {
         // Test that an inbound IPv6 packet with a non-unicast source address is
         // dropped.
-        let cfg = FAKE_CONFIG_V6;
-        let (mut ctx, _device_ids) = FakeEventDispatcherBuilder::from_config(cfg.clone()).build();
+        let cfg = TEST_ADDRS_V6;
+        let (mut ctx, _device_ids) = FakeCtxBuilder::with_addrs(cfg.clone()).build();
         let device = ctx
             .core_api()
             .device::<EthernetLinkDevice>()
@@ -5067,10 +5109,10 @@ mod tests {
 
     #[test]
     fn test_receive_ip_packet_action() {
-        let v4_config = Ipv4::FAKE_CONFIG;
-        let v6_config = Ipv6::FAKE_CONFIG;
+        let v4_config = Ipv4::TEST_ADDRS;
+        let v6_config = Ipv6::TEST_ADDRS;
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         // Both devices have the same MAC address, which is a bit weird, but not
         // a problem for this test.
         let v4_subnet = AddrSubnet::from_witness(v4_config.local_ip, 16).unwrap().subnet();
@@ -5379,7 +5421,7 @@ mod tests {
     #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     fn make_test_ctx<I: Ip + TestIpExt + crate::IpExt>(
     ) -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>) {
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         for device in [Device::First, Device::Second] {
             let ip: SpecifiedAddr<I::Addr> = device.ip_address().into();
             let subnet =
@@ -5423,7 +5465,7 @@ mod tests {
         (ctx, device_ids)
     }
 
-    fn do_route_lookup<I: Ip + TestIpExt + IpDeviceStateIpExt>(
+    fn do_route_lookup<I: IpDeviceStateIpExt + IpExt>(
         ctx: &mut FakeCtx,
         device_ids: Vec<DeviceId<FakeBindingsCtx>>,
         egress_device: Option<Device>,

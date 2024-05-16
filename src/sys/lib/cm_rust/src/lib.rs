@@ -470,6 +470,7 @@ pub struct UseConfigurationDecl {
     #[fidl_decl(default)]
     pub availability: Availability,
     pub type_: ConfigValueType,
+    pub default: Option<ConfigValue>,
 }
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -3410,6 +3411,7 @@ mod tests {
                             target_name: "my_config".parse().unwrap(),
                             availability: Availability::Required,
                             type_: ConfigValueType::Bool,
+                            default: None,
                         }),
                     ],
                     exposes: vec![

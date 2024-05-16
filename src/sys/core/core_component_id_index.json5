@@ -16,10 +16,6 @@
             moniker: "/core/account/credential_manager",
         },
         {
-            instance_id: "7db7e88479772e241229682b47f1794e12ac5d692f8d67421acd9d7ff318a975",
-            moniker: "/core/account/password_authenticator",
-        },
-        {
             instance_id: "ee4b67bc694a8b1f502d0d73377c4e0b7a7a102470fc6abb7b1bb25a38bcda01",
             moniker: "/core/termina-guest-manager",
         },

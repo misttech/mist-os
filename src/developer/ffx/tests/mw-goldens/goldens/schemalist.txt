@@ -1,4 +1,8 @@
 component_show.json
+daemon_stop.json
+emu_show.json
+emu_start.json
+emu_stop.json
 product_download.json
 product_lookup.json
 target_add.json
@@ -7,3 +11,4 @@ target_remove.json
 target_snapshot.json
 target_screenshot.json
 target_show.json
+target_wait.json

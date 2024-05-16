@@ -23,7 +23,7 @@ class PowerManager {
    public:
     virtual mali::RegisterIo* register_io() = 0;
     // Report that all requested power state changes are complete.
-    virtual void ReportPowerChangeComplete(bool success) = 0;
+    virtual void ReportPowerChangeComplete(bool powered_on, bool success) = 0;
   };
 
   explicit PowerManager(Owner* owner, uint64_t default_core_bitmask);

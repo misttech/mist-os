@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <arch/thread.h>
 #include <arch/x86.h>
 #include <arch/x86/descriptor.h>
 #include <arch/x86/feature.h>
@@ -99,11 +100,20 @@ vaddr_t arch_thread_get_blocked_fp(Thread* t) {
 }
 
 static void x86_context_switch_spec_mitigations(Thread* oldthread, Thread* newthread) {
+  // It should always be safe to access a thread's aspace member during a
+  // context switch.  The threads must still be alive (even if the old thread is
+  // context switching for the very last time, and is just about to disappear),
+  // and neither one is really "running" (they cannot be in the process of
+  // switching address spaces).
+  auto GetAspace = [](Thread* t) TA_NO_THREAD_SAFETY_ANALYSIS { return t->aspace(); };
+  VmAspace* oldthread_aspace = GetAspace(oldthread);
+  VmAspace* newthread_aspace = GetAspace(newthread);
+
   // Spectre V2: Overwrite the Return Address Stack to ensure its not poisoned
   // Only overwrite/fill if the prior thread was a user thread or if we're on CPUs vulnerable to
   // RSB underflow attacks.
   if (x86_cpu_should_ras_fill_on_ctxt_switch() &&
-      (oldthread->active_aspace() || x86_cpu_vulnerable_to_rsb_underflow())) {
+      (oldthread_aspace || x86_cpu_vulnerable_to_rsb_underflow())) {
     x86_ras_fill();
   }
   auto* const percpu = x86_get_percpu();
@@ -114,14 +124,13 @@ static void x86_context_switch_spec_mitigations(Thread* oldthread, Thread* newth
   //    on this core.
   // TODO(https://fxbug.dev/42115502): Handle aspace* reuse.
   if (x86_cpu_should_ibpb_on_ctxt_switch() &&
-      (((oldthread->active_aspace() && newthread->active_aspace()) &&
-        (oldthread->active_aspace() != newthread->active_aspace())) ||
-       ((!oldthread->active_aspace() && newthread->active_aspace()) &&
-        (percpu->last_user_aspace != newthread->active_aspace())))) {
+      (((oldthread_aspace && newthread_aspace) && (oldthread_aspace != newthread_aspace)) ||
+       ((!oldthread_aspace && newthread_aspace) &&
+        (percpu->last_user_aspace != newthread_aspace)))) {
     arch::IssueIbpb(arch::BootCpuidIo{}, hwreg::X86MsrIo{});
   }
-  if (oldthread->active_aspace() && !newthread->active_aspace()) {
-    percpu->last_user_aspace = oldthread->active_aspace();
+  if (oldthread_aspace && !newthread_aspace) {
+    percpu->last_user_aspace = oldthread_aspace;
   }
 }
 
@@ -248,7 +257,8 @@ static void x86_debug_restore_state(const Thread* thread) {
   }
 }
 
-void arch_context_switch(Thread* oldthread, Thread* newthread) {
+void arch_context_switch(Thread* oldthread, Thread* newthread)
+    TA_REQ(oldthread->get_lock(), newthread->get_lock()) {
   // set the tss SP0 value to point at the top of our stack
   x86_set_tss_sp(newthread->stack().top());
 

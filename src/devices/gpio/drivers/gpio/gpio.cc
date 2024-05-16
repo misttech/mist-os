@@ -227,13 +227,13 @@ void GpioDevice::SetPolarity(SetPolarityRequestView request,
               }));
 }
 
-zx_status_t GpioDevice::InitAddDevice(const uint32_t controller_id) {
+zx_status_t GpioDevice::InitAddDevice() {
   char name[20];
   snprintf(name, sizeof(name), "gpio-%u", pin_);
 
   zx_device_prop_t props[] = {
       {BIND_GPIO_PIN, 0, pin_},
-      {BIND_GPIO_CONTROLLER, 0, controller_id},
+      {BIND_GPIO_CONTROLLER, 0, controller_id_},
   };
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -285,6 +285,20 @@ void GpioDevice::DdkRelease() { delete this; }
 
 zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
   uint32_t controller_id = 0;
+
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpioimpl::wire::ControllerMetadata>(
+      parent, DEVICE_METADATA_GPIO_CONTROLLER);
+  if (decoded.is_error()) {
+    if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
+      zxlogf(INFO, "No gpio controller metadata provided. Assuming controller id = 0.");
+    } else {
+      zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+      return decoded.error_value();
+    }
+  } else {
+    controller_id = decoded->id;
+  }
+
   {
     zx::result gpio_fidl_client =
         DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent);
@@ -295,14 +309,6 @@ zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
 
     fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl(
         *std::move(gpio_fidl_client));
-
-    fdf::Arena arena('GPIO');
-    if (const auto result = gpio_fidl.buffer(arena)->GetControllerId(); result.ok()) {
-      controller_id = result->controller_id;
-    } else {
-      zxlogf(ERROR, "Failed to get controller ID: %s", result.status_string());
-      return result.status();
-    }
 
     // Process init metadata while we are still the exclusive owner of the GPIO client.
     GpioInitDevice::Create(parent, gpio_fidl.TakeClientEnd(), controller_id);
@@ -412,13 +418,13 @@ zx_status_t GpioRootDevice::AddPinDevices(const uint32_t controller_id,
     ZX_ASSERT_MSG(gpio.is_ok(), "Failed to get additional FIDL client: %s", gpio.status_string());
 
     fbl::AllocChecker ac;
-    std::unique_ptr<GpioDevice> dev(new (&ac) GpioDevice(zxdev(), fidl_dispatcher->borrow(),
-                                                         *std::move(gpio), pin.pin, pin.name));
+    std::unique_ptr<GpioDevice> dev(new (&ac) GpioDevice(
+        zxdev(), fidl_dispatcher->borrow(), *std::move(gpio), pin.pin, controller_id, pin.name));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
 
-    zx_status_t status = dev->InitAddDevice(controller_id);
+    zx_status_t status = dev->InitAddDevice();
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
       return status;

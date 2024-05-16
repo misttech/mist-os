@@ -51,7 +51,9 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
     driver_url_ = url.value();
   }
 
-  zx::result<> add_result = parent_set_collector_->AddNode(composite_parent.index(), *node_ptr);
+  ZX_ASSERT(parent_specs().size() > composite_parent.index());
+  zx::result<> add_result = parent_set_collector_->AddNode(
+      composite_parent.index(), parent_specs()[composite_parent.index()].properties(), *node_ptr);
   if (add_result.is_error()) {
     return add_result.take_error();
   }

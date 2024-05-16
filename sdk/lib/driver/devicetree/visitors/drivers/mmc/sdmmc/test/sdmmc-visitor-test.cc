@@ -67,6 +67,7 @@ TEST(SdmmcVisitorTest, TestClocksProperty) {
       EXPECT_EQ(sdmmc_metadata->speed_capabilities(),
                 fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400 |
                     fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr);
+      EXPECT_EQ(sdmmc_metadata->use_fidl(), false);
 
       node_tested_count++;
     }

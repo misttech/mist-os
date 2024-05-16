@@ -6,6 +6,7 @@
 from typing import Any, Dict, List, Tuple
 import itertools
 import logging
+import sys
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 
@@ -37,6 +38,8 @@ class CpuBreakdownMetricsProcessor:
         self._tid_to_process_name: Dict[int, str] = {}
         # Map of CPU to total duration used (ms).
         self._cpu_to_total_duration: Dict[int, float] = {}
+        self._min_timestamp: float = sys.float_info.max
+        self._max_timestamp: float = 0
 
     def _calculate_duration_per_cpu(
         self,
@@ -50,7 +53,11 @@ class CpuBreakdownMetricsProcessor:
         It's possible that consecutive records do not have matching incoming_tid and outgoing_tid.
         """
         smallest_timestamp = self._timestamp_ms(records[0].start)
+        if smallest_timestamp < self._min_timestamp:
+            self._min_timestamp = smallest_timestamp
         largest_timestamp = self._timestamp_ms(records[-1].start)
+        if largest_timestamp > self._max_timestamp:
+            self._max_timestamp = largest_timestamp
         total_duration = largest_timestamp - smallest_timestamp
         self._cpu_to_total_duration[cpu] = total_duration
 
@@ -87,6 +94,13 @@ class CpuBreakdownMetricsProcessor:
         Return timestamp in ms.
         """
         return timestamp.to_epoch_delta().to_milliseconds_f()
+
+    def process_metrics_and_get_total_time(
+        self,
+    ) -> Tuple[List[Dict[str, Any]], float]:
+        breakdown: List[Dict[str, Any]] = self.process_metrics()
+        total_time: float = self._max_timestamp - self._min_timestamp
+        return breakdown, total_time
 
     def process_metrics(self) -> List[Dict[str, Any]]:
         """
@@ -125,6 +139,7 @@ class CpuBreakdownMetricsProcessor:
                         metric = {
                             "process_name": self._tid_to_process_name[tid],
                             "thread_name": self._tid_to_thread_name[tid],
+                            "tid": tid,
                             "cpu": cpu,
                             "percent": percent,
                             "duration": duration,

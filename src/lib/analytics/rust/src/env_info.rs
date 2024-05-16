@@ -77,11 +77,10 @@ pub fn is_user_a_bot() -> bool {
 }
 
 pub fn is_analytics_disabled_by_env() -> bool {
-    is_test_env() || is_fuchsia_analytics_disabled_set()
-    // TODO (b/333906243) uncomment these two lines after one week
-    // of data collection from infra bots
-    // || is_running_in_ci_bot_env()
-    // || is_user_a_bot()
+    is_test_env()
+        || is_fuchsia_analytics_disabled_set()
+        || is_running_in_ci_bot_env()
+        || is_user_a_bot()
 }
 
 #[cfg(test)]

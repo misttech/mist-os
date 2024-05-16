@@ -14,7 +14,7 @@ use {
             Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
             PastConnectionList, SavedNetworksManagerApi,
         },
-        util::pseudo_energy::SignalData,
+        util::pseudo_energy::EwmaSignalData,
     },
     async_trait::async_trait,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
@@ -295,7 +295,7 @@ impl LocalRoamManagerApi for FakeLocalRoamManager {
         _currently_fulfilled_connection: client_types::ConnectSelection,
         _roam_sender: mpsc::UnboundedSender<client_types::ScannedCandidate>,
     ) -> Box<dyn RoamMonitorApi> {
-        let signal_data = SignalData::new(
+        let signal_data = EwmaSignalData::new(
             signal.rssi_dbm,
             signal.snr_db,
             EWMA_SMOOTHING_FACTOR,
@@ -323,7 +323,7 @@ impl FakeLocalRoamManager {
 /// Stubbed instance of RoamMonitorApi for testing.
 pub struct FakeRoamMonitor {
     stats_sender: Option<mpsc::UnboundedSender<fidl_internal::SignalReportIndication>>,
-    signal_data: Option<SignalData>,
+    signal_data: Option<EwmaSignalData>,
 }
 impl RoamMonitorApi for FakeRoamMonitor {
     fn handle_connection_stats(
@@ -335,7 +335,7 @@ impl RoamMonitorApi for FakeRoamMonitor {
         }
         return Ok(u8::MIN);
     }
-    fn get_signal_data(&self) -> SignalData {
+    fn get_signal_data(&self) -> EwmaSignalData {
         self.signal_data.expect("signal data not set.")
     }
 }
@@ -359,7 +359,7 @@ pub fn random_connection_data() -> PastConnectionData {
         disconnect_time,
         uptime,
         client_types::DisconnectReason::DisconnectDetectedFromSme,
-        SignalData::new(
+        EwmaSignalData::new(
             rng.gen_range(-90..-20),
             rng.gen_range(10..50),
             EWMA_SMOOTHING_FACTOR,

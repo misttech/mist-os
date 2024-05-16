@@ -198,14 +198,6 @@ class PageRequestInterface : public fbl::RefCounted<PageRequestInterface> {
   // Note this gets called without a lock and so due to races the implementation needs to be
   // tolerant of having already been detached/closed.
   virtual zx_status_t WaitOnRequest(PageRequest* request) = 0;
-
-  // Called to complete a batched PageRequest if the last call to GetPage returned
-  // ZX_ERR_SHOULD_WAIT *and* the |request->BatchAccepting| is true.
-  //
-  // Returns ZX_ERR_SHOULD_WAIT if the PageRequest will be fulfilled after
-  // being waited upon.
-  // Returns ZX_ERR_NOT_FOUND if the request will never be resolved.
-  virtual zx_status_t FinalizeRequest(PageRequest* request) = 0;
 };
 
 // A page source is responsible for fulfilling page requests from a VMO with backing pages.
@@ -243,16 +235,10 @@ class PageSource final : public PageRequestInterface {
 
   // Sends a request to the backing source to provide the requested page at |offset|.
   //
-  // If |prefetch_len| > |PAGE_SIZE|, the kernel may eagerly request more pages from the page
-  // source.
-  //
   // Returns ZX_ERR_NOT_FOUND if the request cannot be fulfilled.
-  // Returns ZX_ERR_SHOULD_WAIT if the request will be asynchronously fulfilled. If
-  // |req->BatchAccepting| is true then additional calls to |GetPage| may be performed to add more
-  // pages to the request, or if no more pages want to be added the request should be finalized by
-  // |req->FinalizeRequest|. If |BatchAccepting| was false, or |req| was finalized, then the caller
+  // Returns ZX_ERR_SHOULD_WAIT if the request will be asynchronously fulfilled and the caller
   // should wait on |req|.
-  zx_status_t GetPages(uint64_t offset, uint64_t prefetch_len, PageRequest* req,
+  zx_status_t GetPages(uint64_t offset, uint64_t len, PageRequest* req,
                        VmoDebugInfo vmo_debug_info);
 
   void FreePages(list_node* pages);
@@ -373,21 +359,13 @@ class PageSource final : public PageRequestInterface {
   fbl::WAVLTree<uint64_t, PageRequest*> outstanding_requests_[page_request_type::COUNT] TA_GUARDED(
       page_source_mtx_);
 
-#ifdef DEBUG_ASSERT_IMPLEMENTED
-  // Tracks the request currently being processed (only used for verifying batching assertions).
-  PageRequest* current_request_ TA_GUARDED(page_source_mtx_) = nullptr;
-#endif  // DEBUG_ASSERT_IMPLEMENTED
-
   // PageProvider instance that will provide pages asynchronously (e.g. a userspace pager, see
   // PagerProxy for details).
   const fbl::RefPtr<PageProvider> page_provider_;
 
-  // Helper that adds the span of |len| pages at |offset| to |request| and potentially forwards it
-  // to the provider. |request| must already be initialized, and its page_request_type must be set
-  // to |type|. |offset| must be page-aligned.
-  //
-  // If the |PageRequest::batch_state_| passed in is |BatchState::Internal|, this will attempt to
-  // add |len| pages to the request and then finalize the request.
+  // Helper that adds the span of |len| pages at |offset| to |request| and forwards it to the
+  // provider. |request| must already be initialized, and its page_request_type must be set to
+  // |type|. |offset| must be page-aligned.
   //
   // This function will always return |ZX_ERR_SHOULD_WAIT|.
   zx_status_t PopulateRequestLocked(PageRequest* request, uint64_t offset, uint64_t len,
@@ -411,8 +389,6 @@ class PageSource final : public PageRequestInterface {
   void CancelRequest(PageRequest* request) override TA_EXCL(page_source_mtx_);
 
   zx_status_t WaitOnRequest(PageRequest* request) override;
-
-  zx_status_t FinalizeRequest(PageRequest* request) override;
 };
 
 // The PageRequest provides the ability to be in two difference linked list. One owned by the page
@@ -426,58 +402,20 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
                         fbl::TaggedDoublyLinkedListable<PageRequest*, PageSourceTag>,
                         fbl::TaggedDoublyLinkedListable<PageRequest*, PageProviderTag>> {
  public:
-  // If |allow_batching| is true, then a single request can be used to service
-  // multiple consecutive pages.
-  explicit PageRequest(bool allow_batching = false)
-      : creation_batch_state_(allow_batching ? BatchState::Accepting : BatchState::Unbatched),
-        batch_state_(creation_batch_state_) {}
+  PageRequest() = default;
   ~PageRequest();
 
   // Returns ZX_OK on success, or a permitted error code if the backing page provider explicitly
   // failed this page request. Returns ZX_ERR_INTERNAL_INTR_KILLED if the thread was killed.
   zx_status_t Wait();
 
-  // Forwards to the underlying PageRequestInterface::FinalizeRequest, see that for details.
-  zx_status_t FinalizeRequest();
-
   // If initialized, asks the underlying PageRequestInterface to abort this request, by calling
   // PageRequestInterface::CancelRequest.
   void CancelRequest();
 
-  // Returns |true| if this is a batch request that can still accept additional requests. If |true|
-  // the |FinalizeRequest| method must be called before |Wait| can be used. If this is |false| then
-  // either this is not a batch request, or the batch request has already been closed and does not
-  // need to be finalized.
-  bool BatchAccepting() const { return batch_state_ == BatchState::Accepting; }
-
   DISALLOW_COPY_ASSIGN_AND_MOVE(PageRequest);
 
  private:
-  // The batch state is used both to implement a stateful query of whether a batch page request is
-  // finished taking new requests or not, and to implement assertions to catch misuse of the request
-  // API.
-  enum class BatchState : uint8_t {
-    // Does not support batching.
-    Unbatched,
-    // Supports batching and can keep taking new requests. A request in this state must have
-    // FinalizeRequest called before it can be waited on.
-    Accepting,
-    // This was a batched request that has been finalized and may be waited on.
-    Finalized,
-    // The caller did not request batching, but the PageSource internally decided to batch the
-    // request as an optimization. Internal is treated differently from Accepting even though they
-    // both notionally refer to batches, as Internal is not finalized externally (outside of
-    // PageSource) as is the case for Accepting. The Internal state is managed internally by the
-    // PageSource, so it is never transitioned to Finalized when the batch is ready to be waited on.
-    // Since the "batch" in the case of Internal is not exposed to the external caller, there is
-    // also a difference in the way page request failures are handled by the PageSource.
-    // Only used for page_request_type::DIRTY and page_request_type::READ. See comment near
-    // PageSource::PopulateRequestLocked for more context.
-    // TODO(rashaeqbal): Figure out if Internal can be unified with Accepting by making all batches
-    // external.
-    Internal
-  };
-
   // TODO: PageSource and AnonymousPageRequest should not have direct access, but should rather have
   // their access mediate by the PageRequestInterface class that they derive from.
   friend PageSource;
@@ -486,11 +424,10 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   friend PageProvider;
   friend fbl::DefaultKeyedObjectTraits<uint64_t, PageRequest>;
 
-  // PageRequests may or may not be initialized, to support batching of requests. offset_ must be
-  // checked and the object must be initialized if necessary (an uninitialized request has offset_
-  // set to UINT64_MAX).
+  // PageRequests are initialized separately to being constructed to facilitate any PageSource
+  // specific logic.
   void Init(fbl::RefPtr<PageRequestInterface> src, uint64_t offset, page_request_type type,
-            VmoDebugInfo vmo_debug_info, bool internal_batching = false);
+            VmoDebugInfo vmo_debug_info);
 
   bool IsInitialized() const { return offset_ != UINT64_MAX; }
 
@@ -506,14 +443,6 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
 
   // The type of the page request.
   page_request_type type_;
-
-  // The batch state the external caller created this request with. A single page request object can
-  // be reused multiple times by calling Init in between uses, at which point the batch_state_ is
-  // reset to this value (unless overridden by internal_batching).
-  const BatchState creation_batch_state_;
-  // The current batch state of this request. Used to determine what operations are legal to
-  // perform on the request.
-  BatchState batch_state_;
 
   // PageRequests are active if offset_ is not UINT64_MAX. In an inactive request, the
   // only other valid field is src_. Whilst a request is with a PageProvider (i.e. SendAsyncRequest
@@ -565,9 +494,7 @@ inline uint64_t PageProvider::GetRequestLen(const PageRequest* request) {
 // will not be needed.
 class LazyPageRequest {
  public:
-  // If |allow_batching| is true, then a single request can be used to service
-  // multiple consecutive pages.
-  explicit LazyPageRequest(bool allow_batching = false) : allow_batching_(allow_batching) {}
+  LazyPageRequest() = default;
   ~LazyPageRequest() = default;
 
   // Initialize and return the internal PageRequest.
@@ -578,7 +505,6 @@ class LazyPageRequest {
   PageRequest& operator*() { return *get(); }
 
  private:
-  const bool allow_batching_;
   ktl::optional<PageRequest> request_ = ktl::nullopt;
 };
 

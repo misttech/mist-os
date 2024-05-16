@@ -4,10 +4,12 @@
 
 #include "src/camera/bin/factory/streamer.h"
 
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
+#include <lib/sysmem-version/sysmem-version.h>
 
 namespace camera {
 
@@ -19,7 +21,7 @@ Streamer::~Streamer() {
 }
 
 fpromise::result<std::unique_ptr<Streamer>, zx_status_t> Streamer::Create(
-    fuchsia::sysmem::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
+    fuchsia::sysmem2::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
     fit::closure stop_callback) {
   auto streamer = std::make_unique<Streamer>();
 
@@ -120,13 +122,20 @@ void Streamer::ConnectToStream(uint32_t config_index, uint32_t stream_index) {
   auto stream_request = stream.NewRequest(loop_.dispatcher());
 
   // Allocate buffer collection
-  fuchsia::sysmem::BufferCollectionTokenHandle token_orig;
-  allocator_->AllocateSharedCollection(token_orig.NewRequest());
-  stream->SetBufferCollection(std::move(token_orig));
-  stream->WatchBufferCollection(
-      [this, config_index, stream_index](fuchsia::sysmem::BufferCollectionTokenHandle token_back) {
-        WatchBufferCollectionCallback(config_index, stream_index, std::move(token_back));
-      });
+  fuchsia::sysmem2::BufferCollectionTokenHandle token_orig;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(token_orig.NewRequest());
+  allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
+  // Sysmem token channels serve both sysmem(1) and sysmem2, so we can convert here for now.
+  stream->SetBufferCollection(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token_orig.TakeChannel()));
+  stream->WatchBufferCollection([this, config_index, stream_index](
+                                    fuchsia::sysmem::BufferCollectionTokenHandle token_back) {
+    // Sysmem token channels serve both sysmem(1) and sysmem2, so we can convert here for now.
+    WatchBufferCollectionCallback(
+        config_index, stream_index,
+        fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(token_back.TakeChannel()));
+  });
   device_->ConnectToStream(stream_index, std::move(stream_request));
   stream.set_error_handler(
       [this, stream_index](zx_status_t status) { DisconnectStream(stream_index); });
@@ -134,27 +143,47 @@ void Streamer::ConnectToStream(uint32_t config_index, uint32_t stream_index) {
 
 void Streamer::WatchBufferCollectionCallback(
     uint32_t config_index, uint32_t stream_index,
-    fuchsia::sysmem::BufferCollectionTokenHandle token_back) {
+    fuchsia::sysmem2::BufferCollectionTokenHandle token_back) {
   auto& stream_info = stream_infos_[stream_index];
 
-  allocator_->BindSharedCollection(std::move(token_back),
-                                   stream_info.collection.NewRequest(loop_.dispatcher()));
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(token_back));
+  bind_shared_request.set_buffer_collection_request(
+      stream_info.collection.NewRequest(loop_.dispatcher()));
+  allocator_->BindSharedCollection(std::move(bind_shared_request));
 
   // Set minimal constraints then wait for buffer allocation.
-  stream_info.collection->SetConstraints(
-      true, {.usage{.cpu = fuchsia::sysmem::cpuUsageRead},
-             .min_buffer_count_for_camping = 2,
-             .has_buffer_memory_constraints = true,
-             .buffer_memory_constraints{.ram_domain_supported = true}});
-  stream_info.collection->WaitForBuffersAllocated(
-      [this, stream_index](zx_status_t status,
-                           fuchsia::sysmem::BufferCollectionInfo_2 buffers) mutable {
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = *set_constraints_request.mutable_constraints();
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+  constraints.set_min_buffer_count_for_camping(2);
+  auto& bmc = *constraints.mutable_buffer_memory_constraints();
+  bmc.set_ram_domain_supported(true);
+
+  stream_info.collection->SetConstraints(std::move(set_constraints_request));
+  stream_info.collection->WaitForAllBuffersAllocated(
+      [this, stream_index](
+          fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) mutable {
+        zx_status_t status;
+        if (result.is_err()) {
+          if (result.is_framework_err()) {
+            status = ZX_ERR_INTERNAL;
+          } else {
+            status = sysmem::V1CopyFromV2Error(fidl::HLCPPToNatural(result.err()));
+          }
+        } else {
+          status = ZX_OK;
+        }
+        fuchsia::sysmem2::BufferCollectionInfo buffers;
+        if (result.is_response()) {
+          buffers = std::move(*result.response().mutable_buffer_collection_info());
+        }
         WaitForBuffersAllocatedCallback(stream_index, status, std::move(buffers));
       });
 }
 
 void Streamer::WaitForBuffersAllocatedCallback(uint32_t stream_index, zx_status_t status,
-                                               fuchsia::sysmem::BufferCollectionInfo_2 buffers) {
+                                               fuchsia::sysmem2::BufferCollectionInfo buffers) {
   auto& stream_info = stream_infos_[stream_index];
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to allocate buffers.";
@@ -162,7 +191,7 @@ void Streamer::WaitForBuffersAllocatedCallback(uint32_t stream_index, zx_status_
   }
   stream_info.collection_info = std::move(buffers);
 
-  stream_info.collection->Close();
+  stream_info.collection->Release();
 
   connected_stream_count_++;
 
@@ -188,8 +217,8 @@ void Streamer::OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo fr
     // capture a frame to memory
     capture_->properties_ = configurations_[connected_config_index_].streams[stream_index];
     if (capture_->want_image_) {
-      auto size = stream_info.collection_info.settings.buffer_settings.size_bytes;
-      auto& vmo = stream_info.collection_info.buffers[frame_info.buffer_index].vmo;
+      auto size = stream_info.collection_info.settings().buffer_settings().size_bytes();
+      auto& vmo = stream_info.collection_info.buffers()[frame_info.buffer_index].vmo();
       ZX_ASSERT(vmo.is_valid());
       capture_->image_.resize(size);
       vmo.read(capture_->image_.data(), 0, size);

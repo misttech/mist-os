@@ -1957,7 +1957,7 @@ void SimFirmware::HandleDisconnectForClientIF(
   if (frame->MgmtFrameType() == simulation::SimManagementFrame::FRAME_TYPE_DEAUTH) {
     // The client could receive a deauth even after disassociation. Notify the driver always
     SendEventToDriver(0, nullptr, BRCMF_E_DEAUTH_IND, BRCMF_E_STATUS_SUCCESS, kClientIfidx, 0, 0,
-                      fidl::ToUnderlying(reason));
+                      fidl::ToUnderlying(reason), bssid);
     if (auth_state_.state == AuthState::AUTHENTICATED) {
       AuthClearContext();
     }

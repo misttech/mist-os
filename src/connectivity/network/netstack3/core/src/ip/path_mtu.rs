@@ -422,7 +422,7 @@ mod tests {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt},
-            InstantContext,
+            CtxPair, InstantContext,
         },
         testutil::{assert_empty, TestIpExt},
     };
@@ -431,7 +431,7 @@ mod tests {
         cache: PmtuCache<I, FakeBindingsCtxImpl<I>>,
     }
 
-    type FakeCtxImpl<I> = crate::testutil::ContextPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
+    type FakeCtxImpl<I> = CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
     type FakeCoreCtxImpl<I> = FakeCoreCtx<FakePmtuContext<I>, (), ()>;
     type FakeBindingsCtxImpl<I> = FakeBindingsCtx<PmtuTimerId<I>, (), (), ()>;
 
@@ -440,7 +440,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().cache)
+            cb(&mut self.state.cache)
         }
     }
 
@@ -453,7 +453,7 @@ mod tests {
     }
 
     /// Get an IPv4 or IPv6 address within the same subnet as that of
-    /// `FAKE_CONFIG_*`, but with the last octet set to `3`.
+    /// `TEST_ADDRS_*`, but with the last octet set to `3`.
     fn get_other_ip_address<I: TestIpExt>() -> SpecifiedAddr<I::Addr> {
         I::get_other_ip_address(3)
     }
@@ -489,7 +489,7 @@ mod tests {
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<Mtu> {
-        core_ctx.get_ref().cache.get_pmtu(src_ip, dst_ip)
+        core_ctx.state.cache.get_pmtu(src_ip, dst_ip)
     }
 
     fn get_last_updated<I: Ip>(
@@ -497,12 +497,12 @@ mod tests {
         src_ip: I::Addr,
         dst_ip: I::Addr,
     ) -> Option<FakeInstant> {
-        core_ctx.get_ref().cache.get_last_updated(src_ip, dst_ip)
+        core_ctx.state.cache.get_last_updated(src_ip, dst_ip)
     }
 
     #[ip_test]
     fn test_ip_path_mtu_cache_ctx<I: Ip + TestIpExt>() {
-        let fake_config = I::FAKE_CONFIG;
+        let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Nothing in the cache yet
@@ -675,7 +675,7 @@ mod tests {
 
     #[ip_test]
     fn test_ip_pmtu_task<I: Ip + TestIpExt>() {
-        let fake_config = I::FAKE_CONFIG;
+        let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Make sure there are no timers.

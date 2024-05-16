@@ -107,8 +107,4 @@ void vmm_context_switch(VmAspace* oldspace, VmAspace* newaspace);
 // NULL is a valid argument, which unmaps the current user address space
 void vmm_set_active_aspace(VmAspace* aspace);
 
-// specialized version of above function that must be called with the thread_lock already held.
-// This is only intended for use by panic handlers.
-void vmm_set_active_aspace_locked(VmAspace* aspace);
-
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_H_

@@ -407,9 +407,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if capability.resolver.is_some() && capability.path.is_none() {
             return Err(Error::validate("\"path\" should be present with \"resolver\""));
         }
-        if capability.config.is_some() {
-            self.features.check(Feature::ConfigCapabilities)?;
-        }
 
         if let Some(name) = capability.dictionary.as_ref() {
             self.features.check(Feature::Dictionaries)?;
@@ -498,6 +495,13 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 return Err(Error::validate(format!("Config '{}' missing field 'key'", config)));
             }
             let _ = use_config_to_value_type(use_)?;
+            let availability = use_.availability.unwrap_or(Availability::Required);
+            if availability == Availability::Required && use_.config_default.is_some() {
+                return Err(Error::validate(format!(
+                    "Config '{}' is required and has a default value",
+                    config
+                )));
+            }
         }
 
         if let Some(source) = use_.from.as_ref() {
@@ -1522,7 +1526,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         &self,
         fields: &Option<BTreeMap<ConfigKey, ConfigValueType>>,
     ) -> Result<(), Error> {
-        // If we `use` a config capability optionally then it has to exist in the `config` block.
+        // If we `use` a config capability optionally without a default then it has to exist in the `config` block.
         // Collect the names of the keys here.
         let optional_use_keys: BTreeMap<ConfigKey, ConfigValueType> = self
             .document
@@ -1536,6 +1540,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 if u.availability == Some(Availability::Required) || u.availability == None {
                     return None;
                 }
+                if let Some(_) = u.config_default.as_ref() {
+                    return None;
+                }
                 let key = ConfigKey(u.key.clone().expect("key should be set").into());
                 let value = use_config_to_value_type(u).expect("config type should be valid");
                 Some((key, value))
@@ -1546,7 +1553,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         let Some(fields) = fields else {
             if !optional_use_keys.is_empty() {
                 return Err(Error::validate(
-                    "Optionally using a config capability requires a matching 'config' section.",
+                    "Optionally using a config capability without a default requires a matching 'config' section.",
                 ));
             }
             return Ok(());
@@ -7319,25 +7326,6 @@ mod tests {
     };
 
     #[test]
-    fn test_cml_missing_config_feature() {
-        let input = must_parse_cml!({
-        "capabilities": [
-            {
-                "config": "fuchsia.config.MyConfig",
-                "type": "bool",
-                "value": true,
-            },
-        ],
-        });
-
-        assert_matches!(
-            compile(&input, CompileOptions::new()),
-            Err(Error::RestrictedFeature(feature))
-            if feature == "config_capabilities"
-        );
-    }
-
-    #[test]
     fn test_cml_use_bad_config_from_self() {
         let input = must_parse_cml!({
         "use": [
@@ -7350,8 +7338,7 @@ mod tests {
         ],
         });
 
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().features(&features);
+        let options = CompileOptions::new();
         assert_matches!(compile(&input, options), Err(Error::Validate { .. }));
     }
 
@@ -7415,7 +7402,7 @@ mod tests {
             },
         ],}),
         Err(Error::Validate {err, ..})
-        if &err == "Optionally using a config capability requires a matching 'config' section."
+        if &err == "Optionally using a config capability without a default requires a matching 'config' section."
         ),
         test_cml_transitional_use_no_config(
         json!({"use": [
@@ -7427,7 +7414,7 @@ mod tests {
             },
         ],}),
         Err(Error::Validate {err, ..})
-        if &err == "Optionally using a config capability requires a matching 'config' section."
+        if &err == "Optionally using a config capability without a default requires a matching 'config' section."
         ),
         test_cml_optional_use_bad_type(
         json!({"use": [
@@ -7443,6 +7430,19 @@ mod tests {
         }}),
         Err(Error::Validate {err, ..})
         if &err == "Use and config block differ on type for key 'my_config'"
+        ),
+
+        test_config_required_with_default(
+        json!({"use": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "key": "my_config",
+                "type": "bool",
+                "default": "true",
+            },
+        ]}),
+        Err(Error::Validate {err, ..})
+        if &err == "Config 'fuchsia.config.MyConfig' is required and has a default value"
         ),
 
         test_cml_optional_use_good(

@@ -9,6 +9,12 @@ import("//build/bind/bind.gni")
 bazel_driver_package("bazel_package") {
   bazel_target = "//src/ui/input/drivers/adc-buttons:adc-buttons"
   package_name = "adc-buttons"
+  inputs = [
+    "adc-buttons.cc",
+    "adc-buttons.h",
+    "adc-buttons-device.cc",
+    "adc-buttons-device.h",
+  ]
 }
 
 driver_bind_rules("adc-buttons-bind") {
@@ -25,6 +31,13 @@ driver_bind_rules("adc-buttons-bind") {
 bazel_fuchsia_test_package("adc-buttons-test-package") {
   test_package_name = "adc-buttons-test"
   test_component_names = [ "adc-buttons-test-bin" ]
+  inputs = [
+    "adc-buttons.cc",
+    "adc-buttons.h",
+    "adc-buttons-device.cc",
+    "adc-buttons-device.h",
+    "adc-buttons-test.cc",
+  ]
   test_specs = {
     environments = basic_envs
     log_settings = {

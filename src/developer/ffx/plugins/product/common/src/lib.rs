@@ -117,7 +117,7 @@ mod test {
             writer.machine(&o).expect("write data");
             let data_str = test_buffers.into_stdout_str();
             let data = serde_json::from_str(&data_str).expect("json value");
-            match writer.verify_schema(&data) {
+            match VerifiedMachineWriter::<MachineOutput<TestBundle>>::verify_schema(&data) {
                 Ok(_) => (),
                 Err(e) => {
                     println!("Error verifying schema: {e}");
@@ -139,7 +139,7 @@ mod test {
             writer.machine(&o).expect("write data");
             let data_str = test_buffers.into_stdout_str();
             let data = serde_json::from_str(&data_str).expect("json value");
-            match writer.verify_schema(&data) {
+            match VerifiedMachineWriter::<MachineOutput<()>>::verify_schema(&data) {
                 Ok(_) => (),
                 Err(e) => {
                     println!("Error verifying schema: {e}");

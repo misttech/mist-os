@@ -50,19 +50,18 @@ rustc_binary("policy_service_bin") {
   sources = [ "policy_service.rs" ]
 }
 
-executable("dir_service_bin") {
+rustc_binary("dir_service_bin") {
   testonly = true
-  sources = [ "dir_service.cc" ]
-
+  edition = "2021"
+  source_root = "dir_service.rs"
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//src/storage/lib/vfs/cpp",
-    "//src/storage/memfs:lib",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/svc",
-    "//zircon/system/ulib/zx",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/storage/lib/vfs/rust:vfs",
+    "//third_party/rust_crates:futures",
   ]
+
+  sources = [ "dir_service.rs" ]
 }
 
 rustc_binary("cap_getter_bin") {

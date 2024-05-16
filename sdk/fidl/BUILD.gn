@@ -261,7 +261,9 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.posix.socket.raw",
   "fuchsia.power.metrics",
   "fuchsia.starnix.container",
+  "fuchsia.starnix.runner",
   "fuchsia.sys2",
+  "fuchsia.test.manager",
   "fuchsia.testing.harness",
   "fuchsia.vulkan.loader",
 

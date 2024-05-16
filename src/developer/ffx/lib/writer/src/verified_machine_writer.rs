@@ -71,7 +71,7 @@ where
 
     /// Validates the passed in data object against the schema
     /// for the writer type.
-    pub fn verify_schema(&self, data: &Value) -> Result<()> {
+    pub fn verify_schema(data: &Value) -> Result<()> {
         let s = schemars::schema_for!(T);
         let mut raw_schema: Vec<u8> = vec![];
         format_output(Format::JsonPretty, &mut raw_schema, &s)

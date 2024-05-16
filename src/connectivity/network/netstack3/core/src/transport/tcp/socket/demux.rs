@@ -9,11 +9,11 @@ use alloc::collections::hash_map;
 use core::{fmt::Debug, num::NonZeroU16};
 
 use assert_matches::assert_matches;
-use net_types::{ip::IpAddress, SpecifiedAddr};
+use net_types::SpecifiedAddr;
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
     error::ParseError,
-    ip::IpProto,
+    ip::{IpExt, IpProto},
     tcp::{
         TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
         TcpSegmentBuilderWithOptions,
@@ -25,7 +25,7 @@ use tracing::{debug, error, warn};
 use crate::{
     context::{CounterContext, CtxPair},
     convert::BidirectionalConverter as _,
-    device::{self, StrongId as _, WeakId as _},
+    device::{StrongDeviceIdentifier as _, WeakDeviceIdentifier},
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
@@ -403,7 +403,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
     }
 }
 
-enum SocketLookupResult<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+enum SocketLookupResult<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     Connection(I::DemuxSocketId<D, BT>, ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>),
     Listener((I::DemuxSocketId<D, BT>, ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>)),
 }
@@ -1105,13 +1105,13 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     }
 }
 
-pub(super) fn tcp_serialize_segment<'a, S, A>(
+pub(super) fn tcp_serialize_segment<'a, S, I>(
     segment: S,
-    conn_addr: ConnIpAddr<A, NonZeroU16, NonZeroU16>,
-) -> impl TransportPacketSerializer<Buffer = EmptyBuf> + Debug + 'a
+    conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug + 'a
 where
     S: Into<Segment<SendPayload<'a>>>,
-    A: IpAddress,
+    I: IpExt,
 {
     let Segment { seq, ack, wnd, contents, options } = segment.into();
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
@@ -1188,19 +1188,19 @@ mod test {
         const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 
         let options = segment.options;
-        let serializer = super::tcp_serialize_segment(
+        let serializer = super::tcp_serialize_segment::<_, I>(
             segment,
             ConnIpAddr {
-                local: (SocketIpAddr::try_from(I::FAKE_CONFIG.local_ip).unwrap(), SOURCE_PORT),
-                remote: (SocketIpAddr::try_from(I::FAKE_CONFIG.remote_ip).unwrap(), DEST_PORT),
+                local: (SocketIpAddr::try_from(I::TEST_ADDRS.local_ip).unwrap(), SOURCE_PORT),
+                remote: (SocketIpAddr::try_from(I::TEST_ADDRS.remote_ip).unwrap(), DEST_PORT),
             },
         );
 
         let mut serialized = serializer.serialize_vec_outer().unwrap().unwrap_b();
         let parsed_segment = serialized
             .parse_with::<_, TcpSegment<_>>(TcpParseArgs::new(
-                *I::FAKE_CONFIG.remote_ip,
-                *I::FAKE_CONFIG.local_ip,
+                *I::TEST_ADDRS.remote_ip,
+                *I::TEST_ADDRS.local_ip,
             ))
             .expect("is valid segment");
 

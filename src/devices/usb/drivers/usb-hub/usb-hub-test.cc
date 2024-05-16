@@ -286,6 +286,71 @@ TEST_F(UnbrandedHarness, Usb3Hub) {
   ASSERT_TRUE(ResetPending(1));
 }
 
+TEST_F(UnbrandedHarness, Usb3HubReenumerate) {
+  auto dispatcher = StartDispatching();
+  sync_completion_t enum_complete;
+  sync_completion_reset(&enum_complete);
+  uint8_t port_bitmask = 7;
+  SetConnectCallback([&](uint32_t port, usb_speed_t speed) {
+    if (speed != USB_SPEED_SUPER) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (!(port_bitmask & (1 << (port - 1)))) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    port_bitmask &= ~(1 << (port - 1));
+    if (!port_bitmask) {
+      sync_completion_signal(&enum_complete);
+    }
+    return ZX_OK;
+  });
+
+  ConnectDevice(0, USB_SPEED_SUPER);
+  ConnectDevice(1, USB_SPEED_SUPER);
+  ConnectDevice(2, USB_SPEED_SUPER);
+  Interrupt();
+  sync_completion_wait(&enum_complete, ZX_TIME_INFINITE);
+
+  // Re-enumerate port 0.
+  sync_completion_t reenum_complete;
+  sync_completion_reset(&reenum_complete);
+  bool port0_enumerated = true;
+  SetConnectCallback([&](uint32_t port, usb_speed_t speed) {
+    if (port0_enumerated) {
+      port0_enumerated = false;
+      return speed == static_cast<usb_speed_t>(-1) ? ZX_OK : ZX_ERR_INVALID_ARGS;
+    }
+
+    sync_completion_signal(&reenum_complete);
+    return speed == USB_SPEED_SUPER ? ZX_OK : ZX_ERR_INVALID_ARGS;
+  });
+
+  ConnectDevice(0, USB_SPEED_SUPER);
+  Interrupt();
+  sync_completion_wait(&reenum_complete, ZX_TIME_INFINITE);
+
+  sync_completion_t disconnect_complete;
+  // Disconnect ordering doesn't matter (can happen in any order).
+  uint8_t port_remove_bitmask = 7;
+  SetConnectCallback([&](uint32_t port, usb_speed_t speed) {
+    if ((speed != static_cast<usb_speed_t>(-1))) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    port_remove_bitmask &= ~(1 << (port - 1));
+    if (port_remove_bitmask == 0) {
+      sync_completion_signal(&disconnect_complete);
+    }
+    return ZX_OK;
+  });
+  DisconnectDevice(0);
+  DisconnectDevice(1);
+  DisconnectDevice(2);
+  Interrupt();
+  sync_completion_wait(&disconnect_complete, ZX_TIME_INFINITE);
+  ASSERT_OK(ResetPort(1));
+  ASSERT_TRUE(ResetPending(1));
+}
+
 TEST_F(UnbrandedHarness, UnbindHubDisconnects) {
   auto dispatcher = StartDispatching();
   sync_completion_t enum_complete;

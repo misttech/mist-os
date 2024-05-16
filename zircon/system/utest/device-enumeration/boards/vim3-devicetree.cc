@@ -18,7 +18,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/clock-controller-ff63c000/clocks",
       "sys/platform/clock-controller-ff63c000/clocks/clock-init",
       "sys/platform/ethernet-phy-ff634000/ethernet-phy-ff634000_group/aml-ethernet/dwmac-ff3f0000_group/dwmac/eth_phy/phy_null_device",
-      "sys/platform/fuchsia-contiguous/sysmem",
+      "sys/platform/fuchsia-sysmem/sysmem",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio-init",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio/gpio-93/fusb302-22_group/fusb302",
@@ -27,8 +27,12 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/i2c-5000",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24/khadas-mcu-18_group/vim3-mcu",
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-32/gpio-controller-20_group/ti-tca6408a/gpio",
       "sys/platform/interrupt-controller-ffc01000",
       "sys/platform/nna-ff100000/nna-ff100000_group/aml-nna",
+
+      // SDIO
+      "sys/platform/mmc-ffe03000/mmc-ffe03000_group/aml-sd-emmc/sdmmc",
 
       // SD card
       "sys/platform/mmc-ffe05000/mmc-ffe05000_group/aml-sd-emmc/sdmmc",
@@ -68,6 +72,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-9/pwm_a0_d-regulator_group/pwm_vreg_little",
       "sys/platform/register-controller-1000",
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
+      "sys/platform/video-decoder-ffd00000",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

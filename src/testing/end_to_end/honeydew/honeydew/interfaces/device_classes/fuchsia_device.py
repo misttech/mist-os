@@ -34,7 +34,7 @@ from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {
     "OFFLINE": 60,
-    "ONLINE": 120,
+    "ONLINE": 180,
 }
 
 

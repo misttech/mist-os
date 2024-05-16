@@ -7,11 +7,13 @@ use fuchsia_zircon as zx;
 use bstr::ByteSlice;
 use fidl_fuchsia_buildinfo as buildinfo;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
+use fidl_fuchsia_recovery as frecovery;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
 use starnix_sync::{Locked, Unlocked};
 
 use crate::{
+    device::android::bootloader_message_store::BootloaderMessage,
     mm::{read_to_vec, MemoryAccessor, MemoryAccessorExt, NumberOfElementsRead},
     task::CurrentTask,
     vfs::{FdNumber, FsString},
@@ -258,8 +260,40 @@ pub fn sys_reboot(
                 || reboot_args.contains(&&b"System update during setup"[..])
             {
                 fpower::RebootReason::SystemUpdate
+            } else if reboot_args.contains(&&b"recovery"[..]) {
+                // Read the bootloader message from the misc partition to determine whether the
+                // device is rebooting to perform an FDR.
+                if let Some(store) = current_task.kernel().bootloader_message_store.get() {
+                    match store.read_bootloader_message() {
+                        Ok(BootloaderMessage::BootRecovery(args)) => {
+                            if args.iter().any(|arg| arg == "--wipe_data") {
+                                let factory_reset_proxy =
+                                    connect_to_protocol_sync::<frecovery::FactoryResetMarker>()
+                                        .or_else(|_| error!(EINVAL))?;
+                                // NB: This performs a reboot for us.
+                                log_info!("Initiating factory data reset...");
+                                match factory_reset_proxy.reset(zx::Time::INFINITE) {
+                                    Ok(_) => {
+                                        // System is rebooting... wait until runtime ends.
+                                        zx::Time::INFINITE.sleep();
+                                    }
+                                    Err(e) => {
+                                        return error!(
+                                            EINVAL,
+                                            format!("Failed to reboot for FDR, status: {e}")
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        // In all other cases, fall through to a regular reboot.
+                        Ok(_) => log_info!("Boot message not recognized!"),
+                        Err(e) => log_warn!("Failed to read boot message: {e}"),
+                    }
+                }
+                log_warn!("Recovery mode isn't supported yet, rebooting as normal...");
+                fpower::RebootReason::UserRequest
             } else if reboot_args == [b""] // args empty? splitting "" returns [""], not []
-
                 || reboot_args.contains(&&b"shell"[..])
                 || reboot_args.contains(&&b"userrequested"[..])
             {

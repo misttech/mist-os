@@ -59,6 +59,8 @@ struct fdf_arena : public fbl::RefCounted<fdf_arena> {
   [[maybe_unused]] uint32_t tag_;
 
   fbl::Mutex lock_;
+  // Pointer to the start of the active block
+  uint8_t* current_block_ __TA_GUARDED(&lock_) = initial_buffer_;
   // Pointer to the next available data.
   uint8_t* next_data_available_ __TA_GUARDED(&lock_) = initial_buffer_;
   // Size of the data available at next_data_available_.

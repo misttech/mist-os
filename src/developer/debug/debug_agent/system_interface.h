@@ -9,6 +9,8 @@
 #include <memory>
 #include <vector>
 
+#include <gtest/gtest_prod.h>
+
 #include "src/developer/debug/debug_agent/job_handle.h"
 #include "src/developer/debug/debug_agent/process_handle.h"
 #include "src/developer/debug/ipc/records.h"
@@ -73,6 +75,9 @@ class SystemInterface {
   zx_koid_t GetParentJobKoid(zx_koid_t job);
 
  private:
+  // For access to |parent_jobs_|.
+  FRIEND_TEST(ZirconSystemInterfaceTest, FilterMatchComponents);
+
   // Refresh the parent_jobs_ mapping.
   void RefreshParentJobs();
 

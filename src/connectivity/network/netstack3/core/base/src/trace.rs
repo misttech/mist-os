@@ -9,6 +9,19 @@
 
 use core::ffi::CStr;
 
+/// Convenience wrapper around the [`TracingContext::duration`] trait method.
+///
+/// [`TracingContext::duration`] uses RAII to begin and end the duration by
+/// tying the scope of the duration to the lifetime of the object it returns.
+/// This macro encapsulates that logic such that the trace duration will end
+/// when the scope in which the macro is called ends.
+#[macro_export]
+macro_rules! trace_duration {
+    ($ctx:ident, $name:literal) => {
+        let _scope = $crate::TracingContext::duration($ctx, $name);
+    };
+}
+
 /// A context for emitting tracing data.
 // TODO(https://fxbug.dev/338642329): Change this API to not take CStr when
 // tracing in Fuchsia doesn't require null terminated strings.

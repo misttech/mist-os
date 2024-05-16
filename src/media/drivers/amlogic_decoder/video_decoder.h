@@ -120,7 +120,7 @@ class VideoDecoder {
     virtual __WARN_UNUSED_RESULT zx_status_t AllocateIoBuffer(io_buffer_t* buffer, size_t size,
                                                               uint32_t alignment_log2,
                                                               uint32_t flags, const char* name) = 0;
-    [[nodiscard]] virtual fuchsia::sysmem::AllocatorSyncPtr& SysmemAllocatorSyncPtr() = 0;
+    [[nodiscard]] virtual fidl::SyncClient<fuchsia_sysmem2::Allocator>& SysmemAllocatorSync() = 0;
 
     virtual __WARN_UNUSED_RESULT bool IsDecoderCurrent(VideoDecoder* decoder) = 0;
     // Sets whether a particular hardware unit can read/write protected or

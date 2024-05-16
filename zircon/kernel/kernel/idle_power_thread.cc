@@ -73,14 +73,13 @@ int IdlePowerThread::Run(void* arg) {
       switch (state.target) {
         case State::Offline: {
           InterruptDisableGuard interrupt_disable;
-          Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
           // Emit the complete event early, since mp_unplug_current_cpu() will not return.
           trace.End();
 
           // Updating the state and signaling the complete event is handled by
           // mp_unplug_current_cpu() when it calls FlushAndHalt().
-          mp_unplug_current_cpu(ktl::move(guard));
+          mp_unplug_current_cpu();
           break;
         }
 

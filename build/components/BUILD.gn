@@ -8,7 +8,15 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("test_component_host_helper") {
   edition = "2021"
   name = "test_component_host_helper"
-  deps = [ "//third_party/rust_crates:structopt" ]
+  deps = [
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:structopt",
+  ]
   source_root = "generate_test_component_script_and_config.rs"
   sources = [ source_root ]
   testonly = true

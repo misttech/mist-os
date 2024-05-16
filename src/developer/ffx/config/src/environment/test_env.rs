@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{ConfigMap, Environment, EnvironmentContext};
+use crate::{logging::LogDestination, ConfigMap, Environment, EnvironmentContext};
 use anyhow::{Context, Result};
 use std::{
     cell::Cell,
@@ -73,8 +73,7 @@ impl TestEnv {
         let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> = Arc::new(
             crate::logging::configure_subscribers(
                 &context,
-                Some(crate::logging::StdioOptions { test_writer: true }),
-                false,
+                vec![LogDestination::TestWriter],
                 LevelFilter::DEBUG,
             )
             .await,

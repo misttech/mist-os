@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("fake") {
   testonly = true
@@ -18,10 +17,6 @@ group("fake") {
 group("tests") {
   testonly = true
   deps = [ ":test-pkg" ]
-}
-
-core_shard("core-shard") {
-  shard_file = "meta/fake_fonts.core_shard.cml"
 }
 
 fuchsia_package("pkg") {

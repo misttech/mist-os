@@ -9,7 +9,7 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_trace as ftrace,
     fuchsia_zircon::{self as zx, HandleBased as _, ProcessInfo, ProcessInfoFlags},
-    std::{ffi::CStr, fs::File},
+    std::{ffi::CStr, fs::File, os::fd::OwnedFd},
 };
 
 /// An object used for interacting with the shell.
@@ -86,8 +86,9 @@ impl ServerPty {
         let Self { proxy } = self;
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let () = proxy.clone2(server_end)?;
-        let file = fdio::create_fd::<File>(client_end.into())
-            .context("failed to create FD from server PTY")?;
+        let file: File = fdio::create_fd(client_end.into())
+            .context("failed to create FD from server PTY")?
+            .into();
         let fd = file.as_raw_fd();
         let previous = {
             let res = unsafe { libc::fcntl(fd, libc::F_GETFL) };
@@ -123,11 +124,13 @@ impl ServerPty {
     }
 
     /// Creates a File which is suitable to use as the client side of the Pty.
-    async fn open_client_pty(&self) -> Result<File, Error> {
+    async fn open_client_pty(&self) -> Result<OwnedFd, Error> {
         ftrace::duration!(c"pty", c"Pty:open_client_pty");
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let () = self.open_client(server_end).await.context("failed to open client")?;
-        fdio::create_fd(client_end.into()).context("failed to create FD from client PTY")
+        let fd =
+            fdio::create_fd(client_end.into()).context("failed to create FD from client PTY")?;
+        Ok(fd)
     }
 
     /// Open a client Pty device. `server_end` should be a handle

@@ -105,9 +105,9 @@ void LowEnergyInterrogator::QueueRequestPeerSca() {
         pw::bluetooth::emboss::LERequestPeerSCACompleteSubeventView>();
     bt_log(DEBUG,
            "gap-le",
-           "LE request peer SCA complete (peer: %s, value: %s)",
+           "LE request peer SCA complete (peer: %s, value: %d)",
            bt_str(peer_id_),
-           TryToGetNameFromEnum(view.peer_clock_accuracy().Read()));
+           view.peer_clock_accuracy().Read());
     peer_->MutLe().set_sleep_clock_accuracy(view.peer_clock_accuracy().Read());
   };
 

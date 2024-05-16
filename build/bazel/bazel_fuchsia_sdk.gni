@@ -1,7 +1,6 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import("//build/config/fuchsia/platform_version.gni")
 
 declare_args() {
   # Set to true to populate the @fuchsia_sdk external repository with prebuilt
@@ -9,11 +8,4 @@ declare_args() {
   # for the current build configuration's `target_cpu` value will be generated
   # to save about 3 minutes of build time when they are not needed.
   bazel_fuchsia_sdk_all_cpus = false
-
-  # Set to populate the @fuchsia_sdk external repository with prebuilt binaries
-  # for specific API levels. By default, all API levles will be built
-  # (including supported api levels and in development api levels). If you only
-  # want to build artifacts targeting API level PLATFORM, overwrite this with `[]`
-  build_time_supported_api_levels =
-      platform_version.build_time_supported_api_levels
 }

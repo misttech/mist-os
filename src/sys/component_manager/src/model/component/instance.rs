@@ -4,15 +4,13 @@
 
 use {
     crate::{
-        bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
+        bedrock::{
+            program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
+            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
+        },
         framework::controller,
         model::{
-            actions::{
-                resolve::sandbox_construction::{
-                    self, build_component_sandbox, extend_dict_with_offers,
-                },
-                shutdown, ActionKey, ActionsManager, DiscoverAction, StopAction,
-            },
+            actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
                 Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
                 WeakExtendedInstance,
@@ -46,6 +44,7 @@ use {
     async_utils::async_once::Once,
     clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
+    cm_fidl_validator::error::Error as ValidatorError,
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName},
     cm_rust::{
@@ -55,13 +54,13 @@ use {
     cm_types::Name,
     config_encoder::ConfigFields,
     errors::{
-        ActionError, AddChildError, CreateNamespaceError, DynamicOfferError, OpenOutgoingDirError,
-        ResolveActionError, StopError,
+        AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
+        OpenOutgoingDirError, ResolveActionError, StopError,
     },
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::future::{BoxFuture, FutureExt},
+    futures::future::BoxFuture,
     hooks::{CapabilityReceiver, EventPayload},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{
@@ -505,7 +504,7 @@ impl ResolvedInstanceState {
             .downscope_path(Path::validate_and_split(path).unwrap(), entry_type)
             .expect("get_outgoing must return a directory node");
         let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(_) => sandbox::Sender::new_sendable(open).into(),
+            CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(open).into(),
             _ => open.into(),
         };
         let hook =
@@ -789,8 +788,7 @@ impl ResolvedInstanceState {
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         input: ComponentInput,
-    ) -> Result<(Arc<ComponentInstance>, BoxFuture<'static, Result<(), ActionError>>), AddChildError>
-    {
+    ) -> Result<Arc<ComponentInstance>, AddDynamicChildError> {
         let (child, input) = self
             .add_child_internal(
                 component,
@@ -798,19 +796,23 @@ impl ResolvedInstanceState {
                 collection,
                 dynamic_offers,
                 dynamic_capabilities,
-                controller,
                 input,
             )
             .await?;
-        // Register a Discover action.
-        let discover_fut = child
-            .clone()
-            .lock_actions()
-            .await
-            .register_no_wait(DiscoverAction::new(input))
-            .await
-            .boxed();
-        Ok((child, discover_fut))
+
+        // Run a Discover action.
+        ActionsManager::register(child.clone(), DiscoverAction::new(input)).await?;
+
+        // The controller is not started until this point, because the child must be discovered
+        // before a reference to it is given out to anyone.
+        if let Some(controller) = controller {
+            if let Ok(stream) = controller.into_stream() {
+                child
+                    .nonblocking_task_group()
+                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
+            }
+        }
+        Ok(child)
     }
 
     /// Adds a new child of this instance for the given `ChildDecl`. Returns
@@ -823,17 +825,9 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(
-            component,
-            child,
-            collection,
-            None,
-            None,
-            None,
-            ComponentInput::default(),
-        )
-        .await
-        .map(|_| ())
+        self.add_child_internal(component, child, collection, None, None, ComponentInput::default())
+            .await
+            .map(|_| ())
     }
 
     async fn add_child_internal(
@@ -843,7 +837,6 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
-        controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         mut child_input: ComponentInput,
     ) -> Result<(Arc<ComponentInstance>, ComponentInput), AddChildError> {
         assert!(
@@ -899,13 +892,6 @@ impl ResolvedInstanceState {
             component.persistent_storage_for_child(collection),
         )
         .await;
-        if let Some(controller) = controller {
-            if let Ok(stream) = controller.into_stream() {
-                child
-                    .nonblocking_task_group()
-                    .spawn(controller::run_controller(WeakComponentInstance::new(&child), stream));
-            }
-        }
         self.children.insert(child_moniker, child.clone());
 
         self.dynamic_offers.extend(dynamic_offers.into_iter());
@@ -919,7 +905,7 @@ impl ResolvedInstanceState {
         mut dynamic_offers: Vec<fdecl::Offer>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-    ) -> Result<Vec<fdecl::Offer>, DynamicOfferError> {
+    ) -> Result<Vec<fdecl::Offer>, DynamicCapabilityError> {
         for offer in dynamic_offers.iter_mut() {
             match offer {
                 fdecl::Offer::Service(fdecl::OfferService { target, .. })
@@ -931,7 +917,7 @@ impl ResolvedInstanceState {
                 | fdecl::Offer::Config(fdecl::OfferConfiguration { target, .. })
                 | fdecl::Offer::EventStream(fdecl::OfferEventStream { target, .. }) => {
                     if target.is_some() {
-                        return Err(DynamicOfferError::OfferInvalid {
+                        return Err(DynamicCapabilityError::Invalid {
                             err: cm_fidl_validator::error::ErrorList {
                                 errs: vec![cm_fidl_validator::error::Error::extraneous_field(
                                     DeclType::Offer,
@@ -942,7 +928,7 @@ impl ResolvedInstanceState {
                     }
                 }
                 _ => {
-                    return Err(DynamicOfferError::UnknownOfferType);
+                    return Err(DynamicCapabilityError::UnknownOfferType);
                 }
             }
             *offer_target_mut(offer).expect("validation should have found unknown enum type") =
@@ -956,6 +942,7 @@ impl ResolvedInstanceState {
 
     fn validate_dynamic_component(
         &self,
+        all_dynamic_children: Vec<(&str, &str)>,
         dynamic_offers: Vec<fdecl::Offer>,
         dynamic_capabilities: Vec<fdecl::Capability>,
     ) -> Result<(), AddChildError> {
@@ -974,7 +961,18 @@ impl ResolvedInstanceState {
         }
 
         // Validate!
-        cm_fidl_validator::validate_dynamic_offers(&all_dynamic_offers, &decl)?;
+        cm_fidl_validator::validate_dynamic_offers(
+            all_dynamic_children,
+            &all_dynamic_offers,
+            &decl,
+        )
+        .map_err(|err| {
+            if err.errs.iter().all(|e| matches!(e, ValidatorError::DependencyCycle(_))) {
+                DynamicCapabilityError::Cycle { err }
+            } else {
+                DynamicCapabilityError::Invalid { err }
+            }
+        })?;
 
         // Manifest validation is not informed of the contents of collections, and is thus unable
         // to confirm the source exists if it's in a collection. Let's check that here.
@@ -982,7 +980,7 @@ impl ResolvedInstanceState {
             dynamic_offers.into_iter().map(FidlIntoNative::fidl_into_native).collect();
         for offer in &dynamic_offers {
             if !self.offer_source_exists(offer.source()) {
-                return Err(DynamicOfferError::SourceNotFound { offer: offer.clone() }.into());
+                return Err(DynamicCapabilityError::SourceNotFound { offer: offer.clone() }.into());
             }
         }
         Ok(())
@@ -1000,7 +998,28 @@ impl ResolvedInstanceState {
 
         let dynamic_offers = self.add_target_dynamic_offers(dynamic_offers, child, collection)?;
         if !dynamic_offers.is_empty() || !dynamic_capabilities.is_empty() {
-            self.validate_dynamic_component(dynamic_offers.clone(), dynamic_capabilities.clone())?;
+            let mut all_dynamic_children: Vec<_> = self
+                .children()
+                .filter_map(|(n, _)| {
+                    if let Some(collection) = n.collection() {
+                        Some((n.name().as_str(), collection.as_str()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            all_dynamic_children.push((
+                child.name.as_str(),
+                collection
+                    .expect("child must be dynamic if there were dynamic offers")
+                    .name
+                    .as_str(),
+            ));
+            self.validate_dynamic_component(
+                all_dynamic_children,
+                dynamic_offers.clone(),
+                dynamic_capabilities.clone(),
+            )?;
         }
         let dynamic_offers = dynamic_offers.into_iter().map(|o| o.fidl_into_native()).collect();
         let dynamic_capabilities =
@@ -1114,9 +1133,7 @@ impl ProgramRuntime {
         let exit_listener = fasync::Task::spawn(async move {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
-                let mut actions = component.lock_actions().await;
-                let stop_nf = actions.register_no_wait(StopAction::new(false)).await;
-                drop(actions);
+                let stop_nf = component.actions().register_no_wait(StopAction::new(false)).await;
                 component.nonblocking_task_group().spawn(fasync::Task::spawn(async move {
                     let _ = stop_nf.await.map_err(
                         |err| warn!(%err, "Watching for program termination: Stop failed"),
@@ -1269,13 +1286,6 @@ impl Routable for CapabilityRequestedHook {
             name: self.name.to_string(),
             receiver: receiver.clone(),
         });
-        // TODO(https://fxbug.dev/320698181): Before dispatching events we need to wait for any
-        // in-progress resolve actions to end. See https://fxbug.dev/320698181#comment21 for why.
-        {
-            let resolve_completed =
-                source.lock_actions().await.wait_for_action(ActionKey::Resolve).await;
-            resolve_completed.await.unwrap();
-        }
         source.hooks.dispatch(&event).await;
         if receiver.is_taken() {
             Ok(sender.into())

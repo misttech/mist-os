@@ -132,6 +132,23 @@ where
             .into_stream()
             .map_err(|x| x.context("single_main_loop"));
 
+        let dhcp_v6_pd_state_changed_stream = self
+            .driver_state
+            .lock()
+            .ot_instance
+            .border_routing_dhcp6_pd_state_change_stream()
+            .then(move |pd_state| async move {
+                if let Err(e) =
+                    self.driver_state.lock().dhcp_v6_pd.process_pd_state_change(pd_state)
+                {
+                    error!(
+                        "failed to process DHCPv6 PD state change: {:?}. State: {:?}.",
+                        e, pd_state
+                    );
+                }
+                Ok(())
+            });
+
         // Openthread CLI inbound task
         let (cli_input_sender_local, mut cli_input_receiver) = futures::channel::mpsc::unbounded();
         let openthread_cli_inbound_loop = async move {
@@ -208,6 +225,7 @@ where
             state_machine_stream.boxed(),
             discovery_proxy_stream.boxed(),
             dhcp_v6_pd_stream.boxed(),
+            dhcp_v6_pd_state_changed_stream.boxed(),
             scan_watchdog.into_stream().boxed(),
             openthread_cli_inbound_loop.into_stream().boxed(),
         ]))

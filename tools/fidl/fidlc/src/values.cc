@@ -8,9 +8,43 @@
 
 namespace fidlc {
 
-std::string_view ConstantValue::AsString() const {
-  ZX_ASSERT(kind == Kind::kString);
-  return static_cast<const StringConstantValue*>(this)->value;
+std::optional<uint64_t> ConstantValue::AsUnsigned() const {
+  switch (kind) {
+    case Kind::kUint8:
+    case Kind::kZxUchar:
+      return AsNumeric<uint8_t>();
+    case Kind::kUint16:
+      return AsNumeric<uint16_t>();
+    case Kind::kUint32:
+      return AsNumeric<uint32_t>();
+    case Kind::kUint64:
+    case Kind::kZxUsize64:
+    case Kind::kZxUintptr64:
+      return AsNumeric<uint64_t>();
+    default:
+      return std::nullopt;
+  }
+}
+
+std::optional<int64_t> ConstantValue::AsSigned() const {
+  switch (kind) {
+    case Kind::kInt8:
+      return AsNumeric<int8_t>();
+    case Kind::kInt16:
+      return AsNumeric<int16_t>();
+    case Kind::kInt32:
+      return AsNumeric<int32_t>();
+    case Kind::kInt64:
+      return AsNumeric<int64_t>();
+    default:
+      return std::nullopt;
+  }
+}
+
+std::optional<std::string_view> ConstantValue::AsString() const {
+  if (kind == Kind::kString)
+    return static_cast<const StringConstantValue*>(this)->value;
+  return std::nullopt;
 }
 
 // TODO(https://fxbug.dev/42064981): Use std::cmp_* functions when we're on C++20.

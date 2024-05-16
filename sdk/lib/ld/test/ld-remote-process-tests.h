@@ -12,7 +12,9 @@
 #include <lib/ld/remote-abi.h>
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-load-module.h>
+#include <lib/ld/testing/mock-loader-service.h>
 #include <lib/ld/testing/test-vmo.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -32,16 +34,24 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
  public:
   static constexpr bool kCanCollectLog = false;
 
+  inline static const size_t kPageSize = zx_system_get_page_size();
+
   LdRemoteProcessTests();
 
   ~LdRemoteProcessTests() override;
 
+  void SetUp() override;
+
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});
 
-  void Needed(std::initializer_list<std::string_view> names);
+  void Needed(std::initializer_list<std::string_view> names) { mock_loader_.Needed(names); }
 
-  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+    mock_loader_.Needed(name_found_pairs);
+  }
+
+  void VerifyAndClearNeeded() { mock_loader_.VerifyAndClearExpectations(); }
 
   void Load(std::string_view executable_name) {
     elfldltl::testing::ExpectOkDiagnostics diag;
@@ -56,7 +66,38 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     ASSERT_NO_FATAL_FAILURE(ExpectLog(""));
   }
 
+  zx::vmo TakeStubLdVmo() { return std::move(stub_ld_vmo_); }
+
  protected:
+  using Linker = RemoteDynamicLinker<>;
+  using RemoteModule = RemoteLoadModule<>;
+
+  // This returns a closure usable as the `get_dep` function for calling
+  // ld::RuntimeDynamicLinker::Init.  It captures the Diagnostics reference and
+  // the this pointer; when called it uses LoadObject on the MockLoaderService
+  // to find files (or not) according to the Needed calls priming the expected
+  // sequence of names.
+  template <class Diagnostics>
+  auto GetDepFunction(Diagnostics& diag) {
+    return [this, &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
+      RemoteModule::Decoded::Ptr decoded;
+      auto vmo = mock_loader_.LoadObject(soname.str());
+      if (vmo.is_ok()) [[likely]] {
+        // If it returned fit::ok(zx::vmo{}), keep going without this module.
+        if (*vmo) [[likely]] {
+          decoded = RemoteModule::Decoded::Create(diag, *std::move(vmo), kPageSize);
+        }
+      } else if (vmo.error_value() == ZX_ERR_NOT_FOUND
+                     ? !diag.MissingDependency(soname.str())
+                     : !diag.SystemError("cannot open dependency ", soname.str(), ": ",
+                                         elfldltl::ZirconError{vmo.error_value()})) {
+        // Diagnostics said to bail out now.
+        return std::nullopt;
+      }
+      return std::move(decoded);
+    };
+  }
+
   const zx::vmar& root_vmar() { return root_vmar_; }
 
   void set_entry(uintptr_t entry) { entry_ = entry; }
@@ -66,37 +107,25 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 
  private:
-  class MockLoader;
-
-  using Linker = RemoteDynamicLinker<>;
-  using RemoteModule = RemoteLoadModule<>;
-
-  zx::vmo GetDepVmo(const RemoteModule::Soname& soname);
-
   template <class Diagnostics>
   void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
-    const size_t page_size = zx_system_get_page_size();
     Linker linker;
 
     // Decode the main executable.
-    const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
     zx::vmo vmo;
-    ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(executable_path));
+    ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo(executable_name));
     std::array initial_modules = {Linker::InitModule{
-        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size),
+        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), kPageSize),
     }};
     ASSERT_TRUE(initial_modules.front().decoded_module);
 
     // Pre-decode the vDSO.
-    zx::vmo stub_ld_vmo;
-    ASSERT_NO_FATAL_FAILURE(stub_ld_vmo = elfldltl::testing::GetTestLibVmo("ld-stub.so"));
-
     zx::vmo vdso_vmo;
     zx_status_t status = GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
     std::array predecoded_modules = {Linker::PredecodedModule{
-        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), page_size),
+        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), kPageSize),
     }};
 
     // Acquire the layout details from the stub.  The same values collected
@@ -104,95 +133,16 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // for creating and populating the RemoteLoadModule for the passive ABI of
     // any number of separate dynamic linking domains in however many
     // processes.
-    RemoteAbiStub<>::Ptr abi_stub =
-        RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), page_size);
+    RemoteAbiStub<>::Ptr abi_stub = RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
     EXPECT_TRUE(abi_stub);
-    EXPECT_GE(abi_stub->data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_LT(abi_stub->data_size(), page_size);
-    EXPECT_LE(abi_stub->abi_offset(), abi_stub->data_size() - sizeof(ld::abi::Abi<>));
-    EXPECT_LE(abi_stub->rdebug_offset(), abi_stub->data_size() - sizeof(elfldltl::Elf<>::RDebug<>));
-    EXPECT_NE(abi_stub->rdebug_offset(), abi_stub->abi_offset())
-        << "with data_size() " << abi_stub->data_size();
-
     linker.set_abi_stub(abi_stub);
 
-    // Verify that the TLSDESC entry points were found in the stub and that
-    // their addresses pass some basic smell tests.
-    std::set<elfldltl::Elf<>::size_type> tlsdesc_entrypoints;
-    const auto segment_is_executable = [](const auto& segment) -> bool {
-      return segment.executable();
-    };
-    const RemoteModule::Decoded& stub_module = *abi_stub->decoded_module();
-    for (const elfldltl::Elf<>::size_type entry : abi_stub->tlsdesc_runtime()) {
-      // Must be nonzero.
-      EXPECT_NE(entry, 0u);
-
-      // Must lie within the module bounds.
-      EXPECT_GT(entry, stub_module.load_info().vaddr_start());
-      EXPECT_LT(entry - stub_module.load_info().vaddr_start(),
-                stub_module.load_info().vaddr_size());
-
-      // Must be inside an executable segment.
-      auto segment = stub_module.load_info().FindSegment(entry);
-      ASSERT_NE(segment, stub_module.load_info().segments().end());
-      EXPECT_TRUE(std::visit(segment_is_executable, *segment));
-
-      // Must be unique.
-      auto [it, inserted] = tlsdesc_entrypoints.insert(entry);
-      EXPECT_TRUE(inserted) << "duplicate entry point " << entry;
-    }
-    EXPECT_EQ(tlsdesc_entrypoints.size(), kTlsdescRuntimeCount);
-
     // First just decode all the modules: the executable and dependencies.
-    auto get_dep = [this, page_size,
-                    &diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
-      RemoteModule::Decoded::Ptr decoded;
-      if (zx::vmo vmo = GetDepVmo(soname)) [[likely]] {
-        decoded = RemoteModule::Decoded::Create(diag, std::move(vmo), page_size);
-      } else if (!diag.MissingDependency(soname.str())) {
-        return std::nullopt;
-      }
-      return std::move(decoded);
-    };
-    auto init_result = linker.Init(diag, initial_modules, get_dep, std::move(predecoded_modules));
+    auto init_result =
+        linker.Init(diag, initial_modules, GetDepFunction(diag), std::move(predecoded_modules));
     ASSERT_TRUE(init_result);
     auto& modules = linker.modules();
     ASSERT_FALSE(modules.empty());
-
-    // Check the loaded-by pointers.
-    EXPECT_FALSE(modules.front().loaded_by_modid())
-        << "executable loaded by " << modules[*modules.front().loaded_by_modid()].name();
-    {
-      auto next_module = std::next(modules.begin());
-      auto loaded_by_name = [next_module, &modules]() -> std::string_view {
-        if (next_module->loaded_by_modid()) {
-          return modules[*next_module->loaded_by_modid()].name().str();
-        }
-        return "<none>";
-      };
-      if (next_module != modules.end() && next_module->HasModule() &&
-          next_module->module().symbols_visible) {
-        // The second module must be a direct dependency of the executable.
-        EXPECT_THAT(next_module->loaded_by_modid(), ::testing::Optional(0u))
-            << " second module " << next_module->name().str() << " loaded by " << loaded_by_name();
-      }
-      for (; next_module != modules.end(); ++next_module) {
-        if (!next_module->HasModule()) {
-          continue;
-        }
-        if (next_module->module().symbols_visible) {
-          // This module wouldn't be here if it wasn't loaded by someone.
-          EXPECT_NE(next_module->loaded_by_modid(), std::nullopt)
-              << "visible module " << next_module->name().str() << " loaded by "
-              << loaded_by_name();
-        } else {
-          // A predecoded module was not referenced, so it's loaded by no-one.
-          EXPECT_EQ(next_module->loaded_by_modid(), std::nullopt)
-              << "invisible module " << next_module->name().str() << " loaded by "
-              << loaded_by_name();
-        }
-      }
-    }
 
     // If not all modules could be decoded, don't bother with relocation to
     // diagnose symbol resolution errors since many are likely without all the
@@ -260,10 +210,12 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   uintptr_t entry_ = 0;
   uintptr_t vdso_base_ = 0;
   std::optional<size_t> stack_size_;
+  zx::vmo stub_ld_vmo_;
   zx::vmar root_vmar_;
   zx::thread thread_;
-  std::unique_ptr<MockLoader> mock_loader_;
+  MockLoaderServiceForTest mock_loader_;
 };
+
 }  // namespace ld::testing
 
 #endif  // LIB_LD_TEST_LD_REMOTE_PROCESS_TESTS_H_

@@ -31,7 +31,7 @@ import rustc
 import remote_action
 
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, Optional, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -464,11 +464,15 @@ class RustRemoteAction(object):
         return Path(str(self.depfile) + ".nolink")
 
     @property
-    def dep_only_command(self) -> Sequence[str]:
-        return cl_utils.auto_env_prefix_command(
-            _filter_local_command(
-                self._rust_action.dep_only_command(self.local_depfile)
-            )
+    def dep_only_command_with_rspfiles(
+        self,
+    ) -> Tuple[Sequence[str], Sequence[Path]]:
+        command, aux_files = self._rust_action.dep_only_command_with_rspfiles(
+            self.local_depfile
+        )
+        return (
+            cl_utils.auto_env_prefix_command(_filter_local_command(command)),
+            aux_files,
         )
 
     def remote_compile_command(self) -> Iterable[str]:
@@ -531,8 +535,10 @@ class RustRemoteAction(object):
         # all transitive inputs.
         self._cleanup_files.append(self.local_depfile)
 
-        dep_only_command = self.dep_only_command
+        dep_only_command, aux_rspfiles = self.dep_only_command_with_rspfiles
         cmd_str = cl_utils.command_quoted_str(dep_only_command)
+        self._cleanup_files.extend(aux_rspfiles)
+
         self.vmsg(f"scan-deps-only command: {cmd_str}")
         dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:

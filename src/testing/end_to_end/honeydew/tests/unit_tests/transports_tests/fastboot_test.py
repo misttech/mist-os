@@ -5,9 +5,12 @@
 """Unit tests for honeydew.transports.fastboot.py."""
 
 import ipaddress
+import os
 import subprocess
+import sys
 import unittest
 from collections.abc import Callable
+from importlib import resources
 from typing import Any
 from unittest import mock
 
@@ -143,6 +146,56 @@ class FastbootTests(unittest.TestCase):
             fastboot_node_id=_INPUT_ARGS["fastboot_node_id"],
             ffx_transport=self.ffx_obj,
         )
+
+    @mock.patch(
+        "importlib.resources.files",
+        autospec=True,
+    )
+    def test_get_fastboot_binary_with_env_var_success(
+        self, mock_files: mock.Mock
+    ) -> None:
+        """Test case for _get_fastboot_binary() when environment
+        variable override is provided"""
+        with mock.patch.dict(
+            os.environ, {"HONEYDEW_FASTBOOT_OVERRIDE": "fastboot"}, clear=True
+        ):
+            bin_name = fastboot._get_fastboot_binary()
+            self.assertEqual(bin_name, "fastboot")
+            mock_files.assert_not_called()
+
+    @mock.patch.object(resources, "files", autospec=True)
+    @mock.patch.object(resources, "as_file", autospec=True)
+    @mock.patch("atexit.register", autospec=True)
+    @mock.patch("shutil.copy2", autospec=True)
+    @mock.patch("tempfile.NamedTemporaryFile", autospec=True)
+    def test_get_fastboot_binary_with_resource_success(
+        self,
+        mock_tmp_file: mock.Mock,
+        mock_copy: mock.Mock,
+        *unused_args: Any,
+    ) -> None:
+        """Test case for _get_fastboot_binary() when fastboot data exists"""
+        sys.modules["honeydew.data"] = mock.Mock()
+        with mock.patch.dict(os.environ, {}, clear=True):
+            mock_fd = mock.Mock()
+            mock_fd.name = "tmpfastboot"
+            mock_tmp_file.return_value = mock_fd
+            bin_name = fastboot._get_fastboot_binary()
+            self.assertEqual(bin_name, "tmpfastboot")
+            mock_copy.assert_called_with(mock.ANY, bin_name)
+
+    @mock.patch.object(resources, "as_file", autospec=True)
+    def test_get_fastboot_binary_with_resource_fail(
+        self, mock_as_file: mock.Mock
+    ) -> None:
+        """Test case for _get_fastboot_binary() when fastboot data does not
+        exist"""
+        mock_file = mock.Mock()
+        mock_file.stat.side_effect = ImportError
+        mock_as_file.return_value.__enter__.return_value = mock_file
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(errors.HoneydewDataResourceError):
+                fastboot._get_fastboot_binary()
 
     def test_node_id_when_fastboot_node_id_passed(self) -> None:
         """Testcase for Fastboot.node_id when `fastboot_node_id` arg was passed

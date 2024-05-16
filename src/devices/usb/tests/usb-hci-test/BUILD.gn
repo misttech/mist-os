@@ -38,6 +38,12 @@ fuchsia_unittest_package("usb-hci-test-package") {
         }
         tags = [ "usb-compliance-tests" ]
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
+        }
+        tags = [ "usb-compliance-tests" ]
+      },
     ]
   }
   test_type = "device"

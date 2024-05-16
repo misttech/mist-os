@@ -8,9 +8,9 @@ use {
     fidl_fuchsia_fonts_experimental as fonts_exp,
 };
 
-// Add new tests here so we don't overload component manager with requests (58150)
-#[fasync::run_singlethreaded(test)]
-async fn test_list_typefaces() {
+// Add new tests here so we don't overload component manager with requests (b/42136076).
+#[fuchsia::test]
+async fn test_list_typefaces_1() {
     let factory = ProviderFactory::new();
     test_list_typefaces_empty_request_gets_all(&factory).await.unwrap();
     test_list_typefaces_no_results_after_last_page(&factory).await.unwrap();
@@ -20,6 +20,11 @@ async fn test_list_typefaces() {
     test_list_typefaces_by_alias(&factory).await.unwrap();
     test_list_typefaces_by_name_ignores_case(&factory).await.unwrap();
     test_list_typefaces_by_name_substring(&factory).await.unwrap();
+}
+
+#[fuchsia::test]
+async fn test_list_typefaces_2() {
+    let factory = ProviderFactory::new();
     test_list_typefaces_by_slant_range(&factory).await.unwrap();
     test_list_typefaces_by_slant_range_is_inclusive(&factory).await.unwrap();
     test_list_typefaces_by_weight_range(&factory).await.unwrap();

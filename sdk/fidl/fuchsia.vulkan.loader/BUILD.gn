@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.vulkan.loader") {
   sdk_category = "partner_internal"
+  stable = true
   sdk_area = "Unknown"
 
   sources = [ "loader.fidl" ]

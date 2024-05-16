@@ -3,10 +3,11 @@
 # found in the LICENSE file.
 import asyncio
 import logging
-from typing import Dict, Set, Any, Tuple
+from typing import Dict, Set, Any
 
 from fidl_codec import decode_fidl_response
 from fidl_codec import encode_fidl_message
+from inspect import getframeinfo, stack
 import fuchsia_controller_py as fc
 
 from ._fidl_common import *
@@ -14,11 +15,17 @@ from ._ipc import GlobalHandleWaker
 from ._ipc import EventWrapper
 
 TXID: TXID_Type = 0
+# Simple client ID. Monotonically increasing for each client.
+_CLIENT_ID = 0
+_LOGGER = logging.getLogger("fidl.client")
 
 
 class FidlClient(object):
     def __init__(self, channel, channel_waker=None):
-        if type(channel) == int:
+        global _CLIENT_ID
+        self.id = _CLIENT_ID
+        _CLIENT_ID += 1
+        if type(channel) is int:
             self.channel = fc.Channel(channel)
         else:
             self.channel = channel
@@ -30,8 +37,16 @@ class FidlClient(object):
         self.staged_messages: Dict[TXID_Type, asyncio.Queue[FidlMessage]] = {}
         self.epitaph_received: EpitaphError | None = None
         self.epitaph_event = EventWrapper()
+        caller = getframeinfo(stack()[1][0])
+        _LOGGER.debug(
+            f"{self} instantiated from {caller.filename}:{caller.lineno}"
+        )
+
+    def __str__(self):
+        return f"client:{self.__name__}:{self.id}"
 
     def __del__(self):
+        _LOGGER.debug(f"{self} closing")
         if self.channel is not None:
             self.channel_waker.unregister(self.channel)
 
@@ -74,6 +89,9 @@ class FidlClient(object):
             return await self._read_and_decode(0)
         except fc.ZxStatus as e:
             if e.args[0] != fc.ZxStatus.ZX_ERR_PEER_CLOSED:
+                _LOGGER.warning(
+                    f"{self} received error waiting for next event: {e}"
+                )
                 self.channel_waker.unregister(self.channel)
                 raise e
         return None
@@ -129,20 +147,25 @@ class FidlClient(object):
                 if recvd_txid != 0 and recvd_txid not in self.pending_txids:
                     self.channel_waker.unregister(self.channel)
                     self.channel = None
+                    _LOGGER.warning(
+                        f"{self} received unexpected TXID: {recvd_txid}"
+                    )
                     raise RuntimeError(
-                        "Received unexpected TXID. Channel closed and invalid. "
+                        f"{self} received unexpected TXID. Channel closed and invalid. "
                         + "Continuing to use this FIDL client after this exception will result "
                         + "in undefined behavior"
                     )
                 self._stage_message(recvd_txid, msg)
-            except EpitaphError:
+            except EpitaphError as ep:
                 # This is to avoid some possible race conditions with the below
                 # where unregistering can happen at the same time as receiving
                 # an epitaph error. It should not unregister the channel.
-                raise
+                _LOGGER.warning(f"{self} received epitaph error: {ep}")
+                raise ep
             except fc.ZxStatus as e:
                 if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                     self.channel_waker.unregister(self.channel)
+                    _LOGGER.warning(f"{self} received channel error: {e}")
                     raise e
             loop = asyncio.get_running_loop()
             channel_waker_task = loop.create_task(
@@ -246,6 +269,9 @@ class EventHandlerBase(object):
     def __init__(self, client: FidlClient):
         self.client = client
         self.client.channel_waker.register(self.client.channel)
+
+    def __str__(self):
+        return f"event:{self.client.__name__}:{self.client.id}"
 
     async def serve(self):
         while True:

@@ -27,7 +27,7 @@ use rand::RngCore;
 
 use crate::{
     counters::Counter,
-    device,
+    device::WeakDeviceIdentifier,
     ip::{
         icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
         socket::Mms,
@@ -178,13 +178,13 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) struct TcpState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub(crate) struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
     pub(crate) isn_generator: IsnGenerator<BT::Instant>,
     pub(crate) sockets: Sockets<I, D, BT>,
     pub(crate) counters: TcpCounters<I>,
 }
 
-impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpState<I, D, BT> {
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<I, D, BT> {
     pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
         Self {
             isn_generator: IsnGenerator::new(now, rng),

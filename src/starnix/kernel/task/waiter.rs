@@ -179,6 +179,11 @@ struct WaitCancelerZxio {
     inner: HandleWaitCanceler,
 }
 
+struct WaitCancelerEvent {
+    event_pair: Weak<zx::Event>,
+    inner: HandleWaitCanceler,
+}
+
 struct WaitCancelerEventPair {
     event_pair: Weak<zx::EventPair>,
     inner: HandleWaitCanceler,
@@ -197,6 +202,7 @@ struct WaitCancelerVmo {
 enum WaitCancelerInner {
     Zxio(WaitCancelerZxio),
     Queue(WaitCancelerQueue),
+    Event(WaitCancelerEvent),
     EventPair(WaitCancelerEventPair),
     Timer(WaitCancelerTimer),
     Vmo(WaitCancelerVmo),
@@ -225,6 +231,10 @@ impl WaitCanceler {
 
     pub fn new_zxio(zxio: Weak<Zxio>, inner: HandleWaitCanceler) -> Self {
         Self::new_inner(WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }))
+    }
+
+    pub fn new_event(event_pair: Weak<zx::Event>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Event(WaitCancelerEvent { event_pair, inner }))
     }
 
     pub fn new_event_pair(event_pair: Weak<zx::EventPair>, inner: HandleWaitCanceler) -> Self {
@@ -300,6 +310,10 @@ impl WaitCanceler {
                             }
                         }
                     };
+                }
+                WaitCancelerInner::Event(WaitCancelerEvent { event_pair, inner }) => {
+                    let Some(event_pair) = event_pair.upgrade() else { return };
+                    inner.cancel(event_pair.as_handle_ref());
                 }
                 WaitCancelerInner::EventPair(WaitCancelerEventPair { event_pair, inner }) => {
                     let Some(event_pair) = event_pair.upgrade() else { return };

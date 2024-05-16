@@ -584,9 +584,15 @@ TEST(GpioTest, ControllerId) {
   auto parent = MockDevice::FakeRootParent();
   parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
 
+  fuchsia_hardware_gpioimpl::wire::ControllerMetadata controller_metadata = {.id = kController};
+  const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
+  ASSERT_TRUE(encoded_controller_metadata.is_ok());
+
+  parent->SetMetadata(DEVICE_METADATA_GPIO_CONTROLLER, encoded_controller_metadata->data(),
+                      encoded_controller_metadata->size());
+
   async_patterns::TestDispatcherBound<MockGpioImpl> gpioimpl_fidl(
-      background_dispatcher->async_dispatcher(), std::in_place, background_dispatcher->borrow(),
-      kController);
+      background_dispatcher->async_dispatcher(), std::in_place, background_dispatcher->borrow());
 
   {
     auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImpl::CreateOutgoingAndServe);

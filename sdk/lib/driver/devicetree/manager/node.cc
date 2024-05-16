@@ -111,6 +111,14 @@ void Node::AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
   composite_ = true;
 }
 
+void Node::AddSmc(fuchsia_hardware_platform_bus::Smc smc) {
+  if (!pbus_node_.smc()) {
+    pbus_node_.smc() = std::vector<fuchsia_hardware_platform_bus::Smc>();
+  }
+  pbus_node_.smc()->emplace_back(std::move(smc));
+  add_platform_device_ = true;
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr,
                            fidl::SyncClient<fuchsia_driver_framework::Node> &fdf_node) {

@@ -155,7 +155,7 @@ void NameTypeHelper(std::ostringstream& buf, const Type* type) {
       const auto* array_type = static_cast<const ArrayType*>(type);
       buf << '<';
       NameTypeHelper(buf, array_type->element_type);
-      if (*array_type->element_count != SizeValue::Max()) {
+      if (array_type->element_count->value != kMaxSize) {
         buf << ", ";
         buf << array_type->element_count->value;
       }
@@ -167,7 +167,7 @@ void NameTypeHelper(std::ostringstream& buf, const Type* type) {
       buf << '<';
       NameTypeHelper(buf, vector_type->element_type);
       buf << '>';
-      if (vector_type->ElementCount() != SizeValue::Max().value) {
+      if (vector_type->ElementCount() != kMaxSize) {
         buf << ':';
         buf << vector_type->ElementCount();
       }
@@ -175,7 +175,7 @@ void NameTypeHelper(std::ostringstream& buf, const Type* type) {
     }
     case Type::Kind::kString: {
       const auto* string_type = static_cast<const StringType*>(type);
-      if (string_type->MaxSize() != SizeValue::Max().value) {
+      if (string_type->MaxSize() != kMaxSize) {
         buf << ':';
         buf << string_type->MaxSize();
       }

@@ -63,7 +63,7 @@ ktl::unique_ptr<UserMemory> UserMemory::Create(fbl::RefPtr<VmObject> vmo, uint8_
   // which do not run threads in restricted mode. We assert this to be true by checking that the
   // restricted state is not set on this thread.
   DEBUG_ASSERT(!Thread::Current::restricted_state());
-  fbl::RefPtr<VmAspace> aspace(Thread::Current::Get()->active_aspace());
+  fbl::RefPtr<VmAspace> aspace(Thread::Current::active_aspace());
   DEBUG_ASSERT(aspace);
 
   return CreateInAspace(ktl::move(vmo), aspace, tag, align_pow2);

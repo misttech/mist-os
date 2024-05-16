@@ -29,11 +29,12 @@
 		#size-cells = <0x02>;
 		ranges;
 
-		fuchsia,contiguous {
-			compatible = "sysmem";
+		sysmem: fuchsia,sysmem {
+			compatible = "fuchsia,sysmem";
 			iommus = <&dummy_iommu 1>;
 			pid = <PDEV_PID_AMLOGIC_A311D>;
 			vid = <PDEV_VID_AMLOGIC>;
+			size = <0x00 0x00>;
 			// The AMlogic display engine needs contiguous physical memory for each
 			// frame buffer, because it does not have a page table walker. We reserve
 			// enough memory to hold 5 framebuffers (2 for virtcon, 3 for scenic) at
@@ -46,8 +47,20 @@
 			//
 			// TODO(https://fxbug.dev/42072489): Reserving this much memory seems wasteful. The
 			// quantity below is 10% of RAM on a VIM3 Basic and 5% of RAM on a VIM3 Pro.
-			size = <0x00 (200*1024*1024)>;
+			contiguous-size = <0x00 (200*1024*1024)>;
 		};
+	};
+
+	display_detect: display-detect {
+		gpios = <&gpio_expander 0 0>;
+		gpio-names = "LCD_RESET";
+	};
+
+	backlight {
+		gpios = <&gpio_expander 1 0>;
+		gpio-names = "LCD_BACKLIGHT_ENABLE";
+		pwms = <&pwm 8 0 0>; //PWM_AO_C
+		pwm-names = "LCD_BRIGHTNESS";
 	};
 };
 
@@ -65,6 +78,13 @@
 
 &i2c_AO {
 	pinctrl-0 = <&i2c_AO_pins>;
+
+	gpio_expander: gpio-controller@20 {
+		compatible = "ti,tca6408a";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
 
 	khadas-mcu@18 {
 		compatible = "khadas,vim3-mcu";

@@ -72,16 +72,18 @@ group("tests") {
   ]
 }
 
-core_shard("system_recovery_core_shard") {
-  shard_file = "meta/core_shards/system_recovery.core_shard.cml"
-}
+if (current_toolchain == default_toolchain) {
+  core_shard("system_recovery_core_shard") {
+    shard_file = "meta/core_shards/system_recovery.core_shard.cml"
+  }
 
-core_shard("system_recovery_fdr_core_shard") {
-  shard_file = "meta/core_shards/system_recovery_fdr.core_shard.cml"
-}
+  core_shard("system_recovery_fdr_core_shard") {
+    shard_file = "meta/core_shards/system_recovery_fdr.core_shard.cml"
+  }
 
-core_shard("system_recovery_installer_core_shard") {
-  shard_file = "meta/core_shards/system_recovery_installer.core_shard.cml"
+  core_shard("system_recovery_installer_core_shard") {
+    shard_file = "meta/core_shards/system_recovery_installer.core_shard.cml"
+  }
 }
 
 resource("recovery_logo") {
@@ -391,7 +393,10 @@ fuchsia_test_package("system_recovery_tests") {
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }
@@ -476,7 +481,10 @@ fuchsia_test_package("system_recovery_installer_tests") {
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }

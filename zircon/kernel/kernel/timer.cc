@@ -469,6 +469,22 @@ zx_status_t Timer::TrylockOrCancel(MonitoredSpinLock* lock) {
   return ZX_OK;
 }
 
+zx_status_t Timer::TrylockOrCancel(ChainLock& lock) {
+  // Just like the previous implementation of TrylockOrCancel, but this version
+  // attempts operates on a ChainLock instead of a MonitoredSpinLock, and is
+  // used by the wait queue timeout mechanism.  Keep attempting to acquire the
+  // lock, arch:Yield'ing in between attempts, and bailing out in the case that
+  // we notice that the cancel_ flag has been set.
+  while (!lock.TryAcquire()) {
+    if (cancel_.load(ktl::memory_order_relaxed)) {
+      return ZX_ERR_TIMED_OUT;
+    }
+    arch::Yield();
+  }
+
+  return ZX_OK;
+}
+
 void TimerQueue::TransitionOffCpu(TimerQueue& source) {
   Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
 

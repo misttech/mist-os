@@ -17,7 +17,7 @@ use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fmt::Display;
-use std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6, TcpStream};
+use std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::time::Duration;
 
 #[derive(Debug, PartialEq)]
@@ -47,10 +47,16 @@ trait ManualTargetTester: Send + 'static {
 
 struct TcpOpenManualTargetTester;
 
+const MANUAL_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
+
 impl ManualTargetTester for TcpOpenManualTargetTester {
     async fn target_state(&mut self, target: SocketAddr) -> ManualTargetState {
-        // If we can open a TcpStream to the target then we consider it to be live
-        match TcpStream::connect(target) {
+        // We want to add a timeout, so instead of just not seeing the device at all, we can
+        // return that it is Disconnected.
+        match timeout::timeout(MANUAL_CONNECT_TIMEOUT, tokio::net::TcpStream::connect(target))
+            .await
+            .context("timed out")
+        {
             Ok(_) => {
                 // If we can get a fastboot var then we're fastboot
                 tracing::trace!("Could connect to SocketAddr: {}. Testing if Fastboot TCP", target);
@@ -368,7 +374,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_manual_target_watcher() -> Result<()> {
         let empty_signal = Arc::new(Mutex::new(false));
 
@@ -492,7 +498,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_manual_target_change_state() -> Result<()> {
         let empty_signal = Arc::new(Mutex::new(false));
 
@@ -562,5 +568,15 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_state_checking_times_out() {
+        use std::time::Instant;
+        let mut t = TcpOpenManualTargetTester;
+        let start = Instant::now();
+        let _ = t.target_state("1.2.3.4:22".parse().expect("bad socketaddr parse")).await;
+        let duration = start.elapsed();
+        assert!(duration < MANUAL_CONNECT_TIMEOUT * 2);
     }
 }

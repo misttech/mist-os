@@ -136,6 +136,7 @@ class VmObjectPaged final : public VmObject {
   zx_status_t CommitRangePinned(uint64_t offset, uint64_t len, bool write) override {
     return CommitRangeInternal(offset, len, /*pin=*/true, write);
   }
+  zx_status_t PrefetchRange(uint64_t offset, uint64_t len) override;
   zx_status_t DecommitRange(uint64_t offset, uint64_t len) override;
   zx_status_t ZeroRange(uint64_t offset, uint64_t len) override;
 
@@ -341,6 +342,10 @@ class VmObjectPaged final : public VmObject {
 
   // Internal decommit range helper that expects the lock to be held.
   zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+
+  // Internal prefetch range helper that expects the lock to be held.
+  zx_status_t PrefetchRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
+      TA_REQ(lock());
 
   // see GetAttributedMemoryInRange
   AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,

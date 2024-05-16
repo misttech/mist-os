@@ -51,7 +51,7 @@ type InstalledRouteV6 = table {
 };
 
 /// Provides observability to the system's IPv6 routing state.
-@discoverable
+@discoverable(server="platform")
 @available(added=HEAD)
 closed protocol StateV6 {
     /// Initialize a watcher for IPv6 routing state.

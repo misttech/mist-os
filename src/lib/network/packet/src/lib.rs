@@ -1806,6 +1806,61 @@ impl<'b, 'a: 'b> BufferView<&'b mut [u8]> for &'b mut &'a mut [u8] {
 
 impl<'b, 'a: 'b> BufferViewMut<&'b mut [u8]> for &'b mut &'a mut [u8] {}
 
+/// A [`BufferViewMut`] into a `&mut [u8]`.
+///
+/// This type is useful for instantiating a mutable view into a slice that can
+/// be used for parsing, where any parsing that is done only affects this view
+/// and therefore need not be "undone" later.
+///
+/// Note that `BufferViewMut<&mut [u8]>` is also implemented for &mut &mut [u8]
+/// (a mutable reference to a mutable byte slice), but this can be problematic
+/// if you need to materialize an *owned* type that implements `BufferViewMut`,
+/// in order to pass it to a function, for example, so that it does not hold a
+/// reference to a temporary value.
+pub struct SliceBufViewMut<'a>(&'a mut [u8]);
+
+impl<'a> SliceBufViewMut<'a> {
+    pub fn new(buf: &'a mut [u8]) -> Self {
+        Self(buf)
+    }
+}
+
+impl<'a> BufferView<&'a mut [u8]> for SliceBufViewMut<'a> {
+    fn take_front(&mut self, n: usize) -> Option<&'a mut [u8]> {
+        let Self(buf) = self;
+        if <[u8]>::len(buf) < n {
+            return None;
+        }
+        Some(take_front_mut(buf, n))
+    }
+
+    fn take_back(&mut self, n: usize) -> Option<&'a mut [u8]> {
+        let Self(buf) = self;
+        if <[u8]>::len(buf) < n {
+            return None;
+        }
+        Some(take_back_mut(buf, n))
+    }
+
+    fn into_rest(self) -> &'a mut [u8] {
+        self.0
+    }
+}
+
+impl<'a> BufferViewMut<&'a mut [u8]> for SliceBufViewMut<'a> {}
+
+impl<'a> AsRef<[u8]> for SliceBufViewMut<'a> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl<'a> AsMut<[u8]> for SliceBufViewMut<'a> {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.0
+    }
+}
+
 fn take_front<'a>(bytes: &mut &'a [u8], n: usize) -> &'a [u8] {
     let (prefix, rest) = mem::replace(bytes, &[]).split_at(n);
     *bytes = rest;
@@ -1938,6 +1993,14 @@ mod tests {
 
         test_either!(A);
         test_either!(B);
+    }
+
+    #[test]
+    fn test_slice_buf_view_mut() {
+        let mut buf = ascending(10);
+
+        test_buffer_view(SliceBufViewMut::new(&mut buf));
+        test_buffer_view_mut(SliceBufViewMut::new(&mut buf));
     }
 
     #[test]

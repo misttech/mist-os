@@ -82,9 +82,18 @@ func (d *nudDispatcher) log(verb string, nicID tcpip.NICID, entry stack.Neighbor
 		return "U"
 	}()
 
-	// TODO(https://fxbug.dev/42141219): Change log level to Debug once the neighbor table
-	// is able to be inspected.
-	_ = syslog.InfoTf(nudTag, "%s %s (%s|%s) NIC=%d LinkAddress=%s %s", verb, entry.Addr, family, flags, nicID, entry.LinkAddr, entry.State)
+	// Only log the more significant states at the INFO level to reduce log noise.
+	level := func() syslog.LogLevel {
+		switch entry.State {
+		case stack.Stale, stack.Delay, stack.Probe:
+			return syslog.DebugLevel
+		case stack.Unknown, stack.Incomplete, stack.Reachable, stack.Unreachable, stack.Static:
+			return syslog.InfoLevel
+		default:
+			panic(fmt.Sprintf("invalid NeighborState = %d: %#v", entry.State, entry))
+		}
+	}()
+	_ = syslog.Logf(syslog.DefaultCallDepth, level, nudTag, "%s %s (%s|%s) NIC=%d LinkAddress=%s %s", verb, entry.Addr, family, flags, nicID, entry.LinkAddr, entry.State)
 }
 
 // OnNeighborAdded implements stack.NUDDispatcher.

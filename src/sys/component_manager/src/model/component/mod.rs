@@ -252,7 +252,7 @@ pub struct ComponentInstance {
     /// The component's mutable state.
     state: Mutex<InstanceState>,
     /// Actions on the instance that must eventually be completed.
-    actions: Mutex<ActionsManager>,
+    actions: ActionsManager,
     /// Tasks owned by this component instance that will be cancelled if the component is
     /// destroyed.
     nonblocking_task_group: TaskGroup,
@@ -311,13 +311,13 @@ impl ComponentInstance {
             context,
             parent,
             state: Mutex::new(InstanceState::New),
-            actions: Mutex::new(ActionsManager::new()),
+            actions: ActionsManager::new(),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
             persistent_storage,
             execution_scope: ExecutionScope::new(),
         });
-        self_.lock_actions().await.set_component_reference(WeakComponentInstance::new(&self_));
+        self_.actions().set_component_reference(WeakComponentInstance::new(&self_)).await;
         self_
     }
 
@@ -328,9 +328,8 @@ impl ComponentInstance {
     }
 
     /// Locks and returns the instance's action set.
-    // TODO(b/309656051): Remove this method from ComponentInstance's public API
-    pub async fn lock_actions(&self) -> MutexGuard<'_, ActionsManager> {
-        self.actions.lock().await
+    pub fn actions(&self) -> &ActionsManager {
+        &self.actions
     }
 
     /// Returns a group for this instance where tasks can be run scoped to this instance. Tasks run
@@ -353,6 +352,12 @@ impl ComponentInstance {
         self: &'a Arc<Self>,
     ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ActionError> {
         loop {
+            // Resolve is idempotent; it'll exit early if the component is already resolved. To
+            // ensure that the component is resolved, we call it here without bothering to check
+            // the component's current state. Once it returns successfully we know that the
+            // component is resolved, even if the action did no actual work.
+            self.resolve().await?;
+
             /// Returns Ok(Some(_)) when the component is in a resolved state, Ok(None) when the
             /// component is in a state from which it can be resolved, and Err(_) when the
             /// component is in a state from which it cannot be resolved.
@@ -382,16 +387,11 @@ impl ComponentInstance {
                 }
                 Ok(None)
             }
-
-            if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
-                return Ok(mapped_guard);
-            }
-            self.resolve().await?;
             if let Some(mapped_guard) = get_mapped_mutex_or_error(&self).await? {
                 return Ok(mapped_guard);
             }
             // If we've reached here, then the component must have been unresolved in-between our
-            // calls to resolved and get_mapped_mutex_or_error. Our mission here remains to resolve
+            // calls to resolve and get_mapped_mutex_or_error. Our mission here remains to resolve
             // the component if necessary and then return the resolved state, so let's loop and try
             // to resolve it again.
         }
@@ -506,7 +506,7 @@ impl ComponentInstance {
                 // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once
                 // it exists
                 let router = match value {
-                    Capability::Sender(s) => Router::new_ok(s),
+                    Capability::Connector(s) => Router::new_ok(s),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
@@ -516,7 +516,7 @@ impl ComponentInstance {
             }
         }
 
-        let (child, discover_fut) = state
+        let child = state
             .add_child(
                 self,
                 child_decl,
@@ -528,11 +528,8 @@ impl ComponentInstance {
             )
             .await?;
 
-        // Release the component state lock so DiscoverAction can acquire it.
+        // Release the component state now that the component has been created and discovered.
         drop(state);
-
-        // Wait for the Discover action to finish.
-        discover_fut.await?;
 
         if let Some(start_reason) = maybe_start_reason {
             child
@@ -1183,19 +1180,31 @@ impl ComponentInstance {
         self: &Arc<Self>,
         look_up_moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let mut cur = self.clone();
-        for moniker in look_up_moniker.path().iter() {
-            cur = {
-                let cur_state = cur.lock_resolved_state().await?;
-                if let Some(c) = cur_state.get_child(moniker) {
-                    c.clone()
-                } else {
-                    return Err(ModelError::instance_not_found(look_up_moniker.clone()));
-                }
+        let mut name_iterator = look_up_moniker.path().iter();
+        let mut component = self.clone();
+        loop {
+            // Check the resolved state directly instead of calling `lock_resolve_state`
+            // because that function will wait on any in-progress resolve actions, and we may
+            // have been called from a resolve action.
+            if component.lock_state().await.get_resolved_state().is_none() {
+                component.resolve().await?;
+            }
+            let Some(child_name) = name_iterator.next() else {
+                return Ok(component);
             };
+            let state = component.lock_state().await;
+            let Some(resolved_state) = state.get_resolved_state() else {
+                // The component must have unresolved while waiting on the resolve action.
+                continue;
+            };
+            if let Some(child) = resolved_state.get_child(child_name) {
+                let child = child.clone();
+                drop(state);
+                component = child;
+            } else {
+                return Err(ModelError::instance_not_found(look_up_moniker.clone()));
+            }
         }
-        cur.lock_resolved_state().await?;
-        Ok(cur)
     }
 
     /// Finds a component matching the moniker, if such a component exists.
@@ -1386,7 +1395,7 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::*,
-        errors::{AddChildError, DynamicOfferError},
+        errors::{AddChildError, DynamicCapabilityError},
         fasync::TestExecutor,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
@@ -1910,16 +1919,8 @@ pub mod tests {
         }
     }
 
-    // TODO(https://fxbug.dev/42066274)
-    #[ignore]
     #[fuchsia::test]
     async fn creating_dynamic_child_with_offer_cycle_fails() {
-        let example_offer = OfferBuilder::service()
-            .name("foo")
-            .source(OfferSource::Collection("coll".parse().unwrap()))
-            .target_static_child("static_child")
-            .build();
-
         let components = vec![
             (
                 "root",
@@ -1930,7 +1931,12 @@ pub mod tests {
                             .name("coll")
                             .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                     )
-                    .offer(example_offer.clone())
+                    .offer(
+                        OfferBuilder::service()
+                            .name("foo")
+                            .source(OfferSource::Collection("coll".parse().unwrap()))
+                            .target_static_child("static_child"),
+                    )
                     .build(),
             ),
             ("static_child", component_decl_with_test_runner()),
@@ -1960,16 +1966,8 @@ pub mod tests {
         assert_matches!(res, Err(fcomponent::Error::InvalidArguments));
     }
 
-    // TODO(https://fxbug.dev/42066274)
-    #[ignore]
     #[fuchsia::test]
     async fn creating_cycle_between_collections_fails() {
-        let static_collection_offer = OfferBuilder::service()
-            .name("foo")
-            .source(OfferSource::Collection("coll1".parse().unwrap()))
-            .target(OfferTarget::Collection("coll2".parse().unwrap()))
-            .build();
-
         let components = vec![(
             "root",
             ComponentDeclBuilder::new()
@@ -1983,7 +1981,12 @@ pub mod tests {
                         .name("coll2")
                         .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
                 )
-                .offer(static_collection_offer.clone())
+                .offer(
+                    OfferBuilder::service()
+                        .name("foo")
+                        .source(OfferSource::Collection("coll1".parse().unwrap()))
+                        .target(OfferTarget::Collection("coll2".parse().unwrap())),
+                )
                 .build(),
         )];
 
@@ -2337,8 +2340,8 @@ pub mod tests {
                 ])
                 .await
                 .expect_err("unexpected succeess in validate/convert dynamic offers"),
-                AddChildError::DynamicOfferError { err }
-            if err == DynamicOfferError::SourceNotFound {
+                AddChildError::DynamicCapabilityError { err }
+            if err == DynamicCapabilityError::SourceNotFound {
                 offer: OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "doesnt-exist".parse().unwrap(),
@@ -2379,6 +2382,18 @@ pub mod tests {
             .expect("failed to start root");
         test.runner.wait_for_urls(&["test:///root_resolved"]).await;
 
+        let collection_decl = root
+            .lock_resolved_state()
+            .await
+            .unwrap()
+            .resolved_component
+            .decl
+            .collections
+            .iter()
+            .find(|c| c.name.as_str() == "col")
+            .unwrap()
+            .clone();
+
         let validate_and_convert = |capabilities: Vec<fdecl::Capability>| async {
             root.lock_resolved_state()
                 .await
@@ -2394,7 +2409,7 @@ pub mod tests {
                         environment: None,
                         config_overrides: None,
                     },
-                    None,
+                    Some(&collection_decl),
                 )
         };
 
@@ -2429,12 +2444,11 @@ pub mod tests {
             }),
         ])
             .await.unwrap_err(),
-            AddChildError::DynamicConfigError { err}
+            AddChildError::DynamicCapabilityError { err: DynamicCapabilityError::Invalid { err } }
             if err ==
-            cm_fidl_validator::error::ErrorList {
-
-                                errs: vec![cm_fidl_validator::error::Error::duplicate_field(DeclType::Configuration, "name", "dupe")],
-             }
+                cm_fidl_validator::error::ErrorList {
+                    errs: vec![cm_fidl_validator::error::Error::duplicate_field(DeclType::Configuration, "name", "dupe")],
+                }
         );
     }
 

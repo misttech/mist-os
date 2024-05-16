@@ -97,6 +97,7 @@ const std::vector<fdf::NodeProperty> kPwmProperties = std::vector{
 const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(A311D_GPIOX(6))),
 };
 
@@ -119,6 +120,7 @@ zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   const std::vector<fdf::BindRule> kGpioWifiHostRules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_WIFI_WAKE_HOST)),
   };
 

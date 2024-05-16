@@ -15,53 +15,38 @@ use core::{
     borrow::Borrow,
     convert::Infallible as Never,
     ffi::CStr,
-    fmt::{self, Debug, Display},
+    fmt::Debug,
     hash::Hash,
     num::NonZeroU64,
     ops::{Deref, DerefMut},
-    sync::atomic::AtomicUsize,
     time::Duration,
 };
 
+use derivative::Derivative;
 use lock_order::wrap::prelude::*;
+#[cfg(test)]
+use net_types::MulticastAddr;
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr,
-        Ipv6, Ipv6Addr, Subnet, SubnetEither,
+        AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4,
+        Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
     },
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
-#[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr};
 use packet::{Buf, BufferMut};
-#[cfg(test)]
-use packet_formats::ip::IpProto;
-#[cfg(test)]
-use tracing::Subscriber;
-#[cfg(test)]
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    registry::LookupSpan,
-};
 
 #[cfg(test)]
-use crate::{
-    context::testutil::{FakeFrameCtx, FakeNetworkContext, InstantAndData, WithFakeFrameContext},
-    ip::{device::Ipv6DeviceAddr, SendIpPacketMeta},
-};
+use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
 use crate::{
     context::{
         testutil::{
-            FakeInstant, FakeTimerCtx, FakeTimerCtxExt, PureIpDeviceAndIpVersion,
+            FakeFrameCtx, FakeInstant, FakeTimerCtx, FakeTimerCtxExt, WithFakeFrameContext,
             WithFakeTimerContext,
         },
-        DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-        ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
-        TracingContext, UnlockedCoreCtx,
+        CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+        InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
+        TimerHandler, TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -69,8 +54,9 @@ use crate::{
         link::LinkDevice,
         loopback::LoopbackDeviceId,
         DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
-        DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId,
-        PureIpDeviceId, WeakDeviceId,
+        DeviceLayerStateTypes, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId,
+        EthernetWeakDeviceId, PureIpDeviceId, PureIpWeakDeviceId, ReceiveQueueBindingsContext,
+        TransmitQueueBindingsContext, WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
@@ -80,6 +66,7 @@ use crate::{
             IpDeviceEvent,
         },
         icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
+        raw::RawIpSocketsBindingsTypes,
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -97,10 +84,14 @@ use crate::{
         },
         udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     },
-    BindingsTypes,
+    types::WorkQueueReport,
+    BindingsContext, BindingsTypes,
 };
 
-pub use netstack3_base::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
+pub use netstack3_base::testutil::{
+    assert_empty, new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng,
+    MonotonicIdentifier, TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
+};
 
 /// NDP test utilities.
 pub mod ndp {
@@ -111,114 +102,97 @@ pub mod context {
     pub use crate::context::testutil::*;
 }
 
+/// Device test utilities.
+pub mod device {
+    pub use crate::device::testutil::*;
+}
+
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
-/// A structure holding a core and a bindings context.
-#[derive(Default, Clone)]
-pub struct ContextPair<CC, BT> {
-    /// The core context.
-    pub core_ctx: CC,
-    /// The bindings context.
-    // We put `bindings_ctx` after `core_ctx` to make sure that `core_ctx` is
-    // dropped before `bindings_ctx` so that the existence of
-    // strongly-referenced device IDs in `bindings_ctx` causes test failures,
-    // forcing proper cleanup of device IDs in our unit tests.
-    //
-    // Note that if strongly-referenced (device) IDs exist when dropping the
-    // primary reference, the primary reference's drop impl will panic. See
-    // `crate::sync::PrimaryRc::drop` for details.
-    // TODO(https://fxbug.dev/320021524): disallow destructuring to actually
-    // uphold the intent above.
-    pub bindings_ctx: BT,
-}
-
-impl<CC, BC> ContextPair<CC, BC> {
-    #[cfg(test)]
-    pub(crate) fn with_core_ctx(core_ctx: CC) -> Self
-    where
-        BC: Default,
-    {
-        Self { core_ctx, bindings_ctx: BC::default() }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_default_bindings_ctx<F: FnOnce(&mut BC) -> CC>(builder: F) -> Self
-    where
-        BC: Default,
-    {
-        let mut bindings_ctx = BC::default();
-        let core_ctx = builder(&mut bindings_ctx);
-        Self { core_ctx, bindings_ctx }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn as_mut(&mut self) -> ContextPair<&mut CC, &mut BC> {
-        let Self { core_ctx, bindings_ctx } = self;
-        ContextPair { core_ctx, bindings_ctx }
-    }
-}
-
-impl<CC, BC> crate::context::ContextPair for ContextPair<CC, BC>
-where
-    CC: crate::context::ContextProvider,
-    BC: crate::context::ContextProvider,
-{
-    type CoreContext = CC::Context;
-    type BindingsContext = BC::Context;
-
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
-        let Self { core_ctx, bindings_ctx } = self;
-        (core_ctx.context(), bindings_ctx.context())
-    }
-}
-
 /// Context available during the execution of the netstack.
-pub type Ctx<BT> = ContextPair<StackState<BT>, BT>;
+pub type Ctx<BT> = CtxPair<StackState<BT>, BT>;
 
-impl<BC: crate::BindingsContext + Default> Default for Ctx<BC> {
-    fn default() -> Self {
-        Self::new_with_builder(StackStateBuilder::default())
-    }
-}
-
-impl<BC: crate::BindingsContext + Default> Ctx<BC> {
-    pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
-        let mut bindings_ctx = Default::default();
-        let state = builder.build_with_ctx(&mut bindings_ctx);
-        Self { core_ctx: state, bindings_ctx }
-    }
-}
-
-impl<CC, BC> ContextPair<CC, BC>
-where
-    CC: Borrow<StackState<BC>>,
-    BC: BindingsTypes,
-{
-    /// Retrieves a [`crate::api::CoreApi`] from this [`Ctx`].
-    pub fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
-        let Self { core_ctx, bindings_ctx } = self;
-        CC::borrow(core_ctx).api(bindings_ctx)
-    }
-
+/// Extensions to [`CtxPair`] when it holds a full stack state.
+pub trait CtxPairExt<BC: BindingsContext> {
     /// Retrieves the core and bindings context, respectively.
     ///
     /// This function can be used to call into non-api core functions that want
     /// a core context.
-    pub fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC) {
-        let Self { core_ctx, bindings_ctx } = self;
-        (UnlockedCoreCtx::new(&CC::borrow(core_ctx)), bindings_ctx)
+    fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC);
+
+    /// Retrieves a [`crate::api::CoreApi`] from this context pair.
+    fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        crate::api::CoreApi::new(CtxPair { core_ctx, bindings_ctx })
     }
 
-    /// Like [`ContextPair::contexts`], but retrieves only the core context.
-    pub fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
-        UnlockedCoreCtx::new(&CC::borrow(&self.core_ctx))
+    /// Like [`CtxPairExt::contexts`], but retrieves only the core context.
+    fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC>;
+
+    /// Retrieves a [`TestApi`] from this context pair.
+    fn test_api(&mut self) -> TestApi<'_, BC> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        TestApi(core_ctx, bindings_ctx)
     }
 
-    /// Retrieves a [`TestApi`] from this [`Ctx`].
-    pub fn test_api(&mut self) -> TestApi<'_, BC> {
+    /// Shortcut for [`FakeTimerCtxExt::trigger_next_timer`].
+    fn trigger_next_timer<Id>(&mut self) -> Option<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_next_timer(&mut core_ctx)
+    }
+
+    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_for`].
+    fn trigger_timers_for<Id>(&mut self, duration: Duration) -> Vec<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_timers_for(duration, &mut core_ctx)
+    }
+
+    /// Shortcut for [`FaketimerCtx::trigger_timers_until_instant`].
+    fn trigger_timers_until_instant<Id>(&mut self, instant: FakeInstant) -> Vec<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_timers_until_instant(instant, &mut core_ctx)
+    }
+
+    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_until_and_expect_unordered`].
+    fn trigger_timers_until_and_expect_unordered<Id, I: IntoIterator<Item = Id>>(
+        &mut self,
+        instant: FakeInstant,
+        timers: I,
+    ) where
+        Id: Debug + Hash + Eq,
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let (mut core_ctx, bindings_ctx) = self.contexts();
+        bindings_ctx.trigger_timers_until_and_expect_unordered(instant, timers, &mut core_ctx)
+    }
+}
+
+impl<CC, BC> CtxPairExt<BC> for CtxPair<CC, BC>
+where
+    CC: Borrow<StackState<BC>>,
+    BC: BindingsContext,
+{
+    fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC) {
         let Self { core_ctx, bindings_ctx } = self;
-        TestApi(UnlockedCoreCtx::new(&CC::borrow(core_ctx)), bindings_ctx)
+        (UnlockedCoreCtx::new(CC::borrow(core_ctx)), bindings_ctx)
+    }
+
+    fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
+        UnlockedCoreCtx::new(CC::borrow(&self.core_ctx))
     }
 }
 
@@ -374,7 +348,7 @@ where
     pub fn del_routes_to_subnet(
         &mut self,
         subnet: net_types::ip::SubnetEither,
-    ) -> crate::error::Result<()> {
+    ) -> Result<(), crate::error::NotFoundError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match subnet {
             SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
@@ -388,7 +362,6 @@ where
                 _,
             >(core_ctx, bindings_ctx, subnet),
         }
-        .map_err(From::from)
     }
 
     /// Deletes all routes targeting `device`.
@@ -424,118 +397,27 @@ where
     }
 }
 
-/// Helper functions for dealing with fake timers.
-impl<BC: BindingsTypes> Ctx<BC> {
-    /// Shortcut for [`FakeTimerCtxExt::trigger_next_timer`].
-    pub fn trigger_next_timer<Id>(&mut self) -> Option<Id>
-    where
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_next_timer(&mut core_ctx.context())
-    }
-
-    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_for`].
-    pub fn trigger_timers_for<Id>(&mut self, duration: Duration) -> Vec<Id>
-    where
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_for(duration, &mut core_ctx.context())
-    }
-
-    /// Shortcut for [`FaketimerCtx::trigger_timers_until_instant`].
-    pub fn trigger_timers_until_instant<Id>(&mut self, instant: FakeInstant) -> Vec<Id>
-    where
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_until_instant(instant, &mut core_ctx.context())
-    }
-
-    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_until_and_expect_unordered`].
-    pub fn trigger_timers_until_and_expect_unordered<Id, I: IntoIterator<Item = Id>>(
-        &mut self,
-        instant: FakeInstant,
-        timers: I,
-    ) where
-        Id: Debug + Hash + Eq,
-        BC: FakeTimerCtxExt<Id>,
-        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
-    {
-        let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_until_and_expect_unordered(
-            instant,
-            timers,
-            &mut core_ctx.context(),
-        )
-    }
-}
-
-/// Asserts that an iterable object produces zero items.
-///
-/// `assert_empty` drains `into_iter.into_iter()` and asserts that zero
-/// items are produced. It panics with a message which includes the produced
-/// items if this assertion fails.
-#[cfg(test)]
-#[track_caller]
-pub(crate) fn assert_empty<I: IntoIterator>(into_iter: I)
-where
-    I::Item: Debug,
-{
-    // NOTE: Collecting into a `Vec` is cheap in the happy path because
-    // zero-capacity vectors are guaranteed not to allocate.
-    let vec = into_iter.into_iter().collect::<Vec<_>>();
-    assert!(vec.is_empty(), "vec={vec:?}");
-}
-
-/// Utilities to allow running benchmarks as tests.
-///
-/// Our benchmarks rely on the unstable `test` feature, which is disallowed in
-/// Fuchsia's build system. In order to ensure that our benchmarks are always
-/// compiled and tested, this module provides fakes that allow us to run our
-/// benchmarks as normal tests when the `benchmark` feature is disabled.
-///
-/// See the `bench!` macro for details on how this module is used.
-#[cfg(test)]
-pub(crate) mod benchmarks {
-    /// A trait to allow faking of the `test::Bencher` type.
-    pub(crate) trait Bencher {
-        fn iter<T, F: FnMut() -> T>(&mut self, inner: F);
-    }
-
-    #[cfg(benchmark)]
-    impl Bencher for criterion::Bencher {
-        fn iter<T, F: FnMut() -> T>(&mut self, inner: F) {
-            criterion::Bencher::iter(self, inner)
-        }
-    }
-
-    /// A `Bencher` whose `iter` method runs the provided argument a small,
-    /// fixed number of times.
-    #[cfg(not(benchmark))]
-    pub(crate) struct TestBencher;
-
-    #[cfg(not(benchmark))]
-    impl Bencher for TestBencher {
-        fn iter<T, F: FnMut() -> T>(&mut self, mut inner: F) {
-            const NUM_TEST_ITERS: u32 = 256;
-            super::set_logger_for_test();
-            for _ in 0..NUM_TEST_ITERS {
-                let _: T = inner();
+impl<'a> TestApi<'a, FakeBindingsCtx> {
+    /// Handles any pending frames and returns true if any frames that were in
+    /// the RX queue were processed.
+    pub fn handle_queued_rx_packets(&mut self) -> bool {
+        let mut handled = false;
+        loop {
+            let (_, bindings_ctx) = self.contexts();
+            let rx_available = core::mem::take(&mut bindings_ctx.state_mut().rx_available);
+            if rx_available.len() == 0 {
+                break handled;
+            }
+            handled = true;
+            for id in rx_available.into_iter() {
+                loop {
+                    match self.core_api().receive_queue().handle_queued_frames(&id) {
+                        WorkQueueReport::AllDone => break,
+                        WorkQueueReport::Pending => (),
+                    }
+                }
             }
         }
-    }
-
-    #[inline(always)]
-    pub(crate) fn black_box<T>(placeholder: T) -> T {
-        #[cfg(benchmark)]
-        return criterion::black_box(placeholder);
-        #[cfg(not(benchmark))]
-        return placeholder;
     }
 }
 
@@ -766,35 +648,6 @@ impl DeviceClassMatcher<()> for () {
     }
 }
 
-impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {
-    fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
-        &self,
-        f: F,
-    ) -> O {
-        let Self { core_ctx: _, bindings_ctx } = self;
-        bindings_ctx.with_inner(|ctx| f(&ctx.timers))
-    }
-
-    fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
-        &mut self,
-        f: F,
-    ) -> O {
-        let Self { core_ctx: _, bindings_ctx } = self;
-        bindings_ctx.with_inner_mut(|ctx| f(&mut ctx.timers))
-    }
-}
-
-#[cfg(test)]
-impl WithFakeFrameContext<DispatchedFrame> for FakeCtx {
-    fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<DispatchedFrame>) -> O>(
-        &mut self,
-        f: F,
-    ) -> O {
-        let Self { core_ctx: _, bindings_ctx } = self;
-        bindings_ctx.with_inner_mut(|ctx| f(&mut ctx.frames))
-    }
-}
-
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
     fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &self,
@@ -808,6 +661,15 @@ impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
         f: F,
     ) -> O {
         self.with_inner_mut(|ctx| f(&mut ctx.timers))
+    }
+}
+
+impl WithFakeFrameContext<DispatchedFrame> for FakeBindingsCtx {
+    fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<DispatchedFrame>) -> O>(
+        &mut self,
+        f: F,
+    ) -> O {
+        self.with_inner_mut(|ctx| f(&mut ctx.frames))
     }
 }
 
@@ -935,201 +797,6 @@ impl<D: LinkDevice> LinkResolutionNotifier<D> for () {
     fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
 }
 
-#[cfg(test)]
-struct SimpleFormatter;
-
-#[cfg(test)]
-impl<S, N> FormatEvent<S, N> for SimpleFormatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: format::Writer<'_>,
-        event: &tracing::Event<'_>,
-    ) -> std::fmt::Result {
-        ctx.format_fields(writer.by_ref(), event)?;
-        writeln!(writer)
-    }
-}
-
-/// Install a logger for tests.
-///
-/// Call this method at the beginning of the test for which logging is desired.
-/// This function sets global program state, so all tests that run after this
-/// function is called will use the logger.
-#[cfg(test)]
-pub(crate) fn set_logger_for_test() {
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::fmt()
-            .event_format(SimpleFormatter)
-            .with_max_level(tracing::Level::TRACE)
-            .with_test_writer()
-            .finish(),
-    )
-    .unwrap_or({
-        // Ignore errors caused by some other test invocation having already set
-        // the global default subscriber.
-    })
-}
-
-/// An extension trait for `Ip` providing test-related functionality.
-#[cfg(test)]
-pub(crate) trait TestIpExt:
-    crate::ip::IpExt + crate::ip::IpLayerIpExt + crate::ip::device::IpDeviceIpExt
-{
-    /// Either [`FAKE_CONFIG_V4`] or [`FAKE_CONFIG_V6`].
-    const FAKE_CONFIG: FakeEventDispatcherConfig<Self::Addr>;
-
-    /// Get an IP address in the same subnet as `Self::FAKE_CONFIG`.
-    ///
-    /// `last` is the value to be put in the last octet of the IP address.
-    fn get_other_ip_address(last: u8) -> SpecifiedAddr<Self::Addr>;
-
-    /// Get an IP address in a different subnet from `Self::FAKE_CONFIG`.
-    ///
-    /// `last` is the value to be put in the last octet of the IP address.
-    fn get_other_remote_ip_address(last: u8) -> SpecifiedAddr<Self::Addr>;
-
-    /// Get a multicast IP address.
-    ///
-    /// `last` is the value to be put in the last octet of the IP address.
-    fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr>;
-}
-
-#[cfg(test)]
-impl TestIpExt for Ipv4 {
-    const FAKE_CONFIG: FakeEventDispatcherConfig<Ipv4Addr> = FAKE_CONFIG_V4;
-
-    fn get_other_ip_address(last: u8) -> SpecifiedAddr<Ipv4Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv4_bytes();
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv4Addr::new(bytes)).unwrap()
-    }
-
-    fn get_other_remote_ip_address(last: u8) -> SpecifiedAddr<Self::Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv4_bytes();
-        bytes[bytes.len() - 3] += 1;
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv4Addr::new(bytes)).unwrap()
-    }
-
-    fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr> {
-        assert!(u32::from(Self::Addr::BYTES * 8 - Self::MULTICAST_SUBNET.prefix()) > u8::BITS);
-        let mut bytes = Self::MULTICAST_SUBNET.network().ipv4_bytes();
-        bytes[bytes.len() - 1] = last;
-        MulticastAddr::new(Ipv4Addr::new(bytes)).unwrap()
-    }
-}
-
-#[cfg(test)]
-impl TestIpExt for Ipv6 {
-    const FAKE_CONFIG: FakeEventDispatcherConfig<Ipv6Addr> = FAKE_CONFIG_V6;
-
-    fn get_other_ip_address(last: u8) -> SpecifiedAddr<Ipv6Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv6_bytes();
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv6Addr::from(bytes)).unwrap()
-    }
-
-    fn get_other_remote_ip_address(last: u8) -> SpecifiedAddr<Self::Addr> {
-        let mut bytes = Self::FAKE_CONFIG.local_ip.get().ipv6_bytes();
-        bytes[bytes.len() - 3] += 1;
-        bytes[bytes.len() - 1] = last;
-        SpecifiedAddr::new(Ipv6Addr::from(bytes)).unwrap()
-    }
-
-    fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr> {
-        assert!((Self::Addr::BYTES * 8 - Self::MULTICAST_SUBNET.prefix()) as u32 > u8::BITS);
-        let mut bytes = Self::MULTICAST_SUBNET.network().ipv6_bytes();
-        bytes[bytes.len() - 1] = last;
-        MulticastAddr::new(Ipv6Addr::from_bytes(bytes)).unwrap()
-    }
-}
-
-/// A configuration for a simple network.
-///
-/// `FakeEventDispatcherConfig` describes a simple network with two IP hosts
-/// - one remote and one local - both on the same Ethernet network.
-#[cfg(test)]
-#[derive(Clone, net_types::ip::GenericOverIp)]
-#[generic_over_ip(A, IpAddress)]
-pub(crate) struct FakeEventDispatcherConfig<A: IpAddress> {
-    /// The subnet of the local Ethernet network.
-    pub(crate) subnet: Subnet<A>,
-    /// The IP address of our interface to the local network (must be in
-    /// subnet).
-    pub(crate) local_ip: SpecifiedAddr<A>,
-    /// The MAC address of our interface to the local network.
-    pub(crate) local_mac: UnicastAddr<Mac>,
-    /// The remote host's IP address (must be in subnet if provided).
-    pub(crate) remote_ip: SpecifiedAddr<A>,
-    /// The remote host's MAC address.
-    pub(crate) remote_mac: UnicastAddr<Mac>,
-}
-
-/// A `FakeEventDispatcherConfig` with reasonable values for an IPv4 network.
-#[cfg(test)]
-pub(crate) const FAKE_CONFIG_V4: FakeEventDispatcherConfig<Ipv4Addr> = unsafe {
-    FakeEventDispatcherConfig {
-        subnet: Subnet::new_unchecked(Ipv4Addr::new([192, 168, 0, 0]), 16),
-        local_ip: SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 1])),
-        local_mac: UnicastAddr::new_unchecked(Mac::new([0, 1, 2, 3, 4, 5])),
-        remote_ip: SpecifiedAddr::new_unchecked(Ipv4Addr::new([192, 168, 0, 2])),
-        remote_mac: UnicastAddr::new_unchecked(Mac::new([6, 7, 8, 9, 10, 11])),
-    }
-};
-
-/// A `FakeEventDispatcherConfig` with reasonable values for an IPv6 network.
-#[cfg(test)]
-pub(crate) const FAKE_CONFIG_V6: FakeEventDispatcherConfig<Ipv6Addr> = unsafe {
-    FakeEventDispatcherConfig {
-        subnet: Subnet::new_unchecked(
-            Ipv6Addr::from_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 0]),
-            112,
-        ),
-        local_ip: SpecifiedAddr::new_unchecked(Ipv6Addr::from_bytes([
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 1,
-        ])),
-        local_mac: UnicastAddr::new_unchecked(Mac::new([0, 1, 2, 3, 4, 5])),
-        remote_ip: SpecifiedAddr::new_unchecked(Ipv6Addr::from_bytes([
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 2,
-        ])),
-        remote_mac: UnicastAddr::new_unchecked(Mac::new([6, 7, 8, 9, 10, 11])),
-    }
-};
-
-#[cfg(test)]
-impl<A: IpAddress> FakeEventDispatcherConfig<A> {
-    /// Creates a copy of `self` with all the remote and local fields reversed.
-    pub(crate) fn swap(&self) -> Self {
-        Self {
-            subnet: self.subnet,
-            local_ip: self.remote_ip,
-            local_mac: self.remote_mac,
-            remote_ip: self.local_ip,
-            remote_mac: self.local_mac,
-        }
-    }
-
-    /// Shorthand for `FakeEventDispatcherBuilder::from_config(self)`.
-    pub(crate) fn into_builder(self) -> FakeEventDispatcherBuilder {
-        FakeEventDispatcherBuilder::from_config(self)
-    }
-}
-
-#[cfg(test)]
-impl FakeEventDispatcherConfig<Ipv6Addr> {
-    pub(crate) fn local_ipv6_device_addr(&self) -> Ipv6DeviceAddr {
-        NonMappedAddr::new(UnicastAddr::try_from(self.local_ip).unwrap()).unwrap()
-    }
-    pub(crate) fn remote_ipv6_device_addr(&self) -> Ipv6DeviceAddr {
-        NonMappedAddr::new(UnicastAddr::try_from(self.remote_ip).unwrap()).unwrap()
-    }
-}
-
 #[derive(Clone)]
 struct DeviceConfig {
     mac: UnicastAddr<Mac>,
@@ -1138,15 +805,14 @@ struct DeviceConfig {
     ipv6_config: Option<Ipv6DeviceConfigurationUpdate>,
 }
 
-/// A builder for `FakeEventDispatcher`s.
+/// A builder for `FakeCtx`s.
 ///
-/// A `FakeEventDispatcherBuilder` is capable of storing the configuration of a
-/// network stack including forwarding table entries, devices and their assigned
+/// A `FakeCtxBuilder` is capable of storing the configuration of a network
+/// stack including forwarding table entries, devices and their assigned
 /// addresses and configurations, ARP table entries, etc. It can be built using
-/// `build`, producing a `Context<FakeEventDispatcher>` with all of the
-/// appropriate state configured.
+/// `build`, producing a `FakeCtx` with all of the appropriate state configured.
 #[derive(Clone, Default)]
-pub struct FakeEventDispatcherBuilder {
+pub struct FakeCtxBuilder {
     devices: Vec<DeviceConfig>,
     // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
     arp_table_entries: Vec<(usize, SpecifiedAddr<Ipv4Addr>, UnicastAddr<Mac>)>,
@@ -1155,32 +821,28 @@ pub struct FakeEventDispatcherBuilder {
     device_routes: Vec<(SubnetEither, usize)>,
 }
 
-impl FakeEventDispatcherBuilder {
-    /// Construct a `FakeEventDispatcherBuilder` from a
-    /// `FakeEventDispatcherConfig`.
-    #[cfg(test)]
-    pub(crate) fn from_config<A: IpAddress>(
-        cfg: FakeEventDispatcherConfig<A>,
-    ) -> FakeEventDispatcherBuilder {
-        assert!(cfg.subnet.contains(&cfg.local_ip));
-        assert!(cfg.subnet.contains(&cfg.remote_ip));
+impl FakeCtxBuilder {
+    /// Construct a `FakeCtxBuilder` from a `TestAddrs`.
+    pub fn with_addrs<A: IpAddress>(addrs: TestAddrs<A>) -> FakeCtxBuilder {
+        assert!(addrs.subnet.contains(&addrs.local_ip));
+        assert!(addrs.subnet.contains(&addrs.remote_ip));
 
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         builder.devices.push(DeviceConfig {
-            mac: cfg.local_mac,
+            mac: addrs.local_mac,
             addr_subnet: Some(
-                AddrSubnetEither::new(cfg.local_ip.get().into(), cfg.subnet.prefix()).unwrap(),
+                AddrSubnetEither::new(addrs.local_ip.get().into(), addrs.subnet.prefix()).unwrap(),
             ),
             ipv4_config: None,
             ipv6_config: None,
         });
 
-        match cfg.remote_ip.into() {
-            IpAddr::V4(ip) => builder.arp_table_entries.push((0, ip, cfg.remote_mac)),
+        match addrs.remote_ip.into() {
+            IpAddr::V4(ip) => builder.arp_table_entries.push((0, ip, addrs.remote_mac)),
             IpAddr::V6(ip) => builder.ndp_table_entries.push((
                 0,
                 UnicastAddr::new(ip.get()).unwrap(),
-                cfg.remote_mac,
+                addrs.remote_mac,
             )),
         };
 
@@ -1188,11 +850,11 @@ impl FakeEventDispatcherBuilder {
         // pre-cached.
         builder.ndp_table_entries.push((
             0,
-            cfg.remote_mac.to_ipv6_link_local().addr().get(),
-            cfg.remote_mac,
+            addrs.remote_mac.to_ipv6_link_local().addr().get(),
+            addrs.remote_mac,
         ));
 
-        builder.device_routes.push((cfg.subnet.into(), 0));
+        builder.device_routes.push((addrs.subnet.into(), 0));
         builder
     }
 
@@ -1334,12 +996,7 @@ impl FakeEventDispatcherBuilder {
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
 
-        let FakeEventDispatcherBuilder {
-            devices,
-            arp_table_entries,
-            ndp_table_entries,
-            device_routes,
-        } = self;
+        let FakeCtxBuilder { devices, arp_table_entries, ndp_table_entries, device_routes } = self;
         let idx_to_device_id: Vec<_> = devices
             .into_iter()
             .map(|DeviceConfig { mac, addr_subnet: ip_and_subnet, ipv4_config, ipv6_config }| {
@@ -1407,10 +1064,10 @@ impl FakeEventDispatcherBuilder {
 }
 
 /// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
-/// `FakeEventDispatcherBuilder`.
+/// `FakeCtxBuilder`.
 #[cfg(test)]
 pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
-    builder: &mut FakeEventDispatcherBuilder,
+    builder: &mut FakeCtxBuilder,
     device: usize,
     // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
     ip: SpecifiedAddr<A>,
@@ -1425,20 +1082,27 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
 }
 
 #[cfg(test)]
-impl FakeNetworkContext for FakeCtx {
+pub(crate) enum FakeCtxNetworkSpec {}
+
+#[cfg(test)]
+impl FakeNetworkSpec for FakeCtxNetworkSpec {
+    type Context = FakeCtx;
     type TimerId = TimerId<FakeBindingsCtx>;
     type SendMeta = DispatchedFrame;
     type RecvMeta = EthernetDeviceId<FakeBindingsCtx>;
-    fn handle_frame(&mut self, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
-        self.core_api()
+    fn handle_frame(ctx: &mut FakeCtx, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
+        ctx.core_api()
             .device::<crate::device::ethernet::EthernetLinkDevice>()
             .receive_frame(crate::device::ethernet::RecvEthernetFrameMeta { device_id }, data)
     }
-    fn handle_timer(&mut self, timer: Self::TimerId) {
-        self.core_api().handle_timer(timer)
+    fn handle_timer(ctx: &mut FakeCtx, timer: Self::TimerId) {
+        ctx.core_api().handle_timer(timer)
     }
-    fn process_queues(&mut self) -> bool {
-        handle_queued_rx_packets(self)
+    fn process_queues(ctx: &mut FakeCtx) -> bool {
+        ctx.test_api().handle_queued_rx_packets()
+    }
+    fn fake_frames(ctx: &mut FakeCtx) -> &mut impl WithFakeFrameContext<Self::SendMeta> {
+        &mut ctx.bindings_ctx
     }
 }
 
@@ -1494,6 +1158,10 @@ impl crate::device::socket::DeviceSocketTypes for FakeBindingsCtx {
     type SocketState = Mutex<Vec<(WeakDeviceId<FakeBindingsCtx>, Vec<u8>)>>;
 }
 
+impl RawIpSocketsBindingsTypes for FakeBindingsCtx {
+    type RawIpSocketState<I: Ip> = ();
+}
+
 impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
     fn receive_frame(
         &self,
@@ -1513,15 +1181,19 @@ impl DeviceLayerStateTypes for FakeBindingsCtx {
     type DeviceIdentifier = MonotonicIdentifier;
 }
 
-impl DeviceLayerEventDispatcher for FakeBindingsCtx {
+impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for FakeBindingsCtx {
     fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeBindingsCtx>) {
         self.state_mut().rx_available.push(device.clone());
     }
+}
 
-    fn wake_tx_task(&mut self, device: &DeviceId<FakeBindingsCtx>) {
-        self.state_mut().tx_available.push(device.clone());
+impl<D: Clone + Into<DeviceId<Self>>> TransmitQueueBindingsContext<D> for FakeBindingsCtx {
+    fn wake_tx_task(&mut self, device: &D) {
+        self.state_mut().tx_available.push(device.clone().into());
     }
+}
 
+impl DeviceLayerEventDispatcher for FakeBindingsCtx {
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<FakeBindingsCtx>,
@@ -1544,28 +1216,6 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         });
         self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, packet.into_inner()));
         Ok(())
-    }
-}
-
-/// Handles any pending frames and returns true if any frames that were in the
-/// RX queue were processed.
-#[cfg(test)]
-pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) -> bool {
-    let mut handled = false;
-    loop {
-        let rx_available = core::mem::take(&mut ctx.bindings_ctx.state_mut().rx_available);
-        if rx_available.len() == 0 {
-            break handled;
-        }
-        handled = true;
-        for id in rx_available.into_iter() {
-            loop {
-                match ctx.core_api().receive_queue().handle_queued_frames(&id) {
-                    crate::work_queue::WorkQueueReport::AllDone => break,
-                    crate::work_queue::WorkQueueReport::Pending => (),
-                }
-            }
-        }
     }
 }
 
@@ -1610,6 +1260,14 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>
             }
         }
     }
+}
+
+/// A tuple of device ID and IP version.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub struct PureIpDeviceAndIpVersion<BT: DeviceLayerTypes> {
+    pub(crate) device: PureIpWeakDeviceId<BT>,
+    pub(crate) version: IpVersion,
 }
 
 /// A frame that's been dispatched to Bindings to be sent out the device driver.
@@ -1694,41 +1352,6 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
     const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
 
-/// A convenient monotonically increasing identifier to use as the bindings'
-/// `DeviceIdentifier` in tests.
-pub struct MonotonicIdentifier(usize);
-
-impl Debug for MonotonicIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // NB: This type is used as part of the debug implementation in device
-        // IDs which should provide enough context themselves on the type. For
-        // brevity we omit the type name.
-        let Self(id) = self;
-        Debug::fmt(id, f)
-    }
-}
-
-impl Display for MonotonicIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(self, f)
-    }
-}
-
-static MONOTONIC_COUNTER: AtomicUsize = AtomicUsize::new(1);
-
-impl MonotonicIdentifier {
-    /// Creates a new identifier with the next value.
-    pub fn new() -> Self {
-        Self(MONOTONIC_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
-    }
-}
-
-impl Default for MonotonicIdentifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl DeviceIdAndNameMatcher for MonotonicIdentifier {
     fn id_matches(&self, _id: &NonZeroU64) -> bool {
         unimplemented!()
@@ -1739,450 +1362,38 @@ impl DeviceIdAndNameMatcher for MonotonicIdentifier {
     }
 }
 
+/// Creates a new [`FakeNetwork`] of [`Ctx`]s in a simple two-host
+/// configuration.
+///
+/// Two hosts are created with the given names. Packets emitted by one
+/// arrive at the other and vice-versa.
 #[cfg(test)]
-mod tests {
-    use ip_test_macro::ip_test;
-
-    use packet::Serializer;
-    use packet_formats::{
-        icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode},
-        ip::Ipv4Proto,
-    };
-
-    use super::*;
-    use crate::{
-        context::testutil::{FakeNetwork, FakeNetworkLinks},
-        ip::{
-            socket::{DefaultSendOptions, IpSocketHandler},
-            IpLayerHandler,
-        },
-        socket::address::SocketIpAddr,
-    };
-
-    #[test]
-    fn test_fake_network_transmits_packets() {
-        set_logger_for_test();
-        let (alice_ctx, alice_device_ids) = FAKE_CONFIG_V4.into_builder().build();
-        let (bob_ctx, bob_device_ids) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_simple_fake_network(
-            "alice",
-            alice_ctx,
-            alice_device_ids[0].downgrade(),
-            "bob",
-            bob_ctx,
-            bob_device_ids[0].downgrade(),
-        );
-        core::mem::drop((alice_device_ids, bob_device_ids));
-
-        // Alice sends Bob a ping.
-
-        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
-            IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut core_ctx.context(),
-                bindings_ctx,
-                None, // device
-                None, // local_ip
-                SocketIpAddr::try_from(FAKE_CONFIG_V4.remote_ip).unwrap(),
-                Ipv4Proto::Icmp,
-                &DefaultSendOptions,
-                |_| {
-                    let req = IcmpEchoRequest::new(0, 0);
-                    let req_body = &[1, 2, 3, 4];
-                    Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                        FAKE_CONFIG_V4.local_ip,
-                        FAKE_CONFIG_V4.remote_ip,
-                        IcmpUnusedCode,
-                        req,
-                    ))
-                },
-                None,
-            )
-            .unwrap();
-        });
-
-        // Send from Alice to Bob.
-        assert_eq!(net.step().frames_sent, 1);
-        // Respond from Bob to Alice.
-        assert_eq!(net.step().frames_sent, 1);
-        // Should've starved all events.
-        assert!(net.step().is_idle());
-    }
-
-    // Define some fake contexts and links specifically to test the fake
-    // network timers implementation.
-    #[derive(Default)]
-    struct FakeNetworkTestCtx {
-        timer_ctx: FakeTimerCtx<u32>,
-        frame_ctx: FakeFrameCtx<()>,
-        fired_timers: HashMap<u32, usize>,
-        frames_received: usize,
-    }
-
-    impl FakeNetworkTestCtx {
-        #[track_caller]
-        fn drain_and_assert_timers(&mut self, iter: impl IntoIterator<Item = (u32, usize)>) {
-            for (timer, fire_count) in iter {
-                assert_eq!(self.fired_timers.remove(&timer), Some(fire_count), "for timer {timer}");
-            }
-            assert!(self.fired_timers.is_empty(), "remaining timers: {:?}", self.fired_timers);
+pub(crate) fn new_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
+    a_id: CtxId,
+    a: FakeCtx,
+    a_device_id: EthernetWeakDeviceId<FakeBindingsCtx>,
+    b_id: CtxId,
+    b: FakeCtx,
+    b_device_id: EthernetWeakDeviceId<FakeBindingsCtx>,
+) -> FakeNetwork<
+    FakeCtxNetworkSpec,
+    CtxId,
+    impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, CtxId>,
+> {
+    let contexts = vec![(a_id, a), (b_id, b)].into_iter();
+    FakeNetwork::new(contexts, move |net, _frame: DispatchedFrame| {
+        if net == a_id {
+            b_device_id
+                .upgrade()
+                .map(|device_id| (b_id, device_id, None))
+                .into_iter()
+                .collect::<Vec<_>>()
+        } else {
+            a_device_id
+                .upgrade()
+                .map(|device_id| (a_id, device_id, None))
+                .into_iter()
+                .collect::<Vec<_>>()
         }
-
-        /// Generates an arbitrary request.
-        fn request() -> Vec<u8> {
-            vec![1, 2, 3, 4]
-        }
-
-        /// Generates an arbitrary response.
-        fn response() -> Vec<u8> {
-            vec![4, 3, 2, 1]
-        }
-    }
-
-    impl FakeNetworkContext for FakeNetworkTestCtx {
-        type TimerId = u32;
-        type SendMeta = ();
-        type RecvMeta = ();
-
-        fn handle_frame(&mut self, _recv: (), data: Buf<Vec<u8>>) {
-            self.frames_received += 1;
-            // If data is a request, generate a response. This mimics ICMP echo
-            // behavior.
-            if data.into_inner() == Self::request() {
-                self.frame_ctx.push((), Self::response())
-            }
-        }
-
-        fn handle_timer(&mut self, timer: u32) {
-            *self.fired_timers.entry(timer).or_insert(0) += 1;
-        }
-
-        fn process_queues(&mut self) -> bool {
-            false
-        }
-    }
-
-    impl WithFakeFrameContext<()> for FakeNetworkTestCtx {
-        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<()>) -> O>(&mut self, f: F) -> O {
-            f(&mut self.frame_ctx)
-        }
-    }
-
-    impl WithFakeTimerContext<u32> for FakeNetworkTestCtx {
-        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<u32>) -> O>(&self, f: F) -> O {
-            f(&self.timer_ctx)
-        }
-
-        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<u32>) -> O>(
-            &mut self,
-            f: F,
-        ) -> O {
-            f(&mut self.timer_ctx)
-        }
-    }
-
-    fn new_fake_network_with_latency(
-        latency: Option<Duration>,
-    ) -> FakeNetwork<i32, FakeNetworkTestCtx, impl FakeNetworkLinks<(), (), i32>> {
-        FakeNetwork::new(
-            [(1, FakeNetworkTestCtx::default()), (2, FakeNetworkTestCtx::default())],
-            move |id, ()| {
-                vec![(
-                    match id {
-                        1 => 2,
-                        2 => 1,
-                        _ => unreachable!(),
-                    },
-                    (),
-                    latency,
-                )]
-            },
-        )
-    }
-
-    #[test]
-    fn test_fake_network_timers() {
-        set_logger_for_test();
-        let mut net = new_fake_network_with_latency(None);
-
-        let (mut t1, mut t4, mut t5) =
-            net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
-                (timer_ctx.new_timer(1), timer_ctx.new_timer(4), timer_ctx.new_timer(5))
-            });
-
-        net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), &mut t1), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(4), &mut t4), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), &mut t5), None);
-        });
-
-        let (mut t2, mut t3, mut t6) =
-            net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-                (timer_ctx.new_timer(2), timer_ctx.new_timer(3), timer_ctx.new_timer(6))
-            });
-
-        net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), &mut t2), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), &mut t3), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), &mut t6), None);
-        });
-
-        // No timers fired before.
-        net.context(1).drain_and_assert_timers([]);
-        net.context(2).drain_and_assert_timers([]);
-        assert_eq!(net.step().timers_fired, 1);
-        // Only timer in context 1 should have fired.
-        net.context(1).drain_and_assert_timers([(1, 1)]);
-        net.context(2).drain_and_assert_timers([]);
-        assert_eq!(net.step().timers_fired, 1);
-        // Only timer in context 2 should have fired.
-        net.context(1).drain_and_assert_timers([]);
-        net.context(2).drain_and_assert_timers([(2, 1)]);
-        assert_eq!(net.step().timers_fired, 1);
-        // Only timer in context 2 should have fired.
-        net.context(1).drain_and_assert_timers([]);
-        net.context(2).drain_and_assert_timers([(3, 1)]);
-        assert_eq!(net.step().timers_fired, 1);
-        // Only timer in context 1 should have fired.
-        net.context(1).drain_and_assert_timers([(4, 1)]);
-        net.context(2).drain_and_assert_timers([]);
-        assert_eq!(net.step().timers_fired, 2);
-        // Both timers have fired at the same time.
-        net.context(1).drain_and_assert_timers([(5, 1)]);
-        net.context(2).drain_and_assert_timers([(6, 1)]);
-
-        assert!(net.step().is_idle());
-        // Check that current time on contexts tick together.
-        let t1 = net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.now());
-        let t2 = net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.now());
-        assert_eq!(t1, t2);
-    }
-
-    #[test]
-    fn test_fake_network_until_idle() {
-        set_logger_for_test();
-        let mut net = new_fake_network_with_latency(None);
-
-        let mut t1 =
-            net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.new_timer(1));
-        net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), &mut t1), None);
-        });
-
-        let (mut t2, mut t3) = net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            (timer_ctx.new_timer(2), timer_ctx.new_timer(3))
-        });
-        net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), &mut t2), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), &mut t3), None);
-        });
-
-        while !net.step().is_idle() && net.context(1).fired_timers.len() < 1
-            || net.context(2).fired_timers.len() < 1
-        {}
-        // Assert that we stopped before all times were fired, meaning we can
-        // step again.
-        assert_eq!(net.step().timers_fired, 1);
-    }
-
-    #[test]
-    fn test_delayed_packets() {
-        set_logger_for_test();
-        // Create a network that takes 5ms to get any packet to go through.
-        let mut net = new_fake_network_with_latency(Some(Duration::from_millis(5)));
-
-        // 1 sends 2 a request and schedules a timer.
-        let mut t11 =
-            net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.new_timer(1));
-        net.with_context(1, |FakeNetworkTestCtx { frame_ctx, timer_ctx, .. }| {
-            frame_ctx.push((), FakeNetworkTestCtx::request());
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(3), &mut t11), None);
-        });
-        // 2 schedules some timers.
-        let (mut t21, mut t22) = net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            (timer_ctx.new_timer(1), timer_ctx.new_timer(2))
-        });
-        net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(7), &mut t22), None);
-            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(10), &mut t21), None);
-        });
-
-        // Order of expected events is as follows:
-        // - ctx1's timer expires at t = 3
-        // - ctx2 receives ctx1's packet at t = 5
-        // - ctx2's timer expires at t = 7
-        // - ctx1 receives ctx2's response and ctx2's last timer fires at t = 10
-
-        let assert_full_state = |net: &mut FakeNetwork<_, FakeNetworkTestCtx, _>,
-                                 ctx1_timers,
-                                 ctx2_timers,
-                                 ctx2_frames,
-                                 ctx1_frames| {
-            let ctx1 = net.context(1);
-            assert_eq!(ctx1.fired_timers.len(), ctx1_timers);
-            assert_eq!(ctx1.frames_received, ctx1_frames);
-            let ctx2 = net.context(2);
-            assert_eq!(ctx2.fired_timers.len(), ctx2_timers);
-            assert_eq!(ctx2.frames_received, ctx2_frames);
-        };
-
-        assert_eq!(net.step().timers_fired, 1);
-        assert_full_state(&mut net, 1, 0, 0, 0);
-        assert_eq!(net.step().frames_sent, 1);
-        assert_full_state(&mut net, 1, 0, 1, 0);
-        assert_eq!(net.step().timers_fired, 1);
-        assert_full_state(&mut net, 1, 1, 1, 0);
-        let step = net.step();
-        assert_eq!(step.frames_sent, 1);
-        assert_eq!(step.timers_fired, 1);
-        assert_full_state(&mut net, 1, 2, 1, 1);
-
-        // Should've starved all events.
-        assert!(net.step().is_idle());
-    }
-
-    fn send_packet<'a, A: IpAddress>(
-        core_ctx: &'a FakeCoreCtx,
-        bindings_ctx: &mut FakeBindingsCtx,
-        src_ip: SpecifiedAddr<A>,
-        dst_ip: SpecifiedAddr<A>,
-        device: &DeviceId<FakeBindingsCtx>,
-    ) where
-        A::Version: TestIpExt,
-        UnlockedCoreCtx<'a, FakeBindingsCtx>:
-            IpLayerHandler<A::Version, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
-    {
-        let meta = SendIpPacketMeta {
-            device,
-            src_ip: Some(src_ip),
-            dst_ip,
-            broadcast: None,
-            next_hop: dst_ip,
-            proto: IpProto::Udp.into(),
-            ttl: None,
-            mtu: None,
-        };
-        IpLayerHandler::<A::Version, _>::send_ip_packet_from_device(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            meta,
-            Buf::new(vec![1, 2, 3, 4], ..),
-        )
-        .unwrap();
-    }
-
-    #[ip_test]
-    fn test_send_to_many<I: Ip + TestIpExt>()
-    where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpLayerHandler<
-            I,
-            FakeBindingsCtx,
-            DeviceId = DeviceId<FakeBindingsCtx>,
-            WeakDeviceId = WeakDeviceId<FakeBindingsCtx>,
-        >,
-    {
-        let mac_a = UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap();
-        let mac_b = UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 8])).unwrap();
-        let mac_c = UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 9])).unwrap();
-        let ip_a = I::get_other_ip_address(1);
-        let ip_b = I::get_other_ip_address(2);
-        let ip_c = I::get_other_ip_address(3);
-        let subnet = Subnet::new(I::get_other_ip_address(0).get(), I::Addr::BYTES * 8 - 8).unwrap();
-        let mut alice = FakeEventDispatcherBuilder::default();
-        let alice_device_idx = alice.add_device_with_ip(mac_a, ip_a.get(), subnet);
-        let mut bob = FakeEventDispatcherBuilder::default();
-        let bob_device_idx = bob.add_device_with_ip(mac_b, ip_b.get(), subnet);
-        let mut calvin = FakeEventDispatcherBuilder::default();
-        let calvin_device_idx = calvin.add_device_with_ip(mac_c, ip_c.get(), subnet);
-        add_arp_or_ndp_table_entry(&mut alice, alice_device_idx, ip_b, mac_b);
-        add_arp_or_ndp_table_entry(&mut alice, alice_device_idx, ip_c, mac_c);
-        add_arp_or_ndp_table_entry(&mut bob, bob_device_idx, ip_a, mac_a);
-        add_arp_or_ndp_table_entry(&mut bob, bob_device_idx, ip_c, mac_c);
-        add_arp_or_ndp_table_entry(&mut calvin, calvin_device_idx, ip_a, mac_a);
-        add_arp_or_ndp_table_entry(&mut calvin, calvin_device_idx, ip_b, mac_b);
-        let (alice_ctx, alice_device_ids) = alice.build();
-        let (bob_ctx, bob_device_ids) = bob.build();
-        let (calvin_ctx, calvin_device_ids) = calvin.build();
-        let alice_device_id = alice_device_ids[alice_device_idx].clone();
-        let bob_device_id = bob_device_ids[bob_device_idx].clone();
-        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
-        let mut net = FakeNetwork::new(
-            [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
-            move |net: &'static str, _frame: DispatchedFrame| match net {
-                "alice" => vec![
-                    ("bob", bob_device_id.clone(), None),
-                    ("calvin", calvin_device_id.clone(), None),
-                ],
-                "bob" => vec![("alice", alice_device_id.clone(), None)],
-                "calvin" => Vec::new(),
-                _ => unreachable!(),
-            },
-        );
-        let alice_device_id = alice_device_ids[alice_device_idx].clone();
-        let bob_device_id = bob_device_ids[bob_device_idx].clone();
-        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
-        core::mem::drop((alice_device_ids, bob_device_ids, calvin_device_ids));
-
-        net.collect_frames();
-        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
-        assert_empty(net.iter_pending_frames());
-
-        // Bob and Calvin should get any packet sent by Alice.
-
-        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
-            send_packet(core_ctx, bindings_ctx, ip_a, ip_b, &alice_device_id.clone().into());
-        });
-        assert_matches!(&net.bindings_ctx("alice").copy_ethernet_frames()[..], [_frame]);
-        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
-        assert_empty(net.iter_pending_frames());
-        net.collect_frames();
-        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
-        assert_eq!(net.iter_pending_frames().count(), 2);
-        assert!(net
-            .iter_pending_frames()
-            .any(|InstantAndData(_, x)| (x.dst_context == "bob") && (&x.meta == &bob_device_id)));
-        assert!(net
-            .iter_pending_frames()
-            .any(|InstantAndData(_, x)| (x.dst_context == "calvin")
-                && (&x.meta == &calvin_device_id)));
-
-        // Only Alice should get packets sent by Bob.
-
-        net.drop_pending_frames();
-        net.with_context("bob", |Ctx { core_ctx, bindings_ctx }| {
-            send_packet(core_ctx, bindings_ctx, ip_b, ip_a, &bob_device_id.clone().into());
-        });
-        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
-        assert_matches!(&net.bindings_ctx("bob").copy_ethernet_frames()[..], [_frame]);
-        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
-        assert_empty(net.iter_pending_frames());
-        net.collect_frames();
-        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
-        assert_eq!(net.iter_pending_frames().count(), 1);
-        assert!(net.iter_pending_frames().any(
-            |InstantAndData(_, x)| (x.dst_context == "alice") && (&x.meta == &alice_device_id)
-        ));
-
-        // No one gets packets sent by Calvin.
-
-        net.drop_pending_frames();
-        net.with_context("calvin", |Ctx { core_ctx, bindings_ctx }| {
-            send_packet(core_ctx, bindings_ctx, ip_c, ip_a, &calvin_device_id.clone().into());
-        });
-        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
-        assert_matches!(&net.bindings_ctx("calvin").copy_ethernet_frames()[..], [_frame]);
-        assert_empty(net.iter_pending_frames());
-        net.collect_frames();
-        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
-        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
-        assert_empty(net.iter_pending_frames());
-    }
+    })
 }

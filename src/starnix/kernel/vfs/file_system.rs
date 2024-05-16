@@ -5,8 +5,8 @@
 use crate::{
     task::{CurrentTask, Kernel},
     vfs::{
-        DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        WeakFsNodeHandle, XattrOp,
+        fs_args, DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, WeakFsNodeHandle, XattrOp,
     },
 };
 use linked_hash_map::LinkedHashMap;
@@ -21,6 +21,7 @@ use starnix_uapi::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
+    ops::Deref,
     sync::{Arc, Weak},
 };
 
@@ -70,7 +71,7 @@ pub struct FileSystem {
 
     /// Hack meant to stand in for the fs_use_trans selinux feature. If set, this value will be set
     /// as the selinux label on any newly created inodes in the filesystem.
-    pub selinux_context: OnceCell<FsString>,
+    pub selinux_context: OnceCell<SeLinuxContexts>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -90,6 +91,71 @@ impl FileSystemOptions {
         }
         self.source.as_ref()
     }
+}
+
+/// SELinux security context-related filesystem mount options. These options are documented in the
+/// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
+/// the `mount(8)` manpage.
+#[derive(Clone, Debug)]
+pub enum SeLinuxContexts {
+    /// The value of the `context=[security-context]` mount option. This option cannot be used in
+    /// conjunction with any other security context-related options. This option sets the security
+    /// context for the filesystem (superblock), the inode for its mountpoint, and the inode for
+    /// every file-like object in the filesystem. Among other things, this option overrides
+    /// the `"security.selinux"`-keyed extended attribute values for file-like objects in this
+    /// filesystem.
+    Context(FsString),
+    /// The value of the `(def|fs|root)context=[security-context]` mount options.
+    Multi(MultiContextOptions),
+}
+
+impl SeLinuxContexts {
+    pub fn try_from_mount_options(
+        options: &HashMap<FsString, FsString>,
+    ) -> Result<Option<Self>, Errno> {
+        let context_options = options
+            .into_iter()
+            .filter(|(key, _value)| {
+                ***key == b"context"
+                    || ***key == b"fscontext"
+                    || ***key == b"defcontext"
+                    || ***key == b"rootcontext"
+            })
+            .collect::<HashMap<_, _>>();
+
+        if let Some(context) = context_options.get(&&FsString::from(b"context")) {
+            // The `context` option is incompatible with all other `*context` options.
+            if context_options.len() > 1 {
+                return error!(EINVAL);
+            }
+            let context = *context;
+            Ok(Some(Self::Context(context.clone())))
+        } else if context_options.len() > 0 {
+            let get_option_value = |key: &[u8]| -> Option<FsString> {
+                context_options.get(&&FsString::from(key)).map(Deref::deref).map(Clone::clone)
+            };
+            let def = get_option_value(b"defcontext");
+            let fs = get_option_value(b"fscontext");
+            let root = get_option_value(b"rootcontext");
+            Ok(Some(Self::Multi(MultiContextOptions { def, fs, root })))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MultiContextOptions {
+    /// The value of the `defcontext=[security-context]` mount option. This security context is used
+    /// to override the default security context used for file-like objects in the filesystem when
+    /// no other rules specify what security context should be used.
+    pub def: Option<FsString>,
+    /// The value of the `fscontext=[security-context]` mount option. This option is used to label
+    /// the filesystem (superblock) itself.
+    pub fs: Option<FsString>,
+    /// The value of the `rootcontext=[security-context]` mount option. This option is used to
+    /// (re)label the inode located at the filesystem mountpoint.
+    pub root: Option<FsString>,
 }
 
 struct LruCache {
@@ -133,8 +199,10 @@ impl FileSystem {
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
         options: FileSystemOptions,
-    ) -> FileSystemHandle {
-        Arc::new(FileSystem {
+    ) -> Result<FileSystemHandle, Errno> {
+        let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
+        let selinux_context = SeLinuxContexts::try_from_mount_options(&mount_options)?;
+        Ok(Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
             next_node_id: AtomicU64Counter::new(1),
@@ -150,8 +218,11 @@ impl FileSystem {
                 }
                 CacheMode::Uncached => Entries::Uncached,
             },
-            selinux_context: OnceCell::new(),
-        })
+            selinux_context: match selinux_context {
+                Some(selinux_context) => OnceCell::with_value(selinux_context),
+                None => OnceCell::new(),
+            },
+        }))
     }
 
     pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
@@ -190,30 +261,32 @@ impl FileSystem {
         current_task: &CurrentTask,
         node: &FsNodeHandle,
     ) -> WeakFsNodeHandle {
-        if let Some(label) = self.selinux_context.get() {
-            let _ = node.ops().set_xattr(
-                node,
-                current_task,
-                "security.selinux".into(),
-                label.as_ref(),
-                XattrOp::Create,
-            );
+        match self.selinux_context.get() {
+            Some(SeLinuxContexts::Context(context)) => {
+                let _ = node.ops().set_xattr(
+                    node,
+                    current_task,
+                    "security.selinux".into(),
+                    context.as_ref(),
+                    XattrOp::Create,
+                );
+            }
+            Some(SeLinuxContexts::Multi(MultiContextOptions { def: Some(defcontext), .. })) => {
+                // TODO: Integrate with appropriate algorithm to label node; `defcontext=` mount
+                // option is a default that is used after other policy lookups are tried.
+                let _ = node.ops().set_xattr(
+                    node,
+                    current_task,
+                    "security.selinux".into(),
+                    defcontext.as_ref(),
+                    XattrOp::Create,
+                );
+            }
+            _ => {}
         }
         Arc::downgrade(node)
     }
 
-    /// Get or create an FsNode for this file system.
-    ///
-    /// If node_id is Some, then this function checks the node cache to
-    /// determine whether this node is already open. If so, the function
-    /// returns the existing FsNode. If not, the function calls the given
-    /// create_fn function to create the FsNode.
-    ///
-    /// If node_id is None, then this function assigns a new identifier number
-    /// and calls the given create_fn function to create the FsNode with the
-    /// assigned number.
-    ///
-    /// Returns Err only if create_fn returns Err.
     pub fn get_or_create_node<F>(
         &self,
         current_task: &CurrentTask,
@@ -222,6 +295,34 @@ impl FileSystem {
     ) -> Result<FsNodeHandle, Errno>
     where
         F: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
+    {
+        self.get_and_validate_or_create_node(current_task, node_id, |_| true, create_fn)
+    }
+
+    /// Get a node that is validated with the callback, or create an FsNode for
+    /// this file system.
+    ///
+    /// If node_id is Some, then this function checks the node cache to
+    /// determine whether this node is already open. If so, the function
+    /// returns the existing FsNode if it passes the validation check. If no
+    /// node exists, or a node does but fails the validation check, the function
+    /// calls the given create_fn function to create the FsNode.
+    ///
+    /// If node_id is None, then this function assigns a new identifier number
+    /// and calls the given create_fn function to create the FsNode with the
+    /// assigned number.
+    ///
+    /// Returns Err only if create_fn returns Err.
+    pub fn get_and_validate_or_create_node<V, C>(
+        &self,
+        current_task: &CurrentTask,
+        node_id: Option<ino_t>,
+        validate_fn: V,
+        create_fn: C,
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        V: FnOnce(&FsNodeHandle) -> bool,
+        C: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
     {
         let node_id = node_id.unwrap_or_else(|| self.next_node_id());
         let mut nodes = self.nodes.lock();
@@ -233,7 +334,9 @@ impl FileSystem {
             }
             Entry::Occupied(mut entry) => {
                 if let Some(node) = entry.get().upgrade() {
-                    return Ok(node);
+                    if validate_fn(&node) {
+                        return Ok(node);
+                    }
                 }
                 let node = create_fn(node_id)?;
                 entry.insert(self.prepare_node_for_insertion(current_task, &node));

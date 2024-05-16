@@ -46,6 +46,7 @@ async fn event_count_sampler_test() {
     .unwrap();
 
     let mut project_5_events = EventVerifier::new(&logger_querier, 5);
+    let mut project_13_events = EventVerifier::new(&logger_querier, 13);
 
     test_app_controller.increment_int(1).await.unwrap();
 
@@ -57,6 +58,37 @@ async fn event_count_sampler_test() {
                 Event { id: 103, value: 20, codes: vec![0, 0] },
             ],
             "initial in event_count",
+        )
+        .await;
+
+    // Make sure I'm getting the expected FIRE events.
+    // Three components in components.json5: integer_1, integer_2, and integer_42
+    //   with codes 121, 122, and 142, respectively.
+    // Two metrics in fire_1.json5: id 2 (event codes [0, 0]); id 3 (no event codes)
+    // One metric in fire_2.json5: id 4 (event codes [14, 15])
+    // One metric in fire_3.json5: id 5 (event codes [99])
+    //   metrics in fire_1 and fire_2 are by moniker; in fire_3 is by hash
+    //   metrics in fire_1 and fire_2 all use the same selector and should pick
+    //     up the same published Inspect data.
+    // The component instance ID file (in realm_factory/src/mocks.rs) gives an instance ID
+    //   for the integer_42 component.
+    // The Inspect data (from test_component/src/main.rs) publishes data
+    //   for integer_1 (10) and integer_2 (20) by moniker, and integer_42 by ID (42).
+    //   Also other data that shouldn't be picked up by FIRE.
+    // So I'd expect id's 2, 3, and 4, for integer_1 and integer_2, and id 5 for integer_42.
+    //   Seven events total.
+    project_13_events
+        .validate_with_count(
+            vec![
+                Event { id: 2, value: 10, codes: vec![121, 0, 0] },
+                Event { id: 2, value: 20, codes: vec![122, 0, 0] },
+                Event { id: 3, value: 10, codes: vec![121] },
+                Event { id: 3, value: 20, codes: vec![122] },
+                Event { id: 4, value: 10, codes: vec![121, 14, 15] },
+                Event { id: 4, value: 20, codes: vec![122, 14, 15] },
+                Event { id: 5, value: 42, codes: vec![142, 99] },
+            ],
+            "First FIRE events",
         )
         .await;
 
@@ -74,6 +106,20 @@ async fn event_count_sampler_test() {
 
     test_app_controller.increment_int(1).await.unwrap();
 
+    // Same FIRE events as before, except metric ID 3 is upload_once.
+    project_13_events
+        .validate_with_count(
+            vec![
+                Event { id: 2, value: 10, codes: vec![121, 0, 0] },
+                Event { id: 2, value: 20, codes: vec![122, 0, 0] },
+                Event { id: 4, value: 10, codes: vec![121, 14, 15] },
+                Event { id: 4, value: 20, codes: vec![122, 14, 15] },
+                Event { id: 5, value: 42, codes: vec![142, 99] },
+            ],
+            "Second FIRE events",
+        )
+        .await;
+
     test_app_controller.wait_for_sample().await.unwrap().unwrap();
 
     project_5_events
@@ -84,6 +130,20 @@ async fn event_count_sampler_test() {
                 Event { id: 102, value: 10, codes: vec![0, 0] },
             ],
             "before reboot in event_count",
+        )
+        .await;
+
+    // FIRE continues...
+    project_13_events
+        .validate_with_count(
+            vec![
+                Event { id: 2, value: 10, codes: vec![121, 0, 0] },
+                Event { id: 2, value: 20, codes: vec![122, 0, 0] },
+                Event { id: 4, value: 10, codes: vec![121, 14, 15] },
+                Event { id: 4, value: 20, codes: vec![122, 14, 15] },
+                Event { id: 5, value: 42, codes: vec![142, 99] },
+            ],
+            "More FIRE events",
         )
         .await;
 
@@ -103,11 +163,25 @@ async fn event_count_sampler_test() {
             "after reboot in event_count",
         )
         .await;
+
+    // Just to make sure
+    project_13_events
+        .validate_with_count(
+            vec![
+                Event { id: 2, value: 10, codes: vec![121, 0, 0] },
+                Event { id: 2, value: 20, codes: vec![122, 0, 0] },
+                Event { id: 4, value: 10, codes: vec![121, 14, 15] },
+                Event { id: 4, value: 20, codes: vec![122, 14, 15] },
+                Event { id: 5, value: 42, codes: vec![142, 99] },
+            ],
+            "Last FIRE events",
+        )
+        .await;
 }
 
 /// Runs the Sampler and a test component that can have its inspect properties
-/// manipulated by the test via fidl, and uses mock services to determine that when
-/// the reboot server goes down, sampler continues to run as expected.
+/// manipulated by the test via fidl, and verifies that Sampler publishes
+/// the expected Inspect data reflecting its configuration.
 #[fuchsia::test]
 async fn reboot_server_crashed_test() {
     let ns = test_topology::create_realm().await.expect("initialized topology");
@@ -193,15 +267,15 @@ async fn sampler_inspect_test() {
                 healthily_exited_samplers: 0 as u64,
                 errorfully_exited_samplers: 0 as u64,
                 reboot_exited_samplers: 0 as u64,
-                total_project_samplers_configured: 4 as u64,
+                total_project_samplers_configured: 5 as u64,
                 project_5: {
                     project_sampler_count: 2 as u64,
                     metrics_configured: 4 as u64,
                     cobalt_logs_sent: AnyProperty,
                 },
                 project_13: {
-                    project_sampler_count: 2 as u64,
-                    metrics_configured: 6 as u64,
+                    project_sampler_count: 3 as u64,
+                    metrics_configured: 12 as u64,
                     cobalt_logs_sent: AnyProperty,
                 },
             },
@@ -223,6 +297,14 @@ async fn sampler_inspect_test() {
                     "3": {
                         selector: "single_counter:root/samples:integer_2",
                         upload_count: 0 as u64
+                    },
+                    "4": {
+                        selector: "single_counter:root/samples:integer_42",
+                        upload_count: 0 as u64
+                    },
+                    "5": {
+                        selector: "single_counter:root/samples:integer_42",
+                        upload_count: 0 as u64
                     }
                 },
                 "fire_2.json5": {
@@ -232,6 +314,16 @@ async fn sampler_inspect_test() {
                     },
                     "1": {
                         selector: "single_counter:root/samples:integer_2",
+                        upload_count: 0 as u64
+                    },
+                    "2": {
+                        selector: "single_counter:root/samples:integer_42",
+                        upload_count: 0 as u64
+                    }
+                },
+                "fire_3.json5": {
+                    "0": {
+                        selector: "single_counter:root/samples:1111222233334444111111111111111111111111111111111111111111111111",
                         upload_count: 0 as u64
                     }
                 },

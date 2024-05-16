@@ -54,6 +54,8 @@ class Node {
 
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
 
+  void AddSmc(fuchsia_hardware_platform_bus::Smc smc);
+
   // Publish this node.
   // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.
   zx::result<> Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,

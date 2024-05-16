@@ -6,7 +6,13 @@ import unittest
 import os
 import tempfile
 
-from params import Params
+from params import (
+    Params,
+    SDK_TOOL_PATH_KEY,
+    EXECUTION_JSON_KEY,
+    OUTPUT_DIRECTORY_KEY,
+    TARGETS_KEY,
+)
 from execution_params import ExecutionParams
 
 
@@ -14,7 +20,7 @@ class TestParams(unittest.TestCase):
     TEST_URL = "fuchsia-pkg://fuchsia.com/pkg#meta/test_component.cm"
 
     def setUp(self):
-        # Create temporary directories for SDK_TOOL_PATH and OUTPUT_DIRECTORY
+        # Create temporary directories for sdk tool path and output directory
         self.sdk_tool_path = tempfile.mkdtemp()
         self.output_directory = tempfile.mkdtemp()
 
@@ -27,10 +33,10 @@ class TestParams(unittest.TestCase):
 
     def test_valid_initialization(self):
         env_vars = {
-            "SDK_TOOL_PATH": self.sdk_tool_path,
-            "TARGETS": "target1",
-            "OUTPUT_DIRECTORY": self.output_directory,
-            "EXECUTION_JSON": """{{
+            SDK_TOOL_PATH_KEY: self.sdk_tool_path,
+            TARGETS_KEY: "target1",
+            OUTPUT_DIRECTORY_KEY: self.output_directory,
+            EXECUTION_JSON_KEY: """{{
                     "test_url": "{}",
                     "test_args": ["arg1", "arg2"],
                     "test_filters": ["filter1", "filter2"],
@@ -62,9 +68,9 @@ class TestParams(unittest.TestCase):
 
     def test_missing_sdk_tool_path(self):
         env_vars = {
-            "TARGETS": "target1",
-            "OUTPUT_DIRECTORY": self.output_directory,
-            "EXECUTION_JSON": '{"test_url": self.TEST_URL}',
+            TARGETS_KEY: "target1",
+            OUTPUT_DIRECTORY_KEY: self.output_directory,
+            EXECUTION_JSON_KEY: '{"test_url": self.TEST_URL}',
         }
 
         with self.assertRaises(ValueError) as context:
@@ -72,14 +78,14 @@ class TestParams(unittest.TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "'SDK_TOOL_PATH' environment variable is not available.",
+            f"'{SDK_TOOL_PATH_KEY}' environment variable is not available.",
         )
 
     def test_missing_output_directory(self):
         env_vars = {
-            "SDK_TOOL_PATH": self.sdk_tool_path,
-            "TARGETS": "target1",
-            "EXECUTION_JSON": '{"test_url": self.TEST_URL}',
+            SDK_TOOL_PATH_KEY: self.sdk_tool_path,
+            TARGETS_KEY: "target1",
+            EXECUTION_JSON_KEY: '{"test_url": self.TEST_URL}',
         }
 
         with self.assertRaises(ValueError) as context:
@@ -87,15 +93,15 @@ class TestParams(unittest.TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "'OUTPUT_DIRECTORY' environment variable is not available.",
+            f"'{OUTPUT_DIRECTORY_KEY}' environment variable is not available.",
         )
 
     def test_non_existent_sdk_tool_path(self):
         env_vars = {
-            "SDK_TOOL_PATH": "/nonexistent/path/to/sdk_tool",
-            "TARGETS": "target1",
-            "OUTPUT_DIRECTORY": self.output_directory,
-            "EXECUTION_JSON": '{"test_url": self.TEST_URL}',
+            SDK_TOOL_PATH_KEY: "/nonexistent/path/to/sdk_tool",
+            TARGETS_KEY: "target1",
+            OUTPUT_DIRECTORY_KEY: self.output_directory,
+            EXECUTION_JSON_KEY: '{"test_url": self.TEST_URL}',
         }
 
         with self.assertRaises(ValueError) as context:
@@ -103,15 +109,15 @@ class TestParams(unittest.TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "'SDK_TOOL_PATH: /nonexistent/path/to/sdk_tool' path does not exist.",
+            f"'{SDK_TOOL_PATH_KEY}: /nonexistent/path/to/sdk_tool' path does not exist.",
         )
 
     def test_non_existent_output_directory(self):
         env_vars = {
-            "SDK_TOOL_PATH": self.sdk_tool_path,
-            "TARGETS": "target1",
-            "OUTPUT_DIRECTORY": "/nonexistent/output",
-            "EXECUTION_JSON": '{"test_url": self.TEST_URL}',
+            SDK_TOOL_PATH_KEY: self.sdk_tool_path,
+            TARGETS_KEY: "target1",
+            OUTPUT_DIRECTORY_KEY: "/nonexistent/output",
+            EXECUTION_JSON_KEY: '{"test_url": self.TEST_URL}',
         }
 
         with self.assertRaises(ValueError) as context:
@@ -119,14 +125,14 @@ class TestParams(unittest.TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "'OUTPUT_DIRECTORY: /nonexistent/output' path does not exist.",
+            f"'{OUTPUT_DIRECTORY_KEY}: /nonexistent/output' path does not exist.",
         )
 
     def test_missing_execution_json(self):
         env_vars = {
-            "SDK_TOOL_PATH": self.sdk_tool_path,
-            "TARGETS": "target1",
-            "OUTPUT_DIRECTORY": self.output_directory,
+            SDK_TOOL_PATH_KEY: self.sdk_tool_path,
+            TARGETS_KEY: "target1",
+            OUTPUT_DIRECTORY_KEY: self.output_directory,
         }
 
         with self.assertRaises(ValueError) as context:
@@ -134,15 +140,15 @@ class TestParams(unittest.TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "'EXECUTION_JSON' environment variable is not available.",
+            f"'{EXECUTION_JSON_KEY}' environment variable is not available.",
         )
 
     def test_invalid_execution_json(self):
         env_vars = {
-            "SDK_TOOL_PATH": self.sdk_tool_path,
-            "TARGETS": "target1",
-            "OUTPUT_DIRECTORY": self.output_directory,
-            "EXECUTION_JSON": "{}",
+            SDK_TOOL_PATH_KEY: self.sdk_tool_path,
+            TARGETS_KEY: "target1",
+            OUTPUT_DIRECTORY_KEY: self.output_directory,
+            EXECUTION_JSON_KEY: "{}",
         }
 
         with self.assertRaises(ValueError) as context:

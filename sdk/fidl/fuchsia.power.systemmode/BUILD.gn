@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.power.systemmode") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Power"
 
   sources = [ "systemmode.fidl" ]
 

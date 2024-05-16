@@ -105,6 +105,7 @@
             // drivers depend on system-activity-governor.
             // Weak to resolve dependency cycles.
             dependency: "weak",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.power.broker.Topology" ],

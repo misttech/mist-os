@@ -22,7 +22,6 @@ from perf_test_utils import utils
 from trace_processing import trace_importing
 from trace_processing import trace_metrics
 from trace_processing import trace_model
-from trace_processing import trace_utils
 from trace_processing.metrics import cpu
 
 # The first TCP/UDP port number that the Fuchsia side will listen on.
@@ -325,7 +324,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         model: trace_model.Model = trace_importing.create_model_from_file_path(
             json_trace_file
         )
-        return cpu.metrics_processor(model, {})
+        return list(cpu.metrics_processor(model, {}))
 
     async def _start_iperf3_servers(
         self, executor: concurrent.futures.ThreadPoolExecutor, flows: int

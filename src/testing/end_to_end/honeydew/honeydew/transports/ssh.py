@@ -61,6 +61,9 @@ class SSH(ssh_interface.SSH):
 
         username: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
+
+    Raises:
+        errors.SshConnectionError: In case of SSH connection failure.
     """
 
     def __init__(
@@ -77,6 +80,8 @@ class SSH(ssh_interface.SSH):
         self._username: str = username or _DEFAULTS["USERNAME"]
 
         self._ffx_transport: ffx_interface.FFX = ffx_transport
+
+        self.check_connection()
 
     def check_connection(
         self, timeout: float = ssh_interface.TIMEOUTS["CONNECTION"]

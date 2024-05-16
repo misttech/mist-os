@@ -11,7 +11,6 @@
 
 #include "fidl/fuchsia.bluetooth.host/cpp/fidl.h"
 #include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
-#include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "host.h"
 #include "lib/component/incoming/cpp/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/bt_host_config.h"
@@ -134,14 +133,16 @@ int main() {
     lifecycle_handler.PostStopTask();
   };
 
-  fuchsia::hardware::bluetooth::VendorHandle vendor_handle =
+  zx::result<fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor>> vendor_client_end_result =
       bthost::CreateVendorHandle(config.device_path());
-  if (!vendor_handle) {
-    bt_log(ERROR, "bt-host", "Failed to create VendorHandle; cannot initialize bt-host");
+  if (!vendor_client_end_result.is_ok()) {
+    bt_log(ERROR, "bt-host", "Failed to create VendorHandle; cannot initialize bt-host: %s",
+           vendor_client_end_result.status_string());
     return 1;
   }
 
-  bool initialize_res = host->Initialize(std::move(vendor_handle), init_cb, error_cb);
+  bool initialize_res =
+      host->Initialize(std::move(vendor_client_end_result.value()), init_cb, error_cb);
   if (!initialize_res) {
     bt_log(ERROR, "bt-host", "Error initializing bt-host; shutting down...");
     return 1;

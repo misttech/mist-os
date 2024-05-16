@@ -4,9 +4,11 @@
 
 #include "src/ui/scenic/lib/utils/helpers.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/image-format/image_format.h>
 #include <lib/syslog/cpp/macros.h>
@@ -14,7 +16,6 @@
 
 #include <fbl/algorithm.h>
 
-#include "fuchsia/sysmem/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 #include <glm/gtc/constants.hpp>
@@ -129,6 +130,27 @@ SysmemTokens CreateSysmemTokens(fuchsia::sysmem::Allocator_Sync* sysmem_allocato
   return {std::move(local_token), std::move(dup_token)};
 }
 
+Sysmem2Tokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
+  FX_DCHECK(sysmem_allocator);
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_request;
+  allocate_request.set_token_request(local_token.NewRequest());
+  zx_status_t status = sysmem_allocator->AllocateSharedCollection(std::move(allocate_request));
+  FX_DCHECK(status == ZX_OK);
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(dup_token.NewRequest());
+  status = local_token->Duplicate(std::move(dup_request));
+  FX_DCHECK(status == ZX_OK);
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = local_token->Sync(&sync_result);
+  FX_DCHECK(status == ZX_OK);
+  FX_DCHECK(sync_result.is_response());
+
+  return {std::move(local_token), std::move(dup_token)};
+}
+
 fuchsia::sysmem::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
                                                                       uint32_t width,
                                                                       uint32_t height) {
@@ -155,6 +177,28 @@ fuchsia::sysmem::BufferCollectionConstraints CreateDefaultConstraints(uint32_t b
 
   image_constraints.bytes_per_row_divisor = 4;
 
+  return constraints;
+}
+
+fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints2(uint32_t buffer_count,
+                                                                        uint32_t width,
+                                                                        uint32_t height) {
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
+  constraints.mutable_buffer_memory_constraints()->set_cpu_domain_supported(true);
+  constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN |
+                                       fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
+  constraints.set_min_buffer_count(buffer_count);
+
+  constraints.mutable_image_format_constraints()->reserve(1);
+  auto& image_constraints = constraints.mutable_image_format_constraints()->at(0);
+  image_constraints.mutable_color_spaces()->push_back(fuchsia::images2::ColorSpace::SRGB);
+  image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
+
+  image_constraints.set_required_min_size({.width = width, .height = height});
+  image_constraints.set_required_max_size({.width = width, .height = height});
+  image_constraints.set_bytes_per_row_divisor(4);
   return constraints;
 }
 

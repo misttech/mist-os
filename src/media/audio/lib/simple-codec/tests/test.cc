@@ -125,8 +125,8 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
   void SetElementState(uint64_t processing_element_id, signal_fidl::ElementState state,
                        SetElementStateCallback callback) override {
     ASSERT_EQ(processing_element_id, kAglPeId);
-    ASSERT_TRUE(state.has_enabled());
-    agl_mode_ = state.enabled();
+    ASSERT_TRUE(state.has_started());
+    agl_mode_ = state.started() && (!state.has_bypassed() || !state.bypassed());
     callback(signal_fidl::SignalProcessing_SetElementState_Result::WithResponse(
         signal_fidl::SignalProcessing_SetElementState_Response()));
   }
@@ -354,7 +354,7 @@ TEST_F(SimpleCodecTest, SetDaiFormat) {
 
   DaiFormat format = {.sample_format = audio_fidl::DaiSampleFormat::PCM_SIGNED,
                       .frame_format = FrameFormat::I2S};
-  zx::result<CodecFormatInfo> codec_format_info = client.SetDaiFormat(std::move(format));
+  zx::result<CodecFormatInfo> codec_format_info = client.SetDaiFormat(format);
   ASSERT_EQ(codec_format_info.status_value(), ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -432,7 +432,7 @@ TEST_F(SimpleCodecTest, GainWithClientViaSignalProcessingApi) {
   constexpr float kTestGain = 12.3f;
   signal_fidl::GainElementState gain_state;
   gain_state.set_gain(kTestGain);
-  state_gain.set_type_specific(
+  state_gain.set_bypassed(false).set_started(true).set_type_specific(
       signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_state)));
   ASSERT_OK(signal_processing_client->SetElementState(
       result_elements.response().processing_elements[0].id(), std::move(state_gain), &result_gain));
@@ -447,6 +447,7 @@ TEST_F(SimpleCodecTest, GainWithClientViaSignalProcessingApi) {
   // Control with no gain returns an error.
   signal_fidl::SignalProcessing_SetElementState_Result result_no_gain;
   signal_fidl::ElementState state_no_gain;
+  state_no_gain.set_bypassed(false).set_started(true);
   ASSERT_OK(signal_processing_client->SetElementState(
       result_elements.response().processing_elements[0].id(), std::move(state_no_gain),
       &result_no_gain));
@@ -492,7 +493,7 @@ TEST_F(SimpleCodecTest, AglStateServerWithClientViaSignalProcessingApi) {
   // Control with enabled = true.
   signal_fidl::SignalProcessing_SetElementState_Result result_enable;
   signal_fidl::ElementState state_enable;
-  state_enable.set_enabled(true);
+  state_enable.set_bypassed(false).set_started(true);
   ASSERT_OK(signal_processing_client->SetElementState(result.response().processing_elements[0].id(),
                                                       std::move(state_enable), &result_enable));
   ASSERT_FALSE(result_enable.is_err());

@@ -350,8 +350,8 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
       FX_LOGS(INFO) << "Could not connect wayland device";
       return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
     }
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_allocator = nullptr;
-    status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem_allocator = nullptr;
+    status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                   sysmem_allocator.NewRequest().TakeChannel().release());
     if (status != ZX_OK) {
       FX_LOGS(INFO) << "Could not connect to sysmem allocator service";

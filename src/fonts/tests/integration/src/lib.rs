@@ -7,8 +7,6 @@ mod old_api;
 mod reviewed_api;
 pub mod util;
 
-pub const FONTS_EPHEMERAL_CM: &str =
-    "fuchsia-pkg://fuchsia.com/font_provider_integration_tests#meta/fonts_with_ephemeral_fonts.cm";
 pub const FONTS_ALIASED_CM: &str =
     "fuchsia-pkg://fuchsia.com/font_provider_integration_tests#meta/fonts_with_aliases_fonts.cm";
 pub const FONTS_SMALL_CM: &str =

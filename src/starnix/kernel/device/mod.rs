@@ -12,12 +12,15 @@ pub use binder::*;
 pub use device_init::*;
 pub use registry::*;
 
+pub mod android;
 pub mod ashmem;
+pub mod device_mapper;
 pub mod framebuffer;
 pub mod kobject;
 pub mod loop_device;
 pub mod mem;
 pub mod perfetto_consumer;
+pub mod remote_block_device;
 pub mod sync_fence_registry;
 pub mod sync_file;
 pub mod terminal;

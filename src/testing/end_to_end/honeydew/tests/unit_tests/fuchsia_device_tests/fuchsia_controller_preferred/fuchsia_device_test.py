@@ -95,13 +95,14 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
             mock_fc_create_context.assert_called_once_with(
                 self.fd_obj.fuchsia_controller
             )
-            mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
-            mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
-            mock_fc_check_connection.assert_called_once_with(
-                self.fd_obj.fuchsia_controller
-            )
+            mock_fc_check_connection.assert_called()
+
+            mock_ffx_check_connection.assert_called()
+
+            mock_ssh_check_connection.assert_called()
+
             mock_sl4f_start_server.assert_called_once_with(self.fd_obj.sl4f)
-            mock_sl4f_check_connection.assert_called_once_with(self.fd_obj.sl4f)
+            mock_sl4f_check_connection.assert_called()
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""

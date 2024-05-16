@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 source_set("lib") {
   sources = [
@@ -95,10 +94,6 @@ foreach(hwstress_name, _hwstress_binaries) {
 fuchsia_package("hwstress_v2_pkg") {
   package_name = "hwstress_v2"
   deps = _hwstress_v2_components
-}
-
-core_shard("hwstress_v2_shard") {
-  shard_file = "meta/hwstress.core_shard.cml"
 }
 
 # Tests requiring support from the CFv2 (or requiring support from libraries that depend on CFv2).

@@ -139,6 +139,16 @@ class Node {
  public:
   virtual ~Node() {}
 
+  void SetPermissions(uint32_t perms) {
+    std::lock_guard guard(mtx_);
+    perms_ = perms;
+  }
+
+  void SetEntryValidDuration(uint64_t secs) {
+    std::lock_guard guard(mtx_);
+    entry_valid_secs_ = secs;
+  }
+
   uint64_t UpdateNodeid(uint64_t id) {
     std::lock_guard guard(mtx_);
     std::swap(id, id_);
@@ -153,7 +163,7 @@ class Node {
   void PopulateAttrLocked(fuse_attr& attr) __TA_REQUIRES(mtx_) {
     attr = {
         .ino = id_,
-        .mode = type_ | S_IRWXU | S_IRWXG | S_IRWXO,
+        .mode = type_ | perms_,
     };
   }
 
@@ -167,6 +177,7 @@ class Node {
     entry_out = {
         .nodeid = id_,
         .generation = generation_,
+        .entry_valid = entry_valid_secs_,
     };
     PopulateAttrLocked(entry_out.attr);
   }
@@ -180,6 +191,8 @@ class Node {
   std::mutex mtx_;
   uint64_t id_ __TA_GUARDED(mtx_);
   uint64_t generation_ __TA_GUARDED(mtx_) = 1;
+  uint64_t entry_valid_secs_ __TA_GUARDED(mtx_) = 0;
+  uint32_t perms_ __TA_GUARDED(mtx_) = S_IRWXU | S_IRWXG | S_IRWXO;
 };
 
 class Directory : public Node {
@@ -375,6 +388,20 @@ class FuseServer {
         OK_OR_RETURN(HandleLookup(node, in_header, reinterpret_cast<const char*>(in_payload)));
         break;
       }
+      case FUSE_MKNOD: {
+        struct fuse_mknod_in mknod_in = {};
+        memcpy(&mknod_in, in_payload, sizeof(mknod_in));
+        OK_OR_RETURN(HandleMknod(node, in_header, &mknod_in,
+                                 reinterpret_cast<const char*>(in_payload) + sizeof(mknod_in)));
+        break;
+      }
+      case FUSE_MKDIR: {
+        struct fuse_mkdir_in mkdir_in = {};
+        memcpy(&mkdir_in, in_payload, sizeof(mkdir_in));
+        OK_OR_RETURN(HandleMkdir(node, in_header, &mkdir_in,
+                                 reinterpret_cast<const char*>(in_payload) + sizeof(mkdir_in)));
+        break;
+      }
       case FUSE_OPENDIR:
       case FUSE_OPEN: {
         struct fuse_open_in open_in = {};
@@ -448,6 +475,36 @@ class FuseServer {
       return WriteStructResponse(in_header, entry_out);
     }
     return testing::AssertionSuccess();
+  }
+
+  virtual testing::AssertionResult HandleMknod(const std::shared_ptr<Node>& dir_node,
+                                               const struct fuse_in_header& in_header,
+                                               const struct fuse_mknod_in* mknod_in,
+                                               const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+    }
+
+    std::shared_ptr<File> node = fs_.AddFileAt(dir, std::string(name));
+    fuse_entry_out entry_out;
+    node->PopulateEntry(entry_out);
+    return WriteStructResponse(in_header, entry_out);
+  }
+
+  virtual testing::AssertionResult HandleMkdir(const std::shared_ptr<Node>& dir_node,
+                                               const struct fuse_in_header& in_header,
+                                               const struct fuse_mkdir_in* mkdir_in,
+                                               const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+    }
+
+    std::shared_ptr<Directory> node = fs_.AddDirAt(dir, std::string(name));
+    fuse_entry_out entry_out;
+    node->PopulateEntry(entry_out);
+    return WriteStructResponse(in_header, entry_out);
   }
 
   virtual testing::AssertionResult HandleOpen(const std::shared_ptr<Node>& node,
@@ -1468,6 +1525,7 @@ INSTANTIATE_TEST_SUITE_P(
 struct PathWalkRefreshDirEntryTestCase {
   bool modify_nodeid;
   bool modify_generation;
+  uint64_t entry_valid_forever;
   uint64_t expected_extra_lookups;
 };
 
@@ -1483,6 +1541,11 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   std::shared_ptr<Directory> dir1 = fs.AddDirAtRoot("dir1");
   std::shared_ptr<Directory> dir2 = fs.AddDirAt(dir1, "dir2");
   std::shared_ptr<File> file = fs.AddFileAt(dir2, "file");
+  if (test_case.entry_valid_forever) {
+    dir1->SetEntryValidDuration(std::numeric_limits<uint64_t>::max());
+    dir2->SetEntryValidDuration(std::numeric_limits<uint64_t>::max());
+    file->SetEntryValidDuration(std::numeric_limits<uint64_t>::max());
+  }
   ASSERT_TRUE(Mount(server));
   EXPECT_EQ(server->LookupCount(), 0u);
 
@@ -1491,7 +1554,10 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   // time we create a new DirEntry in starnix. Note that refreshing a DirEntry
   // does not result in extra lookups, only the initial lookup to populate a new
   // DirEntry does.
-  const uint64_t extra_initial_lookups_per_node = test_helper::IsStarnix() ? 1 : 0;
+  const uint64_t extra_initial_lookups_per_node =
+      (!test_case.entry_valid_forever && test_helper::IsStarnix()) ? 1 : 0;
+  const uint64_t extra_subsequent_lookups_per_node =
+      test_case.entry_valid_forever ? 0 : kNumberOfNodesInPath;
   const uint64_t lookup_offset = extra_initial_lookups_per_node * kNumberOfNodesInPath;
   const uint64_t expected_initial_lookup_count = kNumberOfNodesInPath + lookup_offset;
   const uint64_t expected_post_update_lookup_extra_offset = extra_initial_lookups_per_node;
@@ -1506,7 +1572,8 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   EXPECT_EQ(server->LookupCount(), expected_initial_lookup_count);
 
   ASSERT_NO_FATAL_FAILURE(check_open());
-  EXPECT_EQ(server->LookupCount(), expected_initial_lookup_count + kNumberOfNodesInPath);
+  EXPECT_EQ(server->LookupCount(),
+            expected_initial_lookup_count + extra_subsequent_lookups_per_node);
 
   // When the kernel attempts to refresh the entry and sees a node ID or generation
   // different from what the kernel has cached for the same name, the kernel will
@@ -1523,7 +1590,7 @@ TEST_P(FusePathWalkRefreshDirEntryTest, PathWalkRefreshDirEntry) {
   }
   ASSERT_NO_FATAL_FAILURE(check_open());
   EXPECT_EQ(server->LookupCount(),
-            expected_initial_lookup_count + (2 * kNumberOfNodesInPath) +
+            expected_initial_lookup_count + (2 * extra_subsequent_lookups_per_node) +
                 test_case.expected_extra_lookups * (1 + expected_post_update_lookup_extra_offset));
 }
 
@@ -1532,20 +1599,163 @@ INSTANTIATE_TEST_SUITE_P(FusePathWalkRefreshDirEntryTest, FusePathWalkRefreshDir
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = false,
                                  .modify_generation = false,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 0,
                              },
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = false,
                                  .modify_generation = true,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 1,
                              },
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = true,
                                  .modify_generation = false,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 1,
                              },
                              PathWalkRefreshDirEntryTestCase{
                                  .modify_nodeid = true,
                                  .modify_generation = true,
+                                 .entry_valid_forever = false,
                                  .expected_extra_lookups = 1,
+                             },
+
+                             // Same as above but with entryies valid forever.
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = false,
+                                 .modify_generation = false,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = false,
+                                 .modify_generation = true,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = true,
+                                 .modify_generation = false,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
+                             },
+                             PathWalkRefreshDirEntryTestCase{
+                                 .modify_nodeid = true,
+                                 .modify_generation = true,
+                                 .entry_valid_forever = true,
+                                 .expected_extra_lookups = 0,
                              }));
+
+struct DirPermissionCheckTestCase {
+  uint32_t want_init_flags;
+  uint32_t perms;
+  bool expect_open;
+};
+
+class FuseDirPermissionCheck : public FuseServerTest,
+                               public ::testing::WithParamInterface<DirPermissionCheckTestCase> {};
+
+TEST_P(FuseDirPermissionCheck, DirPermissionCheck) {
+  const DirPermissionCheckTestCase& test_case = GetParam();
+
+  std::shared_ptr<FuseServer> server(new FuseServer(test_case.want_init_flags));
+  FileSystem& fs = server->fs();
+  std::shared_ptr<Directory> dir = fs.AddDirAtRoot("dir");
+  ASSERT_TRUE(fs.AddFileAt(dir, "node"));
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+
+  std::string path = GetMountDir() + "/dir/node";
+  dir->SetPermissions(test_case.perms);
+  InThreadWithoutCapDacOverride([&]() {
+    test_helper::ScopedFD fd(open(path.c_str(), O_RDONLY));
+    EXPECT_EQ(fd.is_valid(), test_case.expect_open);
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(FuseDirPermissionCheck, FuseDirPermissionCheck,
+                         testing::Values(
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                                 .expect_open = true,
+                             },
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = 0,
+                                 .perms = 0,
+                                 .expect_open = true,
+                             },
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                                 .expect_open = true,
+                             },
+                             DirPermissionCheckTestCase{
+                                 .want_init_flags = FUSE_POSIX_ACL,
+                                 .perms = 0,
+                                 .expect_open = false,
+                             }));
+
+struct MkPermissionCheckTestCase {
+  uint32_t want_init_flags;
+  uint32_t perms;
+  int expected_errno;
+};
+
+class FuseMkPermissionCheck
+    : public FuseServerTest,
+      public ::testing::WithParamInterface<
+          std::tuple<std::function<int(const std::string&)>, MkPermissionCheckTestCase>> {};
+
+TEST_P(FuseMkPermissionCheck, MkPermissionCheck) {
+  const std::tuple<std::function<int(const std::string&)>, MkPermissionCheckTestCase>& param =
+      GetParam();
+  const std::function<int(const std::string&)>& test_fn = std::get<0>(param);
+  const MkPermissionCheckTestCase& test_case = std::get<1>(param);
+
+  std::shared_ptr<FuseServer> server(new FuseServer(test_case.want_init_flags));
+  FileSystem& fs = server->fs();
+  std::shared_ptr<Directory> dir = fs.AddDirAtRoot("dir");
+  ASSERT_TRUE(Mount(server));
+  server->WaitForInit();
+
+  std::string path = GetMountDir() + "/dir/node";
+  dir->SetPermissions(test_case.perms);
+  InThreadWithoutCapDacOverride([&]() {
+    int ret = test_fn(path);
+    if (test_case.expected_errno == 0) {
+      EXPECT_EQ(ret, 0) << strerror(errno);
+    } else {
+      ASSERT_EQ(ret, -1);
+      EXPECT_EQ(errno, test_case.expected_errno);
+    }
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FuseMkPermissionCheck, FuseMkPermissionCheck,
+    testing::Combine(
+        testing::Values([](const std::string& path) { return mknod(path.c_str(), 0, 0); },
+                        [](const std::string& path) { return mkdir(path.c_str(), 0); }),
+        testing::Values(
+            MkPermissionCheckTestCase{
+                .want_init_flags = 0,
+                .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                .expected_errno = 0,
+            },
+            MkPermissionCheckTestCase{
+                .want_init_flags = 0,
+                .perms = 0,
+                .expected_errno = 0,
+            },
+            MkPermissionCheckTestCase{
+                .want_init_flags = FUSE_POSIX_ACL,
+                .perms = S_IRWXU | S_IRWXG | S_IRWXO,
+                .expected_errno = 0,
+            },
+            MkPermissionCheckTestCase{
+                .want_init_flags = FUSE_POSIX_ACL,
+                .perms = 0,
+                .expected_errno = EACCES,
+            })));

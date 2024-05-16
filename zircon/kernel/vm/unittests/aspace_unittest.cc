@@ -101,7 +101,7 @@ static bool multiple_regions_test() {
   fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test aspace");
   ASSERT_NONNULL(aspace, "VmAspace::Create pointer");
 
-  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
+  VmAspace* old_aspace = Thread::Current::active_aspace();
   vmm_set_active_aspace(aspace.get());
 
   // allocate region 0

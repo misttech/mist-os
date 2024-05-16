@@ -16,7 +16,7 @@ HandlerManager::HandlerManager(async_dispatcher_t* dispatcher, CrashCounter cras
     handlers_.emplace_back(
         dispatcher_, /*log_moniker=*/
         [crash_counter = &crash_counter_](const std::string& moniker) {
-          crash_counter->Increment(std::move(moniker));
+          crash_counter->Increment(moniker);
         },
         /*on_available=*/
         [i, this] {

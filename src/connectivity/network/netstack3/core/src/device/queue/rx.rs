@@ -40,8 +40,13 @@ impl<Meta, Buffer> ReceiveQueueState<Meta, Buffer> {
 }
 
 /// The bindings context for the receive queue.
-pub trait ReceiveQueueBindingsContext<D: Device, DeviceId> {
-    /// Wakes up RX task.
+pub trait ReceiveQueueBindingsContext<DeviceId> {
+    /// Signals to bindings that RX frames are available and ready to be handled
+    /// by device.
+    ///
+    /// Implementations must make sure that the API call to handle queued
+    /// packets is scheduled to be called as soon as possible so that enqueued
+    /// RX frames are promptly handled.
     fn wake_rx_task(&mut self, device_id: &DeviceId);
 }
 
@@ -130,11 +135,8 @@ pub(crate) trait ReceiveQueueHandler<D: Device, BC>: ReceiveQueueTypes<D, BC> {
     ) -> Result<(), ReceiveQueueFullError<(Self::Meta, Self::Buffer)>>;
 }
 
-impl<
-        D: Device,
-        BC: ReceiveQueueBindingsContext<D, CC::DeviceId>,
-        CC: ReceiveQueueContext<D, BC>,
-    > ReceiveQueueHandler<D, BC> for CC
+impl<D: Device, BC: ReceiveQueueBindingsContext<CC::DeviceId>, CC: ReceiveQueueContext<D, BC>>
+    ReceiveQueueHandler<D, BC> for CC
 {
     fn queue_rx_frame(
         &mut self,
@@ -164,12 +166,15 @@ mod tests {
     use packet::Buf;
 
     use crate::{
-        context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx},
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx},
+            CtxPair,
+        },
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
             queue::{api::ReceiveQueueApi, MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN},
         },
-        work_queue::WorkQueueReport,
+        types::WorkQueueReport,
     };
 
     #[derive(Default)]
@@ -186,7 +191,7 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeRxQueueState, (), FakeLinkDeviceId>;
     type FakeBindingsCtxImpl = FakeBindingsCtx<(), (), FakeRxQueueBindingsCtxState, ()>;
 
-    impl ReceiveQueueBindingsContext<FakeLinkDevice, FakeLinkDeviceId> for FakeBindingsCtxImpl {
+    impl ReceiveQueueBindingsContext<FakeLinkDeviceId> for FakeBindingsCtxImpl {
         fn wake_rx_task(&mut self, device_id: &FakeLinkDeviceId) {
             self.state.woken_rx_tasks.push(device_id.clone())
         }
@@ -203,7 +208,7 @@ mod tests {
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            cb(&mut self.get_mut().queue)
+            cb(&mut self.state.queue)
         }
     }
 
@@ -215,7 +220,7 @@ mod tests {
             (): (),
             buf: Buf<Vec<u8>>,
         ) {
-            self.get_mut().handled_frames.push(buf)
+            self.state.handled_frames.push(buf)
         }
     }
 
@@ -248,10 +253,10 @@ mod tests {
 
     #[test]
     fn queue_and_dequeue() {
-        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         for _ in 0..2 {
-            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             for i in 0..MAX_RX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
@@ -291,7 +296,7 @@ mod tests {
                     WorkQueueReport::Pending
                 );
                 assert_eq!(
-                    core::mem::take(&mut ctx.core_ctx.get_mut().handled_frames),
+                    core::mem::take(&mut ctx.core_ctx.state.handled_frames),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
@@ -302,9 +307,9 @@ mod tests {
                 ctx.receive_queue_api().handle_queued_frames(&FakeLinkDeviceId),
                 WorkQueueReport::AllDone
             );
-            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
-                core::mem::take(&mut core_ctx.get_mut().handled_frames),
+                core::mem::take(&mut core_ctx.state.handled_frames),
                 (MAX_BATCH_SIZE * (MAX_RX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_RX_QUEUED_LEN)
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()

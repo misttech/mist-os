@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
+#include <lib/zx/time.h>
 
 #include <unordered_map>
 
@@ -190,45 +191,35 @@ const fha::PcmFormat FakeComposite::kDefaultRbFormat2{{
 // Individual elements
 const fhasp::Element FakeComposite::kSourceDaiElement{{
     .id = kSourceDaiElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kDaiInterconnect,
+    .type = fhasp::ElementType::kDaiInterconnect,
+    .type_specific = fhasp::TypeSpecificElement::WithDaiInterconnect({{
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .description = "Endpoint::DaiInterconnect source element description",
+    .description = "DaiInterconnect source element description",
     .can_stop = true,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kDestDaiElement{{
     .id = kDestDaiElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kDaiInterconnect,
+    .type = fhasp::ElementType::kDaiInterconnect,
+    .type_specific = fhasp::TypeSpecificElement::WithDaiInterconnect({{
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .description = "Endpoint::DaiInterconnect destination element description",
+    .description = "DaiInterconnect destination element description",
     .can_stop = true,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kSourceRbElement{{
     .id = kSourceRbElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kRingBuffer,
-        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
-    }}),
-    .description = "Endpoint::RingBuffer source element description",
+    .type = fhasp::ElementType::kRingBuffer,
+    .description = "RingBuffer source element description",
     .can_stop = false,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kDestRbElement{{
     .id = kDestRbElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kRingBuffer,
-        .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kHardwired,
-    }}),
-    .description = "Endpoint::RingBuffer destination element description",
+    .type = fhasp::ElementType::kRingBuffer,
+    .description = "RingBuffer destination element description",
     .can_stop = false,
     .can_bypass = false,
 }};
@@ -240,54 +231,42 @@ const fhasp::Element FakeComposite::kMuteElement{{
     .can_bypass = true,
 }};
 
-// ElementStates - note that the two Dai endpoints have vendor_specific_data that can be queried.
-const fhasp::Latency FakeComposite::kSourceDaiElementLatency = fhasp::Latency::WithLatencyTime(0);
-const fhasp::Latency FakeComposite::kDestDaiElementLatency = fhasp::Latency::WithLatencyTime(10417);
-const fhasp::Latency FakeComposite::kSourceRbElementLatency = fhasp::Latency::WithLatencyFrames(1);
-const fhasp::Latency FakeComposite::kDestRbElementLatency = fhasp::Latency::WithLatencyFrames(0);
+// ElementStates - note that the two Dai elements have vendor_specific_data that can be queried.
+const zx::duration FakeComposite::kSourceDaiElementProcessingDelay = zx::nsec(0);
+const zx::duration FakeComposite::kDestDaiElementProcessingDelay = zx::nsec(123);
+const zx::duration FakeComposite::kSourceRbElementProcessingDelay = zx::nsec(42);
 const fhasp::ElementState FakeComposite::kSourceDaiElementInitState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+    .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
             .plug_state_time = 0,
         }},
+        .external_delay = 0,
     }}),
-    .latency = kSourceDaiElementLatency,
     .vendor_specific_data = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8},
     .started = false,
     .bypassed = false,
+    .processing_delay = kSourceDaiElementProcessingDelay.get(),
 }};
 const fhasp::ElementState FakeComposite::kDestDaiElementInitState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+    .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
             .plug_state_time = 0,
         }},
+        .external_delay = 123,
     }}),
-    .latency = kDestDaiElementLatency,
     .vendor_specific_data = std::vector<uint8_t>{8, 7, 6, 5, 4, 3, 2, 1, 0},
     .started = false,
     .bypassed = false,
+    .processing_delay = kDestDaiElementProcessingDelay.get(),
 }};
 const fhasp::ElementState FakeComposite::kSourceRbElementInitState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
-        .plug_state = fhasp::PlugState{{
-            .plugged = true,
-            .plug_state_time = 0,
-        }},
-    }}),
-    .latency = kSourceRbElementLatency,
     .started = true,
     .bypassed = false,
+    .processing_delay = kSourceRbElementProcessingDelay.get(),
 }};
 const fhasp::ElementState FakeComposite::kDestRbElementInitState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
-        .plug_state = fhasp::PlugState{{
-            .plugged = true,
-            .plug_state_time = 0,
-        }},
-    }}),
-    .latency = kDestRbElementLatency,
     .started = true,
     .bypassed = false,
 }};

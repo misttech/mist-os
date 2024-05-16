@@ -16,8 +16,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
 
-#include <pw_bluetooth/hci_data.emb.h>
 #include <pw_bluetooth/hci_android.emb.h>
+#include <pw_bluetooth/hci_data.emb.h>
 
 namespace bt::testing {
 namespace {
@@ -158,6 +158,8 @@ void FakeController::Settings::AddLESupportedCommands() {
          hci_spec::SupportedCommand::kLEStartEncryption);
   SetBit(supported_commands + 41,
          hci_spec::SupportedCommand::kLEReadBufferSizeV2);
+  SetBit(supported_commands + 45,
+         hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay);
 }
 
 void FakeController::Settings::ApplyLegacyLEConfig() {
@@ -969,6 +971,16 @@ void FakeController::OnLECreateConnectionCommandReceived(
     return;
   }
 
+  // The link is considered lost after connection_interval_max * 2. Connection
+  // events (when data pdus are transmitted) must occur at least once within
+  // that time frame.
+  if (params.max_connection_event_length().Read() >
+      2 * params.connection_interval_max().Read()) {
+    RespondWithCommandStatus(hci_spec::kLECreateConnection,
+                             pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+    return;
+  }
+
   std::optional<DeviceAddress::Type> addr_type =
       DeviceAddress::LeAddrToDeviceAddr(params.peer_address_type().Read());
   BT_DEBUG_ASSERT(addr_type && *addr_type != DeviceAddress::Type::kBREDR);
@@ -1067,6 +1079,16 @@ void FakeController::OnLEExtendedCreateConnectionCommandReceived(
   if (le_connect_pending_) {
     RespondWithCommandStatus(hci_spec::kLEExtendedCreateConnection,
                              pwemb::StatusCode::COMMAND_DISALLOWED);
+    return;
+  }
+
+  // The link is considered lost after connection_interval_max * 2. Connection
+  // events (when data pdus are transmitted) must occur at least once within
+  // that time frame.
+  if (params.data()[0].max_connection_event_length().Read() >
+      2 * params.data()[0].connection_interval_max().Read()) {
+    RespondWithCommandStatus(hci_spec::kLEExtendedCreateConnection,
+                             pwemb::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
     return;
   }
 
@@ -3351,6 +3373,29 @@ void FakeController::SendAndroidLEMultipleAdvertisingStateChangeSubevent(
   SendCommandChannelPacket(packet.data());
 }
 
+void FakeController::OnReadLocalSupportedControllerDelay(
+    const pwemb::ReadLocalSupportedControllerDelayCommandView& params) {
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::ReadLocalSupportedControllerDelayCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto response_view = packet.view_t();
+  constexpr size_t kReadLocalSupportedControllerDelayOctet = 45;
+  if (settings_.supported_commands[kReadLocalSupportedControllerDelayOctet] &
+      static_cast<uint8_t>(
+          hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay)) {
+    response_view.status().Write(pwemb::StatusCode::SUCCESS);
+    response_view.min_controller_delay().Write(0);  // no delay
+    response_view.max_controller_delay().Write(
+        pwemb::ReadLocalSupportedControllerDelayCommandCompleteEvent::
+            max_delay_usecs());  // maximum allowable delay
+  } else {
+    response_view.status().Write(pwemb::StatusCode::UNKNOWN_COMMAND);
+  }
+
+  RespondWithCommandComplete(hci_spec::kReadLocalSupportedControllerDelay,
+                             &packet);
+}
+
 void FakeController::OnCommandPacketReceived(
     const PacketView<hci_spec::CommandHeader>& command_packet) {
   hci_spec::OpCode opcode = le16toh(command_packet.header().opcode);
@@ -4211,6 +4256,7 @@ void FakeController::HandleReceivedCommandPacket(
     case hci_spec::kLinkKeyRequestNegativeReply:
     case hci_spec::kReadEncryptionKeySize:
     case hci_spec::kReadLocalExtendedFeatures:
+    case hci_spec::kReadLocalSupportedControllerDelay:
     case hci_spec::kReadRemoteExtendedFeatures:
     case hci_spec::kReadRemoteSupportedFeatures:
     case hci_spec::kReadRemoteVersionInfo:
@@ -4581,6 +4627,13 @@ void FakeController::HandleReceivedCommandPacket(
           command_packet
               .view<pwemb::LESetExtendedAdvertisingParametersV1CommandView>();
       OnLESetExtendedAdvertisingParameters(params);
+      break;
+    }
+    case hci_spec::kReadLocalSupportedControllerDelay: {
+      const auto& params =
+          command_packet
+              .view<pwemb::ReadLocalSupportedControllerDelayCommandView>();
+      OnReadLocalSupportedControllerDelay(params);
       break;
     }
     default: {

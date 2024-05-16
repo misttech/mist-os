@@ -509,6 +509,14 @@ type Dhcp6PdInfo = table {
     3: hashed_pd_prefix vector<uint8>:32;
 };
 
+/// Link Metrics info of the neighbors.
+type LinkMetricsEntry = table {
+    /// Link Margin value of the neighbor
+    1: link_margin uint8;
+    /// RSSI value of the neighbor
+    2: rssi int8;
+};
+
 /// LoWPAN Interface Telemetry Information.
 ///
 /// The fields in this table are used for providing low-level telemetry and information about the
@@ -622,4 +630,9 @@ type Telemetry = table {
     ///
     /// Only present on Thread networks.
     23: dhcp6pd_info Dhcp6PdInfo;
+
+    /// Link Metrics Manager related info, if available.
+    ///
+    /// Only present on Thread networks.
+    24: link_metrics_entries vector<LinkMetricsEntry>:64;
 };

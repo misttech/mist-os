@@ -120,6 +120,18 @@ class CommandEvent final : public AnalyticsEvent {
   void FromCommandReport(const CommandReport& report);
 };
 
+class ConsoleType final : public AnalyticsEvent {
+ public:
+  explicit ConsoleType(const std::string& session_id);
+
+  enum class Type {
+    kCommandLine,
+    kDebugAdapter,
+  };
+
+  void SetConsoleType(Type type);
+};
+
 }  // namespace zxdb
 
 #endif  // SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_ANALYTICS_EVENT_H_

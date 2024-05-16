@@ -21,6 +21,8 @@
 #include <gtest/gtest.h>
 
 #include "fault_test.h"
+#include "linux/genetlink.h"
+#include "test_helper.h"
 
 #if !defined(__NR_memfd_create)
 #if defined(__x86_64__)
@@ -235,6 +237,76 @@ TEST_F(UnixSocketTest, ImmediatePeercredCheck) {
   ASSERT_NE(cred.pid, 0);
   ASSERT_NE(cred.uid, static_cast<uid_t>(-1));
   ASSERT_NE(cred.uid, static_cast<gid_t>(-1));
+}
+
+TEST(NetlinkSocket, RecvMsg) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+  }
+  int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+  ASSERT_GT(fd, 0);
+  test_helper::NetlinkEncoder encoder(GENL_ID_CTRL, NLM_F_REQUEST);
+  encoder.BeginGenetlinkHeader(CTRL_CMD_GETFAMILY);
+  encoder.BeginNla(CTRL_ATTR_FAMILY_NAME);
+  encoder.Write(TASKSTATS_GENL_NAME);
+  encoder.EndNla();
+  iovec iov = {};
+  encoder.Finalize(iov);
+  struct msghdr header = {};
+  header.msg_iov = &iov;
+  header.msg_iovlen = 1;
+
+  ASSERT_EQ(sendmsg(fd, &header, 0), static_cast<ssize_t>(iov.iov_len));
+  iov.iov_len = 0;
+  ssize_t received = recvmsg(fd, &header, MSG_PEEK | MSG_TRUNC);
+  ASSERT_GT(static_cast<size_t>(received), sizeof(nlmsghdr));
+  struct {
+    nlmsghdr hdr;
+    genlmsghdr genl;
+    // Family ID
+    nlattr id_attr;
+    __u16 id;
+    char padding;
+    // Family name
+    nlattr name_attr;
+    char name[sizeof(TASKSTATS_GENL_NAME)];
+    char padding_0;
+    // We should get one multicast group.
+    // It doesn't seem to matter what the ID
+    // or name of the group is.
+    nlattr multicast_group_attr;
+  } input;
+  iov.iov_len = sizeof(input);
+  iov.iov_base = &input;
+  received = recvmsg(fd, &header, 0);
+
+  ASSERT_EQ(static_cast<size_t>(received), sizeof(input));
+  ASSERT_EQ(input.id_attr.nla_type, CTRL_ATTR_FAMILY_ID);
+  ASSERT_EQ(input.genl.cmd, CTRL_CMD_NEWFAMILY);
+  ASSERT_EQ(input.name_attr.nla_type, CTRL_ATTR_FAMILY_NAME);
+  ASSERT_FALSE(memcmp(input.name, TASKSTATS_GENL_NAME, sizeof(input.name)));
+  ASSERT_EQ(input.multicast_group_attr.nla_type, CTRL_ATTR_MCAST_GROUPS);
+  struct {
+    nlmsghdr hdr;
+    genlmsghdr genl;
+  } input_2;
+
+  // Connect to TASKSTATS
+  encoder.StartMessage(input.id, NLM_F_REQUEST);
+  // We don't parse commands currently, so this number is arbitrary.
+  encoder.BeginGenetlinkHeader(42);
+  encoder.Finalize(iov);
+  ASSERT_EQ(sendmsg(fd, &header, 0), static_cast<ssize_t>(iov.iov_len));
+  iov.iov_base = &input_2;
+  iov.iov_len = sizeof(input_2);
+  // TASKSTATS payload
+  received = recvmsg(fd, &header, 0);
+  ASSERT_EQ(static_cast<size_t>(received), sizeof(input_2));
+  ASSERT_EQ(input_2.hdr.nlmsg_type, input.id);
+  // ACK payload
+  received = recvmsg(fd, &header, 0);
+  ASSERT_EQ(static_cast<size_t>(received), sizeof(input_2));
+  ASSERT_EQ(input_2.hdr.nlmsg_type, NLMSG_ERROR);
 }
 
 TEST(UnixSocket, SendZeroFds) {

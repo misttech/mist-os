@@ -104,33 +104,42 @@ std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(
   return std::make_shared<fctest::ChildOptions>(std::move(options));
 }
 
-std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(std::string_view name,
-                                                                 std::string_view as,
-                                                                 fcdecl::DependencyType type,
-                                                                 std::string_view path) {
+std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(
+    std::string_view name, cpp17::optional<std::string_view> as,
+    cpp17::optional<fcdecl::DependencyType> type, cpp17::optional<std::string_view> path,
+    cpp17::optional<std::string_view> from_dictionary) {
   fctest::Protocol capability;
   capability.set_name(std::string(name));
-  capability.set_as(std::string(as));
-  capability.set_type(type);
-  capability.set_path(std::string(path));
+  if (as.has_value()) {
+    capability.set_as(std::string(*as));
+  }
+  if (type.has_value()) {
+    capability.set_type(*type);
+  }
+  if (path.has_value()) {
+    capability.set_path(std::string(*path));
+  }
+  if (from_dictionary.has_value()) {
+    capability.set_from_dictionary(std::string(*from_dictionary));
+  }
   return std::make_shared<fctest::Capability>(
       fctest::Capability::WithProtocol(std::move(capability)));
 }
 
-std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(std::string_view name) {
-  fctest::Protocol capability;
-  capability.set_name(std::string(name));
-  return std::make_shared<fctest::Capability>(
-      fctest::Capability::WithProtocol(std::move(capability)));
-}
-
-std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(std::string_view name,
-                                                                std::string_view as,
-                                                                std::string_view path) {
+std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(
+    std::string_view name, cpp17::optional<std::string_view> as,
+    cpp17::optional<std::string_view> path, cpp17::optional<std::string_view> from_dictionary) {
   fctest::Service capability;
   capability.set_name(std::string(name));
-  capability.set_as(std::string(as));
-  capability.set_path(std::string(path));
+  if (as.has_value()) {
+    capability.set_as(std::string(*as));
+  }
+  if (path.has_value()) {
+    capability.set_path(std::string(*path));
+  }
+  if (from_dictionary.has_value()) {
+    capability.set_from_dictionary(std::string(*from_dictionary));
+  }
   return std::make_shared<fctest::Capability>(
       fctest::Capability::WithService(std::move(capability)));
 }
@@ -143,15 +152,30 @@ std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(std::string_view
 }
 
 std::shared_ptr<fctest::Capability> CreateFidlDirectoryCapability(
-    std::string_view name, std::string_view as, fcdecl::DependencyType type,
-    std::string_view subdir, fio::Operations rights, std::string_view path) {
+    std::string_view name, cpp17::optional<std::string_view> as,
+    cpp17::optional<fcdecl::DependencyType> type, cpp17::optional<std::string_view> subdir,
+    cpp17::optional<fio::Operations> rights, cpp17::optional<std::string_view> path,
+    cpp17::optional<std::string_view> from_dictionary) {
   fctest::Directory capability;
   capability.set_name(std::string(name));
-  capability.set_as(std::string(as));
-  capability.set_type(type);
-  capability.set_subdir(std::string(subdir));
-  capability.set_rights(rights);
-  capability.set_path(std::string(path));
+  if (as.has_value()) {
+    capability.set_as(std::string(*as));
+  }
+  if (type.has_value()) {
+    capability.set_type(*type);
+  }
+  if (subdir.has_value()) {
+    capability.set_subdir(std::string(*subdir));
+  }
+  if (rights.has_value()) {
+    capability.set_rights(*rights);
+  }
+  if (path.has_value()) {
+    capability.set_path(std::string(*path));
+  }
+  if (from_dictionary.has_value()) {
+    capability.set_from_dictionary(std::string(*from_dictionary));
+  }
   return std::make_shared<fctest::Capability>(
       fctest::Capability::WithDirectory(std::move(capability)));
 }

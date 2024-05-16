@@ -8,6 +8,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef, Signals, Socket, Status, Time};
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::{Error as IOError, Read, Write};
+use std::os::fd::AsFd as _;
 use std::sync::Arc;
 
 // Holding a reference to File so it lives as long as the associated socket. If the FD is closed
@@ -64,9 +65,9 @@ impl TestProcess {
         let (stdout_file, stdout_sock) = fdio::pipe_half().expect("Failed to make pipe");
         let (stderr_file, stderr_sock) = fdio::pipe_half().expect("Failed to make pipe");
         let mut spawn_actions = [
-            SpawnAction::clone_fd(&stdin_file, 0),
-            SpawnAction::clone_fd(&stdout_file, 1),
-            SpawnAction::clone_fd(&stderr_file, 2),
+            SpawnAction::clone_fd(stdin_file.as_fd(), 0),
+            SpawnAction::clone_fd(stdout_file.as_fd(), 1),
+            SpawnAction::clone_fd(stderr_file.as_fd(), 2),
         ];
 
         let cstrags: Vec<CString> = args.iter().map(|x| cstr(x)).collect();

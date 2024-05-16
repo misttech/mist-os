@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "content": {
+    "files": {
+      "meta/vkloop-test-child.cm": {
+        "hash": "b947ed18a72f62509d543ed81511d7976324c5143fa8b3ecc9661436dc7f31f0"
+      }
+    }
+  }
+}

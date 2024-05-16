@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
+
 use std::num::NonZeroU16;
 
 use assert_matches::assert_matches;
@@ -21,8 +25,9 @@ use netstack3_core::{
     sync::Mutex,
     testutil::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        ContextPair, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
+        CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
     },
+    CtxPair,
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::{
@@ -79,11 +84,11 @@ fn packet_socket_change_device_and_protocol_atomic() {
     let second_proto: NonZeroU16 = NonZeroU16::new(EtherType::Ipv6.into()).unwrap();
 
     loom_model(Default::default(), move || {
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let dev_indexes =
             [(); 2].map(|()| builder.add_device(UnicastAddr::new(DEVICE_MAC).unwrap()));
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
-        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
+        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
         let devs = dev_indexes.map(|i| indexes_to_device_ids[i].clone());
         drop(indexes_to_device_ids);
@@ -275,7 +280,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
     model.preemption_bound = Some(3);
 
     loom_model(model, move || {
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let dev_index = builder.add_device_with_ip(
             UnicastAddr::new(DEVICE_MAC).unwrap(),
             I::DEVICE_ADDR,
@@ -283,7 +288,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         );
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
-        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
+        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
         ctx.test_api()
             .add_route(
@@ -395,14 +400,14 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
 fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
     loom_model(Default::default(), move || {
-        let mut builder = FakeEventDispatcherBuilder::default();
+        let mut builder = FakeCtxBuilder::default();
         let dev_index = builder.add_device_with_ip(
             UnicastAddr::new(DEVICE_MAC).unwrap(),
             I::DEVICE_ADDR,
             I::DEVICE_SUBNET,
         );
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
-        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
+        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
 
         ctx.test_api()

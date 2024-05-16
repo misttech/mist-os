@@ -63,19 +63,20 @@ bool ValidateTopology(const fuchsia_hardware_audio_signalprocessing::Topology& t
 bool ValidateElements(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
 bool ValidateElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateDaiInterconnectElement(
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateDynamicsElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
-bool ValidateEndpointElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateEqualizerElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateGainElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateVendorSpecificElement(const fuchsia_hardware_audio_signalprocessing::Element& element);
 
 bool ValidateElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
-    const fuchsia_hardware_audio_signalprocessing::Element& element, bool from_client = true);
-bool ValidateDynamicsElementState(
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateDaiInterconnectElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
-    const fuchsia_hardware_audio_signalprocessing::Element& element, bool from_client = true);
-bool ValidateEndpointElementState(
+    const fuchsia_hardware_audio_signalprocessing::Element& element);
+bool ValidateDynamicsElementState(
     const fuchsia_hardware_audio_signalprocessing::ElementState& element_state,
     const fuchsia_hardware_audio_signalprocessing::Element& element);
 bool ValidateEqualizerElementState(

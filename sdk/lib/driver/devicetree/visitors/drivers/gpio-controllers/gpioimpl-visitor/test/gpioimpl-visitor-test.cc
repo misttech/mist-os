@@ -50,6 +50,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
   uint32_t node_tested_count = 0;
   uint32_t mgr_request_idx = 0;
+  uint32_t gpioA_id = 0;
   for (size_t i = 0; i < node_count; i++) {
     auto node =
         gpio_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
@@ -68,6 +69,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       fit::result controller_metadata =
           fidl::Unpersist<fuchsia_hardware_gpioimpl::ControllerMetadata>(metadata_blob0);
       ASSERT_TRUE(controller_metadata.is_ok());
+      gpioA_id = controller_metadata->id();
 
       // Init metadata.
       std::vector<uint8_t> metadata_blob1 = std::move(*(*metadata)[1].data());
@@ -162,7 +164,11 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
                     fuchsia_hardware_gpio::GpioFlags::kPullUp));
       node_tested_count++;
     }
+  }
 
+  for (size_t i = 0; i < node_count; i++) {
+    auto node =
+        gpio_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
     if (node.name()->find("audio") != std::string::npos) {
       node_tested_count++;
 
@@ -186,6 +192,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                                     bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
             fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN1))}},
           (*mgr_request.parents())[1].bind_rules(), false));
 
@@ -200,6 +207,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                                     bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
             fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN2))}},
           (*mgr_request.parents())[2].bind_rules(), false));
 

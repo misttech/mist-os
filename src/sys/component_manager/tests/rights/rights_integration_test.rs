@@ -95,7 +95,9 @@ async fn offer_dir_rights() {
 async fn invalid_use_in_offer_dir_rights_prevented() {
     run_test(
         "#meta/root_invalid_use_in_offer_dir_rights.cm",
-        "Directory rights test failed: /read_only - connection aborted",
+        "Directory rights test failed: /read_only - connection aborted\n\
+         Directory rights test failed: /read_exec - permission denied\n\
+         Directory rights test failed: /nested/read_exec - permission denied",
     )
     .await
 }

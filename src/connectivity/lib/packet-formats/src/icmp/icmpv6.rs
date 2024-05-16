@@ -9,15 +9,16 @@ use core::fmt;
 use net_types::ip::{Ipv6, Ipv6Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::{
-    byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
+    byteorder::network_endian::U32, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
+    Unaligned,
 };
 
 use crate::error::{ParseError, ParseResult};
 
 use super::common::{IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpTimeExceeded};
 use super::{
-    mld, ndp, peek_message_type, IcmpIpExt, IcmpMessageType, IcmpPacket, IcmpParseArgs,
-    IcmpUnusedCode, OriginalPacket,
+    mld, ndp, peek_message_type, HeaderPrefix, IcmpIpExt, IcmpMessageType, IcmpPacket,
+    IcmpParseArgs, IcmpUnusedCode, OriginalPacket,
 };
 
 /// An ICMPv6 packet with a dynamic message type.
@@ -37,6 +38,39 @@ pub enum Icmpv6Packet<B: ByteSlice> {
     EchoReply(IcmpPacket<Ipv6, B, IcmpEchoReply>),
     Ndp(ndp::NdpPacket<B>),
     Mld(mld::MldPacket<B>),
+}
+
+impl<B: ByteSliceMut> Icmpv6Packet<B> {
+    pub(super) fn header_prefix_mut(&mut self) -> &mut HeaderPrefix {
+        use Icmpv6Packet::*;
+        match self {
+            DestUnreachable(p) => &mut p.header.prefix,
+            PacketTooBig(p) => &mut p.header.prefix,
+            TimeExceeded(p) => &mut p.header.prefix,
+            ParameterProblem(p) => &mut p.header.prefix,
+            EchoRequest(p) => &mut p.header.prefix,
+            EchoReply(p) => &mut p.header.prefix,
+            Ndp(p) => {
+                use ndp::NdpPacket::*;
+                match p {
+                    RouterSolicitation(p) => &mut p.header.prefix,
+                    RouterAdvertisement(p) => &mut p.header.prefix,
+                    NeighborSolicitation(p) => &mut p.header.prefix,
+                    NeighborAdvertisement(p) => &mut p.header.prefix,
+                    Redirect(p) => &mut p.header.prefix,
+                }
+            }
+            Mld(p) => {
+                use mld::MldPacket::*;
+                match p {
+                    MulticastListenerQuery(p) => &mut p.header.prefix,
+                    MulticastListenerReport(p) => &mut p.header.prefix,
+                    MulticastListenerDone(p) => &mut p.header.prefix,
+                    MulticastListenerReportV2(p) => &mut p.header.prefix,
+                }
+            }
+        }
+    }
 }
 
 impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {

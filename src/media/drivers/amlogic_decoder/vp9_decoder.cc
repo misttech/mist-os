@@ -139,7 +139,7 @@ zx_status_t Vp9Decoder::BufferAllocator::AllocateBuffers(VideoDecoder::Owner* ow
     uint64_t rounded_up_size = fbl::round_up(buffer->size() + kBufferOverrunPaddingBytes,
                                              static_cast<uint32_t>(PAGE_SIZE));
     auto internal_buffer =
-        InternalBuffer::Create(buffer->name(), &owner->SysmemAllocatorSyncPtr(), owner->bti(),
+        InternalBuffer::Create(buffer->name(), &owner->SysmemAllocatorSync(), owner->bti(),
                                rounded_up_size, buffer_is_secure,
                                /*is_writable=*/true, /*is_mapping_needed=*/!buffer_is_secure);
     if (!internal_buffer.is_ok()) {
@@ -405,7 +405,7 @@ zx_status_t Vp9Decoder::InitializeBuffers() {
       mpred_buffer = std::move(cached_mpred_buffer);
     } else {
       auto internal_buffer = InternalBuffer::CreateAligned(
-          "Vp9MpredData", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(), rounded_up_size,
+          "Vp9MpredData", &owner_->SysmemAllocatorSync(), owner_->bti(), rounded_up_size,
           kMpredAlignment, is_secure(), /*is_writable=*/kMpredIsWritable,
           /*is_mapping_needed=*/kMpredIsMappingNeeded);
       if (!internal_buffer.is_ok()) {
@@ -465,9 +465,10 @@ zx_status_t Vp9Decoder::InitializeHardware() {
     }
     uint8_t* data;
     uint32_t firmware_size;
-    // TODO(https://fxbug.dev/42119806): In "CL3", we'll filter video_ucode.bin firmwares by current device,
-    // which will let loading by this more generic ID work, assuming new video_ucode.bin.  For now,
-    // if we were to take this path (which we don't), this would likely get the wrong firmware.
+    // TODO(https://fxbug.dev/42119806): In "CL3", we'll filter video_ucode.bin firmwares by current
+    // device, which will let loading by this more generic ID work, assuming new video_ucode.bin.
+    // For now, if we were to take this path (which we don't), this would likely get the wrong
+    // firmware.
     status = owner_->firmware_blob()->GetFirmwareData(FirmwareBlob::FirmwareType::kDec_Vp9_Mmu,
                                                       &data, &firmware_size);
     if (status != ZX_OK) {
@@ -1416,8 +1417,8 @@ void Vp9Decoder::PrepareNewFrame(bool params_checked_previously) {
   // same PTS if they're part of a superframe, but only one of the frames should
   // have show_frame set, so only that frame will be output with that PTS.
   //
-  // TODO(https://fxbug.dev/42126034): PtsManager needs to be able to help extend stream_offset from < 64 bits
-  // to 64 bits.
+  // TODO(https://fxbug.dev/42126034): PtsManager needs to be able to help extend stream_offset from
+  // < 64 bits to 64 bits.
   uint32_t stream_offset = HevcShiftByteCount::Get().ReadFrom(owner_->dosbus()).reg_value();
 
   // PtsManager does bit-extension to 64 bit stream offset.
@@ -1778,7 +1779,7 @@ zx_status_t Vp9Decoder::AllocateFrames() {
         ZX_DEBUG_ASSERT(!on_deck_internal_buffers_->compressed_headers_[i].present());
       } else {
         auto internal_buffer = InternalBuffer::CreateAligned(
-            "Vp9CompressedFrameHeader", &owner_->SysmemAllocatorSyncPtr(), owner_->bti(),
+            "Vp9CompressedFrameHeader", &owner_->SysmemAllocatorSync(), owner_->bti(),
             kCompressedHeaderSize, kCompressedHeaderAlignment, kCompressedHeaderIsSecure,
             kCompressedHeaderIsWritable, kCompressedHeaderIsMappingNeeded);
         if (!internal_buffer.is_ok()) {

@@ -8,7 +8,7 @@ use {
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
             routing::router_ext::{RouterExt, WeakComponentTokenExt},
-            routing::{self, route_and_open_capability},
+            routing::{self, route_and_open_capability_with_reporting},
         },
         sandbox_util::DictExt,
     },
@@ -280,12 +280,8 @@ async fn route_directory(
         }
         _ => panic!("not a directory or storage capability"),
     };
-    if let Err(e) = route_and_open_capability(&route_request, &target, open_request).await {
-        routing::report_routing_failure(&route_request, &target, &e).await;
-        Err(e)
-    } else {
-        Ok(())
-    }
+    route_and_open_capability_with_reporting(&route_request, &target, open_request).await?;
+    Ok(())
 }
 
 /// Makes a capability for the service/protocol described by `use_`. The service will be
@@ -398,15 +394,14 @@ fn service_or_protocol_use(
                     let _guard = request.scope().active_guard();
 
                     let route_request = RouteRequest::UseService(self.use_service_decl.clone());
-                    if let Err(e) =
-                        routing::route_and_open_capability(&route_request, &component, request)
-                            .await
-                    {
-                        routing::report_routing_failure(&route_request, &component, &e).await;
-                        Err(e.as_zx_status())
-                    } else {
-                        Ok(())
-                    }
+
+                    routing::route_and_open_capability_with_reporting(
+                        &route_request,
+                        &component,
+                        request,
+                    )
+                    .await
+                    .map_err(|e| e.as_zx_status())
                 }
             }
             Open::new(Arc::new(Service {
@@ -452,15 +447,13 @@ fn service_or_protocol_use(
 
                     request.prepend_path(&self.stream.target_path.to_string().try_into()?);
                     let route_request = RouteRequest::UseEventStream(self.stream.clone());
-                    if let Err(e) =
-                        routing::route_and_open_capability(&route_request, &component, request)
-                            .await
-                    {
-                        routing::report_routing_failure(&route_request, &component, &e).await;
-                        Err(e.as_zx_status())
-                    } else {
-                        Ok(())
-                    }
+                    routing::route_and_open_capability_with_reporting(
+                        &route_request,
+                        &component,
+                        request,
+                    )
+                    .await
+                    .map_err(|e| e.as_zx_status())
                 }
             }
             Open::new(Arc::new(UseEventStream { component: component.as_weak(), stream }))

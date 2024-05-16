@@ -52,6 +52,8 @@ included_ffx_plugins = [
 dual_mode_plugins = [
   "//src/developer/ffx/plugins/component:ffx_component",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
+  "//src/developer/ffx/plugins/emulator:ffx_emulator",
+  "//src/developer/ffx/plugins/package:ffx_package",
   "//src/developer/ffx/plugins/product:ffx_product",
   "//src/developer/ffx/plugins/repository:ffx_repository",
   "//src/developer/ffx/plugins/session:ffx_session",
@@ -63,6 +65,7 @@ all_ffx_plugins = required_ffx_plugins + dual_mode_plugins
 # Config default files from tools listed above so they can be included in
 # the build.
 dual_mode_defaults = [
+  "//src/developer/ffx/plugins/emulator/data/config.json",
   "//src/developer/ffx/plugins/product/data/config.json",
   "//src/developer/ffx/plugins/repository/data/config.json",
 ]

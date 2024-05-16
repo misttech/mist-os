@@ -12,6 +12,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+const OBSERVED_ID: &str = "1111222233334444111111111111111111111111111111111111111111111111";
+const IGNORED_ID: &str = "2222222233334444111111111111111111111111111111111111111111112222";
+
 #[fuchsia::main]
 async fn main() {
     let _inspect_server_task = inspect_runtime::publish(
@@ -42,6 +45,8 @@ impl TestState {
         integer_property_map.insert(2, ("integer_1".to_string(), 10));
         integer_property_map.insert(3, ("integer_2".to_string(), 20));
         integer_property_map.insert(4, ("integer_3".to_string(), 30));
+        integer_property_map.insert(5, (OBSERVED_ID.to_string(), 42));
+        integer_property_map.insert(6, (IGNORED_ID.to_string(), 17));
         Arc::new(Mutex::new(TestState {
             integer_property_map,
             optional_integer: None,

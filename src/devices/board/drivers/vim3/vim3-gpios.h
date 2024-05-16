@@ -71,9 +71,10 @@
 #define A311D_GPIOX_10_TDMA_FS_FN 1
 #define A311D_GPIOX_11_TDMA_SCLK_FN 1
 
-// Make the GPIO expander indices start after the SoC GPIOs to avoid any overlap.
-#define VIM3_EXPANDER_GPIO_START (A311D_GPIOE_START + A311D_GPIOE_COUNT)
-#define VIM3_EXPANDER_GPIO(n) (VIM3_EXPANDER_GPIO_START + (n))
+#define VIM3_GPIO_ID 1u
+#define VIM3_EXPANDER_GPIO_ID 2u
+
+#define VIM3_EXPANDER_GPIO(n) (n)
 
 #define VIM3_LCD_RESET VIM3_EXPANDER_GPIO(0)
 

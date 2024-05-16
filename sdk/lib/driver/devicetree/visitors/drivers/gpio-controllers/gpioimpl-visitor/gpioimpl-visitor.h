@@ -14,6 +14,8 @@
 #include <memory>
 #include <vector>
 
+#include <ddk/metadata/gpio.h>
+
 namespace gpio_impl_dt {
 
 class GpioImplVisitor : public fdf_devicetree::Visitor {
@@ -42,7 +44,7 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
 
  private:
   struct GpioController {
-    std::vector<uint8_t> gpio_pins_metadata;
+    std::vector<gpio_pin_t> gpio_pins_metadata;
     fuchsia_hardware_gpioimpl::InitMetadata init_steps;
   };
 
@@ -65,7 +67,8 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   zx::result<fdf_devicetree::ParentNode> GetGpioNodeForPinConfig(
       fdf_devicetree::ReferenceNode& cfg_node);
 
-  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin, std::string gpio_name);
+  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin, uint32_t controller_id,
+                                std::string gpio_name);
 
   zx::result<> AddInitNodeSpec(fdf_devicetree::Node& child);
 

@@ -40,7 +40,7 @@ TypeCPortState TypeCPortStateMachine::NextState(TypeCPortInput input,
         return current_state;
       }
       if (device_.sensors().detected_power_role() != usb_pd::PowerRole::kSink) {
-        FDF_LOG(DEBUG, "Sink-only, ignoring Source power state");
+        FDF_LOG(WARNING, "Sink-only, ignoring Source power state");
         return current_state;
       }
       return TypeCPortState::kSinkAttached;

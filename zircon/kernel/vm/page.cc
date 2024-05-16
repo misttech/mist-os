@@ -56,9 +56,10 @@ ktl::optional<vm_page::object_t::TrySetHasWaiterResult> vm_page::object_t::try_s
       return ktl::nullopt;
     }
     if (value & kObjectOrStackOwnerHasWaiter) {
-      // We rely on the current thread holding the thread_lock to know that the first thread which
-      // set kObjectOrStackOwnerHasWaiter on this page has also already returned from
-      // PrepareForWaiter() and released thread_lock.
+      // We rely on the current thread holding the StackOwnedLoanedPagesInterval
+      // lock to know that the first thread which set
+      // kObjectOrStackOwnerHasWaiter on this page has also already returned
+      // from PrepareForWaiter() and released the lock.
       result.first_setter = false;
       result.stack_owner = &stack_owner();
       return result;
@@ -70,13 +71,16 @@ ktl::optional<vm_page::object_t::TrySetHasWaiterResult> vm_page::object_t::try_s
     }
     break;
   }
-  // We now know that we hold the thread_lock, and kObjectOrStackOwnerHasWaiter is set, which means
-  // the StackOwnedLoanedPagesInterval can't be removed from the page or start deleting until
-  // the thread_lock is released.  We know this is the first thread to set
-  // kObjectOrStackOwnerHasWaiter on this page, and we know that other threads trying to call
-  // try_set_has_waiter() on this page will block until this thread releases thread_lock, so we
-  // know that those threads won't return from this method until after this thread returns from
-  // PrepareForWaiter() and releases thread_lock.
+
+  // We now know that we hold the SOLPI lock, and kObjectOrStackOwnerHasWaiter
+  // is set, which means the StackOwnedLoanedPagesInterval can't be removed from
+  // the page or start deleting until the lock is released and all waiters have
+  // been woken.  We know this is the first thread to set
+  // kObjectOrStackOwnerHasWaiter on this page, and we know that other threads
+  // trying to call try_set_has_waiter() on this page will block until this
+  // thread releases the lock, so we know that those threads won't return from
+  // this method until after this thread returns from PrepareForWaiter() and
+  // releases the lock.
   result.first_setter = true;
   result.stack_owner = &stack_owner();
   return result;

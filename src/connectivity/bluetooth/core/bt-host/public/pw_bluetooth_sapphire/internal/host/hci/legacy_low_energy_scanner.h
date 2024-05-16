@@ -5,9 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_LEGACY_LOW_ENERGY_SCANNER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_LEGACY_LOW_ENERGY_SCANNER_H_
 
-#include <memory>
-#include <unordered_map>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_scanner.h"
 
 namespace bt::hci {
@@ -57,6 +54,9 @@ class LegacyLowEnergyScanner final : public LowEnergyScanner {
                           bool resolved,
                           int8_t rssi,
                           const ByteBuffer& data);
+
+  std::vector<pw::bluetooth::emboss::LEAdvertisingReportDataView>
+  ParseAdvertisingReports(const EmbossEventPacket& event);
 
   // Event handler for HCI LE Advertising Report event.
   void OnAdvertisingReportEvent(const EmbossEventPacket& event);

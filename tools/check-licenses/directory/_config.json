@@ -5,9 +5,9 @@
             {
                 "notes": [
                     "This directory has a 'vendor' subdirectory that shouldn't",
-		    "be processed separately. Skip the directory for now to",
-		    "unblock developers, but investigate a better way of ignoring",
-		    "barrier directory names"
+                    "be processed separately. Skip the directory for now to",
+                    "unblock developers, but investigate a better way of ignoring",
+                    "barrier directory names"
                 ],
                 "paths": [
                     "third_party/android/platform/system/tools/aidl/build"
@@ -507,6 +507,14 @@
                 ],
                 "notes": [
                     "Temporary skip, to unblock checking in these third-party golib sources for building dev tools"
+                ]
+            },
+            {
+                "paths": [
+                    "third_party/chre/src/apps/nearby/third_party/contexthub/chre/util"
+                ],
+                "notes": [
+                    "Skip third party chre directory that doesn't contain a license file."
                 ]
             }
         ]

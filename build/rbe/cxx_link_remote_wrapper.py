@@ -13,6 +13,7 @@ Usage:
 import argparse
 import os
 import subprocess
+import stat
 import sys
 
 import cxx
@@ -28,6 +29,11 @@ from typing import Any, Iterable, Optional, Sequence
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 
+# standard '755' executable permissions
+_EXEC_PERMS = (
+    stat.S_IRWXU | (stat.S_IRGRP | stat.S_IXGRP) | (stat.S_IROTH | stat.S_IXOTH)
+)
+
 
 def msg(text: str):
     print(f"[{_SCRIPT_BASENAME}] {text}")
@@ -41,6 +47,17 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         add_help=True,  # Want this to exit after printing --help
     )
     remote_action.inherit_main_arg_parser_flags(parser)
+
+    group = parser.add_argument_group(
+        title="link remote wrapper",
+        description="linking remote action options",
+    )
+    group.add_argument(
+        "--output-is-executable",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Expect the main output of linking to be executable.  If true, set the executable bit on the main output's download stub if needed.  See (b/285030257).",
+    )
     return parser
 
 
@@ -120,6 +137,10 @@ class CxxLinkRemoteAction(object):
         return self.cxx_action.unwindlib or "libunwind"  # default
 
     @property
+    def primary_output(self) -> Optional[Path]:
+        return self.cxx_action.output_file
+
+    @property
     def depfile(self) -> Optional[Path]:
         return self.cxx_action.linker_depfile
 
@@ -175,7 +196,24 @@ class CxxLinkRemoteAction(object):
             return self._verify_remote_depfile()
             # self._rewrite_remote_depfile()
 
-        # TODO: if downloads were skipped, need to force-download depfile
+        # Note: --download_outputs=false is re-interpreted so that depfiles
+        # will always be downloaded.
+        # Search in this file for 'translated_remote_options'.
+
+        # TODO(b/285030257): This is a workaround to a problem where
+        # download stubs need the appropriate execution permissions
+        # to be set, so that remote execution inputs get the same
+        # permissions.  This is important for tools that mirror execution
+        # bits from inputs to outputs, like llvm-objcopy.
+        # Once re-client presents permission information in the
+        # --action_log (reproxy remote_metadata), this workaround can
+        # be replaced with a more generalized solution.
+        if (
+            self.remote_action.skipping_some_download
+            and self._main_args.output_is_executable
+        ):
+            self.primary_output.chmod(_EXEC_PERMS)
+
         return 0
 
     def _verify_remote_depfile(self) -> int:

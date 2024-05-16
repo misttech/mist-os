@@ -135,7 +135,7 @@ class PmmNode {
   // |FillFreePagesAndArm|.
   //
   // Returns true if the checker was enabled with the requested fill_size, or |false| otherwise.
-  bool EnableFreePageFilling(size_t fill_size, PmmChecker::Action action);
+  bool EnableFreePageFilling(size_t fill_size, CheckFailAction action);
 
   // Return a pointer to this object's free fill checker.
   //

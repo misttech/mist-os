@@ -16,7 +16,7 @@ use starnix_logging::bug_ref;
 use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{Capabilities, FsCred, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
-    error,
+    errno, error,
     errors::Errno,
     file_mode::mode,
 };
@@ -494,8 +494,38 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
+        dir.subdir(current_task, "verity", 0o555, |dir| {
+            dir.entry(
+                current_task,
+                "require_signatures",
+                VerityRequireSignaturesFile::new_node(),
+                mode,
+            );
+        });
     });
     dir.build(current_task)
+}
+
+struct VerityRequireSignaturesFile;
+
+impl VerityRequireSignaturesFile {
+    fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self)
+    }
+}
+
+impl BytesFileOps for VerityRequireSignaturesFile {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
+        let clean_state_str = state_str.split('\n').next().unwrap_or("");
+        if clean_state_str != "0" {
+            return Err(errno!(EINVAL));
+        }
+        Ok(())
+    }
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(Cow::Borrowed(&b"0\n"[..]))
+    }
 }
 
 pub struct SystemLimits {

@@ -63,6 +63,46 @@ import("//build/group_with_inputs.gni")
 #    metadata. If the target isn't a bootfs_files_for_assembly target, it will
 #    cause an error like:
 #      "no dependency provides the input <package_name>/bootfs_files.json"
+#
+#  compiled_packages [optional]
+#     [list of GN scopes] List of GN scopes of `CompiledPackageDefinition`s
+#     that describe packages that are to be built dynamically by Assembly, for
+#     example, the `core` package. This is passed directly through to the AIB
+#     config so all paths should be rebased by the caller.
+#
+#     Example:
+#
+#     # Add a core shard
+#     compiled_packages = [
+#       {
+#         name = "core"
+#         components = [
+#           {
+#             component_name = "core"
+#             shards = [
+#                     "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
+#             ]
+#           },
+#           ...
+#         ],
+#         contents = [ {
+#           label = "//some/gn/label"
+#           source = "//som/gn/file/path"
+#           destination = "foo/bar"
+#         } ]
+#       },
+#     ]
+#
+#     shards [optional]
+#       [list of GN file paths] List of CML files to merge together when
+#       compiling the component.
+#
+#     contents [optional]
+#       [list of GN scopes] List of GN scopes that describe a source/destination
+#       pair for a file to include in the package when it's compiled.  An
+#       optional 'label' field is required when the file is created by the
+#       build, and is the label of the target that creates the file.
+#
 template("assembly_developer_overrides") {
   labels = {
     # So it can be reused.
@@ -114,6 +154,59 @@ template("assembly_developer_overrides") {
     }
   }
 
+  _compiled_packages = []
+  if (defined(invoker.compiled_packages)) {
+    foreach(package, invoker.compiled_packages) {
+      _package = {
+      }
+      _package = {
+        forward_variables_from(package,
+                               "*",
+                               [
+                                 "contents",
+                                 "components",
+                                 "component_includes",
+                               ])
+      }
+
+      # Rebase and gather inputs for the contents and component shards
+
+      # Gather the deps and inputs files for the package contents.
+      if (defined(package.contents)) {
+        _contents = []
+        foreach(entry, package.contents) {
+          creation_inputs += [ entry.source ]
+          creation_deps += [ entry.label ]
+
+          _contents += [
+            {
+              destination = entry.destination
+              source = rebase_path("${entry.source}", root_build_dir)
+            },
+          ]
+        }
+        _package.contents = _contents
+      }
+
+      # Gather the core shards as input files
+      if (defined(package.components)) {
+        components = []
+        foreach(entry, package.components) {
+          creation_inputs += entry.shards
+          components += [
+            {
+              forward_variables_from(entry, "*", [ "shards" ])
+              shards = rebase_path(entry.shards, root_build_dir)
+            },
+          ]
+        }
+        _package.components = components
+      }
+
+      _compiled_packages += [ _package ]
+    }
+  }
+
   _assembly_overrides = {
     target_name = get_label_info(":$target_name", "label_no_toolchain")
     forward_variables_from(invoker,
@@ -123,6 +216,7 @@ template("assembly_developer_overrides") {
                              "kernel",
                            ])
     packages = _packages
+    packages_to_compile = _compiled_packages
   }
 
   # Generate the overrides configuration file itself.

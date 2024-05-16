@@ -13,4 +13,11 @@
             },
         ],
     },
+    use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+    ],
 }

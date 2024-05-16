@@ -89,7 +89,6 @@ class DisplayEngine final : public DisplayEngineInterface {
       size_t* out_client_composition_opcodes_actual) override;
   void ApplyConfiguration(cpp20::span<const display_config_t> display_configs,
                           const config_stamp_t* banjo_config_stamp) override;
-  void SetEld(display::DisplayId display_id, cpp20::span<const uint8_t> raw_eld) override;
   zx::result<> SetBufferCollectionConstraints(
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId driver_buffer_collection_id) override;

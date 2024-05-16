@@ -32,11 +32,42 @@ bazel_fuchsia_test_package("aml-usb-phy-test-package") {
       max_severity = "ERROR"
     }
   }
+  inputs = [
+    "aml-usb-phy.cc",
+    "aml-usb-phy.h",
+    "aml-usb-phy-device.cc",
+    "aml-usb-phy-device.h",
+    "aml-usb-phy-test.cc",
+    "power-regs.h",
+    "usb-phy-base.h",
+    "usb-phy-regs.h",
+    "usb-phy2.cc",
+    "usb-phy2.h",
+    "usb-phy2-regs.h",
+    "usb-phy3.cc",
+    "usb-phy3.h",
+    "usb-phy3-regs.h",
+  ]
 }
 
 bazel_driver_package("bazel_package") {
   bazel_target = "//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy"
   package_name = "aml-usb-phy"
+  inputs = [
+    "aml-usb-phy.cc",
+    "aml-usb-phy.h",
+    "aml-usb-phy-device.cc",
+    "aml-usb-phy-device.h",
+    "power-regs.h",
+    "usb-phy-base.h",
+    "usb-phy-regs.h",
+    "usb-phy2.cc",
+    "usb-phy2.h",
+    "usb-phy2-regs.h",
+    "usb-phy3.cc",
+    "usb-phy3.h",
+    "usb-phy3-regs.h",
+  ]
 }
 
 source_set("common") {

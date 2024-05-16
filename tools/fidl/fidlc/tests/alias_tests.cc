@@ -186,7 +186,7 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto vector_type = static_cast<const VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, Type::Kind::kString);
-  ASSERT_EQ(vector_type->ElementCount(), SizeValue::Max().value);
+  ASSERT_EQ(vector_type->ElementCount(), kMaxSize);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
@@ -286,7 +286,7 @@ alias alias_of_vector_of_string_nullable = vector<string>:optional;
 
   auto vector_type = static_cast<const VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, Type::Kind::kString);
-  ASSERT_EQ(vector_type->ElementCount(), SizeValue::Max().value);
+  ASSERT_EQ(vector_type->ElementCount(), kMaxSize);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);
@@ -318,7 +318,7 @@ alias alias_of_vector_of_string = vector<string>;
 
   auto vector_type = static_cast<const VectorType*>(type);
   ASSERT_EQ(vector_type->element_type->kind, Type::Kind::kString);
-  ASSERT_EQ(vector_type->ElementCount(), SizeValue::Max().value);
+  ASSERT_EQ(vector_type->ElementCount(), kMaxSize);
 
   auto invocation = msg->members[0].type_ctor->resolved_params;
   ASSERT_NE(invocation.from_alias, nullptr);

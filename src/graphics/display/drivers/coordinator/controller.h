@@ -89,14 +89,13 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void PrepareStop();
   void Stop();
 
-  void DisplayControllerInterfaceOnDisplaysChanged(const added_display_args_t* displays_added,
-                                                   size_t added_count,
-                                                   const uint64_t* displays_removed,
-                                                   size_t removed_count);
+  // fuchsia.hardware.display.controller/DisplayControllerInterface:
+  void DisplayControllerInterfaceOnDisplayAdded(const added_display_args_t* added_display);
+  void DisplayControllerInterfaceOnDisplayRemoved(uint64_t display_id);
   void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
-
   void DisplayControllerInterfaceOnCaptureComplete();
+
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   void ShowActiveDisplay();
@@ -165,6 +164,9 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
+
+  zx::result<> AddDisplay(const added_display_args_t& banjo_added_display_args);
+  zx::result<> RemoveDisplay(DisplayId display_id);
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.

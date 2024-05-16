@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("//zircon/kernel/params.gni")
 
 source_set("lib") {
@@ -80,10 +79,6 @@ fuchsia_component("profiler_component") {
 fuchsia_package("profiler") {
   testonly = true
   deps = [ ":profiler_component" ]
-}
-
-core_shard("profiler_core_shard") {
-  shard_file = "meta/profiler.core_shard.cml"
 }
 
 group("tests") {

@@ -256,16 +256,12 @@ void EmulatorDevice::WatchLegacyAdvertisingStates(
   MaybeUpdateLegacyAdvertisingStates();
 }
 
-void EmulatorDevice::GetFeatures(GetFeaturesCompleter::Sync& completer) {
-  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
-}
-
-void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
-                                   EncodeCommandCompleter::Sync& completer) {
+void EmulatorDevice::NewEncodeCommand(NewEncodeCommandRequestView request,
+                                      NewEncodeCommandCompleter::Sync& completer) {
   uint8_t data_buffer[bt_hci_broadcom::kBcmSetAclPriorityCmdSize];
-  switch (request->command.Which()) {
-    case fuchsia_hardware_bluetooth::wire::BtVendorCommand::Tag::kSetAclPriority: {
-      EncodeSetAclPriorityCommand(request->command.set_acl_priority(), data_buffer);
+  switch (request->Which()) {
+    case fuchsia_hardware_bluetooth::wire::VendorCommand::Tag::kSetAclPriority: {
+      EncodeSetAclPriorityCommand(request->set_acl_priority(), data_buffer);
       auto encoded_cmd = fidl::VectorView<uint8_t>::FromExternal(
           data_buffer, bt_hci_broadcom::kBcmSetAclPriorityCmdSize);
       completer.ReplySuccess(encoded_cmd);
@@ -370,6 +366,18 @@ void EmulatorDevice::ConnectEmulator(
 void EmulatorDevice::ConnectVendor(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
   vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    std::move(request), this, fidl::kIgnoreBindingClosure);
+
+  vendor_binding_group_.ForEachBinding(
+      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
+        fidl::Arena arena;
+        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
+        builder.acl_priority_command(true);
+        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
+
+        if (status.status() != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
+        }
+      });
 }
 
 void EmulatorDevice::StartEmulatorInterface(fidl::ServerEnd<ftest::HciEmulator> request) {
@@ -456,7 +464,14 @@ zx_status_t EmulatorDevice::AddHciDeviceChildNode() {
 }
 
 void EmulatorDevice::EncodeSetAclPriorityCommand(
-    fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer) {
+    fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer) {
+  if (!params.has_connection_handle() || !params.has_priority() || !params.has_direction()) {
+    FDF_LOG(ERROR,
+            "The command cannot be encoded because the following fields are missing: %s %s %s",
+            params.has_connection_handle() ? "" : "connection_handle",
+            params.has_priority() ? "" : "priority", params.has_direction() ? "" : "direction");
+    return;
+  }
   bt_hci_broadcom::BcmSetAclPriorityCmd command = {
       .header =
           {
@@ -464,11 +479,11 @@ void EmulatorDevice::EncodeSetAclPriorityCommand(
               .parameter_total_size = sizeof(bt_hci_broadcom::BcmSetAclPriorityCmd) -
                                       sizeof(bt_hci_broadcom::HciCommandHeader),
           },
-      .connection_handle = htole16(params.connection_handle),
-      .priority = (params.priority == fuchsia_hardware_bluetooth::BtVendorAclPriority::kNormal)
+      .connection_handle = htole16(params.connection_handle()),
+      .priority = (params.priority() == fuchsia_hardware_bluetooth::VendorAclPriority::kNormal)
                       ? bt_hci_broadcom::kBcmAclPriorityNormal
                       : bt_hci_broadcom::kBcmAclPriorityHigh,
-      .direction = (params.direction == fuchsia_hardware_bluetooth::BtVendorAclDirection::kSource)
+      .direction = (params.direction() == fuchsia_hardware_bluetooth::VendorAclDirection::kSource)
                        ? bt_hci_broadcom::kBcmAclDirectionSource
                        : bt_hci_broadcom::kBcmAclDirectionSink,
   };

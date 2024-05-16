@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("sessions") {
   testonly = true
@@ -91,8 +90,4 @@ fuchsia_component("component") {
 
 fuchsia_package("mediasession") {
   deps = [ ":component" ]
-}
-
-core_shard("mediasession_core_shard") {
-  shard_file = "meta/mediasession.core_shard.cml"
 }

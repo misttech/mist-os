@@ -21,7 +21,8 @@ using ::cobalt::ErrorToString;
 using fuchsia::metrics::MetricEventLoggerFactory;
 using fxl::StringPrintf;
 
-constexpr uint32_t kMaxPendingEvents = 100000u;
+// Keep this under 1750 so we can't overflow the cobalt channel.
+constexpr uint32_t kMaxPendingEvents = 1700u;
 
 uint64_t CurrentTimeUSecs(const std::unique_ptr<timekeeper::Clock>& clock) {
   return zx::nsec(clock->Now().get()).to_usecs();
@@ -117,13 +118,23 @@ void Logger::RetryConnectingToLogger() {
 void Logger::LogEvent(Event event) {
   FX_CHECK(!shut_down_);
   if (pending_events_.size() >= kMaxPendingEvents) {
-    FX_LOGS(INFO) << StringPrintf("Dropping Cobalt event %s - too many pending events (%lu)",
-                                  event.ToString().c_str(), pending_events_.size());
+    // Drop event
+    dropped_events_since_last_report_++;
+    auto now = zx::clock::get_monotonic();
+    if (now < droped_events_next_report_permitted_) {
+      // Avoid logging to because not enough time has passed since the last report.
+      return;
+    }
+    FX_LOGS(WARNING) << StringPrintf(
+        "Dropped %lu Cobalt events (event: %s) - too many pending events (%lu)",
+        dropped_events_since_last_report_, event.ToString().c_str(), pending_events_.size());
+    dropped_events_since_last_report_ = 0;
+    droped_events_next_report_permitted_ = now + zx::sec(1);
     return;
   }
 
   const uint64_t event_id = next_event_id_++;
-  pending_events_.insert(std::make_pair(event_id, std::move(event)));
+  pending_events_.emplace(event_id, std::move(event));
   SendEvent(event_id);
 }
 

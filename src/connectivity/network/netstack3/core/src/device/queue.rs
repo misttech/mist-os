@@ -11,7 +11,7 @@ pub(crate) mod tx;
 
 use alloc::collections::VecDeque;
 
-use crate::{device::DeviceSendFrameError, work_queue::WorkQueueReport};
+use crate::{device::DeviceSendFrameError, types::WorkQueueReport};
 
 /// The maximum number of elements that can be in the RX queue.
 const MAX_RX_QUEUED_LEN: usize = 10000;

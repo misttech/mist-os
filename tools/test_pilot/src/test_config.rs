@@ -15,7 +15,7 @@ pub struct TestConfigV1 {
 
     /// Specifies requested features for the test.
     #[serde(default)]
-    pub requested_features: RequestedFeatures,
+    pub requested_vars: RequestedVars,
 
     /// Defines the configuration that is directly passed to the Host test binary.
     #[serde(default)]
@@ -26,7 +26,7 @@ pub struct TestConfigV1 {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "version")]
 pub enum TestConfiguration {
-    #[serde(rename = "1")]
+    #[serde(rename = "0.1")]
     V1 {
         #[serde(flatten)]
         config: TestConfigV1,
@@ -47,18 +47,14 @@ pub struct TestTag {
 
 /// Specifies requested features for the test.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
-pub struct RequestedFeatures {
-    /// True if this test requires a path to SDK tools.
-    #[serde(default)]
-    pub sdk_tools_path: bool,
+pub struct RequestedVars {
+    /// List of known env variables which are required by the test.
+    #[serde(default, alias = "KNOWN_VARS")]
+    pub known_vars: Vec<String>,
 
-    /// True if this test requires a Fuchsia system.
-    #[serde(default)]
-    pub requires_target: bool,
-
-    /// True if the tests should be executed over serial.
-    #[serde(default)]
-    pub requires_serial: bool,
+    /// Extra variables required by the test.
+    #[serde(default, alias = "EXTRA_VARS")]
+    pub extra_vars: Vec<String>,
 }
 
 impl TryFrom<&Path> for TestConfiguration {
@@ -87,15 +83,14 @@ mod tests {
         let mut temp_file = NamedTempFile::new().unwrap();
         let test_data = json!({
             "environment": {},
-            "version": "1",
+            "version": "0.1",
             "tags": [
                 { "key": "tag1", "value": "value1" },
                 { "key": "tag2", "value": "value2" }
             ],
-            "requested_features": {
-                "sdk_tools_path": true,
-                "requires_target": false,
-                "requires_serial": true
+            "requested_vars": {
+                "KNOWN_VARS": ["FUCHSIA_SDK_TOOL_PATH"],
+                "EXTRA_VARS": ["FOO", "BAR"]
             },
             "execution": {
                 "some_object": { "some_key": "val" },
@@ -114,10 +109,9 @@ mod tests {
                     TestTag { key: "tag1".to_string(), value: "value1".to_string() },
                     TestTag { key: "tag2".to_string(), value: "value2".to_string() },
                 ],
-                requested_features: RequestedFeatures {
-                    sdk_tools_path: true,
-                    requires_target: false,
-                    requires_serial: true,
+                requested_vars: RequestedVars {
+                    known_vars: vec!["FUCHSIA_SDK_TOOL_PATH".into()],
+                    extra_vars: vec!["FOO".into(), "BAR".into()],
                 },
                 execution: json!({
                     "some_object": { "some_key": "val" },
@@ -134,7 +128,7 @@ mod tests {
         let mut temp_file = NamedTempFile::new().unwrap();
         let test_data = json!({
             "environment": {}, // extra value in config file
-            "version": "1",
+            "version": "0.1",
         });
 
         temp_file.write_all(test_data.to_string().as_bytes()).unwrap();
@@ -145,11 +139,7 @@ mod tests {
             test_config,
             TestConfigV1 {
                 tags: vec![],
-                requested_features: RequestedFeatures {
-                    sdk_tools_path: false,
-                    requires_target: false,
-                    requires_serial: false,
-                },
+                requested_vars: RequestedVars { known_vars: vec![], extra_vars: vec![] },
                 execution: serde_json::Value::default(),
             }
             .into()
@@ -191,11 +181,6 @@ mod tests {
         let test_data = json!({
             "tags": [],
             "version": "1.0",
-            "requested_features": {
-                "sdk_tools_path": false,
-                "requires_target": true,
-                "requires_serial": false
-            },
             "execution": {}
         });
 
@@ -203,7 +188,7 @@ mod tests {
         let file_path = temp_file.path();
         let err = TestConfiguration::try_from(file_path).expect_err("parsing should error out");
         let err_str = format!("{}", err);
-        assert!(err_str.contains("unknown variant `1.0`, expected `1`"), "{}", err_str);
+        assert!(err_str.contains("unknown variant `1.0`, expected `0.1`"), "{}", err_str);
         temp_file.close().expect("Failed to close temporary file");
     }
 }

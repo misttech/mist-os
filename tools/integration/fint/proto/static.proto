@@ -107,6 +107,8 @@ message Static {
 
   // Whether to use goma for running ninja. Will be ignored (and goma will not
   // be used) when building with some experimental toolchain versions.
+  // *** Goma is deprecated, this variable will be removed. ***
+  // See b/340581192 and b/340582840.
   bool use_goma = 23;
 
   // Whether to use a go cache when building.

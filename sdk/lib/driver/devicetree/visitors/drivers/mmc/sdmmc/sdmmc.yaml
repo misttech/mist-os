@@ -38,6 +38,11 @@ properties:
     description: HSDDR modes are not supported.
     $ref: /schemas/types.yaml#/definitions/flag
 
+  use-fidl:
+    description:
+      TODO(https://fxbug.dev/42084501) Temporary field to support banjo-to-fidl migration.
+    $ref: /schemas/types.yaml#/definitions/flag
+
 additionalProperties: true
 
 examples:

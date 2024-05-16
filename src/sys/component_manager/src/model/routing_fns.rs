@@ -56,12 +56,8 @@ impl DirectoryEntryAsync for RouteEntry {
             }
         };
 
-        if let Err(e) = routing::route_and_open_capability(&self.request, &component, request).await
-        {
-            routing::report_routing_failure(&self.request, &component, &e).await;
-            Err(e.as_zx_status())
-        } else {
-            Ok(())
-        }
+        routing::route_and_open_capability_with_reporting(&self.request, &component, request)
+            .await
+            .map_err(|e| e.as_zx_status())
     }
 }

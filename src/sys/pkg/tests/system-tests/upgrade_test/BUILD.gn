@@ -26,6 +26,7 @@ if (is_host) {
     non_go_deps = [ "//src/sys/pkg/tests/system-tests:non_go_deps" ]
     sources = [
       "config.go",
+      "ota.go",
       "upgrade_test.go",
     ]
   }

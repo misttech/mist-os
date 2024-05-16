@@ -245,6 +245,54 @@ pub(crate) mod testutil {
     }
 }
 
+/// Test utilities implementations for base crate test types.
+#[cfg(feature = "testutils")]
+mod base_testutil {
+    use super::*;
+
+    impl InterfaceProperties<()> for netstack3_base::testutil::FakeDeviceId {
+        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _: &str) -> bool {
+            unimplemented!()
+        }
+
+        fn device_class_matches(&self, _: &()) -> bool {
+            unimplemented!()
+        }
+    }
+
+    impl InterfaceProperties<()> for netstack3_base::testutil::FakeReferencyDeviceId {
+        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _: &str) -> bool {
+            unimplemented!()
+        }
+
+        fn device_class_matches(&self, _: &()) -> bool {
+            unimplemented!()
+        }
+    }
+
+    impl InterfaceProperties<()> for netstack3_base::testutil::MultipleDevicesId {
+        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
+            unimplemented!()
+        }
+
+        fn name_matches(&self, _: &str) -> bool {
+            unimplemented!()
+        }
+
+        fn device_class_matches(&self, _: &()) -> bool {
+            unimplemented!()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ip_test_macro::ip_test;

@@ -27,7 +27,7 @@ FactoryServer::~FactoryServer() {
 }
 
 fpromise::result<std::unique_ptr<FactoryServer>, zx_status_t> FactoryServer::Create(
-    fuchsia::sysmem::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
+    fuchsia::sysmem2::AllocatorHandle allocator, fuchsia::camera3::DeviceWatcherHandle watcher,
     fit::closure stop_callback) {
   auto server = std::make_unique<FactoryServer>();
 
@@ -129,8 +129,8 @@ void FactoryServer::CaptureFrames(std::string dir_path, CaptureFramesCallback ca
                             return;
                           }
 
-                          // TODO(https://fxbug.dev/42136461): Check if frame->properties_.image_format ==
-                          // fuchsia::sysmem::PixelFormatType::NV12
+                          // TODO(https://fxbug.dev/42136461): Check if
+                          // frame->properties_.image_format == fuchsia::images2::PixelFormat::NV12
                           if (bypass_) {
                             frame->WritePNGUnprocessed(filefp, true);
                           } else {

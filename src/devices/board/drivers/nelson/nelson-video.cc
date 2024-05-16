@@ -144,7 +144,8 @@ zx_status_t Nelson::VideoInit() {
           {
               fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
+              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
+                                bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
           },
   }};
 
@@ -160,7 +161,7 @@ zx_status_t Nelson::VideoInit() {
           {
               fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
                                 bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS),
+              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_DOS),
           },
   }};
 

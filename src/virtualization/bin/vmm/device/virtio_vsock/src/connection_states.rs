@@ -482,7 +482,7 @@ impl ReadWrite {
                         }
                         SocketState::Ready
                     }
-                    Ok(ReadableState::Closed | ReadableState::ReadableAndClosed) => {
+                    Ok(ReadableState::MaybeReadableAndClosed) => {
                         if outstanding_bytes.unwrap_or(0) == 0 {
                             SocketState::Closed
                         } else {

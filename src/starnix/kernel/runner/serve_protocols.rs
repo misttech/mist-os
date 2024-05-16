@@ -12,6 +12,7 @@ use fidl_fuchsia_starnix_device as fstardevice;
 use fuchsia_async::{
     DurationExt, {self as fasync},
 };
+use fuchsia_zircon as zx;
 use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, TryStreamExt};
 use starnix_core::{
     execution::execute_task_with_prerun_result,
@@ -210,6 +211,16 @@ pub async fn serve_container_controller(
                                 ..Default::default()
                             });
                     }
+                }
+                fstarcontainer::ControllerRequest::GetJobHandle { responder } => {
+                    let _result = responder.send(fstarcontainer::ControllerGetJobHandleResponse {
+                        job: Some(
+                            fuchsia_runtime::job_default()
+                                .duplicate(zx::Rights::SAME_RIGHTS)
+                                .expect("Failed to dup handle"),
+                        ),
+                        ..Default::default()
+                    });
                 }
                 fstarcontainer::ControllerRequest::_UnknownMethod { .. } => (),
             }

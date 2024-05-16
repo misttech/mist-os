@@ -194,11 +194,13 @@ async fn create_system_activity_governor_realm(
 ) -> anyhow::Result<(RealmProxyClient, String, tsc::DeviceProxy)> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
     let (client, server) = create_endpoints();
-    let (result, suspend_control_client_end) = realm_factory
+    let result = realm_factory
         .create_realm(server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
-    Ok((RealmProxyClient::from(client), result, suspend_control_client_end.into_proxy().unwrap()))
+    let client = RealmProxyClient::from(client);
+    let suspend_control = client.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    Ok((client, result, suspend_control))
 }
 
 async fn set_up_default_suspender(device: &tsc::DeviceProxy) {

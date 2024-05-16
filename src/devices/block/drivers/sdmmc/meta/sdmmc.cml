@@ -17,8 +17,18 @@
     capabilities: [
         { service: "fuchsia.hardware.rpmb.Service" },
         { service: "fuchsia.hardware.sdio.Service" },
+        { service: "fuchsia.hardware.sdio.DriverService" },
     ],
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+        { protocol: "fuchsia.power.broker.Topology" },
+
+        // Used by //sdk/lib/driver/power/cpp
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
@@ -31,6 +41,10 @@
         },
         {
             service: "fuchsia.hardware.sdio.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.sdio.DriverService",
             from: "self",
         },
     ],

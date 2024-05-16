@@ -80,9 +80,8 @@ benefits of worktree checkouts:
 ### `./multifuchsia enter $checkout`
 
 creates an isolated shell environment where the `$checkout` directory is
-bind-mounted on your chosen `$MOUNTPOINT`. If goma is enabled in your build, it
-will also start some isolated goma proxies inside the environment (so that they
-can see the bind-mounted files). Other processes on your machine will not see
+bind-mounted on your chosen `$MOUNTPOINT`.
+Other processes on your machine will not see
 the bind mount, only those run inside the shell started by `./multifuchsia
 enter` will see it. When finished, use `exit` or Ctrl+D (EOF) to leave. Since
 the bind mount is isolated, you can have different shells entered into different
@@ -106,7 +105,7 @@ sure if I want to keep that behavior. Maybe that should only be for `mfcd`?
 Note2: `./multifuchsia mount` fails if it can't unmount what is already mounted
 on the mountpoint. The most common problem is a shell which is `cd`ed into the
 mountpoint. Some other common causes include: `ffx` daemons, `fx shell`
-connections, `goma`, and the vscode remote server. `lsof $MOUNTPOINT` and `fuser
+connections, and the vscode remote server. `lsof $MOUNTPOINT` and `fuser
 -m $MOUNTPOINT` can find most causes, but for some reason not all. Anyway, it's
 not usually too hard to look through the running processes and find one which is
 using it, then kill it.
@@ -204,11 +203,6 @@ TriggeredBy: ● fuchsia_update_and_build.timer
     Process: 2220247 ExecStart=/usr/local/google/home/computerdruid/extra_data/fuchsia/external/tools/multifuchsia/systemd/../multifuchsia sync_and_build_here (code=exited, status=2)
    Main PID: 2220247 (code=exited, status=2)
         CPU: 1h 8min 16.578s
-Jun 08 15:06:10 earthshaker.mtv.corp.google.com multifuchsia[2257689]: Killing compiler proxy.
-Jun 08 15:06:10 earthshaker.mtv.corp.google.com multifuchsia[2257689]: compiler proxy status: http://127.0.0.1:8088 quit!
-Jun 08 15:06:10 earthshaker.mtv.corp.google.com multifuchsia[2257689]: Wait for compiler_proxy process to terminate...
-Jun 08 15:06:10 earthshaker.mtv.corp.google.com multifuchsia[2257689]: 5
-Jun 08 15:06:11 earthshaker.mtv.corp.google.com multifuchsia[2257689]: using /run/user/340321/goma_computerdruid_fuchsia as tmpdir
 Jun 08 15:06:11 earthshaker.mtv.corp.google.com multifuchsia[2220251]: ./multifuchsia: line 571: syntax error near unexpected token `)'
 Jun 08 15:06:11 earthshaker.mtv.corp.google.com systemd[5762]: fuchsia_update_and_build.service: Main process exited, code=exited, status=2/INVALIDARGUMENT
 Jun 08 15:06:11 earthshaker.mtv.corp.google.com systemd[5762]: fuchsia_update_and_build.service: Failed with result 'exit-code'.

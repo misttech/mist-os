@@ -26,6 +26,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "trusted-root"
+        }
+      },
+      "optionality": "optional",
+      "long": "--trusted-root",
+      "short": null,
+      "description": "path to the root metadata that was used to sign the repository TUF metadata. This establishes the root of trust for this repository. If the TUF metadata was not signed by this root metadata, running this command will result in an error. Default is to use 1.root.json from the repository.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "address"
         }
       },

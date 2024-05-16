@@ -47,7 +47,7 @@ impl SeLinuxFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // There should always be a SecurityServer if SeLinuxFs is active.

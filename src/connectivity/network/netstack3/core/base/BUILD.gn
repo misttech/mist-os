@@ -12,32 +12,59 @@ rustc_library_with_features("netstack3-base") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
     "src/context.rs",
+    "src/convert.rs",
     "src/counters.rs",
     "src/data_structures.rs",
     "src/data_structures/ref_counted_hash_map.rs",
+    "src/data_structures/socketmap.rs",
+    "src/data_structures/token_bucket.rs",
+    "src/device.rs",
+    "src/error.rs",
     "src/event.rs",
     "src/frame.rs",
     "src/inspect.rs",
     "src/lib.rs",
+    "src/port_alloc.rs",
     "src/resource_references.rs",
     "src/rng.rs",
+    "src/testutil/addr.rs",
+    "src/testutil/benchmarks.rs",
     "src/testutil/fake_bindings.rs",
+    "src/testutil/fake_core.rs",
+    "src/testutil/fake_network.rs",
+    "src/testutil/misc.rs",
+    "src/testutil/monotonic_id.rs",
     "src/time.rs",
     "src/time/local_timer_heap.rs",
     "src/time/testutil.rs",
     "src/trace.rs",
+    "src/uninstantiable.rs",
+    "src/work_queue.rs",
   ]
   deps = [
     "//src/connectivity/lib/net-types",
+    "//src/connectivity/network/lib/explicit",
     "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
+    "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:smallvec",
+    "//third_party/rust_crates:thiserror",
+
+    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
+    "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
   _testutils_deps = [
+    "//src/connectivity/lib/net-declare",
+    "//src/connectivity/lib/packet-formats",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:criterion",
     "//third_party/rust_crates:rand_xorshift",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   if (!is_host) {
@@ -68,12 +95,18 @@ rustc_library_with_features("netstack3-base") {
       deps += _testutils_deps
       deps +=
           [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync" ]
+      configs += [ "//src/connectivity/network/netstack3/core:benchmark" ]
     },
     {
       target_name = "netstack3-base-instrumented"
       with_unit_tests = true
       features = [ "instrumented" ]
-      test_deps = _testutils_deps
+      test_deps = [
+        "//src/lib/proptest-support",
+        "//third_party/rust_crates:proptest",
+      ]
+      test_deps += _testutils_deps
+
       deps += [ "//src/connectivity/network/netstack3/core/sync:netstack3-sync-instrumented" ]
     },
   ]

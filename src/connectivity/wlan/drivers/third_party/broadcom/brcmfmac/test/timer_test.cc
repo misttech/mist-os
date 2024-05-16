@@ -16,211 +16,294 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/timer.h"
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/sync/completion.h>
-#include <zircon/assert.h>
-#include <zircon/types.h>
+#include <lib/async/cpp/task.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 
 #include <gtest/gtest.h>
 
 namespace wlan::brcmfmac {
 
-struct TestTimerCfg {
-  sync_completion_t wait_for_timer;
-  Timer* timer = nullptr;
-  uint32_t delay;
-  uint32_t target_cnt = 0;
-  uint32_t timer_exc_cnt = 0;
-  bool call_timerset = false;
-  bool call_timerstop = false;
-  bool periodic = false;
-  char name[32];
-  TestTimerCfg(const char* name);
-  ~TestTimerCfg();
+struct TimerTest : public testing::Test {
+  [[nodiscard]] bool WaitForStop(Timer& timer) const {
+    // Post the Stopped check on the same dispatcher to ensure that it runs after the timer has
+    // completed all processing.
+    libsync::Completion completed;
+    bool stopped = false;
+    async::PostTask(dispatcher_, [&] {
+      // Get the value of Stopped inside the task to ensure that we don't return a modified value
+      // as a result of a modification of a timer handler running after this task but before
+      // WaitForStop returns.
+      stopped = timer.Stopped();
+      completed.Signal();
+    });
+    completed.Wait();
+    return stopped;
+  }
+
+  fdf_testing::DriverRuntime runtime_;
+  async_dispatcher_t* dispatcher_ = runtime_.StartBackgroundDispatcher()->async_dispatcher();
 };
 
-class TimerTest : public testing::Test {
- public:
-  TimerTest() {}
-  ~TimerTest();
-
-  void SetUp() override;
-  void CreateTimer(TestTimerCfg* cfg, uint32_t exp_count, bool periodic, bool call_timerset,
-                   bool call_timerstop);
-  void StartTimer(TestTimerCfg* cfg, uint32_t delay);
-  void StopTimer(TestTimerCfg* cfg);
-  zx_status_t WaitForTimer(TestTimerCfg* cfg);
-  TestTimerCfg* GetTimerCfg1() { return timer_cfg_1_.get(); }
-  TestTimerCfg* GetTimerCfg2() { return timer_cfg_2_.get(); }
-
- private:
-  std::unique_ptr<async::Loop> dispatcher_loop_;
-  std::unique_ptr<TestTimerCfg> timer_cfg_1_;
-  std::unique_ptr<TestTimerCfg> timer_cfg_2_;
-};
-
-// Setup the dispatcher and timer contexts
-void TimerTest::SetUp() {
-  dispatcher_loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
-  zx_status_t status = dispatcher_loop_->StartThread("test-timer-worker", nullptr);
-  EXPECT_EQ(status, ZX_OK);
-  timer_cfg_1_ = std::make_unique<TestTimerCfg>("timer1");
-  timer_cfg_2_ = std::make_unique<TestTimerCfg>("timer2");
-  // The timer must be standard layout in order to use containerof
-  ASSERT_TRUE(std::is_standard_layout<Timer>::value);
-}
-
-TimerTest::~TimerTest() {
-  if (dispatcher_loop_ != nullptr) {
-    dispatcher_loop_->Shutdown();
-  }
-}
-
-static void test_timer_handler(TestTimerCfg* cfg) {
-  // There shouldn't be a race between the running tests and the async tasks lapping over
-  cfg->timer_exc_cnt++;
-  if (cfg->timer_exc_cnt > cfg->target_cnt)
-    return;
-
-  if (cfg->call_timerset) {
-    cfg->timer->Start(cfg->delay);
-  }
-  if (cfg->call_timerstop || (cfg->timer_exc_cnt == cfg->target_cnt)) {
-    cfg->timer->Stop();
-    sync_completion_signal(&cfg->wait_for_timer);
-  }
-}
-
-TestTimerCfg::TestTimerCfg(const char* timer_name) { strcpy(name, timer_name); }
-
-TestTimerCfg::~TestTimerCfg() {
-  if (timer) {
-    timer->Stop();
-    delete timer;
-  }
-}
-
-void TimerTest::CreateTimer(TestTimerCfg* cfg, uint32_t exp_count, bool periodic,
-                            bool call_timerset, bool call_timerstop) {
-  cfg->target_cnt = exp_count;
-  cfg->call_timerset = call_timerset;
-  cfg->call_timerstop = call_timerstop;
-  cfg->timer =
-      new Timer(dispatcher_loop_->dispatcher(), std::bind(test_timer_handler, cfg), periodic);
-}
-
-void TimerTest::StartTimer(TestTimerCfg* cfg, uint32_t delay) {
-  ZX_ASSERT(cfg->timer);
-  cfg->delay = delay;
-  cfg->timer->Start(delay);
-}
-
-void TimerTest::StopTimer(TestTimerCfg* cfg) {
-  ZX_ASSERT(cfg->timer);
-  cfg->timer->Stop();
-}
-
-zx_status_t TimerTest::WaitForTimer(TestTimerCfg* cfg) {
-  return sync_completion_wait(&cfg->wait_for_timer, ZX_TIME_INFINITE);
-}
 // This test creates a one-shot timer and checks if the handler fired
-TEST_F(TimerTest, one_shot) {
-  auto timer = GetTimerCfg1();
-  CreateTimer(timer, 1, false, false, false);
-  StartTimer(timer, ZX_MSEC(10));
-  zx_status_t status = WaitForTimer(timer);
-  EXPECT_EQ(status, ZX_OK);
-  EXPECT_EQ(timer->timer_exc_cnt, timer->target_cnt);
-  EXPECT_EQ(timer->timer->Stopped(), true);
+TEST_F(TimerTest, OneShot) {
+  libsync::Completion handler_fired;
+  Timer timer(dispatcher_, [&] { handler_fired.Signal(); }, Timer::Type::OneShot);
+  EXPECT_EQ(timer.Start(ZX_MSEC(10)), ZX_OK);
+  handler_fired.Wait();
+
+  ASSERT_TRUE(WaitForStop(timer));
 }
 
-TEST_F(TimerTest, periodic) {
-  auto timer1 = GetTimerCfg1();
-  auto timer2 = GetTimerCfg2();
-  CreateTimer(timer1, 4, true, false, false);
-  CreateTimer(timer2, 2, true, false, false);
-  StartTimer(timer1, ZX_MSEC(25));
-  StartTimer(timer2, ZX_MSEC(50));
+TEST_F(TimerTest, Periodic) {
+  struct CountedTimer {
+    CountedTimer(async_dispatcher_t* dispatcher, int expected_count)
+        : timer_(
+              dispatcher, [this] { OnTimer(); }, Timer::Type::Periodic),
+          expected_count_(expected_count) {}
+
+    void WaitUntilDone() { done_.Wait(); }
+    Timer* operator->() { return &timer_; }
+    Timer& operator*() { return timer_; }
+
+   private:
+    void OnTimer() {
+      if (++current_count_ == expected_count_) {
+        done_.Signal();
+      }
+    }
+    Timer timer_;
+    const int expected_count_;
+    int current_count_ = 0;
+    libsync::Completion done_;
+  };
+
+  CountedTimer timer1(dispatcher_, 4);
+  CountedTimer timer2(dispatcher_, 2);
+
+  EXPECT_EQ(timer1->Start(ZX_MSEC(2)), ZX_OK);
+  EXPECT_EQ(timer2->Start(ZX_MSEC(5)), ZX_OK);
 
   // Wait for the first timer to complete
-  zx_status_t status = WaitForTimer(timer1);
-  timer1->timer->Stop();
-  EXPECT_EQ(status, ZX_OK);
+  timer1.WaitUntilDone();
+  timer1->Stop();
 
   // and wait for the second timer to complete
-  status = WaitForTimer(timer2);
-  timer2->timer->Stop();
-  EXPECT_EQ(status, ZX_OK);
+  timer2.WaitUntilDone();
+  timer2->Stop();
 
-  // Check to make sure the timer fired exactly the expected # of times
-  EXPECT_EQ(timer1->timer_exc_cnt, 4U);
-  EXPECT_EQ(timer2->timer_exc_cnt, 2U);
-  EXPECT_EQ(timer1->timer->Stopped(), true);
-  EXPECT_EQ(timer2->timer->Stopped(), true);
+  // Check to make sure the timers stopped correctly.
+  EXPECT_TRUE(WaitForStop(*timer1));
+  EXPECT_TRUE(WaitForStop(*timer2));
 }
 
-// This test creates a one-shot timer and checks if timer_set can be called
-// from within the handler itself and a second timer is created to ensure
-// calling timer_set() from within the handler does not have any side-effects
-TEST_F(TimerTest, timerset_in_handler) {
-  // A timerset will be called inside callback
-  auto timer1 = GetTimerCfg1();
-  auto timer2 = GetTimerCfg2();
-  CreateTimer(timer1, 2, false, true, false);
-  CreateTimer(timer2, 1, false, false, false);
-  StartTimer(timer1, ZX_MSEC(10));
-  StartTimer(timer2, ZX_MSEC(25));
+// This test creates a one-shot timer and checks if the timer can be Started from within the handler
+// itself. A second timer is created to ensure that calling Start on the first timer in the handler
+// does not have any side-effects.
+TEST_F(TimerTest, StartInHandler) {
+  constexpr zx_duration_t kTimer1Delay = ZX_MSEC(10);
+  constexpr zx_duration_t kTimer2Delay = ZX_MSEC(25);
+
+  int timer_count = 0;
+  libsync::Completion timer1_done;
+  Timer timer1(
+      dispatcher_,
+      [&] {
+        if (timer_count == 0) {
+          EXPECT_EQ(timer1.Start(kTimer1Delay), ZX_OK);
+        }
+        if (++timer_count == 2) {
+          timer1_done.Signal();
+        }
+      },
+      Timer::Type::OneShot);
+  libsync::Completion timer2_done;
+  Timer timer2(dispatcher_, [&] { timer2_done.Signal(); }, Timer::Type::OneShot);
+
+  EXPECT_EQ(timer1.Start(kTimer1Delay), ZX_OK);
+  EXPECT_EQ(timer2.Start(kTimer2Delay), ZX_OK);
 
   // Wait for the first timer to complete
-  zx_status_t status = WaitForTimer(timer1);
-  timer1->timer->Stop();
-  EXPECT_EQ(status, ZX_OK);
+  timer1_done.Wait();
+  EXPECT_TRUE(WaitForStop(timer1));
 
   // and wait for the second timer to complete
-  status = WaitForTimer(timer2);
-  timer2->timer->Stop();
-  EXPECT_EQ(status, ZX_OK);
-
-  // Check to make sure the timer fired exactly the expected # of times
-  EXPECT_EQ(timer1->timer_exc_cnt, 2U);
-  EXPECT_EQ(timer2->timer_exc_cnt, 1U);
-  EXPECT_EQ(timer1->timer->Stopped(), true);
-  EXPECT_EQ(timer2->timer->Stopped(), true);
+  timer2_done.Wait();
+  EXPECT_TRUE(WaitForStop(timer2));
 }
 
-// This test creates a periodic timer and checks if timer_stop can be called
-// from within the handler itself and a second timer is created to ensure
-// calling timer_stop() from within the handler does not have any side-effects
-TEST_F(TimerTest, timerstop_in_handler) {
-  // Setup a periodic timer meant to fire twice but a timerstop will be called inside callback
-  auto timer1 = GetTimerCfg1();
-  auto timer2 = GetTimerCfg2();
-  CreateTimer(timer1, 5, true, false, true);
-  CreateTimer(timer2, 2, true, false, false);
-  StartTimer(timer1, ZX_MSEC(10));
-  StartTimer(timer2, ZX_MSEC(10));
+// This test creates a periodic timer and checks if Stop can be called from within the handler
+// itself. A second timer is created to ensure calling Stop from within the first handler does not
+// have any side-effects.
+TEST_F(TimerTest, StopInHandler) {
+  // Set the delay for the first timer to be very short, even if the next timer is about to fire
+  // right away the Stop call should still prevent further timer triggers.
+  constexpr zx_duration_t kTimer1Delay = ZX_USEC(1);
+  constexpr zx_duration_t kTimer2Delay = ZX_MSEC(10);
 
-  // Wait for the first timer to complete
-  zx_status_t status = WaitForTimer(timer2);
-  timer2->timer->Stop();
-  EXPECT_EQ(status, ZX_OK);
+  int timer_count = 0;
+  libsync::Completion timer1_overstepped;
+  libsync::Completion timer1_stop_called;
+  Timer timer1(
+      dispatcher_,
+      [&] {
+        if (timer_count == 0) {
+          timer1.Stop();
+          timer1_stop_called.Signal();
+        }
+        if (++timer_count > 1) {
+          timer1_overstepped.Signal();
+        }
+      },
+      Timer::Type::OneShot);
+  libsync::Completion timer2_done;
+  Timer timer2(dispatcher_, [&] { timer2_done.Signal(); }, Timer::Type::OneShot);
+
+  EXPECT_EQ(timer1.Start(kTimer1Delay), ZX_OK);
+  EXPECT_EQ(timer2.Start(kTimer2Delay), ZX_OK);
+
+  // Wait for the first timer to complete, it should not have signaled the completion.
+  timer1_stop_called.Wait();
+  EXPECT_TRUE(WaitForStop(timer1));
+  EXPECT_FALSE(timer1_overstepped.signaled());
+  EXPECT_EQ(timer_count, 1);
 
   // and wait for the second timer to complete
-  status = WaitForTimer(timer1);
-  timer1->timer->Stop();
-  EXPECT_EQ(status, ZX_OK);
+  timer2_done.Wait();
+  timer2.Stop();
+  EXPECT_TRUE(WaitForStop(timer2));
+}
 
-  // In about 20 msecs, first timer should have fired at least once and second one twice
-  // Since the timer handler runs on the Work Q task, it is likely that the main
-  // Timer handler runs to completion (after adding the Work Item) before the timer
-  // handler runs. Because of this the main Timer handler might arm the timer again
-  // before the timer is stopped (by the timer handler).
-  // TODO: Does the handler need to be added to the Work Q?
-  EXPECT_GT(timer1->timer_exc_cnt, 0U);
-  EXPECT_EQ(timer2->timer_exc_cnt, 2U);
-  EXPECT_EQ(timer1->timer->Stopped(), true);
-  EXPECT_EQ(timer2->timer->Stopped(), true);
+TEST_F(TimerTest, CallbackInProgressDuringStop) {
+  libsync::Completion started;
+  libsync::Completion proceed;
+  libsync::Completion done;
+  Timer timer(
+      dispatcher_,
+      [&] {
+        started.Signal();
+        proceed.Wait();
+        done.Signal();
+      },
+      Timer::Type::Periodic);
+
+  EXPECT_EQ(timer.Start(ZX_USEC(5)), ZX_OK);
+  // Wait until the timer handler has started processing
+  started.Wait();
+  // Post a delayed task to let the timer handler complete
+  constexpr zx::duration delay = zx::msec(10);
+  // Post a delayed task to allow the timer handler to proceed. This has to be done on another
+  // dispatcher or it will block on the timer handler.
+  async_dispatcher_t* task_dispatcher = runtime_.StartBackgroundDispatcher()->async_dispatcher();
+  // Keep track of how long the posting and stopping takes
+  const zx::time start(zx_clock_get_monotonic());
+  async::PostDelayedTask(task_dispatcher, [&] { proceed.Signal(); }, delay);
+  timer.Stop();
+  const zx::duration elapsed = zx::time(zx_clock_get_monotonic()) - start;
+  // The posting and Stop call must have waited for at least as long as the delay. We have to
+  // include the posting of the task. It is technically possible that the posted task completes
+  // before we call Stop, even if it is delayed. This means the minimum time taken for Stop itself
+  // is near zero. But the time taken for both operations together must equal or exceed the delay.
+  EXPECT_GE(elapsed, delay);
+  // done should already be signaled since Stop guarantees that the timer callback has finished.
+  EXPECT_TRUE(done.signaled());
+}
+
+TEST_F(TimerTest, IntervalIsUsed) {
+  libsync::Completion done;
+  Timer timer(dispatcher_, [&] { done.Signal(); }, Timer::Type::OneShot);
+
+  constexpr zx::duration delay = zx::msec(100);
+
+  const zx::time start(zx_clock_get_monotonic());
+  EXPECT_EQ(timer.Start(delay.get()), ZX_OK);
+  done.Wait();
+  const zx::duration elapsed = zx::time(zx_clock_get_monotonic()) - start;
+  EXPECT_GE(elapsed.get(), delay.get());
+}
+
+TEST_F(TimerTest, DoubleStop) {
+  Timer timer(dispatcher_, [] {}, Timer::Type::Periodic);
+
+  EXPECT_EQ(timer.Start(ZX_USEC(10)), ZX_OK);
+
+  // Calling stop twice without waiting should work.
+  timer.Stop();
+  timer.Stop();
+}
+
+TEST_F(TimerTest, SpamStartStop) {
+  // This test verifies that Start and Stop can be called from multiple threads at the same time
+  // without crashing or triggering any UBSAN or ASAN checks. Any flakes here should be considered
+  // problematic as they may indicate a threading issue.
+  constexpr size_t kNumThreads = 10;
+  constexpr size_t kNumIterations = 1'000;
+  Timer timer(dispatcher_, [] {}, Timer::Type::Periodic);
+
+  std::vector<std::thread> threads;
+  for (size_t i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back([i, &timer] {
+      for (size_t iteration = 0; iteration < kNumIterations; ++iteration) {
+        if (i % 2) {
+          EXPECT_EQ(timer.Start(ZX_USEC(i)), ZX_OK);
+        } else {
+          timer.Stop();
+        }
+      }
+    });
+  }
+
+  for (auto& thread : threads) {
+    thread.join();
+  }
+}
+
+TEST_F(TimerTest, UsesDispatcherTime) {
+  // Verify that the timer uses the dispatcher's idea of time and not the system's idea of time or
+  // anything else.
+
+  struct FakeDispatcher : public async_dispatcher_t {
+    FakeDispatcher() : async_dispatcher_t{&ops_} {}
+
+    std::atomic<zx_time_t> current_time = 0;
+    std::atomic<zx_time_t> posted_time = 0;
+    libsync::Completion posted;
+
+    async_ops_t ops_{
+        .version = ASYNC_OPS_V1,
+        .v1{
+            .now = [](async_dispatcher_t* dispatcher) -> zx_time_t {
+              return static_cast<FakeDispatcher*>(dispatcher)->current_time.load();
+            },
+            .post_task = [](async_dispatcher_t* dispatcher, async_task_t* task) -> zx_status_t {
+              auto fake_dispatcher = static_cast<FakeDispatcher*>(dispatcher);
+              fake_dispatcher->posted_time = task->deadline;
+              fake_dispatcher->posted.Signal();
+              // No need to actually run the task here, it doesn't matter, we just need to verify
+              // the deadline it was posted with.
+              return ZX_OK;
+            },
+            .cancel_task = [](async_dispatcher_t* dispatcher, async_task_t* task) -> zx_status_t {
+              return ZX_OK;
+            },
+        }};
+  };
+
+  FakeDispatcher dispatcher;
+
+  constexpr zx::duration first_delay = zx::msec(5);
+  Timer timer(&dispatcher, [] {}, Timer::Type::OneShot);
+  EXPECT_EQ(timer.Start(first_delay.get()), ZX_OK);
+  dispatcher.posted.Wait();
+  EXPECT_EQ(dispatcher.posted_time.load(), dispatcher.current_time.load() + first_delay.get());
+
+  dispatcher.posted.Reset();
+
+  // Travel forward in time a little bit.
+  dispatcher.current_time = ZX_HOUR(1);
+  constexpr zx::duration second_delay = zx::sec(15);
+  EXPECT_EQ(timer.Start(second_delay.get()), ZX_OK);
+  dispatcher.posted.Wait();
+  EXPECT_EQ(dispatcher.posted_time.load(), dispatcher.current_time.load() + second_delay.get());
 }
 
 }  // namespace wlan::brcmfmac

@@ -12,14 +12,18 @@ pub mod common;
 
 mod adb;
 mod console;
+mod suspend;
 mod vmo;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum StarnixSubCommand {
     Adb(adb::StarnixAdbCommand),
+    #[cfg(feature = "enable_console_tool")]
     Console(console::StarnixConsoleCommand),
     Vmo(vmo::StarnixVmoCommand),
+    Suspend(suspend::StarnixSuspendCommand),
+    Resume(suspend::StarnixResumeCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -50,6 +54,7 @@ impl FfxMain for StarnixTool {
                     .await
                     .map_err(|e| Error::User(e))
             }
+            #[cfg(feature = "enable_console_tool")]
             StarnixSubCommand::Console(command) => {
                 console::starnix_console(command, &self.rcs_proxy, writer)
                     .await
@@ -57,6 +62,12 @@ impl FfxMain for StarnixTool {
             }
             StarnixSubCommand::Vmo(command) => {
                 vmo::starnix_vmo(command, &self.rcs_proxy, writer).await.map_err(|e| Error::User(e))
+            }
+            StarnixSubCommand::Suspend(command) => {
+                suspend::starnix_suspend(command, &self.rcs_proxy, writer).await
+            }
+            StarnixSubCommand::Resume(command) => {
+                suspend::starnix_resume(command, &self.rcs_proxy, writer).await
             }
         }
     }

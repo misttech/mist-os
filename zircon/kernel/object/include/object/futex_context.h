@@ -17,7 +17,6 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <kernel/owned_wait_queue.h>
-#include <kernel/thread_lock.h>
 #include <ktl/move.h>
 #include <ktl/unique_ptr.h>
 
@@ -127,7 +126,8 @@ class FutexContext {
   // otherwise leaves the potential to hit a race condition where we end up appearing to violate
   // the "bad handle" policy when actually we didn't.  See https://fxbug.dev/42109683 for details.
   zx_status_t FutexWait(user_in_ptr<const zx_futex_t> value_ptr, zx_futex_t current_value,
-                        zx_handle_t new_futex_owner, const Deadline& deadline);
+                        zx_handle_t new_futex_owner, const Deadline& deadline)
+      TA_EXCL(chainlock_transaction_token);
 
   // FutexWake will wake up to |wake_count| number of threads blocked on the |value_ptr| futex.
   //
@@ -136,7 +136,7 @@ class FutexContext {
   // the futex's owner will be set to the thread which was woken during the operation, or nullptr
   // if no thread was woken.
   zx_status_t FutexWake(user_in_ptr<const zx_futex_t> value_ptr, uint32_t wake_count,
-                        OwnerAction owner_action);
+                        OwnerAction owner_action) TA_EXCL(chainlock_transaction_token);
 
   // FutexRequeue first verifies that the integer pointed to by |wake_ptr| still equals
   // |current_value|. If the test fails, FutexRequeue returns BAD_STATE.  Otherwise it will wake
@@ -151,7 +151,8 @@ class FutexContext {
   zx_status_t FutexRequeue(user_in_ptr<const zx_futex_t> wake_ptr, uint32_t wake_count,
                            zx_futex_t current_value, OwnerAction owner_action,
                            user_in_ptr<const zx_futex_t> requeue_ptr, uint32_t requeue_count,
-                           zx_handle_t new_requeue_owner_handle);
+                           zx_handle_t new_requeue_owner_handle)
+      TA_EXCL(chainlock_transaction_token);
 
   // Get the KOID of the current owner of the specified futex, if any, or ZX_KOID_INVALID if there
   // is no known owner.
@@ -164,7 +165,6 @@ class FutexContext {
   // NullableDispatcherGuard here inside of FutuexContext, we can leach off of
   // the ThreadDispatcher --> FutexContext friendship.
   class TA_SCOPED_CAP NullableDispatcherGuard;
-
   // Notes about FutexState lifecycle.
   // aka. Why is this safe?
   //
@@ -360,24 +360,24 @@ class FutexContext {
     // Sadly, there is no good way to express this using static annotations.
     uint32_t pending_operation_count_ = 0;
 
-    DECLARE_SPINLOCK(FutexState) lock_ TA_ACQ_BEFORE(thread_lock);
+    DECLARE_SPINLOCK(FutexState) lock_;
   };
 
-  // Definition of two small callback hooks used with OwnedWaitQueue::Wake and
-  // OwnedWaitQueue::WakeAndRequeue.  These hooks perform two jobs.
-  //
-  // 1) They allow us to count the number of threads actually woken or requeued
-  //    during these operations.  This is needed for proper pending op reference
-  //    bookkeeping.
-  //
-  // 2) Second, they allow us to maintain user-thread blocked_futex_id info as
-  //    the OwnedWaitQueue code selects threads to be woken/requeued.
-  template <OwnedWaitQueue::Hook::Action action>
-  static OwnedWaitQueue::Hook::Action ResetBlockingFutexId(Thread* thrd,
-                                                           void* ctx) TA_NO_THREAD_SAFETY_ANALYSIS;
-  template <OwnedWaitQueue::Hook::Action action>
-  static OwnedWaitQueue::Hook::Action SetBlockingFutexId(Thread* thrd,
-                                                         void* ctx) TA_NO_THREAD_SAFETY_ANALYSIS;
+  struct WakeHook : public OwnedWaitQueue::IWakeRequeueHook {
+    void OnWakeOrRequeue(Thread& t) override TA_REQ(t.get_lock());
+  };
+
+  struct RequeueHook : public OwnedWaitQueue::IWakeRequeueHook {
+    RequeueHook(FutexState::PendingOpRef& wake_futex_ref,
+                FutexState::PendingOpRef& requeue_futex_ref, FutexId new_id)
+        : wake_futex_ref{wake_futex_ref}, requeue_futex_ref{requeue_futex_ref}, new_id{new_id} {}
+
+    void OnWakeOrRequeue(Thread& t) override TA_REQ(t.get_lock());
+
+    FutexState::PendingOpRef& wake_futex_ref;
+    FutexState::PendingOpRef& requeue_futex_ref;
+    const FutexId new_id;
+  };
 
   // FutexContexts may not be copied, moved, or allocated on the heap.  They
   // are to exist as singleton members of the ProcessDispatcher class and

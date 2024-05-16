@@ -6,6 +6,7 @@ import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/config.gni")
 import("//build/sdk/idk.gni")
 import("//build/sdk/sdk_collection.gni")
@@ -23,7 +24,7 @@ idk("idk") {
   output_name = "bazel_fuchsia_sdk_idk"
   sdk_collection_label = "//sdk:core"
   target_cpus = _fuchsia_sdk_target_cpus
-  api_levels = build_time_supported_api_levels
+  api_levels = platform_version.build_time_supported_api_levels
 
   # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
   # are too slow to enable this setting, and therefore the mac IDK won't have

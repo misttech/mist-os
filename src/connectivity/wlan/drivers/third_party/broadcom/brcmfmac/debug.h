@@ -16,14 +16,10 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEBUG_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEBUG_H_
 
-#include <lib/driver/logging/cpp/logger.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
-#include <algorithm>
-#include <cinttypes>
 #include <cstring>
-#include <utility>
 
 #include <wlan/drivers/log.h>
 

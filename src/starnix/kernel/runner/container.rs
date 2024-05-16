@@ -34,7 +34,8 @@ use selinux::security_server::SecurityServer;
 use starnix_core::{
     device::init_common_devices,
     execution::{
-        create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
+        create_filesystem_from_spec, create_remote_block_device_from_spec,
+        create_remotefs_filesystem, execute_task_with_prerun_result,
     },
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
     task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task},
@@ -118,6 +119,7 @@ fn get_config_from_component_start_info(
     let rlimits = get_strvec("rlimits");
     let name = get_string("name");
     let startup_file_path = get_string("startup_file_path");
+    let remote_block_devices = get_strvec("remote_block_devices");
 
     let mut ns = start_info.ns.take();
     let pkg_dir = get_ns_entry(&mut ns, "/pkg");
@@ -126,7 +128,16 @@ fn get_config_from_component_start_info(
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
 
     ConfigWrapper {
-        config: Config { features, init, kernel_cmdline, mounts, rlimits, name, startup_file_path },
+        config: Config {
+            features,
+            init,
+            kernel_cmdline,
+            mounts,
+            rlimits,
+            name,
+            startup_file_path,
+            remote_block_devices,
+        },
         pkg_dir,
         outgoing_dir,
         svc_dir,
@@ -427,6 +438,15 @@ async fn create_container(
         )?;
     }
 
+    if features.android_fdr {
+        init_remote_block_devices(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            &system_task,
+            config,
+        )
+        .source_context("initalizing remote block devices")?;
+    }
+
     // If there is an init binary path, run it, optionally waiting for the
     // startup_file_path to be created. The task struct is still used
     // to initialize the system up until this point, regardless of whether
@@ -592,6 +612,23 @@ where
             .lookup_path_from_root(mount_point)
             .with_source_context(|| format!("lookup path from root: {mount_point}"))?;
         mount_point.mount(WhatToMount::Fs(child_fs), MountFlags::empty())?;
+    }
+    Ok(())
+}
+
+fn init_remote_block_devices<L>(
+    locked: &mut Locked<'_, L>,
+    system_task: &CurrentTask,
+    config: &ConfigWrapper,
+) -> Result<(), Error>
+where
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
+{
+    let devices_iter = config.remote_block_devices.iter();
+    for device_spec in devices_iter {
+        create_remote_block_device_from_spec(locked, system_task, device_spec)
+            .with_source_context(|| format!("creating remoteblk from spec: {}", &device_spec))?;
     }
     Ok(())
 }

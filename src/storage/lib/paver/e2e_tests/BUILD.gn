@@ -49,6 +49,12 @@ if (is_linux || is_mac) {
         }
         tags = [ "e2e-isolated" ]
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
+        }
+        tags = [ "e2e-isolated" ]
+      },
     ]
     pave_timeout = "5m"
     cycle_count = "1"

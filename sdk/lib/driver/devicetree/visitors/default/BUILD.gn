@@ -9,6 +9,7 @@ group("tests") {
     "boot-metadata:tests",
     "bti:tests",
     "mmio:tests",
+    "smc:tests",
   ]
   testonly = true
 }
@@ -28,6 +29,7 @@ sdk_source_set("default") {
     "boot-metadata",
     "bti",
     "mmio",
+    "smc",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree",
   ]

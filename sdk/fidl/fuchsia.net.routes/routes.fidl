@@ -80,7 +80,7 @@ type Destination = table {
 };
 
 /// Provides access to the system's routing state.
-@discoverable
+@discoverable(server="platform")
 closed protocol State {
     /// Resolves the route to a destination.
     ///

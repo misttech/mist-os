@@ -77,13 +77,40 @@ do
   esac
 done
 
-deps=( $(<"$output.deps") )
+# $deps_rspfile contains --externs for direct dependencies
+deps_rspfile="$output.deps"
 transdeps=( $(sort -u "$output.transdeps") )
+
+# Rewrite --externs to use rmetas where possible.
+# Use rmetas where they exist, to avoid requiring local copies of full rlibs.
+# Remote-build rlibs do not need to be downloaded, only their .rmeta are needed.
+# Assume $deps_rspfile is formatted with one --extern per line.
+while read line
+do
+  case "$line" in
+    --extern=*=*.rlib)
+      mapping="${line#--extern=}"  # remove prefix (shortest-match)
+      lib_name="${mapping%%=*}"  # remove suffix to get lib name (longest-match)
+      lib_path="${mapping#*=}"  # remove prefix to get lib path (shortest-match)
+      rmeta="${lib_path/.rlib/.rmeta}"
+      # If the .rmeta exists, use it.
+      if [[ -r "$rmeta" ]]
+      then echo "--extern=$lib_name=$rmeta"
+      else
+        echo "Expecting $rmeta to exist, but did not find it." >&2
+        exit 1
+      fi
+      ;;
+    *)  # No change for all other cases, including --extern=...=*.so
+      echo "$line"
+      ;;
+  esac
+done < "$deps_rspfile" > "$deps_rspfile.alt"
 
 command=(
   "${filtered_driver_options[@]}"
   -Zno_codegen
-  "${deps[@]}"
+  @"$deps_rspfile.alt"
   "${transdeps[@]}"
   --emit metadata="$output.rmeta"
   --error-format=json
@@ -92,6 +119,11 @@ command=(
 
 RUSTC_LOG=error "${command[@]}" 2>"$output"
 result="$?"
+
+# clean-up temporary files
+[[ "$result" != 0 ]] || {
+  rm -f "$deps_rspfile.alt"
+}
 
 # Print any detected lints if --quiet wasn't passed
 if [[ "$quiet" = 0 ]]; then

@@ -76,6 +76,7 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
     *out_property = uint_property->value();
   }
 
+  wlan::drivers::log::testing::UnitTestLogContext logging_{"DeviceInspectTest"};
   std::unique_ptr<DeviceInspect> device_inspect_;
   // Defining properties which will be covered in the test cases.
   const PropertyTestUnit uint_properties_[kUintPropertyNum] = {
@@ -124,8 +125,6 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
       PropertyTestUnit(kRootMetrics, "high_wme_rx_error_rate_24hrs",
                        std::bind(&DeviceInspectTest::LogHighWmeRxErrorRate, this)),
   };
-
-  wlan::drivers::log::testing::UnitTestLogContext logging_{"DeviceInspectTest"};
 };
 
 TEST_F(DeviceInspectTest, HierarchyCreation) {

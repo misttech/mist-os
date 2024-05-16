@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::fuchsia::{TimerFile, TimerFileClock},
+    fs::fuchsia::{TimerFile, TimerFileClock, TimerWakeup},
     mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
     vfs::{
@@ -1856,31 +1856,21 @@ pub fn sys_timerfd_create(
     clock_id: u32,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    let timer_file_clock = match clock_id {
-        CLOCK_MONOTONIC | CLOCK_BOOTTIME => TimerFileClock::Monotonic,
+    let (timer_file_clock, timer_type) = match clock_id {
+        CLOCK_MONOTONIC | CLOCK_BOOTTIME => (TimerFileClock::Monotonic, TimerWakeup::Regular),
         CLOCK_BOOTTIME_ALARM => {
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-
-            track_stub!(
-                TODO("https://fxbug.dev/297375023"),
-                "timerfd_create: CLOCK_BOOTTIME_ALARM",
-            );
-            TimerFileClock::Monotonic
+            (TimerFileClock::Monotonic, TimerWakeup::Alarm)
         }
         CLOCK_REALTIME_ALARM => {
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-
-            track_stub!(
-                TODO("https://fxbug.dev/297375023"),
-                "timerfd_create: CLOCK_REALTIME_ALARM",
-            );
-            TimerFileClock::Realtime
+            (TimerFileClock::Realtime, TimerWakeup::Alarm)
         }
-        CLOCK_REALTIME => TimerFileClock::Realtime,
+        CLOCK_REALTIME => (TimerFileClock::Realtime, TimerWakeup::Regular),
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
@@ -1899,7 +1889,7 @@ pub fn sys_timerfd_create(
         fd_flags |= FdFlags::CLOEXEC;
     };
 
-    let timer = TimerFile::new_file(current_task, timer_file_clock, open_flags)?;
+    let timer = TimerFile::new_file(current_task, timer_type, timer_file_clock, open_flags)?;
     let fd = current_task.add_file(timer, fd_flags)?;
     Ok(fd)
 }
@@ -1942,7 +1932,7 @@ pub fn sys_timerfd_settime(
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
 
     let new_timer_spec = current_task.read_object(user_new_value)?;
-    let old_timer_spec = timer_file.set_timer_spec(new_timer_spec, flags)?;
+    let old_timer_spec = timer_file.set_timer_spec(current_task, new_timer_spec, flags)?;
     log_trace!(
         "timerfd_settime(fd={:?}, flags={:#x}, new_value={:?}, current_value={:?})",
         fd,

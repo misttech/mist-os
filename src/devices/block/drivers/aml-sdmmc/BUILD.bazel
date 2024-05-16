@@ -1,0 +1,113 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+    "fuchsia_structured_config_cpp_elf_lib",
+    "fuchsia_structured_config_values",
+)
+
+fuchsia_driver_bind_bytecode(
+    name = "aml-sdmmc-bind",
+    output = "aml-sdmmc.bindbc",
+    rules = "aml-sdmmc.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
+        "@fuchsia_sdk//bind/fuchsia.gpio",
+        "@fuchsia_sdk//bind/fuchsia.platform",
+        "@fuchsia_sdk//bind/fuchsia.power",
+        "@fuchsia_sdk//bind/fuchsia.pwm",
+        "@fuchsia_sdk//bind/fuchsia.register",
+        "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
+        "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "aml-sdmmc-driver",
+    srcs = [
+        "aml-sdmmc.cc",
+        "aml-sdmmc.h",
+        "aml-sdmmc-export.cc",
+        "aml-sdmmc-regs.h",
+    ],
+    copts = [
+        "-Wno-vla-cxx-extension",
+    ],
+    defines = [
+        "ZX_ASSERT_LEVEL=2",
+        "_ALL_SOURCE",
+        "_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS=1",
+    ],
+    output_name = "aml-sdmmc",
+    deps = [
+        ":aml-sdmmc-config",
+        "//sdk/lib/driver/power/cpp",
+        "//src/devices/block/lib/sdio",
+        "//src/devices/block/lib/sdmmc",
+        "//src/devices/lib/amlogic",
+        "//src/devices/lib/dma-buffer",
+        "//src/lib/ddk:ddk_metadata",
+        "//src/lib/vmo_store",
+        "//zircon/system/ulib/ddk-platform-defs",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime_cpp",
+        "@fuchsia_sdk//pkg/fit",
+        "@fuchsia_sdk//pkg/hwreg",
+        "@fuchsia_sdk//pkg/inspect",
+        "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/sync",
+        "@fuchsia_sdk//pkg/trace",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+        "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+        "@internal_sdk//pkg/driver_compat",
+        "@internal_sdk//pkg/zircon-internal",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/aml-sdmmc-no-banjo.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    bind_bytecode = ":aml-sdmmc-bind",
+    driver_lib = ":aml-sdmmc-driver",
+    manifest = ":manifest",
+)
+
+fuchsia_structured_config_cpp_elf_lib(
+    name = "aml-sdmmc-config",
+    cm_label = ":manifest",
+)
+
+fuchsia_structured_config_values(
+    name = "sc-values",
+    cm_label = ":manifest",
+    values = {
+        "enable_suspend": "false",
+    },
+)
+
+fuchsia_package(
+    name = "aml-sdmmc-no-banjo",
+    package_name = "aml-sdmmc",
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    resources = [":sc-values"],
+    visibility = ["//visibility:public"],
+)

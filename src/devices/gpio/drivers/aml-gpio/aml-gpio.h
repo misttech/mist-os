@@ -14,7 +14,6 @@
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 
-#include <array>
 #include <cstdint>
 
 #include <fbl/array.h>

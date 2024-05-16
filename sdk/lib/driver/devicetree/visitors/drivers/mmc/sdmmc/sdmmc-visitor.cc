@@ -22,10 +22,11 @@ namespace sdmmc_dt {
 SdmmcVisitor::SdmmcVisitor() {
   fdf_devicetree::Properties properties = {};
   properties.emplace_back(std::make_unique<fdf_devicetree::Uint32Property>(kMaxFrequency));
-  properties.emplace_back(std::make_unique<fdf_devicetree::BoolProperty>(KNonRemovable));
+  properties.emplace_back(std::make_unique<fdf_devicetree::BoolProperty>(kNonRemovable));
   properties.emplace_back(std::make_unique<fdf_devicetree::BoolProperty>(kNoMmcHs400));
   properties.emplace_back(std::make_unique<fdf_devicetree::BoolProperty>(kNoMmcHs200));
   properties.emplace_back(std::make_unique<fdf_devicetree::BoolProperty>(kNoMmcHsDdr));
+  properties.emplace_back(std::make_unique<fdf_devicetree::BoolProperty>(kUseFidl));
   sdmmc_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
 }
 
@@ -53,7 +54,7 @@ zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,
     sdmmc_metadata.max_frequency() = parser_output->at(kMaxFrequency)[0].AsUint32();
   }
 
-  if (parser_output->find(KNonRemovable) != parser_output->end()) {
+  if (parser_output->find(kNonRemovable) != parser_output->end()) {
     sdmmc_metadata.removable() = false;
   } else {
     sdmmc_metadata.removable() = true;
@@ -73,6 +74,12 @@ zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,
   if (host_prefs) {
     sdmmc_metadata.speed_capabilities() =
         std::optional<fuchsia_hardware_sdmmc::SdmmcHostPrefs>(host_prefs);
+  }
+
+  if (parser_output->find(kUseFidl) != parser_output->end()) {
+    sdmmc_metadata.use_fidl() = true;
+  } else {
+    sdmmc_metadata.use_fidl() = false;
   }
 
   fit::result encoded_metadata = fidl::Persist(sdmmc_metadata);

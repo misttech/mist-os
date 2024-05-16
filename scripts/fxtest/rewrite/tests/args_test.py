@@ -105,6 +105,15 @@ class TestArgs(unittest.TestCase):
         self.assertEqual(flags.e2e, True)
         self.assertEqual(flags.only_e2e, True)
 
+    def test_use_test_interface(self) -> None:
+        flags = args.parse_args(["--use-test-interface"])
+        flags.validate()
+        self.assertEqual(flags.use_test_interface, True)
+
+        flags = args.parse_args([])
+        flags.validate()
+        self.assertEqual(flags.use_test_interface, False)
+
     def test_default_merging(self) -> None:
         config_file = config.ConfigFile(
             "path", args.parse_args(["--parallel=10"])

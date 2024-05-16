@@ -19,14 +19,15 @@ pub async fn datagram_socket(
     Ok(async move {
         let response =
             result.map_err(|errno| std::io::Error::from_raw_os_error(errno.into_primitive()))?;
-        match response {
+        let fd = match response {
             fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(client_end) => {
                 fdio::create_fd(client_end.into()).map_err(zx::Status::into_io_error)
             }
             fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
                 client_end,
             ) => fdio::create_fd(client_end.into()).map_err(zx::Status::into_io_error),
-        }
+        }?;
+        Ok(fd.into())
     }
     .await)
 }
@@ -40,7 +41,7 @@ pub async fn packet_socket(
     Ok(async move {
         let client_end =
             result.map_err(|errno| std::io::Error::from_raw_os_error(errno.into_primitive()))?;
-        fdio::create_fd(client_end.into()).map_err(zx::Status::into_io_error)
+        Ok(fdio::create_fd(client_end.into()).map_err(zx::Status::into_io_error)?.into())
     }
     .await)
 }

@@ -76,7 +76,8 @@ foreach(test_type, test_types) {
           environments = [
             emu_env,
             vim3_env,
-            nuc_env,
+            nuc7_env,
+            nuc11_env,
           ]
         }
       }

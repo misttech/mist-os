@@ -555,6 +555,10 @@ def main():
     # during build and query operations.
     repo_override_map = {
         "bazel_skylib": fuchsia_source_dir / "third_party" / "bazel_skylib",
+        "com_google_googletest": fuchsia_source_dir
+        / "third_party"
+        / "googletest"
+        / "src",
         "rules_cc": fuchsia_source_dir / "third_party" / "bazel_rules_cc",
         "rules_python": fuchsia_source_dir
         / "third_party"

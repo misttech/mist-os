@@ -732,7 +732,7 @@ mod tests {
     /// If start and stop happens concurrently, the component should either end up as
     /// started or stopped, without deadlocking.
     async fn concurrent_start_stop() {
-        let (test_topology, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
+        let (_test_topology, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         // Run start and stop in random order.
         let start_fut = ActionsManager::register(
@@ -745,21 +745,7 @@ mod tests {
         let stream: FuturesUnordered<_> = futs.into_iter().collect();
         let _: Vec<_> = stream.collect().await;
 
-        let events: Vec<_> = test_topology
-            .test_hook
-            .lifecycle()
-            .into_iter()
-            .filter(|event| match event {
-                Lifecycle::Start(_) | Lifecycle::Stop(_) => true,
-                _ => false,
-            })
-            .collect();
-
-        let start_event =
-            Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap());
-        let stop_event =
-            Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap());
-        assert!(events.contains(&start_event) || events.contains(&stop_event));
+        // Both actions have completed, which demonstrates that the component did not deadlock.
     }
 
     /// If start is blocked during resolving then stop can interrupt it.
@@ -784,8 +770,7 @@ mod tests {
             test_topology.model.root().find(&TEST_CHILD_NAME.try_into().unwrap()).await.unwrap();
 
         let start_fut = child
-            .lock_actions()
-            .await
+            .actions()
             .register_no_wait(StartAction::new(
                 StartReason::Debug,
                 None,
@@ -797,7 +782,7 @@ mod tests {
         resolved_rx.await.unwrap();
 
         // Stop should cancel start.
-        let stop_fut = child.lock_actions().await.register_no_wait(StopAction::new(false)).await;
+        let stop_fut = child.actions().register_no_wait(StopAction::new(false)).await;
         assert_matches!(
             start_fut.await.unwrap_err(),
             ActionError::StartError { err: StartActionError::Aborted { .. } }

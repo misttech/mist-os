@@ -56,5 +56,24 @@
                 }
             }
         ]
+    },
+    {
+        "node": "mipi-dsi-display",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.display.OUTPUT": "fuchsia.display.OUTPUT.MIPI_DSI"
+                }
+            },
+            {
+                "name": "Mismatch",
+                "expected": "abort",
+                "device": {
+                    "fuchsia.hardware.i2c.Service": "fuchsia.hardware.i2c.Service.ZirconTransport"
+                }
+            }
+        ]
     }
 ]

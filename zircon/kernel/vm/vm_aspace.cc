@@ -27,7 +27,6 @@
 #include <fbl/intrusive_double_list.h>
 #include <kernel/mutex.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <ktl/algorithm.h>
 #include <object/process_dispatcher.h>
 #include <vm/fault.h>
@@ -560,14 +559,17 @@ void VmAspace::AttachToThread(Thread* t) {
   canary_.Assert();
   DEBUG_ASSERT(t);
 
-  // point the lk thread at our object
-  Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+  // Attach to thread is the one place where a different thread is allowed to
+  // set a thread's address space.  This is only permitted because the thread
+  // cannot be running yet.  Once the thread starts, only it will be allowed to
+  // change its address space.
+  SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("VmAspace::AttachToThread")};
 
   // not prepared to handle setting a new address space or one on a running thread
-  DEBUG_ASSERT(!t->active_aspace());
+  DEBUG_ASSERT(!t->GetAspaceRefLocked());
   DEBUG_ASSERT(t->state() != THREAD_RUNNING);
 
-  t->switch_aspace(this);
+  [&]() TA_NO_THREAD_SAFETY_ANALYSIS { t->switch_aspace(this); }();
 }
 
 zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {

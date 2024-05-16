@@ -55,7 +55,10 @@ fuchsia_unittest_package("intel-hda-test-package") {
   package_name = "intel-hda-test"
   deps = [ ":intel-hda-test-bin" ]
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
   }
 }
 

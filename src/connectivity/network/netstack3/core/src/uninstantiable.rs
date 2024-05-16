@@ -2,24 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! A collection of uninstantiable types.
-//!
-//! These uninstantiable types can be used to satisfy trait bounds in
-//! uninstantiable situations. For example,
-//! [`crate::socket::datagram::DatagramBoundStateContext::DualStackContext`]
-//! is set to the [`UninstantiableWrapper`] when implemented for Ipv4, because
-//! IPv4 sockets do not support dualstack operations.
-
-use core::{convert::Infallible as Never, marker::PhantomData};
+//! Groups trait implementations for uninstantiable types.
 
 use explicit::UnreachableExt as _;
-use net_types::{ip::Ip, SpecifiedAddr};
+use net_types::SpecifiedAddr;
 use packet::{BufferMut, Serializer};
 
 use crate::{
-    context::{CoreTimerContext, CounterContext, TimerBindingsTypes},
-    convert::BidirectionalConverter,
-    device::{self, Device, DeviceIdContext},
+    context::CounterContext,
+    device::WeakDeviceIdentifier,
     ip::{
         socket::{DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError, SendOptions},
         EitherDeviceId, HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError,
@@ -40,54 +31,7 @@ use crate::{
     },
 };
 
-/// An uninstantiable type.
-#[derive(Clone, Copy)]
-pub struct Uninstantiable(Never);
-
-impl AsRef<Never> for Uninstantiable {
-    fn as_ref(&self) -> &Never {
-        &self.0
-    }
-}
-
-impl<I, O> BidirectionalConverter<I, O> for Uninstantiable {
-    fn convert_back(&self, _: O) -> I {
-        self.uninstantiable_unreachable()
-    }
-    fn convert(&self, _: I) -> O {
-        self.uninstantiable_unreachable()
-    }
-}
-
-/// An uninstantiable type that wraps an instantiable type, `A`.
-///
-/// This type can be used to more easily implement traits where `A` already
-/// implements the trait.
-// TODO(https://github.com/rust-lang/rust/issues/118212): Simplify the trait
-// implementations once Rust supports function delegation.
-pub struct UninstantiableWrapper<A>(Never, PhantomData<A>);
-
-impl<A> AsRef<Never> for UninstantiableWrapper<A> {
-    fn as_ref(&self) -> &Never {
-        let Self(never, _marker) = self;
-        &never
-    }
-}
-
-impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrapper<C> {
-    type DeviceId = C::DeviceId;
-    type WeakDeviceId = C::WeakDeviceId;
-}
-
-impl<T, BT, C> CoreTimerContext<T, BT> for UninstantiableWrapper<C>
-where
-    BT: TimerBindingsTypes,
-    C: CoreTimerContext<T, BT>,
-{
-    fn convert_timer(dispatch_id: T) -> BT::DispatchId {
-        C::convert_timer(dispatch_id)
-    }
-}
+pub use netstack3_base::{Uninstantiable, UninstantiableWrapper};
 
 impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     DatagramBoundStateContext<I, C, S> for UninstantiableWrapper<P>
@@ -240,7 +184,7 @@ where
 
 impl<
         I: tcp_socket::DualStackIpExt,
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         BT: TcpBindingsTypes,
         P: tcp_socket::TcpDemuxContext<I, D, BT>,
     > tcp_socket::TcpDemuxContext<I, D, BT> for UninstantiableWrapper<P>
@@ -336,7 +280,7 @@ impl<P> tcp_socket::AsThisStack<P> for UninstantiableWrapper<P> {
 }
 
 impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for Uninstantiable {
-    fn convert<D: device::WeakId, BT: tcp_socket::TcpBindingsTypes>(
+    fn convert<D: WeakDeviceIdentifier, BT: tcp_socket::TcpBindingsTypes>(
         &self,
         _id: tcp_socket::TcpSocketId<I, D, BT>,
     ) -> <I::OtherVersion as tcp_socket::DualStackIpExt>::DemuxSocketId<D, BT> {
@@ -346,7 +290,7 @@ impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for
 
 impl<
         I: tcp_socket::DualStackIpExt,
-        D: device::WeakId,
+        D: WeakDeviceIdentifier,
         BT: TcpBindingsTypes,
         P: tcp_socket::TcpDualStackContext<I::OtherVersion, D, BT>,
     > tcp_socket::TcpDualStackContext<I, D, BT> for UninstantiableWrapper<P>
@@ -391,12 +335,6 @@ where
         &mut self,
         _cb: F,
     ) -> O {
-        self.uninstantiable_unreachable()
-    }
-}
-
-impl<I: Ip, P> CounterContext<TcpCounters<I>> for UninstantiableWrapper<P> {
-    fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, _cb: F) -> O {
         self.uninstantiable_unreachable()
     }
 }

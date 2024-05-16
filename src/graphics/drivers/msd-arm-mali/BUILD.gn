@@ -4,6 +4,7 @@
 
 import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/bind/bind.gni")
+import("//build/components/fuchsia_structured_config.gni")
 import("//build/drivers.gni")
 import("//build/packages/prebuilt_package.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
@@ -37,6 +38,34 @@ entry_deps = [
   "//zircon/system/ulib/trace-vthread",
   "//zircon/system/ulib/zx",
 ]
+
+fuchsia_component_manifest("msd_arm_manifest") {
+  component_name = "msd_arm"
+  manifest = "meta/msd_arm.cml"
+}
+
+fuchsia_component_manifest("msd_arm_test_manifest") {
+  component_name = "msd_arm_mali"
+  manifest = "meta/msd_arm_test.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("config") {
+  cm_label = ":msd_arm_manifest"
+}
+
+fuchsia_structured_config_values("msd_arm_config_values") {
+  cm_label = ":msd_arm_manifest"
+  values = {
+    enable_suspend = false
+  }
+}
+
+fuchsia_structured_config_values("msd_arm_test_config_values") {
+  cm_label = ":msd_arm_test_manifest"
+  values = {
+    enable_suspend = false
+  }
+}
 
 source_set("msd_arm_entry") {
   sources = [ "src/driver_entry_dfv2.cc" ]
@@ -75,6 +104,7 @@ fuchsia_driver_component("msd_arm") {
   deps = [
     ":msd_arm-driver",
     ":msd_arm_bind",
+    ":msd_arm_config_values",
   ]
   info = "msd_arm-info.json"
   manifest = "meta/msd_arm.cml"
@@ -96,6 +126,7 @@ fuchsia_driver_component("msd_arm_test") {
   deps = [
     ":msd_arm_bind",
     ":msd_arm_test-driver",
+    ":msd_arm_test_config_values",
   ]
   info = "msd_arm_test-info.json"
   manifest = "meta/msd_arm_test.cml"

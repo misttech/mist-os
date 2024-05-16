@@ -18,6 +18,7 @@
 #include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
@@ -239,8 +240,9 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture {
     // Register the FakeInputDevice
     registry_->Register(std::move(input_device_ptr_));
     FX_LOGS(INFO) << "Registered touchscreen with x touch range = (" << x_axis.range.min << ", "
-                  << x_axis.range.max << ") " << "and y touch range = (" << y_axis.range.min << ", "
-                  << y_axis.range.max << ").";
+                  << x_axis.range.max << ") "
+                  << "and y touch range = (" << y_axis.range.min << ", " << y_axis.range.max
+                  << ").";
   }
 
   // Inject directly into Input Pipeline, using fuchsia.input.injection FIDLs.
@@ -429,7 +431,8 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
          .source = ChildRef{kMockCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
+        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
+                          Protocol{fuchsia::sysmem2::Allocator::Name_}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}, target}},
         {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},

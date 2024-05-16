@@ -8,7 +8,7 @@ import("//tools/fidl/measure-tape/measure_tape.gni")
 fidl("fuchsia.test") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Testing"
 
   sources = [ "suite.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

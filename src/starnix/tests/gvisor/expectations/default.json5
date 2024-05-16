@@ -353,6 +353,8 @@
                 "GetcpuTest.IsValidCpu",
 
                 // getdents_test
+                "GetdentsTest.TooLargeSize",
+
                 // Assumes structure of root directory.
                 "ReaddirTest.RootContainsBasicDirectories",
 
@@ -641,6 +643,7 @@
                 "ProcFilesystems.Bug65172365",
                 "ProcFilesystems.ReadCapLastCap",
                 "Proc.GetdentsEnoent",
+                "Proc.PidReuse",
                 "Proc.PidTidIOAccounting",
 
                 // proc_isolated_test
@@ -1201,6 +1204,9 @@
 
                 // TODO(https://fxbug.dev/328690451) Re-enable once flake is resolved.
                 "InotifyTest.InotifyAndTargetDestructionDoNotDeadlock",
+
+                // TODO(https://fxbug.dev/339238239) Re-enable once flake is resolved.
+                "IntervalTimerTest.PeriodicGroupDirectedSignal",
             ],
         },
     ],

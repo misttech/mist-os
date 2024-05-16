@@ -6,14 +6,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // Netstack3 does not support SO_REUSEADDR and only partially supports
-                // SO_REUSEPORT for UDP sockets.
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindDoubleReuseAddrReusePortThenReuseAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConversionReversable1/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConversionReversable2/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.BindReuseAddrReusePortConvertibleToReuseAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.ReuseAddrDistribution/*",
-
                 // Netstack3 does not have complete support for multicast UDP sockets.
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddrNoDefaultSendIf/*",
@@ -25,8 +17,6 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketRecvBuf/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBuf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufAboveMax/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufBelowMin/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenReceive/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenSend/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenSend/*",

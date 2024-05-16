@@ -1,0 +1,13 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+composite vim3_display_detect;
+
+using fuchsia.gpio;
+using fuchsia.hardware.gpio;
+
+primary node "gpio-display-detect" {
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_RESET;
+}

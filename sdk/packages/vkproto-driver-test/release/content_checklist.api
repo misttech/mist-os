@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "content": {
+    "files": {
+      "meta/vkproto-driver-test-child.cm": {
+        "hash": "9cedcc80d3613f3309fb38f274263dd71525cd04b83698454db289a92e47153f"
+      }
+    }
+  }
+}

@@ -4,8 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/starnix/build/starnix_linux_executable.gni")
 import("//src/starnix/kernel/starnix.gni")
-import("//src/starnix/tests/build/starnix_linux_test_executable.gni")
 
 group("self_profile") {
   testonly = true
@@ -37,7 +37,8 @@ rustc_binary("bin") {
   ]
 }
 
-starnix_linux_test_executable("linux_pipe_writer") {
+starnix_linux_executable("linux_pipe_writer") {
+  testonly = true
   sources = [ "src/pipe_writer.cc" ]
 }
 

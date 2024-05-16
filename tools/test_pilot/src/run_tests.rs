@@ -3,32 +3,28 @@
 // found in the LICENSE file.
 
 use crate::errors::TestRunError;
-use crate::opts::TestPilotArgs;
+use crate::opts::{
+    TestPilotArgs, ENV_CUSTOM_TEST_ARGS, ENV_OUT_DIR, ENV_PATH, ENV_RESOURCE_PATH,
+    ENV_SDK_TOOL_PATH, ENV_TARGETS, ENV_TEST_FILTER,
+};
 use crate::test_config::{TestConfigV1, TestConfiguration};
 use std::io::{self, Write};
 use std::process::{ExitStatus, Stdio};
 use tokio::io::AsyncReadExt;
 use tokio::process::{self, Command};
 
-const DEFAULT_PATH: &str = "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin";
-const ENV_PATH: &str = "PATH";
-const ENV_SDK_TOOL_PATH: &str = "SDK_TOOL_PATH";
-const ENV_TARGETS: &str = "TARGETS";
-const ENV_RESOURCE_PATH: &str = "RESOURCE_PATH";
-const ENV_EXECUTION_JSON: &str = "EXECUTION_JSON";
-const ENV_TEST_FILTER: &str = "TEST_FILTER";
-const ENV_CUSTOM_TEST_ARGS: &str = "custom_test_args";
-const ENV_TAGS: &str = "TAGS";
+const ENV_TAGS: &str = "FUCHSIA_TAGS";
+const ENV_EXECUTION_JSON: &str = "FUCHSIA_EXECUTION_JSON";
 const BUFFER_SIZE: usize = 2048;
 
 fn create_test_launch_command_v1(args: &TestPilotArgs, config: &TestConfigV1) -> Command {
     let mut cmd = Command::new(&args.test_bin_path);
     cmd.env_clear();
-    cmd.env(ENV_PATH, DEFAULT_PATH);
-    if config.requested_features.sdk_tools_path {
-        cmd.env(ENV_SDK_TOOL_PATH, args.sdk_tools_path.clone().unwrap());
+    cmd.env(ENV_PATH, args.path.clone());
+    if let Some(path) = &args.sdk_tools_path {
+        cmd.env(ENV_SDK_TOOL_PATH, path);
     }
-    if config.requested_features.requires_target {
+    if !args.targets.is_empty() {
         cmd.env(ENV_TARGETS, args.targets.join(", "));
     }
     if let Some(path) = &args.resource_path {
@@ -47,6 +43,9 @@ fn create_test_launch_command_v1(args: &TestPilotArgs, config: &TestConfigV1) ->
     if let Some(custom_test_args) = &args.custom_test_args {
         cmd.env(ENV_CUSTOM_TEST_ARGS, custom_test_args);
     }
+    if let Some(out_dir) = &args.out_dir {
+        cmd.env(ENV_OUT_DIR, out_dir);
+    }
 
     if config.tags.len() > 0 {
         let tags_str = config
@@ -62,6 +61,12 @@ fn create_test_launch_command_v1(args: &TestPilotArgs, config: &TestConfigV1) ->
     if !args.strict_mode {
         for (key, value) in &args.extra_env_vars {
             cmd.env(key, value);
+        }
+    } else {
+        for (key, value) in &args.extra_env_vars {
+            if config.requested_vars.extra_vars.contains(key) {
+                cmd.env(key, value);
+            }
         }
     }
 
@@ -152,6 +157,8 @@ pub async fn run_test(
 
 #[cfg(test)]
 mod tests {
+    use self::test_config::RequestedVars;
+
     use super::*;
     use crate::*;
     use assert_matches::assert_matches;
@@ -162,6 +169,7 @@ mod tests {
         TestPilotArgs {
             test_bin_path: "/path/to/test_bin".into(),
             sdk_tools_path: None,
+            path: std::env::var("PATH").unwrap(),
             targets: Vec::new(),
             resource_path: None,
             out_dir: None,
@@ -176,13 +184,9 @@ mod tests {
 
     fn default_config_v1() -> TestConfigV1 {
         TestConfigV1 {
-            requested_features: test_config::RequestedFeatures {
-                sdk_tools_path: false,
-                requires_target: false,
-                requires_serial: false,
-            },
             execution: serde_json::Value::Null,
             tags: Vec::new(),
+            requested_vars: RequestedVars::default(),
         }
     }
 
@@ -196,7 +200,7 @@ mod tests {
         assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
         assert_eq!(cmd.as_std().get_args().len(), 0);
         let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
-        assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), DEFAULT_PATH);
+        assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), args.path.as_str());
         assert_eq!(env.get(OsStr::new(ENV_SDK_TOOL_PATH)), None);
         assert_eq!(env.get(OsStr::new(ENV_TARGETS)), None);
         assert_eq!(env.get(OsStr::new(ENV_RESOURCE_PATH)), None);
@@ -212,7 +216,7 @@ mod tests {
     #[test]
     fn test_strict_mode() {
         let mut args = default_args();
-        let config = default_config_v1();
+        let mut config = default_config_v1();
 
         args.extra_env_vars = vec![("key1".into(), "val1".into()), ("key2".into(), "val2".into())];
 
@@ -236,6 +240,18 @@ mod tests {
         // make sure we inherit extra env variables.
         assert_eq!(env.get(OsStr::new("key1")).unwrap().unwrap(), "val1");
         assert_eq!(env.get(OsStr::new("key2")).unwrap().unwrap(), "val2");
+
+        args.strict_mode = true;
+        config.requested_vars.extra_vars = vec!["key3".into(), "key2".into()];
+        args.extra_env_vars.push(("key3".into(), "val3".into()));
+        let cmd = create_test_launch_command_v1(&args, &config);
+        assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
+        assert_eq!(cmd.as_std().get_args().len(), 0);
+        let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
+
+        // make sure we inherit allowed extra env variables.
+        assert_eq!(env.get(OsStr::new("key3")).unwrap().unwrap(), "val3");
+        assert_eq!(env.get(OsStr::new("key2")).unwrap().unwrap(), "val2");
     }
 
     #[test]
@@ -245,11 +261,6 @@ mod tests {
         args.targets = vec!["target1".to_string(), "target2".to_string()];
 
         let config = TestConfigV1 {
-            requested_features: test_config::RequestedFeatures {
-                sdk_tools_path: true,
-                requires_target: true,
-                requires_serial: false,
-            },
             execution: serde_json::json!({ "key": "value" }),
             tags: vec![
                 test_config::TestTag {
@@ -261,13 +272,14 @@ mod tests {
                     value: "tag_value2".to_string(),
                 },
             ],
+            requested_vars: RequestedVars::default(),
         };
 
         let cmd = create_test_launch_command_v1(&args, &config);
         let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
         assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
         assert_eq!(cmd.as_std().get_args().len(), 0);
-        assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), DEFAULT_PATH);
+        assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), args.path.as_str());
         assert_eq!(env.get(OsStr::new(ENV_SDK_TOOL_PATH)).unwrap().unwrap(), "/path/to/sdk_tools");
         assert_eq!(env.get(OsStr::new(ENV_TARGETS)).unwrap().unwrap(), "target1, target2");
         assert_eq!(env.get(OsStr::new(ENV_RESOURCE_PATH)), None);
@@ -297,7 +309,7 @@ mod tests {
         let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
         assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
         assert_eq!(cmd.as_std().get_args().len(), 0);
-        assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), DEFAULT_PATH);
+        assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), args.path.as_str());
         assert_eq!(env.get(OsStr::new(ENV_SDK_TOOL_PATH)), None);
         assert_eq!(env.get(OsStr::new(ENV_TARGETS)), None);
         assert_eq!(
@@ -328,7 +340,7 @@ mod tests {
         let stdout_output = String::from_utf8(stdout_buf.into_inner()).unwrap();
         let stderr_output = String::from_utf8(stderr_buf.into_inner()).unwrap();
 
-        assert_eq!(stdout_output, format!("{}={}\n", ENV_PATH, DEFAULT_PATH));
+        assert_eq!(stdout_output, format!("{}={}\n", ENV_PATH, args.path.as_str()));
         assert_eq!(stderr_output, "");
         assert!(status.success(), "status: {}", status);
     }

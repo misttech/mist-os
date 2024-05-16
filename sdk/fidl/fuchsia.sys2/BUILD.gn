@@ -9,6 +9,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.sys2") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
+  stable = true
 
   public_deps = [
     "//sdk/fidl/fuchsia.component",

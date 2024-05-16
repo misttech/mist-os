@@ -83,6 +83,9 @@ type PowerElementConfiguration = table {
     2: dependencies vector<PowerDependency>:MAX_DEPENDENCIES;
 };
 
+// NOTE: This is _not_ a complete list of SAG elements. This enum only lists
+// the elements supported by the power support library. For a complete list
+// of SAG elements, see `fuchsia.power.system.PowerElements`.
 type SagElement = strict enum {
     EXECUTION_STATE = 1;
     EXECUTION_RESUME_LATENCY = 2;

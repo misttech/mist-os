@@ -1600,6 +1600,19 @@ _fuzzer_remove_common_configs = [ "//build/config:icf" ]
 # Disable warnings about symbols that will be provided by compiler runtimes.
 _fuzzer_remove_shared_configs = [ "//build/config:symbol_no_undefined" ]
 
+# The vptr instrumentation requires RTTI.  If -fno-rtti is passed then
+# this checking is implicitly disabled.  However, another translation
+# unit built without -fno-rtti will have the checking enabled.  The
+# -fno-rtti vtables are not compatible with the checking at runtime, so a
+# vtable from a -fno-rtti TU used by code from a -frtti TU gets false
+# positive failures.  Since the vtables are emitted in multiple TUs in
+# COMDAT and one implementation chosen randomly at link time, there's no
+# way to be sure the checking code requiring RTTI uses its own
+# RTTI-enabled vtables rather than other non-RTTI vtables.  So just let
+# RTTI be enabled everywhere, and then get the vptr checking everywhere
+# too.
+_ubsan_remove_common_configs = [ "//build/config:no_rtti" ]
+
 declare_args() {
   # List of variants that will form the basis for variant toolchains.
   # To make use of a variant, set [`select_variant`](#select_variant).
@@ -1738,29 +1751,18 @@ declare_args() {
       # This is the hwasan-ubsan variant.
       forward_variables_from(_hwasan_variant, "*")
       configs += [ "//build/config/sanitizers:ubsan" ]
+      remove_common_configs = _ubsan_remove_common_configs
       tags += [ "ubsan" ]
     },
 
     {
       configs = [ "//build/config/sanitizers:ubsan" ]
-
-      # The vptr instrumentation requires RTTI.  If -fno-rtti is passed then
-      # this checking is implicitly disabled.  However, another translation
-      # unit built without -fno-rtti will have the checking enabled.  The
-      # -fno-rtti vtables are not compatible with the checking at runtime, so a
-      # vtable from a -fno-rtti TU used by code from a -frtti TU gets false
-      # positive failures.  Since the vtables are emitted in multiple TUs in
-      # COMDAT and one implementation chosen randomly at link time, there's no
-      # way to be sure the checking code requiring RTTI uses its own
-      # RTTI-enabled vtables rather than other non-RTTI vtables.  So just let
-      # RTTI be enabled everywhere, and then get the vptr checking everywhere
-      # too.
-      remove_common_configs = [ "//build/config:no_rtti" ]
+      remove_common_configs = _ubsan_remove_common_configs
       tags = [
+        # This doesn't have "instrumentation-runtime" et al because while it
+        # requires some kind of runtime, every special environment that avoids
+        # the toolchain prebuilt libraries can use a custom runtime of its own.
         "instrumented",
-        "instrumentation-runtime",
-        "needs-compiler-abi",
-        "needs-writable-globals",
         "ubsan",
       ]
     },
@@ -1769,7 +1771,7 @@ declare_args() {
         "//build/config/sanitizers:ubsan",
         "//build/config/sanitizers:sancov",
       ]
-      remove_common_configs = [ "//build/config:no_rtti" ]  # See above.
+      remove_common_configs = _ubsan_remove_common_configs
       tags = [
         "instrumented",
         "instrumentation-runtime",
@@ -1785,7 +1787,7 @@ declare_args() {
     {
       forward_variables_from(_asan_variant, "*")
       configs += [ "//build/config/sanitizers:ubsan" ]
-      remove_common_configs += [ "//build/config:no_rtti" ]  # See above.
+      remove_common_configs += _ubsan_remove_common_configs
       tags += [ "ubsan" ]
     },
     {
@@ -1830,9 +1832,9 @@ declare_args() {
         "//build/config/sanitizers:ubsan",
       ]
       configs += _fuzzer_remove_common_configs  # Ensure present when removing.
-      remove_common_configs = _fuzzer_remove_common_configs
+      remove_common_configs =
+          _fuzzer_remove_common_configs + _ubsan_remove_common_configs
       remove_shared_configs = _fuzzer_remove_shared_configs
-      remove_common_configs += [ "//build/config:no_rtti" ]  # See above.
       tags = [
         "fuzzer",
         "instrumented",
@@ -1971,14 +1973,27 @@ declare_args() {
       ]
     },
     {
-      # This is the ubsan variant that applies only to the kernel.
-      # phys uses ubsan-trap, without a runtime.
+      # This requests the ubsan variant only for kernel-related things.
       name = "kubsan"
       select_variant = []
       select_variant = [
         {
           variant = "ubsan"
-          dir = [ "//zircon/kernel" ]
+          if (current_cpu == "x64") {
+            _zircon_cpu = "x86"
+          } else {
+            _zircon_cpu = current_cpu
+          }
+          dir = [
+            "//zircon/kernel",
+            "//zircon/kernel/arch/$_zircon_cpu/phys",
+            "//zircon/kernel/arch/$_zircon_cpu/phys/boot-shim",
+            "//zircon/kernel/arch/$_zircon_cpu/phys/efi",
+            "//zircon/kernel/phys",
+            "//zircon/kernel/phys/boot-shim",
+            "//zircon/kernel/phys/efi",
+            "//zircon/kernel/phys/test",
+          ]
         },
       ]
     },

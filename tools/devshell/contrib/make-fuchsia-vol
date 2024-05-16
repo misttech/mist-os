@@ -6,7 +6,7 @@
 #### CATEGORY=Other
 ### build a fuchsia persistent disk
 ## usage: fx make-fuchsia-vol [-include-keys]
-##   -include-keys add the keys from ~/.ssh/fuchsia_authorized_keys
+##   -include-keys add the authorized public keys configured
 ##                 to the Zircon ZBI as authorized_keys
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?

@@ -8,6 +8,7 @@ fidl("fuchsia.hardware.pty") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
   api = "fuchsia.hardware.pty.api"
+  stable = true
   sources = [ "pty.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.io" ]
 

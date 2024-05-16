@@ -246,7 +246,7 @@ void TestBase::RetrieveDaiFormats() {
   } else if (device_entry().isComposite()) {
     RequestTopologies();
 
-    // If there is a dai id, request the DAI formats for this endpoint.
+    // If there is a dai id, request the DAI formats for this interconnect.
     if (dai_id_.has_value()) {
       composite()->GetDaiFormats(
           dai_id_.value(),
@@ -574,7 +574,7 @@ void TestBase::RetrieveRingBufferFormats() {
   if (device_entry().isComposite()) {
     RequestTopologies();
 
-    // If ring_buffer_id_ is set, then a ring-buffer endpoint exists for this composite device.
+    // If ring_buffer_id_ is set, then a ring-buffer element exists for this composite device.
     // Retrieve the supported ring buffer formats for that node.
     if (ring_buffer_id_.has_value()) {
       composite()->GetRingBufferFormats(
@@ -900,7 +900,7 @@ void TestBase::SignalProcessingConnect() {
 }
 
 // First retrieve the element list. If signalprocessing is not supported, exit early;
-// otherwise save the ID of a RING_BUFFER ENDPOINT, and the ID of a DAI_INTERCONNECT ENDPOINT.
+// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
 // We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
 void TestBase::RequestTopologies() {
   SignalProcessingConnect();
@@ -916,15 +916,11 @@ void TestBase::RequestTopologies() {
           elements_ = std::move(result.response().processing_elements);
           for (auto& element : elements_) {
             if (element.type() ==
-                fuchsia::hardware::audio::signalprocessing::ElementType::ENDPOINT) {
-              if (element.type_specific().endpoint().type() ==
-                  fuchsia::hardware::audio::signalprocessing::EndpointType::RING_BUFFER) {
-                ring_buffer_id_.emplace(element.id());  // Override any previous.
-              } else if (element.type_specific().endpoint().type() ==
-                         fuchsia::hardware::audio::signalprocessing::EndpointType::
-                             DAI_INTERCONNECT) {
-                dai_id_.emplace(element.id());  // Override any previous.
-              }
+                fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER) {
+              ring_buffer_id_.emplace(element.id());  // Override any previous.
+            } else if (element.type() ==
+                       fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
+              dai_id_.emplace(element.id());  // Override any previous.
             }
           }
         }

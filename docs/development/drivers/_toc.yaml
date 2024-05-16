@@ -51,7 +51,7 @@ toc:
 - title: "DFv1 concepts"
   section:
   - include: /docs/development/drivers/concepts/_toc.yaml
-- title: "Driver-specifc guides"
+- title: "Driver-specific guides"
   section:
   - include: /docs/development/drivers/driver_guides/_toc.yaml
 - title: "Others"

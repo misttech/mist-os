@@ -19,7 +19,7 @@ class FakePowerOwner : public PowerManager::Owner {
   explicit FakePowerOwner(mali::RegisterIo* register_io) : register_io_(register_io) {}
 
   mali::RegisterIo* register_io() override { return register_io_; }
-  void ReportPowerChangeComplete(bool success) override {
+  void ReportPowerChangeComplete(bool powered_on, bool success) override {
     if (!success) {
       power_change_failure_count_++;
     }

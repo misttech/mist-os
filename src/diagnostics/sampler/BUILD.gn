@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 # Library containing core logic for sampler,
 # library launched by generic diagnostics Launcher
@@ -81,10 +80,6 @@ fuchsia_package("sampler") {
     ":sampler-component",
     ":sampler-prod-config",
   ]
-}
-
-core_shard("core_shard") {
-  shard_file = "meta/sampler.core_shard.cml"
 }
 
 group("tests") {

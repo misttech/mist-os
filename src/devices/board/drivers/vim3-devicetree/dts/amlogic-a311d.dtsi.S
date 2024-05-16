@@ -7,6 +7,8 @@
 /include/ "meson-g12-common.dtsi"
 
 #include <soc/aml-a311d/a311d-gpio.h>
+#include <soc/aml-a311d/a311d-hw.h>
+#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
 
 / {
 	compatible = "amlogic,a311d";
@@ -33,6 +35,7 @@
 		regulator-min-microvolt = <690000>;
 		regulator-max-microvolt = <1050000>;
 		regulator-step-microvolt = <1000>;
+		#regulator-cells = <0>;
 	 };
 
 	vddcpu1: pwm_a-regulator {
@@ -43,6 +46,7 @@
 		regulator-min-microvolt = <690000>;
 		regulator-max-microvolt = <1050000>;
 		regulator-step-microvolt = <1000>;
+		#regulator-cells = <0>;
 	};
 };
 

@@ -55,6 +55,10 @@ impl Address {
         Ok(Address::Public(le_bytes_from_be_str(s)?))
     }
 
+    pub fn random_from_str(s: &str) -> Result<Address, Error> {
+        Ok(Address::Random(le_bytes_from_be_str(s)?))
+    }
+
     pub fn address_type_string(&self) -> String {
         match self {
             Address::Public(_) => "public".to_string(),
@@ -179,6 +183,15 @@ mod tests {
             let str_rep = addr_to_string(address.bytes());
             assert_eq!(
                 Address::public_from_str(&str_rep).map_err(|e| e.to_string()),
+                Ok(address),
+            );
+        }
+
+        #[test]
+        fn random_address_str_roundtrip(address in any_random_address()) {
+            let str_rep = addr_to_string(address.bytes());
+            assert_eq!(
+                Address::random_from_str(&str_rep).map_err(|e| e.to_string()),
                 Ok(address),
             );
         }

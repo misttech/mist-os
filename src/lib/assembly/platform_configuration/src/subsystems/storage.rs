@@ -73,6 +73,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 source: index_path.clone(),
             })
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
+        // Also add it to Sampler
+        builder
+            .package("sampler")
+            .config_data(FileEntry {
+                source: index_path.clone(),
+                destination: format!("component_id_index"),
+            })
+            .context(format!("Adding component id index to sampler"))?;
 
         if *context.feature_set_level == FeatureSupportLevel::Embeddable {
             // We don't need fshost in embeddable.

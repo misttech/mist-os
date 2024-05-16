@@ -46,15 +46,16 @@ void DlLoadTestsBase::FileCheck(std::string_view filename) {
   EXPECT_NE(filename, ld::abi::Abi<>::kSoname.str());
 }
 
-std::optional<DlLoadTestsBase::File> DlLoadTestsBase::RetrieveFile(Diagnostics& diag,
-                                                                   std::string_view filename) {
+fit::result<std::optional<DlLoadTestsBase::SystemError>, DlLoadTestsBase::File>
+DlLoadTestsBase::RetrieveFile(Diagnostics& diag, std::string_view filename) {
   FileCheck(filename);
   std::filesystem::path path = elfldltl::testing::GetTestDataPath(filename);
   if (fbl::unique_fd fd{open(path.c_str(), O_RDONLY)}) {
-    return File{std::move(fd), diag};
+    return fit::ok(File{std::move(fd), diag});
   }
-  diag.SystemError("cannot open ", filename);
-  return std::nullopt;
+  // The only expected failure is a "not found" error.
+  EXPECT_EQ(errno, ENOENT);
+  return fit::error(std::nullopt);
 }
 
 }  // namespace dl::testing

@@ -29,7 +29,7 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   };
 
   zx_device_str_prop_t str_fragment_props_1[] = {
-      {bind_test::FLAG.c_str(), str_prop_bool_val(false)},
+      ddk::MakeStrProperty(bind_test::FLAG, false),
   };
 
   auto fragment_dev_a_1 = std::make_unique<RootDriver>(dev);
@@ -70,7 +70,7 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
 
   // Add 2 devices that matches the other node group node.
   zx_device_str_prop_t str_fragment_props_2[] = {
-      {bind_test::TEST_PROP.c_str(), str_prop_str_val(bind_test::TEST_PROP_VALUE_2.c_str())},
+      ddk::MakeStrProperty(bind_test::TEST_PROP, bind_test::TEST_PROP_VALUE_2),
   };
 
   auto fragment_dev_b_1 = std::make_unique<RootDriver>(dev);

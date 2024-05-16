@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
 
 rustc_test("dictionaries_integration_test_bin") {
   edition = "2021"
@@ -13,6 +15,24 @@ rustc_test("dictionaries_integration_test_bin") {
     "//src/lib/fuchsia-component",
     "//src/sys/component_manager/tests/fidl:components_rust",
   ]
+}
+
+rustc_binary("dict_trigger_bin") {
+  testonly = true
+  name = "dict_trigger"
+  edition = "2021"
+  deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/sys/component_manager/tests/fidl:components_rust",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+  source_root = "src/trigger.rs"
+  sources = [ "src/trigger.rs" ]
 }
 
 fuchsia_unittest_package("dictionaries_integration_test") {
@@ -29,7 +49,7 @@ fuchsia_unittest_package("dictionaries_integration_test") {
 
 fuchsia_component("trigger_c") {
   testonly = true
-  deps = [ "//src/sys/component_manager/tests:trigger_bin" ]
+  deps = [ ":dict_trigger_bin" ]
   manifest = "meta/trigger_c.cml"
   restricted_features = [ "dictionaries" ]
 }

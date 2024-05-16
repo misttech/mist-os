@@ -7,7 +7,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("progress-ui") {
   deps = [ ":package" ]
@@ -52,9 +51,4 @@ fuchsia_package("package") {
     "//src/recovery/system:recovery_logo",
     "//src/recovery/system:roboto_regular",
   ]
-}
-
-# The core realm shard to be used by example users
-core_shard("progress-ui-core-shard") {
-  shard_file = "meta/progress_ui.core_shard.cml"
 }

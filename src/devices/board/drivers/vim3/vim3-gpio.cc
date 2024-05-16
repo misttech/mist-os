@@ -123,7 +123,14 @@ fpbus::Node CreateGpioExpanderPbusNode() {
       DECL_GPIO_PIN(VIM3_SD_MODE),
   };
 
-  static const uint32_t kGpioExpanderPinOffset = VIM3_EXPANDER_GPIO_START;
+  fuchsia_hardware_gpioimpl::wire::ControllerMetadata controller_metadata = {
+      .id = VIM3_EXPANDER_GPIO_ID};
+  const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
+  if (!encoded_controller_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO controller metadata: %s",
+           encoded_controller_metadata.error_value().FormatDescription().c_str());
+    return {};
+  }
 
   fpbus::Node dev = {};
   dev.name() = "gpio-expander";
@@ -138,10 +145,8 @@ fpbus::Node CreateGpioExpanderPbusNode() {
               reinterpret_cast<const uint8_t*>(&kGpioExpanderPins) + sizeof(kGpioExpanderPins)),
       }},
       {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&kGpioExpanderPinOffset),
-                                       reinterpret_cast<const uint8_t*>(&kGpioExpanderPinOffset) +
-                                           sizeof(kGpioExpanderPinOffset)),
+          .type = DEVICE_METADATA_GPIO_CONTROLLER,
+          .data = encoded_controller_metadata.value(),
       }}};
   return dev;
 }
@@ -158,12 +163,24 @@ zx_status_t Vim3::GpioInit() {
     return encoded_metadata.error_value().status();
   }
 
+  fuchsia_hardware_gpioimpl::wire::ControllerMetadata controller_metadata = {.id = VIM3_GPIO_ID};
+  const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
+  if (!encoded_controller_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO controller metadata: %s",
+           encoded_controller_metadata.error_value().FormatDescription().c_str());
+    return encoded_controller_metadata.error_value().status();
+  }
+
   const std::vector<fpbus::Metadata> gpio_metadata{
       {{
           .type = DEVICE_METADATA_GPIO_PINS,
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&gpio_pins),
               reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPIO_CONTROLLER,
+          .data = encoded_controller_metadata.value(),
       }},
       {{
           .type = DEVICE_METADATA_GPIO_INIT,

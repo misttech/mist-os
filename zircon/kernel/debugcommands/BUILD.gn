@@ -10,7 +10,7 @@ source_set("debugcommands") {
     "undefined-behavior.cc",
   ]
   deps = [
-    "//zircon/kernel/lib/boot-options:boot-options-cli",
+    "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/unittest",
     "//zircon/system/ulib/zircon-internal",

@@ -365,8 +365,6 @@ void ThreadDispatcher::ExitingCurrent() {
   // marked dead, and we don't want to have a state where the process is
   // dead but one thread is not.
   {
-    Guard<CriticalMutex> guard{get_lock()};
-
     // Mark the thread as dead in the thread stats.  The thread is technically
     // still running, but from a perspective of user-mode observable thread
     // stats, it is now dead.  It is important to do this now, before we remove
@@ -382,8 +380,12 @@ void ThreadDispatcher::ExitingCurrent() {
     }
 
     // put ourselves into the dead state
+    Guard<CriticalMutex> guard{get_lock()};
     SetStateLocked(ThreadState::Lifecycle::DEAD);
-    core_thread_ = nullptr;
+
+    // Then obtain the core thread lock and reset our core thread pointer.
+    Guard<SpinLock, IrqSave> core_thread_guard{&core_thread_lock_};
+    ResetCoreThread();
   }
 
   // Drop our exception channel endpoint so any userspace listener

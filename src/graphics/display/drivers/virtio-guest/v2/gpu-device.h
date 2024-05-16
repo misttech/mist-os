@@ -69,8 +69,6 @@ class GpuDevice : public fdf::WireServer<fuchsia_hardware_display_engine::Engine
                           CheckConfigurationCompleter::Sync& completer) override {}
   void ApplyConfiguration(ApplyConfigurationRequestView request, fdf::Arena& arena,
                           ApplyConfigurationCompleter::Sync& completer) override {}
-  void SetEld(SetEldRequestView request, fdf::Arena& arena,
-              SetEldCompleter::Sync& completer) override {}
   void SetBufferCollectionConstraints(
       SetBufferCollectionConstraintsRequestView request, fdf::Arena& arena,
       SetBufferCollectionConstraintsCompleter::Sync& completer) override {}

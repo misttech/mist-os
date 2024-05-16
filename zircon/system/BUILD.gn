@@ -26,9 +26,9 @@ static_library("availability_test") {
         platform_version.in_development_api_level + 1
 
     defines = [
-      "BUILT_AT_SPECIFIC_API_LEVEL=$override_target_api_level",
-      "BUILT_AT_SPECIFIC_API_LEVEL_MINUS_ONE=$_override_target_api_level_minus_one",
-      "BUILT_AT_SPECIFIC_API_LEVEL_PLUS_ONE=$_override_target_api_level_plus_one",
+      "BUILT_AT_NUMBERED_API_LEVEL=$override_target_api_level",
+      "BUILT_AT_NUMBERED_API_LEVEL_MINUS_ONE=$_override_target_api_level_minus_one",
+      "BUILT_AT_NUMBERED_API_LEVEL_PLUS_ONE=$_override_target_api_level_plus_one",
       "FUCHSIA_INTERNAL_LEVEL_${_highest_supported_api_level_plus_one}_()=${_highest_supported_api_level_plus_one}",
     ]
   }

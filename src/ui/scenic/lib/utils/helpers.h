@@ -16,6 +16,11 @@ using SysmemTokens = struct {
   fuchsia::sysmem::BufferCollectionTokenSyncPtr dup_token;
 };
 
+using Sysmem2Tokens = struct {
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
+};
+
 constexpr std::array<float, 2> kDefaultPixelScale = {1.f, 1.f};
 
 // Helper for creating a Present2Args fidl struct.
@@ -54,11 +59,17 @@ fuchsia::sysmem::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
 
 // Create local and dup tokens for sysmem.
 SysmemTokens CreateSysmemTokens(fuchsia::sysmem::Allocator_Sync* sysmem_allocator);
+Sysmem2Tokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator);
 
 // Creates default constraints for |buffer_collection|
 fuchsia::sysmem::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
                                                                       uint32_t kWidth,
                                                                       uint32_t kHeight);
+
+// Transitional: same as above, but returns a sysmem2 BufferCollectionConstraints.
+fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints2(uint32_t buffer_count,
+                                                                        uint32_t kWidth,
+                                                                        uint32_t kHeight);
 
 // Accounts for floating point rounding errors.
 bool RectFContainsPoint(const fuchsia::math::RectF& rect, float x, float y);

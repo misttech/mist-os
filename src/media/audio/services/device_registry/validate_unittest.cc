@@ -584,20 +584,21 @@ TEST(ValidateTest, ValidateTopology) {
 
 TEST(ValidateTest, ValidateElements) { EXPECT_TRUE(ValidateElements(kElements)); }
 
-TEST(ValidateTest, ValidateElement) { EXPECT_TRUE(ValidateElement(kAgcElement)); }
+TEST(ValidateTest, ValidateElement) {
+  EXPECT_TRUE(ValidateElement(kAgcElement));
+  EXPECT_TRUE(ValidateElement(kRingBufferElement));
+}
+
+TEST(ValidateTest, ValidateDaiInterconnectElement) {
+  EXPECT_TRUE(ValidateDaiInterconnectElement(kDaiInterconnectElement));
+
+  EXPECT_TRUE(ValidateElement(kDaiInterconnectElement));
+}
 
 TEST(ValidateTest, ValidateDynamicsElement) {
   EXPECT_TRUE(ValidateDynamicsElement(kDynamicsElement));
 
   EXPECT_TRUE(ValidateElement(kDynamicsElement));
-}
-
-TEST(ValidateTest, ValidateEndpointElement) {
-  EXPECT_TRUE(ValidateEndpointElement(kDaiEndpointElement));
-  EXPECT_TRUE(ValidateEndpointElement(kRingBufferEndpointElement));
-
-  EXPECT_TRUE(ValidateElement(kDaiEndpointElement));
-  EXPECT_TRUE(ValidateElement(kRingBufferEndpointElement));
 }
 
 TEST(ValidateTest, ValidateEqualizerElement) {
@@ -623,18 +624,17 @@ TEST(ValidateTest, ValidateElementState) {
   EXPECT_TRUE(ValidateElementState(kGenericElementState, kAgcElement));
 }
 
+TEST(ValidateTest, ValidateDaiInterconnectElementState) {
+  EXPECT_TRUE(
+      ValidateDaiInterconnectElementState(kDaiInterconnectElementState, kDaiInterconnectElement));
+
+  EXPECT_TRUE(ValidateElementState(kDaiInterconnectElementState, kDaiInterconnectElement));
+}
+
 TEST(ValidateTest, ValidateDynamicsElementState) {
   EXPECT_TRUE(ValidateDynamicsElementState(kDynamicsElementState, kDynamicsElement));
 
   EXPECT_TRUE(ValidateElementState(kDynamicsElementState, kDynamicsElement));
-}
-
-TEST(ValidateTest, ValidateEndpointElementState) {
-  EXPECT_TRUE(ValidateEndpointElementState(kEndpointElementState, kDaiEndpointElement));
-  EXPECT_TRUE(ValidateEndpointElementState(kEndpointElementState, kRingBufferEndpointElement));
-
-  EXPECT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));
-  EXPECT_TRUE(ValidateElementState(kEndpointElementState, kRingBufferEndpointElement));
 }
 
 TEST(ValidateTest, ValidateEqualizerElementState) {

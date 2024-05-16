@@ -850,7 +850,7 @@ mod tests {
             assert_eq!(err, fcomponent::Error::InvalidArguments);
         }
 
-        // Source is the component itself... which doesn't exist... yet.
+        // Source is the component itself, which would create a cycle.
         {
             let collection_ref = fdecl::CollectionRef { name: "dynoff".to_string() };
             let child_decl = fdecl::Child {

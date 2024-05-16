@@ -1,5 +1,9 @@
 # Frequently Asked Questions
 
+Note: Compatibility testing documents are being overhauled in Q2
+2024.  Some information in this document is out of date. See
+https://fxbug.dev/339893257 for details.
+
 ## What is Fuchsia CTF? {#what-is-cts}
 
 Please see the [CTF overview] for an explanation of what CTF is.

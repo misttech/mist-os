@@ -49,7 +49,6 @@
             protocol: "fuchsia.component.Binder",
             from: "#detect",
             as: "fuchsia.component.DetectBinder",
-            availability: "optional",
             source_availability: "unknown",
         },
     ],

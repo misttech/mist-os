@@ -11,7 +11,6 @@
 #include <pw_async_fuchsia/dispatcher.h>
 
 #include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
-#include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
 #include "third_party/pigweed/backends/pw_random/zircon_random_generator.h"
@@ -37,8 +36,9 @@ class BtHostComponent {
   // false if initialization fails, otherwise returns true.
   using InitCallback = fit::callback<void(bool success)>;
   using ErrorCallback = fit::callback<void()>;
-  [[nodiscard]] bool Initialize(fuchsia::hardware::bluetooth::VendorHandle vendor_handle,
-                                InitCallback init_cb, ErrorCallback error_cb);
+  [[nodiscard]] bool Initialize(
+      fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end, InitCallback init_cb,
+      ErrorCallback error_cb);
 
   // Shuts down all systems.
   void ShutDown();

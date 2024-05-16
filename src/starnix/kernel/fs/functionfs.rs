@@ -71,7 +71,7 @@ impl FunctionFs {
             return error!(ENODEV);
         }
 
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options);
+        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
 
         let mut mount_options = fs_args::generic_parse_mount_options(fs.options.params.as_ref())?;
         let uid = if let Some(uid) = mount_options.remove(B("uid")) {

@@ -152,8 +152,8 @@ impl<S: HandleOwner> Directory<S> {
         Self::new(owner, object_id)
     }
 
-    /// Acquires the transaction with the appropriate locks to replace src.0/src.1 with |dst|.
-    /// src can be None in the case of unlinking |dst| from |self|.
+    /// Acquires the transaction with the appropriate locks to replace |dst| with |src.0|/|src.1|.
+    /// |src| can be None in the case of unlinking |dst| from |self|.
     /// Returns the transaction, as well as the ID and type of the child and the src. If the child
     /// doesn't exist, then a transaction is returned with a lock only on the parent and None for
     /// the target info so that the transaction can be executed with the confidence that the target

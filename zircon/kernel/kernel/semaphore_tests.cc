@@ -8,7 +8,6 @@
 #include <platform.h>
 
 #include <kernel/semaphore.h>
-#include <kernel/thread_lock.h>
 #include <lockdep/lockdep.h>
 
 using lockdep::Guard;
@@ -90,7 +89,8 @@ static int wait_sema_thread(void* arg) {
 }
 
 static bool thread_is_blocked(const Thread* t) {
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  SingletonChainLockGuardIrqSave guard{t->get_lock(),
+                                       CLT_TAG("thread_is_blocked (semaphore tests)")};
   return (t->state() == THREAD_BLOCKED);
 }
 

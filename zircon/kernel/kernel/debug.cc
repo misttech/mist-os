@@ -17,7 +17,9 @@
 
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/concurrent/copy.h>
 #include <lib/console.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <stdio.h>
@@ -31,7 +33,6 @@
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
 #include <kernel/thread.h>
-#include <kernel/thread_lock.h>
 #include <vm/vm.h>
 
 static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags);
@@ -65,16 +66,25 @@ static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    Thread* t = NULL;
-    if (is_kernel_address(argv[2].u)) {
-      t = (Thread*)argv[2].u;
-    } else {
-      t = thread_id_to_thread_slow(argv[2].u);
-    }
-    if (t) {
-      Backtrace bt;
-      t->GetBacktrace(bt);
-      bt.Print();
+    {
+      // Hold the list lock so that thread objects cannot destruct while we dump
+      // this info.
+      //
+      // Note that the practice of dumping info about a thread by direct kernel
+      // address is inherently dangerous.  No validation of the pointer is
+      // currently done.
+      Guard<SpinLock, IrqSave> list_lock_guard(&Thread::get_list_lock());
+      Thread* t = NULL;
+      if (is_kernel_address(argv[2].u)) {
+        t = (Thread*)argv[2].u;
+      } else {
+        t = thread_id_to_thread_slow(argv[2].u);
+      }
+      if (t) {
+        Backtrace bt;
+        t->GetBacktrace(bt);
+        bt.Print();
+      }
     }
   } else if (!strcmp(argv[1].str, "dump")) {
     if (argc < 3) {
@@ -146,7 +156,7 @@ namespace {
 
 RecurringCallback g_threadload_callback([]() {
   static struct cpu_stats old_stats[SMP_MAX_CPUS];
-  static zx_duration_t last_idle_time[SMP_MAX_CPUS];
+  static zx_duration_t last_idle_time[SMP_MAX_CPUS]{0};
 
   printf(
       "cpu    load"
@@ -155,33 +165,46 @@ RecurringCallback g_threadload_callback([]() {
       " ints (hw  tmr tmr_cb)"
       " ipi (rs  gen)\n");
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
-    Guard<MonitoredSpinLock, NoIrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
+    const Thread& idle_power_thread = percpu::Get(i).idle_power_thread.thread();
+    struct cpu_stats stats;
 
-    // dont display time for inactive cpus
-    if (!mp_is_cpu_active(i)) {
+    SingletonChainLockGuardIrqSave thread_guard{idle_power_thread.get_lock(),
+                                                CLT_TAG("g_threadload_callback")};
+    using optional_duration = ktl::optional<zx_duration_t>;
+    auto maybe_idle_time = Scheduler::RunInLockedScheduler(i, [&]() -> optional_duration {
+      // dont display time for inactive cpus
+      if (!mp_is_cpu_active(i)) {
+        return ktl::nullopt;
+      }
+
+      {
+        const auto& percpu = percpu::Get(i);
+        concurrent::WellDefinedCopyFrom<concurrent::SyncOpt::None, alignof(decltype(stats))>(
+            &stats, &percpu.stats, sizeof(stats));
+      }
+
+      // if the cpu is currently idle, add the time since it went idle up until now to the idle
+      // counter
+      bool is_idle = !!mp_is_cpu_idle(i);
+      if (is_idle) {
+        ChainLockTransaction::AssertActive();
+        idle_power_thread.get_lock().AssertHeld();
+        zx_duration_t recent_idle_time = zx_time_sub_time(
+            current_time(), idle_power_thread.scheduler_state().last_started_running());
+        return zx_duration_add_duration(stats.idle_time, recent_idle_time);
+      } else {
+        return stats.idle_time;
+      }
+    });
+
+    if (!maybe_idle_time.has_value()) {
       continue;
     }
-    const auto& percpu = percpu::Get(i);
 
-    zx_duration_t idle_time = percpu.stats.idle_time;
-
-    // if the cpu is currently idle, add the time since it went idle up until now to the idle
-    // counter
-    bool is_idle = !!mp_is_cpu_idle(i);
-    if (is_idle) {
-      zx_duration_t recent_idle_time = zx_time_sub_time(
-          current_time(),
-          percpu.idle_power_thread.thread().scheduler_state().last_started_running());
-      idle_time = zx_duration_add_duration(idle_time, recent_idle_time);
-    }
-
-    zx_duration_t delta_time = zx_duration_sub_duration(idle_time, last_idle_time[i]);
-    zx_duration_t busy_time;
-    if (ZX_SEC(1) > delta_time) {
-      busy_time = zx_duration_sub_duration(ZX_SEC(1), delta_time);
-    } else {
-      busy_time = 0;
-    }
+    const zx_duration_t idle_time = maybe_idle_time.value();
+    const zx_duration_t delta_time = zx_duration_sub_duration(idle_time, last_idle_time[i]);
+    const zx_duration_t busy_time =
+        (ZX_SEC(1) > delta_time) ? zx_duration_sub_duration(ZX_SEC(1), delta_time) : 0;
     zx_duration_t busypercent = zx_duration_mul_int64(busy_time, 10000) / ZX_SEC(1);
 
     printf(
@@ -193,17 +216,14 @@ RecurringCallback g_threadload_callback([]() {
         " %8lu %4lu"
         "\n",
         i, static_cast<uint>(busypercent / 100), static_cast<uint>(busypercent % 100),
-        percpu.stats.context_switches - old_stats[i].context_switches,
-        percpu.stats.yields - old_stats[i].yields, percpu.stats.preempts - old_stats[i].preempts,
-        percpu.stats.irq_preempts - old_stats[i].irq_preempts,
-        percpu.stats.syscalls - old_stats[i].syscalls,
-        percpu.stats.interrupts - old_stats[i].interrupts,
-        percpu.stats.timer_ints - old_stats[i].timer_ints,
-        percpu.stats.timers - old_stats[i].timers,
-        percpu.stats.reschedule_ipis - old_stats[i].reschedule_ipis,
-        percpu.stats.generic_ipis - old_stats[i].generic_ipis);
+        stats.context_switches - old_stats[i].context_switches, stats.yields - old_stats[i].yields,
+        stats.preempts - old_stats[i].preempts, stats.irq_preempts - old_stats[i].irq_preempts,
+        stats.syscalls - old_stats[i].syscalls, stats.interrupts - old_stats[i].interrupts,
+        stats.timer_ints - old_stats[i].timer_ints, stats.timers - old_stats[i].timers,
+        stats.reschedule_ipis - old_stats[i].reschedule_ipis,
+        stats.generic_ipis - old_stats[i].generic_ipis);
 
-    old_stats[i] = percpu.stats;
+    old_stats[i] = stats;
     last_idle_time[i] = idle_time;
   }
 });

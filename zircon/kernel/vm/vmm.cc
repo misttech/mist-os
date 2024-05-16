@@ -19,7 +19,6 @@
 #include <fbl/null_lock.h>
 #include <kernel/mutex.h>
 #include <kernel/task_runtime_timers.h>
-#include <kernel/thread_lock.h>
 #include <object/diagnostics.h>
 #include <vm/fault.h>
 #include <vm/pmm.h>
@@ -37,7 +36,7 @@
 // the older api.
 
 void vmm_context_switch(VmAspace* oldspace, VmAspace* newaspace) {
-  thread_lock.AssertHeld();
+  DEBUG_ASSERT(arch_ints_disabled());
 
   ArchVmAspace::ContextSwitch(oldspace ? &oldspace->arch_aspace() : nullptr,
                               newaspace ? &newaspace->arch_aspace() : nullptr);
@@ -93,31 +92,20 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   return status;
 }
 
-template <typename GuardType, typename Lock>
-static void vmm_set_active_aspace_internal(VmAspace* aspace, Lock lock) {
+void vmm_set_active_aspace(VmAspace* aspace) {
   LTRACEF("aspace %p\n", aspace);
 
   Thread* t = Thread::Current::Get();
+  t->AssertIsCurrentThread();
   DEBUG_ASSERT(t);
 
   if (aspace == t->active_aspace()) {
     return;
   }
 
-  // grab the thread lock and switch to the new address space
-  GuardType lock_guard{lock, SOURCE_TAG};
-
+  InterruptDisableGuard irqd;
   VmAspace* old = t->switch_aspace(aspace);
   vmm_context_switch(old, t->active_aspace());
-}
-
-void vmm_set_active_aspace(VmAspace* aspace) {
-  vmm_set_active_aspace_internal<Guard<MonitoredSpinLock, IrqSave>>(aspace, ThreadLock::Get());
-}
-
-void vmm_set_active_aspace_locked(VmAspace* aspace) {
-  fbl::NullLock null_lock;
-  vmm_set_active_aspace_internal<NullGuard>(aspace, &null_lock);
 }
 
 static fbl::RefPtr<VmAspace> test_aspace;
@@ -195,7 +183,7 @@ static int cmd_vmm(int argc, const cmd_args* argv, uint32_t flags) {
     printf("VmAspace::Create aspace %p\n", aspace.get());
 
     test_aspace = aspace;
-    Thread::Current::Get()->switch_aspace(aspace.get());
+    Thread::Current::switch_aspace(aspace.get());
     Thread::Current::Sleep(1);  // XXX hack to force it to reschedule and thus load the aspace
   } else if (!strcmp(argv[1].str, "free_aspace")) {
     if (argc < 2) {
@@ -207,8 +195,8 @@ static int cmd_vmm(int argc, const cmd_args* argv, uint32_t flags) {
       test_aspace = nullptr;
     }
 
-    if (Thread::Current::Get()->active_aspace() == aspace.get()) {
-      Thread::Current::Get()->switch_aspace(nullptr);
+    if (Thread::Current::active_aspace() == aspace.get()) {
+      Thread::Current::switch_aspace(nullptr);
       Thread::Current::Sleep(1);  // hack
     }
 
@@ -220,7 +208,7 @@ static int cmd_vmm(int argc, const cmd_args* argv, uint32_t flags) {
     }
 
     test_aspace = fbl::RefPtr((VmAspace*)(void*)argv[2].u);
-    Thread::Current::Get()->switch_aspace(test_aspace.get());
+    Thread::Current::switch_aspace(test_aspace.get());
     Thread::Current::Sleep(1);  // XXX hack to force it to reschedule and thus load the aspace
   } else {
     printf("unknown command\n");

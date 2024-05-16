@@ -30,6 +30,7 @@ class TestMpeg2 {
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
 
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(TestSupport::parent_device()));
 
     TestBasicClient client;

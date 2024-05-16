@@ -19,7 +19,7 @@ use crate::{
     context::{
         CoreTimerContext, HandleableTimer, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
     },
-    device::{self, AnyDevice, DeviceIdContext, WeakId as _},
+    device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
     time::LocalTimerHeap,
 };
 
@@ -34,7 +34,7 @@ pub struct Ipv6RouteDiscoveryState<BT: Ipv6RouteDiscoveryBindingsTypes> {
 }
 
 impl<BC: Ipv6RouteDiscoveryBindingsContext> Ipv6RouteDiscoveryState<BC> {
-    pub fn new<D: device::WeakId, CC: CoreTimerContext<Ipv6DiscoveredRouteTimerId<D>, BC>>(
+    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<Ipv6DiscoveredRouteTimerId<D>, BC>>(
         bindings_ctx: &mut BC,
         device_id: D,
     ) -> Self {
@@ -62,11 +62,11 @@ pub struct Ipv6DiscoveredRoute {
 
 /// A timer ID for IPv6 route discovery.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct Ipv6DiscoveredRouteTimerId<D: device::WeakId> {
+pub struct Ipv6DiscoveredRouteTimerId<D: WeakDeviceIdentifier> {
     device_id: D,
 }
 
-impl<D: device::WeakId> Ipv6DiscoveredRouteTimerId<D> {
+impl<D: WeakDeviceIdentifier> Ipv6DiscoveredRouteTimerId<D> {
     pub(super) fn device_id(&self) -> &D {
         &self.device_id
     }
@@ -279,8 +279,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _,
+        context::{
+            testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt as _},
+            CtxPair,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -297,7 +298,7 @@ mod tests {
             IpLayerEvent, IPV6_DEFAULT_SUBNET,
         },
         testutil::{
-            DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            CtxPairExt as _, DispatchedEvent, TestAddrs, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
@@ -382,8 +383,7 @@ mod tests {
             &FakeDeviceId: &Self::DeviceId,
             cb: F,
         ) -> O {
-            let FakeIpv6RouteDiscoveryContext { state, route_table, ip_device_id_ctx: _ } =
-                self.get_mut();
+            let FakeIpv6RouteDiscoveryContext { state, route_table, .. } = &mut self.state;
             cb(state, route_table)
         }
     }
@@ -404,8 +404,8 @@ mod tests {
     const THREE_SECONDS: NonZeroDuration =
         const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(3));
 
-    fn new_context() -> crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
-        FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
+    fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+        CtxPair::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeIpv6RouteDiscoveryContext {
                 state: Ipv6RouteDiscoveryState::new::<_, IntoCoreTimerCtx>(
                     bindings_ctx,
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn new_route_no_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         RouteDiscoveryHandler::update_route(
             &mut core_ctx,
@@ -445,7 +445,7 @@ mod tests {
             Some(duration),
         );
 
-        let route_table = &core_ctx.get_ref().route_table.route_table;
+        let route_table = &core_ctx.state.route_table.route_table;
         assert!(route_table.contains(&route), "route_table={route_table:?}");
 
         let expect = match duration {
@@ -472,7 +472,7 @@ mod tests {
         bindings_ctx: &mut FakeBindingsCtxImpl,
         route: Ipv6DiscoveredRoute,
     ) {
-        let route_table = &core_ctx.get_ref().route_table.route_table;
+        let route_table = &core_ctx.state.route_table.route_table;
         assert!(!route_table.contains(&route), "route_table={route_table:?}");
         bindings_ctx.timers.assert_no_timers_installed();
     }
@@ -488,10 +488,10 @@ mod tests {
 
     #[test]
     fn new_route_already_exists() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         // Fake the route already being present in the routing table.
-        assert!(core_ctx.get_mut().route_table.route_table.insert(ROUTE1));
+        assert!(core_ctx.state.route_table.route_table.insert(ROUTE1));
 
         // Clear events so we can assert on route-added events later.
         let _: Vec<crate::testutil::DispatchedEvent> = bindings_ctx.take_events();
@@ -511,13 +511,13 @@ mod tests {
 
     #[test]
     fn invalidated_route_not_found() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
 
         // Fake the route already being removed from underneath the route
         // discovery table.
-        assert!(core_ctx.get_mut().route_table.route_table.remove(&ROUTE1));
+        assert!(core_ctx.state.route_table.route_table.remove(&ROUTE1));
         // Invalidating the route should ignore the fact that the route is not
         // in the route table.
         update_to_invalidate_check_invalidation(&mut core_ctx, &mut bindings_ctx, ROUTE1);
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn new_route_with_infinite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn update_route_from_infinite_to_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn invalidate_route_with_infinite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(&mut core_ctx, &mut bindings_ctx, ROUTE1, NonZeroNdpLifetime::Infinite);
         bindings_ctx.timers.assert_no_timers_installed();
@@ -572,7 +572,7 @@ mod tests {
     }
     #[test]
     fn new_route_with_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -585,7 +585,7 @@ mod tests {
 
     #[test]
     fn update_route_from_finite_to_infinite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn update_route_from_finite_to_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -631,7 +631,7 @@ mod tests {
 
     #[test]
     fn invalidate_route_with_finite_lifetime() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
 
         discover_new_route(
             &mut core_ctx,
@@ -645,7 +645,7 @@ mod tests {
 
     #[test]
     fn invalidate_all_routes() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = new_context();
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context();
         discover_new_route(
             &mut core_ctx,
             &mut bindings_ctx,
@@ -661,7 +661,7 @@ mod tests {
 
         RouteDiscoveryHandler::invalidate_routes(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
         bindings_ctx.timers.assert_no_timers_installed();
-        let route_table = &core_ctx.get_ref().route_table.route_table;
+        let route_table = &core_ctx.state.route_table.route_table;
         assert!(route_table.is_empty(), "route_table={route_table:?}");
     }
 
@@ -718,18 +718,11 @@ mod tests {
             .unwrap_b()
     }
 
-    fn setup() -> (
-        crate::testutil::FakeCtx,
-        DeviceId<crate::testutil::FakeBindingsCtx>,
-        FakeEventDispatcherConfig<Ipv6Addr>,
-    ) {
-        let FakeEventDispatcherConfig {
-            local_mac,
-            remote_mac: _,
-            local_ip: _,
-            remote_ip: _,
-            subnet: _,
-        } = Ipv6::FAKE_CONFIG;
+    fn setup(
+    ) -> (crate::testutil::FakeCtx, DeviceId<crate::testutil::FakeBindingsCtx>, TestAddrs<Ipv6Addr>)
+    {
+        let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
+            Ipv6::TEST_ADDRS;
 
         let mut ctx = crate::testutil::FakeCtx::default();
         let device_id = ctx
@@ -760,7 +753,7 @@ mod tests {
 
         assert_timers_integration(&mut ctx.core_ctx(), &device_id, []);
 
-        (ctx, device_id, Ipv6::FAKE_CONFIG)
+        (ctx, device_id, Ipv6::TEST_ADDRS)
     }
 
     fn as_secs(d: NonZeroDuration) -> u16 {
@@ -818,13 +811,7 @@ mod tests {
         let (
             mut ctx,
             device_id,
-            FakeEventDispatcherConfig {
-                local_mac: _,
-                remote_mac,
-                local_ip: _,
-                remote_ip: _,
-                subnet,
-            },
+            TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
         ) = setup();
 
         add_link_local_route(&mut ctx, &device_id);
@@ -1000,13 +987,7 @@ mod tests {
         let (
             mut ctx,
             device_id,
-            FakeEventDispatcherConfig {
-                local_mac: _,
-                remote_mac,
-                local_ip: _,
-                remote_ip: _,
-                subnet,
-            },
+            TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
         ) = setup();
 
         add_link_local_route(&mut ctx, &device_id);
@@ -1131,13 +1112,7 @@ mod tests {
         let (
             mut ctx,
             device_id,
-            FakeEventDispatcherConfig {
-                local_mac: _,
-                remote_mac,
-                local_ip: _,
-                remote_ip: _,
-                subnet,
-            },
+            TestAddrs { local_mac: _, remote_mac, local_ip: _, remote_ip: _, subnet },
         ) = setup();
         add_link_local_route(&mut ctx, &device_id);
 

@@ -170,19 +170,6 @@ zx_status_t BlockDeviceAdapter::WaitUntilVisible() const {
   return channel.status_value();
 }
 
-zx_status_t BlockDeviceAdapter::Rebind() {
-  if (zx_status_t status = RebindBlockDevice(device()); status != ZX_OK) {
-    return status;
-  }
-
-  // Block device is visible again.
-  if (zx_status_t status = WaitUntilVisible(); status != ZX_OK) {
-    return status;
-  }
-
-  return ZX_OK;
-}
-
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> VPartitionAdapter::GetController() {
   return fvm::GetController(device());
 }
@@ -318,10 +305,6 @@ std::unique_ptr<FvmAdapter> FvmAdapter::CreateGrowable(const fbl::unique_fd& dev
     return nullptr;
   }
   return std::make_unique<FvmAdapter>(devfs_root, fvm_path.c_str(), device);
-}
-
-FvmAdapter::~FvmAdapter() {
-  fs_management::FvmDestroyWithDevfs(devfs_root_.get(), block_device_->path());
 }
 
 zx_status_t FvmAdapter::AddPartition(const fbl::unique_fd& devfs_root, const std::string& name,

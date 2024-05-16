@@ -130,41 +130,39 @@ async fn main_inner() -> Result<(), Error> {
 
     let authenticator = base_resolver::context_authenticator::ContextAuthenticator::new();
 
-    let (system_image, executability_restrictions, base_packages, cache_packages) =
-        if use_system_image {
-            let boot_args = connect_to_protocol::<fidl_fuchsia_boot::ArgumentsMarker>()
-                .context("error connecting to fuchsia.boot/Arguments")?;
-            let system_image = system_image::SystemImage::new(blobfs.clone(), &boot_args)
-                .await
-                .context("Accessing contents of system_image package")?;
-            inspector.root().record_string("system_image", system_image.hash().to_string());
+    let (executability_restrictions, base_packages, cache_packages) = if use_system_image {
+        let boot_args = connect_to_protocol::<fidl_fuchsia_boot::ArgumentsMarker>()
+            .context("error connecting to fuchsia.boot/Arguments")?;
+        let system_image = system_image::SystemImage::new(blobfs.clone(), &boot_args)
+            .await
+            .context("Accessing contents of system_image package")?;
+        inspector.root().record_string("system_image", system_image.hash().to_string());
 
-            let (base_packages_res, cache_packages_res) =
-                join!(BasePackages::new(&blobfs, &system_image), async {
-                    let cache_packages =
-                        system_image.cache_packages().await.context("reading cache_packages")?;
-                    Ok(CachePackages::new(&blobfs, &cache_packages)
-                        .await
-                        .context("creating CachePackages index")?)
-                });
-            let base_packages = base_packages_res.context("loading base packages")?;
-            let cache_packages = cache_packages_res.unwrap_or_else(|e: anyhow::Error| {
-                error!("Failed to load cache packages, using empty: {e:#}");
-                CachePackages::empty()
+        let (base_packages_res, cache_packages_res) =
+            join!(BasePackages::new(&blobfs, &system_image), async {
+                let cache_packages =
+                    system_image.cache_packages().await.context("reading cache_packages")?;
+                Ok(CachePackages::new(&blobfs, &cache_packages)
+                    .await
+                    .context("creating CachePackages index")?)
             });
-            let executability_restrictions = system_image.load_executability_restrictions();
+        let base_packages = base_packages_res.context("loading base packages")?;
+        let cache_packages = cache_packages_res.unwrap_or_else(|e: anyhow::Error| {
+            error!("Failed to load cache packages, using empty: {e:#}");
+            CachePackages::empty()
+        });
+        let executability_restrictions = system_image.load_executability_restrictions();
 
-            (Some(system_image), executability_restrictions, base_packages, cache_packages)
-        } else {
-            info!("not loading system_image due to structured config");
-            inspector.root().record_string("system_image", "ignored");
-            (
-                None,
-                system_image::ExecutabilityRestrictions::Enforce,
-                BasePackages::empty(),
-                CachePackages::empty(),
-            )
-        };
+        (executability_restrictions, base_packages, cache_packages)
+    } else {
+        info!("not loading system_image due to structured config");
+        inspector.root().record_string("system_image", "ignored");
+        (
+            system_image::ExecutabilityRestrictions::Enforce,
+            BasePackages::empty(),
+            CachePackages::empty(),
+        )
+    };
 
     inspector
         .root()
@@ -353,9 +351,7 @@ async fn main_inner() -> Result<(), Error> {
             crate::compat::pkgfs::make_dir(
                 Arc::clone(&base_packages),
                 blobfs.clone(),
-                system_image,
-            )
-            .context("serve pkgfs compat directories")?,
+            ),
         "specific-base-packages" => vfs::pseudo_directory! {
             "build-info" => base_package_entry("build-info").await?,
             "config-data" => base_package_entry("config-data").await?,

@@ -247,7 +247,7 @@ void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
   auto spec = std::make_unique<driver_manager::CompositeNodeSpecV2>(
       driver_manager::CompositeNodeSpecCreateInfo{
           .name = composite,
-          .size = parents.size(),
+          .parents = parent_specs,
       },
       dispatcher(), &node_manager_);
 

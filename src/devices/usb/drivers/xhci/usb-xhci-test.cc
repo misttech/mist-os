@@ -543,7 +543,8 @@ zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* con
 
 void TransferRing::CommitTransaction(const State& start) {}
 
-zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> context, TRB* first) {
+zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> context, TRB* first,
+                                        TRB* setup) {
   fbl::AutoLock _(&mutex_);
   if (context->token != token_) {
     return ZX_ERR_INVALID_ARGS;

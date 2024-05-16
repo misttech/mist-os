@@ -179,6 +179,7 @@ zx_status_t InterruptDispatcher::Destroy() {
 }
 
 zx_status_t InterruptDispatcher::Bind(fbl::RefPtr<PortDispatcher> port_dispatcher, uint64_t key) {
+  AutoPreemptDisabler preempt_disable;
   Guard<SpinLock, IrqSave> guard{&spinlock_};
   if (state_ == InterruptState::DESTROYED) {
     return ZX_ERR_CANCELED;

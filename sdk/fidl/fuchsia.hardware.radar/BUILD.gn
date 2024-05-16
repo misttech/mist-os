@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.radar") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Drivers"
   sources = [ "radar.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

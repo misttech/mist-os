@@ -18,7 +18,7 @@ source_set("generic-riscv64") {
     "//zircon/kernel/dev/hw_watchdog/generic32",
     "//zircon/kernel/dev/interrupt/gic/common",
     "//zircon/kernel/dev/interrupt/gic/v2",
-    "//zircon/kernel/dev/interrupt/riscv_plic",
+    "//zircon/kernel/dev/interrupt/plic",
     "//zircon/kernel/dev/pdev/power",
     "//zircon/kernel/dev/pdev/timer",
     "//zircon/kernel/dev/uart/dw8250",

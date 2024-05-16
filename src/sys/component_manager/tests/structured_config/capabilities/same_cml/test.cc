@@ -38,5 +38,8 @@ TEST(ScTest, CheckValues) {
   ASSERT_EQ(c.my_string_vector().size(), 2);
   ASSERT_EQ(c.my_string_vector()[0], "Hello");
   ASSERT_EQ(c.my_string_vector()[1], "World!");
+
+  // Check that our transitional value with a default got the default value.
+  ASSERT_EQ(c.my_uint16_default(), 15);
 }
 }  // namespace

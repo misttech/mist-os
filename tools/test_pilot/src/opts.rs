@@ -11,19 +11,21 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use thiserror::Error as ThisError;
 
-const ENV_TARGETS: &str = "FUCHSIA_TARGETS";
-const ENV_TIMEOUT_SECONDS: &str = "FUCHSIA_TIMEOUT_SECONDS";
-const ENV_SDK_TOOLS_PATH: &str = "FUCHSIA_SDK_TOOLS_PATH";
-const ENV_RESOURCE_PATH: &str = "FUCHSIA_RESOURCE_PATH";
-const ENV_CUSTOM_TEST_ARGS: &str = "FUCHSIA_CUSTOM_TEST_ARGS";
-const ENV_TEST_FILTER: &str = "FUCHSIA_TEST_FILTER";
-const ENV_OUT_DIR: &str = "FUCHSIA_TEST_OUTDIR";
+pub const ENV_TARGETS: &str = "FUCHSIA_TARGETS";
+pub const ENV_TIMEOUT_SECONDS: &str = "FUCHSIA_TIMEOUT_SECONDS";
+pub const ENV_SDK_TOOL_PATH: &str = "FUCHSIA_SDK_TOOL_PATH";
+pub const ENV_RESOURCE_PATH: &str = "FUCHSIA_RESOURCE_PATH";
+pub const ENV_CUSTOM_TEST_ARGS: &str = "FUCHSIA_CUSTOM_TEST_ARGS";
+pub const ENV_TEST_FILTER: &str = "FUCHSIA_TEST_FILTER";
+pub const ENV_OUT_DIR: &str = "FUCHSIA_TEST_OUTDIR";
+pub const ENV_PATH: &str = "PATH";
+
 const ENV_STRICT_MODE: &str = "FUCHSIA_TEST_PILOT_STRICT_MODE";
 
 const ALL_ENV_VARS: [&str; 8] = [
     ENV_TARGETS,
     ENV_TIMEOUT_SECONDS,
-    ENV_SDK_TOOLS_PATH,
+    ENV_SDK_TOOL_PATH,
     ENV_RESOURCE_PATH,
     ENV_OUT_DIR,
     ENV_CUSTOM_TEST_ARGS,
@@ -61,6 +63,9 @@ pub struct TestPilotArgs {
 
     /// Path to the host test binary to execute.
     pub test_bin_path: PathBuf,
+
+    ///  PATH environment variable.
+    pub path: String,
 
     ///  Fuchsia targets. User can pass in multiple comma separated targets.
     pub targets: Vec<String>,
@@ -147,19 +152,37 @@ macro_rules! parse_optional_var {
     };
 }
 
+macro_rules! required_config {
+    (option: $option:expr, $config_var:ident) => {
+        if $option.is_none() {
+            return Err(ConfigError::Required($config_var));
+        }
+    };
+    (vec: $vec:expr, $config_var:ident) => {
+        if $vec.is_empty() {
+            return Err(ConfigError::Required($config_var));
+        }
+    };
+}
+
 impl TestPilotArgs {
     pub fn validate_config(
         &self,
-        config: &test_config::TestConfiguration,
+        test_config: &test_config::TestConfiguration,
     ) -> Result<(), ConfigError> {
-        match config {
+        match test_config {
             test_config::TestConfiguration::V1 { config } => {
-                if config.requested_features.sdk_tools_path && self.sdk_tools_path.is_none() {
-                    return Err(ConfigError::Required(ENV_SDK_TOOLS_PATH));
-                }
-
-                if config.requested_features.requires_target && self.targets.is_empty() {
-                    return Err(ConfigError::Required(ENV_TARGETS));
+                for var in &config.requested_vars.known_vars {
+                    match var.as_str() {
+                        ENV_SDK_TOOL_PATH => {
+                            required_config!(option: self.sdk_tools_path, ENV_SDK_TOOL_PATH)
+                        }
+                        ENV_TARGETS => required_config!(vec: self.targets, ENV_TARGETS),
+                        ENV_RESOURCE_PATH => {
+                            required_config!(option: self.resource_path, ENV_RESOURCE_PATH)
+                        }
+                        _ => {}
+                    }
                 }
             }
         };
@@ -179,8 +202,9 @@ impl TestPilotArgs {
         let mut s = Self {
             test_config: cmd.fuchsia_test_configuration,
             test_bin_path: cmd.fuchsia_test_bin_path,
+            path: env.var(ENV_PATH).unwrap_or("".into()),
             timeout_seconds: parse_optional_var!(env, ENV_TIMEOUT_SECONDS, parse_u32)?,
-            sdk_tools_path: parse_optional_var!(env, ENV_SDK_TOOLS_PATH, dir_parse_path)?,
+            sdk_tools_path: parse_optional_var!(env, ENV_SDK_TOOL_PATH, dir_parse_path)?,
             resource_path: parse_optional_var!(env, ENV_RESOURCE_PATH, dir_parse_path)?,
             out_dir: parse_optional_var!(env, ENV_OUT_DIR, dir_parse_path)?,
             targets: env
@@ -346,7 +370,7 @@ mod tests {
 
         env.set_var(ENV_TARGETS, "target1, target2");
         env.set_var(ENV_TIMEOUT_SECONDS, "10");
-        env.set_var(ENV_SDK_TOOLS_PATH, temp_dir_path.to_str().unwrap());
+        env.set_var(ENV_SDK_TOOL_PATH, temp_dir_path.to_str().unwrap());
         env.set_var(ENV_RESOURCE_PATH, temp_dir_path.to_str().unwrap());
         env.set_var(ENV_OUT_DIR, temp_dir_path.to_str().unwrap());
         env.set_var(ENV_TEST_FILTER, "test_filter");
@@ -532,11 +556,7 @@ mod tests {
     fn create_test_config_v1() -> TestConfigV1 {
         TestConfigV1 {
             tags: Vec::new(),
-            requested_features: RequestedFeatures {
-                sdk_tools_path: false,
-                requires_target: false,
-                requires_serial: false,
-            },
+            requested_vars: RequestedVars::default(),
             execution: serde_json::json!({}),
         }
     }
@@ -546,6 +566,7 @@ mod tests {
         let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
+            path: "/some/path".into(),
             targets: vec!["target1".to_string()],
             timeout_seconds: Some(30),
             sdk_tools_path: Some(PathBuf::from("sdk_tools")),
@@ -558,8 +579,7 @@ mod tests {
         };
 
         let mut test_config = create_test_config_v1();
-        test_config.requested_features.sdk_tools_path = true;
-        test_config.requested_features.requires_target = true;
+        test_config.requested_vars.known_vars = vec![ENV_SDK_TOOL_PATH.into(), ENV_TARGETS.into()];
         let test_config = test_config.into();
         let result = args.validate_config(&test_config);
         assert!(result.is_ok());
@@ -567,6 +587,7 @@ mod tests {
         let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
+            path: "/some/path".into(),
             targets: vec![],
             timeout_seconds: Some(30),
             sdk_tools_path: None,
@@ -588,6 +609,7 @@ mod tests {
         let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
+            path: "/some/path".into(),
             targets: vec!["target1".to_string()],
             timeout_seconds: Some(30),
             sdk_tools_path: None, // Missing sdk_tools_path
@@ -600,10 +622,10 @@ mod tests {
         };
 
         let mut test_config = create_test_config_v1();
-        test_config.requested_features.sdk_tools_path = true;
+        test_config.requested_vars.known_vars = vec![ENV_SDK_TOOL_PATH.into()];
         let test_config = test_config.into();
         let result = args.validate_config(&test_config);
-        assert_eq!(result.unwrap_err(), ConfigError::Required(ENV_SDK_TOOLS_PATH));
+        assert_eq!(result.unwrap_err(), ConfigError::Required(ENV_SDK_TOOL_PATH));
     }
 
     #[test]
@@ -611,6 +633,7 @@ mod tests {
         let args = TestPilotArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
+            path: "/some/path".into(),
             targets: Vec::new(), // Missing targets
             timeout_seconds: Some(30),
             sdk_tools_path: Some(PathBuf::from("sdk_tools")),
@@ -623,9 +646,33 @@ mod tests {
         };
 
         let mut test_config = create_test_config_v1();
-        test_config.requested_features.requires_target = true;
+        test_config.requested_vars.known_vars = vec![ENV_TARGETS.into()];
         let test_config = test_config.into();
         let result = args.validate_config(&test_config);
         assert_eq!(result.unwrap_err(), ConfigError::Required(ENV_TARGETS));
+    }
+
+    #[test]
+    fn test_validate_missing_resources() {
+        let args = TestPilotArgs {
+            test_config: PathBuf::from("test_config.json"),
+            test_bin_path: PathBuf::from("test_bin"),
+            path: "/some/path".into(),
+            targets: Vec::new(), // Missing targets
+            timeout_seconds: Some(30),
+            sdk_tools_path: Some(PathBuf::from("sdk_tools")),
+            resource_path: None,
+            test_filter: Some("test_filter".to_string()),
+            out_dir: None,
+            custom_test_args: Some("extra_args".to_string()),
+            strict_mode: true,
+            extra_env_vars: vec![],
+        };
+
+        let mut test_config = create_test_config_v1();
+        test_config.requested_vars.known_vars = vec![ENV_RESOURCE_PATH.into()];
+        let test_config = test_config.into();
+        let result = args.validate_config(&test_config);
+        assert_eq!(result.unwrap_err(), ConfigError::Required(ENV_RESOURCE_PATH));
     }
 }

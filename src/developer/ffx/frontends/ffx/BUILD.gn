@@ -115,7 +115,8 @@ host_test("ffx-e2e-with-target") {
   environments = [
     # XXX(https://fxbug.dev/42143551): support arm64 HTI tests
     # emu_env,
-    nuc_env,
+    nuc7_env,
+    nuc11_env,
   ]
 
   # TODO(https://fxbug.dev/42077085) ffx self-test seems to be buggy, so let's at least

@@ -488,6 +488,10 @@ template("bazel_action") {
 
     inputs += [ _ninja_inputs_manifest ]
 
+    if (defined(invoker.inputs)) {
+      inputs += invoker.inputs
+    }
+
     depfile = "$target_gen_dir/$target_name.d"
 
     outputs = _outputs

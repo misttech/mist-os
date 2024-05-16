@@ -28,22 +28,16 @@ Trace event types can be found in
 
 ### Record a trace of the test
 
-Add the tracing package to your `fx set`:
+Add the touch tests to the base package set:
 
 ```shell
-$ fx set <product>.<arch> --with //src/ui/tests/integration_input_tests/touch:tests --with-base=//bundles/packages/prod:tracing
-```
-
-To record a trace of the test, use this fx invocation:
+$ fx set <product>.<arch> --with //src/ui/tests/integration_input_tests/touch:tests
 
 ```shell
-$ fx traceutil record --duration 20s --categories touch-input-test fuchsia-pkg://fuchsia.com/touch-input-test#meta/touch-input-test.cm
+$ ffx trace start --categories touch-input-test --background
+$ fx test touch-input-test
+$ ffx trace stop
 ```
-
-Note: The default duration for `traceutil record` is 10 seconds. When running
-locally, package resolving can take more than 10 seconds. If the recording ends
-before the test completes, increase the amount of time in the `--duration` flag.
-
 ## Play with clients
 
 You can use [`tiles-session`](/src/ui/bin/tiles-session/README.md) to manually run and

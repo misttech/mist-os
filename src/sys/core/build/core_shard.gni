@@ -4,6 +4,8 @@
 
 # Defines a core realm shard.
 #
+# DEPRECATED: ALL USES ARE NOW ALLOWLISTED.
+#
 # This template defines a core realm shard, a cml manifest that
 # is optionally included in the core component.
 #
@@ -36,17 +38,14 @@
 #     Component manifest file.
 #     Type: path
 #
-#   includes (optional)
-#     [list of paths to shards] List paths to all cml files which are included
-#      in the shard cml using cml `include`, so that they can be included
-#      in the Assembly Input Bundle.
-#
 # All other parameters are forwarded to the generated `group` target.
 #
 template("core_shard") {
   assert(
       defined(invoker.shard_file),
       "The `shard_file` argument was missing when calling core_shard($target_name)")
+  assert(!defined(invoker.includes),
+         "includes for core_shards() are no longer supported.")
 
   if ("cml" != get_path_info(invoker.shard_file, "extension")) {
     assert(
@@ -61,21 +60,9 @@ template("core_shard") {
                              "shard_file",
                              "includes",
                            ])
+    deps = [ "//build:core_realm_shards_allowlist" ]
     metadata = {
       shard_files = [ rebase_path(invoker.shard_file, root_build_dir) ]
-
-      # TODO(https://fxbug.dev/42055992): Make shard_includes required
-      if (defined(invoker.includes)) {
-        shard_includes = []
-        foreach(include, invoker.includes) {
-          shard_includes += [
-            {
-              source = rebase_path(include, root_build_dir)
-              destination = rebase_path(include, "//")
-            },
-          ]
-        }
-      }
     }
   }
 }

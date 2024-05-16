@@ -422,9 +422,7 @@ async fn open2_rights() {
         .expect_err("open should fail if rights exceed those of the parent connection");
     assert_eq!(status, zx::Status::ACCESS_DENIED);
 
-    // Check that empty rights get copied from the parent if we don't specify any rights.
-    // TODO(https://fxbug.dev/324932108): We should always require rights for an open request, even
-    // if the set of rights are empty.
+    // Calling open2 with no rights set is the same as calling open2 with empty rights.
     let proxy = test_dir
         .open2_node::<fio::FileMarker>(
             &TEST_FILE,
@@ -438,12 +436,30 @@ async fn open2_rights() {
         )
         .await
         .unwrap();
-
     assert_eq!(
         proxy.get_connection_info().await.expect("get_connection_info failed").rights,
-        Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES)
+        Some(fio::Rights::empty())
     );
 
+    // Opening with rights that the connection has should succeed.
+    let proxy = test_dir
+        .open2_node::<fio::FileMarker>(
+            &TEST_FILE,
+            fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                rights: Some(fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        proxy.get_connection_info().await.expect("get_connection_info failed").rights,
+        Some(fio::Rights::READ_BYTES | fio::Operations::GET_ATTRIBUTES)
+    );
     // We should be able to read from the file, but not write.
     assert_eq!(&fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
     assert_matches!(
@@ -714,6 +730,7 @@ async fn open2_file_append() {
         .open2_node::<fio::FileMarker>(
             "file",
             fio::NodeOptions {
+                rights: Some(fio::Operations::WRITE_BYTES | fio::Operations::READ_BYTES),
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::APPEND),
                     ..Default::default()
@@ -778,6 +795,7 @@ async fn open2_file_truncate() {
         .open2_node::<fio::FileMarker>(
             "file",
             fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES),
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::TRUNCATE),
                     ..Default::default()

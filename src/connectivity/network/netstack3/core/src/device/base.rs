@@ -10,7 +10,7 @@ use core::{
 };
 
 use derivative::Derivative;
-use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpVersion, Ipv4, Ipv6},
@@ -20,8 +20,7 @@ use packet::Buf;
 
 use crate::{
     context::{
-        CounterContext, HandleableTimer, InstantContext, ReferenceNotifiers, TimerBindingsTypes,
-        TimerHandler,
+        HandleableTimer, InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
     },
     counters::Counter,
     device::{
@@ -29,79 +28,22 @@ use crate::{
         ethernet::{EthernetLinkDevice, EthernetTimerId},
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
-            EthernetWeakDeviceId, StrongId, WeakId,
+            EthernetWeakDeviceId,
         },
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
+        queue::{rx::ReceiveQueueBindingsContext, tx::TransmitQueueBindingsContext},
         socket::{self, HeldSockets},
-        state::{DeviceStateSpec, IpLinkDeviceStateInner},
+        state::DeviceStateSpec,
     },
     filter::FilterBindingsTypes,
     inspect::Inspectable,
-    ip::{
-        device::{
-            nud::{LinkResolutionContext, NudCounters},
-            state::IpDeviceFlags,
-            IpDeviceIpExt, IpDeviceStateContext,
-        },
-        forwarding::IpForwardingDeviceContext,
-        types::RawMetric,
-    },
+    ip::device::nud::{LinkResolutionContext, NudCounters},
     sync::RwLock,
-    BindingsContext, CoreCtx, Inspector, StackState,
+    Inspector,
 };
 
-/// A device.
-///
-/// `Device` is used to identify a particular device implementation. It
-/// is only intended to exist at the type level, never instantiated at runtime.
-pub trait Device: 'static {}
-
-/// Marker type for a generic device.
-pub enum AnyDevice {}
-
-impl Device for AnyDevice {}
-
-/// An execution context which provides device ID types type for various
-/// netstack internals to share.
-pub trait DeviceIdContext<D: Device> {
-    /// The type of device IDs.
-    type DeviceId: StrongId<Weak = Self::WeakDeviceId> + 'static;
-
-    /// The type of weakly referenced device IDs.
-    type WeakDeviceId: WeakId<Strong = Self::DeviceId> + 'static;
-}
-
-/// A marker trait tying [`DeviceIdContext`] implementations.
-///
-/// To call into the IP layer, we need to be able to represent device
-/// identifiers in the [`AnyDevice`] domain. This trait is a statement that a
-/// [`DeviceIdContext`] in some domain `D` has its identifiers convertible into
-/// the [`AnyDevice`] domain with `From` bounds.
-///
-/// It is provided as a blanket implementation for [`DeviceIdContext`]s that
-/// fulfill the conversion.
-pub trait DeviceIdAnyCompatContext<D: Device>:
-    DeviceIdContext<D>
-    + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId_, WeakDeviceId = Self::WeakDeviceId_>
-{
-    type DeviceId_: StrongId<Weak = Self::WeakDeviceId_>
-        + From<<Self as DeviceIdContext<D>>::DeviceId>;
-    type WeakDeviceId_: WeakId<Strong = Self::DeviceId_>
-        + From<<Self as DeviceIdContext<D>>::WeakDeviceId>;
-}
-
-impl<CC, D> DeviceIdAnyCompatContext<D> for CC
-where
-    D: Device,
-    CC: DeviceIdContext<D> + DeviceIdContext<AnyDevice>,
-    <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId:
-        From<<CC as DeviceIdContext<D>>::WeakDeviceId>,
-    <CC as DeviceIdContext<AnyDevice>>::DeviceId: From<<CC as DeviceIdContext<D>>::DeviceId>,
-{
-    type DeviceId_ = <CC as DeviceIdContext<AnyDevice>>::DeviceId;
-    type WeakDeviceId_ = <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId;
-}
+pub(crate) use netstack3_base::{AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext};
 
 pub(super) struct RecvIpFrameMeta<D, I: Ip> {
     /// The device on which the IP frame was received.
@@ -127,16 +69,16 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 /// Implements `Iterator<Item=DeviceId<C>>` by pulling from provided loopback
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
-pub struct DevicesIter<'s, BC: BindingsContext> {
+pub struct DevicesIter<'s, BT: DeviceLayerTypes> {
     pub(super) ethernet:
-        alloc::collections::hash_map::Values<'s, EthernetDeviceId<BC>, EthernetPrimaryDeviceId<BC>>,
+        alloc::collections::hash_map::Values<'s, EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
     pub(super) pure_ip:
-        alloc::collections::hash_map::Values<'s, PureIpDeviceId<BC>, PureIpPrimaryDeviceId<BC>>,
-    pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BC>>,
+        alloc::collections::hash_map::Values<'s, PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
+    pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BT>>,
 }
 
-impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
-    type Item = DeviceId<BC>;
+impl<'s, BT: DeviceLayerTypes> Iterator for DevicesIter<'s, BT> {
+    type Item = DeviceId<BT>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, pure_ip, loopback } = self;
@@ -145,25 +87,6 @@ impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
             .chain(pure_ip.map(|primary| primary.clone_strong().into()))
             .chain(loopback.map(|primary| primary.clone_strong().into()))
             .next()
-    }
-}
-
-impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpForwardingDeviceContext<I> for CoreCtx<'_, BC, L>
-where
-    Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
-{
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        crate::device::integration::with_ip_device_state(self, device_id, |state| {
-            *state.unlocked_access::<crate::lock_ordering::RoutingMetric>()
-        })
-    }
-
-    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
-        IpDeviceStateContext::<I, _>::with_ip_device_flags(
-            self,
-            device_id,
-            |IpDeviceFlags { ip_enabled }| *ip_enabled,
-        )
     }
 }
 
@@ -282,7 +205,7 @@ pub struct Devices<BT: DeviceLayerTypes> {
 }
 
 /// The state associated with the device layer.
-pub(crate) struct DeviceLayerState<BT: DeviceLayerTypes> {
+pub struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub(super) devices: RwLock<Devices<BT>>,
     pub(super) origin: OriginTracker,
     pub(super) shared_sockets: HeldSockets<BT>,
@@ -313,6 +236,13 @@ impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
 
     pub(crate) fn arp_counters(&self) -> &ArpCounters {
         &self.arp_counters
+    }
+}
+
+impl<BT: DeviceLayerTypes> OrderedLockAccess<Devices<BT>> for DeviceLayerState<BT> {
+    type Lock = RwLock<Devices<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.devices)
     }
 }
 
@@ -377,33 +307,6 @@ impl Inspectable for DeviceCounters {
         crate::counters::inspect_device_counters(inspector, self)
     }
 }
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BC> {
-    type Data = DeviceCounters;
-    type Guard<'l> = &'l DeviceCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.device_counters()
-    }
-}
-
-impl<T, BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters>
-    for IpLinkDeviceStateInner<T, BC>
-{
-    type Data = DeviceCounters;
-    type Guard<'l> = &'l DeviceCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.counters
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::DeviceCounters>())
-    }
-}
-
 /// Light-weight tracker for recording the source of some instance.
 ///
 /// This should be held as a field in a parent type that is cloned into each
@@ -548,25 +451,14 @@ impl<
 }
 
 /// An event dispatcher for the device layer.
-///
-/// See the `EventDispatcher` trait in the crate root for more details.
-pub trait DeviceLayerEventDispatcher: DeviceLayerTypes + Sized {
-    /// Signals to the dispatcher that RX frames are available and ready to be
-    /// handled by [`handle_queued_rx_packets`].
-    ///
-    /// Implementations must make sure that [`handle_queued_rx_packets`] is
-    /// scheduled to be called as soon as possible so that enqueued RX frames
-    /// are promptly handled.
-    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self>);
-
-    /// Signals to the dispatcher that TX frames are available and ready to be
-    /// sent by [`transmit_queued_tx_frames`].
-    ///
-    /// Implementations must make sure that [`transmit_queued_tx_frames`] is
-    /// scheduled to be called as soon as possible so that enqueued TX frames
-    /// are promptly sent.
-    fn wake_tx_task(&mut self, device: &DeviceId<Self>);
-
+pub trait DeviceLayerEventDispatcher:
+    DeviceLayerTypes
+    + ReceiveQueueBindingsContext<LoopbackDeviceId<Self>>
+    + TransmitQueueBindingsContext<EthernetDeviceId<Self>>
+    + TransmitQueueBindingsContext<LoopbackDeviceId<Self>>
+    + TransmitQueueBindingsContext<PureIpDeviceId<Self>>
+    + Sized
+{
     /// Send a frame to an Ethernet device driver.
     ///
     /// See [`DeviceSendFrameError`] for the ways this call may fail; all other
@@ -604,184 +496,23 @@ pub enum DeviceSendFrameError<T> {
 pub(crate) mod testutil {
     use super::*;
 
-    #[cfg(test)]
-    use alloc::sync::Arc;
-    #[cfg(test)]
-    use core::sync::atomic::AtomicBool;
-
-    use crate::ip::device::config::{
-        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    use crate::{
+        ip::device::config::{
+            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate,
+        },
+        testutil::{Ctx, CtxPairExt as _},
+        BindingsContext,
     };
-    #[cfg(test)]
-    use crate::testutil::Ctx;
-
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-    pub struct FakeWeakDeviceId<D>(pub(crate) D);
-
-    impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {
-        fn eq(&self, other: &D) -> bool {
-            let Self(this) = self;
-            this == other
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> WeakId for FakeWeakDeviceId<D> {
-        type Strong = D;
-
-        fn upgrade(&self) -> Option<D> {
-            let Self(inner) = self;
-            inner.is_alive().then(|| inner.clone())
-        }
-    }
-
-    impl<D: crate::device::Id> crate::device::Id for FakeWeakDeviceId<D> {
-        fn is_loopback(&self) -> bool {
-            let Self(inner) = self;
-            inner.is_loopback()
-        }
-    }
-
-    /// A fake device ID for use in testing.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-    pub(crate) struct FakeDeviceId;
-
-    impl StrongId for FakeDeviceId {
-        type Weak = FakeWeakDeviceId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakDeviceId(self.clone())
-        }
-    }
-
-    impl crate::device::Id for FakeDeviceId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    impl crate::filter::InterfaceProperties<()> for FakeDeviceId {
-        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
-        fn device_class_matches(&self, _: &()) -> bool {
-            unimplemented!()
-        }
-    }
-
-    impl FakeStrongDeviceId for FakeDeviceId {
-        fn is_alive(&self) -> bool {
-            true
-        }
-    }
-
-    /// A fake device ID for use in testing.
-    ///
-    /// [`FakeReferencyDeviceId`] behaves like a referency device ID, each
-    /// constructed instance represents a new device.
-    #[derive(Clone, Debug, Default)]
-    #[cfg(test)]
-    pub(crate) struct FakeReferencyDeviceId {
-        removed: Arc<AtomicBool>,
-    }
 
     #[cfg(test)]
-    impl core::hash::Hash for FakeReferencyDeviceId {
-        fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-            let Self { removed } = self;
-            core::ptr::hash(alloc::sync::Arc::as_ptr(removed), state)
-        }
-    }
+    pub(crate) use netstack3_base::testutil::{
+        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+        MultipleDevicesId,
+    };
 
-    #[cfg(test)]
-    impl core::cmp::Eq for FakeReferencyDeviceId {}
-
-    #[cfg(test)]
-    impl core::cmp::PartialEq for FakeReferencyDeviceId {
-        fn eq(&self, Self { removed: other }: &Self) -> bool {
-            let Self { removed } = self;
-            alloc::sync::Arc::ptr_eq(removed, other)
-        }
-    }
-
-    #[cfg(test)]
-    impl core::cmp::Ord for FakeReferencyDeviceId {
-        fn cmp(&self, Self { removed: other }: &Self) -> core::cmp::Ordering {
-            let Self { removed } = self;
-            alloc::sync::Arc::as_ptr(removed).cmp(&alloc::sync::Arc::as_ptr(other))
-        }
-    }
-
-    #[cfg(test)]
-    impl core::cmp::PartialOrd for FakeReferencyDeviceId {
-        fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
-    #[cfg(test)]
-    impl FakeReferencyDeviceId {
-        /// Marks this device as removed, all weak references will not be able
-        /// to upgrade anymore.
-        pub(crate) fn mark_removed(&self) {
-            self.removed.store(true, core::sync::atomic::Ordering::Relaxed);
-        }
-    }
-
-    #[cfg(test)]
-    impl StrongId for FakeReferencyDeviceId {
-        type Weak = FakeWeakDeviceId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakDeviceId(self.clone())
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::device::Id for FakeReferencyDeviceId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::filter::InterfaceProperties<()> for FakeReferencyDeviceId {
-        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
-        fn device_class_matches(&self, _: &()) -> bool {
-            unimplemented!()
-        }
-    }
-
-    #[cfg(test)]
-    impl FakeStrongDeviceId for FakeReferencyDeviceId {
-        fn is_alive(&self) -> bool {
-            !self.removed.load(core::sync::atomic::Ordering::Relaxed)
-        }
-    }
-
-    pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {
-        /// Returns whether this ID is still alive.
-        ///
-        /// This is used by [`FakeWeakDeviceId`] to return `None` when trying to
-        /// upgrade back a `FakeStrongDeviceId`.
-        fn is_alive(&self) -> bool;
-    }
-
-    pub fn enable_device<BC: BindingsContext>(
-        ctx: &mut crate::testutil::Ctx<BC>,
-        device: &DeviceId<BC>,
-    ) {
+    /// Enables `device`.
+    pub fn enable_device<BC: BindingsContext>(ctx: &mut Ctx<BC>, device: &DeviceId<BC>) {
         let ip_config =
             IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() };
         let _: Ipv4DeviceConfigurationUpdate = ctx
@@ -803,9 +534,8 @@ pub(crate) mod testutil {
     }
 
     /// Enables or disables IP packet routing on `device`.
-    #[cfg(test)]
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub(crate) fn set_forwarding_enabled<BC: BindingsContext, I: crate::IpExt>(
+    pub fn set_forwarding_enabled<BC: BindingsContext, I: crate::IpExt>(
         ctx: &mut Ctx<BC>,
         device: &DeviceId<BC>,
         enabled: bool,
@@ -835,61 +565,6 @@ pub(crate) mod testutil {
         let crate::ip::device::state::IpDeviceConfiguration { forwarding_enabled, .. } =
             configuration.as_ref();
         *forwarding_enabled
-    }
-
-    /// A device ID type that supports identifying more than one distinct
-    /// device.
-    #[cfg(test)]
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
-    pub(crate) enum MultipleDevicesId {
-        A,
-        B,
-        C,
-    }
-
-    #[cfg(test)]
-    impl MultipleDevicesId {
-        pub(crate) fn all() -> [Self; 3] {
-            [Self::A, Self::B, Self::C]
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::device::Id for MultipleDevicesId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    #[cfg(test)]
-    impl StrongId for MultipleDevicesId {
-        type Weak = FakeWeakDeviceId<Self>;
-
-        fn downgrade(&self) -> Self::Weak {
-            FakeWeakDeviceId(self.clone())
-        }
-    }
-
-    #[cfg(test)]
-    impl FakeStrongDeviceId for MultipleDevicesId {
-        fn is_alive(&self) -> bool {
-            true
-        }
-    }
-
-    #[cfg(test)]
-    impl crate::filter::InterfaceProperties<()> for MultipleDevicesId {
-        fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
-        fn device_class_matches(&self, _: &()) -> bool {
-            unimplemented!()
-        }
     }
 }
 
@@ -928,8 +603,10 @@ mod tests {
             slaac::SlaacConfiguration,
             state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
         },
-        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
-        work_queue::WorkQueueReport,
+        testutil::{
+            CtxPairExt as _, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
+        types::WorkQueueReport,
     };
 
     #[test]
@@ -1050,7 +727,7 @@ mod tests {
             .device::<EthernetLinkDevice>()
             .add_device_with_default_state(
                 EthernetCreationProperties {
-                    mac: Ipv6::FAKE_CONFIG.local_mac,
+                    mac: Ipv6::TEST_ADDRS.local_mac,
                     max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
                 },
                 DEFAULT_INTERFACE_METRIC,
@@ -1180,7 +857,7 @@ mod tests {
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt + crate::IpExt>(
         addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
     ) {
-        let config = I::FAKE_CONFIG;
+        let config = I::TEST_ADDRS;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()

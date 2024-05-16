@@ -36,7 +36,7 @@ class FakeFxEnv extends IFxEnv {
   String get outputDir => p.join(fuchsiaDir, 'out/default');
 
   @override
-  String get sshKey => p.join(fuchsiaDir, 'out/default/.ssh/pkey');
+  String get sshKey => p.join(fuchsiaDir, 'out/default/some-pkey');
 
   @override
   String? getEnv(String variableName, [String? defaultValue]) =>

@@ -137,7 +137,7 @@ impl TmpFs {
         kernel: &Arc<Kernel>,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options);
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options)?;
         let mut mount_options = fs_args::generic_parse_mount_options(fs.options.params.as_ref())?;
         let mode = if let Some(mode) = mount_options.remove(B("mode")) {
             FileMode::from_string(mode.as_ref())?

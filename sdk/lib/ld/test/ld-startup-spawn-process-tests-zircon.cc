@@ -137,8 +137,7 @@ void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> ar
 }
 
 void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
-  const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
-  ASSERT_NO_FATAL_FAILURE(executable_ = elfldltl::testing::GetTestLibVmo(executable_path));
+  ASSERT_NO_FATAL_FAILURE(executable_ = GetExecutableVmo(executable_name));
 
   // The program launcher service first uses the loader service channel to look
   // up the PT_INTERP and then transfers it to the new process to be used by

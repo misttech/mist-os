@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.posix") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
-  sdk_area = "Unknown"
+  stable = true
   sources = [ "error.fidl" ]
   enable_hlcpp = true
 }

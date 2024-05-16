@@ -12,7 +12,7 @@ load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "zircon",
     "bootstrap",
-    "console_user",
+    "console",
     "driver_framework",
     "embeddable",
     "emulator_support",
@@ -48,13 +48,14 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "bootstrap_userdebug",
     "bootstrap_realm_vsock_development_access",
     "clock_development_tools",
-    "console_userdebug",
     "embeddable_userdebug",
     "kernel_args_eng",
     "kernel_args_userdebug",
     "kernel_debug_broker_userdebug",
     "netsvc",
     "paravirtualization_support_bootstrap",
+    "power_framework",
+    "power_framework_sag",
     "ptysvc",
 ]
 
@@ -65,6 +66,7 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "embeddable_eng",
     "bootstrap_eng",
     "kernel_pmm_checker_enabled",
+    "power_framework_testing_sag",
 ]
 
 # This is the combined set of valid AIBs for "bringup" builds (which are the
@@ -93,6 +95,7 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "core_realm",
     "core_realm_networking",
     "core_realm_user_and_userdebug",
+    "detect_user",
     "diagnostics_triage_detect_mali",
     "element_manager",
     "factory_data",
@@ -169,7 +172,6 @@ USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLA
     "core_realm_development_access_rcs_usb",
     "core_realm_development_access_userdebug",
     "omaha_client_empty_eager_config",
-    "power_framework",
     "standard_userdebug",
     "standard_userdebug_and_eng",
     "mdns_fuchsia_device_wired_service",

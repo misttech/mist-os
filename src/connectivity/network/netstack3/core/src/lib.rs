@@ -5,6 +5,9 @@
 //! A networking stack.
 
 #![no_std]
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
@@ -22,28 +25,43 @@ extern crate fakealloc as alloc;
 // TODO(https://github.com/dtolnay/thiserror/pull/64): remove this module.
 extern crate fakestd as std;
 
-#[macro_use]
-mod macros;
-
-mod algorithm;
 mod api;
 mod context;
-mod convert;
 mod counters;
-mod data_structures;
 mod lock_ordering;
 mod marker;
 mod state;
 mod time;
-mod trace;
 mod transport;
 mod uninstantiable;
-mod work_queue;
 
-#[cfg(test)]
+#[cfg(any(test, benchmark))]
 pub mod benchmarks;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
+
+pub(crate) mod algorithm {
+    pub(crate) use netstack3_base::{simple_randomized_port_alloc, PortAllocImpl};
+}
+pub(crate) mod convert {
+    pub(crate) use netstack3_base::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
+}
+
+pub(crate) mod data_structures {
+    pub(crate) mod ref_counted_hash_map {
+        pub(crate) use netstack3_base::ref_counted_hash_map::{
+            InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
+        };
+    }
+    pub(crate) mod socketmap {
+        pub(crate) use netstack3_base::socketmap::{
+            Entry, IterShadows, OccupiedEntry, SocketMap, Tagged,
+        };
+    }
+    pub(crate) mod token_bucket {
+        pub(crate) use netstack3_base::TokenBucket;
+    }
+}
 
 /// The device layer.
 pub mod device {
@@ -83,7 +101,10 @@ pub mod device {
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
         PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
-    pub use queue::tx::TransmitQueueConfiguration;
+    pub use queue::{
+        rx::ReceiveQueueBindingsContext,
+        tx::{TransmitQueueBindingsContext, TransmitQueueConfiguration},
+    };
 }
 
 /// Device socket API.
@@ -98,10 +119,13 @@ pub mod device_socket {
     };
 }
 
-// Allow direct public access to the error module. This module is unlikely to
-// evolve poorly or have sealed traits. We can revisit if this becomes hard to
-// uphold.
-pub mod error;
+/// Generic netstack errors.
+pub mod error {
+    pub use netstack3_base::{
+        AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
+        RemoteAddressError, SocketError, ZonedAddressError,
+    };
+}
 
 /// Framework for packet filtering.
 pub mod filter {
@@ -119,8 +143,8 @@ pub mod filter {
     pub(crate) use netstack3_filter::{
         ConntrackConnection, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
         FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket,
-        MaybeTransportPacket, NestedWithInnerIpPacket, RxPacket, State, TransportPacketSerializer,
-        TxPacket, Verdict,
+        MaybeTransportPacket, NestedWithInnerIpPacket, State, TransportPacketSerializer, TxPacket,
+        Verdict,
     };
 }
 
@@ -147,6 +171,7 @@ pub mod ip {
     pub(crate) mod forwarding;
     pub(crate) mod gmp;
     pub(crate) mod icmp;
+    pub(crate) mod raw;
     pub(crate) mod reassembly;
     pub(crate) mod socket;
     pub(crate) mod types;
@@ -157,7 +182,6 @@ pub mod ip {
     pub(crate) use base::*;
 
     // Re-exported types.
-    pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
     pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
         api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, SetIpAddressPropertiesError},
@@ -165,6 +189,7 @@ pub mod ip {
             IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
             Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
         },
+        opaque_iid::StableIidSecret,
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
         state::{
             IpDeviceConfiguration, Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags,
@@ -173,6 +198,7 @@ pub mod ip {
         },
         AddressRemovedReason, IpAddressState, IpDeviceEvent,
     };
+    pub use raw::RawIpSocketsBindingsTypes;
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }
 
@@ -250,7 +276,7 @@ pub mod tcp {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use crate::work_queue::WorkQueueReport;
+    pub use netstack3_base::WorkQueueReport;
 }
 
 /// Methods for dealing with UDP sockets.
@@ -263,9 +289,9 @@ pub mod udp {
 
 pub use api::CoreApi;
 pub use context::{
-    CoreCtx, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
-    UnlockedCoreCtx,
+    CoreCtx, CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+    InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
+    TracingContext, UnlockedCoreCtx,
 };
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
@@ -273,5 +299,5 @@ pub use state::StackState;
 pub use time::{Instant, TimerId};
 
 // Re-export useful macros.
+pub(crate) use netstack3_base::trace_duration;
 pub use netstack3_macros::context_ip_bounds;
-pub(crate) use trace::trace_duration;

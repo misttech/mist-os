@@ -2,17 +2,28 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import asyncio
-from dataclasses import dataclass
+import logging
 import typing
 
 from fidl_codec import decode_fidl_request
 from fidl_codec import decode_fidl_response
 from fidl_codec import encode_fidl_message
+from inspect import getframeinfo, stack
 import fuchsia_controller_py as fc
 
 from ._fidl_common import *
 from ._ipc import GlobalHandleWaker
 from ._client import FidlClient
+
+
+# Rather than make a long server UUID, this will be a monotonically increasing
+# ID to differentiate servers for debugging purposes.
+_SERVER_ID = 0
+_LOGGER = logging.getLogger("fidl.server")
+
+
+class ServerError(Exception):
+    pass
 
 
 class ServerBase(object):
@@ -21,14 +32,25 @@ class ServerBase(object):
     library: str = ""
     method_map: typing.Dict[Ordinal, MethodInfo] = {}
 
+    def __str__(self):
+        return f"server:{self.__name__}:{self.id}"
+
     def __init__(self, channel: fc.Channel, channel_waker=None):
+        global _SERVER_ID
         self.channel = channel
+        self.id = _SERVER_ID
+        _SERVER_ID += 1
         if channel_waker is None:
             self.channel_waker = GlobalHandleWaker()
         else:
             self.channel_waker = channel_waker
+        caller = getframeinfo(stack()[1][0])
+        _LOGGER.debug(
+            f"{self} instantiated from {caller.filename}:{caller.lineno}"
+        )
 
     def __del__(self):
+        _LOGGER.debug(f"{self} closing")
         if self.channel is not None:
             self.channel_waker.unregister(self.channel)
 
@@ -56,6 +78,7 @@ class ServerBase(object):
             # forever. So, we must close the channel in order to make progress.
             self.channel.close()
             self.channel = None
+            _LOGGER.debug(f"{self} request handling error: {e}")
             raise e
 
     async def _handle_request_helper(self) -> bool:
@@ -66,8 +89,10 @@ class ServerBase(object):
             msg, txid, ordinal = await self._channel_read_and_parse()
         except fc.ZxStatus as e:
             if e.args[0] == fc.ZxStatus.ZX_ERR_PEER_CLOSED:
+                _LOGGER.debug(f"{self} shutting down. PEER_CLOSED received")
                 return False
             else:
+                _LOGGER.warn(f"{self} channel received error: {e}")
                 raise e
         info = self.method_map[ordinal]
         info.request_ident
@@ -80,14 +105,17 @@ class ServerBase(object):
         if asyncio.iscoroutine(res) or asyncio.isfuture(res):
             res = await res
         if res is not None and not info.requires_response:
-            raise RuntimeError(
-                f"Method {info.name} received a response when it is a one-way method"
+            raise ServerError(
+                f"{self} method {info.name} received a "
+                + "response but is one-way method"
             )
         if res is None and info.requires_response:
-            raise RuntimeError(
-                f"Method {info.name} returned None when a response was expected"
+            raise ServerError(
+                f"{self} method {info.name} returned "
+                + "None when a response was expected"
             )
         if info.has_result:
+            _LOGGER.debug(f"{self} received method response {res}")
             if type(res) is DomainError:
                 res = GenericResult(
                     fidl_type=info.response_identifier, err=res.error
@@ -126,6 +154,7 @@ class ServerBase(object):
         except fc.ZxStatus as e:
             if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                 self.channel_waker.unregister(self.channel)
+                _LOGGER.warning(f"{self} channel received error: {e}")
                 raise e
             await self.channel_waker.wait_channel_ready(self.channel)
             msg = self.channel.read()

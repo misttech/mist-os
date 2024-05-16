@@ -18,6 +18,12 @@
         "value": "128"
     },
     {
+        "kind": "const",
+        "name": "fuchsia.component.sandbox/MAX_DICTIONARY_KEYS_CHUNK",
+        "type": "uint32",
+        "value": "128"
+    },
+    {
         "kind": "library",
         "name": "fuchsia.component.sandbox"
     }

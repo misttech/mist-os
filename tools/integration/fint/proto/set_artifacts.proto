@@ -24,6 +24,8 @@ message SetArtifacts {
   bool skip_build = 3;
 
   // Whether the caller should set up Goma before invoking `fint build`.
+  // *** Goma is deprecated.  This variable will be removed. ***
+  // See b/340581192 and b/340582840.
   bool use_goma = 4;
 
   // Metadata contains `fint set` parameters that are needed for

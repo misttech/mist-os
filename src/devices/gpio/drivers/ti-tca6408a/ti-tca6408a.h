@@ -18,8 +18,7 @@ class TiTca6408aTest;
 
 class TiTca6408a : public fdf::Server<fuchsia_hardware_gpioimpl::GpioImpl> {
  public:
-  TiTca6408a(ddk::I2cChannel i2c, uint32_t pin_index_offset)
-      : i2c_(std::move(i2c)), pin_index_offset_(pin_index_offset) {}
+  TiTca6408a(ddk::I2cChannel i2c) : i2c_(std::move(i2c)) {}
 
   void ConfigIn(ConfigInRequest& request, ConfigInCompleter::Sync& completer) override;
   void ConfigOut(ConfigOutRequest& request, ConfigOutCompleter::Sync& completer) override;
@@ -60,16 +59,13 @@ class TiTca6408a : public fdf::Server<fuchsia_hardware_gpioimpl::GpioImpl> {
 
   zx_status_t Write(uint32_t index, uint8_t value);
 
-  bool IsIndexInRange(uint32_t index) const {
-    return index >= pin_index_offset_ && index < (pin_index_offset_ + kPinCount);
-  }
+  bool IsIndexInRange(uint32_t index) const { return index < kPinCount; }
 
   zx::result<uint8_t> ReadBit(Register reg, uint32_t index);
   zx::result<> SetBit(Register reg, uint32_t index);
   zx::result<> ClearBit(Register reg, uint32_t index);
 
   ddk::I2cChannel i2c_;
-  const uint32_t pin_index_offset_;
 };
 
 class TiTca6408aDevice : public fdf::DriverBase {

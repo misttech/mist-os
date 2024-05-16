@@ -16,6 +16,8 @@
         {
             protocol: [
                 "fuchsia.kernel.InfoResource",
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.scheduler.RoleManager",
             ],
         },
@@ -24,6 +26,11 @@
                 "fuchsia.hardware.gpu.mali.Service",
                 "fuchsia.hardware.platform.device.Service",
             ],
+        },
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
         },
     ],
 }

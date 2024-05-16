@@ -120,14 +120,11 @@ if (is_fuchsia) {
   }
 
   core_realm_definition("core-eng") {
-    deps =
-        _core_realm_deps + core_realm_testing_aib_shards + [
-          # required for SL4F
-          "//src/developer/memory/monitor:memory_monitor_core_shard",
-          "//src/factory/factory_store_providers:factory_store_providers_shard",
-          "//src/recovery/system:system_recovery_core_shard",
-          "//src/settings/service:setui_service_core_shard",
-        ]
+    deps = _core_realm_deps + core_realm_testing_aib_shards + [
+             # required for SL4F
+             "//src/recovery/system:system_recovery_core_shard",
+             "//src/settings/service:setui_service_core_shard",
+           ]
   }
 
   core_realm_definition("core-installer") {

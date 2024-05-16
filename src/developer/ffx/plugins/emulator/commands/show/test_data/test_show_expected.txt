@@ -16,32 +16,14 @@ Device:
 	{
   "name": "one_instance_device",
   "description": "The virtual device used to launch the one_instance emulator.",
-  "type": "virtual_device",
-  "hardware": {
-    "cpu": {
-      "arch": "x64"
-    },
-    "audio": {
-      "model": "none"
-    },
-    "storage": {
-      "quantity": 0,
-      "units": "bytes"
-    },
-    "inputs": {
-      "pointing_device": "none"
-    },
-    "memory": {
-      "quantity": 0,
-      "units": "bytes"
-    },
-    "window_size": {
-      "height": 0,
-      "width": 0,
-      "units": "pixels"
-    }
-  },
-  "ports": null
+  "cpu": "x64",
+  "audio": "none",
+  "storage_bytes": 0,
+  "pointing_device": "none",
+  "memory_bytes": 0,
+  "ports": null,
+  "window_height": 0,
+  "window_width": 0
 }
 
 Network:

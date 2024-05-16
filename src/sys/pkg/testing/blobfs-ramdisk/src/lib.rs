@@ -337,7 +337,16 @@ impl BlobfsRamdisk {
 
     /// Returns a new connection to blobfs's root directory as a openat::Dir.
     pub fn root_dir(&self) -> Result<openat::Dir, Error> {
-        fdio::create_fd(self.root_dir_handle()?.into()).context("failed to create fd")
+        use std::os::fd::{FromRawFd as _, IntoRawFd as _, OwnedFd};
+
+        let fd: OwnedFd =
+            fdio::create_fd(self.root_dir_handle()?.into()).context("failed to create fd")?;
+
+        // SAFETY: `openat::Dir` requires that the file descriptor is a directory, which we are
+        // guaranteed because `root_dir_handle()` implements the directory FIDL interface. There is
+        // not a direct way to transfer ownership from an `OwnedFd` to `openat::Dir`, so we need to
+        // convert the fd into a `RawFd` before handing it off to `Dir`.
+        unsafe { Ok(openat::Dir::from_raw_fd(fd.into_raw_fd())) }
     }
 
     /// Signals blobfs to unmount and waits for it to exit cleanly, returning a new

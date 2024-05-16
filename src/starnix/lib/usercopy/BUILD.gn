@@ -84,6 +84,7 @@ template("_hermetic_code_blob") {
 static_library("usercopy_assembly_routines") {
   arch_dir = "arch/${target_cpu}"
   sources = rebase_path([
+                          "hermetic_copy.S",
                           "hermetic_copy_error.S",
                           "atomic_load.S",
                           "atomic_store.S",

@@ -606,12 +606,6 @@
             from: "#network",
         },
         {
-            protocol: "fuchsia.component.DetectBinder",
-            from: "#diagnostics",
-            availability: "optional",
-            source_availability: "unknown",
-        },
-        {
             protocol: [
                 "fuchsia.virtualization.LinuxManager",
                 "fuchsia.virtualization.TerminaGuestManager",

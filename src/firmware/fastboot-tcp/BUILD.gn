@@ -52,9 +52,11 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-# The core realm shard to be used by product integrators.
-core_shard("fastboot-tcp-core-shard") {
-  shard_file = "meta/fastboot_tcp.core_shard.cml"
+if (current_toolchain == default_toolchain) {
+  # The core realm shard to be used by product integrators.
+  core_shard("fastboot-tcp-core-shard") {
+    shard_file = "meta/fastboot_tcp.core_shard.cml"
+  }
 }
 
 fuchsia_component("component") {

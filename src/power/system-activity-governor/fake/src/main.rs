@@ -10,26 +10,10 @@ use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_test_suspendcontrol as tsc;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use tracing::info;
 
 async fn connect_to_suspend_ctrl_and_setup_suspend_device() -> Result<tsc::DeviceProxy> {
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
-        "/dev/class/test",
-        fuchsia_fs::OpenFlags::empty(),
-    )?;
-    let entry = device_watcher::wait_for_device_with(&dir_proxy, |info| {
-        info!("{:?} has topological path {:?}", info.filename, info.topological_path);
-        info.topological_path.ends_with("fake-suspend/control").then_some(info.filename.to_string())
-    })
-    .await
-    .unwrap();
-
-    let suspend_device = device_watcher::recursive_wait_and_open::<tsc::DeviceMarker>(
-        &dir_proxy,
-        format!("{}/device_protocol", &entry).as_str(),
-    )
-    .await
-    .unwrap();
+    let suspend_device =
+        fuchsia_component::client::connect_to_protocol::<tsc::DeviceMarker>().unwrap();
 
     // Set up default state.
     suspend_device

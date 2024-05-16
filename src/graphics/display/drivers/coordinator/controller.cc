@@ -46,10 +46,10 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
-#include "src/graphics/display/drivers/coordinator/eld.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -148,120 +148,135 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   }
 }
 
-void Controller::DisplayControllerInterfaceOnDisplaysChanged(
-    const added_display_args_t* displays_added, size_t added_count,
-    const uint64_t* displays_removed, size_t removed_count) {
-  fbl::Vector<fbl::RefPtr<DisplayInfo>> added_display_infos;
-  fbl::Vector<DisplayId> removed_display_ids;
-  std::unique_ptr<async::Task> task;
+zx::result<> Controller::AddDisplay(const added_display_args_t& banjo_added_display_args) {
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(banjo_added_display_args);
+  if (display_info_result.is_error()) {
+    zxlogf(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_added_display_args.display_id,
+           display_info_result.status_string());
+    return display_info_result.take_error();
+  }
 
-  fbl::AllocChecker alloc_checker;
-  if (added_count) {
-    added_display_infos.reserve(added_count, &alloc_checker);
-    if (!alloc_checker.check()) {
-      zxlogf(ERROR, "No memory when processing hotplug");
-      return;
-    }
-  }
-  if (removed_count) {
-    removed_display_ids.reserve(removed_count, &alloc_checker);
-    if (!alloc_checker.check()) {
-      zxlogf(ERROR, "No memory when processing hotplug");
-      return;
-    }
-    for (size_t i = 0; i < removed_count; ++i) {
-      removed_display_ids.push_back(ToDisplayId(displays_removed[i]));
-    }
-  }
-  task = fbl::make_unique_checked<async::Task>(&alloc_checker);
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "No memory when processing hotplug");
-    return;
-  }
+  fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
+  DisplayId display_id = display_info->id;
 
   fbl::AutoLock lock(mtx());
+  auto display_it = displays_.find(display_id);
+  if (display_it != displays_.end()) {
+    zxlogf(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
+           display_id.value());
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
+  }
+  displays_.insert(display_info);
 
-  for (unsigned i = 0; i < removed_count; i++) {
-    DisplayId removed_display_id(displays_removed[i]);
-
-    auto target = displays_.erase(removed_display_id);
-    if (target) {
-      while (fbl::RefPtr<Image> image = target->images.pop_front()) {
-        AssertMtxAliasHeld(image->mtx());
-        image->StartRetire();
-        image->OnRetire();
-      }
-    } else {
-      zxlogf(DEBUG, "Unknown display %" PRIu64 " removed", removed_display_id.value());
-    }
+  fbl::AllocChecker alloc_checker;
+  auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "No memory when processing hotplug");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  for (unsigned i = 0; i < added_count; i++) {
-    zx::result<fbl::RefPtr<DisplayInfo>> info_result = DisplayInfo::Create(displays_added[i]);
-    if (info_result.is_error()) {
-      zxlogf(INFO, "failed to add display %ld: %s", displays_added[i].display_id,
-             info_result.status_string());
-      continue;
-    }
-    fbl::RefPtr<DisplayInfo> info = std::move(info_result).value();
-    if (info->edid.has_value()) {
-      fbl::Array<uint8_t> eld = ComputeEld(info->edid->base);
+  zx::result<> post_task_result =
+      PostTask(std::move(post_task_state), *async_dispatcher(),
+               [this, display_info = std::move(display_info)]() {
+                 if (display_info->edid.has_value()) {
+                   PopulateDisplayTimings(display_info);
+                 }
 
-      // The array is empty if memory allocation failed. We prefer using an
-      // empty ELD to dropping the display altogether.
-      engine_driver_client_->SetEld(info->id, eld);
-    }
+                 // TODO(b/317914671): Pass parsed display metadata to driver.
 
-    if (displays_.insert_or_find(info)) {
-      added_display_infos.push_back(std::move(info));
-    } else {
-      zxlogf(INFO, "Ignoring duplicate display");
-    }
+                 fbl::AutoLock lock(mtx());
+
+                 const std::array<DisplayId, 1> added_id_candidates = {display_info->id};
+                 cpp20::span<const DisplayId> added_ids(added_id_candidates);
+
+                 // TODO(https://fxbug.dev/339311596): Do not trigger the client's
+                 // `OnDisplaysChanged` if an added display is ignored.
+                 //
+                 // Dropping some add events can result in spurious removes, but
+                 // those are filtered out in the clients.
+                 if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
+                   display_info->init_done = true;
+                   display_info->InitializeInspect(&root_);
+                 } else {
+                   zxlogf(WARNING, "Ignoring display with no compatible edid timings");
+                   added_ids = {};
+                 }
+
+                 if (virtcon_client_ready_) {
+                   ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+                   virtcon_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
+                 }
+                 if (primary_client_ready_) {
+                   ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+                   primary_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
+                 }
+               });
+
+  if (post_task_result.is_error()) {
+    zxlogf(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
+  }
+  return post_task_result;
+}
+
+zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
+  fbl::AutoLock lock(mtx());
+  fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(display_id);
+  if (!removed_display) {
+    zxlogf(WARNING, "Unknown display %" PRIu64 " removed", display_id.value());
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  task->set_handler([this, added_display_infos = std::move(added_display_infos),
-                     removed_display_ids = std::move(removed_display_ids)](
-                        async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-    if (status == ZX_OK) {
-      for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
-        if (added_display_info->edid.has_value()) {
-          PopulateDisplayTimings(added_display_info);
+  while (fbl::RefPtr<Image> image = removed_display->images.pop_front()) {
+    AssertMtxAliasHeld(image->mtx());
+    image->StartRetire();
+    image->OnRetire();
+  }
+
+  fbl::AllocChecker alloc_checker;
+  auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "No memory when processing hotplug");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+  zx::result<> post_task_result =
+      PostTask(std::move(post_task_state), *async_dispatcher(), [this, display_id]() {
+        fbl::AutoLock lock(mtx());
+        const std::array<DisplayId, 1> removed_display_ids = {
+            display_id,
+        };
+        if (virtcon_client_ready_) {
+          ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+          virtcon_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
         }
-      }
-
-      // TODO(b/317914671): Pass parsed display metadata to driver.
-
-      fbl::AutoLock lock(mtx());
-
-      fbl::Vector<DisplayId> added_ids;
-      added_ids.reserve(added_display_infos.size());
-      for (const fbl::RefPtr<DisplayInfo>& added_display_info : added_display_infos) {
-        // Dropping some add events can result in spurious removes, but
-        // those are filtered out in the clients.
-        if (!added_display_info->edid.has_value() ||
-            !added_display_info->edid->timings.is_empty()) {
-          added_ids.push_back(added_display_info->id);
-          added_display_info->init_done = true;
-          added_display_info->InitializeInspect(&root_);
-        } else {
-          zxlogf(WARNING, "Ignoring display with no compatible edid timings");
+        if (primary_client_ready_) {
+          ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+          primary_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
         }
-      }
-      if (virtcon_client_ready_) {
-        ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-        virtcon_client_->OnDisplaysChanged(added_ids, removed_display_ids);
-      }
-      if (primary_client_ready_) {
-        ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-        primary_client_->OnDisplaysChanged(added_ids, removed_display_ids);
-      }
-    } else {
-      zxlogf(ERROR, "Failed to dispatch display change task %d", status);
-    }
+      });
 
-    delete task;
-  });
-  task.release()->Post(dispatcher_.async_dispatcher());
+  if (post_task_result.is_error()) {
+    zxlogf(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
+  }
+  return post_task_result;
+}
+
+void Controller::DisplayControllerInterfaceOnDisplayAdded(
+    const added_display_args_t* banjo_added_display) {
+  ZX_DEBUG_ASSERT(banjo_added_display != nullptr);
+  zx::result<> added_display_result = AddDisplay(*banjo_added_display);
+  if (added_display_result.is_error()) {
+    zxlogf(WARNING, "Failed to add a display %" PRIu64 ": %s", banjo_added_display->display_id,
+           added_display_result.status_string());
+  }
+}
+
+void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t banjo_display_id) {
+  DisplayId display_id = ToDisplayId(banjo_display_id);
+  zx::result<> remove_display_result = RemoveDisplay(display_id);
+  if (remove_display_result.is_error()) {
+    zxlogf(WARNING, "Failed to remove a display: %s", remove_display_result.status_string());
+  }
 }
 
 void Controller::DisplayControllerInterfaceOnCaptureComplete() {
@@ -272,31 +287,26 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
     return;
   }
 
-  std::unique_ptr<async::Task> task = std::make_unique<async::Task>();
-  fbl::AutoLock lock(mtx());
-  task->set_handler([this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-    if (status == ZX_OK) {
-      // Free an image that was previously used by the hardware.
-      if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
-        ReleaseCaptureImage(pending_release_capture_image_id_);
-        pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
-      }
-
-      fbl::AutoLock lock(mtx());
-      if (virtcon_client_ready_) {
-        ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-        virtcon_client_->OnCaptureComplete();
-      }
-      if (primary_client_ready_) {
-        ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-        primary_client_->OnCaptureComplete();
-      }
-    } else {
-      zxlogf(ERROR, "Failed to dispatch capture complete task %d", status);
+  zx::result<> post_task_result = PostTask<kDisplayTaskTargetSize>(*async_dispatcher(), [this]() {
+    // Free an image that was previously used by the hardware.
+    if (pending_release_capture_image_id_ != kInvalidDriverCaptureImageId) {
+      ReleaseCaptureImage(pending_release_capture_image_id_);
+      pending_release_capture_image_id_ = kInvalidDriverCaptureImageId;
     }
-    delete task;
+
+    fbl::AutoLock lock(mtx());
+    if (virtcon_client_ready_) {
+      ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+      virtcon_client_->OnCaptureComplete();
+    }
+    if (primary_client_ready_) {
+      ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+      primary_client_->OnCaptureComplete();
+    }
   });
-  task.release()->Post(dispatcher_.async_dispatcher());
+  if (post_task_result.is_error()) {
+    zxlogf(ERROR, "Failed to dispatch capture complete task: %s", post_task_result.status_string());
+  }
 }
 
 void Controller::DisplayControllerInterfaceOnDisplayVsync(
@@ -733,9 +743,10 @@ zx_status_t Controller::CreateClient(
     fidl::ServerEnd<fidl_display::Coordinator> coordinator_server_end,
     fit::function<void()> on_display_client_dead) {
   PrintChannelKoids(client_priority, coordinator_server_end.channel());
-  fbl::AllocChecker ac;
-  std::unique_ptr<async::Task> task = fbl::make_unique_checked<async::Task>(&ac);
-  if (!ac.check()) {
+
+  fbl::AllocChecker alloc_checker;
+  auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
+  if (!alloc_checker.check()) {
     zxlogf(DEBUG, "Failed to alloc client task");
     return ZX_ERR_NO_MEMORY;
   }
@@ -782,43 +793,48 @@ zx_status_t Controller::CreateClient(
   }
   HandleClientOwnershipChanges();
 
-  task->set_handler(
-      [this, client_ptr](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-        if (status == ZX_OK) {
-          fbl::AutoLock lock(mtx());
-          if (unbinding_) {
-            return;
-          }
-          if (client_ptr == virtcon_client_ || client_ptr == primary_client_) {
-            // Add all existing displays to the client
-            if (displays_.size() > 0) {
-              DisplayId current_displays[displays_.size()];
-              int initialized_display_count = 0;
-              for (const DisplayInfo& display : displays_) {
-                if (display.init_done) {
-                  current_displays[initialized_display_count] = display.id;
-                  ++initialized_display_count;
-                }
-              }
-              cpp20::span<DisplayId> removed_display_ids = {};
-              client_ptr->OnDisplaysChanged(
-                  cpp20::span<DisplayId>(current_displays, initialized_display_count),
-                  removed_display_ids);
-            }
-
-            if (virtcon_client_ == client_ptr) {
-              ZX_DEBUG_ASSERT(!virtcon_client_ready_);
-              virtcon_client_ready_ = true;
-            } else {
-              ZX_DEBUG_ASSERT(!primary_client_ready_);
-              primary_client_ready_ = true;
-            }
-          }
+  zx::result<> post_task_result =
+      PostTask(std::move(post_task_state), *async_dispatcher(), [this, client_id]() {
+        fbl::AutoLock lock(mtx());
+        if (unbinding_) {
+          return;
         }
-        delete task;
-      });
 
-  return task.release()->Post(dispatcher_.async_dispatcher());
+        ClientProxy* client_proxy;
+        if (virtcon_client_ != nullptr && virtcon_client_->client_id() == client_id) {
+          client_proxy = virtcon_client_;
+        } else if (primary_client_ != nullptr && primary_client_->client_id() == client_id) {
+          client_proxy = primary_client_;
+        } else {
+          return;
+        }
+
+        // Add all existing displays to the client
+        if (displays_.size() > 0) {
+          DisplayId current_displays[displays_.size()];
+          int initialized_display_count = 0;
+          for (const DisplayInfo& display : displays_) {
+            if (display.init_done) {
+              current_displays[initialized_display_count] = display.id;
+              ++initialized_display_count;
+            }
+          }
+          cpp20::span<DisplayId> removed_display_ids = {};
+          client_proxy->OnDisplaysChanged(
+              cpp20::span<DisplayId>(current_displays, initialized_display_count),
+              removed_display_ids);
+        }
+
+        if (virtcon_client_ == client_proxy) {
+          ZX_DEBUG_ASSERT(!virtcon_client_ready_);
+          virtcon_client_ready_ = true;
+        } else {
+          ZX_DEBUG_ASSERT(primary_client_ == client_proxy);
+          ZX_DEBUG_ASSERT(!primary_client_ready_);
+          primary_client_ready_ = true;
+        }
+      });
+  return post_task_result.status_value();
 }
 
 display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() {

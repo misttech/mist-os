@@ -5,7 +5,7 @@
 use anyhow::{bail, Context, Result};
 use daemonize::daemonize;
 use errors::{ffx_error, FfxError};
-use ffx_config::EnvironmentContext;
+use ffx_config::{logging::LogDirHandling, EnvironmentContext};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
@@ -27,7 +27,7 @@ mod socket;
 
 pub use config::*;
 
-pub use constants::LOG_FILE_PREFIX;
+pub use constants::DAEMON_LOG_FILENAME;
 
 pub use socket::SocketDetails;
 
@@ -238,13 +238,21 @@ async fn daemon_cmd(context: &EnvironmentContext) -> Result<Command> {
     let mut stderr = Stdio::null();
 
     if ffx_config::logging::is_enabled(context).await {
-        stdout = Stdio::from(ffx_config::logging::log_file(context, LOG_FILE_PREFIX, true).await?);
-        // Second argument is false, meaning don't perform log rotation. We rotated the logs once
+        let file = PathBuf::from(DAEMON_LOG_FILENAME);
+        stdout = Stdio::from(
+            ffx_config::logging::log_file(context, &file, LogDirHandling::WithDirWithRotate)
+                .await?,
+        );
+        // Third argument says not to rotate the logs.  We rotated the logs once
         // for the call above, we shouldn't do it again.
-        stderr = Stdio::from(ffx_config::logging::log_file(context, LOG_FILE_PREFIX, false).await?);
+        stderr = Stdio::from(
+            ffx_config::logging::log_file(context, &file, LogDirHandling::WithDirWithoutRotate)
+                .await?,
+        );
     }
 
     cmd.stdin(Stdio::null()).stdout(stdout).stderr(stderr).env("RUST_BACKTRACE", "full");
+    // Note: daemon start produces output on stdout by default -- see ffx_command::run()
     cmd.arg("daemon");
     cmd.arg("start");
     cmd.arg("--path").arg(socket_path);

@@ -378,4 +378,12 @@ void AmlCpu::GetLogicalCoreId(GetLogicalCoreIdRequestView request,
   completer.Reply(0);
 }
 
+void AmlCpu::GetDomainId(GetDomainIdCompleter::Sync& completer) {
+  completer.Reply(perf_domain_.id);
+}
+
+void AmlCpu::GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) {
+  completer.ReplySuccess(perf_domain_.relative_performance);
+}
+
 }  // namespace amlogic_cpu

@@ -691,6 +691,29 @@ mod tests {
     }
 
     #[test]
+    fn test_update_noop() {
+        for b in IPV4_HEADERS {
+            let mut buf = Vec::new();
+            buf.extend_from_slice(b);
+
+            let mut c = Checksum::new();
+            c.add_bytes(&buf);
+            assert_eq!(c.checksum(), [0u8; 2]);
+
+            // Replace the destination IP with the same address. I.e. this
+            // update should be a no-op.
+            let old = [buf[16], buf[17], buf[18], buf[19]];
+            let updated = update(c.checksum(), &old, &old);
+            let from_scratch = {
+                let mut c = Checksum::new();
+                c.add_bytes(&buf);
+                c.checksum()
+            };
+            assert_eq!(updated, from_scratch);
+        }
+    }
+
+    #[test]
     fn test_smoke_update() {
         let mut rng = new_rng(70_812_476_915_813);
 

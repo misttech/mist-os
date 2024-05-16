@@ -7,6 +7,7 @@
 //! types will be directly deserializable from the PBM, and converted into engine-specific types at
 //! runtime.
 
+use schemars::JsonSchema;
 use sdk_metadata::display_impl;
 pub use sdk_metadata::CpuArchitecture;
 use serde::{Deserialize, Serialize};
@@ -224,7 +225,7 @@ impl From<String> for OperatingSystem {
 display_impl!(OperatingSystem);
 
 /// Selector for the mode of networking to enable between the guest and host systems.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NetworkingMode {
     /// Allow the system to determine the best available networking option. Typically

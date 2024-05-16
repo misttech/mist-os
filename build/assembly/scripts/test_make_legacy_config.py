@@ -22,8 +22,8 @@ from assembly import (
     KernelInfo,
 )
 from assembly.assembly_input_bundle import (
-    CompiledPackageAdditionalShards,
-    CompiledPackageMainDefinition,
+    CompiledPackageDefinition,
+    CompiledComponentDefinition,
     DriverDetails,
     PackageDetails,
     DuplicatePackageException,
@@ -260,16 +260,19 @@ class MakeLegacyConfig(unittest.TestCase):
             self.assertEqual(
                 aib.packages_to_compile,
                 [
-                    CompiledPackageAdditionalShards(
+                    CompiledPackageDefinition(
                         name="core",
-                        component_shards={
-                            "core": set(
-                                [
-                                    "compiled_packages/core/core/shard1.cml",
-                                    "compiled_packages/core/core/shard2.cml",
-                                ]
+                        components=[
+                            CompiledComponentDefinition(
+                                "core",
+                                set(
+                                    [
+                                        "compiled_packages/core/core/shard1.cml",
+                                        "compiled_packages/core/core/shard2.cml",
+                                    ]
+                                ),
                             )
-                        },
+                        ],
                     ),
                 ],
             )
@@ -564,7 +567,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 [],
                 [],
                 dict(),
-                set(),
+                [],
                 None,
             )
 
@@ -621,7 +624,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     [],
                     [],
                     dict(),
-                    set(),
+                    [],
                     None,
                 )
 
@@ -656,7 +659,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 serialization.json_dump(manifest2, manifest_file, indent=2)
 
             # Add manifest path to both base and cache
-            base = set([manifest_path, manifest2_path])
+            base = [manifest_path, manifest2_path]
 
             # Copies legacy config into AIB
             self.assertRaises(
@@ -676,7 +679,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     [],
                     [],
                     dict(),
-                    set(),
+                    [],
                     None,
                 ),
             )

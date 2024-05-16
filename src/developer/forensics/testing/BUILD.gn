@@ -31,11 +31,10 @@ source_set("scoped_memfs_manager") {
   sources = [ "scoped_memfs_manager.h" ]
 
   public_deps = [
+    "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
-    "//src/storage/memfs:cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//src/lib/files",
+    "//src/sys/test_runners:tmp_storage",
   ]
 }
 

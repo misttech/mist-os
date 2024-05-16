@@ -66,7 +66,6 @@ class BindingTest : public testing::Test {
     config.use_fake_irq = true;
 
     config.device_info = {
-        .pid = PDEV_PID_AMLOGIC_S905D3,
         .mmio_count = 5,
         .irq_count = 4,
     };
@@ -183,6 +182,7 @@ class BindingTest : public testing::Test {
     InitFirmware();
     auto device = std::make_unique<DeviceCtx>(&driver_ctx_, root_.get());
     amlogic_decoder::AmlogicVideo* video = device->video();
+    video->SetDeviceType(DeviceType::kSM1);
     EXPECT_EQ(ZX_OK, video->InitRegisters(root_.get()));
     EXPECT_EQ(ZX_OK, video->InitDecoder());
 

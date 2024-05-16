@@ -142,6 +142,12 @@ impl<T> FromIterator<T> for OneOrMany<T> {
     }
 }
 
+impl<T> From<T> for OneOrMany<T> {
+    fn from(item: T) -> Self {
+        Self::One(item)
+    }
+}
+
 impl<'a, T: Display> Display for OneOrMany<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {

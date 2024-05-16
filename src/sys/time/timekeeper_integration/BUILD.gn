@@ -102,7 +102,10 @@ fuchsia_test_package("timekeeper-integration-test-root") {
   ]
 
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       # Some tests produce "error" level logs as part of the test execution.
       max_severity = "ERROR"
@@ -177,7 +180,10 @@ fuchsia_test_package("faketime-integration-test-root") {
   ]
 
   test_specs = {
-    environments = [ nuc_env ]
+    environments = [
+      nuc7_env,
+      nuc11_env,
+    ]
     log_settings = {
       max_severity = "ERROR"
     }

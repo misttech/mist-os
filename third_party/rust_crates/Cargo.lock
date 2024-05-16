@@ -1448,7 +1448,7 @@ dependencies = [
  "simplelog",
  "siphasher 0.3.10",
  "slab",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
  "socket2 0.5.5",
  "splines",
  "static_assertions",
@@ -2365,7 +2365,7 @@ dependencies = [
  "libc",
  "netlink-packet-core",
  "netlink-packet-utils",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
 ]
 
 [[package]]
@@ -2685,7 +2685,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall 0.2.13",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
  "winapi",
 ]
 
@@ -2698,7 +2698,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "redox_syscall 0.4.1",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
  "windows-targets",
 ]
 
@@ -4122,9 +4122,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.8.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
+checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
 name = "socket2"
@@ -4584,7 +4584,7 @@ dependencies = [
  "once_cell",
  "regex",
  "sharded-slab",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
  "thread_local",
  "tracing",
  "tracing-core",
@@ -4614,7 +4614,7 @@ dependencies = [
  "ipnet",
  "lazy_static",
  "rand 0.8.4",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
  "thiserror",
  "tinyvec",
  "tracing",
@@ -4632,7 +4632,7 @@ dependencies = [
  "lazy_static",
  "lru-cache",
  "parking_lot 0.12.0",
- "smallvec 1.8.0",
+ "smallvec 1.13.1",
  "thiserror",
  "tracing",
  "trust-dns-proto",

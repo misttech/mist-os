@@ -414,12 +414,25 @@ fn translate_use(
             };
             let availability = extract_use_availability(use_)?;
             let type_ = validate::use_config_to_value_type(use_)?;
+
+            let default = if let Some(default) = &use_.config_default {
+                let value = config_value_file::field::config_value_from_json_value(
+                    default,
+                    &type_.clone().into(),
+                )
+                .map_err(|e| Error::InvalidArgs(format!("Error parsing config '{}': {}", n, e)))?;
+                Some(value.native_into_fidl())
+            } else {
+                None
+            };
+
             out_uses.push(fdecl::Use::Config(fdecl::UseConfiguration {
                 source: Some(source),
                 source_name: Some(n.clone().into()),
                 target_name: Some(target.into()),
                 availability: Some(availability),
                 type_: Some(translate_value_type(&type_).0),
+                default,
                 ..Default::default()
             }));
         } else {
@@ -2883,7 +2896,7 @@ mod tests {
         },
 
         test_compile_use => {
-            features = FeatureSet::from(vec![Feature::Dictionaries, Feature::ConfigCapabilities]),
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "use": [
                     {
@@ -5024,7 +5037,7 @@ mod tests {
 
 
         test_compile_configuration_capability => {
-            features = FeatureSet::from(vec![Feature::ConfigCapabilities]),
+            features = FeatureSet::from(vec![]),
             input = json!({
                 "capabilities": [
                     {
@@ -5594,8 +5607,7 @@ mod tests {
                     }
             ],
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let actual = compile(&input, options).unwrap();
         let type_ = fdecl::ConfigType {
             layout: fdecl::ConfigTypeLayout::Bool,
@@ -5640,8 +5652,7 @@ mod tests {
             "my_config": { "type": "int8"},
         }
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         assert_matches!(
             compile(&input, options),
             Err(Error::Validate { err, .. })
@@ -5664,8 +5675,7 @@ mod tests {
             "my_config": { "type": "bool"},
         }
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let decl = compile(&input, options).unwrap();
         let config = decl.config.unwrap();
         assert_eq!(
@@ -5685,8 +5695,7 @@ mod tests {
                     }
             ],
         });
-        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
-        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let options = CompileOptions::new().config_package_path("fake.cvf");
         let decl = compile(&input, options).unwrap();
         let config = decl.config.unwrap();
         assert_eq!(
@@ -5695,6 +5704,47 @@ mod tests {
                 fdecl::ConfigValueSource::Capabilities(fdecl::ConfigSourceCapabilities::default())
             )
         );
+    }
+
+    #[test]
+    fn test_config_default() {
+        let input = must_parse_cml!({
+            "use": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "key" : "my_config",
+                        "type": "bool",
+                        "availability": "optional",
+                        "default": true
+                    }
+            ],
+        });
+        let options = CompileOptions::new().config_package_path("fake.cvf");
+        let decl = compile(&input, options).unwrap();
+        assert_matches!(
+            decl.uses.as_ref().unwrap()[0],
+            fdecl::Use::Config(fdecl::UseConfiguration {
+                default: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
+                ..
+            })
+        );
+    }
+
+    #[test]
+    fn test_config_default_bad_type() {
+        let input = must_parse_cml!({
+            "use": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "key" : "my_config",
+                        "type": "bool",
+                        "availability": "optional",
+                        "default": 5
+                    }
+            ],
+        });
+        let options = CompileOptions::new().config_package_path("fake.cvf");
+        assert_matches!(compile(&input, options), Err(Error::InvalidArgs(_)));
     }
 
     #[test]

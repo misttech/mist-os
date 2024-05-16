@@ -26,6 +26,7 @@
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-meson/g12b-clk.h>
 
+#include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 
 namespace fdf {
@@ -174,6 +175,7 @@ const std::vector<fdf::NodeProperty> kClockGateProperties = std::vector{
 const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(A311D_GPIOBOOT(12))),
 };
 

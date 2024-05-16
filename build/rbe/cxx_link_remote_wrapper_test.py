@@ -82,6 +82,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.sysroot, sysroot)
         self.assertEqual(c.target, target)
         self.assertEqual(c.original_link_command, command)
+        self.assertEqual(c.primary_output, output)
         self.assertFalse(c.local_only)
 
         with mock.patch.object(

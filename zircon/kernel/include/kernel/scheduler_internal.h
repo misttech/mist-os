@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_INTERNAL_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_INTERNAL_H_
 
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 
 #include <arch/mp.h>
@@ -127,11 +128,49 @@ inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {
 
     // Can we do it here and now?
     if (preempt_enabled) {
-      // TODO(https://fxbug.dev/42143537): Once spinlocks imply preempt disable, this if-else can be
-      // replaced with a call to Preempt().
-      if (arch_num_spinlocks_held() < 2 && !arch_blocking_disallowed()) {
-        // Yes, do it.
-        Preempt();
+      // TODO(https://fxbug.dev/42143537): Once spinlocks/chainlocks imply preempt disable,
+      // this if-else can be replaced with a call to Preempt().
+
+      if ((arch_num_spinlocks_held() == 0) && !arch_blocking_disallowed()) {
+        // From a chain-lock requirement perspective, there are a few different
+        // cases to consider.
+        //
+        // 1) We currently have no transaction in progress and hold no locks.
+        //    In this case, we can simply call Preempt, which will start a
+        //    transaction, lock our current thread, and take care of preemption.
+        // 2) We do currently have a transaction in progress, but we hold no
+        //    locks.  This can happen in the cases such as Unblock(thread) or
+        //    Unblock(list), where all of the unblocking thread's locks were
+        //    dropped after adding them to the proper scheduler queue.  We need
+        //    to re-use our existing transaction by first restarting it, then
+        //    obtaining our current thread's lock, and finally calling
+        //    PreemptLocked.
+        // 3) We do currently have a transaction in progress, and we are holding
+        //    exactly one lock which is the current thread's lock.  In this case,
+        //    we call simply PreemptLocked directly.
+        //
+        // TODO(johngro): Determine if #1 and #3 are actual possibilities by the
+        // time that we hit this stage.  #2 may be the only legit case, but I'm
+        // not quite sure yet.
+        if (ChainLockTransaction* active_clt = ChainLockTransaction::Active();
+            active_clt != nullptr) {
+          ChainLockTransaction::MarkActive();
+          Thread* const current_thread = Thread::Current::Get();
+
+          if (current_thread->get_lock().is_held() == false) {
+            active_clt->Restart(CLT_TAG("Scheduler::RescheduleMask"));
+            active_clt->AssertNumLocksHeld(0);
+            UnconditionalChainLockGuard guard{current_thread->get_lock()};
+            active_clt->Finalize();
+            PreemptLocked(current_thread);
+          } else {
+            active_clt->AssertNumLocksHeld(1);
+            current_thread->get_lock().AssertHeld();
+            PreemptLocked(current_thread);
+          }
+        } else {
+          Preempt();
+        }
         return;
       }
     }

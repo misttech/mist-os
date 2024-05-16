@@ -297,18 +297,34 @@ def cmd_gn_label_to_ninja_paths(args: argparse.Namespace) -> int:
     if not outputs.load(args.build_dir):
         return 1
 
+    from gn_labels import GnLabelQualifier
+
+    host_cpu = args.host_tag.split("-")[1]
+    target_cpu = _get_target_cpu(args.build_dir)
+    qualifier = GnLabelQualifier(host_cpu, target_cpu)
+
     failure = False
     all_paths = []
     for label in args.labels:
-        paths = outputs.gn_label_to_paths(label)
-        if paths:
-            all_paths.extend(paths)
-            continue
-        if args.allow_unknown and not label.startswith("/"):
+        if label.startswith("//"):
+            qualified_label = qualifier.qualify_label(label)
+            paths = outputs.gn_label_to_paths(qualified_label)
+            if paths:
+                all_paths.extend(paths)
+                continue
+            _error(f"Unknown GN label (not in the configured graph): {label}")
+            failure = True
+        elif label.startswith("/"):
+            _error(
+                f"Absolute path is not a valid GN label or Ninja path: {label}"
+            )
+            failure = True
+        elif args.allow_unknown:
+            # Assume this is a Ninja path.
             all_paths.append(label)
-            continue
-        _error(f"Unknown GN label (not in the configured graph): {label}")
-        failure = True
+        else:
+            _error(f"Not a proper GN label (must start with //): {label}")
+            failure = True
 
     if failure:
         return 1

@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <queue>
+#include <variant>
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
@@ -68,12 +69,45 @@ class Dwc2 : public Dwc2Type,
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
                          ConnectToEndpointCompleter::Sync& completer) override;
 
+  void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override;
+
+  void ConfigureEndpoint(ConfigureEndpointRequest& request,
+                         ConfigureEndpointCompleter::Sync& completer) override;
+
+  void DisableEndpoint(DisableEndpointRequest& request,
+                       DisableEndpointCompleter::Sync& completer) override;
+
+  void EndpointSetStall(EndpointSetStallRequest& request,
+                        EndpointSetStallCompleter::Sync& completer) override;
+
+  void EndpointClearStall(EndpointClearStallRequest& request,
+                          EndpointClearStallCompleter::Sync& completer) override;
+
+  void CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) override;
+
   // Allows tests to configure a fake interrupt.
   void SetInterrupt(zx::interrupt irq) { irq_ = std::move(irq); }
 
   const zx::bti& bti() const { return bti_; }
 
  private:
+  // For the purposes of banjo->FIDL migration. Once banjo is ripped out of the driver, the logic
+  // here can be folded into the FIDL endpoint implementation and calling code.
+  //
+  // The CommonFoo() methods are for implementing protocol endpoints in both banjo and FIDL.
+  // Similarly, the DciIntfWrapFoo() methods are for dispatching to the UsbDciInterface protocol
+  // served over either banjo or FIDL.
+  zx_status_t CommonSetInterface();
+  zx_status_t CommonDisableEndpoint(uint8_t ep_address);
+  zx_status_t CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_desc,
+                                      const usb_ss_ep_comp_descriptor_t* ss_comp_desc);
+  zx_status_t CommonCancelAll(uint8_t ep_address);
+  void DciIntfWrapSetSpeed(usb_speed_t speed);
+  void DciIntfWrapSetConnected(bool connected);
+  zx_status_t DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,
+                                 size_t write_size, uint8_t* out_read_buffer, size_t read_size,
+                                 size_t* out_read_actual);
+
   enum class Ep0State {
     DISCONNECTED,
     IDLE,
@@ -195,7 +229,13 @@ class Dwc2 : public Dwc2Type,
   Ep0State ep0_state_ = Ep0State::DISCONNECTED;
 
   ddk::PDevFidl pdev_;
-  std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
+
+  using DciInterfaceBanjoClient = ddk::UsbDciInterfaceProtocolClient;
+  using DciInterfaceFidlClient = fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface>;
+
+  // The protocol client to either a Banjo protocol or FIDL server.
+  std::optional<std::variant<DciInterfaceBanjoClient, DciInterfaceFidlClient>> dci_intf_;
+
   std::optional<usb_phy::UsbPhyClient> usb_phy_;
 
   std::optional<fdf::MmioBuffer> mmio_;

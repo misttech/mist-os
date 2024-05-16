@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_AUTO_PREEMPT_DISABLER_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_AUTO_PREEMPT_DISABLER_H_
 
+#include <kernel/preempt_disabled_token.h>
 #include <kernel/thread.h>
 
 // AutoPreemptDisabler is a RAII helper that automatically manages disabling and
@@ -54,7 +55,7 @@ class AutoPreemptDisabler {
   AutoPreemptDisabler& operator=(AutoPreemptDisabler&&) = delete;
 
   // Disables preemption if it was not disabled by this instance already.
-  void Disable() {
+  void Disable() TA_ASSERT(preempt_disabled_token) {
     if (!disabled_) {
       Thread::Current::preemption_state().PreemptDisable();
       disabled_ = true;
@@ -68,6 +69,8 @@ class AutoPreemptDisabler {
       disabled_ = false;
     }
   }
+
+  void AssertDisabled() const TA_ASSERT(preempt_disabled_token) { DEBUG_ASSERT(disabled_); }
 
  private:
   bool disabled_{true};

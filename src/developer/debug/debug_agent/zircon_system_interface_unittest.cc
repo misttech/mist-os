@@ -9,10 +9,10 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/debug/debug_agent/component_manager.h"
-#include "src/developer/debug/debug_agent/filter.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/debug_agent/zircon_process_handle.h"
 #include "src/developer/debug/debug_agent/zircon_utils.h"
+#include "src/developer/debug/ipc/filter_utils.h"
 #include "src/developer/debug/shared/test_with_loop.h"
 
 namespace debug_agent {
@@ -39,6 +39,8 @@ bool FindProcess(const debug_ipc::ProcessTreeRecord& record, zx_koid_t koid_to_f
   }
   return false;
 }
+
+}  // namespace
 
 class ZirconSystemInterfaceTest : public debug::TestWithLoop {};
 
@@ -104,26 +106,45 @@ TEST_F(ZirconSystemInterfaceTest, DISABLED_FindComponentInfo) {
   EXPECT_EQ(suffix, component_info.url.substr(component_info.url.size() - suffix.size()));
 }
 
-TEST_F(ZirconSystemInterfaceTest, FilterMatchProcess) {
+TEST_F(ZirconSystemInterfaceTest, FilterMatchComponents) {
   ZirconSystemInterface system_interface;
+
+  // Create a job tree like this:
+  // 1: root-job
+  //   2: child_job1 fake/moniker
+  //     ...
+  //   5: child_job2 other/moniker
+  //     ...
+
+  constexpr zx_koid_t kRootJobKoid = 1;
+  constexpr zx_koid_t kChildJob1Koid = 2;
+  constexpr zx_koid_t kChildJob2Koid = 5;
+
+  auto& parent_jobs = system_interface.parent_jobs_;
+  parent_jobs.insert({kChildJob1Koid, kRootJobKoid});
+  parent_jobs.insert({kChildJob2Koid, kRootJobKoid});
+
+  auto& component_info = system_interface.zircon_component_manager().running_component_info_;
+  component_info.insert(
+      {kChildJob1Koid, {"fake/moniker", "fuchsia-pkg://fuchsia.com/component1#meta/component.cm"}});
+  component_info.insert(
+      {kChildJob2Koid,
+       {"other/moniker", "fuchsia-pkg://fuchsia.com/some_other#meta/other_component.cm"}});
 
   system_interface.zircon_component_manager().SetReadyCallback([&]() { loop().QuitNow(); });
   loop().Run();
 
-  zx::process handle;
-  zx::process::self()->duplicate(ZX_RIGHT_SAME_RIGHTS, &handle);
-  ZirconProcessHandle self(std::move(handle));
-
   debug_ipc::Filter filter{.type = debug_ipc::Filter::Type::kComponentName,
-                           .pattern = "debug_agent_unit_tests.cm"};
-  EXPECT_TRUE(Filter(filter).MatchesProcess(self, system_interface));
+                           .pattern = "component.cm"};
+  auto components = system_interface.GetComponentManager().FindComponentInfo(kChildJob1Koid);
+  EXPECT_EQ(components.size(), 1u);
+  EXPECT_TRUE(debug_ipc::FilterMatches(filter, "", components));
 
-  filter = {
-      .type = debug_ipc::Filter::Type::kComponentUrl,
-      .pattern = "fuchsia-pkg://fuchsia.com/debug_agent_unit_tests#meta/debug_agent_unit_tests.cm"};
-  EXPECT_TRUE(Filter(filter).MatchesProcess(self, system_interface));
+  filter = {.type = debug_ipc::Filter::Type::kComponentUrl,
+            .pattern = "fuchsia-pkg://fuchsia.com/some_other#meta/other_component.cm"};
+  components = system_interface.GetComponentManager().FindComponentInfo(kChildJob2Koid);
+  EXPECT_EQ(components.size(), 1u);
+  EXPECT_TRUE(debug_ipc::FilterMatches(filter, "", components));
 }
-
-}  // namespace
 
 }  // namespace debug_agent

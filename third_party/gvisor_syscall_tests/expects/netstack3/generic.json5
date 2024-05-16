@@ -14,10 +14,6 @@
                 "SocketTest.UnixSocketStatFS",
                 "OpenModes/SocketOpenTest.Unix/*",
 
-                // Netstack3 does not support SO_REUSEADDR for UDP.
-                "IPUnboundSockets/IPUnboundSocketTest.ReuseAddrDefault/[0123]",
-                "IPUnboundSockets/IPUnboundSocketTest.SetReuseAddr/[0123]",
-
                 // Netstack3 does not support many UDP socket options or operations
                 "IPUnboundSockets/IPUnboundSocketTest.CheckSkipECN/*",
                 "IPUnboundSockets/IPUnboundSocketTest.InvalidLargeTOS/*",

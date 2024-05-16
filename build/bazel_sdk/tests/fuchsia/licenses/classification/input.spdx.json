@@ -13,7 +13,7 @@
         {
             "SPDXID": "SPDXRef-Package-A",
             "name": "Package A",
-            "licenseConcluded": "LicenseRef-A-known AND LicenseRef-B-dedupped AND LicenseRef-C-unknown",
+            "licenseConcluded": "LicenseRef-A-known AND LicenseRef-B-dedupped AND LicenseRef-C-ignorable AND LicenseRef-C-copyright",
             "copyrightText": "copyright A"
         },
         {
@@ -49,9 +49,14 @@
             "extractedText": "Some known\ntest license B\n(multiple copies)"
         },
         {
-            "name": "License C unknown",
-            "licenseId": "LicenseRef-C-unknown",
-            "extractedText": "Some unknown\ntest license C"
+            "name": "License C ignorable",
+            "licenseId": "LicenseRef-C-ignorable",
+            "extractedText": "Some ignorable\ntext"
+        },
+        {
+            "name": "License C copyright",
+            "licenseId": "LicenseRef-C-copyright",
+            "extractedText": "Some copyright\ntext"
         },
         {
             "name": "License D multiple conditions",

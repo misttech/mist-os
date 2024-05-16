@@ -481,13 +481,15 @@ async fn shred_data_volume(
         return Err(zx::Status::NOT_SUPPORTED);
     }
     // If we expect Fxfs to be live, ask `environment` to shred the data volume.
-    if config.data && !config.ramdisk_image {
+    if (config.data || config.fxfs_blob) && !config.ramdisk_image {
+        tracing::info!("Filesystem is running; shredding online.");
         environment.lock().await.shred_data().await.map_err(|err| {
             debug_log(&format!("Failed to shred data: {:?}", err));
             zx::Status::INTERNAL
         })?;
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
+        tracing::info!("Filesystem is not running; shredding offline.");
         let partition_controller = if config.fxfs_blob {
             let fxfs_matcher = PartitionMatcher {
                 detected_disk_formats: Some(vec![DiskFormat::Fxfs]),
@@ -560,6 +562,7 @@ async fn shred_data_volume(
             })?;
         debug_log("Deleted fxfs-data keybag");
     }
+    tracing::info!("Shredded the data volume.  Data will be lost!!");
     Ok(())
 }
 

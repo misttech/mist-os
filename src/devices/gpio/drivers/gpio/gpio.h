@@ -51,16 +51,17 @@ class GpioDevice : public GpioDeviceType {
  public:
   GpioDevice(zx_device_t* parent, fdf::UnownedDispatcher fidl_dispatcher,
              fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio, uint32_t pin,
-             std::string_view name)
+             uint32_t controller_id, std::string_view name)
       : GpioDeviceType(parent),
         fidl_dispatcher_(std::move(fidl_dispatcher)),
         pin_(pin),
+        controller_id_(controller_id),
         name_(name),
         gpio_(std::in_place, std::move(gpio), fidl_dispatcher_->get()),
         bindings_(std::in_place),
         outgoing_(std::in_place, fidl_dispatcher_->async_dispatcher()) {}
 
-  zx_status_t InitAddDevice(uint32_t controller_id);
+  zx_status_t InitAddDevice();
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -85,6 +86,7 @@ class GpioDevice : public GpioDeviceType {
  private:
   const fdf::UnownedDispatcher fidl_dispatcher_;
   const uint32_t pin_;
+  const uint32_t controller_id_;
   const std::string name_;
 
   // These objects can only be accessed on the FIDL dispatcher. Making them optional allows them to

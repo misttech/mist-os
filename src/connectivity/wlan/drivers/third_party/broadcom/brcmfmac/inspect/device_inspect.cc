@@ -93,7 +93,6 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
   }
 
   // Start timers.
-  constexpr bool kPeriodic = true;
   inspect->timer_hr_ = std::make_unique<Timer>(
       dispatcher,
       [inspect = inspect.get()]() {
@@ -109,7 +108,7 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
         inspect->low_data_rate_24hrs_.SlideWindow();
         inspect->high_wme_rx_error_rate_24hrs_.SlideWindow();
       },
-      kPeriodic);
+      Timer::Type::Periodic);
   inspect->timer_hr_->Start(zx::hour(1).get());
 
   *inspect_out = std::move(inspect);

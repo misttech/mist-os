@@ -149,8 +149,8 @@ pub fn new_fuse_fs(
         CacheMode::Cached(CacheConfig::default()),
         FuseFs { connection: connection.clone(), default_permissions },
         options,
-    );
-    let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64);
+    )?;
+    let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64, 0);
     fuse_node.state.lock().nlookup += 1;
 
     let mut root_node = FsNode::new_root(fuse_node.clone());
@@ -181,7 +181,7 @@ pub fn new_fusectl_fs(
         CacheMode::Uncached,
         Arc::clone(fusectl_fs(current_task)),
         options,
-    );
+    )?;
     let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
         info.chmod(mode!(IFDIR, 0o755));
     });
@@ -454,15 +454,17 @@ struct FuseNodeMutableState {
 struct FuseNode {
     connection: Arc<FuseConnection>,
     nodeid: u64,
+    generation: u64,
     attributes_valid_until: AtomicTime,
     state: Mutex<FuseNodeMutableState>,
 }
 
 impl FuseNode {
-    fn new(connection: Arc<FuseConnection>, nodeid: u64) -> Arc<Self> {
+    fn new(connection: Arc<FuseConnection>, nodeid: u64, generation: u64) -> Arc<Self> {
         Arc::new(Self {
             connection,
             nodeid,
+            generation,
             attributes_valid_until: zx::Time::INFINITE_PAST.into(),
             state: Default::default(),
         })
@@ -592,17 +594,26 @@ impl FuseNode {
         if entry.nodeid == 0 {
             return error!(ENOENT);
         }
-        let node = node.fs().get_or_create_node(current_task, Some(entry.nodeid), |id| {
-            let fuse_node = FuseNode::new(self.connection.clone(), entry.nodeid);
-            let mut info = FsNodeInfo::default();
-            FuseNode::set_node_info(
-                &mut info,
-                entry.attr,
-                attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
-                &fuse_node.attributes_valid_until,
-            )?;
-            Ok(FsNode::new_uncached(current_task, fuse_node, &node.fs(), id, info))
-        })?;
+        let node = node.fs().get_and_validate_or_create_node(
+            current_task,
+            Some(entry.nodeid),
+            |node| {
+                let fuse_node = FuseNode::from_node(&node);
+                fuse_node.generation == entry.generation
+            },
+            |id| {
+                let fuse_node =
+                    FuseNode::new(self.connection.clone(), entry.nodeid, entry.generation);
+                let mut info = FsNodeInfo::default();
+                FuseNode::set_node_info(
+                    &mut info,
+                    entry.attr,
+                    attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
+                    &fuse_node.attributes_valid_until,
+                )?;
+                Ok(FsNode::new_uncached(current_task, fuse_node, &node.fs(), id, info))
+            },
+        )?;
         // . and .. do not get their lookup count increased.
         if !DirEntry::is_reserved_name(name) {
             let fuse_node = FuseNode::from_node(&node);
@@ -945,18 +956,18 @@ impl DirEntryOps for FuseDirEntry {
         )?;
         let FuseResponse::Entry(uapi::fuse_entry_out {
             nodeid,
+            generation,
             entry_valid,
             entry_valid_nsec,
             attr,
             attr_valid,
             attr_valid_nsec,
-            ..
         }) = response
         else {
             return error!(EINVAL);
         };
 
-        if nodeid != node.nodeid {
+        if (nodeid != node.nodeid) || (generation != node.generation) {
             // A new entry exists with the name. This `DirEntry` is no longer
             // valid. The caller should attempt to restart the path walk at this
             // node.
@@ -1023,24 +1034,12 @@ impl FsNodeOps for Arc<FuseNode> {
                     error!(EINVAL)
                 }
             }
-            CheckAccessReason::Open => {
-                // Don't perform any access checks when this access check is being
-                // performed for an open. `FUSE_OPEN` handlers are expected to validate
-                // that the open request is valid for the given node being opened,
-                // including the flags which hold the requested access permissions
-                // like read/write (e.g. `O_RDONLY`/`O_RDWR`).
-                //
-                // For more details, see fuse(4) and `libfuse`'s low-level `FUSE_OPEN`
-                // handler.
-                Ok(())
-            }
             CheckAccessReason::InternalPermissionChecks => {
-                return self.default_check_access_with_valid_node_attributes(
-                    node,
-                    current_task,
-                    access,
-                    info,
-                );
+                // Per FUSE's mount options, the kernel does not check file access
+                // permissions unless the default permissions mount option is set.
+                //
+                // See https://www.kernel.org/doc/html/v5.6/filesystems/fuse.html#mount-options.
+                Ok(())
             }
         }
     }

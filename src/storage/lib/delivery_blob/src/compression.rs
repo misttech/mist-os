@@ -32,8 +32,14 @@ pub enum ChunkedArchiveError {
     #[error("Value is out of range or cannot be represented in specified type.")]
     OutOfRange,
 
-    #[error("Error when decompressing chunk: `{0:?}`.")]
-    DecompressionError(std::io::Error),
+    #[error("Error invoking Zstd function: `{0:?}`.")]
+    ZstdError(#[source] std::io::Error),
+
+    #[error("Error decompressing chunk {index}: `{source:?}`.")]
+    DecompressionError { index: usize, source: std::io::Error },
+
+    #[error("Error compressing chunk {index}: `{source:?}`.")]
+    CompressionError { index: usize, source: std::io::Error },
 }
 
 /// Validated chunk information from an archive. Compressed ranges are relative to the start of
@@ -262,7 +268,8 @@ impl ChunkedArchive {
         let chunk_size = ChunkedArchive::chunk_size_for(data.len(), chunk_alignment);
         let mut chunks: Vec<Result<CompressedChunk, ChunkedArchiveError>> = vec![];
         data.par_chunks(chunk_size)
-            .map(|chunk| {
+            .enumerate()
+            .map(|(index, chunk)| {
                 // Creating and destroying zstd::bulk::Compressor objects is expensive. A single
                 // `Compressor` is created for each `rayon` thread and is reused across chunks.
                 thread_local! {
@@ -279,7 +286,9 @@ impl ChunkedArchive {
                 }
                 let compressed_data = COMPRESSOR.with(|compressor| {
                     let mut compressor = compressor.borrow_mut();
-                    compressor.compress(chunk).map_err(ChunkedArchiveError::DecompressionError)
+                    compressor
+                        .compress(chunk)
+                        .map_err(|err| ChunkedArchiveError::CompressionError { index, source: err })
                 })?;
                 Ok(CompressedChunk { compressed_data, decompressed_size: chunk.len() })
             })
@@ -386,8 +395,8 @@ impl ChunkedDecompressor {
             seek_table.last().map(|last_chunk| last_chunk.compressed_range.end).unwrap_or(0);
         let decompressed_buffer =
             vec![0u8; seek_table.first().map(|c| c.decompressed_range.len()).unwrap_or(0)];
-        let decompressor = zstd::bulk::Decompressor::new()
-            .map_err(|err| ChunkedArchiveError::DecompressionError(err))?;
+        let decompressor =
+            zstd::bulk::Decompressor::new().map_err(ChunkedArchiveError::ZstdError)?;
         Ok(Self {
             seek_table,
             buffer: vec![],
@@ -413,7 +422,10 @@ impl ChunkedDecompressor {
         let decompressed_size = self
             .decompressor
             .decompress_to_buffer(data, self.decompressed_buffer.as_mut_slice())
-            .map_err(|err| ChunkedArchiveError::DecompressionError(err))?;
+            .map_err(|err| ChunkedArchiveError::DecompressionError {
+                index: self.curr_chunk,
+                source: err,
+            })?;
         if decompressed_size != chunk.decompressed_range.len() {
             return Err(ChunkedArchiveError::IntegrityError);
         }
@@ -811,7 +823,7 @@ mod tests {
         let mut decompressor = ChunkedDecompressor::new(seek_table).unwrap();
         assert!(matches!(
             decompressor.update(&chunk_data, &mut |_chunk| {}),
-            Err(ChunkedArchiveError::DecompressionError(_))
+            Err(ChunkedArchiveError::DecompressionError { index: 0, .. })
         ));
     }
 }

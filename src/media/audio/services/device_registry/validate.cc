@@ -915,9 +915,66 @@ bool ValidateDelayInfo(const fha::DelayInfo& delay_info) {
 }
 
 // Validate the type-specific state for this element type.
+bool ValidateDaiInterconnectElementState(const fhasp::ElementState& element_state,
+                                         const fhasp::Element& element) {
+  if (  // This must be an element of type DaiInterconnect
+      element.type() != fhasp::ElementType::kDaiInterconnect ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type dai_interconnect() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDaiInterconnect ||
+      !element.type_specific()->dai_interconnect().has_value() ||
+      // ... specifically including plug_detect_capabilities()
+      !element.type_specific()->dai_interconnect()->plug_detect_capabilities().has_value() ||
+      // ElementState must be type DaiInterconnect (type_specific dai_interconnect() must exist)
+      !element_state.type_specific().has_value() ||
+      element_state.type_specific()->Which() !=
+          fhasp::TypeSpecificElementState::Tag::kDaiInterconnect ||
+      // A type_specific element state dai_interconnect() must exist
+      !element_state.type_specific()->dai_interconnect().has_value() ||
+      // plug_state must be present
+      !element_state.type_specific()->dai_interconnect()->plug_state().has_value() ||
+      // plugged and plug_state_time are required
+      !element_state.type_specific()->dai_interconnect()->plug_state()->plugged().has_value() ||
+      !element_state.type_specific()
+           ->dai_interconnect()
+           ->plug_state()
+           ->plug_state_time()
+           .has_value() ||
+      // plug_state_time (which is on the MONOTONIC timeline) cannot be negative
+      *element_state.type_specific()->dai_interconnect()->plug_state()->plug_state_time() < 0 ||
+      // if unplugged...
+      (!*element_state.type_specific()->dai_interconnect()->plug_state()->plugged() &&
+       // ... then the Element's capabilities must allow for that.
+       *element.type_specific()->dai_interconnect()->plug_detect_capabilities() ==
+           fhasp::PlugDetectCapabilities::kHardwired)) {
+    FX_LOGS(WARNING) << "Invalid DaiInterconnect-specific fields in ElementState";
+    return false;
+  }
+
+  // external_delay, if present, must not be negative
+  if (element_state.type_specific()->dai_interconnect()->external_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.external_delay ("
+                     << *element_state.type_specific()->dai_interconnect()->external_delay()
+                     << " ns) cannot be negative";
+    return false;
+  }
+
+  return true;
+}
+
+// Validate the type-specific state for this element type.
 bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
-                                  const fhasp::Element& element, bool from_client) {
-  if (  // A type_specific of type dynamics() must not be absent or empty.
+                                  const fhasp::Element& element) {
+  if (  // This must be an element of type Dynamics
+      element.type() != fhasp::ElementType::kDynamics || !element.type_specific().has_value() ||
+      // ... with appropriate type_specific info
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDynamics ||
+      !element.type_specific()->dynamics().has_value() ||
+      // ... specifically including the bands() vector
+      !element.type_specific()->dynamics()->bands().has_value() ||
+      element.type_specific()->dynamics()->bands()->empty() ||
+      // A type_specific element state of dynamics() must not be absent or empty.
       !element_state.type_specific().has_value() ||
       element_state.type_specific()->Which() != fhasp::TypeSpecificElementState::Tag::kDynamics ||
       !element_state.type_specific()->dynamics().has_value() ||
@@ -950,59 +1007,23 @@ bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
         // threshold_db must be finite
         !std::isfinite(*band_state.threshold_db()) ||
         // threshold_type is required for servers
-        (!from_client && !band_state.threshold_type().has_value()) ||
-        // threshold_type from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.threshold_type().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kThresholdType)) ||
+        !band_state.threshold_type().has_value() ||
         // ratio is required and must be finite
         !band_state.ratio().has_value() || !std::isfinite(*band_state.ratio()) ||
-        // knee_width_db from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.knee_width_db().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kKneeWidth)) ||
         // knee_width_db, if present, must not be negative
-        (band_state.knee_width_db().has_value() && *band_state.knee_width_db() < 0.0f) ||
+        (band_state.knee_width_db().value_or(0) < 0.0f) ||
         // knee_width_db, if present, must be finite
-        (band_state.knee_width_db().has_value() && !std::isfinite(*band_state.knee_width_db())) ||
-        // attack from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.attack().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kAttack)) ||
+        (!std::isfinite(band_state.knee_width_db().value_or(0))) ||
         // attack, if present, must not be negative
-        (band_state.attack().has_value() && *band_state.attack() < 0) ||
-        // release from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.release().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kRelease)) ||
+        (band_state.attack().value_or(0) < 0) ||
         // release, if present, must not be negative
-        (band_state.release().has_value() && *band_state.release() < 0) ||
-        // output_gain_db from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.output_gain_db().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kOutputGain)) ||
+        (band_state.release().value_or(0) < 0) ||
         // output_gain_db, if present, must be finite
-        (band_state.output_gain_db().has_value() && !std::isfinite(*band_state.output_gain_db())) ||
-        // input_gain_db from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.input_gain_db().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kInputGain)) ||
+        (!std::isfinite(band_state.output_gain_db().value_or(0))) ||
         // input_gain_db, if present, must be finite
-        (band_state.input_gain_db().has_value() && !std::isfinite(*band_state.input_gain_db())) ||
-        // level_type from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.level_type().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kLevelType)) ||
-        // lookahead from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.lookahead().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kLookahead)) ||
+        (!std::isfinite(band_state.input_gain_db().value_or(0))) ||
         // lookahead, if present, must not be negative
-        (band_state.lookahead().has_value() && *band_state.lookahead() < 0) ||
-        // linked_channels from a CLIENT requires that supported_controls bit to be set
-        (from_client && band_state.linked_channels().has_value() &&
-         !(*element.type_specific()->dynamics()->supported_controls() &
-           fhasp::DynamicsSupportedControls::kLinkedChannels))) {
+        (band_state.lookahead().value_or(0) < 0)) {
       FX_LOGS(WARNING) << "Invalid DynamicsBandState (id "
                        << (band_state.id().has_value() ? std::to_string(*band_state.id())
                                                        : "<none>")
@@ -1016,38 +1037,21 @@ bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
 }
 
 // Validate the type-specific state for this element type.
-bool ValidateEndpointElementState(const fhasp::ElementState& element_state,
-                                  const fhasp::Element& element) {
-  if (  // A type_specific of type endpoint() must exist and must contain a non-empty plug_state.
-      !element_state.type_specific().has_value() ||
-      element_state.type_specific()->Which() != fhasp::TypeSpecificElementState::Tag::kEndpoint ||
-      !element_state.type_specific()->endpoint().has_value() ||
-      !element_state.type_specific()->endpoint()->plug_state().has_value() ||
-      // plugged and plug_state_time are required
-      !element_state.type_specific()->endpoint()->plug_state()->plugged().has_value() ||
-      !element_state.type_specific()->endpoint()->plug_state()->plug_state_time().has_value() ||
-      // if unplugged...
-      (!*element_state.type_specific()->endpoint()->plug_state()->plugged() &&
-       // ... then the Element's capabilities must allow for that.
-       *element.type_specific()->endpoint()->plug_detect_capabilities() ==
-           fhasp::PlugDetectCapabilities::kHardwired)) {
-    FX_LOGS(WARNING) << "Invalid Endpoint-specific fields in ElementState";
-    return false;
-  }
-
-  // if (element_state.type_specific()->endpoint()->external_delay().value_or(0) < 0) {
-  //   FX_LOGS(WARNING) << "WatchElementState: ElementState.external_delay (" <<
-  //     *element_state.type_specific()->endpoint()->external_delay() << " ns) cannot be negative";
-  //   return false;
-  // }
-
-  return true;
-}
-
-// Validate the type-specific state for this element type.
 bool ValidateEqualizerElementState(const fhasp::ElementState& element_state,
                                    const fhasp::Element& element) {
-  if (  // A type_specific of type equalizer() must not be absent or empty.
+  if (  // This must be an element of type Equalizer
+      element.type() != fhasp::ElementType::kEqualizer ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type equalizer() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEqualizer ||
+      !element.type_specific()->equalizer().has_value() ||
+      // ... specifically including bands(), min_frequency() and max_frequency()
+      !element.type_specific()->equalizer()->bands().has_value() ||
+      element.type_specific()->equalizer()->bands()->empty() ||
+      !element.type_specific()->equalizer()->min_frequency().has_value() ||
+      !element.type_specific()->equalizer()->max_frequency().has_value() ||
+      // A type_specific element state of equalizer() must not be absent or empty.
       !element_state.type_specific().has_value() ||
       element_state.type_specific()->Which() != fhasp::TypeSpecificElementState::Tag::kEqualizer ||
       !element_state.type_specific()->equalizer().has_value() ||
@@ -1105,7 +1109,20 @@ bool ValidateEqualizerElementState(const fhasp::ElementState& element_state,
 // Validate the type-specific state for this element type.
 bool ValidateGainElementState(const fhasp::ElementState& element_state,
                               const fhasp::Element& element) {
-  if (  // A type_specific of type gain() must not be absent or empty.
+  if (  // This must be an element of type Gain
+      element.type() != fhasp::ElementType::kGain ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type gain() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kGain ||
+      !element.type_specific()->gain().has_value() ||
+      // ... specifically including min_gain() and max_gain()
+      !element.type_specific()->gain()->min_gain().has_value() ||
+      !element.type_specific()->gain()->max_gain().has_value() ||
+      // ... both of which must be finite
+      !std::isfinite(*element.type_specific()->gain()->min_gain()) ||
+      !std::isfinite(*element.type_specific()->gain()->max_gain()) ||
+      // A type_specific element state of gain() must not be absent or empty.
       !element_state.type_specific().has_value() ||
       element_state.type_specific()->Which() != fhasp::TypeSpecificElementState::Tag::kGain ||
       !element_state.type_specific()->gain().has_value() ||
@@ -1126,7 +1143,14 @@ bool ValidateGainElementState(const fhasp::ElementState& element_state,
 // Validate the type-specific state for this element type.
 bool ValidateVendorSpecificElementState(const fhasp::ElementState& element_state,
                                         const fhasp::Element& element) {
-  if (  // A type_specific of type vendor_specific() must not be absent or empty.
+  if (  // This must be an element of type VendorSpecific
+      element.type() != fhasp::ElementType::kVendorSpecific ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type vendor_specific() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kVendorSpecific ||
+      !element.type_specific()->vendor_specific().has_value() ||
+      // A type_specific element state of vendor_specific() must not be absent or empty.
       !element_state.type_specific().has_value() ||
       element_state.type_specific()->Which() !=
           fhasp::TypeSpecificElementState::Tag::kVendorSpecific ||
@@ -1141,8 +1165,7 @@ bool ValidateVendorSpecificElementState(const fhasp::ElementState& element_state
   return true;
 }
 
-bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp::Element& element,
-                          bool from_client) {
+bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp::Element& element) {
   LogElementState(element_state);
 
   if (!ValidateElement(element)) {
@@ -1150,13 +1173,13 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   }
 
   switch (*element.type()) {
-    case fhasp::ElementType::kDynamics:
-      if (!ValidateDynamicsElementState(element_state, element, from_client)) {
+    case fhasp::ElementType::kDaiInterconnect:
+      if (!ValidateDaiInterconnectElementState(element_state, element)) {
         return false;
       }
       break;
-    case fhasp::ElementType::kEndpoint:
-      if (!ValidateEndpointElementState(element_state, element)) {
+    case fhasp::ElementType::kDynamics:
+      if (!ValidateDynamicsElementState(element_state, element)) {
         return false;
       }
       break;
@@ -1192,6 +1215,7 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   }
 
   if (element_state.latency().has_value()) {
+    FX_LOGS(WARNING) << "WatchElementState: .latency is deprecated; use `processing_delay`";
     if (element_state.latency()->Which() == fhasp::Latency::Tag::kLatencyTime &&
         element_state.latency()->latency_time().value() < 0) {
       FX_LOGS(WARNING)
@@ -1237,12 +1261,32 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
     return false;
   }
 
+  if (element_state.processing_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.processing_delay ("
+                     << *element_state.processing_delay() << " ns) cannot be negative";
+    return false;
+  }
+
+  return true;
+}
+
+// Validate the type-specific table for this element type.
+bool ValidateDaiInterconnectElement(const fhasp::Element& element) {
+  if (  // A type_specific info of dai_interconnect() must not be absent or empty.
+      !element.type_specific().has_value() ||
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDaiInterconnect ||
+      !element.type_specific()->dai_interconnect().has_value() ||
+      // plug_detect_capabilities must be present
+      !element.type_specific()->dai_interconnect()->plug_detect_capabilities().has_value()) {
+    FX_LOGS(WARNING) << "Invalid DaiInterconnect-specific fields";
+    return false;
+  }
   return true;
 }
 
 // Validate the type-specific table for this element type.
 bool ValidateDynamicsElement(const fhasp::Element& element) {
-  if (  // A type_specific of type dynamics() must not be absent or empty.
+  if (  // A type_specific info of dynamics() must not be absent or empty.
       !element.type_specific().has_value() ||
       element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDynamics ||
       !element.type_specific()->dynamics().has_value() ||
@@ -1268,22 +1312,8 @@ bool ValidateDynamicsElement(const fhasp::Element& element) {
 }
 
 // Validate the type-specific table for this element type.
-bool ValidateEndpointElement(const fhasp::Element& element) {
-  if (  // A type_specific of type endpoint() must not be absent or empty.
-      !element.type_specific().has_value() ||
-      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEndpoint ||
-      !element.type_specific()->endpoint().has_value() ||
-      !element.type_specific()->endpoint()->type().has_value() ||
-      !element.type_specific()->endpoint()->plug_detect_capabilities().has_value()) {
-    FX_LOGS(WARNING) << "Invalid Endpoint-specific fields";
-    return false;
-  }
-  return true;
-}
-
-// Validate the type-specific table for this element type.
 bool ValidateEqualizerElement(const fhasp::Element& element) {
-  if (  // A type_specific of type equalizer() must not be absent or empty.
+  if (  // A type_specific info of equalizer() must not be absent or empty.
       !element.type_specific().has_value() ||
       element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEqualizer ||
       !element.type_specific()->equalizer().has_value() ||
@@ -1336,7 +1366,7 @@ bool ValidateEqualizerElement(const fhasp::Element& element) {
 
 // Validate the type-specific table for this element type.
 bool ValidateGainElement(const fhasp::Element& element) {
-  if (  // A type_specific of type gain() must not be absent or empty.
+  if (  // A type_specific info of gain() must not be absent or empty.
       !element.type_specific().has_value() ||
       element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kGain ||
       !element.type_specific()->gain().has_value() ||
@@ -1366,7 +1396,7 @@ bool ValidateGainElement(const fhasp::Element& element) {
 
 // Validate the type-specific table for this element type.
 bool ValidateVendorSpecificElement(const fhasp::Element& element) {
-  if (  // A type_specific of type vendor_specific() must not be absent or empty.
+  if (  // A type_specific info of vendor_specific() must not be absent or empty.
       !element.type_specific().has_value() ||
       element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kVendorSpecific ||
       !element.type_specific()->vendor_specific().has_value()) {
@@ -1390,17 +1420,17 @@ bool ValidateElement(const fhasp::Element& element) {
   }
 
   switch (*element.type()) {
+    case fhasp::ElementType::kDaiInterconnect:
+      if (!ValidateDaiInterconnectElement(element)) {
+        return false;
+      }
+      break;
     case fhasp::ElementType::kDynamics: {
       if (!ValidateDynamicsElement(element)) {
         return false;
       }
       break;
     }
-    case fhasp::ElementType::kEndpoint:
-      if (!ValidateEndpointElement(element)) {
-        return false;
-      }
-      break;
     case fhasp::ElementType::kEqualizer: {
       if (!ValidateEqualizerElement(element)) {
         return false;
@@ -1502,20 +1532,24 @@ bool ValidateTopology(const fhasp::Topology& topology,
     destination_elements.insert(edge_pair.processing_element_id_to());
   }
 
-  // Check that only ENDPOINTs are terminal
+  // Check that only DaiInterconnect or RingBuffer elements are terminal
   for (auto& [id, element_record] : element_map) {
     if (source_elements.find(id) != source_elements.end() &&
         destination_elements.find(id) == destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kEndpoint) {
-        FX_LOGS(WARNING) << "Element " << id << " has no incoming edges but is not an Endpoint! Is "
+      if (*element_record.element.type() != fhasp::ElementType::kDaiInterconnect &&
+          *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "Element " << id
+                         << " has no incoming edges but is not a DaiInterconnect or RingBuffer! Is "
                          << *element_record.element.type();
         return false;
       }
     }
     if (source_elements.find(id) == source_elements.end() &&
         destination_elements.find(id) != destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kEndpoint) {
-        FX_LOGS(WARNING) << "Element " << id << " has no outgoing edges but is not an Endpoint! Is "
+      if (*element_record.element.type() != fhasp::ElementType::kDaiInterconnect &&
+          *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "Element " << id
+                         << " has no outgoing edges but is not a DaiInterconnect or RingBuffer! Is "
                          << *element_record.element.type();
         return false;
       }

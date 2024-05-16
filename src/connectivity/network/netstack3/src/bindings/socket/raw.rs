@@ -9,15 +9,22 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
+use net_types::ip::Ip;
+use netstack3_core::ip::RawIpSocketsBindingsTypes;
 use tracing::error;
 use zx::{HandleBased, Peered};
 
-use crate::bindings::Ctx;
+use crate::bindings::{BindingsCtx, Ctx};
 
 use super::{
     worker::{self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection},
     SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
 };
+
+impl RawIpSocketsBindingsTypes for BindingsCtx {
+    // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
+    type RawIpSocketState<I: Ip> = ();
+}
 
 #[derive(Debug)]
 struct BindingData {

@@ -7,44 +7,53 @@ mod system_activity_governor;
 use crate::system_activity_governor::SystemActivityGovernor;
 use anyhow::Result;
 use fidl_fuchsia_hardware_suspend as fhsuspend;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_power_broker as fbroker;
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance, open_service};
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon::Duration;
-use futures::prelude::*;
+use futures::{TryFutureExt, TryStreamExt};
 
-const SUSPEND_DEV_PATH: &'static str = "/dev/class/suspend";
 const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(5);
 
-async fn connect_to_suspender(dir_path: &str) -> Result<fhsuspend::SuspenderProxy> {
-    let dir = fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::OpenFlags::empty())?;
-    let mut stream = device_watcher::watch_for_files(&dir).await?;
+async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
+    let service_dir =
+        open_service::<fhsuspend::SuspendServiceMarker>().expect("failed to open service dir");
 
-    let filename = match stream
-        .try_next()
-        .on_timeout(SUSPEND_DEVICE_TIMEOUT.after_now(), || {
-            Err(anyhow::anyhow!("Timeout waiting for suspend device in {dir_path}"))
-        })
+    let mut watcher = fuchsia_fs::directory::Watcher::new(&service_dir)
         .await
-    {
-        Ok(Some(filename)) => filename,
-        e => return Err(anyhow::anyhow!("Failed to find suspend device: {e:?}")),
-    };
+        .map_err(|e| anyhow::anyhow!("Failed to create watcher: {:?}", e))?;
 
-    let filename_str = filename.to_str().ok_or(anyhow::anyhow!("to_str for filename failed"))?;
-    tracing::info!(?filename_str, "Opening suspend device");
+    // Connect to the first suspend service instance that is discovered.
+    let filename = loop {
+        let next = watcher
+            .try_next()
+            .map_err(|e| anyhow::anyhow!("Failed to get next watch message: {e:?}"))
+            .on_timeout(SUSPEND_DEVICE_TIMEOUT.after_now(), || {
+                Err(anyhow::anyhow!("Timeout waiting for next watcher message."))
+            })
+            .await?;
 
-    let (device, server_end) = fidl::endpoints::create_proxy::<fhsuspend::SuspenderMarker>()?;
-    dir.open(
-        fio::OpenFlags::NOT_DIRECTORY,
-        fio::ModeType::empty(),
-        &filename_str,
-        server_end.into_channel().into(),
-    )?;
+        if let Some(watch_msg) = next {
+            let filename = watch_msg.filename.as_path().to_str().unwrap().to_owned();
+            if filename != "." {
+                if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE
+                    || watch_msg.event == fuchsia_fs::directory::WatchEvent::EXISTING
+                {
+                    break Ok(filename);
+                }
+            }
+        } else {
+            break Err(anyhow::anyhow!("Suspend service watcher returned None entry."));
+        }
+    }?;
 
-    return Ok(device);
+    let svc_inst =
+        connect_to_service_instance::<fhsuspend::SuspendServiceMarker>(filename.as_str())?;
+
+    svc_inst
+        .connect_to_suspender()
+        .map_err(|e| anyhow::anyhow!("Failed to connect to suspender: {:?}", e))
 }
 
 #[fuchsia::main]
@@ -57,12 +66,10 @@ async fn main() -> Result<()> {
     fuchsia_inspect::component::health().set_starting_up();
 
     // Set up the SystemActivityGovernor.
-    let suspender = match connect_to_suspender(SUSPEND_DEV_PATH).await {
+    let suspender = match connect_to_suspender().await {
         Ok(s) => Some(s),
         Err(e) => {
-            tracing::warn!(
-                "Unable to connect to suspender prototocol at {SUSPEND_DEV_PATH}: {e:?}"
-            );
+            tracing::warn!("Unable to connect to suspender prototocol: {e:?}");
             None
         }
     };

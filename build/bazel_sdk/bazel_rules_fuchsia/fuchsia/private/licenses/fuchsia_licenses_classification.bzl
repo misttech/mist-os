@@ -23,8 +23,6 @@ def _fuchsia_licenses_classification_impl(ctx):
         arguments.append("--default_is_notice_shipped=True")
     if ctx.attr.default_is_source_code_shipped:
         arguments.append("--default_is_source_code_shipped=True")
-    if ctx.attr.default_condition:
-        arguments.append("--default_condition=%s" % ctx.attr.default_condition)
     if ctx.attr.allowed_conditions:
         arguments.append("--allowed_conditions")
         arguments.extend(ctx.attr.allowed_conditions)
@@ -101,7 +99,7 @@ and build identify_license to match their organization OSS compliance policies.
             default = [],
         ),
         "default_condition": attr.string(
-            doc = "The default condition for unmapped or unidentified licenses",
+            doc = "Deprecated",
             mandatory = False,
             default = "",
         ),

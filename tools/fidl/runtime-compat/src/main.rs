@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(unused)]
-
 use std::{fs::File, io, path::PathBuf};
 
 use anyhow::{Context, Result};
@@ -41,7 +39,7 @@ fn compare_platforms<W: io::Write>(external: PathBuf, platform: PathBuf, mut out
         compare::compatible(&external, &platform).context("comparing external and platform IR")?;
 
     for inc in problems {
-        writeln!(out, "{}", inc);
+        writeln!(out, "{}", inc)?;
     }
 
     Ok(())

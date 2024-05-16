@@ -39,7 +39,6 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1c/aml_nna",
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:00:10/aml-canvas",
-      "sys/platform/05:06:d/display/amlogic-display/display-coordinator",
       "sys/platform/05:06:1d",  // pwm
       "sys/platform/05:06:1d/aml-pwm-device/pwm-4/pwm_init",
       "sys/platform/05:06:1d/aml-pwm-device/pwm-0/pwm_vreg_big/pwm_vreg_big",
@@ -95,7 +94,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:40/ddr-temp-sensor/aml-trip-device",  // DDR Temperature Sensor
 
       // GPIO
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-107",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-7",
 
       // Touch panel
       //
@@ -104,7 +103,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // interrupt pin
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-21",
       // reset pin
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-106",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-6",
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/mcu-composite/vim3-mcu",
 
@@ -134,6 +133,13 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+
+  static const char* kDisplayDevicePaths[] = {
+      "sys/platform/05:06:d/hdmi-display/amlogic-display/display-coordinator",
+      "sys/platform/05:06:d/dsi-display/amlogic-display/display-coordinator",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kDisplayDevicePaths, std::size(kDisplayDevicePaths))));
 }
 
 }  // namespace

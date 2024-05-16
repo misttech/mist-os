@@ -91,12 +91,7 @@ class TestSelections:
         Returns:
             bool: True if a test that requires a device is selected, False otherwise.
         """
-        return any(
-            [
-                entry.is_device_test() or entry.is_e2e_test()
-                for entry in self.selected
-            ]
-        )
+        return any([entry.needs_device() for entry in self.selected])
 
     def has_e2e_test(self) -> bool:
         """Determine if this set of test selections has any host-driven device tests.

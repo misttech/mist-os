@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use crate::desc::Description;
 use addr::TargetAddr;
+use discovery::DiscoverySources;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIpPort};
 use std::net::SocketAddr;
 
@@ -105,6 +106,21 @@ impl TargetInfoQuery {
             Self::First => true,
         }
     }
+
+    /// Return the invoke discovery on to resolve this query
+    pub fn discovery_sources(&self) -> DiscoverySources {
+        match self {
+            TargetInfoQuery::Addr(_) => {
+                DiscoverySources::MDNS | DiscoverySources::MANUAL | DiscoverySources::EMULATOR
+            }
+            _ => {
+                DiscoverySources::MDNS
+                    | DiscoverySources::MANUAL
+                    | DiscoverySources::EMULATOR
+                    | DiscoverySources::USB
+            }
+        }
+    }
 }
 
 impl<T> From<Option<T>> for TargetInfoQuery
@@ -151,5 +167,31 @@ impl From<String> for TargetInfoQuery {
 impl From<TargetAddr> for TargetInfoQuery {
     fn from(t: TargetAddr) -> Self {
         Self::Addr(t.into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_discovery_sources() {
+        let query = TargetInfoQuery::from("name");
+        let sources = query.discovery_sources();
+        assert_eq!(
+            sources,
+            DiscoverySources::MDNS
+                | DiscoverySources::MANUAL
+                | DiscoverySources::EMULATOR
+                | DiscoverySources::USB
+        );
+
+        // IP Address shouldn't use USB source
+        let query = TargetInfoQuery::from("1.2.3.4");
+        let sources = query.discovery_sources();
+        assert_eq!(
+            sources,
+            DiscoverySources::MDNS | DiscoverySources::MANUAL | DiscoverySources::EMULATOR
+        );
     }
 }

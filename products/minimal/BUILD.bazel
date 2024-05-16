@@ -6,12 +6,14 @@ load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "ARCH",
     "BUILD_TYPES",
     "INPUT_DEVICE_TYPE",
     "fuchsia_elf_sizes",
     "fuchsia_product",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
+    "fuchsia_virtual_device",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -52,6 +54,14 @@ fuchsia_product(
     product_config = ":product_config",
 )
 
+fuchsia_virtual_device(
+    name = "minimal_emu",
+    arch = ARCH.X64,
+    device_name = "minimal_emu",
+    window_height_px = 1200,
+    window_width_px = 720,
+)
+
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
     product = ":image.x64",
@@ -66,6 +76,10 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
+    virtual_devices = [
+        ":minimal_emu",
+    ],
 )
 
 fuchsia_product(
@@ -90,6 +104,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(
@@ -114,6 +129,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:qemu-x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(
@@ -161,6 +177,7 @@ fuchsia_product_bundle(
     product_bundle_name = "fuchsia",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(
@@ -185,4 +202,5 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:riscv64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )

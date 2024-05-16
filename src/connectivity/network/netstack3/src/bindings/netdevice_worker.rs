@@ -28,12 +28,11 @@ use netstack3_core::{
     },
     ip::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-        SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
+        SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
     },
     routes::RawMetric,
     sync::RwLock as CoreRwLock,
 };
-use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
@@ -508,8 +507,7 @@ impl DeviceHandler {
 
         // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
-        let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        ctx.rng().fill(&mut secret_key);
+        let secret_key = StableIidSecret::new_random(&mut ctx.rng());
 
         let ip_config = IpDeviceConfigurationUpdate {
             ip_enabled: Some(false),
@@ -635,7 +633,7 @@ async fn add_initial_routes(bindings_ctx: &BindingsCtx, device: &DeviceId<Bindin
 
     for change in v4_changes.chain(v6_changes) {
         bindings_ctx
-            .apply_route_change_either(change)
+            .apply_main_table_route_change_either(change)
             .await
             .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("adding initial routes should succeed");

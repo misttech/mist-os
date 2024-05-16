@@ -40,6 +40,10 @@ def main():
         "--keep-location", help="Keep source location information."
     )
     parser.add_argument("--keep-documentation", help="Keep API documentation.")
+    parser.add_argument(
+        "--include-internal",
+        help="Include libraries from the partner_internal as well as partner category.",
+    )
     parser.add_argument("--depfile", type=argparse.FileType("w"))
 
     args = parser.parse_args()
@@ -48,9 +52,14 @@ def main():
     root_build_dir = os.path.dirname(args.sdk_fidl_json.name)
 
     # Extract the IR path for each library. This is the path for the in-tree version.
-    # If we want to filter by SDK category we could do it here.
     ir_paths = [
-        fidl_library["ir"] for fidl_library in json.load(args.sdk_fidl_json)
+        fidl_library["ir"]
+        for fidl_library in json.load(args.sdk_fidl_json)
+        if (
+            fidl_library["category"] == "partner"
+            or (args.include_internal)
+            and fidl_library["category"] == "partner_internal"
+        )
     ]
 
     def patch_path(path: str, api_level: int) -> str:

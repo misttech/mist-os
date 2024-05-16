@@ -27,7 +27,9 @@
 
 set -e
 
+# shellcheck source=tools/devshell/lib/vars.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
+# shellcheck source=tools/devshell/lib/host_symbolizer.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/host_symbolizer.sh || exit $?
 fx-config-read
 
@@ -90,6 +92,7 @@ shift
 
 # list-build-artifacts fails with a reasonable error message if tool is unknown
 toolpath="$(fx-command-run list-build-artifacts --name "${toolname}" --expect-one tools)"
+tool_label="$(fx-command-run list-build-artifacts --show-label --name "${toolname}" --expect-one tools)"
 
 if [[ ! -f "${FUCHSIA_BUILD_DIR}/${toolpath}" ]]; then
   # If the desire is to build, then it's important for the build to
@@ -107,13 +110,13 @@ if [[ ! -f "${FUCHSIA_BUILD_DIR}/${toolpath}" ]]; then
 
   if ! $build; then
     fx-error "Tool \"${toolname}\" is required by this command and has not been built."
-    fx-error "Please build it first: fx build ${toolpath}"
+    fx-error "Please build it first: fx build ${tool_label}"
     exit 2
   fi
 
   {
-    echo "Building required tool \"${toolpath}\"..."
-    fx-command-run build "${toolpath}" || exit $?
+    echo "Building required tool '${toolname}' from \"${tool_label}\"..."
+    fx-command-run build "${tool_label}" || exit $?
   } 1>&2
 fi
 

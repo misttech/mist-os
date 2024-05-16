@@ -4,15 +4,19 @@
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_capabilities::CapabilityNamedMap;
+use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::collections::{btree_map::Entry, BTreeSet};
 use tempfile::TempDir;
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
 use assembly_named_file_map::NamedFileMap;
-use assembly_util::{BootfsDestination, FileEntry, NamedMap, PackageSetDestination};
+use assembly_util::{
+    BootfsDestination, CompiledPackageDestination, FileEntry, NamedMap, PackageSetDestination,
+};
 
 /// The platform's base service level.
 ///
@@ -108,6 +112,7 @@ pub(crate) trait DefineSubsystemConfiguration<T> {
 /// module.  These are the fields from the
 /// `assembly_config_schema::platform_config::PlatformConfig` struct that are
 /// available to all subsystems to use to derive their configuration from.
+#[derive(Debug)]
 pub(crate) struct ConfigurationContext<'a> {
     pub feature_set_level: &'a FeatureSupportLevel,
     pub build_type: &'a BuildType,
@@ -177,6 +182,15 @@ pub(crate) trait ConfigurationBuilder {
     /// Add a kernel command line arg that should be included in the
     /// assembled platform.
     fn kernel_arg(&mut self, arg: String);
+
+    /// Packages compiled by subsystems to include in the assembled product.
+    /// Example: the trusted apps package which is configured by the product
+    /// configuration.
+    fn compiled_package(
+        &mut self,
+        destination: CompiledPackageDestination,
+        definition: CompiledPackageDefinition,
+    ) -> Result<&mut CompiledPackageDefinition>;
 }
 
 /// The interface for specifying the configuration to provide for bootfs.
@@ -284,6 +298,9 @@ pub(crate) struct ConfigurationBuilderImpl {
 
     /// The Kernel Commandline Arguments to add.
     kernel_args: BTreeSet<String>,
+
+    /// Packages compiled by assembly subsystems to include in the assembled product.
+    compiled_packages: BTreeMap<CompiledPackageDestination, CompiledPackageDefinition>,
 }
 
 #[cfg(test)]
@@ -307,6 +324,7 @@ impl ConfigurationBuilderImpl {
             core_shards: Vec::new(),
             configuration_capabilities: CapabilityNamedMap::new("config capabilties"),
             kernel_args: BTreeSet::default(),
+            compiled_packages: BTreeMap::default(),
         }
     }
 
@@ -322,6 +340,7 @@ impl ConfigurationBuilderImpl {
             core_shards,
             configuration_capabilities,
             kernel_args,
+            compiled_packages,
         } = self;
         CompletedConfiguration {
             bundles,
@@ -331,6 +350,7 @@ impl ConfigurationBuilderImpl {
             core_shards,
             configuration_capabilities,
             kernel_args,
+            compiled_packages,
         }
     }
 }
@@ -363,6 +383,8 @@ pub struct CompletedConfiguration {
 
     /// The Kernel Commandline Arguments to add.
     pub kernel_args: BTreeSet<String>,
+
+    pub compiled_packages: BTreeMap<CompiledPackageDestination, CompiledPackageDefinition>,
 }
 
 /// A map from package names to the configuration to apply to them.
@@ -519,6 +541,17 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
 
     fn kernel_arg(&mut self, arg: String) {
         self.kernel_args.insert(arg);
+    }
+
+    fn compiled_package(
+        &mut self,
+        destination: CompiledPackageDestination,
+        definition: CompiledPackageDefinition,
+    ) -> Result<&mut CompiledPackageDefinition> {
+        match self.compiled_packages.entry(destination) {
+            Entry::Occupied(entry) => Err(anyhow!("duplicate package destination: {:?}", entry)),
+            Entry::Vacant(entry) => Ok(entry.insert(definition)),
+        }
     }
 }
 

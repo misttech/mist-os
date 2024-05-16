@@ -22,6 +22,7 @@ driver_bind_rules("amlogic_video_bind") {
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -38,6 +39,7 @@ driver_bind_rules("amlogic_video_test_bind") {
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -196,6 +198,7 @@ if (target_cpu == "arm64") {
       "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
       "//sdk/lib/fit",
       "//sdk/lib/fit-promise",
+      "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
       "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
       "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
       "//src/devices/bus/lib/device-protocol-pdev",
@@ -228,6 +231,9 @@ if (target_cpu == "arm64") {
       "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
       "//sdk/lib/fdio",
       "//sdk/lib/fidl/cpp",
+      "//src/devices/bind/fuchsia:fuchsia_cpp",
+      "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
+      "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
       "//src/lib/ddktl",
       "//src/lib/metrics_buffer",
       "//src/media/lib/codec_impl",

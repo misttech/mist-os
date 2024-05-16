@@ -25,6 +25,36 @@ use tracing_subscriber::{
 
 use crate::EnvironmentContext;
 
+/// The valid destinations for a log file
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LogDestination {
+    Stdout,
+    Stderr,
+    TestWriter,
+    File(PathBuf),
+    // "Global" means the global variable log file, which has special
+    // semantics: it can change due to rotation, it can be swapped in
+    // and out via change_log_file().
+    Global,
+}
+
+impl std::str::FromStr for LogDestination {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "-" | "stdout" => Ok(LogDestination::Stdout),
+            "stderr" => Ok(LogDestination::Stderr),
+            _ => Ok(LogDestination::File(PathBuf::from(s))),
+        }
+    }
+}
+
+pub enum LogDirHandling {
+    WithDirWithoutRotate,
+    WithDirWithRotate,
+}
+
 const LOG_DIR: &str = "log.dir";
 const LOG_ROTATIONS: &str = "log.rotations";
 const LOG_ROTATE_SIZE: &str = "log.rotate_size";
@@ -32,7 +62,7 @@ const LOG_ENABLED: &str = "log.enabled";
 const LOG_TARGET_LEVELS: &str = "log.target_levels";
 const LOG_LEVEL: &str = "log.level";
 const LOG_INCLUDE_SPANS: &str = "log.include_spans";
-pub const LOG_PREFIX: &str = "ffx";
+pub const LOG_FILENAME: &str = "ffx.log";
 
 static LOG_ENABLED_FLAG: AtomicBool = AtomicBool::new(true);
 
@@ -231,23 +261,27 @@ fn rotate_file(
     Ok(None)
 }
 
-async fn init_global_log_file(ctx: &EnvironmentContext, name: &str, rotate: bool) -> Result<()> {
-    let (f, log_path) = log_file_with_info(ctx, name, rotate).await?;
+async fn init_global_log_file(
+    ctx: &EnvironmentContext,
+    name: &PathBuf,
+    log_dir_handling: LogDirHandling,
+) -> Result<()> {
+    let (f, log_path) = log_file_with_info(ctx, name, log_dir_handling).await?;
     init_log_file_holder(log_path, f);
     Ok(())
 }
 
 pub async fn log_file_with_info(
     ctx: &EnvironmentContext,
-    name: &str,
-    rotate: bool,
+    name: &PathBuf,
+    log_dir_handling: LogDirHandling,
 ) -> Result<(File, PathBuf)> {
     let mut log_path: PathBuf = ctx.query(LOG_DIR).get().await?;
     create_dir_all(&log_path)?;
-    log_path.push(format!("{}.log", name));
+    log_path.push(name);
 
     let mut f: Option<File> = None;
-    if rotate {
+    if let LogDirHandling::WithDirWithRotate = log_dir_handling {
         let log_rotations: Option<u64> = ctx.query(LOG_ROTATIONS).get().await?;
         let log_rotations = log_rotations.unwrap_or(0);
         if log_rotations > 0 {
@@ -265,8 +299,12 @@ pub async fn log_file_with_info(
     Ok((f, log_path))
 }
 
-pub async fn log_file(ctx: &EnvironmentContext, name: &str, rotate: bool) -> Result<File> {
-    let (f, _) = log_file_with_info(ctx, name, rotate).await?;
+pub async fn log_file(
+    ctx: &EnvironmentContext,
+    name: &PathBuf,
+    log_dir_handling: LogDirHandling,
+) -> Result<File> {
+    let (f, _) = log_file_with_info(ctx, name, log_dir_handling).await?;
     Ok(f)
 }
 
@@ -304,17 +342,51 @@ async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
         .unwrap_or(LevelFilter::INFO)
 }
 
-pub async fn init(ctx: &EnvironmentContext, log_to_stdio: bool, log_to_file: bool) -> Result<()> {
-    let init_file = log_to_file && is_enabled(ctx).await;
-    if init_file {
-        init_global_log_file(ctx, LOG_PREFIX, true).await?;
+pub async fn init(
+    ctx: &EnvironmentContext,
+    mut log_to_stdio: bool,
+    log_destination: &Option<LogDestination>,
+) -> Result<()> {
+    let mut destinations = vec![];
+
+    // We log to a file if config(log.enabled) is true, AND if either of the following are true:
+    // * no destination is specified (in which case we log to <log.dir>/<LOG_PREFIX>.log
+    // * log_destination is File(path)
+    // Otherwise we only log to stdio
+    // Logging can't be completely disabled, but the user can specify the destination as /dev/null
+    if is_enabled(ctx).await {
+        match log_destination {
+            None => {
+                init_global_log_file(
+                    ctx,
+                    &PathBuf::from(LOG_FILENAME),
+                    LogDirHandling::WithDirWithRotate,
+                )
+                .await?;
+                destinations.push(LogDestination::Global);
+            }
+            Some(f @ LogDestination::File(_)) => {
+                destinations.push(f.clone());
+            }
+            Some(LogDestination::Stdout) => {
+                // Stdout gets special handling, since "-v" results in logs going
+                // to _both_ stdout and the destination. But we don't want to
+                // log twice if `-v --log-output -` is specified.
+                log_to_stdio = true;
+            }
+            Some(d) => {
+                destinations.push(d.clone());
+            }
+        }
     };
+
+    if log_to_stdio {
+        destinations.push(LogDestination::Stdout);
+    }
 
     let level = filter_level(ctx).await;
 
-    configure_subscribers(ctx, log_to_stdio.then_some(StdioOptions::default()), init_file, level)
-        .await
-        .init();
+    configure_subscribers(ctx, destinations, level).await.init();
 
     Ok(())
 }
@@ -358,49 +430,87 @@ async fn include_spans(ctx: &EnvironmentContext) -> bool {
     ctx.query(LOG_INCLUDE_SPANS).get().await.unwrap_or(false)
 }
 
-#[derive(Default)]
-pub(crate) struct StdioOptions {
-    pub(crate) test_writer: bool,
-}
-
 pub(crate) async fn configure_subscribers(
     ctx: &EnvironmentContext,
-    stdio: Option<StdioOptions>,
-    use_file: bool,
+    destinations: Vec<LogDestination>,
     level: LevelFilter,
 ) -> impl tracing::Subscriber + Send + Sync {
     let filter_targets =
         filter::Targets::new().with_targets(target_levels(ctx).await).with_default(level);
 
     let include_spans = include_spans(ctx).await;
-    let stdio_layer = if let Some(stdio) = stdio {
-        let event_format = LogFormat::new(*LOGGING_ID, include_spans);
-        let format = tracing_subscriber::fmt::layer()
-            .event_format(event_format)
-            .with_writer(if stdio.test_writer {
-                BoxMakeWriter::new(TestWriter::default())
-            } else {
-                BoxMakeWriter::new(std::io::stdout)
-            })
-            .with_filter(DisableableFilter)
-            .with_filter(filter_targets.clone());
-        Some(format)
+    let event_format = LogFormat::new(*LOGGING_ID, include_spans);
+    // I'd love to loop through the options, but because each layer is strongly-typed, it's hard to
+    // make that work.
+    let stderr_layer = if destinations.contains(&LogDestination::Stderr) {
+        Some({
+            tracing_subscriber::fmt::layer()
+                .event_format(event_format)
+                .with_writer(std::io::stderr)
+                .with_filter(DisableableFilter)
+                .with_filter(filter_targets.clone())
+        })
     } else {
         None
     };
-
-    let file_layer = if use_file {
-        let event_format = LogFormat::new(*LOGGING_ID, include_spans);
-        let lfh = log_file_holder().expect("uninitialized LFH when use_file is set??");
-        let writer = Mutex::new(std::io::LineWriter::new(lfh.get_resettable_writer()));
-        let format = tracing_subscriber::fmt::layer()
-            .event_format(event_format)
-            .with_writer(writer)
-            .with_filter(filter_targets);
-        Some(format)
+    let stdout_layer = if destinations.contains(&LogDestination::Stdout) {
+        Some({
+            tracing_subscriber::fmt::layer()
+                .event_format(event_format)
+                .with_writer(std::io::stdout)
+                .with_filter(DisableableFilter)
+                .with_filter(filter_targets.clone())
+        })
     } else {
         None
     };
+    let test_layer = if destinations.contains(&LogDestination::TestWriter) {
+        Some({
+            tracing_subscriber::fmt::layer()
+                .event_format(event_format)
+                .with_writer(BoxMakeWriter::new(TestWriter::default()))
+                .with_filter(DisableableFilter)
+                .with_filter(filter_targets.clone())
+        })
+    } else {
+        None
+    };
+    let global_layer = if destinations.contains(&LogDestination::Global) {
+        Some({
+            let lfh = log_file_holder().expect("uninitialized LFH when use_file is set??");
+            let writer = Mutex::new(std::io::LineWriter::new(lfh.get_resettable_writer()));
+            tracing_subscriber::fmt::layer()
+                .event_format(event_format)
+                .with_writer(writer)
+                .with_filter(filter_targets.clone())
+        })
+    } else {
+        None
+    };
+    let mut file_layer = None;
+    for d in destinations {
+        if let LogDestination::File(p) = d {
+            let fres = open_log_file(p.as_path());
+            file_layer = match fres {
+                Ok(f) => Some(
+                    tracing_subscriber::fmt::layer()
+                        .event_format(event_format)
+                        .with_writer(f)
+                        .with_filter(DisableableFilter)
+                        .with_filter(filter_targets.clone()),
+                ),
+                Err(e) => {
+                    eprintln!("Could not log file: {p:?}: {e}");
+                    None
+                }
+            }
+        }
+    }
 
-    tracing_subscriber::registry().with(stdio_layer).with(file_layer)
+    tracing_subscriber::registry()
+        .with(stderr_layer)
+        .with(stdout_layer)
+        .with(test_layer)
+        .with(global_layer)
+        .with(file_layer)
 }

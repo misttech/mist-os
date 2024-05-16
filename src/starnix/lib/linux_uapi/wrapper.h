@@ -79,6 +79,7 @@
 #include <linux/stat.h>
 #include <linux/sync_file.h>
 #include <linux/sysinfo.h>
+#include <linux/taskstats.h>
 #include <linux/termios.h>
 #include <linux/time.h>
 #include <linux/timerfd.h>

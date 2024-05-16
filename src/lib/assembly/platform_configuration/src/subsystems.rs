@@ -39,7 +39,6 @@ mod forensics;
 mod graphics;
 mod hwinfo;
 mod icu;
-mod identity;
 mod input_groups;
 mod intl;
 mod kernel;
@@ -57,6 +56,7 @@ mod storage;
 mod swd;
 mod thermal;
 mod timekeeper;
+mod trusted_apps;
 mod ui;
 mod usb;
 mod virtualization;
@@ -297,9 +297,6 @@ fn configure_subsystems(
     icu::IcuSubsystem::define_configuration(context, &platform.icu, builder)
         .context("Configuring the 'icu' subsystem")?;
 
-    identity::IdentitySubsystemConfig::define_configuration(context, &platform.identity, builder)
-        .context("Configuring the 'identity' subsystem")?;
-
     input_groups::InputGroupsSubsystem::define_configuration(
         context,
         &platform.input_groups,
@@ -385,6 +382,9 @@ fn configure_subsystems(
 
     usb::UsbSubsystemConfig::define_configuration(context, &platform.usb, builder)
         .context("Configuring the 'usb' subsystem")?;
+
+    trusted_apps::TrustedAppsConfig::define_configuration(context, &product.trusted_apps, builder)
+        .context("configuring the 'trusted_apps' subsystem")?;
 
     Ok(())
 }

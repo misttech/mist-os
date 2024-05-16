@@ -1234,11 +1234,6 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
                     ))?;
                 ctx.pings_completed = ctx.pings_completed + 1;
 
-                info!(
-                    "handle ping: after ping response {}/{} pings completed",
-                    ctx.pings_completed, ctx.pings_expected
-                );
-
                 if success {
                     let () = Self::handle_ping_success(ctx, &addr);
                 }
@@ -1361,11 +1356,6 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
                         cookie.id
                     ))?;
                 ctx.fetches_completed += 1;
-
-                info!(
-                    "handle fetch: after fetch response {}/{} fetches completed",
-                    ctx.fetches_completed, ctx.fetches_expected
-                );
 
                 if let Some(status) = status {
                     if expected_statuses.contains(&status) {

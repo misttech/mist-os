@@ -9,7 +9,7 @@ use {
         client::types as client_types,
         util::{
             historical_list::{HistoricalList, Timestamped},
-            pseudo_energy::SignalData,
+            pseudo_energy::EwmaSignalData,
         },
     },
     arbitrary::Arbitrary,
@@ -135,7 +135,7 @@ pub struct PastConnectionData {
     /// Cause of disconnect or failure to connect
     pub disconnect_reason: client_types::DisconnectReason,
     /// Final signal strength measure before disconnect
-    pub signal_data_at_disconnect: SignalData,
+    pub signal_data_at_disconnect: EwmaSignalData,
     /// Average phy rate over connection duration
     pub average_tx_rate: u32,
 }
@@ -148,7 +148,7 @@ impl PastConnectionData {
         disconnect_time: fasync::Time,
         connection_uptime: zx::Duration,
         disconnect_reason: client_types::DisconnectReason,
-        signal_data_at_disconnect: SignalData,
+        signal_data_at_disconnect: EwmaSignalData,
         average_tx_rate: u32,
     ) -> Self {
         Self {

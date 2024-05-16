@@ -360,6 +360,11 @@ class VmObject : public VmHierarchyBase,
   // May block on user pager requests and must be called without locks held.
   virtual zx_status_t CommitRange(uint64_t offset, uint64_t len) { return ZX_ERR_NOT_SUPPORTED; }
 
+  // Fetches content in the given range of the object. This should operate logically equivalent to
+  // reading such that future reads are quicker.
+  // May block on user pager requests and must be called without locks held.
+  virtual zx_status_t PrefetchRange(uint64_t offset, uint64_t len) = 0;
+
   // find physical pages to back the range of the object and pin them.
   // |len| must be non-zero. |write| indicates whether the range is being pinned for a write or a
   // read.

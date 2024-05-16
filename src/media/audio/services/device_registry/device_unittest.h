@@ -359,8 +359,8 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return *device->plug_state_->plugged();
   }
 
-  static ElementId ring_buffer_element_id() { return kRingBufferElementId; }
-  static ElementId dai_element_id() { return kDaiElementId; }
+  static ElementId ring_buffer_id() { return kRingBufferElementId; }
+  static ElementId dai_id() { return kDaiElementId; }
 
  private:
   static constexpr ElementId kRingBufferElementId =
@@ -447,19 +447,19 @@ class CompositeTest : public DeviceTestBase {
   void TestCreateRingBuffer(const std::shared_ptr<Device>& device, ElementId element_id,
                             const fuchsia_hardware_audio::Format& safe_format);
 
-  bool ExpectDaiFormatMatches(ElementId dai_element_id,
+  bool ExpectDaiFormatMatches(ElementId dai_id,
                               const fuchsia_hardware_audio::DaiFormat& dai_format) {
-    auto format_match = notify()->dai_formats().find(dai_element_id);
+    auto format_match = notify()->dai_formats().find(dai_id);
     if (format_match == notify()->dai_formats().end()) {
-      ADR_WARN_METHOD() << "Dai element " << dai_element_id << " not found";
+      ADR_WARN_METHOD() << "Dai element " << dai_id << " not found";
       return false;
     }
     if (!format_match->second.has_value()) {
-      ADR_WARN_METHOD() << "Dai format not set for element " << dai_element_id;
+      ADR_WARN_METHOD() << "Dai format not set for element " << dai_id;
       return false;
     }
     if (*format_match->second != dai_format) {
-      ADR_WARN_METHOD() << "Dai format for element " << dai_element_id << " is not the expected";
+      ADR_WARN_METHOD() << "Dai format for element " << dai_id << " is not the expected";
       return false;
     }
     return true;

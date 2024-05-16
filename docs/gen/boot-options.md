@@ -855,20 +855,16 @@ This option is similar to "kernel.compression.reclaim_anonymous" but applies to 
 anonymous pages. Enabling this makes the "kernel.page-scanner.zero-page-scans-per-second" option
 have no effect, and it is an error to enable this without enabling "kernel.compression.reclaim_anonymous".
 
-### kernel.pmm-checker.action=\<string>
+### kernel.pmm-checker.action=\[oops | panic\]
 
 **Default:** `oops`
 
-Supported actions:
-- `oops`
-- `panic`
-
 This option specifies which action is taken when the PMM checker detects
-corruption.
-
-When `oops`, a non-fatal kernel OOPS will be emitted when corruption is detected.
-
-When `panic` a fatal kernel panic will occur when corruption is detected.
+corruption.  Values must be one of:
+ * `oops`
+   - A non-fatal kernel OOPS will be emitted when corruption is detected.
+ * `panic`
+   - A fatal kernel panic will occur when corruption is detected.
 
 ### kernel.pmm-checker.enable=\<bool>
 
@@ -997,6 +993,18 @@ this option trades off improved performance in favor of reduced power consumptio
 
 DEPRECATED - This option is scheduled to be removed in an upcoming release.  Do not take any
 critical dependencies on it.
+
+### kernel.ubsan.action=\[oops | panic\]
+
+**Default:** `panic`
+
+When the kernel is instrumented with UndefinedBehaviorSanitizer, problems
+it detects are reported on the serial console.  These can be fatal or not.
+Values must be one of:
+ * `oops`
+   - Detected undefined behavior causes a non-fatal kernel OOPS.
+ * `panic`
+   - Detected undefined behavior causes a fatal kernel panic.
 
 
 ## Options available only on arm64 machines

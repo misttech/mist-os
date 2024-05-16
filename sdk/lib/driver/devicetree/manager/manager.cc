@@ -163,7 +163,8 @@ zx::result<> Manager::PublishDevices(
   for (auto& node : nodes_publish_order_) {
     zx::result<> status = node->Publish(pbus_client, mgr_client, fdf_node);
     if (status.is_error()) {
-      return status.take_error();
+      FDF_LOG(ERROR, "Failed to publish node: %s: %s", node->name().c_str(),
+              status.status_string());
     }
   }
 

@@ -28,42 +28,6 @@
 
 namespace bthost {
 
-// Custom hanging getter for the `WatchPeers()` method. Here we keep track of each `updated` and
-// `removed` notification per PeerId so that the hanging get contains no duplicates and removed
-// entries aren't reflected in `updated`.
-class PeerTracker {
- public:
-  using Updated = std::vector<fuchsia::bluetooth::sys::Peer>;
-  using Removed = std::vector<fuchsia::bluetooth::PeerId>;
-
-  PeerTracker() = default;
-  PeerTracker(PeerTracker&&) = default;
-  PeerTracker& operator=(PeerTracker&&) = default;
-
-  // Returns parameters that can be used in a WatchPeers() response.
-  std::pair<Updated, Removed> ToFidl(const bt::gap::PeerCache* peer_cache);
-
-  void Update(bt::PeerId id);
-  void Remove(bt::PeerId id);
-
- private:
-  std::unordered_set<bt::PeerId> updated_;
-  std::unordered_set<bt::PeerId> removed_;
-};
-
-class WatchPeersGetter
-    : public bt_lib_fidl::HangingGetterBase<PeerTracker,
-                                            void(PeerTracker::Updated, PeerTracker::Removed)> {
- public:
-  explicit WatchPeersGetter(bt::gap::PeerCache* peer_cache);
-
- protected:
-  void Notify(std::queue<Callback> callbacks, PeerTracker peers) override;
-
- private:
-  bt::gap::PeerCache* peer_cache_;  // weak
-};
-
 // Implements the Host FIDL interface. Owns all FIDL connections that have been
 // opened through it.
 class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
@@ -77,7 +41,8 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void RequestProtocol(::fuchsia::bluetooth::host::ProtocolRequest request) override;
   void WatchState(WatchStateCallback callback) override;
   void SetLocalData(::fuchsia::bluetooth::sys::HostData host_data) override;
-  void WatchPeers(WatchPeersCallback callback) override;
+  void SetPeerWatcher(
+      ::fidl::InterfaceRequest<::fuchsia::bluetooth::host::PeerWatcher> peer_watcher) override;
   void RestoreBonds(::std::vector<fuchsia::bluetooth::sys::BondingData> bonds,
                     RestoreBondsCallback callback) override;
   void SetLocalName(::std::string local_name, SetLocalNameCallback callback) override;
@@ -121,6 +86,45 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
     HostServer* host_;
   };
 
+  class PeerWatcherServer : public ServerBase<::fuchsia::bluetooth::host::PeerWatcher> {
+   public:
+    PeerWatcherServer(::fidl::InterfaceRequest<::fuchsia::bluetooth::host::PeerWatcher> request,
+                      bt::gap::PeerCache* peer_cache, HostServer* host);
+    ~PeerWatcherServer() override;
+
+    // Called by |adapter()->peer_cache()| when a peer is updated.
+    void OnPeerUpdated(const bt::gap::Peer& peer);
+
+    // Called by |adapter()->peer_cache()| when a peer is removed.
+    void OnPeerRemoved(bt::PeerId identifier);
+
+    void MaybeCallCallback();
+
+   private:
+    using Updated = std::vector<fuchsia::bluetooth::sys::Peer>;
+    using Removed = std::vector<fuchsia::bluetooth::PeerId>;
+
+    // PeerWatcher overrides:
+    void GetNext(::fuchsia::bluetooth::host::PeerWatcher::GetNextCallback callback) override;
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
+    std::unordered_set<bt::PeerId> updated_;
+    std::unordered_set<bt::PeerId> removed_;
+
+    bt::gap::PeerCache* peer_cache_;
+    // Id of the PeerCache::add_peer_updated_callback callback. Used to remove the callback when
+    // this server is closed.
+    bt::gap::PeerCache::CallbackId peer_updated_callback_id_;
+
+    ::fuchsia::bluetooth::host::PeerWatcher::GetNextCallback callback_ = nullptr;
+
+    HostServer* host_;
+
+    // Keep this as the last member to make sure that all weak pointers are
+    // invalidated before other members get destroyed.
+    WeakSelf<PeerWatcherServer> weak_self_;
+  };
+
   // bt::gap::PairingDelegate overrides:
   bt::sm::IOCapability io_capability() const override;
   void CompletePairing(bt::PeerId id, bt::sm::Result<> status) override;
@@ -133,12 +137,6 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   void DisplayPairingRequest(bt::PeerId id, std::optional<uint32_t> passkey,
                              fuchsia::bluetooth::sys::PairingMethod method,
                              ConfirmCallback confirm);
-
-  // Called by |adapter()->peer_cache()| when a peer is updated.
-  void OnPeerUpdated(const bt::gap::Peer& peer);
-
-  // Called by |adapter()->peer_cache()| when a peer is removed.
-  void OnPeerRemoved(bt::PeerId identifier);
 
   // Called by |adapter()->peer_cache()| when a peer is bonded.
   void OnPeerBonded(const bt::gap::Peer& peer);
@@ -215,12 +213,7 @@ class HostServer : public AdapterServerBase<fuchsia::bluetooth::host::Host>,
   // Used to drive the WatchState() method.
   bt_lib_fidl::HangingGetter<fuchsia::bluetooth::sys::HostInfo> info_getter_;
 
-  // Used to drive the WatchPeers() method.
-  WatchPeersGetter watch_peers_getter_;
-
-  // Id of the PeerCache::add_peer_updated_callback callback. Used to remove the callback when
-  // this server is closed.
-  bt::gap::PeerCache::CallbackId peer_updated_callback_id_;
+  std::optional<PeerWatcherServer> peer_watcher_server_;
 
   // Keep this as the last member to make sure that all weak pointers are
   // invalidated before other members get destroyed.

@@ -80,6 +80,7 @@ class Flags:
     show_full_moniker_in_logs: bool
     break_on_failure: bool
     breakpoints: typing.List[str]
+    use_test_interface: bool
     extra_args: typing.List[str]
     env: typing.List[str]
 
@@ -453,6 +454,13 @@ def parse_args(
         --breakpoint=my_source_file.cc:37 will insert a breakpoint at line 37 of any file
         named my_source_file.cc. Implies --no-status. Note: this flag is experimental""",
         default=[],
+    )
+
+    execution.add_argument(
+        "--use-test-interface",
+        action=argparse.BooleanOptionalAction,
+        help="""Run test components using test interface API. Note: this flag is experimental""",
+        default=False,
     )
 
     output = parser.add_argument_group("Output Options")

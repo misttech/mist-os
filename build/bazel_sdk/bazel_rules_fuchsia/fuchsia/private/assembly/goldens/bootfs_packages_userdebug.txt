@@ -50,7 +50,7 @@ ramdisk
 registers
 rndis-function
 role_manager
-root
+?root
 sdmmc
 serial
 shutdown-shim

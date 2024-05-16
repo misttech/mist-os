@@ -12,20 +12,24 @@ from unittest import mock
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import errors
-from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.typing import custom_types
 
-_IPV4: str = "11.22.33.44"
-_IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
+_TARGET_NAME: str = "fuchsia-emulator"
 
-_DEVICE_NAME: str = "fuchsia-emulator"
+_IPV6: str = "fe80::4fce:3102:ef13:888c%qemu"
+_IPV6_OBJ: ipaddress.IPv6Address = ipaddress.IPv6Address(_IPV6)
+
+_SSH_ADDRESS: ipaddress.IPv6Address = _IPV6_OBJ
+_SSH_PORT = 8022
+_TARGET_IP_PORT = custom_types.IpPort(ip=_SSH_ADDRESS, port=_SSH_PORT)
+
 
 _INPUT_ARGS: dict[str, Any] = {
-    "device_name": _DEVICE_NAME,
-    "device_ip_v4": _IPV4_OBJ,
+    "target_name": _TARGET_NAME,
+    "target_ip_port": _TARGET_IP_PORT,
     "BuildInfo": custom_types.FidlEndpoint(
         "/core/build-info", "fuchsia.buildinfo.Provider"
     ),
@@ -50,9 +54,6 @@ class FuchsiaControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.ffx_obj = mock.MagicMock(spec=ffx_transport.FFX)
-        self.ffx_obj.config = _MOCK_ARGS["ffx_config"]
-
         with mock.patch.object(
             fuchsia_controller.Context,
             "target_wait",
@@ -60,32 +61,39 @@ class FuchsiaControllerTests(unittest.TestCase):
         ) as mock_target_wait:
             self.fuchsia_controller_obj_wo_device_ip = (
                 fuchsia_controller_transport.FuchsiaController(
-                    device_name=_INPUT_ARGS["device_name"],
-                    ffx_transport=self.ffx_obj,
+                    target_name=_INPUT_ARGS["target_name"],
+                    config=_MOCK_ARGS["ffx_config"],
                 )
             )
-            mock_target_wait.assert_called_once()
+        mock_target_wait.assert_called()
 
-            mock_target_wait.reset_mock()
+        mock_target_wait.reset_mock()
+
+        with (
+            mock.patch.object(
+                fuchsia_controller.Context,
+                "target_wait",
+                autospec=True,
+            ) as mock_target_wait,
+            mock.patch.object(
+                fuchsia_controller.Context,
+                "target_add",
+                autospec=True,
+            ) as mock_target_add,
+        ):
             self.fuchsia_controller_obj_with_device_ip = (
                 fuchsia_controller_transport.FuchsiaController(
-                    device_name=_INPUT_ARGS["device_name"],
-                    device_ip=_INPUT_ARGS["device_ip_v4"],
-                    ffx_transport=self.ffx_obj,
+                    target_name=_INPUT_ARGS["target_name"],
+                    target_ip_port=_INPUT_ARGS["target_ip_port"],
+                    config=_MOCK_ARGS["ffx_config"],
                 )
             )
-            mock_target_wait.assert_called_once()
+        mock_target_wait.assert_called()
+        mock_target_add.assert_called()
 
-    @mock.patch.object(
-        fuchsia_controller.Context,
-        "target_wait",
-        autospec=True,
-    )
-    def test_create_context(self, mock_target_wait: mock.Mock) -> None:
+    def test_create_context(self) -> None:
         """Test case for fuchsia_controller_transport.create_context()."""
         self.fuchsia_controller_obj_with_device_ip.create_context()
-
-        mock_target_wait.assert_called_once()
 
     @mock.patch.object(
         fuchsia_controller,

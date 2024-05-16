@@ -736,6 +736,7 @@ def protocol_server_type(ir: IR, root_ir) -> type:
     properties = {
         "__doc__": docstring(ir),
         "__fidl_kind__": "server",
+        "__name__": name,
         "library": root_ir.name(),
         "method_map": {},
     }
@@ -771,6 +772,7 @@ def protocol_client_type(ir: IR, root_ir) -> type:
     properties = {
         "__doc__": docstring(ir),
         "__fidl_kind__": "client",
+        "__name__": name,
     }
     for method in ir.methods():
         if not method.has_request():

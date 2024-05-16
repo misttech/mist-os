@@ -212,6 +212,9 @@ pub enum BlobfsCompiledPackageDestination {
     SystemUpdateRealm,
     /// The compiled toolbox package.
     Toolbox,
+    /// The trusted apps package, of components which depend on TEE
+    /// protocols.
+    TrustedApps,
 }
 
 /// A blobfs package that assembly is allowed to compiled then include.
@@ -222,6 +225,8 @@ pub enum BootfsCompiledPackageDestination {
     Fshost,
     /// The compiled bootstrap realm package.
     Bootstrap,
+    /// The compiled root realm package.
+    Root,
 }
 
 /// Test variants.

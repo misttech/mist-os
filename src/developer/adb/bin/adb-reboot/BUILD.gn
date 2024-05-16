@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("common") {
   public_deps = [
@@ -25,10 +24,6 @@ executable("adb-reboot") {
     "main.cc",
   ]
   deps = [ ":common" ]
-}
-
-core_shard("adb-reboot-shard") {
-  shard_file = "meta/adb-reboot.core_shard.cml"
 }
 
 fuchsia_component("adb-reboot-component") {

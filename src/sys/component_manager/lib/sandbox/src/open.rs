@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{registry, sender::Sendable, CapabilityTrait, ConversionError};
+use crate::{connector::Connectable, registry, CapabilityTrait, ConversionError};
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -48,7 +48,7 @@ pub struct Open {
     entry: Arc<dyn DirectoryEntry>,
 }
 
-impl Sendable for Open {
+impl Connectable for Open {
     fn send(&self, message: crate::Message) -> Result<(), ()> {
         self.open(
             ExecutionScope::new(),
@@ -189,7 +189,7 @@ impl From<Open> for ClientEnd<fio::OpenableMarker> {
 
 impl From<Open> for fsandbox::Capability {
     fn from(open: Open) -> Self {
-        Self::Sender(crate::Sender::new_sendable(open).into())
+        Self::Connector(crate::Connector::new_sendable(open).into())
     }
 }
 
@@ -312,7 +312,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_sender_into_open() {
+    async fn test_connector_into_open() {
         let (receiver, sender) = Receiver::new();
         let open = Open::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = zx::Channel::create();
@@ -326,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sender_into_open_extra_path() {
+    fn test_connector_into_open_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
         let (receiver, sender) = Receiver::new();
@@ -349,10 +349,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_sender_into_open_via_dict() {
+    async fn test_connector_into_open_via_dict() {
         let mut dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.insert("echo".parse().unwrap(), Capability::Sender(sender))
+        dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());
@@ -368,12 +368,12 @@ mod tests {
     }
 
     #[test]
-    fn test_sender_into_open_via_dict_extra_path() {
+    fn test_connector_into_open_via_dict_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
         let mut dict = Dict::new();
         let (receiver, sender) = Receiver::new();
-        dict.insert("echo".parse().unwrap(), Capability::Sender(sender))
+        dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
         let open = Open::new(dict.try_into_directory_entry().unwrap());

@@ -1,0 +1,23 @@
+[
+    {
+        "node": "gpio-display-detect",
+        "tests": [
+            {
+                "expected": "match",
+                "name": "Match gpio-display-detect",
+                "device": {
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_RESET"
+                }
+            },
+            {
+                "expected": "abort",
+                "name": "Invalid function",
+                "device": {
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_ENABLE"
+                }
+            }
+        ]
+    }
+]

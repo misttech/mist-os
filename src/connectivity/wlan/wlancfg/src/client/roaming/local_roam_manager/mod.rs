@@ -12,7 +12,7 @@ use {
             types,
         },
         telemetry::{TelemetryEvent, TelemetrySender},
-        util::pseudo_energy::SignalData,
+        util::pseudo_energy::EwmaSignalData,
     },
     anyhow::{format_err, Error},
     fuchsia_async as fasync,
@@ -64,7 +64,7 @@ impl LocalRoamManagerApi for LocalRoamManager {
     ) -> Box<dyn roam_monitor::RoamMonitorApi> {
         let connection_data = ConnectionData::new(
             currently_fulfilled_connection.clone(),
-            SignalData::new(
+            EwmaSignalData::new(
                 signal.rssi_dbm,
                 signal.snr_db,
                 EWMA_SMOOTHING_FACTOR,
@@ -197,8 +197,8 @@ mod tests {
         crate::{
             client::connection_selection::ConnectionSelectionRequest,
             util::testing::{
-                generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
-                generate_random_signal_data,
+                generate_connect_selection, generate_random_bss, generate_random_ewma_signal_data,
+                generate_random_scanned_candidate,
             },
         },
         fuchsia_async::TestExecutor,
@@ -257,7 +257,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         let signal_data =
-            SignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR);
+            EwmaSignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR);
 
         let connection_data = ConnectionData::new(
             test_values.currently_fulfilled_connection.clone(),
@@ -313,7 +313,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Initialize current connection data.
-        let signal_data = SignalData::new(
+        let signal_data = EwmaSignalData::new(
             init_rssi,
             init_snr,
             EWMA_SMOOTHING_FACTOR,
@@ -388,7 +388,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Initialize current connection data.
-        let signal_data = SignalData::new(
+        let signal_data = EwmaSignalData::new(
             init_rssi,
             init_snr,
             EWMA_SMOOTHING_FACTOR,
@@ -438,7 +438,7 @@ mod tests {
         let roam_search_request = RoamSearchRequest::new(
             ConnectionData::new(
                 generate_connect_selection(),
-                generate_random_signal_data(),
+                generate_random_ewma_signal_data(),
                 fasync::Time::now(),
             ),
             sender,

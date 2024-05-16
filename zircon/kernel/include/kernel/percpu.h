@@ -22,6 +22,7 @@
 #include <kernel/stats.h>
 #include <kernel/thread.h>
 #include <kernel/timer.h>
+#include <ktl/atomic.h>
 #include <ktl/forward.h>
 #include <lockdep/thread_lock_state.h>
 #include <vm/page_state.h>
@@ -57,6 +58,11 @@ struct percpu {
   // The state of the currently active chain-lock transaction if any, nullptr
   // otherwise.
   kconcurrent::ChainLockTransaction* active_cl_transaction{nullptr};
+
+  // The chainlock conflict ID generator for this CPU.  This field is used by
+  // threads to know when to retry a ChainLockTransaction when a conflict is
+  // encountered.  See lib/kconcurrent for more details.
+  ktl::atomic<uint64_t> chain_lock_conflict_id{1};
 
   // guest entry/exit statistics
   struct guest_stats gstats;

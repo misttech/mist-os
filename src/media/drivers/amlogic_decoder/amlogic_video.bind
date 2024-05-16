@@ -11,8 +11,16 @@ using fuchsia.hardware.clock;
 using fuchsia.hardware.tee;
 using fuchsia.platform;
 using fuchsia.hardware.sysmem;
+using fuchsia.devicetree;
 
 primary node "pdev" {
+  if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC {
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE;
+    accept fuchsia.devicetree.FIRST_COMPATIBLE {
+      "amlogic,g12a-vdec",
+      "amlogic,g12b-vdec",
+    }
+  } else {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.VIDEO;
@@ -22,6 +30,7 @@ primary node "pdev" {
       fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
       fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
     }
+  }
 }
 
 node "sysmem" {
@@ -34,12 +43,12 @@ node "canvas" {
 
 node "clock-dos-vdec" {
   fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
-  fuchsia.BIND_CLOCK_ID == fuchsia.clock.FUNCTION.DOS_GCLK_VDEC;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.DOS_GCLK_VDEC;
 }
 
 node "clock-dos" {
   fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
-  fuchsia.BIND_CLOCK_ID == fuchsia.clock.FUNCTION.DOS;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.DOS;
 }
 
 optional node "tee" {

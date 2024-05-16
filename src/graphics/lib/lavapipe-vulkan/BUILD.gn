@@ -38,6 +38,11 @@ shared_library("libvulkan_lavapipe") {
       "//src/lib/llvm:LLVMAArch64CodeGen",
       "//src/lib/llvm:LLVMAArch64Disassembler",
       "//src/lib/llvm:LLVMAArch64Info",
+
+      # TODO(https://fxbug.dev/339107217): the arm64 build shouldn't require these x64-specific libs
+      "//src/lib/llvm:LLVMX86CodeGen",
+      "//src/lib/llvm:LLVMX86Disassembler",
+      "//src/lib/llvm:LLVMX86Info",
     ]
   } else if (target_cpu == "x64") {
     deps += [

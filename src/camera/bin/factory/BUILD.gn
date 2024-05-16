@@ -43,6 +43,7 @@ source_set("lib") {
     "//third_party/libpng",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/sysmem-version",
   ]
 }
 

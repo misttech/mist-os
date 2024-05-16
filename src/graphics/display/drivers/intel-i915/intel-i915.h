@@ -100,8 +100,6 @@ class Controller : public DeviceType,
   void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
                                                size_t display_config_count,
                                                const config_stamp_t* banjo_config_stamp);
-  void DisplayControllerImplSetEld(uint64_t banjo_display_id, const uint8_t* raw_eld_list,
-                                   size_t raw_eld_count);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
@@ -133,7 +131,6 @@ class Controller : public DeviceType,
   zx_status_t IntelGpuCoreGttClear(uint64_t addr);
   zx_status_t IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uint64_t page_offset,
                                     uint64_t page_count);
-  void GpuRelease();
 
   fdf::MmioBuffer* mmio_space() { return mmio_space_.has_value() ? &*mmio_space_ : nullptr; }
   Interrupts* interrupts() { return &interrupts_; }
@@ -222,10 +219,6 @@ class Controller : public DeviceType,
   void InitDisplayBuffers();
   DisplayDevice* FindDevice(display::DisplayId display_id) __TA_REQUIRES(display_lock_);
 
-  void CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
-                             cpp20::span<const display::DisplayId> removed)
-      __TA_REQUIRES(display_lock_);
-
   // Gets the layer_t* config for the given pipe/plane. Return false if there is no layer.
   bool GetPlaneLayer(Pipe* pipe, uint32_t plane,
                      cpp20::span<const display_config_t> banjo_display_configs,
@@ -272,8 +265,6 @@ class Controller : public DeviceType,
 
   zx_device_t* zx_gpu_dev_ = nullptr;
   zx_device_t* display_controller_dev_ = nullptr;
-  bool gpu_released_ = false;
-  bool display_released_ = false;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
@@ -284,7 +275,10 @@ class Controller : public DeviceType,
       buffer_collections_;
 
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
-  bool ready_for_callback_ __TA_GUARDED(display_lock_) = false;
+
+  // True iff the driver initialization (Bind() and DdkInit()) is fully
+  // completed.
+  bool driver_initialized_ __TA_GUARDED(display_lock_) = false;
 
   Gtt gtt_ __TA_GUARDED(gtt_lock_);
   mutable mtx_t gtt_lock_;
@@ -346,8 +340,6 @@ class Controller : public DeviceType,
 
   // Various configuration values set by the BIOS which need to be carried across suspend.
   bool ddi_e_disabled_ = true;
-
-  std::optional<display::DisplayId> eld_display_id_;
 
   // Debug
   inspect::Inspector inspector_;

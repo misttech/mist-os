@@ -70,6 +70,7 @@ def _fuchsia_product_configuration_impl(ctx):
     # Otherwise, paths are relative to the execroot.
     if (ctx.attr.relative_paths):
         relative_base = product_config_file.dirname
+        product_config["file_relative_paths"] = True
 
     replace_labels_with_files(product_config, ctx.attr.product_config_labels, relative = relative_base)
 

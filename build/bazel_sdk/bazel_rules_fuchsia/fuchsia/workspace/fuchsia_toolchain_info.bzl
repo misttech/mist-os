@@ -14,6 +14,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         blobfs = ctx.executable.blobfs,
         blobfs_manifest = ctx.file.blobfs_manifest,
         bindc = ctx.executable.bindc or None,
+        configc = ctx.executable.configc,
         cmc = ctx.executable.cmc,
         cmc_manifest = ctx.file.cmc_manifest,
         cmc_includes = ctx.attr.cmc_includes or None,
@@ -40,6 +41,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         ffx_test_manifest = ctx.file.ffx_test_manifest or None,
         fssh = ctx.executable.fssh,
         fidlc = ctx.executable.fidlc,
+        fidl_format = ctx.executable.fidl_format,
         fidlgen_hlcpp = ctx.executable.fidlgen_hlcpp,
         fidlgen_cpp = ctx.executable.fidlgen_cpp,
         funnel = ctx.executable.funnel,
@@ -97,6 +99,13 @@ included in the Fuchsia IDK.
         "bindc": attr.label(
             doc = "bindc tool executable.",
             mandatory = False,
+            cfg = "exec",
+            executable = True,
+            allow_single_file = True,
+        ),
+        "configc": attr.label(
+            doc = "configc tool executable.",
+            mandatory = True,
             cfg = "exec",
             executable = True,
             allow_single_file = True,
@@ -229,6 +238,13 @@ included in the Fuchsia IDK.
         ),
         "fidlc": attr.label(
             doc = "fidlc tool executable.",
+            mandatory = True,
+            cfg = "exec",
+            executable = True,
+            allow_single_file = True,
+        ),
+        "fidl_format": attr.label(
+            doc = "fidl-format tool executable.",
             mandatory = True,
             cfg = "exec",
             executable = True,

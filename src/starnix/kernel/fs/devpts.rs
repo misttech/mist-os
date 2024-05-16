@@ -111,7 +111,8 @@ fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSy
     // Register tty and ptmx device types.
     kernel.device_registry.register_major(TTY_ALT_MAJOR, device, DeviceMode::Char).unwrap();
 
-    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options);
+    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options)
+        .expect("devpts filesystem constructed with valid options");
     let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
         info.ino = ROOT_NODE_ID;
     });
@@ -342,10 +343,10 @@ impl DevPtmxFile {
 impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
         self.terminal.main_close();
         let id = FsString::from(self.terminal.id.to_string());
-        self.dev_pts_root.remove_child(id.as_ref());
+        self.dev_pts_root.remove_child(id.as_ref(), &current_task.kernel().mounts);
     }
 
     fn read(

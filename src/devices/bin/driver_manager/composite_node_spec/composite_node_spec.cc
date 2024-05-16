@@ -8,7 +8,9 @@ namespace driver_manager {
 
 CompositeNodeSpec::CompositeNodeSpec(CompositeNodeSpecCreateInfo create_info)
     : name_(create_info.name) {
-  parent_specs_ = std::vector<std::optional<DeviceOrNode>>(create_info.size, std::nullopt);
+  parent_nodes_ =
+      std::vector<std::optional<DeviceOrNode>>(create_info.parents.size(), std::nullopt);
+  parent_specs_ = std::move(create_info.parents);
 }
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpec::BindParent(
@@ -16,11 +18,11 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpec::BindParent(
     const DeviceOrNode& device_or_node) {
   ZX_ASSERT(composite_parent.has_index());
   auto node_index = composite_parent.index();
-  if (node_index >= parent_specs_.size()) {
+  if (node_index >= parent_nodes_.size()) {
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  const std::optional<DeviceOrNode>& current_at_index = parent_specs_[node_index];
+  const std::optional<DeviceOrNode>& current_at_index = parent_nodes_[node_index];
   if (current_at_index.has_value()) {
     const DeviceOrNode& existing = current_at_index.value();
     const std::weak_ptr<driver_manager::Node>* existing_node =
@@ -34,14 +36,14 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpec::BindParent(
 
   auto result = BindParentImpl(composite_parent, device_or_node);
   if (result.is_ok()) {
-    parent_specs_[node_index] = device_or_node;
+    parent_nodes_[node_index] = device_or_node;
   }
 
   return result;
 }
 
 void CompositeNodeSpec::Remove(RemoveCompositeNodeCallback callback) {
-  std::fill(parent_specs_.begin(), parent_specs_.end(), std::nullopt);
+  std::fill(parent_nodes_.begin(), parent_nodes_.end(), std::nullopt);
   RemoveImpl(std::move(callback));
 }
 

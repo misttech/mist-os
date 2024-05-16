@@ -4,6 +4,7 @@
 
 #include "amlogic-video.h"
 
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -27,11 +28,16 @@
 #include <optional>
 #include <thread>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/devicetree/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <hwreg/bitfields.h>
 #include <hwreg/mmio.h>
 
 #include "device_ctx.h"
 #include "device_fidl.h"
+#include "device_type.h"
 #include "hevcdec.h"
 #include "local_codec_factory.h"
 #include "macros.h"
@@ -58,8 +64,8 @@ namespace amlogic_decoder {
 //  search_pattern_ - HW only reads this
 //  parser_input_ - not used when secure)
 
-// TODO(https://fxbug.dev/42118114): bti::release_quarantine() or zx_bti_release_quarantine() somewhere
-// during startup, after HW is known idle, before we allocate anything from sysmem.
+// TODO(https://fxbug.dev/42118114): bti::release_quarantine() or zx_bti_release_quarantine()
+// somewhere during startup, after HW is known idle, before we allocate anything from sysmem.
 
 namespace {
 
@@ -256,7 +262,7 @@ zx_status_t AmlogicVideo::AllocateStreamBuffer(StreamBuffer* buffer, uint32_t si
     stream_buffer = std::move(saved_stream_buffer);
   } else {
     auto create_result = InternalBuffer::Create(
-        "AMLStreamBuffer", &sysmem_sync_ptr_, zx::unowned_bti(bti_), size, is_secure,
+        "AMLStreamBuffer", &sysmem_sync_, zx::unowned_bti(bti_), size, is_secure,
         /*is_writable=*/kStreamBufferIsWritable, /*is_mapping_needed=*/!use_parser);
     if (!create_result.is_ok()) {
       DECODE_ERROR("Failed to make video fifo: %d", create_result.error());
@@ -427,8 +433,8 @@ zx_status_t AmlogicVideo::AllocateIoBuffer(io_buffer_t* buffer, size_t size,
   return ZX_OK;
 }
 
-fuchsia::sysmem::AllocatorSyncPtr& AmlogicVideo::SysmemAllocatorSyncPtr() {
-  return sysmem_sync_ptr_;
+fidl::SyncClient<fuchsia_sysmem2::Allocator>& AmlogicVideo::SysmemAllocatorSync() {
+  return sysmem_sync_;
 }
 
 // This parser handles MPEG elementary streams.
@@ -674,9 +680,9 @@ void AmlogicVideo::SwapInCurrentInstance() {
   video_decoder_->SwappedIn();
 }
 
-zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> AmlogicVideo::ConnectToSysmem() {
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> AmlogicVideo::ConnectToSysmem() {
   auto sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_, "sysmem");
+      fuchsia_hardware_sysmem::Service::AllocatorV2>(parent_, "sysmem");
   if (sysmem_result.is_error()) {
     LOG(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol: %s",
         sysmem_result.status_string());
@@ -862,6 +868,81 @@ std::string GetObjectName(zx_handle_t handle) {
   return status == ZX_OK ? std::string(name) : std::string();
 }
 
+zx_status_t AmlogicVideo::SetDeviceType(zx_device_t* parent) {
+  constexpr uint32_t kMaxPropertyCount = 10;
+  zx_device_prop_t props[kMaxPropertyCount] = {};
+  zx_device_str_prop_t str_props[kMaxPropertyCount] = {};
+  device_props_args_t prop_out_args = {
+      .props = props,
+      .prop_count = kMaxPropertyCount,
+      .str_props = str_props,
+      .str_prop_count = kMaxPropertyCount,
+  };
+  zx_status_t status = device_get_properties(parent, &prop_out_args);
+  if (status != ZX_OK) {
+    DECODE_ERROR("Failed to get device properties. Status: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  uint32_t pid = 0;
+  uint32_t did = 0;
+  uint32_t vid = 0;
+
+  std::string compatible;
+  for (uint32_t i = 0; i < prop_out_args.actual_str_prop_count; i++) {
+    if (!strcmp(str_props[i].key, bind_fuchsia::PLATFORM_DEV_VID.c_str())) {
+      vid = str_props[i].property_value.data.int_val;
+    }
+    if (!strcmp(str_props[i].key, bind_fuchsia::PLATFORM_DEV_PID.c_str())) {
+      pid = str_props[i].property_value.data.int_val;
+    }
+    if (!strcmp(str_props[i].key, bind_fuchsia::PLATFORM_DEV_DID.c_str())) {
+      did = str_props[i].property_value.data.int_val;
+    }
+
+    if (!strcmp(str_props[i].key, bind_fuchsia_devicetree::FIRST_COMPATIBLE.c_str())) {
+      ZX_ASSERT(str_props[i].property_value.data_type == ZX_DEVICE_PROPERTY_VALUE_STRING);
+      compatible = std::string(str_props[i].property_value.data.str_val);
+      break;
+    }
+  }
+
+  LOG(DEBUG, "vid: %d pid: %d did: %d compatible: %s", vid, pid, did, compatible.c_str());
+
+  if (vid == bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC &&
+      did == bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE) {
+    if (compatible == "amlogic,g12a-vdec") {
+      device_type_ = DeviceType::kG12A;
+    } else if (compatible == "amlogic,g12b-vdec") {
+      device_type_ = DeviceType::kG12B;
+    } else {
+      DECODE_ERROR("Unknown soc compatible string: %s", compatible.c_str());
+      return ZX_ERR_INVALID_ARGS;
+    }
+  } else {
+    switch (pid) {
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S912:
+        device_type_ = DeviceType::kGXM;
+        break;
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2:
+        device_type_ = DeviceType::kG12A;
+        break;
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931:
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D:
+        device_type_ = DeviceType::kG12B;
+        break;
+      case bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3:
+        device_type_ = DeviceType::kSM1;
+        break;
+      default:
+        DECODE_ERROR("Unknown soc pid: %d", pid);
+        return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   TRACE_DURATION("media", "AmlogicVideo::InitRegisters");
   parent_ = parent;
@@ -888,7 +969,7 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
         sysmem_result.status_string());
     return sysmem_result.status_value();
   }
-  sysmem_sync_ptr_.Bind(sysmem_result->TakeChannel());
+  sysmem_sync_.Bind(std::move(*sysmem_result));
 
   zx::result canvas_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
       fuchsia_hardware_amlogiccanvas::Service::Device>(parent_, "canvas");
@@ -937,39 +1018,13 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   if (is_tee_available_) {
     tee_proto_client_.Bind(std::move(endpoints->client));
-    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via video_firmware
-    // TA
+    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via
+    // video_firmware TA
     LOG(INFO, "Got ZX_PROTOCOL_TEE");
   } else {
-    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via video_firmware
-    // TA
+    // TODO(https://fxbug.dev/42115709): remove log spam once we're loading firmware via
+    // video_firmware TA
     LOG(INFO, "Skipped ZX_PROTOCOL_TEE");
-  }
-
-  pdev_device_info_t info;
-  status = pdev_.GetDeviceInfo(&info);
-  if (status != ZX_OK) {
-    DECODE_ERROR("pdev_.GetDeviceInfo failed");
-    return status;
-  }
-
-  switch (info.pid) {
-    case PDEV_PID_AMLOGIC_S912:
-      device_type_ = DeviceType::kGXM;
-      break;
-    case PDEV_PID_AMLOGIC_S905D2:
-      device_type_ = DeviceType::kG12A;
-      break;
-    case PDEV_PID_AMLOGIC_T931:
-    case PDEV_PID_AMLOGIC_A311D:
-      device_type_ = DeviceType::kG12B;
-      break;
-    case PDEV_PID_AMLOGIC_S905D3:
-      device_type_ = DeviceType::kSM1;
-      break;
-    default:
-      DECODE_ERROR("Unknown soc pid: %d", info.pid);
-      return ZX_ERR_INVALID_ARGS;
   }
 
   static constexpr uint32_t kTrustedOsSmcIndex = 0;
@@ -1061,7 +1116,11 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   fidl::Arena arena;
   fidl::StringView process_name(arena, name);
-  auto set_debug_client_info_result = sysmem_->SetDebugClientInfo(std::move(process_name), pid);
+  auto set_debug_request =
+      fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena);
+  set_debug_request.name(std::move(process_name));
+  set_debug_request.id(pid);
+  auto set_debug_client_info_result = sysmem_->SetDebugClientInfo(set_debug_request.Build());
   if (!set_debug_client_info_result.ok()) {
     DECODE_ERROR("sending SetDebugClientInfo failed: %s",
                  set_debug_client_info_result.status_string());

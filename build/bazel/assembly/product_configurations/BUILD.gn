@@ -19,18 +19,10 @@ verify_product_configuration("verify_default_product_configuration") {
   bazel_inputs = []
 }
 
-verify_product_configuration("verify_minimal_product_configuration") {
-  gn_product_config_target = "//products/minimal"
-  bazel_product_config_target = "//products/minimal:product_config"
-  bazel_inputs =
-      [ "//src/fonts/asset_providers:small-open-fonts-collection-bazel" ]
-}
-
 group("verifications") {
   testonly = true
   deps = [
     ":verify_default_product_configuration",
-    ":verify_minimal_product_configuration",
     ":verify_zedboot_product_configuration",
   ]
 }

@@ -20,6 +20,12 @@ import("//build/compiled_action.gni")
 #   hals (optional; default=[])
 #     [list of labels] Labels of HAL fuchsia packages to add as subpackages.
 #
+#   fstab (optional)
+#     [path] fstab file to place in /odm
+#
+#   init (optional; default=[])
+#     [list of paths] Paths of additional init files to place in /odm/etc/init.
+#
 #     The resulting container package will also have an ODM filesystem with
 #     configurations for HALs. See /src/starnix/tools/gen_android_starnix_container/README.md
 #     for details.
@@ -95,6 +101,16 @@ template("android_starnix_container") {
           rebase_path(invoker.fstab, root_build_dir),
         ]
         inputs += [ invoker.fstab ]
+      }
+
+      if (defined(invoker.init)) {
+        inputs += invoker.init
+        foreach(i, invoker.init) {
+          args += [
+            "--init",
+            rebase_path(i, root_build_dir),
+          ]
+        }
       }
     }
   } else {

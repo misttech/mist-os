@@ -54,9 +54,8 @@ zx::result<> AmlSuspend::CreateDevfsNode() {
     return connector.take_error();
   }
 
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("suspend");
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
+      std::move(connector.value()));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, kDeviceName)
@@ -81,9 +80,11 @@ zx::result<> AmlSuspend::CreateDevfsNode() {
 }
 
 zx::result<> AmlSuspend::Start() {
-  auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_suspend::Suspender>(
-      suspend_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
-      kDeviceName);
+  fuchsia_hardware_suspend::SuspendService::InstanceHandler handler({
+      .suspender = suspend_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+  });
+  auto result =
+      outgoing()->AddService<fuchsia_hardware_suspend::SuspendService>(std::move(handler));
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add Suspender service %s", result.status_string());
     return result.take_error();

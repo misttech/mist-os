@@ -395,9 +395,13 @@ mod tests {
         instant: FakeInstantCtx,
     }
 
-    impl AsRef<FakeInstantCtx> for FakeTimerCtx {
-        fn as_ref(&self) -> &FakeInstantCtx {
-            &self.instant
+    impl InstantBindingsTypes for FakeTimerCtx {
+        type Instant = FakeInstant;
+    }
+
+    impl InstantContext for FakeTimerCtx {
+        fn now(&self) -> Self::Instant {
+            self.instant.now()
         }
     }
 

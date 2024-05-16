@@ -19,13 +19,8 @@ struct LayoutInvocation;
 struct LayoutParameterList;
 struct TypeConstraints;
 
-// Typespace provides builders for all types (e.g. array, vector, string), and
-// ensures canonicalization, i.e. the same type is represented by one object,
-// shared amongst all uses of said type. For instance, while the text
-// `vector<uint8>:7` may appear multiple times in source, these all indicate
-// the same type.
-//
-// TODO(https://fxbug.dev/42156099): Implement canonicalization.
+// Typespace owns all types. It provides methods for building types which
+// store the object in the typespace and return a Type*.
 class Typespace final {
  public:
   // Initializes the typespace with builtin types from the root library.

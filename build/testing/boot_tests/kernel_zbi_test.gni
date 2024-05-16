@@ -27,7 +27,6 @@ cuckoo_kernel_zbi_test_params = {
   input_groups = [
     "bootstrap",
     "network",
-    "test",
   ]
 }
 

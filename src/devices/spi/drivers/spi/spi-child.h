@@ -5,34 +5,30 @@
 #ifndef SRC_DEVICES_SPI_DRIVERS_SPI_SPI_CHILD_H_
 #define SRC_DEVICES_SPI_DRIVERS_SPI_SPI_CHILD_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-
-#include <ddktl/device.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 namespace spi {
 
 class SpiDevice;
 
-class SpiChild;
-using SpiChildType =
-    ddk::Device<SpiChild, ddk::Messageable<fuchsia_hardware_spi::Controller>::Mixin,
-                ddk::Unbindable>;
-
-class SpiChild : public SpiChildType, public fidl::WireServer<fuchsia_hardware_spi::Device> {
+class SpiChild : public fidl::WireServer<fuchsia_hardware_spi::Device>,
+                 public fidl::WireServer<fuchsia_hardware_spi::Controller> {
  public:
-  SpiChild(zx_device_t* parent, fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi,
-           uint32_t chip_select, bool has_siblings, fdf::UnownedDispatcher fidl_dispatcher)
-      : SpiChildType(parent),
-        spi_(std::move(spi)),
+  SpiChild(fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi, uint32_t chip_select,
+           bool has_siblings, fdf::UnownedSynchronizedDispatcher fidl_dispatcher,
+           std::unique_ptr<compat::SyncInitializedDeviceServer> compat_server,
+           fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_client)
+      : spi_(std::move(spi)),
         cs_(chip_select),
         has_siblings_(has_siblings),
         fidl_dispatcher_(std::move(fidl_dispatcher)),
-        outgoing_(fidl_dispatcher_->async_dispatcher()) {}
-
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+        compat_server_(std::move(compat_server)),
+        controller_(std::move(controller_client)),
+        devfs_connector_(fit::bind_member<&SpiChild::DevfsConnect>(this)) {}
 
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
 
@@ -57,25 +53,26 @@ class SpiChild : public SpiChildType, public fidl::WireServer<fuchsia_hardware_s
 
   void Bind(fidl::ServerEnd<fuchsia_hardware_spi::Device> server_end);
 
-  zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  fuchsia_hardware_spi::Service::InstanceHandler CreateInstanceHandler();
 
-  // May be called by the root device on any thread.
-  void FidlClientTeardownHandler();
+  zx::result<fidl::ClientEnd<fuchsia_device_fs::Connector>> BindDevfs() {
+    return devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  }
 
  private:
+  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_spi::Controller> server);
+
   fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi_;
   const uint32_t cs_;
   // False if this child is the only device on the bus.
   const bool has_siblings_;
-  const fdf::UnownedDispatcher fidl_dispatcher_;
+  const fdf::UnownedSynchronizedDispatcher fidl_dispatcher_;
 
-  // These objects can only be accessed on the FIDL dispatcher. Making them optional allows them to
-  // be destroyed manually in our unbind hook.
   std::optional<fidl::ServerBinding<fuchsia_hardware_spi::Device>> binding_;
-  std::optional<component::OutgoingDirectory> outgoing_;
-
-  std::optional<ddk::UnbindTxn> unbind_txn_;
-  bool client_torn_down_ = false;
+  fidl::ServerBindingGroup<fuchsia_hardware_spi::Controller> controller_bindings_;
+  std::unique_ptr<compat::SyncInitializedDeviceServer> compat_server_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_hardware_spi::Controller> devfs_connector_;
 };
 
 }  // namespace spi

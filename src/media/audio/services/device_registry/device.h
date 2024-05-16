@@ -44,11 +44,11 @@ class Device : public std::enable_shared_from_this<Device> {
   ~Device();
 
   template <typename ProtocolT>
-  class EndpointFidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
+  class RingBufferFidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
    public:
-    EndpointFidlErrorHandler(Device* device, ElementId element_id, std::string name)
+    RingBufferFidlErrorHandler(Device* device, ElementId element_id, std::string name)
         : device_(device), element_id_(element_id), name_(std::move(name)) {}
-    EndpointFidlErrorHandler() = default;
+    RingBufferFidlErrorHandler() = default;
     void on_fidl_error(fidl::UnbindInfo info) override;
 
    protected:
@@ -204,10 +204,8 @@ class Device : public std::enable_shared_from_this<Device> {
   bool has_health_state() const { return health_state_.has_value(); }
   bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
   bool ring_buffer_format_sets_retrieved() const { return ring_buffer_format_sets_retrieved_; }
-  const std::unordered_set<ElementId>& dai_endpoint_ids() const { return dai_endpoint_ids_; }
-  const std::unordered_set<ElementId>& ring_buffer_endpoint_ids() const {
-    return ring_buffer_endpoint_ids_;
-  }
+  const std::unordered_set<ElementId>& dai_ids() const { return dai_ids_; }
+  const std::unordered_set<ElementId>& ring_buffer_ids() const { return ring_buffer_ids_; }
   const std::unordered_set<TopologyId>& topology_ids() const { return topology_ids_; }
   const std::unordered_set<ElementId>& element_ids() const { return element_ids_; }
 
@@ -402,10 +400,10 @@ class Device : public std::enable_shared_from_this<Device> {
   std::vector<fuchsia_hardware_audio_signalprocessing::Topology> sig_proc_topologies_;
   std::unordered_map<ElementId, ElementRecord> sig_proc_element_map_;
 
-  std::unordered_set<ElementId> dai_endpoint_ids_;
-  std::unordered_set<ElementId> temp_dai_endpoint_ids_;
-  std::unordered_set<ElementId> ring_buffer_endpoint_ids_;
-  std::unordered_set<ElementId> temp_ring_buffer_endpoint_ids_;
+  std::unordered_set<ElementId> dai_ids_;
+  std::unordered_set<ElementId> temp_dai_ids_;
+  std::unordered_set<ElementId> ring_buffer_ids_;
+  std::unordered_set<ElementId> temp_ring_buffer_ids_;
   std::unordered_set<ElementId> element_ids_;
 
   std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
@@ -452,7 +450,7 @@ class Device : public std::enable_shared_from_this<Device> {
     RingBufferState ring_buffer_state = RingBufferState::NotCreated;
 
     std::optional<fidl::Client<fuchsia_hardware_audio::RingBuffer>> ring_buffer_client;
-    std::unique_ptr<EndpointFidlErrorHandler<fuchsia_hardware_audio::RingBuffer>>
+    std::unique_ptr<RingBufferFidlErrorHandler<fuchsia_hardware_audio::RingBuffer>>
         ring_buffer_handler;
 
     fit::callback<void(

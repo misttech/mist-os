@@ -57,6 +57,7 @@ zx_status_t Vim3::TouchInit() {
 
   const std::vector<fdf::BindRule> kInterruptRules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               static_cast<uint32_t>(VIM3_TOUCH_PANEL_INTERRUPT)),
   };
@@ -67,6 +68,7 @@ zx_status_t Vim3::TouchInit() {
 
   const std::vector<fdf::BindRule> kResetRules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_EXPANDER_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               static_cast<uint32_t>(VIM3_TOUCH_PANEL_RESET)),
   };

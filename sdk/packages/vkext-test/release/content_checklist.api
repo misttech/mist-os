@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "content": {
+    "files": {
+      "meta/vkext-test-child.cm": {
+        "hash": "aae12c190d66d65f81aa78ed7af09141f390681a303a488fee6d4c27da4c9f08"
+      }
+    }
+  }
+}

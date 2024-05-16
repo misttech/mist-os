@@ -42,7 +42,7 @@ class MaliDriver : public MagmaDriverBaseType,
       magma::PlatformBusMapper::SetInfoResource(std::move(*info_resource));
     }
 
-    parent_device_ = ParentDeviceDFv2::Create(incoming());
+    parent_device_ = ParentDeviceDFv2::Create(incoming(), take_config<config::Config>());
     if (!parent_device_) {
       MAGMA_LOG(ERROR, "Failed to create ParentDeviceDFv2");
       return zx::error(ZX_ERR_INTERNAL);
@@ -113,7 +113,7 @@ class MaliDriver : public MagmaDriverBaseType,
 
     static_cast<MsdArmDevice*>(dev)->SetPowerState(
         request->enabled,
-        [completer = completer.ToAsync()]() mutable { completer.ReplySuccess(); });
+        [completer = completer.ToAsync()](bool powered_on) mutable { completer.ReplySuccess(); });
   }
 
  private:

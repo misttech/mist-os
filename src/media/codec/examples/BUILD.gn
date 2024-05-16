@@ -91,7 +91,8 @@ fuchsia_test_package("use_h264_decoder_tests") {
       nelson_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
     ]
   }
 }
@@ -131,7 +132,8 @@ fuchsia_test_package("use_h264_decoder_frame_num_gaps_tests") {
       nelson_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
     ]
   }
 }
@@ -210,6 +212,14 @@ fuchsia_test_package("use_h264_decoder_stream_switching_tests") {
       {
         dimensions = {
           device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+        tags = [ "flaky" ]  # TODO(https://fxbug.dev/42064464): Re-enable when
+                            # test is no
+                            # longer flaky
+      },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC11TNHv5"
         }
         tags = [ "flaky" ]  # TODO(https://fxbug.dev/42064464): Re-enable when
                             # test is no
@@ -356,7 +366,8 @@ fuchsia_test_package("h264_decoder_fuzzer_tests") {
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
     ]
   }
 }
@@ -380,7 +391,8 @@ fuchsia_test_package("codec_description_tests") {
       astro_env,
       sherlock_env,
       vim3_env,
-      nuc_env,
+      nuc7_env,
+      nuc11_env,
     ]
   }
 }
@@ -702,7 +714,8 @@ if (build_all_vp9_file_decoder_conformance_tests) {
         environments = [
           sherlock_env,
           vim3_env,
-          nuc_env,
+          nuc7_env,
+          nuc11_env,
           atlas_env,
         ]
       }

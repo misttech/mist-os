@@ -85,6 +85,9 @@ pub use reset::*;
 mod link;
 pub use link::*;
 
+mod link_metrics;
+pub use link_metrics::*;
+
 pub(crate) mod types;
 pub use types::*;
 
@@ -172,6 +175,7 @@ pub trait InstanceInterface:
     + NetData
     + Nat64
     + DnsUpstream
+    + LinkMetrics
 {
 }
 

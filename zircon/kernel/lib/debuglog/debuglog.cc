@@ -9,6 +9,7 @@
 #include <lib/debuglog.h>
 #include <lib/fit/defer.h>
 #include <lib/io.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/version.h>
@@ -216,7 +217,7 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     hdr.tid = 0;
   }
 
-  bool holding_thread_lock;
+  bool do_signal = true;
   {
     Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
 
@@ -224,6 +225,28 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
 
     if (lifecycle_.load(ktl::memory_order_acquire) != Lifecycle::Running) {
       return ZX_ERR_BAD_STATE;
+    }
+
+    // We're about to place a log record in the buffer.  Once we've done that
+    // we'll need to signal the notifier thread.  Ideally we'd just call
+    // Event::Signal after dropping our spinlock, however, Event::Signal might
+    // start a new chainlock transaction and we might have been called in a
+    // context where there's *already* an active transaction.  If there's an
+    // active transaction we must instead defer calling signal to a point at
+    // which there is no active transaction.  We use a Timer for this because
+    // Timers only fire when interrupts are enabled and it would be an error to
+    // have an active chainlock transaction with interrupts enabled.
+    if (ChainLockTransaction::Active() != nullptr) {
+      do_signal = false;
+      // As an optimization, we track whether or not there's a pending timer.
+      // This is check may race with the timer firing (and clearing the bool),
+      // but that's OK.  The worst case is that we observed false and set an
+      // "extra" timer.
+      if (!pending_deferred_signal_.load()) {
+        pending_deferred_signal_.store(true);
+        deferred_signal_timer_.Set(Deadline::no_slack(ZX_TIME_INFINITE_PAST), DLog::DeferredSignal,
+                                   this);
+      }
     }
 
     // Discard records at tail until there is enough
@@ -255,26 +278,9 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     }
     head_ += wiresize;
     sequence_count_++;
-
-    // Need to check this before re-releasing the log lock, since we may
-    // re-enable interrupts while doing that.  If interrupts are enabled when we
-    // make this check, we could see the following sequence of events between
-    // two CPUs and incorrectly conclude we are holding the thread lock:
-    // C2: Acquire thread_lock
-    // C1: Running this thread, evaluate thread_lock.HolderCpu() -> C2
-    // C1: Context switch away
-    // C2: Release thread_lock
-    // C2: Context switch to this thread
-    // C2: Running this thread, evaluate arch_curr_cpu_num() -> C2
-    holding_thread_lock = thread_lock.HolderCpu() == arch_curr_cpu_num();
   }
 
-  // If we happen to be called from within the global thread lock, use a special
-  // version of event signal.
-  if (holding_thread_lock) {
-    thread_lock.AssertHeld();
-    notifier_state_.event.SignalLocked();
-  } else {
+  if (do_signal) {
     notifier_state_.event.Signal();
   }
 
@@ -438,6 +444,11 @@ int DLog::DumperThread() {
   }
 
   return 0;
+}
+
+void DLog::DeferredSignal() {
+  notifier_state_.event.Signal();
+  pending_deferred_signal_.store(false);
 }
 
 // TODO: support reading multiple messages at a time

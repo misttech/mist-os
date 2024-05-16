@@ -6,6 +6,7 @@
 
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/unittest/unittest.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zx/time.h>
@@ -19,6 +20,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/auto_preempt_disabler.h>
+#include <kernel/event.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
@@ -59,8 +61,7 @@ enum class InheritableProfile { No, Yes };
 // timing related flake in the tests.
 class AutoProfileBooster {
  public:
-  AutoProfileBooster()
-      : initial_base_profile_(Thread::Current::Get()->scheduler_state().SnapshotBaseProfile()) {
+  AutoProfileBooster() : initial_base_profile_(Thread::Current::Get()->SnapshotBaseProfile()) {
     constexpr SchedUtilization utilization = SchedUtilization{90} / SchedUtilization{100};
     constexpr SchedDuration deadline{ZX_USEC(200)};
     const SchedulerState::BaseProfile new_base_profile{SchedDeadlineParams{utilization, deadline}};
@@ -154,10 +155,7 @@ struct ExpectedEffectiveProfile {
 namespace unittest {
 class ThreadEffectiveProfileObserver {
  public:
-  void Observe(const Thread& t) {
-    Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
-    observed_profile_ = t.scheduler_state().SnapshotEffectiveProfileLocked();
-  }
+  void Observe(const Thread& t) { observed_profile_ = t.SnapshotEffectiveProfile(); }
 
   bool VerifyExpectedEffectiveProfile(const ExpectedEffectiveProfile& eep) {
     BEGIN_TEST;
@@ -295,45 +293,6 @@ class DeadlineProfile : public Profile {
   const SchedDeadlineParams sched_params_;
 };
 
-// A simple barrier class which can be waited on by multiple threads.  Used to
-// stall test threads at various parts of their execution in order to sequence
-// things in a deterministic fashion.
-class Barrier {
- public:
-  constexpr Barrier(bool signaled = false) : signaled_{signaled} {}
-  ~Barrier() {
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    ASSERT(queue_.IsEmpty());
-  }
-
-  void Signal(bool state) {
-    bool expected = !state;
-    if (signaled_.compare_exchange_strong(expected, state) && state) {
-      Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-      queue_.WakeAll(ZX_OK);
-    }
-  }
-
-  void Wait(Deadline deadline = Deadline::infinite()) {
-    if (state()) {
-      return;
-    }
-
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    if (state()) {
-      return;
-    }
-
-    queue_.Block(deadline, Interruptible::Yes);
-  }
-
-  bool state() const { return signaled_.load(); }
-
- private:
-  ktl::atomic<bool> signaled_;
-  WaitQueue queue_;
-};
-
 // Helper wrapper for an owned wait queue which manages grabbing and releasing
 // the thread lock at appropriate times for us.  Mostly, this is just about
 // saving some typing.
@@ -342,17 +301,14 @@ class LockedOwnedWaitQueue : public OwnedWaitQueue {
   constexpr LockedOwnedWaitQueue() = default;
   DISALLOW_COPY_ASSIGN_AND_MOVE(LockedOwnedWaitQueue);
 
-  void ReleaseAllThreads() TA_EXCL(thread_lock) {
+  void ReleaseAllThreads() {
     AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
     OwnedWaitQueue::WakeThreads(ktl::numeric_limits<uint32_t>::max());
   }
 
-  void ReleaseOneThread() TA_EXCL(thread_lock) {
+  void ReleaseOneThread() {
     AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-    auto hook = [](Thread*, void*) { return Hook::Action::SelectAndAssignOwner; };
-    OwnedWaitQueue::WakeThreads(1u, {hook, nullptr});
+    OwnedWaitQueue::WakeThreadAndAssignOwner();
   }
 };
 
@@ -425,12 +381,12 @@ class TestThread {
 
   // Reset the barrier at the start of a test in order to prevent threads from
   // exiting after they have completed their operation..
-  static void ResetShutdownBarrier() { allow_shutdown_.Signal(false); }
+  static void ResetShutdownBarrier() { allow_shutdown_.Unsignal(); }
 
   // Clear the barrier and allow shutdown.
-  static void ClearShutdownBarrier() { allow_shutdown_.Signal(true); }
+  static void ClearShutdownBarrier() { allow_shutdown_.Signal(); }
 
-  static Barrier& allow_shutdown() { return allow_shutdown_; }
+  static Event& allow_shutdown() { return allow_shutdown_; }
 
   // Create a thread, settings its entry point and initial profile in
   // the process, but do not start it yet.
@@ -439,10 +395,14 @@ class TestThread {
   // Start the thread, have it do nothing but wait to be allowed to exit.
   bool DoStall();
 
+  // Start the thread and have it block on an standard wait queue.
+  bool BlockOnWaitQueue(WaitQueue* wq, zx::duration relative_timeout = zx::duration::infinite())
+      TA_EXCL(chainlock_transaction_token);
+
   // Start the thread and have it block on an owned wait queue, declaring the
   // specified test thread to be the owner of that queue in the process.
-  bool BlockOnOwnedQueue(OwnedWaitQueue* owned_wq, TestThread* owner,
-                         zx::duration relative_timeout = zx::duration::infinite());
+  bool BlockOnOwnedWaitQueue(OwnedWaitQueue* owned_wq, TestThread* owner,
+                             zx::duration relative_timeout = zx::duration::infinite());
 
   // Directly take ownership of the specified wait queue using AssignOwner.
   bool TakeOwnership(OwnedWaitQueue* owned_wq);
@@ -464,7 +424,8 @@ class TestThread {
       return thread_state::THREAD_DEATH;
     }
 
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+    SingletonChainLockGuardIrqSave guard{thread_->get_lock(),
+                                         CLT_TAG("TestThread::tstate (pi_tests)")};
     return thread_->state();
   }
 
@@ -490,15 +451,13 @@ class TestThread {
 
   int ThreadEntry();
 
-  static Barrier allow_shutdown_;
+  static inline Event allow_shutdown_{};
 
   Thread* thread_ = nullptr;
   ktl::atomic<State> state_{State::INITIAL};
   fit::inline_function<void(void), kMaxOpLambdaCaptureStorageBytes> op_;
   fbl::RefPtr<Profile> initial_profile_;
 };
-
-Barrier TestThread::allow_shutdown_;
 
 bool TestThread::Create(fbl::RefPtr<Profile> initial_profile) {
   BEGIN_TEST;
@@ -535,15 +494,54 @@ bool TestThread::DoStall() {
   END_TEST;
 }
 
-bool TestThread::BlockOnOwnedQueue(OwnedWaitQueue* owned_wq, TestThread* owner,
-                                   zx::duration relative_timeout) {
+bool TestThread::BlockOnWaitQueue(WaitQueue* wq, zx::duration relative_timeout) {
+  BEGIN_TEST;
+  ASSERT_EQ(state(), State::CREATED);
+  ASSERT_FALSE(static_cast<bool>(op_));
+
+  op_ = [wq, relative_timeout]() TA_EXCL(chainlock_transaction_token) {
+    Deadline timeout = (relative_timeout == zx::duration::infinite())
+                           ? Deadline::infinite()
+                           : Deadline::after(relative_timeout.get());
+
+    ChainLockTransactionPreemptDisableAndIrqSave clt{
+        CLT_TAG("TestThread::BlockOnWaitQueue (pi_tests)")};
+    for (;; clt.Relax()) {
+      Thread* const current_thread = Thread::Current::Get();
+      ktl::array locks{&current_thread->get_lock(), &wq->get_lock()};
+      ChainLock::LockResult res = AcquireChainLockSet(locks);
+
+      if (res == ChainLock::LockResult::kBackoff) {
+        continue;
+      }
+
+      DEBUG_ASSERT(res == ChainLock::LockResult::kOk);
+      clt.Finalize();
+
+      current_thread->get_lock().AssertAcquired();
+      wq->get_lock().AssertAcquired();
+      wq->Block(current_thread, timeout, Interruptible::Yes);
+      current_thread->get_lock().Release();
+      break;
+    }
+  };
+
+  state_.store(State::WAITING_TO_START);
+  thread_->Resume();
+
+  ASSERT_TRUE(WaitFor<Condition::BLOCKED>());
+
+  END_TEST;
+}
+
+bool TestThread::BlockOnOwnedWaitQueue(OwnedWaitQueue* owned_wq, TestThread* owner,
+                                       zx::duration relative_timeout) {
   BEGIN_TEST;
   ASSERT_EQ(state(), State::CREATED);
   ASSERT_FALSE(static_cast<bool>(op_));
 
   op_ = [owned_wq, owner_thrd = owner ? owner->thread_ : nullptr, relative_timeout]() {
     AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
-    Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
     Deadline timeout = (relative_timeout == zx::duration::infinite())
                            ? Deadline::infinite()
@@ -567,7 +565,7 @@ bool TestThread::Reset(bool explicit_kill) {
   // If we are explicitly killing the thread as part of the test, then we
   // should not expect the shutdown barrier to be cleared.
   if (!explicit_kill) {
-    EXPECT_TRUE(allow_shutdown_.state());
+    EXPECT_TRUE(allow_shutdown_.is_signaled());
   }
 
   switch (state()) {
@@ -630,7 +628,11 @@ int TestThread::ThreadEntry() {
   state_.store(State::STARTED);
   op_();
   state_.store(State::WAITING_FOR_SHUTDOWN);
-  allow_shutdown_.Wait();
+  // Do not block on the allow shutdown event if we have received the kill
+  // signal.  Zircon events are non-interruptible.
+  if ((thread_->signals() & THREAD_SIGNAL_KILL) == 0) {
+    allow_shutdown_.Wait();
+  }
 
   state_.store(State::SHUTDOWN);
   op_ = nullptr;
@@ -752,7 +754,8 @@ bool pi_test_basic() {
           zx::duration relative_timeout = (rel_method == ReleaseMethod::TIMEOUT)
                                               ? TIMEOUT_RELEASE_DURATION
                                               : zx::duration::infinite();
-          ASSERT_TRUE(pressure_thread.BlockOnOwnedQueue(&owq, &blocking_thread, relative_timeout));
+          ASSERT_TRUE(
+              pressure_thread.BlockOnOwnedWaitQueue(&owq, &blocking_thread, relative_timeout));
 
           // Observe the effective profile of the blocking thread, then observe
           // the state of the thread applying pressure.  If this is the TIMEOUT
@@ -865,7 +868,7 @@ bool pi_test_changing_priority() {
   ASSERT_TRUE(observer.VerifyExpectedEffectiveProfile(expected_profile));
 
   // Block the second thread behind the first.
-  ASSERT_TRUE(pressure_thread.BlockOnOwnedQueue(&owq, &blocking_thread));
+  ASSERT_TRUE(pressure_thread.BlockOnOwnedWaitQueue(&owq, &blocking_thread));
   pressure_thread.initial_profile()->AccumulateExpectedPressure(expected_profile);
   observer.Observe(blocking_thread.thread());
   ASSERT_TRUE(observer.VerifyExpectedEffectiveProfile(expected_profile));
@@ -892,6 +895,65 @@ bool pi_test_changing_priority() {
   blocking_thread.initial_profile()->SetExpectedBaseProfile(expected_profile);
   observer.Observe(blocking_thread.thread());
   ASSERT_TRUE(observer.VerifyExpectedEffectiveProfile(expected_profile));
+
+  END_TEST;
+}
+
+// A simple smoke test to make sure that we can change a thread's base priority
+// when it is blocked in a normal wait queue (instead of an owned wait queue)
+bool pi_test_changing_priority_in_wait_queue() {
+  BEGIN_TEST;
+
+  AutoProfileBooster pboost;
+  WaitQueue wq;
+  TestThread thread;
+
+  auto cleanup = fit::defer([&]() {
+    TestThread::ClearShutdownBarrier();
+    wq.WakeAll(ZX_OK);
+    thread.Reset();
+  });
+
+  const ktl::array profiles = {
+      FairProfile::Create(TEST_DEFAULT_WEIGHT, InheritableProfile::Yes),
+      FairProfile::Create(TEST_DEFAULT_WEIGHT + TEST_EPSILON_WEIGHT, InheritableProfile::Yes),
+      FairProfile::Create(TEST_DEFAULT_WEIGHT - TEST_EPSILON_WEIGHT, InheritableProfile::Yes),
+      FairProfile::Create(TEST_LOWEST_WEIGHT, InheritableProfile::Yes),
+      FairProfile::Create(TEST_HIGHEST_WEIGHT, InheritableProfile::Yes),
+      DeadlineProfile::Create(ZX_MSEC(2), ZX_MSEC(5)),
+      DeadlineProfile::Create(ZX_USEC(200), ZX_MSEC(1)),
+  };
+
+  for (auto& profile : profiles) {
+    ASSERT_NONNULL(profile);
+  }
+
+  ExpectedEffectiveProfile expected_profile;
+  unittest::ThreadEffectiveProfileObserver observer;
+
+  // Make sure that our default barriers have been reset to their proper
+  // initial states.
+  TestThread::ResetShutdownBarrier();
+
+  // Create our thread and have it block in our wait queue.
+  ASSERT_TRUE(thread.Create(profiles[0]));
+  ASSERT_TRUE(thread.BlockOnWaitQueue(&wq));
+  thread.initial_profile()->SetExpectedBaseProfile(expected_profile);
+  observer.Observe(thread.thread());
+  ASSERT_TRUE(observer.VerifyExpectedEffectiveProfile(expected_profile));
+
+  // Changing the thread's base profile while it is blocked in the queue.  Its
+  // effective profile should always match the base profile we set.
+  for (auto profile : profiles) {
+    PRINT_LOOP_ITER(profile);
+
+    profile->Apply(thread.thread());
+    profile->SetExpectedBaseProfile(expected_profile);
+    observer.Observe(thread.thread());
+    ASSERT_TRUE(observer.VerifyExpectedEffectiveProfile(expected_profile));
+
+    print_profile.cancel();
+  }
 
   END_TEST;
 }
@@ -1035,7 +1097,7 @@ bool pi_test_chain() {
         PRINT_LOOP_ITER(tndx);
 
         auto& link = links[tndx - 1];
-        ASSERT_TRUE(threads[tndx].BlockOnOwnedQueue(&link.queue, &threads[tndx - 1]));
+        ASSERT_TRUE(threads[tndx].BlockOnOwnedWaitQueue(&link.queue, &threads[tndx - 1]));
         link.active = true;
         ASSERT_TRUE(ValidatePriorities());
 
@@ -1191,7 +1253,7 @@ bool pi_test_multi_waiter() {
         PRINT_LOOP_ITER(waiter_ndx);
 
         auto& w = waiters[waiter_ndx];
-        ASSERT_TRUE(w.thread.BlockOnOwnedQueue(&blocking_queue, current_owner));
+        ASSERT_TRUE(w.thread.BlockOnOwnedWaitQueue(&blocking_queue, current_owner));
         w.started = true;
         w.is_waiting = true;
         ASSERT_TRUE(ValidatePriorities());
@@ -1377,7 +1439,7 @@ bool pi_test_multi_owned_queues() {
         PRINT_LOOP_ITER(queue_ndx);
 
         auto& q = queues[queue_ndx];
-        ASSERT_TRUE(q.thread.BlockOnOwnedQueue(&q.queue, &blocking_thread));
+        ASSERT_TRUE(q.thread.BlockOnOwnedWaitQueue(&q.queue, &blocking_thread));
         q.is_started = true;
         q.is_waiting = true;
         ASSERT_TRUE(ValidatePriorities());
@@ -1465,7 +1527,7 @@ bool pi_test_cycle() {
 
     TestThread& owner_thread = nodes[(tndx + 1) % ktl::size(nodes)].thread;
     LockedOwnedWaitQueue& link = nodes[tndx].link;
-    ASSERT_TRUE(nodes[tndx].thread.BlockOnOwnedQueue(&link, &owner_thread));
+    ASSERT_TRUE(nodes[tndx].thread.BlockOnOwnedWaitQueue(&link, &owner_thread));
 
     for (size_t validation_ndx = 0; validation_ndx <= tndx; ++validation_ndx) {
       PRINT_LOOP_ITER(validation_ndx);
@@ -1488,13 +1550,14 @@ bool pi_test_cycle() {
       // the sequence, except for the last OWQ.  We tried to assign it to be
       // owned by the first thread when we tried to create the cycle, but the
       // implementation should have refused and left the queue with now owner.
-      Thread* expected_owner =
+      auto ObserveOwner = [](OwnedWaitQueue& queue) -> const Thread* {
+        SingletonChainLockGuardIrqSave guard{queue.get_lock(), CLT_TAG("pi_test_cycle")};
+        return queue.owner();
+      };
+
+      const Thread* const expected_owner =
           (tndx < (nodes.size() - 1)) ? &(nodes[tndx + 1].thread.thread()) : nullptr;
-      Thread* observed_owner;
-      {
-        Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-        observed_owner = nodes[tndx].link.owner();
-      }
+      const Thread* const observed_owner = ObserveOwner(nodes[tndx].link);
       ASSERT_EQ(expected_owner, observed_owner);
 
       print_validation_ndx.cancel();
@@ -1568,7 +1631,7 @@ bool bug_42182770_regression() {
     // should be storage allocated at this point in time, but because the
     // blocked thread's profile is not inheritable, there should be no inherited
     // utilization in the queue's values.
-    ASSERT_TRUE(fair_thread.BlockOnOwnedQueue(owq.get(), nullptr));
+    ASSERT_TRUE(fair_thread.BlockOnOwnedWaitQueue(owq.get(), nullptr));
     ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
     {
       const SchedulerState::WaitQueueInheritedSchedulerState& iss =
@@ -1585,7 +1648,7 @@ bool bug_42182770_regression() {
     // inherited the blocked thread's utilization, as well as its dynamic
     // parameters since it is the only "consequential" thread blocked in the
     // queue.
-    ASSERT_TRUE(deadline_thread.BlockOnOwnedQueue(owq.get(), nullptr));
+    ASSERT_TRUE(deadline_thread.BlockOnOwnedWaitQueue(owq.get(), nullptr));
     ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
     {
       const SchedDeadlineParams& params =
@@ -1644,6 +1707,7 @@ bool bug_42182770_regression() {
 UNITTEST_START_TESTCASE(pi_tests)
 UNITTEST("basic", pi_test_basic)
 UNITTEST("changing priority", pi_test_changing_priority)
+UNITTEST("changing priority in WaitQueue", pi_test_changing_priority_in_wait_queue)
 UNITTEST("chains", pi_test_chain)
 UNITTEST("multiple waiters", pi_test_multi_waiter)
 UNITTEST("multiple owned queues", pi_test_multi_owned_queues)

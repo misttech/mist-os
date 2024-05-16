@@ -26,12 +26,6 @@ impl StopAction {
 #[async_trait]
 impl Action for StopAction {
     async fn handle(self, component: Arc<ComponentInstance>) -> Result<(), ActionError> {
-        // Ensure `Stop` is dispatched after `Discovered`.
-        {
-            let discover_completed =
-                component.lock_actions().await.wait_for_action(ActionKey::Discover).await;
-            discover_completed.await.unwrap();
-        }
         component.stop_instance_internal(self.shut_down).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
@@ -181,15 +175,11 @@ pub mod tests {
         // ActionsManager, plus a reference we take to check the count from, for a total of 4
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let mut actions = component_a.lock_actions().await;
-        let nf = actions.register_no_wait(StopAction::new(false)).await;
-        drop(actions);
+        let nf = component_a.actions().register_no_wait(StopAction::new(false)).await;
         stopped_rx.await.unwrap();
 
-        let actions = component_a.lock_actions().await;
-        let action_notifier = actions.wait(ActionKey::Stop).await.unwrap();
+        let action_notifier = component_a.actions().wait(ActionKey::Stop).await.unwrap();
         assert_eq!(action_notifier.get_reference_count().unwrap(), 4);
-        drop(actions);
 
         // Let the stop continue.
         continue_tx.send(()).unwrap();

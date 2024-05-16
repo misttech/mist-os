@@ -115,9 +115,6 @@ test("usb-peripheral-unittest-bin") {
     "//src/devices/usb/lib/usb:peripheral",
     "//src/devices/usb/lib/usb-monitor-util",
     "//src/lib/ddk",
-
-    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
     "//src/lib/utf_conversion",

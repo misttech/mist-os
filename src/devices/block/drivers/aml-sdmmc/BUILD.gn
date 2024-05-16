@@ -2,10 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/drivers/bazel_driver_package.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+
+bazel_driver_package("aml-sdmmc-no-banjo-bazel-package") {
+  bazel_target = "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo"
+  package_name = "aml-sdmmc"
+}
 
 driver_bind_rules("aml-sdmmc-bind") {
   rules = "aml-sdmmc.bind"
@@ -50,33 +56,6 @@ _common_deps = [
   "//zircon/system/ulib/zircon-internal",
   "//zircon/system/ulib/zx",
 ]
-
-fuchsia_driver("aml-sdmmc-no-banjo-driver") {
-  output_name = "aml-sdmmc-no-banjo"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-
-    # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-    "//build/config:Wno-vla-cxx-extension",
-  ]
-  sources = [
-    "aml-sdmmc-export.cc",
-    "aml-sdmmc.cc",
-  ]
-  deps = _common_deps + [
-           "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-           "//sdk/lib/driver/runtime:driver_runtime_cpp",
-           "//src/devices/bin/driver_runtime",
-         ]
-}
-
-fuchsia_driver_component("aml-sdmmc-no-banjo") {
-  component_name = "aml-sdmmc-no-banjo"
-  deps = [ ":aml-sdmmc-no-banjo-driver" ]
-  info = "aml-sdmmc-info.json"
-  manifest = "meta/aml-sdmmc-no-banjo.cml"
-}
 
 fuchsia_driver("aml-sdmmc-driver") {
   output_name = "aml-sdmmc"

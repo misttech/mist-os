@@ -5,11 +5,12 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_INSPECT_OPERATION_TRACKER_OPERATION_TRACKER_BASE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_INSPECT_OPERATION_TRACKER_OPERATION_TRACKER_BASE_H_
 
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
 
-#include <functional>
 #include <optional>
+#include <type_traits>
 
 //
 // Provides tracking of various filesystem operations, including stubs for host builds.
@@ -21,8 +22,10 @@ class OperationTracker {
  public:
   class TrackerEvent;
 
-  /// Record latency/error of the given operation.
-  zx_status_t Track(const std::function<zx_status_t()>& operation);
+  /// Record latency/error of the given operation. `op` can be any callable that returns either a
+  /// `zx_status_t` or `zx::result`.
+  template <typename Operation>
+  std::invoke_result_t<Operation> Track(Operation&& op);
 
   /// Create a `TrackerEvent` used to record a latency or error value. Can be moved between threads.
   /// The returned `TrackerEvent` must not outlive the associated `OperationTracker`.
@@ -58,6 +61,20 @@ class OperationTracker::TrackerEvent final {
   const zx::time start_;
   std::optional<zx_status_t> status_;
 };
+
+template <typename Operation>
+std::invoke_result_t<Operation> OperationTracker::Track(Operation&& op) {
+  auto tracker = NewEvent();
+  if constexpr (std::is_same_v<zx_status_t, std::invoke_result_t<Operation>>) {
+    zx_status_t status = op();
+    tracker.SetStatus(status);
+    return status;
+  } else {
+    zx::result result = op();
+    tracker.SetStatus(result.status_value());
+    return result;
+  }
+}
 
 }  // namespace fs_inspect
 

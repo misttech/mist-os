@@ -45,6 +45,9 @@ struct Protocol final {
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<DependencyType> type = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+#endif
 };
 
 // A service capability. The name refers to the name of the FIDL service,
@@ -54,6 +57,9 @@ struct Service final {
   std::string_view name;
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+#endif
 };
 
 // A directory capability.
@@ -65,6 +71,9 @@ struct Directory final {
   cpp17::optional<std::string_view> subdir = cpp17::nullopt;
   cpp17::optional<fuchsia::io::Operations> rights = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+#endif
 };
 
 // A storage capability.
@@ -81,9 +90,16 @@ struct Config final {
   cpp17::optional<std::string_view> as = cpp17::nullopt;
 };
 
+// Routing information for a dictionary capability.
+struct Dictionary final {
+  std::string_view name;
+  cpp17::optional<std::string_view> as = cpp17::nullopt;
+  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+};
+
 // A capability to be routed from one component to another.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities
-using Capability = cpp17::variant<Protocol, Service, Directory, Storage, Config>;
+using Capability = cpp17::variant<Protocol, Service, Directory, Storage, Config, Dictionary>;
 
 // [START mock_handles_cpp]
 // Handles provided to mock component.

@@ -8,8 +8,11 @@ use futures::{
     future::{join, Future},
     stream::{FuturesUnordered, StreamExt},
 };
+use linux_uapi::{NLM_F_ACK, NLM_F_CAPPED};
 use netlink::{messaging::Sender, multicast_groups::ModernGroup, NETLINK_LOG_TAG};
-use netlink_packet_core::{NetlinkHeader, NetlinkMessage, NetlinkPayload};
+use netlink_packet_core::{
+    ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload, NETLINK_HEADER_LEN,
+};
 use netlink_packet_generic::{
     constants::GENL_ID_CTRL,
     ctrl::{
@@ -18,6 +21,7 @@ use netlink_packet_generic::{
     },
     GenlMessage,
 };
+use netlink_packet_utils::Emitable;
 use starnix_logging::track_stub;
 use starnix_sync::Mutex;
 use std::{
@@ -31,6 +35,7 @@ use starnix_uapi::{error, errors::Errno};
 
 mod messages;
 mod nl80211;
+mod taskstats;
 
 pub use messages::GenericMessage;
 
@@ -157,7 +162,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
 
     fn handle_ctrl_message(
         &mut self,
-        netlink_header: NetlinkHeader,
+        mut netlink_header: NetlinkHeader,
         genl_message: GenlMessage<GenlCtrl>,
         sender: &mut S,
     ) {
@@ -200,6 +205,11 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                                 ),
                             ],
                         };
+                        // Flags need to be cleared as we are sending a response back
+                        // to the client, not requesting that the client send us
+                        // data or ACKs.
+                        let orig_flags = netlink_header.flags;
+                        netlink_header.flags = 0;
                         let mut genl_message = GenlMessage::from_parts(genl_header, resp_ctrl);
                         genl_message.finalize();
                         let mut message = NetlinkMessage::new(
@@ -208,6 +218,23 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                         );
                         message.finalize();
                         sender.send(message, None);
+                        // Conversion is safe because 4 < 65535.
+                        if orig_flags & NLM_F_ACK as u16 != 0 {
+                            // ACK requested, send ACK
+                            let mut buffer = [0; NETLINK_HEADER_LEN];
+                            // Conversion is safe because 256 < 65535
+                            netlink_header.flags = NLM_F_CAPPED as u16;
+                            netlink_header.emit(&mut buffer[..NETLINK_HEADER_LEN]);
+                            let mut ack = ErrorMessage::default();
+                            // Netlink uses an error payload with no error code to indicate a
+                            // successful ack.
+                            ack.code = None;
+                            ack.header = buffer.to_vec();
+                            let mut netlink_message =
+                                NetlinkMessage::new(netlink_header, NetlinkPayload::Error(ack));
+                            netlink_message.finalize();
+                            sender.send(netlink_message, None);
+                        }
                     } else {
                         log_warn!(
                             tag = NETLINK_LOG_TAG,
@@ -409,6 +436,18 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
                     log_error!(
                         tag = NETLINK_LOG_TAG,
                         "Failed to connect to Nl80211 netlink family: {}",
+                        e
+                    );
+                }
+            };
+            match taskstats::TaskstatsFamily::new() {
+                Ok(taskstats_family) => {
+                    server.state.lock().add_family(Arc::new(taskstats_family) as _)
+                }
+                Err(e) => {
+                    log_error!(
+                        tag = NETLINK_LOG_TAG,
+                        "Failed to connect to TASKSTATS netlink family: {}",
                         e
                     );
                 }

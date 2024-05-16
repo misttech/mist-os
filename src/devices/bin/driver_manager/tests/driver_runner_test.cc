@@ -1088,7 +1088,7 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   auto spec = std::make_unique<driver_manager::CompositeNodeSpecV2>(
       driver_manager::CompositeNodeSpecCreateInfo{
           .name = name,
-          .size = 2,
+          .parents = fidl_spec.parents().value(),
       },
       dispatcher(), &driver_runner());
   fidl::Arena<> arena;
@@ -1099,13 +1099,13 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   EXPECT_TRUE(RunLoopUntilIdle());
 
   ASSERT_EQ(2u,
-            driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().size());
+            driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().size());
 
   ASSERT_FALSE(
-      driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().at(0));
+      driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().at(0));
 
   ASSERT_FALSE(
-      driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().at(1));
+      driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().at(1));
 
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
@@ -1119,9 +1119,9 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
                                       "fuchsia-boot:///#meta/composite-driver.cm");
   EXPECT_TRUE(RunLoopUntilIdle());
 
-  ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().at(0));
+  ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().at(0));
 
-  ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().at(1));
+  ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().at(1));
 
   StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     ValidateProgram(start_args.program(), "driver/composite-driver.so", "true", "false", "false");

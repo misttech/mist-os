@@ -16,7 +16,7 @@
       "optionality": "optional",
       "long": "--all",
       "short": null,
-      "description": "show all of the available details, excluding the raw internal format.",
+      "description": "show all of the available details, which is the default.",
       "hidden": false
     },
     {
@@ -49,14 +49,6 @@
       "long": "--net",
       "short": null,
       "description": "switch to show network details.",
-      "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--raw",
-      "short": null,
-      "description": "show the entire config output. This is the default output if no other switches are invoked.",
       "hidden": false
     }
   ],

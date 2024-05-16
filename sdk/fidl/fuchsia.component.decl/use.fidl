@@ -19,7 +19,7 @@ type Use = flexible union {
     7: event_stream UseEventStream;
     @available(added=HEAD)
     8: runner UseRunner;
-    @available(added=HEAD)
+    @available(added=20)
     9: config UseConfiguration;
 };
 
@@ -279,7 +279,7 @@ type UseRunner = table {
     3: source_dictionary dictionary_path;
 };
 
-@available(added=HEAD)
+@available(added=20)
 type UseConfiguration = table {
     /// (Required) The provider of the configuration relative to the component
     /// itself. Must be `parent`, `self`, `child`.
@@ -303,4 +303,8 @@ type UseConfiguration = table {
     /// (Required) The type of this config value. If `target_name` matches a
     /// key in the `config` schema, then this type must match that type.
     5: type ConfigType;
+
+    /// (Optional): If this is set, this is the value that will be provided via routing
+    /// if the capability is successfully routed from void.
+    6: default ConfigValue;
 };

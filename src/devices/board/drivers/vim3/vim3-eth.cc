@@ -103,6 +103,7 @@ zx_status_t AddEthComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   const std::vector<fdf::BindRule> kGpioIntRules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, VIM3_GPIO_ID),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_ETH_MAC_INTR)),
   };
 

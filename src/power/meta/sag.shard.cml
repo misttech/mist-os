@@ -1,0 +1,31 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "system-activity-governor",
+            url: "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
+        },
+    ],
+    offer: [
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "#boot-drivers",
+            to: "#system-activity-governor",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#system-activity-governor",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#system-activity-governor",
+        },
+    ],
+}

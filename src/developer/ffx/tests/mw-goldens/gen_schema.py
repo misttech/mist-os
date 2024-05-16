@@ -94,6 +94,7 @@ def build_command_list(
     src_cmds, out_dir, ffx_path, comparison_path, goldens_dir, sdk_root
 ):
     comparisons = []
+    cmd_diagnostics = None
 
     with open(src_cmds) as input:
         for cmd in input.readlines():
@@ -122,8 +123,18 @@ def build_command_list(
                     schema_cmd, stdout=schema_out
                 )
                 if cmd_rc.returncode:
+                    if not cmd_diagnostics:
+                        cmds_cmd = [
+                            ffx_path,
+                            "-c",
+                            "sdk.module=host_tools.internal",
+                            "-c",
+                            f"sdk.root={sdk_root}",
+                            "commands",
+                        ]
+                        cmd_diagnostics = subprocess.check_output(cmds_cmd)
                     raise ValueError(
-                        f"Error running {schema_cmd}: {cmd_rc.returncode} {cmd_rc.stdout} {cmd_rc.stderr}"
+                        f"Error running {schema_cmd}: {cmd_rc.returncode} {cmd_rc.stdout} {cmd_rc.stderr}\nAll commands {cmd_diagnostics}"
                     )
 
     with open(comparison_path, mode="w") as cmp_file:

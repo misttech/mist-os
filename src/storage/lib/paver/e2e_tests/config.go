@@ -14,6 +14,7 @@ import (
 )
 
 type config struct {
+	ffxConfig            *cli.FfxConfig
 	archiveConfig        *cli.ArchiveConfig
 	installerConfig      *cli.InstallerConfig
 	deviceConfig         *cli.DeviceConfig
@@ -33,14 +34,17 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 		return nil, err
 	}
 
+	ffxConfig := cli.NewFfxConfig(fs)
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
+
 	c := &config{
+		ffxConfig:            ffxConfig,
 		archiveConfig:        archiveConfig,
 		installerConfig:      installerConfig,
 		deviceConfig:         deviceConfig,
-		downgradeBuildConfig: cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, "", "downgrade-", true),
-		upgradeBuildConfig:   cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), "upgrade-", false),
+		downgradeBuildConfig: cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, "", "downgrade-"),
+		upgradeBuildConfig:   cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), "upgrade-"),
 	}
 
 	fs.DurationVar(&c.paveTimeout, "pave-timeout", 5*time.Minute, "Err if a pave takes longer than this time (default is 5 minutes)")
@@ -52,6 +56,10 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 }
 
 func (c *config) validate() error {
+	if err := c.ffxConfig.Validate(); err != nil {
+		return err
+	}
+
 	if err := c.downgradeBuildConfig.Validate(); err != nil {
 		return err
 	}

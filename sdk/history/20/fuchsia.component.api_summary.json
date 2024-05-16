@@ -220,7 +220,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.component/Error",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {

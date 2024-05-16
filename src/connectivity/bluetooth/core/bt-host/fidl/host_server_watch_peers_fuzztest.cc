@@ -5,6 +5,7 @@
 #include <fuzzer/FuzzedDataProvider.h>
 #include <pw_random/fuzzer.h>
 
+#include "fuchsia/bluetooth/host/cpp/fidl.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/adapter_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/host_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
@@ -41,11 +42,17 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
     // TODO(https://fxbug.dev/42144165): WatchPeers will trigger this test as a failure if we try to
     // encode a lot of peers, even though fuzzing multiple peers would be helpful.
     int watch_peers_responses = 0;
-    host_client()->WatchPeers([this, peer, &watch_peers_responses](
-                                  fuchsia::bluetooth::host::Host_WatchPeers_Result result) {
+    peer_watcher()->GetNext([this, peer, &watch_peers_responses](
+                                fuchsia::bluetooth::host::PeerWatcher_GetNext_Result result) {
       BT_ASSERT(result.is_response());
-      std::vector<::fuchsia::bluetooth::sys::Peer> updated = std::move(result.response().updated);
-      std::vector<::fuchsia::bluetooth::PeerId> removed = std::move(result.response().removed);
+      std::vector<::fuchsia::bluetooth::sys::Peer> updated;
+      if (result.response().is_updated()) {
+        updated = std::move(result.response().updated());
+      }
+      std::vector<::fuchsia::bluetooth::PeerId> removed;
+      if (result.response().is_removed()) {
+        removed = std::move(result.response().removed());
+      }
       BT_ASSERT_MSG(updated.size() == 1, "peer %s: peers updated = %zu", bt_str(*peer),
                     updated.size());
       BT_ASSERT_MSG(removed.size() == 0, "peer %s: peers removed = %zu", bt_str(*peer),
@@ -63,6 +70,8 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
 
   fuchsia::bluetooth::host::Host *host_client() const { return host_.get(); }
 
+  fuchsia::bluetooth::host::PeerWatcher *peer_watcher() const { return peer_watcher_client_.get(); }
+
   void SetUp() override {
     AdapterTestFixture::SetUp();
     gatt_ = take_gatt();
@@ -70,6 +79,10 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
     host_server_ = std::make_unique<HostServer>(host_handle.NewRequest().TakeChannel(),
                                                 adapter()->AsWeakPtr(), gatt_->GetWeakPtr());
     host_.Bind(std::move(host_handle));
+
+    fidl::InterfaceHandle<fuchsia::bluetooth::host::PeerWatcher> peer_watcher_handle;
+    host_client()->SetPeerWatcher(peer_watcher_handle.NewRequest());
+    peer_watcher_client_ = peer_watcher_handle.Bind();
   }
 
   // WatchPeers response handler that can re-initiate the call per the "hanging get" pattern up to
@@ -80,14 +93,19 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
                                 std::vector<fuchsia::bluetooth::PeerId> removed) {
     call_counter++;
     BT_ASSERT_MSG(call_counter <= max_call_depth, "max depth (%d) exceeded", call_counter);
-    host.WatchPeers([this, &host, &call_counter,
-                     max_call_depth](fuchsia::bluetooth::host::Host_WatchPeers_Result result) {
+    peer_watcher()->GetNext([this, &host, &call_counter, max_call_depth](
+                                fuchsia::bluetooth::host::PeerWatcher_GetNext_Result result) {
       BT_ASSERT(result.is_response());
-      std::vector<::fuchsia::bluetooth::sys::Peer> updated = std::move(result.response().updated);
-      std::vector<::fuchsia::bluetooth::PeerId> removed = std::move(result.response().removed);
-      this->HandleWatchPeersResponse(host, call_counter, max_call_depth,
-                                     std::move(result.response().updated),
-                                     std::move(result.response().removed));
+      std::vector<::fuchsia::bluetooth::sys::Peer> updated;
+      if (result.response().is_updated()) {
+        updated = std::move(result.response().updated());
+      }
+      std::vector<::fuchsia::bluetooth::PeerId> removed;
+      if (result.response().is_removed()) {
+        removed = std::move(result.response().removed());
+      }
+      this->HandleWatchPeersResponse(host, call_counter, max_call_depth, std::move(updated),
+                                     std::move(removed));
     });
   }
 
@@ -97,6 +115,7 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
   std::unique_ptr<bt::gatt::GATT> gatt_;
   std::unique_ptr<HostServer> host_server_;
   fuchsia::bluetooth::host::HostPtr host_;
+  fuchsia::bluetooth::host::PeerWatcherPtr peer_watcher_client_;
 };
 
 }  // namespace

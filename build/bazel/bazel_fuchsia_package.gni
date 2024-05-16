@@ -65,6 +65,7 @@ template("bazel_fuchsia_package") {
                              "metadata",
                              "testonly",
                              "visibility",
+                             "inputs",
                            ])
     command = "build"
 

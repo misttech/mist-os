@@ -273,7 +273,7 @@ void SimpleCodecServerInternal<T>::SetElementState(
             signal_fidl::ElementState state = {};
             state.set_type_specific(
                 signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_state)));
-            state.set_enabled(true);
+            state.set_started(true).set_bypassed(false);
             (*instance.gain_callback_)(std::move(state));
             instance.gain_callback_.reset();
             instance.gain_updated_ = false;
@@ -289,14 +289,14 @@ void SimpleCodecServerInternal<T>::SetElementState(
       break;
 
     case kMutePeId:
-      gain_state_.muted = state.enabled();
+      gain_state_.muted = state.started() && !state.bypassed();
 
       {
         fbl::AutoLock lock(&instances_lock_);
         for (auto& instance : instances_) {
           if (instance.mute_callback_) {
             signal_fidl::ElementState state = {};
-            state.set_enabled(gain_state_.muted);
+            state.set_started(true).set_bypassed(!gain_state_.muted);
             (*instance.mute_callback_)(std::move(state));
             instance.mute_callback_.reset();
             instance.mute_updated_ = false;
@@ -312,13 +312,13 @@ void SimpleCodecServerInternal<T>::SetElementState(
       break;
 
     case kAgcPeId:
-      gain_state_.agc_enabled = state.enabled();
+      gain_state_.agc_enabled = state.started() && !state.bypassed();
       {
         fbl::AutoLock lock(&instances_lock_);
         for (auto& instance : instances_) {
           if (instance.agc_callback_) {
             signal_fidl::ElementState state = {};
-            state.set_enabled(gain_state_.agc_enabled);
+            state.set_started(true).set_bypassed(!gain_state_.agc_enabled);
             (*instance.agc_callback_)(std::move(state));
             instance.agc_callback_.reset();
             instance.agc_updated_ = false;
@@ -396,7 +396,7 @@ void SimpleCodecServerInternal<T>::WatchElementState(
         signal_fidl::ElementState state = {};
         state.set_type_specific(
             signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_state)));
-        state.set_enabled(true);
+        state.set_started(true).set_bypassed(false);
         callback(std::move(state));
       } else if (!instance->gain_callback_) {
         instance->gain_callback_.emplace(std::move(callback));
@@ -415,7 +415,7 @@ void SimpleCodecServerInternal<T>::WatchElementState(
         instance->mute_updated_ = false;
 
         signal_fidl::ElementState state = {};
-        state.set_enabled(gain_state_.muted);
+        state.set_started(true).set_bypassed(!gain_state_.muted);
         callback(std::move(state));
       } else if (!instance->mute_callback_) {
         instance->mute_callback_.emplace(std::move(callback));
@@ -434,7 +434,7 @@ void SimpleCodecServerInternal<T>::WatchElementState(
         instance->agc_updated_ = false;
 
         signal_fidl::ElementState state = {};
-        state.set_enabled(gain_state_.agc_enabled);
+        state.set_started(true).set_bypassed(!gain_state_.agc_enabled);
         callback(std::move(state));
       } else if (!instance->agc_callback_) {
         instance->agc_callback_.emplace(std::move(callback));
@@ -610,7 +610,7 @@ void SimpleCodecServerInternal<T>::SetDaiFormat(audio_fidl::DaiFormat format,
   }
   // clang-format on
   audio_fidl::Codec_SetDaiFormat_Result result = {};
-  zx::result<CodecFormatInfo> format_info = thiz->SetDaiFormat(std::move(format2));
+  zx::result<CodecFormatInfo> format_info = thiz->SetDaiFormat(format2);
   if (!format_info.is_ok()) {
     thiz->state_.Set(std::string("Set DAI format error: ") + format_info.status_string());
     result.set_err(format_info.status_value());

@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 #![warn(dead_code, unused_imports, unused_macros)]
+// TODO(https://fxbug.dev/339502691): Return to the default limit once lock
+// ordering no longer causes overflows.
+#![recursion_limit = "256"]
 
 use core::{
     convert::{Infallible as Never, TryInto as _},
@@ -18,7 +21,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::{EthernetDeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
-    testutil::{FakeBindingsCtx, FakeCtx},
+    testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx},
     TimerId,
 };
 use packet::{
@@ -415,7 +418,7 @@ fn dispatch(ctx: &mut FakeCtx, device_id: &EthernetDeviceId<FakeBindingsCtx>, ac
 pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
     print_on_panic::initialize_logging();
 
-    let mut builder = netstack3_core::testutil::FakeEventDispatcherBuilder::default();
+    let mut builder = netstack3_core::testutil::FakeCtxBuilder::default();
     let device_index = builder.add_device(UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap());
 
     let (mut ctx, ethernet_devices) = builder.build();

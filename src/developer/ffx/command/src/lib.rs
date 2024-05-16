@@ -161,7 +161,22 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         }
     };
 
-    ffx_config::logging::init(&context, app.verbose, true).await?;
+    // Yecch, this is unreasonably specific. But it is to preserve compatibility
+    // with the daemon, which is going away, at which point this code can also
+    // go away.
+    let log_dest = if app.subcommand.len() >= 2
+        && app.subcommand[0..2] == ["daemon", "start"]
+        && app.log_destination.is_none()
+    {
+        // The daemon should by default produce output on stdout, not ffx.log,
+        // because integrators who turn off daemon.autostart are expecting to
+        // manage the output.
+        Some(ffx_config::logging::LogDestination::Stdout)
+    } else {
+        app.log_destination.clone()
+    };
+
+    ffx_config::logging::init(&context, app.verbose, &log_dest).await?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
 
     let metrics = MetricsSession::start(&context).await?;

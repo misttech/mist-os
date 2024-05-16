@@ -105,12 +105,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MyFirstLacewingTest(fuchsia_base_test.FuchsiaBaseTest):
-    def setup_class(self):
+    def setup_class(self) -> None:
         """Initialize all DUT(s)"""
         super().setup_class()
         self.fuchsia_dut = self.fuchsia_devices[0]
 
-    def test_my_first_testcase(self):
+    def test_my_first_testcase(self) -> None:
         _LOGGER.info("Running my first Lacewing test...")
         # Test logic goes here.
         # e.g. self.fuchsia_dut.some_api(...)

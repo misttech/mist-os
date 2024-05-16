@@ -37,6 +37,7 @@ pub type zx_status_t = i32;
 pub type zx_rsrc_system_base_t = u64;
 pub type zx_ticks_t = i64;
 pub type zx_time_t = i64;
+pub type zx_txid_t = u32;
 pub type zx_vaddr_t = usize;
 pub type zx_vm_option_t = u32;
 pub type zx_thread_state_topic_t = u32;
