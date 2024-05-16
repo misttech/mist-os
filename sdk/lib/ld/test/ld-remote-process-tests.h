@@ -144,41 +144,6 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     auto& modules = linker.modules();
     ASSERT_FALSE(modules.empty());
 
-    // Check the loaded-by pointers.
-    EXPECT_FALSE(modules.front().loaded_by_modid())
-        << "executable loaded by " << modules[*modules.front().loaded_by_modid()].name();
-    {
-      auto next_module = std::next(modules.begin());
-      auto loaded_by_name = [next_module, &modules]() -> std::string_view {
-        if (next_module->loaded_by_modid()) {
-          return modules[*next_module->loaded_by_modid()].name().str();
-        }
-        return "<none>";
-      };
-      if (next_module != modules.end() && next_module->HasModule() &&
-          next_module->module().symbols_visible) {
-        // The second module must be a direct dependency of the executable.
-        EXPECT_THAT(next_module->loaded_by_modid(), ::testing::Optional(0u))
-            << " second module " << next_module->name().str() << " loaded by " << loaded_by_name();
-      }
-      for (; next_module != modules.end(); ++next_module) {
-        if (!next_module->HasModule()) {
-          continue;
-        }
-        if (next_module->module().symbols_visible) {
-          // This module wouldn't be here if it wasn't loaded by someone.
-          EXPECT_NE(next_module->loaded_by_modid(), std::nullopt)
-              << "visible module " << next_module->name().str() << " loaded by "
-              << loaded_by_name();
-        } else {
-          // A predecoded module was not referenced, so it's loaded by no-one.
-          EXPECT_EQ(next_module->loaded_by_modid(), std::nullopt)
-              << "invisible module " << next_module->name().str() << " loaded by "
-              << loaded_by_name();
-        }
-      }
-    }
-
     // If not all modules could be decoded, don't bother with relocation to
     // diagnose symbol resolution errors since many are likely without all the
     // modules there and they are unlikely to add any helpful information

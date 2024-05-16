@@ -61,4 +61,83 @@ TEST_F(LdRemoteTests, RemoteAbiStub) {
   EXPECT_EQ(tlsdesc_entrypoints.size(), ld::kTlsdescRuntimeCount);
 }
 
+TEST_F(LdRemoteTests, LoadedBy) {
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  // Acquire the layout details from the stub.  The same values collected here
+  // can be reused along with the decoded RemoteLoadModule for the stub for
+  // creating and populating the RemoteLoadModule for the passive ABI of any
+  // number of separate dynamic linking domains in however many processes.
+  Linker linker;
+  linker.set_abi_stub(ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
+  ASSERT_TRUE(linker.abi_stub());
+
+  // Decode the main executable.
+  zx::vmo vmo;
+  ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo("many-deps"));
+  std::array initial_modules = {Linker::InitModule{
+      .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), kPageSize),
+  }};
+  ASSERT_TRUE(initial_modules.front().decoded_module);
+  ASSERT_TRUE(initial_modules.front().decoded_module->HasModule());
+
+  // Prime expectations for its dependencies.
+  ASSERT_NO_FATAL_FAILURE(Needed({
+      "libld-dep-a.so",
+      "libld-dep-b.so",
+      "libld-dep-f.so",
+      "libld-dep-c.so",
+      "libld-dep-d.so",
+      "libld-dep-e.so",
+  }));
+
+  // Pre-decode the vDSO.
+  zx::vmo vdso_vmo;
+  zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  std::array predecoded_modules = {Linker::PredecodedModule{
+      .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), kPageSize),
+  }};
+
+  auto init_result =
+      linker.Init(diag, initial_modules, GetDepFunction(diag), std::move(predecoded_modules));
+  ASSERT_TRUE(init_result);
+  const auto& modules = linker.modules();
+
+  // Check the loaded-by pointers.
+  EXPECT_FALSE(modules.front().loaded_by_modid())
+      << "executable loaded by " << modules[*modules.front().loaded_by_modid()].name();
+  {
+    auto next_module = std::next(modules.begin());
+    auto loaded_by_name = [next_module, &modules]() -> std::string_view {
+      if (next_module->loaded_by_modid()) {
+        return modules[*next_module->loaded_by_modid()].name().str();
+      }
+      return "<none>";
+    };
+    if (next_module != modules.end() && next_module->HasModule() &&
+        next_module->module().symbols_visible) {
+      // The second module must be a direct dependency of the executable.
+      EXPECT_THAT(next_module->loaded_by_modid(), ::testing::Optional(0u))
+          << " second module " << next_module->name().str() << " loaded by " << loaded_by_name();
+    }
+    for (; next_module != modules.end(); ++next_module) {
+      if (!next_module->HasModule()) {
+        continue;
+      }
+      if (next_module->module().symbols_visible) {
+        // This module wouldn't be here if it wasn't loaded by someone.
+        EXPECT_NE(next_module->loaded_by_modid(), std::nullopt)
+            << "visible module " << next_module->name().str() << " loaded by " << loaded_by_name();
+      } else {
+        // A predecoded module was not referenced, so it's loaded by no-one.
+        EXPECT_EQ(next_module->loaded_by_modid(), std::nullopt)
+            << "invisible module " << next_module->name().str() << " loaded by "
+            << loaded_by_name();
+      }
+    }
+  }
+}
+
 }  // namespace
