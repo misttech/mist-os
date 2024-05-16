@@ -36,30 +36,30 @@ class ProtectionFlagsImpl : public ProtectionFlags {
  public:
   ProtectionFlagsImpl(const ProtectionFlags& flags) : ProtectionFlags(flags) {}
 
-  Bits to_vmar_flags() {
-    int flags = 0;
+  zx_vm_option_t to_vmar_flags() {
+    zx_vm_option_t flags = 0;
     if (contains(ProtectionFlagsEnum::READ)) {
       flags |= ZX_VM_PERM_READ;
     }
     if (contains(ProtectionFlagsEnum::WRITE)) {
-      flags |= ZX_VM_PERM_WRITE;
+      flags |= ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
     }
     if (contains(ProtectionFlagsEnum::EXEC)) {
-      flags |= ZX_VM_PERM_EXECUTE;
+      flags |= ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED;
     }
     return flags;
   }
 
-  ProtectionFlags from_vmar_flags(int vmar_flags) {
+  static ProtectionFlags from_vmar_flags(zx_vm_option_t vmar_flags) {
     auto prot_flags = empty();
     if ((vmar_flags & ZX_VM_PERM_READ) == ZX_VM_PERM_READ) {
       prot_flags |= ProtectionFlagsEnum::READ;
     }
     if ((vmar_flags & ZX_VM_PERM_WRITE) == ZX_VM_PERM_WRITE) {
-      prot_flags |= ProtectionFlagsEnum::READ;
+      prot_flags |= ProtectionFlagsEnum::WRITE;
     }
     if ((vmar_flags & ZX_VM_PERM_EXECUTE) == ZX_VM_PERM_EXECUTE) {
-      prot_flags |= ProtectionFlagsEnum::READ;
+      prot_flags |= ProtectionFlagsEnum::EXEC;
     }
     return prot_flags;
   }
