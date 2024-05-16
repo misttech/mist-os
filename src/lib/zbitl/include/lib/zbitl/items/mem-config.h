@@ -58,7 +58,7 @@ class MemRangeMerger {
     }
     iterator operator++(int) {  // postfix
       iterator result = *this;
-      ++this;
+      ++*this;
       return result;
     }
 
