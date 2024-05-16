@@ -207,7 +207,6 @@ class FvmAdapter : public DeviceRef {
   FvmAdapter(FvmAdapter&&) = delete;
   FvmAdapter& operator=(const FvmAdapter&) = delete;
   FvmAdapter& operator=(FvmAdapter&&) = delete;
-  ~FvmAdapter() override;
 
   zx_status_t AddPartition(const fbl::unique_fd& devfs_root, const std::string& name,
                            const Guid& guid, const Guid& type, uint64_t slice_count,

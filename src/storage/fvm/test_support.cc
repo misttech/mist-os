@@ -320,10 +320,6 @@ std::unique_ptr<FvmAdapter> FvmAdapter::CreateGrowable(const fbl::unique_fd& dev
   return std::make_unique<FvmAdapter>(devfs_root, fvm_path.c_str(), device);
 }
 
-FvmAdapter::~FvmAdapter() {
-  fs_management::FvmDestroyWithDevfs(devfs_root_.get(), block_device_->path());
-}
-
 zx_status_t FvmAdapter::AddPartition(const fbl::unique_fd& devfs_root, const std::string& name,
                                      const Guid& guid, const Guid& type, uint64_t slice_count,
                                      std::unique_ptr<VPartitionAdapter>* out_vpartition) {

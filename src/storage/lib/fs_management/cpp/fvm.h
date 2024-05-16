@@ -37,15 +37,6 @@ zx_status_t FvmInitPreallocated(fidl::UnownedClientEnd<fuchsia_hardware_block::B
                                 uint64_t initial_volume_size, uint64_t max_volume_size,
                                 size_t slice_size);
 
-// Queries driver to obtain slice_size, then overwrites and unbinds an FVM
-zx_status_t FvmDestroy(std::string_view path);
-zx_status_t FvmDestroyWithDevfs(int devfs_root_fd, std::string_view relative_path);
-
-// Given the slice_size, overwrites and unbinds an FVM
-zx_status_t FvmOverwrite(std::string_view path, size_t slice_size);
-zx_status_t FvmOverwriteWithDevfs(int devfs_root_fd, std::string_view relative_path,
-                                  size_t slice_size);
-
 // Allocates a new vpartition in the fvm, and waits for it to become accessible.
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmAllocatePartition(
     fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm, uint64_t slice_count,
