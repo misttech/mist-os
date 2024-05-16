@@ -12,7 +12,6 @@ import("//build/config/linker.gni")
 import("//build/config/lto/config.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
-import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
@@ -232,35 +231,21 @@ config("toolchain_version_stamp") {
 
 config("relative_paths") {
   if (is_gcc) {
-    if (use_goma) {
-      # TODO(https://fxbug.dev/42101823): `-fdebug-prefix-map` is also used by Goma to canonicalize
-      # build commands, allowing it to reuse compilation results for users running
-      # out of different working directories. However, it only supports a single
-      # "-fdebug-prefix-map" prefix. Attempting to provide more than one causes
-      # canonicalization to fail, meaning that builds running out of different
-      # directories won't share cache results. For now, we just provide a single
-      # debug-prefix-map, even though more would be ideal.
-
+    # Relativize paths without leaking the build output directory in debug info.
+    # Note: with multiple prefix map options, the mappings are checked in
+    # reverse-order, and *stops* after the first match is applied.
+    # Thus, longest prefix matches should be near the tail of this list.
+    cflags = [
       # Map "/some/dir/fuchsia" to "../..".
-      cflags = [ "-fdebug-prefix-map=" + rebase_path("//") + "=" +
-                 rebase_path("//", root_build_dir) ]
-    } else {
-      # Relativize paths without leaking the build output directory in debug info.
-      # Note: with multiple prefix map options, the mappings are checked in
-      # reverse-order, and *stops* after the first match is applied.
-      # Thus, longest prefix matches should be near the tail of this list.
-      cflags = [
-        # Map "/some/dir/fuchsia" to "../..".
-        "-ffile-prefix-map=" + rebase_path("//") + "=" +
-            rebase_path("//", root_build_dir),
+      "-ffile-prefix-map=" + rebase_path("//") + "=" +
+          rebase_path("//", root_build_dir),
 
-        # Map "/some/dir/fuchsia/out" to "..".
-        "-ffile-prefix-map=" + rebase_path("$root_build_dir/..") + "=..",
+      # Map "/some/dir/fuchsia/out" to "..".
+      "-ffile-prefix-map=" + rebase_path("$root_build_dir/..") + "=..",
 
-        # Map "/some/dir/fuchsia/out/my-build.my-arch" to ".".
-        "-ffile-prefix-map=" + rebase_path(root_build_dir) + "=.",
-      ]
-    }
+      # Map "/some/dir/fuchsia/out/my-build.my-arch" to ".".
+      "-ffile-prefix-map=" + rebase_path(root_build_dir) + "=.",
+    ]
   } else {
     # Make builds independent of the absolute file path. -ffile-prefix-map= can
     # be used to the same effect, but it requires putting the absolute path to

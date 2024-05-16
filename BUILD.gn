@@ -15,7 +15,6 @@ import("//build/rust/config.gni")
 import("//build/security.gni")
 import("//build/testing/platforms.gni")
 import("//build/testing/validated_test_types_group.gni")
-import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/zircon/clang.gni")
 import("//build/zbi/zbi.gni")
@@ -158,11 +157,7 @@ _fx_config_lines = [
   "FUCHSIA_BOARD_NAME=${board_name}",
   "FUCHSIA_ZBI_COMPRESSION=zstd",
   "HOST_OUT_DIR='${_host_out_dir}'",
-  "USE_GOMA=$use_goma",
 ]
-if (use_goma && goma_dir != prebuilt_goma_dir) {
-  _fx_config_lines += [ "GOMA_DIR=" + rebase_path(goma_dir) ]
-}
 write_file("$root_build_dir/fx.config", _fx_config_lines)
 generated_file("default_toolchain_name.txt") {
   outputs = [ "$root_build_dir/default_toolchain_name.txt" ]

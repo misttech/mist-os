@@ -140,7 +140,7 @@ declare_args() {
   ########################
 
   # Set to true to enable distributed compilation of C++ using RBE.
-  # Enabling this takes precedence over `use_goma`.
+  # Remote execution offers increased build parallelism and caching.
   cxx_rbe_enable = false
 
   # Set to true to use a fast, minimalist wrapper, that lacks features

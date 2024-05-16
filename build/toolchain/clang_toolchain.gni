@@ -8,7 +8,6 @@ import("//build/toolchain/breakpad.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/default_tools.gni")
-import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")
 
@@ -62,9 +61,9 @@ if (support_rust) {
 #     Type: bool
 #     Default: true
 #
-#   use_ccache, use_goma, cxx_rbe_enable, link_rbe_enable
+#   cxx_rbe_enable, link_rbe_enable, use_ccache
 #     Optional: Override the global setting, useful to opt out of
-#     ccache/goma in a particular toolchain.
+#     build caching or remote execution for a particular toolchain.
 #
 #   deps
 #     Optional: Dependencies of this toolchain.
@@ -92,9 +91,6 @@ template("clang_toolchain") {
       _cxx_rbe_enable = invoker.cxx_rbe_enable
     } else {
       _cxx_rbe_enable = cxx_rbe_enable
-    }
-    if (defined(invoker.use_goma)) {
-      use_goma = invoker.use_goma
     }
     if (defined(invoker.link_rbe_enable)) {
       _link_rbe_enable = invoker.link_rbe_enable
@@ -162,11 +158,6 @@ template("clang_toolchain") {
         compiler_prefix_list += [ "--preserve_unchanged_output_mtime" ]
       }
       compiler_prefix_list += [ "--" ]
-      not_needed([ "use_goma" ])
-    } else if (use_goma) {
-      compiler_prefix_list =
-          [ rebase_path(goma_dir, root_build_dir) + "/gomacc" ]
-      _cxx_concurrent_jobs = concurrent_jobs.remote
     } else {
       if (defined(invoker.use_ccache)) {
         use_ccache = invoker.use_ccache
