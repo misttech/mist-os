@@ -10,6 +10,8 @@ load(
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
     "fuchsia_package",
+    "fuchsia_structured_config_cpp_elf_lib",
+    "fuchsia_structured_config_values",
 )
 
 fuchsia_bind_library(
@@ -36,7 +38,10 @@ fuchsia_cc_driver(
     ],
     # name the driver like this to make sure out extension stripping works
     output_name = "test_driver_so",
-    deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
+    deps = [
+        ":driver-config",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+    ],
 )
 
 fuchsia_component_manifest(
@@ -51,6 +56,19 @@ fuchsia_driver_component(
     manifest = ":manifest",
 )
 
+fuchsia_structured_config_cpp_elf_lib(
+    name = "driver-config",
+    cm_label = ":manifest",
+)
+
+fuchsia_structured_config_values(
+    name = "sc-values",
+    cm_label = ":manifest",
+    values = {
+        "enable_suspend": "false",
+    },
+)
+
 fuchsia_package(
     name = "pkg",
     package_name = "test_driver",
@@ -58,5 +76,6 @@ fuchsia_package(
         ":component",
     ],
     fuchsia_api_level = "HEAD",
+    resources = [":sc-values"],
     visibility = ["//visibility:public"],
 )

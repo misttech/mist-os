@@ -281,3 +281,10 @@ FuchsiaProductBundleInfo = provider(
         "repository": "The name of the repository to host extra packages in the product bundle",
     },
 )
+
+FuchsiaStructuredConfigCVFInfo = provider(
+    doc = "A provider which contains the generated cvf for structured configs.",
+    fields = {
+        "cvf": "The generated cvf",
+    },
+)
