@@ -693,7 +693,7 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
         FX_LOGS(INFO) << indent << "latency (time)";
         if (element_state->latency()->latency_time().has_value()) {
           FX_LOGS(INFO) << new_indent << "     " << element_state->latency()->latency_time().value()
-                        << " ns";
+                        << " ns  (deprecated)";
         } else {
           FX_LOGS(INFO) << new_indent << "     <none>  (non-compliant)";
         }
@@ -702,7 +702,8 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
         FX_LOGS(INFO) << indent << "latency (frames)";
         if (element_state->latency()->latency_frames().has_value()) {
           FX_LOGS(INFO) << new_indent << "     "
-                        << element_state->latency()->latency_frames().value() << " frames";
+                        << element_state->latency()->latency_frames().value()
+                        << " frames  (deprecated)";
         } else {
           FX_LOGS(INFO) << new_indent << "     <none>  (non-compliant)";
         }
@@ -741,6 +742,11 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
   FX_LOGS(INFO) << indent << "turn_off_delay (ns)     "
                 << (element_state->turn_off_delay().has_value()
                         ? std::to_string(*element_state->turn_off_delay())
+                        : "<none>");
+
+  FX_LOGS(INFO) << indent << "processing_delay (ns)   "
+                << (element_state->processing_delay().has_value()
+                        ? std::to_string(*element_state->processing_delay())
                         : "<none>");
 }
 

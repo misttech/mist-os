@@ -1215,6 +1215,7 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   }
 
   if (element_state.latency().has_value()) {
+    FX_LOGS(WARNING) << "WatchElementState: .latency is deprecated; use `processing_delay`";
     if (element_state.latency()->Which() == fhasp::Latency::Tag::kLatencyTime &&
         element_state.latency()->latency_time().value() < 0) {
       FX_LOGS(WARNING)
@@ -1257,6 +1258,12 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   if (element_state.turn_off_delay().value_or(0) < 0) {
     FX_LOGS(WARNING) << "WatchElementState: ElementState.turn_off_delay ("
                      << *element_state.turn_off_delay() << " ns) cannot be negative";
+    return false;
+  }
+
+  if (element_state.processing_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.processing_delay ("
+                     << *element_state.processing_delay() << " ns) cannot be negative";
     return false;
   }
 

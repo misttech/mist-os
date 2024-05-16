@@ -163,10 +163,9 @@ class FakeComposite
   static const fuchsia_hardware_audio_signalprocessing::Element kSourceRbElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kDestDaiElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kMuteElement;
-  static const fuchsia_hardware_audio_signalprocessing::Latency kSourceDaiElementLatency;
-  static const fuchsia_hardware_audio_signalprocessing::Latency kDestRbElementLatency;
-  static const fuchsia_hardware_audio_signalprocessing::Latency kSourceRbElementLatency;
-  static const fuchsia_hardware_audio_signalprocessing::Latency kDestDaiElementLatency;
+  static const zx::duration kSourceDaiElementProcessingDelay;
+  static const zx::duration kSourceRbElementProcessingDelay;
+  static const zx::duration kDestDaiElementProcessingDelay;
   static const fuchsia_hardware_audio_signalprocessing::ElementState kSourceDaiElementInitState;
   static const fuchsia_hardware_audio_signalprocessing::ElementState kDestRbElementInitState;
   static const fuchsia_hardware_audio_signalprocessing::ElementState kSourceRbElementInitState;

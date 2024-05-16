@@ -177,10 +177,11 @@ const std::unordered_map<ElementId, ElementRecord> kEmptyElementMap{};
 const fhasp::ElementState kGenericElementState{{
     // .type_specific is unspecified
     // .enabled (deprecated) is unspecified
-    .latency = fhasp::Latency::WithLatencyFrames(16),
+    // .latency (deprecated) is unspecified
     .vendor_specific_data = {{8, 7, 6, 5, 4, 3, 2, 1, 0}},
     .started = true,
     .bypassed = false,
+    .processing_delay = ZX_USEC(333),
 }};
 const fhasp::ElementState kDynamicsElementState{{
     .type_specific = fhasp::TypeSpecificElementState::WithDynamics({{

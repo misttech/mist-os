@@ -93,6 +93,7 @@ type TypeSpecificElement = flexible union {
     6: dai_interconnect DaiInterconnect;
 };
 
+@available(deprecated=20)
 type Latency = flexible union {
     /// Latency added to the pipeline as a zx.Duration.
     1: latency_time zx.Duration;
@@ -209,6 +210,7 @@ type ElementState = table {
     /// `WatchElementState` reply.
     ///
     /// Optional.
+    @available(deprecated=20)
     3: latency Latency;
 
     /// If included, an opaque object of octets for exchanging vendor specific information.
@@ -275,6 +277,20 @@ type ElementState = table {
     /// Optional.
     @available(added=20)
     8: turn_off_delay zx.Duration;
+
+    /// If included, the driver's best estimate (as currently configured, including `bypassed`) of
+    /// the delay added by this processing element.
+    ///
+    /// This value must be taken into account by clients when determining the requirements for
+    /// minimum lead time (during playback) and minimum capture delay (during capture).
+    ///
+    /// For an element of type `RING_BUFFER`, this delay should not include the inherent delay
+    /// added by the temporary buffering needed to copy data in and out of a ring buffer, which
+    /// is contained in the `RingBufferProperties` field `driver_transfer_bytes`.
+    ///
+    /// Optional.
+    @available(added=20)
+    9: processing_delay zx.Duration;
 };
 
 /// Edge pairs between processing elements used to define ordering in processing elements

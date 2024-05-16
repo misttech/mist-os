@@ -994,11 +994,11 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
                 }},
                 ZX_MSEC(element_id),
             }}),
-        .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
         .started = false,
         .bypassed = false,
+        .processing_delay = ZX_USEC(element_id),
     }};
     ASSERT_EQ(new_state.vendor_specific_data()->size(), 17u) << "Test configuration error";
     element_states_to_inject.insert_or_assign(element_id, new_state);
@@ -1052,9 +1052,7 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
 
     EXPECT_FALSE(state_received.enabled().has_value());
 
-    ASSERT_TRUE(state_received.latency().has_value());
-    ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
-    EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
+    ASSERT_FALSE(state_received.latency().has_value());
 
     ASSERT_TRUE(state_received.vendor_specific_data().has_value());
     ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
@@ -1065,6 +1063,9 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
 
     ASSERT_TRUE(state_received.bypassed().has_value());
     EXPECT_FALSE(*state_received.bypassed());
+
+    ASSERT_TRUE(state_received.processing_delay().has_value());
+    EXPECT_EQ(*state_received.processing_delay(), ZX_USEC(element_id));
 
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())

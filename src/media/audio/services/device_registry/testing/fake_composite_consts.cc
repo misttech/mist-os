@@ -232,10 +232,9 @@ const fhasp::Element FakeComposite::kMuteElement{{
 }};
 
 // ElementStates - note that the two Dai elements have vendor_specific_data that can be queried.
-const fhasp::Latency FakeComposite::kSourceDaiElementLatency = fhasp::Latency::WithLatencyTime(0);
-const fhasp::Latency FakeComposite::kDestDaiElementLatency = fhasp::Latency::WithLatencyTime(10417);
-const fhasp::Latency FakeComposite::kSourceRbElementLatency = fhasp::Latency::WithLatencyFrames(1);
-const fhasp::Latency FakeComposite::kDestRbElementLatency = fhasp::Latency::WithLatencyFrames(0);
+const zx::duration FakeComposite::kSourceDaiElementProcessingDelay = zx::nsec(0);
+const zx::duration FakeComposite::kDestDaiElementProcessingDelay = zx::nsec(123);
+const zx::duration FakeComposite::kSourceRbElementProcessingDelay = zx::nsec(42);
 const fhasp::ElementState FakeComposite::kSourceDaiElementInitState{{
     .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect({{
         .plug_state = fhasp::PlugState{{
@@ -244,10 +243,10 @@ const fhasp::ElementState FakeComposite::kSourceDaiElementInitState{{
         }},
         .external_delay = 0,
     }}),
-    .latency = kSourceDaiElementLatency,
     .vendor_specific_data = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8},
     .started = false,
     .bypassed = false,
+    .processing_delay = kSourceDaiElementProcessingDelay.get(),
 }};
 const fhasp::ElementState FakeComposite::kDestDaiElementInitState{{
     .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect({{
@@ -257,18 +256,17 @@ const fhasp::ElementState FakeComposite::kDestDaiElementInitState{{
         }},
         .external_delay = 123,
     }}),
-    .latency = kDestDaiElementLatency,
     .vendor_specific_data = std::vector<uint8_t>{8, 7, 6, 5, 4, 3, 2, 1, 0},
     .started = false,
     .bypassed = false,
+    .processing_delay = kDestDaiElementProcessingDelay.get(),
 }};
 const fhasp::ElementState FakeComposite::kSourceRbElementInitState{{
-    .latency = kSourceRbElementLatency,
     .started = true,
     .bypassed = false,
+    .processing_delay = kSourceRbElementProcessingDelay.get(),
 }};
 const fhasp::ElementState FakeComposite::kDestRbElementInitState{{
-    .latency = kDestRbElementLatency,
     .started = true,
     .bypassed = false,
 }};

@@ -542,8 +542,7 @@ int main(int argc, char** argv) {
                 return -1;
               }
               args.pop_front();
-              state.latency(
-                  fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(latency));
+              state.processing_delay(latency);
             } else {
               std::cerr << "set processing element state failed: no latency specified" << std::endl;
               return -1;

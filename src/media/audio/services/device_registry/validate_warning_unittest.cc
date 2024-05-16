@@ -1406,6 +1406,11 @@ TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
   state_with_negative_turn_off_delay.turn_off_delay(ZX_NSEC(-1));
   EXPECT_FALSE(ValidateElementState(state_with_negative_turn_off_delay, kDaiInterconnectElement));
 
+  // `processing_delay` is optional, but if present then it cannot be negative.
+  fhasp::ElementState state_with_negative_processing_delay = kDaiInterconnectElementState;
+  state_with_negative_processing_delay.processing_delay(ZX_NSEC(-1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_processing_delay, kDaiInterconnectElement));
+
   // `plug_state_time` cannot be negative.
   fhasp::ElementState state_with_negative_plug_state_time = kDaiInterconnectElementState;
   state_with_negative_plug_state_time.type_specific()
