@@ -10,8 +10,6 @@ using fuchsia.testing.harness;
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
 type RealmOptions = resource table {
-    /// Retained for compatibility with pre-20.
-    @available(deprecated=20)
     1: pkg_directory_server server_end:fuchsia.io.Directory;
 };
 

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{format_err, Error, Result},
+    anyhow::{bail, Error, Result},
     blobfs_ramdisk::BlobfsRamdisk,
-    fidl::endpoints::{self, Proxy},
+    fidl::endpoints::{self, ServerEnd},
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg_test::*,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream},
@@ -88,28 +88,24 @@ async fn serve_factory(
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm { options, responder } => {
-                // Compatibility with pre-20.
-                if let Some(incoming_server_end) = options.pkg_directory_server {
-                    directory
-                        .clone(
-                            fio::OpenFlags::CLONE_SAME_RIGHTS,
-                            incoming_server_end.into_channel().into(),
-                        )
-                        .expect("clone should not fail");
+                let pkg_directory_server_end = match options.pkg_directory_server {
+                    Some(v) => ServerEnd::<fio::NodeMarker>::from(v.into_channel()),
+                    None => {
+                        responder.send(Err(OperationError::Failed)).ok();
+                        bail!("pkg directory required");
+                    }
+                };
+                if let Err(e) =
+                    directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, pkg_directory_server_end)
+                {
+                    error!("failed to clone: {:?}", e);
+                    responder.send(Err(OperationError::Failed)).ok();
+                    continue;
                 }
 
-                let dictionary = factory.create_dictionary().await?;
-                let dictionary = dictionary.into_proxy().unwrap();
-                let (client_end, server_end) =
-                    endpoints::create_endpoints::<fio::DirectoryMarker>();
-                directory
-                    .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into_channel().into())
-                    .expect("clone should not fail");
-                dictionary
-                    .insert("pkg", fsandbox::Capability::Directory(client_end))
-                    .await?
-                    .map_err(|e| format_err!("Insert failed: {e:?}"))?;
-                responder.send(Ok(dictionary.into_client_end().unwrap()))?;
+                let my_dictionary = factory.create_dictionary().await?;
+
+                responder.send(Ok(my_dictionary))?;
             }
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
         }
