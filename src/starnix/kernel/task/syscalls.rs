@@ -1552,6 +1552,7 @@ pub fn sys_setpriority(
     track_stub!(TODO("https://fxbug.dev/322894197"), "setpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
+    security::check_setsched_access(current_task, &target_task)?;
     // The priority passed into setpriority is actually in the -19...20 range and is not
     // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
     // be lying anymore by the time you read this.)
