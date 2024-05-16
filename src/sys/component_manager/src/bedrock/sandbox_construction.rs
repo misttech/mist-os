@@ -32,7 +32,7 @@ use {
     moniker::{ChildName, ChildNameBase, MonikerBase},
     router_error::RouterError,
     sandbox::Routable,
-    sandbox::{Capability, Dict, Request, Router, Unit},
+    sandbox::{Capability, Dict, Request, Router, Unit, WeakDict},
     std::{collections::HashMap, fmt::Debug, sync::Arc},
     tracing::warn,
     vfs::execution_scope::ExecutionScope,
@@ -105,7 +105,14 @@ pub fn build_component_sandbox(
     }
 
     for use_ in &decl.uses {
-        extend_dict_with_use(component, children, component_input, program_input_dict, use_);
+        extend_dict_with_use(
+            component,
+            children,
+            component_input,
+            program_input_dict,
+            program_output_dict,
+            use_,
+        );
     }
 
     for offer in &decl.offers {
@@ -147,11 +154,24 @@ pub fn build_component_sandbox(
                 dict
             }
         };
-        extend_dict_with_offer(component, children, component_input, offer, &mut target_dict);
+        extend_dict_with_offer(
+            component,
+            children,
+            component_input,
+            program_output_dict,
+            offer,
+            &mut target_dict,
+        );
     }
 
     for expose in &decl.exposes {
-        extend_dict_with_expose(component, children, expose, component_output_dict);
+        extend_dict_with_expose(
+            component,
+            children,
+            program_output_dict,
+            expose,
+            component_output_dict,
+        );
     }
 }
 
@@ -412,6 +432,7 @@ pub fn extend_dict_with_offers(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
+    program_output_dict: &Dict,
     target_input: &mut ComponentInput,
 ) {
     for offer in dynamic_offers {
@@ -419,6 +440,7 @@ pub fn extend_dict_with_offers(
             component,
             children,
             component_input,
+            program_output_dict,
             offer,
             &mut target_input.capabilities(),
         );
@@ -437,6 +459,7 @@ fn extend_dict_with_use(
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
     program_input_dict: &Dict,
+    program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
 ) {
     let Some(use_protocol) = supported_use(use_) else {
@@ -448,7 +471,7 @@ fn extend_dict_with_use(
         cm_rust::UseSource::Parent => {
             use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
         }
-        cm_rust::UseSource::Self_ => component.program_output().lazy_get(
+        cm_rust::UseSource::Self_ => WeakDict::new(program_output_dict).lazy_get(
             source_path.to_owned(),
             RoutingError::use_from_self_not_found(
                 &component.moniker,
@@ -590,6 +613,7 @@ fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     component_input: &ComponentInput,
+    program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
 ) {
@@ -615,7 +639,7 @@ fn extend_dict_with_offer(
                 source_path.iter_segments().join("/"),
             ),
         ),
-        cm_rust::OfferSource::Self_ => component.program_output().lazy_get(
+        cm_rust::OfferSource::Self_ => WeakDict::new(program_output_dict).lazy_get(
             source_path.to_owned(),
             RoutingError::offer_from_self_not_found(
                 &component.moniker,
@@ -685,6 +709,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
 fn extend_dict_with_expose(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    program_output_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
 ) {
@@ -699,7 +724,7 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => component.program_output().lazy_get(
+        cm_rust::ExposeSource::Self_ => WeakDict::new(program_output_dict).lazy_get(
             source_path.to_owned(),
             RoutingError::expose_from_self_not_found(
                 &component.moniker,

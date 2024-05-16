@@ -22,6 +22,8 @@ pub enum ConversionError {
         #[source]
         err: Box<ConversionError>,
     },
+    #[error("reference to dictionary is no longer valid")]
+    UpgradeFailed,
 }
 
 /// Errors arising from conversion between Rust and FIDL types.

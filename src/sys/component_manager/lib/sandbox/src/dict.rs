@@ -10,7 +10,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard, Weak},
 };
 use tracing::warn;
 use vfs::{
@@ -350,6 +350,44 @@ async fn serve_dict_key_iterator(
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct WeakDict {
+    entries: Weak<Mutex<BTreeMap<Key, Capability>>>,
+    not_found: Weak<dyn Fn(&str) -> () + 'static + Send + Sync>,
+}
+
+impl WeakDict {
+    pub fn new(dict: &Dict) -> Self {
+        Self { entries: Arc::downgrade(&dict.entries), not_found: Arc::downgrade(&dict.not_found) }
+    }
+
+    pub fn upgrade(&self) -> Option<Dict> {
+        match (self.entries.upgrade(), self.not_found.upgrade()) {
+            (Some(entries), Some(not_found)) => {
+                Some(Dict { entries, not_found, iterator_tasks: fasync::TaskGroup::new() })
+            }
+            _ => None,
+        }
+    }
+}
+
+impl CapabilityTrait for WeakDict {
+    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
+        let dict = self.upgrade().ok_or(ConversionError::UpgradeFailed)?;
+        dict.try_into_directory_entry()
+    }
+}
+
+impl From<WeakDict> for fsandbox::Capability {
+    fn from(weak_dict: WeakDict) -> Self {
+        match weak_dict.upgrade() {
+            Some(dict) => dict.into(),
+            None => panic!("TODO: what to do here?"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

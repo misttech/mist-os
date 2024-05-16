@@ -859,6 +859,7 @@ impl ResolvedInstanceState {
                 &self.children,
                 &self.component_input,
                 &dynamic_offers,
+                &self.program_output_dict,
                 &mut child_input,
             );
         }

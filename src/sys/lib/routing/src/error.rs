@@ -308,6 +308,9 @@ pub enum RoutingError {
     )]
     BedrockSourceDictionaryCollision,
 
+    #[error("a reference to a dictionary is no longer valid")]
+    BedrockDictionaryUpgradeFailed,
+
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -377,7 +380,9 @@ impl Explain for RoutingError {
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
-            RoutingError::MonikerError(_) => zx::Status::INTERNAL,
+            RoutingError::MonikerError(_) | RoutingError::BedrockDictionaryUpgradeFailed => {
+                zx::Status::INTERNAL
+            }
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),
             RoutingError::PolicyError(err) => err.as_zx_status(),

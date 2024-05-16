@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken};
+use crate::{Capability, CapabilityTrait, Dict, WeakComponentToken, WeakDict};
 use async_trait::async_trait;
 use cm_types::Availability;
 use fidl::AsHandleRef;
@@ -10,9 +10,10 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::TryStreamExt;
-use router_error::RouterError;
+use router_error::{Explain, RouterError};
 use std::fmt::Debug;
 use std::{fmt, sync::Arc};
+use thiserror::Error;
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -189,6 +190,31 @@ impl Routable for Capability {
 impl Routable for Dict {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         Capability::Dictionary(self.clone()).route(request).await
+    }
+}
+
+#[async_trait]
+impl Routable for WeakDict {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+        match self.upgrade() {
+            Some(dict) => dict.route(request).await,
+            None => Err(RouterError::NotFound(Arc::new(FailedUpgradeError))),
+        }
+    }
+}
+
+#[derive(Debug, Error, Clone)]
+struct FailedUpgradeError;
+
+impl Explain for FailedUpgradeError {
+    fn as_zx_status(&self) -> zx::Status {
+        zx::Status::NOT_FOUND
+    }
+}
+
+impl fmt::Display for FailedUpgradeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "reference to dictionary is no longer valid")
     }
 }
 
