@@ -92,6 +92,9 @@ zx_library("vm") {
 
     # "pmm_arena.h" has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx:headers",
+
+    # <vm/pmm_checker.h> has #include <lib/boot-options/boot-options.h>.
+    "//zircon/kernel/lib/boot-options:headers",
   ]
   public_configs = [
     # <vm/physical_page_provider.h> has #include <object/port_dispatcher.h>.

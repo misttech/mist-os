@@ -97,6 +97,9 @@ if (current_toolchain == default_toolchain) {
         # <vm/vm_object.h> has #include <lib/user_copy/user_ptr.h>.
         "//zircon/kernel/lib/user_copy:headers.config",
 
+        # <vm/pmm_checker.h> has #include <lib/boot-options/boot-options.h>.
+        "//zircon/kernel/lib/boot-options:headers.config",
+
         # <lib/ktrace.h> has #include <lib/zircon-internal/ktrace.h>.
         "//zircon/system/ulib/zircon-internal:headers.config",
 

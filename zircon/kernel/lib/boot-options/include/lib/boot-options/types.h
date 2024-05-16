@@ -116,6 +116,12 @@ struct RamReservation {
   uint64_t size;
 };
 
+// See kernel.pmm-checker.action.
+enum class CheckFailAction {
+  kOops,
+  kPanic,
+};
+
 constexpr bool operator==(const RamReservation& lhs, const RamReservation& rhs) {
   return lhs.paddr == rhs.paddr && lhs.size == rhs.size;
 }

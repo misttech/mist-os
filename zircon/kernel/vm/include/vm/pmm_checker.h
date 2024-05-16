@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_CHECKER_H_
 #define ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_CHECKER_H_
 
+#include <lib/boot-options/boot-options.h>
 #include <stdio.h>
 
 #include <arch/defines.h>
@@ -35,15 +36,9 @@
 //
 class PmmChecker {
  public:
-  // The action to take when page validation fails.
-  enum class Action : uint32_t { OOPS, PANIC };
-
-  static constexpr Action DefaultAction = Action::OOPS;
-
-  // Returns ktl::nullopt if |action_string| is invalid.
-  static ktl::optional<Action> ActionFromString(const char* action_string);
-
-  static const char* ActionToString(Action action);
+  // See //zircon/kernel/lib/boot-options/include/lib/boot-options/options.inc
+  // for default value.
+  static constexpr CheckFailAction kDefaultAction = BootOptions{}.pmm_checker_action;
 
   // Returns true if |fill_size| is a valid value.  Valid values are mutliples of 8 between 8 and
   // PAGE_SIZE, inclusive.
@@ -61,8 +56,8 @@ class PmmChecker {
   // Returns the fill size.
   size_t GetFillSize() const { return fill_size_; }
 
-  void SetAction(Action action) { action_ = action; }
-  Action GetAction() const { return action_; }
+  void SetAction(CheckFailAction action) { action_ = action; }
+  CheckFailAction GetAction() const { return action_; }
 
   // Returns true if armed.
   bool IsArmed() const { return armed_; }
@@ -90,7 +85,7 @@ class PmmChecker {
   // The number of bytes to fill/validate.
   size_t fill_size_ = PAGE_SIZE;
 
-  Action action_ = DefaultAction;
+  CheckFailAction action_ = kDefaultAction;
 
   bool armed_ = false;
 };

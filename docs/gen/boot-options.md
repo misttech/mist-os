@@ -855,20 +855,16 @@ This option is similar to "kernel.compression.reclaim_anonymous" but applies to 
 anonymous pages. Enabling this makes the "kernel.page-scanner.zero-page-scans-per-second" option
 have no effect, and it is an error to enable this without enabling "kernel.compression.reclaim_anonymous".
 
-### kernel.pmm-checker.action=\<string>
+### kernel.pmm-checker.action=\[oops | panic\]
 
 **Default:** `oops`
 
-Supported actions:
-- `oops`
-- `panic`
-
 This option specifies which action is taken when the PMM checker detects
-corruption.
-
-When `oops`, a non-fatal kernel OOPS will be emitted when corruption is detected.
-
-When `panic` a fatal kernel panic will occur when corruption is detected.
+corruption.  Values must be one of:
+ * `oops`
+   - A non-fatal kernel OOPS will be emitted when corruption is detected.
+ * `panic`
+   - A fatal kernel panic will occur when corruption is detected.
 
 ### kernel.pmm-checker.enable=\<bool>
 

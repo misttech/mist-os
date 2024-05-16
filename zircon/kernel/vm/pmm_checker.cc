@@ -52,28 +52,6 @@ void DumpPageAndPanic(vm_page_t* page, size_t fill_size, void* kvaddr) {
 }  // namespace
 
 // static
-ktl::optional<PmmChecker::Action> PmmChecker::ActionFromString(const char* action_string) {
-  if (!strcmp(action_string, "oops")) {
-    return PmmChecker::Action::OOPS;
-  }
-  if (!strcmp(action_string, "panic")) {
-    return PmmChecker::Action::PANIC;
-  }
-  return ktl::nullopt;
-}
-
-// static
-const char* PmmChecker::ActionToString(Action action) {
-  switch (action) {
-    case PmmChecker::Action::OOPS:
-      return "oops";
-    case PmmChecker::Action::PANIC:
-      return "panic";
-  };
-  __UNREACHABLE;
-}
-
-// static
 bool PmmChecker::IsValidFillSize(size_t fill_size) {
   return fill_size >= 8 && fill_size <= PAGE_SIZE && (fill_size % 8 == 0);
 }
@@ -113,10 +91,10 @@ void PmmChecker::AssertPattern(vm_page_t* page) const {
     kcounter_add(counter_pattern_validation_failed, 1);
     auto kvaddr = static_cast<void*>(paddr_to_physmap(page->paddr()));
     switch (action_) {
-      case Action::OOPS:
+      case CheckFailAction::kOops:
         DumpPageAndOops(page, fill_size_, kvaddr);
         break;
-      case Action::PANIC:
+      case CheckFailAction::kPanic:
         DumpPageAndPanic(page, fill_size_, kvaddr);
         break;
     }
@@ -124,8 +102,10 @@ void PmmChecker::AssertPattern(vm_page_t* page) const {
 }
 
 void PmmChecker::PrintStatus(FILE* f) const {
-  fprintf(f, "PMM: pmm checker %s, fill size is %lu, action is %s\n",
-          armed_ ? "enabled" : "disabled", fill_size_, ActionToString(action_));
+  fprintf(f, "PMM: pmm checker %s, fill size is %lu, action is ", armed_ ? "enabled" : "disabled",
+          fill_size_);
+  BootOptions::PrintValue(action_, f);
+  putc('\n', f);
 }
 
 int64_t PmmChecker::get_validation_failed_count() {

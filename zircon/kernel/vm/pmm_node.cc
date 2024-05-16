@@ -203,7 +203,7 @@ void PmmNode::PoisonAllFreePages() {
 }
 #endif  // __has_feature(address_sanitizer)
 
-bool PmmNode::EnableFreePageFilling(size_t fill_size, PmmChecker::Action action) {
+bool PmmNode::EnableFreePageFilling(size_t fill_size, CheckFailAction action) {
   Guard<Mutex> guard{&lock_};
   if (free_fill_enabled_) {
     // Checker is already enabled.

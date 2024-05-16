@@ -202,7 +202,7 @@ int64_t pmm_get_alloc_failed_count() { return PmmNode::get_alloc_failed_count();
 
 bool pmm_has_alloc_failed_no_mem() { return PmmNode::has_alloc_failed_no_mem(); }
 
-static void pmm_checker_enable(size_t fill_size, PmmChecker::Action action) {
+static void pmm_checker_enable(size_t fill_size, CheckFailAction action) {
   // Enable filling of pages going forward.
   if (!pmm_node.EnableFreePageFilling(fill_size, action)) {
     printf("Checker already configured, requested fill size and action ignored.\n");
@@ -229,18 +229,7 @@ void pmm_checker_init_from_cmdline() {
       fill_size = PAGE_SIZE;
     }
 
-    PmmChecker::Action action = PmmChecker::DefaultAction;
-    const char* const action_string = gBootOptions->pmm_checker_action.data();
-    if (action_string != nullptr) {
-      if (auto opt_action = PmmChecker::ActionFromString(action_string)) {
-        action = opt_action.value();
-      } else {
-        printf("PMM: value from %s is invalid (\"%s\"), using \"%s\" instead\n",
-               kPmmCheckerActionName.data(), action_string, PmmChecker::ActionToString(action));
-      }
-    }
-
-    pmm_node.EnableFreePageFilling(fill_size, action);
+    pmm_node.EnableFreePageFilling(fill_size, gBootOptions->pmm_checker_action);
   }
 }
 
@@ -503,7 +492,7 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
       pmm_checker_print_status();
     } else if (!strcmp(argv[2].str, "enable")) {
       size_t fill_size = PAGE_SIZE;
-      PmmChecker::Action action = PmmChecker::DefaultAction;
+      CheckFailAction action = PmmChecker::kDefaultAction;
       if (argc >= 4) {
         fill_size = argv[3].u;
         if (!PmmChecker::IsValidFillSize(fill_size)) {
@@ -514,8 +503,9 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
         }
       }
       if (argc == 5) {
-        if (auto opt_action = PmmChecker::ActionFromString(argv[4].str)) {
-          action = opt_action.value();
+        BootOptions opts;
+        if (opts.Parse(argv[4].str, &BootOptions::pmm_checker_action)) {
+          action = opts.pmm_checker_action;
         } else {
           printf("error: invalid action\n");
           return ZX_ERR_INTERNAL;
