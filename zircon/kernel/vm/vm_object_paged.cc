@@ -963,7 +963,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         }
       });
 
-  __UNINITIALIZED LazyPageRequest page_request(true);
+  __UNINITIALIZED LazyPageRequest page_request;
   // Convenience lambda to advance offset by processed_len, indicating that all pages in the range
   // [offset, offset + processed_len) have been processed, then potentially wait on the page_request
   // (if wait_on_page_request is set to true), and revalidate range checks after waiting.

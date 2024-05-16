@@ -19,23 +19,11 @@ lazy_init::LazyInit<fbl::RefPtr<AnonymousPageRequester>> anonymous_page_requeste
 }  // namespace
 
 zx_status_t AnonymousPageRequester::FillRequest(PageRequest* request) {
-  if (!request->IsInitialized()) {
-    // Pretend a read request at offset 0. The only actor that should ever inspect these values is
-    // us, and we don't, so they can be anything.
-    request->Init(fbl::RefPtr<PageRequestInterface>(this), 0, page_request_type::READ,
-                  VmoDebugInfo{0, 0});
-  } else {
-    DEBUG_ASSERT(request->batch_state_ == PageRequest::BatchState::Accepting);
-    // We ignore batch requests for this requester, so should only be here if this was a batch
-    // request started against a different interface.
-    ASSERT(request->src_.get() != static_cast<PageRequestInterface*>(this));
-    return request->FinalizeRequest();
-  }
-  // If this is a batch request complete it immediately. There is no value in finding additional
-  // pages, since the only thing we are going to do is wait on the pmm.
-  if (request->batch_state_ == PageRequest::BatchState::Accepting) {
-    request->batch_state_ = PageRequest::BatchState::Finalized;
-  }
+  DEBUG_ASSERT(!request->IsInitialized());
+  // Pretend a read request at offset 0. The only actor that should ever inspect these values is
+  // us, and we don't, so they can be anything.
+  request->Init(fbl::RefPtr<PageRequestInterface>(this), 0, page_request_type::READ,
+                VmoDebugInfo{0, 0});
   return ZX_ERR_SHOULD_WAIT;
 }
 

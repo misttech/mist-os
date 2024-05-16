@@ -2973,13 +2973,6 @@ zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_
 
     if (result.is_error()) {
       status = result.error_value();
-      if (status == ZX_ERR_SHOULD_WAIT) {
-        // Will have already grabbed the longest contiguous run of missing pages for a request, so
-        // finalize any outstanding batch request.
-        if (page_request->get()->BatchAccepting()) {
-          status = page_request->get()->FinalizeRequest();
-        }
-      }
       break;
     }
     offset += PAGE_SIZE;
