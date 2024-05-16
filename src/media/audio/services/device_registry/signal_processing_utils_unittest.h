@@ -219,6 +219,7 @@ const fhasp::ElementState kDaiInterconnectElementState{{
             .plugged = true,
             .plug_state_time = 0,
         }},
+        .external_delay = 0,
     }}),
     .started = true,
 }};

@@ -1257,6 +1257,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
                     !was_plugged,
                     plug_change_time_to_inject.get(),
                 }},
+                ZX_MSEC(element_id),
             }}),
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
@@ -1310,6 +1311,9 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
                     .has_value());
     EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->plug_state()->plug_state_time(),
               plug_change_time_to_inject.get());
+    ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->external_delay().has_value());
+    EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
+              ZX_MSEC(element_id));
 
     EXPECT_FALSE(state_received.enabled().has_value());
 

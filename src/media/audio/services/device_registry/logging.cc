@@ -639,6 +639,13 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
                                                     ->plug_state_time()) +
                                     " nsec"
                               : "<none> (non-compliant)");
+        FX_LOGS(INFO)
+            << new_indent << "     external_delay              "
+            << (element_state->type_specific()->dai_interconnect()->external_delay().has_value()
+                    ? std::to_string(
+                          *element_state->type_specific()->dai_interconnect()->external_delay()) +
+                          " nsec"
+                    : "<none>");
         break;
       case fhasp::TypeSpecificElementState::Tag::kDynamics:
         if (!element_state->type_specific()->dynamics().has_value()) {

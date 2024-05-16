@@ -83,4 +83,16 @@ type DaiInterconnectElementState = table {
     ///
     /// Required.
     1: plug_state PlugState;
+
+    /// The driver's best estimate of the external delay beyond this DAI endpoint, as the pipeline
+    /// is currently configured.
+    ///
+    /// `external_delay` must be taken into account by the client when determining the requirements
+    /// for minimum lead time (during playback) and minimum capture delay (during capture).
+    ///
+    /// If not included, `external_delay` is unknown; the client may treat it however it chooses
+    /// (e.g. consider it zero or some other duration, autodetect it, etc).
+    ///
+    /// Optional.
+    2: external_delay zx.Duration;
 };

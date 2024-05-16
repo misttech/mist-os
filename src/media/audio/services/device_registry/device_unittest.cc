@@ -1775,6 +1775,7 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
                     !was_plugged,
                     plug_change_time_to_inject.get(),
                 }},
+                ZX_MSEC(element_id),
             }}),
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
@@ -1834,6 +1835,10 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       ASSERT_TRUE(state_received.latency().has_value());
       ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
       EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
+
+      ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->external_delay().has_value());
+      EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
+                ZX_MSEC(element_id));
 
       ASSERT_TRUE(state_received.vendor_specific_data().has_value());
       ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);

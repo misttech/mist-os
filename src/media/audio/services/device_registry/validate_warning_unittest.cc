@@ -1413,6 +1413,12 @@ TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
       ->plug_state()
       ->plug_state_time(ZX_NSEC(-1));
   EXPECT_FALSE(ValidateElementState(state_with_negative_plug_state_time, kDaiInterconnectElement));
+
+  // `external_delay` is optional, but if present then it cannot be negative.
+  fhasp::ElementState state_with_negative_external_delay = kDaiInterconnectElementState;
+  state_with_negative_external_delay.type_specific()->dai_interconnect()->external_delay(
+      ZX_NSEC(-1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_external_delay, kDaiInterconnectElement));
 }
 
 // All the ways that a DaiInterconnect ElementState can be invalid.

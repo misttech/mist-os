@@ -952,6 +952,14 @@ bool ValidateDaiInterconnectElementState(const fhasp::ElementState& element_stat
     return false;
   }
 
+  // external_delay, if present, must not be negative
+  if (element_state.type_specific()->dai_interconnect()->external_delay().value_or(0) < 0) {
+    FX_LOGS(WARNING) << "WatchElementState: ElementState.external_delay ("
+                     << *element_state.type_specific()->dai_interconnect()->external_delay()
+                     << " ns) cannot be negative";
+    return false;
+  }
+
   return true;
 }
 
