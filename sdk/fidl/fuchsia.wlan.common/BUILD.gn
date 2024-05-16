@@ -10,7 +10,7 @@ fidl("fuchsia.wlan.common") {
 
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "WLAN"
 
   sources = [
     "associnfo.fidl",

@@ -11,7 +11,7 @@ fidl("fuchsia.wlan.policy") {
 
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "WLAN"
 
   sources = [
     "access_point_provider.fidl",
