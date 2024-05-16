@@ -902,6 +902,57 @@
         "name": "fuchsia.hardware.audio.signalprocessing/Reader_GetTopologies_Response"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState.bypassed",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState.started",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState.type_specific",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableElementState"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState.dynamics",
+        "ordinal": "4",
+        "type": "fuchsia.hardware.audio.signalprocessing/DynamicsElementState"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState.equalizer",
+        "ordinal": "3",
+        "type": "fuchsia.hardware.audio.signalprocessing/EqualizerElementState"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState.gain",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.audio.signalprocessing/GainElementState"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState.vendor_specific",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/VendorSpecificState"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.audio.signalprocessing/SettableTypeSpecificElementState",
+        "strictness": "flexible"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing.GetElements",
         "strictness": "strict",
@@ -964,7 +1015,7 @@
         "kind": "struct/member",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessingSetElementStateRequest.state",
         "ordinal": "2",
-        "type": "fuchsia.hardware.audio.signalprocessing/ElementState"
+        "type": "fuchsia.hardware.audio.signalprocessing/SettableElementState"
     },
     {
         "kind": "struct",

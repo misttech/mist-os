@@ -567,6 +567,52 @@ void FakeComposite::WatchElementState(WatchElementStateRequest& request,
   MaybeCompleteWatchElementState(element);
 }
 
+bool ElementStateMatchesSettableElementState(
+    fuchsia_hardware_audio_signalprocessing::ElementState state,
+    fuchsia_hardware_audio_signalprocessing::SettableElementState settable_state) {
+  return
+      // started must match
+      (state.started() == settable_state.started()) &&
+      // bypassed must match
+      (state.bypassed() == settable_state.bypassed()) &&
+      // type_specific must match ...
+      (
+          // ... whether it is dynamics ...
+          (state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kDynamics &&
+           state.type_specific()->dynamics().value() ==
+               settable_state.type_specific()->dynamics().value()) ||
+          // ... or equalizer ...
+          (state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kEqualizer &&
+           state.type_specific()->equalizer().value() ==
+               settable_state.type_specific()->equalizer().value()) ||
+          // ... or gain ...
+          (state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kGain &&
+           state.type_specific()->gain().value() ==
+               settable_state.type_specific()->gain().value()) ||
+          // ... or vendor_specific.
+          (state.type_specific()->Which() == fuchsia_hardware_audio_signalprocessing::
+                                                 TypeSpecificElementState::Tag::kVendorSpecific &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kVendorSpecific &&
+           state.type_specific()->vendor_specific().value() ==
+               settable_state.type_specific()->vendor_specific().value())) &&
+      // vendor_specific_data must match
+      (state.vendor_specific_data() == settable_state.vendor_specific_data());
+}
+
 void FakeComposite::SetElementState(SetElementStateRequest& request,
                                     SetElementStateCompleter::Sync& completer) {
   auto element_id = request.processing_element_id();
@@ -579,12 +625,34 @@ void FakeComposite::SetElementState(SetElementStateRequest& request,
     return;
   }
   FakeElementRecord& element_record = match->second;
-
-  if (element_record.state == request.state()) {
+  if (ElementStateMatchesSettableElementState(element_record.state, request.state())) {
     ADR_LOG_METHOD(kLogFakeComposite)
         << "element " << element_id << " was already in this state: no change";
   } else {
-    element_record.state = request.state();
+    element_record.state.started() = request.state().started();
+    element_record.state.bypassed() = request.state().bypassed();
+    element_record.state.vendor_specific_data() = request.state().vendor_specific_data();
+    if (*element_record.element.type() ==
+        fuchsia_hardware_audio_signalprocessing::ElementType::kDynamics) {
+      element_record.state.type_specific() =
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDynamics(
+              request.state().type_specific()->dynamics().value());
+    } else if (*element_record.element.type() ==
+               fuchsia_hardware_audio_signalprocessing::ElementType::kEqualizer) {
+      element_record.state.type_specific() =
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEqualizer(
+              request.state().type_specific()->equalizer().value());
+    } else if (*element_record.element.type() ==
+               fuchsia_hardware_audio_signalprocessing::ElementType::kGain) {
+      element_record.state.type_specific() =
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithGain(
+              request.state().type_specific()->gain().value());
+    } else if (*element_record.element.type() ==
+               fuchsia_hardware_audio_signalprocessing::ElementType::kVendorSpecific) {
+      element_record.state.type_specific() =
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithVendorSpecific(
+              request.state().type_specific()->vendor_specific().value());
+    }
     element_record.state_has_changed = true;
 
     MaybeCompleteWatchElementState(element_record);

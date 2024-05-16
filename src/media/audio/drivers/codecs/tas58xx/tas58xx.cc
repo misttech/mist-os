@@ -78,7 +78,7 @@ static const audio::DaiSupportedFormats kSupportedDaiDaiFormats = {
 };
 
 // Utility function to reason about the combined started/bypassed state.
-std::optional<bool> StateIsEnabled(const signal_fidl::ElementState& state) {
+std::optional<bool> StateIsEnabled(const signal_fidl::SettableElementState& state) {
   if ((state.has_started() && !state.started()) || (state.has_bypassed() && state.bypassed())) {
     return false;
   }
@@ -382,7 +382,7 @@ void Tas58xx::GetElements(signal_fidl::SignalProcessing::GetElementsCallback cal
   callback(std::move(result));
 }
 
-zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::ElementState state) {
+zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::SettableElementState state) {
   if (number_of_channels_ != 1 && !metadata_.bridged) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -460,7 +460,7 @@ zx_status_t Tas58xx::SetEqualizerElement(signal_fidl::ElementState state) {
   return ZX_OK;
 }
 
-zx_status_t Tas58xx::SetAutomaticGainLimiterElement(signal_fidl::ElementState state) {
+zx_status_t Tas58xx::SetAutomaticGainLimiterElement(signal_fidl::SettableElementState state) {
   // If started and bypassed are not present, then perform no operation, we keep the current state.
   bool enable_agl = StateIsEnabled(state).value_or(last_agl_);
 
@@ -542,7 +542,7 @@ zx_status_t Tas58xx::SetAutomaticGainLimiterElement(signal_fidl::ElementState st
   return ZX_OK;
 }
 
-zx_status_t Tas58xx::SetGainElement(signal_fidl::ElementState state) {
+zx_status_t Tas58xx::SetGainElement(signal_fidl::SettableElementState state) {
   bool has_valid_gain_specific_state = state.has_type_specific() &&
                                        state.type_specific().is_gain() &&
                                        state.type_specific().gain().has_gain();
@@ -571,10 +571,10 @@ zx_status_t Tas58xx::SetGainElement(signal_fidl::ElementState state) {
   return ZX_OK;
 }
 
-zx_status_t Tas58xx::SetMuteElement(signal_fidl::ElementState state) {
+zx_status_t Tas58xx::SetMuteElement(signal_fidl::SettableElementState state) {
   if (auto new_muted = StateIsEnabled(state); new_muted.has_value()) {
     gain_state_.muted = *new_muted;
-    zx_status_t status = SetMute(*new_muted);
+    zx_status_t status = SetMute(gain_state_.muted);
     if (status != ZX_OK) {
       return status;
     }
@@ -768,7 +768,8 @@ void Tas58xx::SetTopology(uint64_t topology_id,
       signal_fidl::SignalProcessing_SetTopology_Response()));
 }
 
-void Tas58xx::SetElementState(uint64_t processing_element_id, signal_fidl::ElementState state,
+void Tas58xx::SetElementState(uint64_t processing_element_id,
+                              signal_fidl::SettableElementState state,
                               signal_fidl::SignalProcessing::SetElementStateCallback callback) {
   zx_status_t status = ZX_OK;
   switch (processing_element_id) {

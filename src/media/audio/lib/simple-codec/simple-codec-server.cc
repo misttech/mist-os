@@ -248,7 +248,7 @@ void SimpleCodecServerInternal<T>::GetElements(
 
 template <class T>
 void SimpleCodecServerInternal<T>::SetElementState(
-    uint64_t processing_element_id, signal_fidl::ElementState state,
+    uint64_t processing_element_id, signal_fidl::SettableElementState state,
     signal_fidl::SignalProcessing::SetElementStateCallback callback,
     SimpleCodecServerInstance<T>* unused_instance) {
   // The unused_instance parameter indicates which instance triggered this call,

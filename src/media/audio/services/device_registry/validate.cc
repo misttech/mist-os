@@ -1037,6 +1037,114 @@ bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
 }
 
 // Validate the type-specific state for this element type.
+bool ValidateSettableDynamicsElementState(const fhasp::SettableElementState& element_state,
+                                          const fhasp::Element& element) {
+  if (  // This must be an element of type Dynamics
+      element.type() != fhasp::ElementType::kDynamics || !element.type_specific().has_value() ||
+      // ... with appropriate type_specific info
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDynamics ||
+      !element.type_specific()->dynamics().has_value() ||
+      // ... specifically including the bands() vector
+      !element.type_specific()->dynamics()->bands().has_value() ||
+      element.type_specific()->dynamics()->bands()->empty() ||
+      // A type_specific element state of dynamics() must not be absent or empty.
+      !element_state.type_specific().has_value() ||
+      element_state.type_specific()->Which() !=
+          fhasp::SettableTypeSpecificElementState::Tag::kDynamics ||
+      !element_state.type_specific()->dynamics().has_value() ||
+      // band_states() must not be absent or empty.
+      !element_state.type_specific()->dynamics()->band_states().has_value() ||
+      element_state.type_specific()->dynamics()->band_states()->empty()) {
+    FX_LOGS(WARNING) << "Invalid Dynamics-specific fields in SettableElementState";
+    return false;
+  }
+
+  // Additional type-specific checks on each DynamicsBandState.
+  std::unordered_set<uint64_t> band_state_ids;
+  for (const auto& band_state : *element_state.type_specific()->dynamics()->band_states()) {
+    if (  // id is required
+        !band_state.id().has_value() ||
+        // id must be unique (not duplicated in another band_state).
+        band_state_ids.find(*band_state.id()) != band_state_ids.end() ||
+        // id must be contained in the Element.bands vector.
+        std::none_of(element.type_specific()->dynamics()->bands()->cbegin(),
+                     element.type_specific()->dynamics()->bands()->cend(),
+                     [id = *band_state.id()](const fhasp::DynamicsBand& band) {
+                       return (*band.id() == id);
+                     }) ||
+        // min_frequency and max_frequency are required
+        !band_state.min_frequency().has_value() || !band_state.max_frequency().has_value() ||
+        // max_frequency must equal/exceed min_frequency
+        *band_state.min_frequency() > *band_state.max_frequency() ||
+        // threshold_db is required
+        !band_state.threshold_db().has_value() ||
+        // threshold_db must be finite
+        !std::isfinite(*band_state.threshold_db()) ||
+        // threshold_type from a CLIENT requires that supported_controls bit to be set
+        (band_state.threshold_type().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kThresholdType)) ||
+        // ratio is required and must be finite
+        !band_state.ratio().has_value() || !std::isfinite(*band_state.ratio()) ||
+        // knee_width_db from a CLIENT requires that supported_controls bit to be set
+        (band_state.knee_width_db().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kKneeWidth)) ||
+        // knee_width_db, if present, must not be negative
+        (band_state.knee_width_db().value_or(0) < 0.0f) ||
+        // knee_width_db, if present, must be finite
+        (band_state.knee_width_db().has_value() && !std::isfinite(*band_state.knee_width_db())) ||
+        // attack from a CLIENT requires that supported_controls bit to be set
+        (band_state.attack().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kAttack)) ||
+        // attack, if present, must not be negative
+        (band_state.attack().has_value() && *band_state.attack() < 0) ||
+        // release from a CLIENT requires that supported_controls bit to be set
+        (band_state.release().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kRelease)) ||
+        // release, if present, must not be negative
+        (band_state.release().has_value() && *band_state.release() < 0) ||
+        // output_gain_db from a CLIENT requires that supported_controls bit to be set
+        (band_state.output_gain_db().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kOutputGain)) ||
+        // output_gain_db, if present, must be finite
+        (band_state.output_gain_db().has_value() && !std::isfinite(*band_state.output_gain_db())) ||
+        // input_gain_db from a CLIENT requires that supported_controls bit to be set
+        (band_state.input_gain_db().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kInputGain)) ||
+        // input_gain_db, if present, must be finite
+        (band_state.input_gain_db().has_value() && !std::isfinite(*band_state.input_gain_db())) ||
+        // level_type from a CLIENT requires that supported_controls bit to be set
+        (band_state.level_type().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kLevelType)) ||
+        // lookahead from a CLIENT requires that supported_controls bit to be set
+        (band_state.lookahead().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kLookahead)) ||
+        // lookahead, if present, must not be negative
+        (band_state.lookahead().has_value() && *band_state.lookahead() < 0) ||
+        // linked_channels from a CLIENT requires that supported_controls bit to be set
+        (band_state.linked_channels().has_value() &&
+         !(*element.type_specific()->dynamics()->supported_controls() &
+           fhasp::DynamicsSupportedControls::kLinkedChannels))) {
+      FX_LOGS(WARNING) << "Invalid DynamicsBandState (id "
+                       << (band_state.id().has_value() ? std::to_string(*band_state.id())
+                                                       : "<none>")
+                       << ")";
+      return false;
+    }
+    band_state_ids.insert(*band_state.id());
+  }
+
+  return true;
+}
+
+// Validate the type-specific state for this element type.
 bool ValidateEqualizerElementState(const fhasp::ElementState& element_state,
                                    const fhasp::Element& element) {
   if (  // This must be an element of type Equalizer
@@ -1107,6 +1215,140 @@ bool ValidateEqualizerElementState(const fhasp::ElementState& element_state,
 }
 
 // Validate the type-specific state for this element type.
+bool ValidateSettableEqualizerElementState(const fhasp::SettableElementState& element_state,
+                                           const fhasp::Element& element) {
+  if (  // This must be an element of type Equalizer
+      element.type() != fhasp::ElementType::kEqualizer ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type equalizer() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEqualizer ||
+      !element.type_specific()->equalizer().has_value() ||
+      // ... specifically including bands(), min_frequency() and max_frequency()
+      !element.type_specific()->equalizer()->bands().has_value() ||
+      element.type_specific()->equalizer()->bands()->empty() ||
+      !element.type_specific()->equalizer()->min_frequency().has_value() ||
+      !element.type_specific()->equalizer()->max_frequency().has_value() ||
+      // A type_specific element state of equalizer() must not be absent or empty.
+      !element_state.type_specific().has_value() ||
+      element_state.type_specific()->Which() !=
+          fhasp::SettableTypeSpecificElementState::Tag::kEqualizer ||
+      !element_state.type_specific()->equalizer().has_value() ||
+      // band_states() must not be absent or empty.
+      !element_state.type_specific()->equalizer()->band_states().has_value() ||
+      element_state.type_specific()->equalizer()->band_states()->empty()) {
+    FX_LOGS(WARNING) << "Invalid EQ-specific fields in SettableElementState";
+    return false;
+  }
+
+  // Additional type-specific checks on each EqualizerBandState.
+  for (const auto& band_state : *element_state.type_specific()->equalizer()->band_states()) {
+    if (  // id is required
+        !band_state.id().has_value() ||
+        // id must be contained in the Element.bands vector.
+        std::none_of(element.type_specific()->equalizer()->bands()->cbegin(),
+                     element.type_specific()->equalizer()->bands()->cend(),
+                     [id = *band_state.id()](const fhasp::EqualizerBand& band) {
+                       return (*band.id() == id);
+                     }) ||
+
+        // frequency, if present, can't be lower than min_frequency...
+        (band_state.frequency().has_value() &&
+         element.type_specific()->equalizer()->min_frequency() &&
+         *band_state.frequency() < *element.type_specific()->equalizer()->min_frequency()) ||
+        // ... or greater than max_frequency
+        (band_state.frequency().has_value() &&
+         element.type_specific()->equalizer()->max_frequency() &&
+         *band_state.frequency() > *element.type_specific()->equalizer()->max_frequency()) ||
+        // CAN_CONTROL_FREQUENCY must be a property of this EQ element.
+        (band_state.frequency().has_value() &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.frequency().has_value() &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kCanControlFrequency)) ||
+
+        // q, if present, must be positive and finite
+        (band_state.q().has_value() &&
+         (*band_state.q() <= 0.0f || !std::isfinite(*band_state.q()))) ||
+        // CAN_CONTROL_Q must be a property of this EQ element.
+        (band_state.q().has_value() &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.q().has_value() &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kCanControlQ)) ||
+
+        // gain_db, if present, must be finite
+        (band_state.gain_db().has_value() && !std::isfinite(*band_state.gain_db())) ||
+        // gain_db is required for PEAK, LOW_SHELF, HIGH_SHELF...
+        (!band_state.gain_db().has_value() && band_state.type().has_value() &&
+         (*band_state.type() == fhasp::EqualizerBandType::kPeak ||
+          *band_state.type() == fhasp::EqualizerBandType::kLowShelf ||
+          *band_state.type() == fhasp::EqualizerBandType::kHighShelf)) ||
+        // ... but it is disallowed for NOTCH, LOW_CUT, HIGH_CUT.
+        (band_state.gain_db().has_value() && band_state.type().has_value() &&
+         (*band_state.type() == fhasp::EqualizerBandType::kNotch ||
+          *band_state.type() == fhasp::EqualizerBandType::kLowCut ||
+          *band_state.type() == fhasp::EqualizerBandType::kHighCut)) ||
+
+        // SUPPORTS_TYPE_PEAK must be a property of this EQ element.
+        (band_state.type().has_value() && *band_state.type() == fhasp::EqualizerBandType::kPeak &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.type().has_value() && *band_state.type() == fhasp::EqualizerBandType::kPeak &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kSupportsTypePeak)) ||
+
+        // SUPPORTS_TYPE_NOTCH must be a property of this EQ element.
+        (band_state.type().has_value() && *band_state.type() == fhasp::EqualizerBandType::kNotch &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.type().has_value() && *band_state.type() == fhasp::EqualizerBandType::kNotch &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kSupportsTypeNotch)) ||
+
+        // SUPPORTS_TYPE_LOW_CUT must be a property of this EQ element.
+        (band_state.type().has_value() && *band_state.type() == fhasp::EqualizerBandType::kLowCut &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.type().has_value() && *band_state.type() == fhasp::EqualizerBandType::kLowCut &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kSupportsTypeLowCut)) ||
+
+        // SUPPORTS_TYPE_HIGH_CUT must be a property of this EQ element.
+        (band_state.type().has_value() &&
+         *band_state.type() == fhasp::EqualizerBandType::kHighCut &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.type().has_value() &&
+         *band_state.type() == fhasp::EqualizerBandType::kHighCut &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kSupportsTypeHighCut)) ||
+
+        // SUPPORTS_TYPE_LOW_SHELF must be a property of this EQ element.
+        (band_state.type().has_value() &&
+         *band_state.type() == fhasp::EqualizerBandType::kLowShelf &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.type().has_value() &&
+         *band_state.type() == fhasp::EqualizerBandType::kLowShelf &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kSupportsTypeLowShelf)) ||
+
+        // SUPPORTS_TYPE_HIGH_SHELF must be a property of this EQ element.
+        (band_state.type().has_value() &&
+         *band_state.type() == fhasp::EqualizerBandType::kHighShelf &&
+         !element.type_specific()->equalizer()->supported_controls().has_value()) ||
+        (band_state.type().has_value() &&
+         *band_state.type() == fhasp::EqualizerBandType::kHighShelf &&
+         !(*element.type_specific()->equalizer()->supported_controls() &
+           fhasp::EqualizerSupportedControls::kSupportsTypeHighShelf))) {
+      FX_LOGS(WARNING) << "Invalid EqualizerBandState (id "
+                       << (band_state.id().has_value() ? std::to_string(*band_state.id())
+                                                       : "<none>")
+                       << ")";
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Validate the type-specific state for this element type.
 bool ValidateGainElementState(const fhasp::ElementState& element_state,
                               const fhasp::Element& element) {
   if (  // This must be an element of type Gain
@@ -1141,6 +1383,41 @@ bool ValidateGainElementState(const fhasp::ElementState& element_state,
 }
 
 // Validate the type-specific state for this element type.
+bool ValidateSettableGainElementState(const fhasp::SettableElementState& element_state,
+                                      const fhasp::Element& element) {
+  if (  // This must be an element of type Gain
+      element.type() != fhasp::ElementType::kGain ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type gain() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kGain ||
+      !element.type_specific()->gain().has_value() ||
+      // ... specifically including min_gain() and max_gain()
+      !element.type_specific()->gain()->min_gain().has_value() ||
+      !element.type_specific()->gain()->max_gain().has_value() ||
+      // ... both of which must be finite
+      !std::isfinite(*element.type_specific()->gain()->min_gain()) ||
+      !std::isfinite(*element.type_specific()->gain()->max_gain()) ||
+      // A type_specific element state of gain() must not be absent or empty.
+      !element_state.type_specific().has_value() ||
+      element_state.type_specific()->Which() !=
+          fhasp::SettableTypeSpecificElementState::Tag::kGain ||
+      !element_state.type_specific()->gain().has_value() ||
+      // A gain value is required, and it must be finite
+      !element_state.type_specific()->gain()->gain().has_value() ||
+      !std::isfinite(*element_state.type_specific()->gain()->gain()) ||
+      // ... and must be in the [min_gain, max_gain] range.
+      *element_state.type_specific()->gain()->gain() <
+          element.type_specific()->gain()->min_gain() ||
+      *element_state.type_specific()->gain()->gain() >
+          element.type_specific()->gain()->max_gain()) {
+    FX_LOGS(WARNING) << "Invalid Gain-specific fields in ElementState";
+    return false;
+  }
+  return true;
+}
+
+// Validate the type-specific state for this element type.
 bool ValidateVendorSpecificElementState(const fhasp::ElementState& element_state,
                                         const fhasp::Element& element) {
   if (  // This must be an element of type VendorSpecific
@@ -1154,6 +1431,31 @@ bool ValidateVendorSpecificElementState(const fhasp::ElementState& element_state
       !element_state.type_specific().has_value() ||
       element_state.type_specific()->Which() !=
           fhasp::TypeSpecificElementState::Tag::kVendorSpecific ||
+      !element_state.type_specific()->vendor_specific().has_value() ||
+      // Overall vendor_specific_data is optional for ANY element type, but required for this one.
+      !element_state.vendor_specific_data().has_value() ||
+      // vendor_specific_data is opaque: we have no structured checks; just check for empty.
+      element_state.vendor_specific_data()->empty()) {
+    FX_LOGS(WARNING) << "Invalid VendorSpecific fields in ElementState";
+    return false;
+  }
+  return true;
+}
+
+// Validate the type-specific state for this element type.
+bool ValidateSettableVendorSpecificElementState(const fhasp::SettableElementState& element_state,
+                                                const fhasp::Element& element) {
+  if (  // This must be an element of type VendorSpecific
+      element.type() != fhasp::ElementType::kVendorSpecific ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type vendor_specific() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kVendorSpecific ||
+      !element.type_specific()->vendor_specific().has_value() ||
+      // A type_specific element state of vendor_specific() must not be absent or empty.
+      !element_state.type_specific().has_value() ||
+      element_state.type_specific()->Which() !=
+          fhasp::SettableTypeSpecificElementState::Tag::kVendorSpecific ||
       !element_state.type_specific()->vendor_specific().has_value() ||
       // Overall vendor_specific_data is optional for ANY element type, but required for this one.
       !element_state.vendor_specific_data().has_value() ||
@@ -1264,6 +1566,69 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   if (element_state.processing_delay().value_or(0) < 0) {
     FX_LOGS(WARNING) << "WatchElementState: ElementState.processing_delay ("
                      << *element_state.processing_delay() << " ns) cannot be negative";
+    return false;
+  }
+
+  return true;
+}
+
+bool ValidateSettableElementState(const fhasp::SettableElementState& element_state,
+                                  const fhasp::Element& element) {
+  LogSettableElementState(element_state);
+
+  if (!ValidateElement(element)) {
+    return false;
+  }
+
+  switch (*element.type()) {
+    case fhasp::ElementType::kDynamics:
+      if (!ValidateSettableDynamicsElementState(element_state, element)) {
+        return false;
+      }
+      break;
+    case fhasp::ElementType::kEqualizer:
+      if (!ValidateSettableEqualizerElementState(element_state, element)) {
+        return false;
+      }
+      break;
+    case fhasp::ElementType::kGain:
+      if (!ValidateSettableGainElementState(element_state, element)) {
+        return false;
+      }
+      break;
+    case fhasp::ElementType::kVendorSpecific:
+      if (!ValidateSettableVendorSpecificElementState(element_state, element)) {
+        return false;
+      }
+      break;
+    default:
+      // If none of these, then .type_specific should not contain any value.
+      if (element_state.type_specific().has_value()) {
+        FX_LOGS(WARNING)
+            << "WatchElementState: ElementState.type_specific should be empty for ElementType "
+            << element.type();
+        return false;
+      }
+      break;
+  }
+
+  if (element_state.vendor_specific_data().has_value()) {
+    // vendor_specific_data is opaque to us, so we can't really perform any other structured checks.
+    if (element_state.vendor_specific_data()->empty()) {
+      FX_LOGS(WARNING)
+          << "WatchElementState: ElementState.vendor_specific_data, if present, must not be empty";
+      return false;
+    }
+  }
+
+  if (!element.can_stop().value_or(false) && !element_state.started().value_or(true)) {
+    FX_LOGS(WARNING) << "WatchElementState: Element.can_stop is false, but ElementState is stopped";
+    return false;
+  }
+
+  if (!element.can_bypass().value_or(false) && element_state.bypassed().value_or(false)) {
+    FX_LOGS(WARNING)
+        << "WatchElementState: Element.can_bypass is false, but ElementState is bypassed";
     return false;
   }
 

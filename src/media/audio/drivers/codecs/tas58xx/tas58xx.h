@@ -52,7 +52,7 @@ class Tas58xx : public SimpleCodecServer,
                        callback) override;
   void SetElementState(
       uint64_t processing_element_id,
-      fuchsia::hardware::audio::signalprocessing::ElementState state,
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetElementStateCallback
           callback) override;
   void WatchElementState(
@@ -108,11 +108,14 @@ class Tas58xx : public SimpleCodecServer,
   zx_status_t UpdateReg(uint8_t reg, uint8_t mask, uint8_t value);
   zx_status_t SetGain(float gain);
   zx_status_t SetMute(bool mute);
-  zx_status_t SetEqualizerElement(fuchsia::hardware::audio::signalprocessing::ElementState state);
+  zx_status_t SetEqualizerElement(
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state);
   zx_status_t SetAutomaticGainLimiterElement(
-      fuchsia::hardware::audio::signalprocessing::ElementState state);
-  zx_status_t SetGainElement(fuchsia::hardware::audio::signalprocessing::ElementState state);
-  zx_status_t SetMuteElement(fuchsia::hardware::audio::signalprocessing::ElementState state);
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state);
+  zx_status_t SetGainElement(
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state);
+  zx_status_t SetMuteElement(
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state);
   void SendEqualizerWatchReply(
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchElementStateCallback
           callback);

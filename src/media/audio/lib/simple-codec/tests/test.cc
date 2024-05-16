@@ -122,7 +122,7 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
     result.set_response(std::move(response));
     callback(std::move(result));
   }
-  void SetElementState(uint64_t processing_element_id, signal_fidl::ElementState state,
+  void SetElementState(uint64_t processing_element_id, signal_fidl::SettableElementState state,
                        SetElementStateCallback callback) override {
     ASSERT_EQ(processing_element_id, kAglPeId);
     ASSERT_TRUE(state.has_started());
@@ -428,12 +428,12 @@ TEST_F(SimpleCodecTest, GainWithClientViaSignalProcessingApi) {
 
   // Control with test gain.
   signal_fidl::SignalProcessing_SetElementState_Result result_gain;
-  signal_fidl::ElementState state_gain;
+  signal_fidl::SettableElementState state_gain;
   constexpr float kTestGain = 12.3f;
   signal_fidl::GainElementState gain_state;
   gain_state.set_gain(kTestGain);
   state_gain.set_bypassed(false).set_started(true).set_type_specific(
-      signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_state)));
+      signal_fidl::SettableTypeSpecificElementState::WithGain(std::move(gain_state)));
   ASSERT_OK(signal_processing_client->SetElementState(
       result_elements.response().processing_elements[0].id(), std::move(state_gain), &result_gain));
   ASSERT_FALSE(result_gain.is_err());
@@ -446,7 +446,7 @@ TEST_F(SimpleCodecTest, GainWithClientViaSignalProcessingApi) {
 
   // Control with no gain returns an error.
   signal_fidl::SignalProcessing_SetElementState_Result result_no_gain;
-  signal_fidl::ElementState state_no_gain;
+  signal_fidl::SettableElementState state_no_gain;
   state_no_gain.set_bypassed(false).set_started(true);
   ASSERT_OK(signal_processing_client->SetElementState(
       result_elements.response().processing_elements[0].id(), std::move(state_no_gain),
@@ -492,7 +492,7 @@ TEST_F(SimpleCodecTest, AglStateServerWithClientViaSignalProcessingApi) {
 
   // Control with enabled = true.
   signal_fidl::SignalProcessing_SetElementState_Result result_enable;
-  signal_fidl::ElementState state_enable;
+  signal_fidl::SettableElementState state_enable;
   state_enable.set_bypassed(false).set_started(true);
   ASSERT_OK(signal_processing_client->SetElementState(result.response().processing_elements[0].id(),
                                                       std::move(state_enable), &result_enable));

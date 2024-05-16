@@ -750,6 +750,78 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
                         : "<none>");
 }
 
+void LogSettableElementStateInternal(
+    const std::optional<fhasp::SettableElementState>& element_state, const std::string& indent) {
+  std::string new_indent = indent + "                 ";
+  if (!element_state.has_value()) {
+    FX_LOGS(INFO) << new_indent << "     <none>  (during device initialization)";
+    return;
+  }
+
+  if (element_state->type_specific().has_value()) {
+    switch (element_state->type_specific()->Which()) {
+      case fhasp::SettableTypeSpecificElementState::Tag::kDynamics:
+        if (!element_state->type_specific()->dynamics().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Dynamics)              <none> (non-compliant)";
+          break;
+        }
+        LogDynamicsBandStatesInternal(element_state->type_specific()->dynamics()->band_states(),
+                                      indent);
+        break;
+      case fhasp::SettableTypeSpecificElementState::Tag::kEqualizer:
+        if (!element_state->type_specific()->equalizer().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Equalizer)             <none> (non-compliant)";
+          break;
+        }
+        LogEqualizerBandStatesInternal(element_state->type_specific()->equalizer()->band_states(),
+                                       indent);
+        break;
+      case fhasp::SettableTypeSpecificElementState::Tag::kGain:
+        if (!element_state->type_specific()->gain().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (Gain)        <none> (non-compliant)";
+          break;
+        }
+        LogGainDbInternal(element_state->type_specific()->gain()->gain(), indent);
+        break;
+      case fhasp::SettableTypeSpecificElementState::Tag::kVendorSpecific:
+        FX_LOGS(INFO) << indent << "type_specific (VendorSpecific)";
+        break;
+      default:
+        FX_LOGS(INFO) << indent << "type_specific <unknown union>  (non-compliant)";
+        break;
+    }
+  } else {
+    FX_LOGS(INFO) << indent << "type_specific <none> (non-compliant)";
+  }
+
+  if (element_state->vendor_specific_data().has_value()) {
+    FX_LOGS(INFO) << indent << "vendor_specific_data  ["
+                  << element_state->vendor_specific_data()->size() << "]  (not shown here)"
+                  << (element_state->vendor_specific_data()->empty() ? " (non-compliant)" : "");
+  } else {
+    FX_LOGS(INFO) << indent << "vendor_specific_data    <none>";
+  }
+
+  FX_LOGS(INFO) << indent << "started                 "
+                << (element_state->started().has_value()
+                        ? (*element_state->started() ? "TRUE" : "FALSE")
+                        : "<none> (non-compliant)");
+
+  FX_LOGS(INFO) << indent << "bypassed                "
+                << (element_state->bypassed().has_value()
+                        ? (*element_state->bypassed() ? "TRUE" : "FALSE")
+                        : "<none>");
+}
+
+void LogSettableElementState(const std::optional<fhasp::SettableElementState>& element_state) {
+  if constexpr (!kLogSignalProcessingFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/SettableElementState";
+  LogSettableElementStateInternal(element_state, "    ");
+}
+
 void LogElementState(const std::optional<fhasp::ElementState>& element_state) {
   if constexpr (!kLogSignalProcessingFidlResponseValues) {
     return;

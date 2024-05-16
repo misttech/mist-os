@@ -613,12 +613,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x39}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x39}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(0.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
@@ -630,12 +631,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x00}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x00}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(-57.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
@@ -647,12 +649,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x3f}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x3f}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(6.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
@@ -664,12 +667,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x3f}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x3f}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(7.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
@@ -681,12 +685,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x00}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x00}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(-99.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
@@ -714,12 +719,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x39}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x39}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(0.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());
@@ -733,12 +739,13 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainSetting) {
     mock_i2c_.ExpectWriteStop({0x48, 0x3c}, ZX_OK);
     mock_i2c_.ExpectWriteStop({0x49, 0x3c}, ZX_OK);
     fidl::Arena arena;
-    auto gain_state = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(arena);
+    auto gain_state =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(arena);
     auto gain_param =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(arena);
     gain_param.gain(3.0f);
     auto type_specific_gain =
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             arena, gain_param.Build());
     gain_state.type_specific(type_specific_gain);
     auto gain_ret = signal->SetElementState(kHeadphoneGainPeId, gain_state.Build());

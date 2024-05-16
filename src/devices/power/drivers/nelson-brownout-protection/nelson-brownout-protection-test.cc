@@ -72,11 +72,11 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
     result.set_response(std::move(response));
     callback(std::move(result));
   }
-  void SetElementState(uint64_t processing_element_id, signal_fidl::ElementState state,
+  void SetElementState(uint64_t processing_element_id, signal_fidl::SettableElementState state,
                        SetElementStateCallback callback) override {
     ASSERT_EQ(processing_element_id, kAglPeId);
-    ASSERT_TRUE(state.has_enabled());
-    agl_enabled_ = state.enabled();
+    ASSERT_TRUE(state.has_started());
+    agl_enabled_ = state.started() && (!state.has_bypassed() || !state.bypassed());
     callback(signal_fidl::SignalProcessing_SetElementState_Result::WithResponse(
         signal_fidl::SignalProcessing_SetElementState_Response()));
   }

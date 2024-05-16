@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <ctype.h>
-#include <errno.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_ostream.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -14,13 +12,13 @@
 #include <lib/fit/defer.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <zircon/status.h>
 
 #include <deque>
 #include <filesystem>
 #include <sstream>
+#include <utility>
 
 #include <fbl/unique_fd.h>
 
@@ -45,7 +43,7 @@ Usage:
   audio-codec-ctl [-d|--device <device>] t[opologies]
   audio-codec-ctl [-d|--device <device>] w[atch] <id>
   audio-codec-ctl [-d|--device <device>] set <id> [start|stop] [bypass] [gain <gain>]
-    [latency <nsecs>] [vendor <hex> <hex> ...]
+    [vendor <hex> <hex> ...]
   audio-codec-ctl [-h|--help]
 )""";
 
@@ -93,14 +91,13 @@ Commands:
   e[lements]                        : Returns a vector of supported processing elements.
   t[opologies]                      : Returns a vector of supported topologies.
   w[atch] <id>                      : Get a processing element state.
-  set <id> [start|stop] [bypass] [gain <gain>] [latency <nsecs>] [vendor <hex> <hex> ...] : Controls
-    a processing element.
+  set <id> [start|stop] [bypass] [gain <gain>] [vendor <hex> <hex> ...] : Controls a processing
+    element.
     <id>: Processing element id.
     start: Process element started state.
     stop: Process element stopped state.
     bypass: Process element bypassed state.
     <gain>: Current gain in GainType format reported in the supported processing elements vector.
-    <nsecs>: Latency added to the pipeline in nanoseconds.
     <hex>: Vendor specific raw byte to feed to the processing element in hex format.
 
 Examples:
@@ -219,7 +216,7 @@ fidl::SyncClient<fuchsia_hardware_audio::Codec> GetCodecClient(std::string path)
   }
 
   std::cout << "Executing on device " << path << std::endl;
-  zx::result connector = component::Connect<fuchsia_hardware_audio::CodecConnector>(path.c_str());
+  zx::result connector = component::Connect<fuchsia_hardware_audio::CodecConnector>(path);
   if (connector.is_error()) {
     std::cerr << "could not connect to:" << path << " status:" << connector.status_string();
     return {};
@@ -236,7 +233,7 @@ fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing> GetS
     std::string path) {
   auto [local, remote] =
       fidl::Endpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>::Create();
-  auto connect_ret = GetCodecClient(path)->SignalProcessingConnect(std::move(remote));
+  auto connect_ret = GetCodecClient(std::move(path))->SignalProcessingConnect(std::move(remote));
   ZX_ASSERT(connect_ret.is_ok());
   return fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing>(
       std::move(local));
@@ -440,10 +437,9 @@ int main(int argc, char** argv) {
       }
       args.pop_front();
 
-      fuchsia_hardware_audio::DaiFormat format(number_of_channels, channels_to_use_bitmask,
-                                               std::move(sample_format), std::move(frame_format),
-                                               frame_rate, static_cast<uint8_t>(bits_per_slot),
-                                               static_cast<uint8_t>(bits_per_sample));
+      fuchsia_hardware_audio::DaiFormat format(
+          number_of_channels, channels_to_use_bitmask, sample_format, std::move(frame_format),
+          frame_rate, static_cast<uint8_t>(bits_per_slot), static_cast<uint8_t>(bits_per_sample));
       std::cout << "Setting DAI format:" << std::endl;
       std::cout << FidlString(format) << std::endl;
       auto result = GetCodecClient(path)->SetDaiFormat(std::move(format));
@@ -495,12 +491,13 @@ int main(int argc, char** argv) {
         }
         args.pop_front();
 
-        fuchsia_hardware_audio_signalprocessing::ElementState state;
+        fuchsia_hardware_audio_signalprocessing::SettableElementState state;
 
         if (args.size() > 0) {
           if (args.front() == "start") {
             args.pop_front();
             state.started(true);
+            state.bypassed(false);
           } else if (args.front() == "stop") {
             args.pop_front();
             state.started(false);
@@ -523,8 +520,8 @@ int main(int argc, char** argv) {
               args.pop_front();
               gain_state.gain(gain);
               state.type_specific(
-                  fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithGain(
-                      std::move(gain_state)));
+                  fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::
+                      WithGain(std::move(gain_state)));
             } else {
               std::cerr << "set processing element state failed: no gain specified" << std::endl;
               return -1;
@@ -534,19 +531,9 @@ int main(int argc, char** argv) {
 
         if (args.size() > 0) {
           if (args.front() == "latency") {
-            args.pop_front();
-            if (args.size() > 0) {
-              uint64_t latency = 0;
-              if (sscanf(args.front().c_str(), "%lu", &latency) != 1) {
-                ShowUsage(false);
-                return -1;
-              }
-              args.pop_front();
-              state.processing_delay(latency);
-            } else {
-              std::cerr << "set processing element state failed: no latency specified" << std::endl;
-              return -1;
-            }
+            std::cerr << "set processing element state failed: cannot specify latency (deprecated)"
+                      << std::endl;
+            return -1;
           }
         }
 
@@ -576,7 +563,7 @@ int main(int argc, char** argv) {
             id, std::move(state));
         std::cout << "Setting element state:" << std::endl;
         std::cout << FidlString(request) << std::endl;
-        auto result = GetSignalClient(path)->SetElementState(std::move(request));
+        auto result = GetSignalClient(path)->SetElementState(request);
         if (result.is_error()) {
           std::cerr << "set processing element state failed: "
                     << result.error_value().FormatDescription() << std::endl;

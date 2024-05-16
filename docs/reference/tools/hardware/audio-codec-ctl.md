@@ -39,7 +39,7 @@ to play, record, and configure audio streams.
   audio-codec-ctl [-d|--device <device>] w[atch] <id>
 
   audio-codec-ctl [-d|--device <device>] set <id> [start|stop] [bypass] [gain <gain>]
-    [latency <nsecs>] [vendor <hex> <hex> ...]
+    [vendor <hex> <hex> ...]
 
   audio-codec-ctl [-h|--help]
 ```
@@ -201,7 +201,7 @@ Get a processing element state.
 
 ```none
   audio-codec-ctl [-d|--device <device>] set <id> [start|stop] [bypass] [gain <gain>]
-    [latency <nsecs>] [vendor <hex> <hex> ...]
+    [vendor <hex> <hex> ...]
 ```
 
 Controls a processing element.
@@ -215,8 +215,6 @@ Controls a processing element.
 `bypass`: Process element bypassed state.
 
 `<gain>`: Current gain in GainType format reported in the supported processing elements vector.
-
-`<nsecs>`: Latency added to the pipeline in nanoseconds.
 
 `<hex>`: Vendor specific raw byte to feed to the processing element in hex format.
 

@@ -1923,7 +1923,7 @@ TEST_F(CompositeTest, SetElementState) {
   ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
               notify()->element_states().end());
   notify()->clear_element_states();
-  fhasp::ElementState state{{.started = true, .bypassed = false}};
+  fhasp::SettableElementState state{{.started = true, .bypassed = false}};
 
   EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
 

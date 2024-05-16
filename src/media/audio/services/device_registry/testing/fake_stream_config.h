@@ -191,7 +191,7 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
   void GetTopologies(GetTopologiesCallback callback) override {}
   void WatchTopology(WatchTopologyCallback callback) override {}
   void SetElementState(ElementId processing_element_id,
-                       fuchsia::hardware::audio::signalprocessing::ElementState state,
+                       fuchsia::hardware::audio::signalprocessing::SettableElementState state,
                        SetElementStateCallback callback) override {}
   void SetTopology(TopologyId topology_id, SetTopologyCallback callback) override {}
 

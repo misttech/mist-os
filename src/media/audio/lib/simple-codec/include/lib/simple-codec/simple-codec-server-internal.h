@@ -73,7 +73,7 @@ class SimpleCodecServerInternal {
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::GetElementsCallback callback);
   void SetElementState(
       uint64_t processing_element_id,
-      fuchsia::hardware::audio::signalprocessing::ElementState state,
+      fuchsia::hardware::audio::signalprocessing::SettableElementState state,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetElementStateCallback
           callback,
       SimpleCodecServerInstance<T>* instance);
@@ -136,7 +136,7 @@ class SimpleCodecServerInstance
     parent_->GetElements(std::move(callback));
   }
   void SetElementState(uint64_t processing_element_id,
-                       fuchsia::hardware::audio::signalprocessing::ElementState state,
+                       fuchsia::hardware::audio::signalprocessing::SettableElementState state,
                        SetElementStateCallback callback) override {
     parent_->SetElementState(processing_element_id, std::move(state), std::move(callback), this);
   }

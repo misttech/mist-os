@@ -1366,6 +1366,10 @@ TEST(ValidateWarningTest, ElementStateWithMissingFields) {
   EXPECT_FALSE(ValidateElementState(state_without_type_specific, kDaiInterconnectElement));
 }
 
+TEST(ValidateWarningTest, SettableElementStateWithMissingFields) {
+  EXPECT_TRUE(ValidateSettableElementState(kSettableElementStateEmpty, kAgcElement));
+}
+
 // ElementState's type_specific union must match its Element's type.
 TEST(ValidateWarningTest, ElementStateWithIncorrectTypeSpecificState) {
   ASSERT_TRUE(
@@ -1378,6 +1382,18 @@ TEST(ValidateWarningTest, ElementStateWithIncorrectTypeSpecificState) {
   EXPECT_FALSE(ValidateElementState(state_with_incorrect_type_specific, kDaiInterconnectElement));
 }
 
+// ElementState's type_specific union must match its Element's type.
+TEST(ValidateWarningTest, SettableElementStateWithIncorrectTypeSpecificState) {
+  ASSERT_TRUE(
+      ValidateSettableElementState(kSettableDynamicsElementState, kDynamicsElement));  // Baseline
+
+  // Element is an Endpoint, but the state has an Equalizer type_specific table.
+  fhasp::SettableElementState state_with_incorrect_type_specific = kSettableDynamicsElementState;
+  state_with_incorrect_type_specific.type_specific(
+      fhasp::SettableTypeSpecificElementState::WithEqualizer({{.band_states = {{{{.id = 0}}}}}}));
+  EXPECT_FALSE(ValidateSettableElementState(state_with_incorrect_type_specific, kDynamicsElement));
+}
+
 // ElementState that violates the capabilities of that element.
 TEST(ValidateWarningTest, ElementStateInconsistent) {
   // According to Element properties it cannot stop, but ElementState says it is stopped.
@@ -1385,6 +1401,17 @@ TEST(ValidateWarningTest, ElementStateInconsistent) {
 
   // According to Element properties it cannot bypass, but ElementState says it is bypassed.
   EXPECT_FALSE(ValidateElementState(kElementStateBypassed, kElementCannotBypass));
+
+  // More negative tests here that are type-specific.
+}
+
+// ElementState that violates the capabilities of that element.
+TEST(ValidateWarningTest, SettableElementStateInconsistent) {
+  // According to Element properties it cannot stop, but ElementState says it is stopped.
+  EXPECT_FALSE(ValidateSettableElementState(kSettableElementStateStopped, kElementCannotStop));
+
+  // According to Element properties it cannot bypass, but ElementState says it is bypassed.
+  EXPECT_FALSE(ValidateSettableElementState(kSettableElementStateBypassed, kElementCannotBypass));
 
   // More negative tests here that are type-specific.
 }
@@ -1429,35 +1456,33 @@ TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
 // All the ways that a DaiInterconnect ElementState can be invalid.
 TEST(ValidateWarningTest, DaiInterconnectElementStateInvalid) {
   {
-    auto endp_state_plug_state_none = kDaiInterconnectElementState;
-    endp_state_plug_state_none.type_specific()->dai_interconnect()->plug_state(std::nullopt);
+    auto dai_state_plug_state_none = kDaiInterconnectElementState;
+    dai_state_plug_state_none.type_specific()->dai_interconnect()->plug_state(std::nullopt);
     EXPECT_FALSE(
-        ValidateDaiInterconnectElementState(endp_state_plug_state_none, kDaiInterconnectElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plug_state_none, kDaiInterconnectElement));
+        ValidateDaiInterconnectElementState(dai_state_plug_state_none, kDaiInterconnectElement));
+    EXPECT_FALSE(ValidateElementState(dai_state_plug_state_none, kDaiInterconnectElement));
   }
   {
-    auto endp_state_plugged_none = kDaiInterconnectElementState;
-    endp_state_plugged_none.type_specific()->dai_interconnect()->plug_state()->plugged(
+    auto dai_state_plugged_none = kDaiInterconnectElementState;
+    dai_state_plugged_none.type_specific()->dai_interconnect()->plug_state()->plugged(std::nullopt);
+    EXPECT_FALSE(
+        ValidateDaiInterconnectElementState(dai_state_plugged_none, kDaiInterconnectElement));
+    EXPECT_FALSE(ValidateElementState(dai_state_plugged_none, kDaiInterconnectElement));
+  }
+  {
+    auto dai_state_plugged_unsupported = kDaiInterconnectElementState;
+    dai_state_plugged_unsupported.type_specific()->dai_interconnect()->plug_state()->plugged(false);
+    EXPECT_FALSE(
+        ValidateDaiInterconnectElementState(dai_state_plugged_unsupported, kRingBufferElement));
+    EXPECT_FALSE(ValidateElementState(dai_state_plugged_unsupported, kRingBufferElement));
+  }
+  {
+    auto dai_state_plug_time_none = kDaiInterconnectElementState;
+    dai_state_plug_time_none.type_specific()->dai_interconnect()->plug_state()->plug_state_time(
         std::nullopt);
     EXPECT_FALSE(
-        ValidateDaiInterconnectElementState(endp_state_plugged_none, kDaiInterconnectElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plugged_none, kDaiInterconnectElement));
-  }
-  {
-    auto endp_state_plugged_unsupported = kDaiInterconnectElementState;
-    endp_state_plugged_unsupported.type_specific()->dai_interconnect()->plug_state()->plugged(
-        false);
-    EXPECT_FALSE(
-        ValidateDaiInterconnectElementState(endp_state_plugged_unsupported, kRingBufferElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plugged_unsupported, kRingBufferElement));
-  }
-  {
-    auto endp_state_plug_time_none = kDaiInterconnectElementState;
-    endp_state_plug_time_none.type_specific()->dai_interconnect()->plug_state()->plug_state_time(
-        std::nullopt);
-    EXPECT_FALSE(
-        ValidateDaiInterconnectElementState(endp_state_plug_time_none, kDaiInterconnectElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plug_time_none, kDaiInterconnectElement));
+        ValidateDaiInterconnectElementState(dai_state_plug_time_none, kDaiInterconnectElement));
+    EXPECT_FALSE(ValidateElementState(dai_state_plug_time_none, kDaiInterconnectElement));
   }
 }
 
@@ -1627,6 +1652,265 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
   }
 }
 
+// All the ways that a Dynamics-specific SettableElementState can be invalid.
+TEST(ValidateWarningTest, SettableDynamicsElementStateInvalid) {
+  {
+    auto dyn_state_band_states_none = kSettableDynamicsElementState;
+    dyn_state_band_states_none.type_specific()->dynamics()->band_states(std::nullopt);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(dyn_state_band_states_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_band_states_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_band_states_empty = kSettableDynamicsElementState;
+    dyn_state_band_states_empty.type_specific()->dynamics()->band_states({{}});
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(dyn_state_band_states_empty, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_band_states_empty, kDynamicsElement));
+  }
+  {
+    auto dyn_state_id_none = kSettableDynamicsElementState;
+    dyn_state_id_none.type_specific()->dynamics()->band_states()->at(0).id(std::nullopt);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_id_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_id_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_id_unknown = kSettableDynamicsElementState;
+    dyn_state_id_unknown.type_specific()->dynamics()->band_states()->at(0).id(-1);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_id_unknown, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_id_unknown, kDynamicsElement));
+  }
+  {
+    auto dyn_state_min_freq_none = kSettableDynamicsElementState;
+    dyn_state_min_freq_none.type_specific()->dynamics()->band_states()->at(0).min_frequency(
+        std::nullopt);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_min_freq_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_min_freq_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_max_freq_none = kSettableDynamicsElementState;
+    dyn_state_max_freq_none.type_specific()->dynamics()->band_states()->at(0).max_frequency(
+        std::nullopt);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_max_freq_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_max_freq_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_max_freq_too_low = kSettableDynamicsElementState;
+    dyn_state_max_freq_too_low.type_specific()->dynamics()->band_states()->at(0).min_frequency(
+        *kSettableDynamicsElementState.type_specific()
+             ->dynamics()
+             ->band_states()
+             ->at(0)
+             .max_frequency() +
+        1);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(dyn_state_max_freq_too_low, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_max_freq_too_low, kDynamicsElement));
+  }
+  {
+    auto dyn_state_threshold_db_inf = kSettableDynamicsElementState;
+    dyn_state_threshold_db_inf.type_specific()->dynamics()->band_states()->at(0).threshold_db(
+        INFINITY);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+    dyn_state_threshold_db_inf.type_specific()->dynamics()->band_states()->at(0).threshold_db(
+        -INFINITY);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_threshold_db_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_threshold_db_nan = kSettableDynamicsElementState;
+    dyn_state_threshold_db_nan.type_specific()->dynamics()->band_states()->at(0).threshold_db(NAN);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(dyn_state_threshold_db_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_threshold_db_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_threshold_type_unsupported = kDynamicsElement;
+    dyn_element_threshold_type_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_threshold_type_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kThresholdType);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_threshold_type_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_threshold_type_unsupported));
+  }
+  {
+    auto dyn_state_ratio_none = kSettableDynamicsElementState;
+    dyn_state_ratio_none.type_specific()->dynamics()->band_states()->at(0).ratio(std::nullopt);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_ratio_none, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_ratio_none, kDynamicsElement));
+  }
+  {
+    auto dyn_state_ratio_inf = kSettableDynamicsElementState;
+    dyn_state_ratio_inf.type_specific()->dynamics()->band_states()->at(0).ratio(INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_ratio_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_ratio_inf, kDynamicsElement));
+    dyn_state_ratio_inf.type_specific()->dynamics()->band_states()->at(0).ratio(-INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_ratio_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_ratio_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_ratio_nan = kSettableDynamicsElementState;
+    dyn_state_ratio_nan.type_specific()->dynamics()->band_states()->at(0).ratio(NAN);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_ratio_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_ratio_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_knee_width_unsupported = kDynamicsElement;
+    dyn_element_knee_width_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_knee_width_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kKneeWidth);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_knee_width_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_knee_width_unsupported));
+  }
+  {
+    auto dyn_state_knee_neg = kSettableDynamicsElementState;
+    dyn_state_knee_neg.type_specific()->dynamics()->band_states()->at(0).knee_width_db(-1.0f);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_knee_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_knee_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_state_knee_inf = kSettableDynamicsElementState;
+    dyn_state_knee_inf.type_specific()->dynamics()->band_states()->at(0).knee_width_db(INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_knee_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_knee_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_knee_nan = kSettableDynamicsElementState;
+    dyn_state_knee_nan.type_specific()->dynamics()->band_states()->at(0).knee_width_db(NAN);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_knee_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_knee_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_attack_unsupported = kDynamicsElement;
+    dyn_element_attack_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_attack_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kAttack);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_attack_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_attack_unsupported));
+  }
+  {
+    auto dyn_state_attack_neg = kSettableDynamicsElementState;
+    dyn_state_attack_neg.type_specific()->dynamics()->band_states()->at(0).attack(ZX_USEC(-1));
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_attack_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_attack_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_element_release_unsupported = kDynamicsElement;
+    dyn_element_release_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_release_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kRelease);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_release_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_release_unsupported));
+  }
+  {
+    auto dyn_state_release_neg = kSettableDynamicsElementState;
+    dyn_state_release_neg.type_specific()->dynamics()->band_states()->at(0).release(ZX_USEC(-1));
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_release_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_release_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_element_output_gain_unsupported = kDynamicsElement;
+    dyn_element_output_gain_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_output_gain_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kOutputGain);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_output_gain_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_output_gain_unsupported));
+  }
+  {
+    auto dyn_state_output_gain_inf = kSettableDynamicsElementState;
+    dyn_state_output_gain_inf.type_specific()->dynamics()->band_states()->at(0).output_gain_db(
+        INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_output_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_output_gain_inf, kDynamicsElement));
+    dyn_state_output_gain_inf.type_specific()->dynamics()->band_states()->at(0).output_gain_db(
+        -INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_output_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_output_gain_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_output_gain_nan = kSettableDynamicsElementState;
+    dyn_state_output_gain_nan.type_specific()->dynamics()->band_states()->at(0).output_gain_db(NAN);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_output_gain_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_output_gain_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_input_gain_unsupported = kDynamicsElement;
+    dyn_element_input_gain_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_input_gain_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kInputGain);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_input_gain_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_input_gain_unsupported));
+  }
+  {
+    auto dyn_state_input_gain_inf = kSettableDynamicsElementState;
+    dyn_state_input_gain_inf.type_specific()->dynamics()->band_states()->at(0).input_gain_db(
+        INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_input_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_input_gain_inf, kDynamicsElement));
+    dyn_state_input_gain_inf.type_specific()->dynamics()->band_states()->at(0).input_gain_db(
+        -INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_input_gain_inf, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_input_gain_inf, kDynamicsElement));
+  }
+  {
+    auto dyn_state_input_gain_nan = kSettableDynamicsElementState;
+    dyn_state_input_gain_nan.type_specific()->dynamics()->band_states()->at(0).input_gain_db(NAN);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_input_gain_nan, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_input_gain_nan, kDynamicsElement));
+  }
+  {
+    auto dyn_element_level_type_unsupported = kDynamicsElement;
+    dyn_element_level_type_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_level_type_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kLevelType);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_level_type_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_level_type_unsupported));
+  }
+  {
+    auto dyn_element_lookahead_unsupported = kDynamicsElement;
+    dyn_element_lookahead_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_lookahead_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kLookahead);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_lookahead_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_lookahead_unsupported));
+  }
+  {
+    auto dyn_state_lookahead_neg = kSettableDynamicsElementState;
+    dyn_state_lookahead_neg.type_specific()->dynamics()->band_states()->at(0).lookahead(
+        ZX_USEC(-1));
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(dyn_state_lookahead_neg, kDynamicsElement));
+    EXPECT_FALSE(ValidateSettableElementState(dyn_state_lookahead_neg, kDynamicsElement));
+  }
+  {
+    auto dyn_element_linked_channels_unsupported = kDynamicsElement;
+    dyn_element_linked_channels_unsupported.type_specific()->dynamics()->supported_controls(
+        *dyn_element_linked_channels_unsupported.type_specific()->dynamics()->supported_controls() &
+        ~fhasp::DynamicsSupportedControls::kLinkedChannels);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableDynamicsElementState,
+                                                      dyn_element_linked_channels_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableDynamicsElementState,
+                                              dyn_element_linked_channels_unsupported));
+  }
+}
+
 // All the ways that an Equalizer ElementState can be invalid.
 TEST(ValidateWarningTest, EqualizerElementStateInvalid) {
   {
@@ -1729,6 +2013,188 @@ TEST(ValidateWarningTest, EqualizerElementStateInvalid) {
   }
 }
 
+// All the ways that an Equalizer SettableElementState can be invalid.
+TEST(ValidateWarningTest, SettableEqualizerElementStateInvalid) {
+  {
+    auto eq_state_band_states_none = kSettableEqualizerElementState;
+    eq_state_band_states_none.type_specific()->equalizer()->band_states(std::nullopt);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(eq_state_band_states_none, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_band_states_none, kEqualizerElement));
+  }
+  {
+    auto eq_state_band_states_empty = kSettableEqualizerElementState;
+    eq_state_band_states_empty.type_specific()->equalizer()->band_states({{}});
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(eq_state_band_states_empty, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_band_states_empty, kEqualizerElement));
+  }
+  {
+    auto eq_state_id_none = kSettableEqualizerElementState;
+    eq_state_id_none.type_specific()->equalizer()->band_states()->at(0).id(std::nullopt);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_id_none, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_id_none, kEqualizerElement));
+  }
+  {
+    auto eq_state_id_unknown = kSettableEqualizerElementState;
+    eq_state_id_unknown.type_specific()->equalizer()->band_states()->at(0).id(-1);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_id_unknown, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_id_unknown, kEqualizerElement));
+  }
+  // Is BandState.EqualizerBandType ever required?
+  // Is BandState.frequency ever required, depending on the EqualizerBandType?
+  {
+    auto eq_state_freq_too_low = kSettableEqualizerElementState;
+    eq_state_freq_too_low.type_specific()->equalizer()->band_states()->at(0).frequency(
+        *kEqualizerElement.type_specific()->equalizer()->min_frequency());
+    auto eq_element = kEqualizerElement;
+    eq_element.type_specific()->equalizer()->min_frequency(
+        *eq_element.type_specific()->equalizer()->min_frequency() + 1);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_freq_too_low, eq_element));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_freq_too_low, eq_element));
+  }
+  {
+    auto eq_state_freq_too_high = kSettableEqualizerElementState;
+    eq_state_freq_too_high.type_specific()->equalizer()->band_states()->at(0).frequency(
+        *kEqualizerElement.type_specific()->equalizer()->max_frequency());
+    auto eq_element = kEqualizerElement;
+    eq_element.type_specific()->equalizer()->max_frequency(
+        *eq_element.type_specific()->equalizer()->max_frequency() - 1);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_freq_too_high, eq_element));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_freq_too_high, eq_element));
+  }
+  {
+    auto eq_cannot_control_freq = kEqualizerElement;
+    eq_cannot_control_freq.type_specific()->equalizer()->supported_controls(
+        *eq_cannot_control_freq.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kCanControlFrequency);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableEqualizerElementState,
+                                                      eq_cannot_control_freq));
+    EXPECT_FALSE(
+        ValidateSettableElementState(kSettableEqualizerElementState, eq_cannot_control_freq));
+  }
+  {
+    auto eq_state_q_zero = kSettableEqualizerElementState;
+    eq_state_q_zero.type_specific()->equalizer()->band_states()->at(0).q(0.0f);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_q_zero, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_q_zero, kEqualizerElement));
+  }
+  {
+    auto eq_state_q_inf = kSettableEqualizerElementState;
+    eq_state_q_inf.type_specific()->equalizer()->band_states()->at(0).q(INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_q_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_q_inf, kEqualizerElement));
+    eq_state_q_inf.type_specific()->equalizer()->band_states()->at(0).q(-INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_q_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_q_inf, kEqualizerElement));
+  }
+  {
+    auto eq_cannot_control_q = kEqualizerElement;
+    eq_cannot_control_q.type_specific()->equalizer()->supported_controls(
+        *eq_cannot_control_q.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kCanControlQ);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(kSettableEqualizerElementState, eq_cannot_control_q));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableEqualizerElementState, eq_cannot_control_q));
+  }
+  {
+    auto eq_state_gain_nan = kSettableEqualizerElementState;
+    eq_state_gain_nan.type_specific()->equalizer()->band_states()->at(0).gain_db(NAN);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_gain_nan, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_gain_nan, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_inf = kSettableEqualizerElementState;
+    eq_state_gain_inf.type_specific()->equalizer()->band_states()->at(0).gain_db(INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_gain_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_gain_inf, kEqualizerElement));
+    eq_state_gain_inf.type_specific()->equalizer()->band_states()->at(0).gain_db(-INFINITY);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_gain_inf, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_gain_inf, kEqualizerElement));
+  }
+  {
+    auto eq_state_q_nan = kSettableEqualizerElementState;
+    eq_state_q_nan.type_specific()->equalizer()->band_states()->at(0).q(NAN);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_q_nan, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_q_nan, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_unexpected = kSettableEqualizerElementState;
+    eq_state_gain_unexpected.type_specific()->equalizer()->band_states()->at(1).type(
+        fhasp::EqualizerBandType::kNotch);
+    eq_state_gain_unexpected.type_specific()->equalizer()->band_states()->at(1).gain_db(0.0f);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_gain_unexpected, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_gain_unexpected, kEqualizerElement));
+  }
+  {
+    auto eq_state_gain_expected = kSettableEqualizerElementState;
+    eq_state_gain_expected.type_specific()->equalizer()->band_states()->at(0).type(
+        fhasp::EqualizerBandType::kPeak);
+    eq_state_gain_expected.type_specific()->equalizer()->band_states()->at(0).gain_db(std::nullopt);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(eq_state_gain_expected, kEqualizerElement));
+    EXPECT_FALSE(ValidateSettableElementState(eq_state_gain_expected, kEqualizerElement));
+  }
+  {
+    auto eq_peak_unsupported = kEqualizerElement;
+    eq_peak_unsupported.type_specific()->equalizer()->supported_controls(
+        *eq_peak_unsupported.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kSupportsTypePeak);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(kSettableEqualizerElementState, eq_peak_unsupported));
+    EXPECT_FALSE(ValidateSettableElementState(kSettableEqualizerElementState, eq_peak_unsupported));
+  }
+  {
+    auto eq_notch_unsupported = kEqualizerElement;
+    eq_notch_unsupported.type_specific()->equalizer()->supported_controls(
+        *eq_notch_unsupported.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kSupportsTypeNotch);
+    EXPECT_FALSE(
+        ValidateSettableDynamicsElementState(kSettableEqualizerElementState, eq_notch_unsupported));
+    EXPECT_FALSE(
+        ValidateSettableElementState(kSettableEqualizerElementState, eq_notch_unsupported));
+  }
+  {
+    auto eq_low_cut_unsupported = kEqualizerElement;
+    eq_low_cut_unsupported.type_specific()->equalizer()->supported_controls(
+        *eq_low_cut_unsupported.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kSupportsTypeLowCut);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableEqualizerElementState,
+                                                      eq_low_cut_unsupported));
+    EXPECT_FALSE(
+        ValidateSettableElementState(kSettableEqualizerElementState, eq_low_cut_unsupported));
+  }
+  {
+    auto eq_high_cut_unsupported = kEqualizerElement;
+    eq_high_cut_unsupported.type_specific()->equalizer()->supported_controls(
+        *eq_high_cut_unsupported.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kSupportsTypeHighCut);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableEqualizerElementState,
+                                                      eq_high_cut_unsupported));
+    EXPECT_FALSE(
+        ValidateSettableElementState(kSettableEqualizerElementState, eq_high_cut_unsupported));
+  }
+  {
+    auto eq_low_shelf_unsupported = kEqualizerElement;
+    eq_low_shelf_unsupported.type_specific()->equalizer()->supported_controls(
+        *eq_low_shelf_unsupported.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kSupportsTypeLowShelf);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableEqualizerElementState,
+                                                      eq_low_shelf_unsupported));
+    EXPECT_FALSE(
+        ValidateSettableElementState(kSettableEqualizerElementState, eq_low_shelf_unsupported));
+  }
+  {
+    auto eq_high_shelf_unsupported = kEqualizerElement;
+    eq_high_shelf_unsupported.type_specific()->equalizer()->supported_controls(
+        *eq_high_shelf_unsupported.type_specific()->equalizer()->supported_controls() &
+        ~fhasp::EqualizerSupportedControls::kSupportsTypeHighShelf);
+    EXPECT_FALSE(ValidateSettableDynamicsElementState(kSettableEqualizerElementState,
+                                                      eq_high_shelf_unsupported));
+    EXPECT_FALSE(
+        ValidateSettableElementState(kSettableEqualizerElementState, eq_high_shelf_unsupported));
+  }
+}
+
 // All the ways that a Gain ElementState can be invalid.
 TEST(ValidateWarningTest, GainElementStateInvalid) {
   {
@@ -1768,6 +2234,45 @@ TEST(ValidateWarningTest, GainElementStateInvalid) {
   }
 }
 
+// All the ways that a Gain SettableElementState can be invalid.
+TEST(ValidateWarningTest, SettableGainElementStateInvalid) {
+  {
+    auto gain_state_gain_none = kSettableGainElementState;
+    gain_state_gain_none.type_specific()->gain()->gain(std::nullopt);
+    EXPECT_FALSE(ValidateSettableGainElementState(gain_state_gain_none, kGainElement));
+    EXPECT_FALSE(ValidateSettableElementState(gain_state_gain_none, kGainElement));
+  }
+  {
+    auto gain_state_gain_too_low = kSettableGainElementState;
+    gain_state_gain_too_low.type_specific()->gain()->gain(
+        *kGainElement.type_specific()->gain()->min_gain() - 1.0f);
+    EXPECT_FALSE(ValidateSettableGainElementState(gain_state_gain_too_low, kGainElement));
+    EXPECT_FALSE(ValidateSettableElementState(gain_state_gain_too_low, kGainElement));
+  }
+  {
+    auto gain_state_gain_too_high = kSettableGainElementState;
+    gain_state_gain_too_high.type_specific()->gain()->gain(
+        *kGainElement.type_specific()->gain()->max_gain() + 1.0f);
+    EXPECT_FALSE(ValidateSettableGainElementState(gain_state_gain_too_high, kGainElement));
+    EXPECT_FALSE(ValidateSettableElementState(gain_state_gain_too_high, kGainElement));
+  }
+  {
+    auto gain_state_gain_inf = kSettableGainElementState;
+    gain_state_gain_inf.type_specific()->gain()->gain(INFINITY);
+    EXPECT_FALSE(ValidateSettableGainElementState(gain_state_gain_inf, kGainElement));
+    EXPECT_FALSE(ValidateSettableElementState(gain_state_gain_inf, kGainElement));
+    gain_state_gain_inf.type_specific()->gain()->gain(-INFINITY);
+    EXPECT_FALSE(ValidateSettableGainElementState(gain_state_gain_inf, kGainElement));
+    EXPECT_FALSE(ValidateSettableElementState(gain_state_gain_inf, kGainElement));
+  }
+  {
+    auto gain_state_gain_nan = kSettableGainElementState;
+    gain_state_gain_nan.type_specific()->gain()->gain(NAN);
+    EXPECT_FALSE(ValidateSettableGainElementState(gain_state_gain_nan, kGainElement));
+    EXPECT_FALSE(ValidateSettableElementState(gain_state_gain_nan, kGainElement));
+  }
+}
+
 // All the ways that a VendorSpecific ElementState can be invalid.
 TEST(ValidateWarningTest, VendorSpecificElementStateInvalid) {
   {
@@ -1785,6 +2290,26 @@ TEST(ValidateWarningTest, VendorSpecificElementStateInvalid) {
                                                     kVendorSpecificElement));
     EXPECT_FALSE(
         ValidateElementState(vendor_specific_vendor_specific_data_empty, kVendorSpecificElement));
+  }
+}
+
+// All the ways that a VendorSpecific SettableElementState can be invalid.
+TEST(ValidateWarningTest, SettableVendorSpecificElementStateInvalid) {
+  {
+    auto vendor_specific_vendor_specific_data_none = kSettableVendorSpecificElementState;
+    vendor_specific_vendor_specific_data_none.vendor_specific_data(std::nullopt);
+    EXPECT_FALSE(ValidateSettableVendorSpecificElementState(
+        vendor_specific_vendor_specific_data_none, kVendorSpecificElement));
+    EXPECT_FALSE(ValidateSettableElementState(vendor_specific_vendor_specific_data_none,
+                                              kVendorSpecificElement));
+  }
+  {
+    auto vendor_specific_vendor_specific_data_empty = kSettableVendorSpecificElementState;
+    vendor_specific_vendor_specific_data_empty.vendor_specific_data({{}});
+    EXPECT_FALSE(ValidateSettableVendorSpecificElementState(
+        vendor_specific_vendor_specific_data_empty, kVendorSpecificElement));
+    EXPECT_FALSE(ValidateSettableElementState(vendor_specific_vendor_specific_data_empty,
+                                              kVendorSpecificElement));
   }
 }
 

@@ -258,13 +258,14 @@ zx::result<GainState> SimpleCodecClient::GetGainState() {
 void SimpleCodecClient::SetGainState(GainState gain_state) {
   fidl::Arena allocator;
   if (gain_pe_id_.has_value()) {
-    auto gain = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(allocator);
+    auto gain =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(allocator);
     gain.started(true).bypassed(false);
     auto gain_parameters =
         fuchsia_hardware_audio_signalprocessing::wire::GainElementState::Builder(allocator);
     gain_parameters.gain(gain_state.gain);
     gain.type_specific(
-        fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElementState::WithGain(
+        fuchsia_hardware_audio_signalprocessing::wire::SettableTypeSpecificElementState::WithGain(
             allocator, gain_parameters.Build()));
     auto ret = signal_processing_.sync()->SetElementState(gain_pe_id_.value(), gain.Build());
     if (!ret.ok()) {
@@ -273,7 +274,8 @@ void SimpleCodecClient::SetGainState(GainState gain_state) {
   }
 
   if (mute_pe_id_.has_value()) {
-    auto mute = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(allocator);
+    auto mute =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(allocator);
     mute.started(true).bypassed(!gain_state.muted);
     auto ret = signal_processing_.sync()->SetElementState(mute_pe_id_.value(), mute.Build());
     if (!ret.ok()) {
@@ -282,7 +284,8 @@ void SimpleCodecClient::SetGainState(GainState gain_state) {
   }
 
   if (agc_pe_id_.has_value()) {
-    auto agc = fuchsia_hardware_audio_signalprocessing::wire::ElementState::Builder(allocator);
+    auto agc =
+        fuchsia_hardware_audio_signalprocessing::wire::SettableElementState::Builder(allocator);
     agc.started(true).bypassed(!gain_state.agc_enabled);
     auto ret = signal_processing_.sync()->SetElementState(agc_pe_id_.value(), agc.Build());
     if (!ret.ok()) {
