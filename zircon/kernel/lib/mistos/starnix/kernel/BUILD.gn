@@ -18,6 +18,7 @@ zx_library("kernel") {
     "mm/syscalls.cc",
     "runner/container.cc",
     "starnix-loader.cc",
+    "syscalls/misc.cc",
     "task/current_task.cc",
     "task/kernel.cc",
     "task/pidtable.cc",

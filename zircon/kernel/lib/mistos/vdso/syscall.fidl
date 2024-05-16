@@ -667,8 +667,15 @@ closed protocol Syscall {
     strict Renameat2() -> () error int64;
     ///STUB 317
     strict Seccomp() -> () error int64;
-    ///STUB 318
-    strict Getrandom() -> () error int64;
+
+    // #318, SYSCALL_DEFINE3(getrandom, char __user *, ubuf, size_t, len, unsigned int, flags)
+    strict Getrandom(resource struct {
+        @out
+        buf experimental_pointer<uchar>;
+        len uint64;
+        flags uint32;
+    }) -> () error int64;
+
     ///STUB 319
     strict MemfdCreate() -> () error int64;
     ///STUB 320

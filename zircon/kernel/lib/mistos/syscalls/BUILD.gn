@@ -31,6 +31,7 @@ source_set("impl") {
   sources = [
     "fs.cc",
     "kernel/exit.cc",
+    "misc.cc",
     "not_implemented.cc",
     "test.cc",
   ]
@@ -40,4 +41,7 @@ source_set("impl") {
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/object",
   ]
+
+  # Force to be the last one
+  deps += [ "//zircon/kernel/lib/mistos/starnix/kernel" ]
 }
