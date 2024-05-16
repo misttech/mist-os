@@ -27,6 +27,7 @@
 #include <lib/mistos/starnix_uapi/math.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/cprng.h>
+#include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
 #include <lib/zbi-format/internal/bootfs.h>
 #include <trace.h>
@@ -39,6 +40,7 @@
 #include <numeric>
 #include <optional>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/static_vector.h>
 #include <fbl/string.h>
@@ -48,13 +50,13 @@
 #include <ktl/span.h>
 
 #include "../kernel_priv.h"
-#include "fbl/alloc_checker.h"
+#include "starnix-loader.h"
 
 #include <ktl/enforce.h>
 
 #include <linux/auxvec.h>
 
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
 
 namespace {
 
@@ -97,8 +99,8 @@ fit::result<Errno, StackResult> populate_initial_stack(
   LTRACE;
   auto stack_pointer = original_stack_start_addr;
 
-  auto write_stack = [&](const ktl::span<const uint8_t>& data,
-                         UserAddress addr) -> fit::result<Errno, size_t> {
+  auto write_stack = [&ma](const ktl::span<const uint8_t>& data,
+                           UserAddress addr) -> fit::result<Errno, size_t> {
     LTRACEF("write [%lx] - %p - %zu\n", addr.ptr(), data.data(), data.size());
     return ma.write_memory(addr, data);
   };
@@ -243,25 +245,26 @@ fit::result<Errno, LoadedElf> load_elf(
   auto& [ehdr, phdrs_result] = *headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
-  // zx::vmar tmp_user_vmar;
-  //{
-  Guard<Mutex> lock(mm->mm_state_rw_lock());
-  const auto& state = mm->state();
-  // tmp_user_vmar.reset(state.user_vmar().get());
-  //}
-  elfldltl::StaticOrDynExecutableVmarLoader loader{state.user_vmar(),
-                                                   (ehdr.type == elfldltl::ElfType::kDyn)};
   elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container> load_info;
   ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(PAGE_SIZE)));
-  ZX_ASSERT(loader.Load(diag, load_info, vmo->as_ref().borrow()));
 
-  LTRACEF("loaded at %p, entry point %p\n", (void*)(load_info.vaddr_start() + loader.load_bias()),
-          (void*)(ehdr.entry + loader.load_bias()));
+  size_t file_base = 0;
+  if (ehdr.type == elfldltl::ElfType::kDyn) {
+    file_base = mm->get_random_base(load_info.vaddr_size()).ptr();
+  } else if (ehdr.type == elfldltl::ElfType::kExec) {
+    file_base = load_info.vaddr_start();
+  } else {
+    return fit::error(errno(EINVAL));
+  }
+  size_t vaddr_bias = file_base - load_info.vaddr_start();
 
-  using RelroRegion = decltype(load_info)::Region;
-  zx::vmar loaded_vmar = ktl::move(loader).Commit(RelroRegion{}).TakeVmar();
+  StarnixLoader loader(mm);
+  ZX_ASSERT(loader.map_elf_segments(diag, load_info, vmo->as_ref().borrow(), mm->base_addr.ptr(),
+                                    vaddr_bias));
 
-  return fit::ok(LoadedElf{ehdr, load_info.vaddr_start(), loader.load_bias()});
+  LTRACEF("loaded at %lx, entry point %lx\n", file_base, ehdr.entry + vaddr_bias);
+
+  return fit::ok(LoadedElf{ehdr, file_base, vaddr_bias});
 }
 
 // Resolves a file handle into a validated executable ELF.
@@ -433,12 +436,6 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   }
 
   auto entry_elf = interp_elf.value_or(main_elf.value());
-
-  /*
-  let entry = UserAddress::from_ptr(
-        entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias),
-    );
-  */
   auto entry = entry_elf.file_header.entry + entry_elf.vaddr_bias;
 
   LTRACEF("loaded %.*s at entry point 0x%lx\n", static_cast<int>(original_path.size()),
@@ -525,9 +522,10 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
     return stack_base.take_error();
   }
 
-  //
-  // uintptr_t sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_size);
   auto stack = stack_base.value() + (stack_size_result.value() - 8);
+
+  LTRACEF("stack [%lx, %lx) sp=%lx\n", stack_base.value().ptr(),
+          stack_base.value().ptr() + stack_size_result.value(), stack.ptr());
 
   auto stack_result = populate_initial_stack(current_task, stack_base.value(), original_path,
                                              resolved_elf.argv, resolved_elf.environ, auxv, stack);
