@@ -11,16 +11,12 @@
         binary: "bin/fake-suspend-bin",
     },
     capabilities: [
-        {
-            directory: "dev-class-suspend",
-            rights: [ "r*" ],
-            path: "/suspend",
-        },
+        { service: "fuchsia.hardware.suspend.SuspendService" },
         { protocol: "test.suspendcontrol.Device" },
     ],
     expose: [
         {
-            directory: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "self",
         },
         {

@@ -5,6 +5,7 @@
 #include "src/power/testing/client/cpp/client.h"
 
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 
 namespace test_client {
 
@@ -32,8 +33,9 @@ PowerTestingClient::ConnectSuspendControl() {
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_suspend::Suspender>>
 PowerTestingClient::ConnectSuspender() {
-  return root_->component().Connect<fuchsia_hardware_suspend::Suspender>(
-      "/dev-class-suspend/instance");
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc(
+      root_->component().exposed().unowned_channel()->get());
+  return component::ConnectAtMember<fuchsia_hardware_suspend::SuspendService::Suspender>(svc);
 }
 
 }  // namespace test_client

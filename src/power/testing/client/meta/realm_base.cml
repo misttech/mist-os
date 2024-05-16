@@ -27,10 +27,9 @@
             to: "#test-system-activity-governor",
         },
         {
-            directory: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "#test-suspend",
             to: "#test-system-activity-governor",
-            rights: [ "r*" ],
         },
         {
             protocol: "test.suspendcontrol.Device",
@@ -52,9 +51,8 @@
             from: "#test-power-broker",
         },
         {
-            directory: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "#test-suspend",
-            rights: [ "r*" ],
         },
         {
             protocol: "test.suspendcontrol.Device",

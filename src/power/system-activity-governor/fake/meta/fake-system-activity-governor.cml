@@ -51,10 +51,9 @@
             to: [ "#system-activity-governor" ],
         },
         {
-            directory: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "parent",
             to: "#system-activity-governor",
-            rights: [ "r*" ],
         },
     ],
     expose: [

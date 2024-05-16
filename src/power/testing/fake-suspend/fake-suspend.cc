@@ -21,12 +21,14 @@ int main() {
   control_server->set_resumable(device_server);
   device_server->set_suspend_observer(control_server);
 
-  auto result = outgoing.AddUnmanagedProtocolAt<fuchsia_hardware_suspend::Suspender>(
-      "suspend",
-      [device_server](fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> server_end) {
-        device_server->Serve(async_get_default_dispatcher(), std::move(server_end));
-      },
-      "instance");
+  fuchsia_hardware_suspend::SuspendService::InstanceHandler handler({
+      .suspender =
+          [device_server](fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> server_end) {
+            device_server->Serve(async_get_default_dispatcher(), std::move(server_end));
+          },
+  });
+
+  auto result = outgoing.AddService<fuchsia_hardware_suspend::SuspendService>(std::move(handler));
   if (result.is_error()) {
     return -1;
   }

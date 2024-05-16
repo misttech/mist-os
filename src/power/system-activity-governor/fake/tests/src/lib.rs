@@ -78,7 +78,7 @@ async fn create_test_env() -> TestEnv {
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("test.suspendcontrol.Device"))
-                .capability(Capability::directory("dev-class-suspend"))
+                .capability(Capability::service_by_name("fuchsia.hardware.suspend.SuspendService"))
                 .from(&fake_suspend_ref)
                 .to(&component_ref),
         )

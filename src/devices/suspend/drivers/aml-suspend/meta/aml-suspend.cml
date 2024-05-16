@@ -15,9 +15,18 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         colocate: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.suspend.SuspendService" },
+    ],
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { protocol: "fuchsia.kernel.CpuResource" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "self",
+        },
     ],
 }

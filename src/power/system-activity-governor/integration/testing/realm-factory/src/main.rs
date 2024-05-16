@@ -112,7 +112,7 @@ async fn create_realm() -> Result<RealmInstance, Error> {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::directory("dev-class-suspend"))
+                .capability(Capability::service_by_name("fuchsia.hardware.suspend.SuspendService"))
                 .from(&fake_suspend_ref)
                 .to(&component_ref),
         )

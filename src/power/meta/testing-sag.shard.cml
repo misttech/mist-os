@@ -14,7 +14,7 @@
     ],
     offer: [
         {
-            directory: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "#fake-suspend",
             to: "#system-activity-governor",
         },

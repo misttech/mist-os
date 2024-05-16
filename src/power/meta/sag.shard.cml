@@ -10,11 +10,9 @@
     ],
     offer: [
         {
-            directory: "dev-class",
-            from: "#devfs",
-            as: "dev-class-suspend",
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "#boot-drivers",
             to: "#system-activity-governor",
-            subdir: "suspend",
         },
         {
             protocol: [
