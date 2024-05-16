@@ -3875,18 +3875,18 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
   }
 }
 
-void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len,
-                                                   bool set_always_need,
-                                                   Guard<CriticalMutex>* guard) {
+zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len,
+                                                          bool set_always_need, bool ignore_errors,
+                                                          Guard<CriticalMutex>* guard) {
   canary_.Assert();
 
   // Hints only apply to pager backed VMOs.
   if (!can_root_source_evict_locked()) {
-    return;
+    return ZX_OK;
   }
   // Zero lengths have no work to do.
   if (len == 0) {
-    return;
+    return ZX_OK;
   }
 
   uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
@@ -3903,7 +3903,7 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
     if (!cursor_valid) {
       cursor = GetLookupCursorLocked(cur_offset, remaining);
       if (cursor.is_error()) {
-        return;
+        return cursor.status_value();
       }
       cursor_valid = true;
     }
@@ -3921,7 +3921,7 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
       // root again and check if we still have a page source backing it before applying the hint.
       if (!can_root_source_evict_locked()) {
         // Hinting is not applicable anymore. No more pages to hint.
-        return;
+        return ZX_OK;
       }
 
       // Check to see if the page is owned by the root VMO. Hints only apply to the root.
@@ -3956,13 +3956,13 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
     // Either way when go back around in the loop we are going to need a new cursor.
     cursor_valid = false;
 
-    if (result.error_value() == ZX_ERR_SHOULD_WAIT) {
+    if (status == ZX_ERR_SHOULD_WAIT) {
       guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
 
       // The size might have changed since we dropped the lock. Adjust the range if required.
       if (cur_offset >= size_locked()) {
         // No more pages to hint.
-        return;
+        return ZX_OK;
       }
       // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
       // we've already hinted on the preceding pages, so just go on ahead instead of returning an
@@ -3979,10 +3979,13 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
         continue;
       }
     }
-
-    // Getting here indicates an error was encountered for this page. Simply ignore it and move on
-    // to the next page. Hints are best effort anyway.
+    // Should only get here if an error was encountered, check if we should ignore or return it.
+    DEBUG_ASSERT(status != ZX_OK);
+    if (!ignore_errors) {
+      return status;
+    }
   }
+  return ZX_OK;
 }
 
 zx_status_t VmCowPages::DecompressInRangeLocked(uint64_t offset, uint64_t len,

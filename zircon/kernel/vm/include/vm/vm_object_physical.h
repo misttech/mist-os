@@ -51,6 +51,7 @@ class VmObjectPhysical final : public VmObject {
       TA_REQ(lock());
 
   zx_status_t CommitRangePinned(uint64_t offset, uint64_t len, bool write) override;
+  zx_status_t PrefetchRange(uint64_t offset, uint64_t len) override;
 
   void Unpin(uint64_t offset, uint64_t len) override {
     // Unpin is a no-op for physical VMOs as they are always pinned.

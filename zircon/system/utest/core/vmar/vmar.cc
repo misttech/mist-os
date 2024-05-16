@@ -2758,4 +2758,54 @@ TEST(Vmar, MapRangeResizable) {
   zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size() * 2);
 }
 
+// Prefetch on an anonymous VMO only has an effect of decompressing pages, which we cannot trigger
+// and check here in userspace, so this test just validates general syscall errors.
+TEST(Vmar, Prefetch) {
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &vmo));
+
+  // Map the VMO into a sub vmar, making the sub vmar slightly larger to ensure a fault gap.
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 4, &vmar, &vmar_addr));
+  auto destroy = fit::defer([&]() {
+    // Cleanup the vmar.
+    vmar.destroy();
+  });
+
+  zx_vaddr_t addr;
+  EXPECT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC, zx_system_get_page_size(),
+                     vmo, 0, zx_system_get_page_size() * 2, &addr));
+  EXPECT_EQ(vmar_addr + zx_system_get_page_size(), addr);
+
+  // Correct ranges.
+  EXPECT_OK(vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size(), nullptr, 0));
+  EXPECT_OK(vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size() * 2, nullptr, 0));
+  // Zero length is an error.
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, 0, nullptr, 0));
+  // Unaligned ranges generate an error.
+  EXPECT_EQ(
+      ZX_ERR_INVALID_ARGS,
+      vmar.op_range(ZX_VMAR_OP_PREFETCH, addr + zx_system_get_page_size() - 1, 2, nullptr, 0));
+  // Out of range of the entire vmar gives out of range.
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            vmar.op_range(ZX_VMAR_OP_PREFETCH, addr + zx_system_get_page_size() * 2,
+                          zx_system_get_page_size() * 2, nullptr, 0));
+  // Out of range of the mapping, but into the unmapped portion is a bad state.
+  EXPECT_EQ(ZX_ERR_BAD_STATE,
+            vmar.op_range(ZX_VMAR_OP_PREFETCH, addr + zx_system_get_page_size() * 2,
+                          zx_system_get_page_size(), nullptr, 0));
+
+  // Operating on the root vmar should fail as prefetch can never operate on child mappings.
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS,
+            zx::vmar::root_self()->op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size(),
+                                            nullptr, 0));
+
+  // Protecting the mapping to not have the read permissions does not prevent prefetch.
+  EXPECT_OK(vmar.protect(0, addr, zx_system_get_page_size() * 2));
+  EXPECT_OK(vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size() * 2, nullptr, 0));
+}
+
 }  // namespace

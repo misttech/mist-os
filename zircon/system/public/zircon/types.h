@@ -218,6 +218,8 @@ typedef struct zx_wait_item {
 #define ZX_VMO_OP_TRY_LOCK               ((uint32_t)11u)
 #define ZX_VMO_OP_DONT_NEED              ((uint32_t)12u)
 #define ZX_VMO_OP_ALWAYS_NEED            ((uint32_t)13u)
+// keep value in sync with ZX_VMAR_OP_PREFETCH
+#define ZX_VMO_OP_PREFETCH               ((uint32_t)14u)
 
 // |buffer| for zx_vmo_op_range() with ZX_VMO_OP_LOCK.
 typedef struct zx_vmo_lock_state {
@@ -244,6 +246,8 @@ typedef struct zx_vmo_lock_state {
 #define ZX_VMAR_OP_DONT_NEED             ((uint32_t)12u)
 // Keep value in sync with ZX_VMO_OP_ALWAYS_NEED.
 #define ZX_VMAR_OP_ALWAYS_NEED           ((uint32_t)13u)
+// Keep value in sync with ZX_VMO_OP_PREFETCH
+#define ZX_VMAR_OP_PREFETCH              ((uint32_t)14u)
 
 // Pager opcodes
 #define ZX_PAGER_OP_FAIL                 ((uint32_t)1u)

@@ -3678,4 +3678,63 @@ TEST(Pager, PageRequestBatchingChecksAncestorPages) {
   ASSERT_TRUE(t3.Wait());
 }
 
+TEST(Pager, Prefetch) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  // Test prefetching directly on the root.
+  {
+    Vmo* root_vmo;
+    ASSERT_TRUE(pager.CreateVmo(1, &root_vmo));
+
+    TestThread t([&root_vmo] { return root_vmo->Prefetch(0, 1); });
+    ASSERT_TRUE(t.Start());
+
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 0, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 0, 1));
+    pager.ReleaseVmo(root_vmo);
+  }
+
+  // Prefetch through a slice.
+  {
+    Vmo* root_vmo;
+    ASSERT_TRUE(pager.CreateVmo(2, &root_vmo));
+    std::unique_ptr<Vmo> slice =
+        root_vmo->Clone(zx_system_get_page_size(), zx_system_get_page_size(), ZX_VMO_CHILD_SLICE);
+    ASSERT_NOT_NULL(slice);
+
+    TestThread t([&slice] { return slice->Prefetch(0, 1); });
+    ASSERT_TRUE(t.Start());
+
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 1, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 1, 1));
+    pager.ReleaseVmo(root_vmo);
+  }
+
+  // Prefetch through a clone.
+  {
+    Vmo* root_vmo;
+    ASSERT_TRUE(pager.CreateVmo(2, &root_vmo));
+    std::unique_ptr<Vmo> clone = root_vmo->Clone();
+    ASSERT_NOT_NULL(clone);
+
+    TestThread t([&clone] {
+      // Perform a copy-on-write to the first page of the clone.
+      *reinterpret_cast<volatile uint64_t*>(clone->base_addr()) = 42;
+      // Now prefetch the entire clone.
+      return clone->Prefetch(0, 2);
+    });
+    ASSERT_TRUE(t.Start());
+
+    // Should expect a read for the copy-on-write page first.
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 0, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 0, 1));
+    // Now expect a read for just the second page due to the prefetch. Even if the first page got
+    // evicted due to a race, we still should not see a request for it because the clone has a CoW
+    // view of the first page, and so it should not be requested.
+    EXPECT_TRUE(pager.WaitForPageRead(root_vmo, 1, 1, ZX_TIME_INFINITE));
+    EXPECT_TRUE(pager.SupplyPages(root_vmo, 1, 1));
+  }
+}
+
 }  // namespace pager_tests

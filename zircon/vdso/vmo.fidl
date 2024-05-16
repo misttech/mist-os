@@ -480,6 +480,11 @@ closed protocol Vmo {
     /// This is only supported for vmos created from [`zx_vmo_create()`], which do not have non-slice
     /// children, and for slice children of such vmos. Provided range must be page aligned.
     ///
+    /// `ZX_VMO_OP_PREFETCH` - Prefetch *size* bytes worth of pages starting at byte *offset* for the
+    /// VMO. Actual pages may or may not be committed but future reads to the range should have similar
+    /// performance characteristics as if this operation were replaced with a read over the range.
+    /// Requires the `ZX_RIGHT_READ` right.
+    ///
     /// `ZX_VMO_OP_ZERO` - Resets the range of bytes in the VMO from *offset* to *offset*+*size* to
     /// 0. This is semantically equivalent to writing 0's with
     /// [`zx_vmo_write()`](/docs/reference/syscalls/vmo_write.md), except that it is able to be done more
@@ -582,6 +587,8 @@ closed protocol Vmo {
     ///
     /// If *op* is `ZX_VMO_OP_DECOMMIT`, *handle* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_WRITE`.
     ///
+    /// If *op* is `ZX_VMO_OP_PREFETCH`, *handle* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_READ`.
+    ///
     /// If *op* is `ZX_VMO_OP_CACHE_SYNC`, *handle* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_READ`.
     ///
     /// If *op* is `ZX_VMO_OP_CACHE_INVALIDATE`, *handle* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_WRITE`.
@@ -601,8 +608,8 @@ closed protocol Vmo {
     ///
     /// `ZX_ERR_OUT_OF_RANGE`  An invalid memory range specified by *offset* and *size*.
     ///
-    /// `ZX_ERR_NO_MEMORY`  Allocations to commit pages for `ZX_VMO_OP_COMMIT` or `ZX_VMO_OP_ZERO`
-    /// failed.
+    /// `ZX_ERR_NO_MEMORY`  Allocations to commit pages for `ZX_VMO_OP_COMMIT`, `ZX_VMO_OP_PREFETCH` or
+    /// `ZX_VMO_OP_ZERO` failed.
     ///
     /// `ZX_ERR_WRONG_TYPE`  *handle* is not a VMO handle.
     ///
@@ -621,15 +628,16 @@ closed protocol Vmo {
     /// `ZX_ERR_UNAVAILABLE` *op* was `ZX_VMO_OP_TRY_LOCK`, the VMO was discardable and the VMO has been
     /// discarded by the kernel.
     ///
-    /// `ZX_ERR_BAD_STATE`  *op* was `ZX_VMO_OP_COMMIT`, the VMO is backed by a pager and the pager or
-    /// the VMO is in a bad state preventing requested pages from being populated. *op* was
-    /// `ZX_VMO_OP_UNLOCK`, the VMO is discardable and the VMO was not previously locked.
+    /// `ZX_ERR_BAD_STATE`  *op* was `ZX_VMO_OP_COMMIT` or `ZX_VMO_OP_PREFETCH`, the VMO is backed by a
+    /// pager and the pager or the VMO is in a bad state preventing requested pages from being populated.
+    /// *op* was `ZX_VMO_OP_UNLOCK`, the VMO is discardable and the VMO was not previously locked.
     ///
-    /// `ZX_ERR_IO` *op* was `ZX_VMO_OP_COMMIT`, the VMO is backed by a pager and the pager encountered
-    /// an I/O error while committing the requested pages.
+    /// `ZX_ERR_IO` *op* was `ZX_VMO_OP_COMMIT` or `ZX_VMO_OP_PREFETCH`, the VMO is backed by a pager and
+    /// the pager encountered an I/O error while committing the requested pages.
     ///
-    /// `ZX_ERR_IO_DATA_INTEGRITY` *op* was `ZX_VMO_OP_COMMIT`, the VMO is backed by a pager and the
-    /// contents that were read in by the pager for the pages being committed are corrupted.
+    /// `ZX_ERR_IO_DATA_INTEGRITY` *op* was `ZX_VMO_OP_COMMIT` or `ZX_VMO_OP_PREFETCH`, the VMO is
+    /// backed by a pager and the contents that were read in by the pager for the pages being committed
+    /// are corrupted.
     ///
     /// ## See also
     ///

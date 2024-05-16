@@ -693,12 +693,12 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
 
     zx_status_t result = ZX_OK;
     enumerator.pause();
-    // The commit and decommit ops check the maximal permissions of the mapping and can be thought
-    // of as acting as if they perform a protect to add write permissions. Since protect to add
-    // permissions through a parent VMAR is not valid we similarly forbid this notional protect by
-    // not allowing these operations if acting through a sub-vmar, regardless of whether op_children
-    // is otherwise allowed..
-    if ((op == RangeOpType::Commit || op == RangeOpType::Decommit ||
+    // The commit, decommit and prefetch ops check the maximal permissions of the mapping and can be
+    // thought of as acting as if they perform a protect to add read or write permissions. Since
+    // protect to add permissions through a parent VMAR is not valid we similarly forbid this
+    // notional protect by not allowing these operations if acting through a sub-vmar, regardless of
+    // whether op_children is otherwise allowed.
+    if ((op == RangeOpType::Commit || op == RangeOpType::Decommit || op == RangeOpType::Prefetch ||
          op_children == VmAddressRegionOpChildren::No) &&
         mapping->parent_ != this) {
       return ZX_ERR_INVALID_ARGS;
@@ -738,6 +738,17 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
           break;
         case RangeOpType::DontNeed:
           result = vmo->HintRange(vmo_offset, size, VmObject::EvictionHint::DontNeed);
+          break;
+        case RangeOpType::Prefetch:
+          if (!mapping->is_valid_mapping_flags(ARCH_MMU_FLAG_PERM_READ)) {
+            result = ZX_ERR_ACCESS_DENIED;
+          } else {
+            result = vmo->PrefetchRange(vmo_offset, size);
+            if (result == ZX_OK) {
+              result = mapping->MapRange(mapping_offset, size, /*commit=*/false,
+                                         /*ignore_existing=*/true);
+            }
+          }
           break;
         default:
           result = ZX_ERR_NOT_SUPPORTED;

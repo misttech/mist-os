@@ -75,6 +75,10 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
     return OpRange(ZX_VMO_OP_COMMIT, page_offset, page_count);
   }
 
+  bool Prefetch(uint64_t page_offset, uint64_t page_count) const {
+    return OpRange(ZX_VMO_OP_PREFETCH, page_offset, page_count);
+  }
+
   std::unique_ptr<Vmo> Clone(uint32_t options = ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
                                                 ZX_VMO_CHILD_RESIZABLE) const {
     // Hold the lock to read the size_ *and* use it for cloning to prevent a Resize from sneaking

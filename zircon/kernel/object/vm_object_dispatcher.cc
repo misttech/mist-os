@@ -428,6 +428,11 @@ zx_status_t VmObjectDispatcher::RangeOp(uint32_t op, uint64_t offset, uint64_t s
       return vmo_->HintRange(offset, size, VmObject::EvictionHint::AlwaysNeed);
     case ZX_VMO_OP_DONT_NEED:
       return vmo_->HintRange(offset, size, VmObject::EvictionHint::DontNeed);
+    case ZX_VMO_OP_PREFETCH:
+      if ((rights & ZX_RIGHT_READ) == 0) {
+        return ZX_ERR_ACCESS_DENIED;
+      }
+      return vmo_->PrefetchRange(offset, size);
     default:
       return ZX_ERR_INVALID_ARGS;
   }

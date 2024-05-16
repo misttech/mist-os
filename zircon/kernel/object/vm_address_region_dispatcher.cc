@@ -247,6 +247,9 @@ zx_status_t VmAddressRegionDispatcher::RangeOp(uint32_t op, vaddr_t base, size_t
   } else if (op == ZX_VMAR_OP_ALWAYS_NEED) {
     return vmar_->RangeOp(VmAddressRegion::RangeOpType::AlwaysNeed, base, len, op_children, buffer,
                           buffer_size);
+  } else if (op == ZX_VMAR_OP_PREFETCH) {
+    return vmar_->RangeOp(VmAddressRegion::RangeOpType::Prefetch, base, len, op_children, buffer,
+                          buffer_size);
   }
   return ZX_ERR_INVALID_ARGS;
 }

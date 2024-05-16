@@ -4305,6 +4305,48 @@ static bool vmo_pin_race_loaned_test() {
   END_TEST;
 }
 
+static bool vmo_prefetch_compressed_pages_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  // Need a working compressor.
+  auto compression = pmm_page_compression();
+  if (!compression) {
+    END_TEST;
+  }
+
+  auto compressor = compression->AcquireCompressor();
+
+  // Create a VMO and commit some pages to it, ensuring they have non-zero content.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * 2, &vmo);
+  ASSERT_OK(status);
+  uint64_t data = 42;
+  EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
+  EXPECT_OK(vmo->Write(&data, PAGE_SIZE, sizeof(data)));
+  EXPECT_TRUE((VmObject::AttributionCounts{2 * PAGE_SIZE, 0}) == vmo->GetAttributedMemory())
+
+  // Compress the second page.
+  EXPECT_OK(compressor.get().Arm());
+  vm_page_t* page;
+  status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
+  ASSERT_OK(status);
+  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(
+      page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow, &compressor.get()));
+  pmm_free_page(page);
+  EXPECT_TRUE((VmObject::AttributionCounts{1 * PAGE_SIZE, 1 * PAGE_SIZE}) ==
+              vmo->GetAttributedMemory())
+
+  // Prefetch the entire VMO.
+  EXPECT_OK(vmo->PrefetchRange(0, PAGE_SIZE * 2));
+
+  // Both pages should be back to being uncompressed.
+  EXPECT_TRUE((VmObject::AttributionCounts{2 * PAGE_SIZE, 0}) == vmo->GetAttributedMemory())
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4368,6 +4410,7 @@ VM_UNITTEST(vmo_dedup_dirty_test)
 VM_UNITTEST(vmo_high_priority_reclaim_test)
 VM_UNITTEST(vmo_snapshot_modified_test)
 VM_UNITTEST(vmo_pin_race_loaned_test)
+VM_UNITTEST(vmo_prefetch_compressed_pages_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

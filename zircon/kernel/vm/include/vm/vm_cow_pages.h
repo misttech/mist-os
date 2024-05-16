@@ -529,8 +529,12 @@ class VmCowPages final : public VmHierarchyBase,
   // of the page request(s), dropping |guard| while waiting (multiple times if multiple pages need
   // to be supplied), and then, if |set_always_need| is true, the |always_need| flag in the pages
   // will be set.
-  void ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len, bool set_always_need,
-                                         Guard<CriticalMutex>* guard) TA_REQ(lock());
+  // If the |ignore_errors| flag is set then any per page errors will be ignored and future pages in
+  // the range will still be operated on. If this flag is not set then any kind of error causes an
+  // immediate abort.
+  zx_status_t ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len, bool set_always_need,
+                                                bool ignore_errors, Guard<CriticalMutex>* guard)
+      TA_REQ(lock());
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
