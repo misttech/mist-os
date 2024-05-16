@@ -130,7 +130,17 @@ where
             .driver_state
             .dhcp_v6_pd_future()
             .into_stream()
-            .map_err(|x| x.context("single_main_loop"));
+            .map_err(|x| x.context("single_main_loop"))
+            .filter_map(|x| async {
+                match x {
+                    Ok(x) => Some(Ok(x)),
+                    Err(x) => {
+                        error!("dhcp_v6_pd stream has terminated, reason: {:?}", x);
+                        // TODO (jiamingw): create a crash report via `CrashReporterMarker`
+                        None
+                    }
+                }
+            });
 
         let dhcp_v6_pd_state_changed_stream = self
             .driver_state
