@@ -353,7 +353,7 @@
                 "GetcpuTest.IsValidCpu",
 
                 // getdents_test
-                "GetdentsTest.TooLargeSize",
+                "GetdentsTest/0.TooLargeSize",
 
                 // Assumes structure of root directory.
                 "ReaddirTest.RootContainsBasicDirectories",
