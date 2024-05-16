@@ -11,28 +11,26 @@ namespace media_audio {
 
 namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
-std::unordered_set<ElementId> dai_endpoints(
+std::unordered_set<ElementId> dais(
     const std::unordered_map<ElementId, ElementRecord>& element_map) {
-  std::unordered_set<ElementId> dai_endpoints;
+  std::unordered_set<ElementId> dais;
   for (const auto& element_entry_pair : element_map) {
-    if (element_entry_pair.second.element.type() == fhasp::ElementType::kEndpoint &&
-        element_entry_pair.second.element.type_specific()->endpoint()->type() ==
-            fhasp::EndpointType::kDaiInterconnect) {
-      dai_endpoints.insert(element_entry_pair.first);
+    if (element_entry_pair.second.element.type() == fhasp::ElementType::kDaiInterconnect) {
+      dais.insert(element_entry_pair.first);
     }
   }
-  return dai_endpoints;
+  return dais;
 }
 
-std::unordered_set<ElementId> ring_buffer_endpoints(
+std::unordered_set<ElementId> ring_buffers(
     const std::unordered_map<ElementId, ElementRecord>& element_map) {
-  std::unordered_set<ElementId> ring_buffer_endpoints;
+  std::unordered_set<ElementId> ring_buffers;
   for (const auto& element_entry_pair : element_map) {
     if (element_entry_pair.second.element.type() == fhasp::ElementType::kRingBuffer) {
-      ring_buffer_endpoints.insert(element_entry_pair.first);
+      ring_buffers.insert(element_entry_pair.first);
     }
   }
-  return ring_buffer_endpoints;
+  return ring_buffers;
 }
 
 // This maps ElementId->ElementRecord but populates only the Element portion of the ElementRecord.

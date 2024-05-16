@@ -206,8 +206,8 @@ void VirtualAudioComposite::GetHealthState(GetHealthStateCompleter::Sync& comple
 void VirtualAudioComposite::Reset(ResetCompleter::Sync& completer) {
   // Future: check here whether to respond or to infinitely pend.
 
-  // Must clear all state for DAI endpoints.
-  // Must stop all RingBuffers, close connections and clear all state for RingBuffer endpoints.
+  // Must clear all state for DAIs.
+  // Must stop all RingBuffers, close connections and clear all state for RingBuffers elements.
   // Must clear all state for signalprocessing elements.
   // Must clear all signalprocessing topology state (presumably returning to a default topology?)
 
@@ -634,12 +634,13 @@ void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
       .type(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer);
 
   fuchsia_hardware_audio_signalprocessing::Element dai;
-  fuchsia_hardware_audio_signalprocessing::Endpoint dai_endpoint;
-  dai_endpoint.type(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
+  fuchsia_hardware_audio_signalprocessing::DaiInterconnect dai_interconnect;
+  // Customize this for plug_detect_capabilities?
   dai.id(kDaiId)
-      .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
-      .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
-          std::move(dai_endpoint)));
+      .type(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect)
+      .type_specific(
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithDaiInterconnect(
+              std::move(dai_interconnect)));
 
   std::vector elements{std::move(ring_buffer), std::move(dai)};
   completer.Reply(zx::ok(elements));
@@ -667,13 +668,13 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
   }
   if (!watch_element_replied_[index]) {
     fuchsia_hardware_audio_signalprocessing::ElementState state;
-    fuchsia_hardware_audio_signalprocessing::EndpointElementState endpoint;
+    fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
     fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
     plug_state.plugged(true).plug_state_time(0);
-    endpoint.plug_state(std::move(plug_state));
+    dai_state.plug_state(std::move(plug_state));
     state.type_specific(
-        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
-            std::move(endpoint)));
+        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
+            std::move(dai_state)));
     completer.Reply(std::move(state));
     watch_element_replied_[index] = true;
   } else if (!element_state_completer_[index]) {

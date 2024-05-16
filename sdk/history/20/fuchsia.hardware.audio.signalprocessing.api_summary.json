@@ -26,6 +26,26 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/DaiInterconnect.plug_detect_capabilities",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/PlugDetectCapabilities"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio.signalprocessing/DaiInterconnect"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/DaiInterconnectElementState.plug_state",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.audio.signalprocessing/PlugState"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.audio.signalprocessing/DaiInterconnectElementState"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Dynamics.bands",
         "ordinal": "1",
         "type": "vector<fuchsia.hardware.audio.signalprocessing/DynamicsBand>:64"
@@ -321,6 +341,11 @@
         "kind": "enum/member",
         "name": "fuchsia.hardware.audio.signalprocessing/ElementType.CONNECTION_POINT",
         "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/ElementType.DAI_INTERCONNECT",
+        "value": "14"
     },
     {
         "kind": "enum/member",
@@ -977,6 +1002,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElement.dai_interconnect",
+        "ordinal": "6",
+        "type": "fuchsia.hardware.audio.signalprocessing/DaiInterconnect"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElement.dynamics",
         "ordinal": "4",
         "type": "fuchsia.hardware.audio.signalprocessing/Dynamics"
@@ -1009,6 +1040,12 @@
         "kind": "union",
         "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElement",
         "strictness": "flexible"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.audio.signalprocessing/TypeSpecificElementState.dai_interconnect",
+        "ordinal": "6",
+        "type": "fuchsia.hardware.audio.signalprocessing/DaiInterconnectElementState"
     },
     {
         "kind": "union/member",

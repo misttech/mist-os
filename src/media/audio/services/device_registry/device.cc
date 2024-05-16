@@ -48,7 +48,7 @@ TokenId NextTokenId() {
 
 // Invoked when a RingBuffer channel drops. Device state previously was Configured/Paused/Started.
 template <>
-void Device::EndpointFidlErrorHandler<fha::RingBuffer>::on_fidl_error(fidl::UnbindInfo info) {
+void Device::RingBufferFidlErrorHandler<fha::RingBuffer>::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(RingBuffer)";
   if (device()->state_ == State::Error) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
@@ -836,7 +836,7 @@ void Device::RetrieveRingBufferFormatSets(
     OnError(ZX_ERR_INVALID_ARGS);
     return;
   }
-  ring_buffer_endpoint_ids_.insert(fad::kDefaultRingBufferElementId);
+  ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
 
   (*stream_config_client_)
       ->GetSupportedFormats()
@@ -1238,19 +1238,19 @@ void Device::RetrieveCodecDaiFormatSets() {
       });
 }
 
-// We have our signalprocessing Elements now; GetDaiFormats on each DAI Endpoint.
+// We have our signalprocessing Elements now; GetDaiFormats on each DAI element.
 void Device::RetrieveCompositeDaiFormatSets() {
   ADR_LOG_METHOD(kLogCompositeFidlCalls);
-  dai_endpoint_ids_ = dai_endpoints(sig_proc_element_map_);
-  temp_dai_endpoint_ids_ = dai_endpoint_ids_;
+  dai_ids_ = dais(sig_proc_element_map_);
+  temp_dai_ids_ = dai_ids_;
   element_dai_format_sets_.clear();
-  for (auto element_id : temp_dai_endpoint_ids_) {
+  for (auto element_id : temp_dai_ids_) {
     RetrieveDaiFormatSets(
         element_id,
         [this](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
           element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
-          temp_dai_endpoint_ids_.erase(element_id);
-          if (temp_dai_endpoint_ids_.empty()) {
+          temp_dai_ids_.erase(element_id);
+          if (temp_dai_ids_.empty()) {
             dai_format_sets_retrieved_ = true;
             OnInitializationResponse();
           }
@@ -1318,14 +1318,14 @@ void Device::RetrieveDaiFormatSets(
   }
 }
 
-// We have our signalprocessing Elements now; GetDaiFormats on each RingBuffer Endpoint.
+// We have our signalprocessing Elements now; GetDaiFormats on each RingBuffer element.
 void Device::RetrieveCompositeRingBufferFormatSets() {
   ADR_LOG_METHOD(kLogCompositeFidlCalls);
-  ring_buffer_endpoint_ids_ = ring_buffer_endpoints(sig_proc_element_map_);
-  temp_ring_buffer_endpoint_ids_ = ring_buffer_endpoint_ids_;
+  ring_buffer_ids_ = ring_buffers(sig_proc_element_map_);
+  temp_ring_buffer_ids_ = ring_buffer_ids_;
 
   element_ring_buffer_format_sets_.clear();
-  for (auto id : ring_buffer_endpoint_ids_) {
+  for (auto id : ring_buffer_ids_) {
     ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
     (*composite_client_)
         ->GetRingBufferFormats(id)
@@ -1354,8 +1354,8 @@ void Device::RetrieveCompositeRingBufferFormatSets() {
 
           element_driver_ring_buffer_format_sets_.emplace_back(id, result->ring_buffer_formats());
           element_ring_buffer_format_sets_.push_back({{id, translated_ring_buffer_format_sets}});
-          temp_ring_buffer_endpoint_ids_.erase(id);
-          if (temp_ring_buffer_endpoint_ids_.empty()) {
+          temp_ring_buffer_ids_.erase(id);
+          if (temp_ring_buffer_ids_.empty()) {
             ring_buffer_format_sets_retrieved_ = true;
             OnInitializationResponse();
           }
@@ -1914,8 +1914,8 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
   }
 
   if (is_codec() ? (element_id != fad::kDefaultDaiInterconnectElementId)
-                 : (dai_endpoint_ids_.find(element_id) == dai_endpoint_ids_.end())) {
-    ADR_WARN_METHOD() << "element_id not found, or not a DaiInterconnect Endpoint";
+                 : (dai_ids_.find(element_id) == dai_ids_.end())) {
+    ADR_WARN_METHOD() << "element_id not found, or not a DaiInterconnect element";
     notify->DaiFormatNotSet(element_id, dai_format,
                             fad::ControlSetDaiFormatError::kInvalidElementId);
     return;
@@ -2277,7 +2277,7 @@ bool Device::CreateRingBuffer(
     return false;
   }
 
-  if (ring_buffer_endpoint_ids_.find(element_id) == ring_buffer_endpoint_ids_.end()) {
+  if (ring_buffer_ids_.find(element_id) == ring_buffer_ids_.end()) {
     create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
     return false;
   }
@@ -2367,7 +2367,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
 
   RingBufferRecord ring_buffer_record{
       .ring_buffer_state = RingBufferState::NotCreated,
-      .ring_buffer_handler = std::make_unique<EndpointFidlErrorHandler<fha::RingBuffer>>(
+      .ring_buffer_handler = std::make_unique<RingBufferFidlErrorHandler<fha::RingBuffer>>(
           this, element_id, "RingBuffer"),
       .vmo_format = {{
           .sample_type = *sample_type,

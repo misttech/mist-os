@@ -555,16 +555,16 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
   auto control = CreateTestControlServer(device);
   auto observer = CreateTestObserverServer(device);
 
-  auto ring_buffer_element_id = *device->ring_buffer_endpoint_ids().begin();
+  auto ring_buffer_id = *device->ring_buffer_ids().begin();
   auto format = SafeRingBufferFormatFromElementRingBufferFormatSets(
-      ring_buffer_element_id, device->ring_buffer_format_sets());
-  fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+      ring_buffer_id, device->ring_buffer_format_sets());
+  fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
   auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
   bool received_callback = false;
 
   control->client()
       ->CreateRingBuffer({{
-          ring_buffer_element_id,
+          ring_buffer_id,
           fad::RingBufferOptions{{format, 2000}},
           std::move(ring_buffer_server_end),
       }})
@@ -576,7 +576,7 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfDriverRingBufferDrops) 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
 
-  fake_driver->DropRingBuffer(ring_buffer_element_id);
+  fake_driver->DropRingBuffer(ring_buffer_id);
 
   RunLoopUntilIdle();
   EXPECT_EQ(ObserverServer::count(), 1u);
@@ -596,17 +596,17 @@ TEST_F(ObserverServerCompositeTest, ObserverDoesNotDropIfClientRingBufferDrops) 
   auto control = CreateTestControlServer(device);
   auto observer = CreateTestObserverServer(device);
 
-  auto ring_buffer_element_id = *device->ring_buffer_endpoint_ids().begin();
+  auto ring_buffer_id = *device->ring_buffer_ids().begin();
   auto format = SafeRingBufferFormatFromElementRingBufferFormatSets(
-      ring_buffer_element_id, device->ring_buffer_format_sets());
-  fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+      ring_buffer_id, device->ring_buffer_format_sets());
+  fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
   {
     auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
     bool received_callback = false;
 
     control->client()
         ->CreateRingBuffer({{
-            ring_buffer_element_id,
+            ring_buffer_id,
             fad::RingBufferOptions{{format, 2000}},
             std::move(ring_buffer_server_end),
         }})
@@ -969,31 +969,30 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
     auto element_id = element_map_entry.first;
     const auto& element = element_map_entry.second.element;
     const auto& state = element_map_entry.second.state;
-    if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
-        !element.type_specific()->endpoint().has_value() ||
-        !element.type_specific()->endpoint()->type().has_value() ||
-        element.type_specific()->endpoint()->type() !=
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect ||
-        !element.type_specific()->endpoint()->plug_detect_capabilities().has_value() ||
-        element.type_specific()->endpoint()->plug_detect_capabilities() !=
+    if (element.type() != fhasp::ElementType::kDaiInterconnect ||
+        !element.type_specific().has_value() ||
+        !element.type_specific()->dai_interconnect().has_value() ||
+        !element.type_specific()->dai_interconnect()->plug_detect_capabilities().has_value() ||
+        element.type_specific()->dai_interconnect()->plug_detect_capabilities() !=
             fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;
     }
     if (!state.has_value() || !state->type_specific().has_value() ||
-        !state->type_specific()->endpoint().has_value() ||
-        !state->type_specific()->endpoint()->plug_state().has_value() ||
-        !state->type_specific()->endpoint()->plug_state()->plugged().has_value() ||
-        !state->type_specific()->endpoint()->plug_state()->plug_state_time().has_value()) {
+        !state->type_specific()->dai_interconnect().has_value() ||
+        !state->type_specific()->dai_interconnect()->plug_state().has_value() ||
+        !state->type_specific()->dai_interconnect()->plug_state()->plugged().has_value() ||
+        !state->type_specific()->dai_interconnect()->plug_state()->plug_state_time().has_value()) {
       continue;
     }
-    auto was_plugged = state->type_specific()->endpoint()->plug_state()->plugged();
+    auto was_plugged = state->type_specific()->dai_interconnect()->plug_state()->plugged();
     auto new_state = fhasp::ElementState{{
-        .type_specific = fhasp::TypeSpecificElementState::WithEndpoint(fhasp::EndpointElementState{{
-            fhasp::PlugState{{
-                !was_plugged,
-                plug_change_time_to_inject.get(),
-            }},
-        }}),
+        .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect(
+            fhasp::DaiInterconnectElementState{{
+                fhasp::PlugState{{
+                    !was_plugged,
+                    plug_change_time_to_inject.get(),
+                }},
+            }}),
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
@@ -1035,12 +1034,16 @@ TEST_F(ObserverServerCompositeTest, WatchElementStateUpdate) {
   for (const auto& [element_id, state_received] : element_states_received) {
     // Compare to actual static values we know.
     ASSERT_TRUE(state_received.type_specific().has_value());
-    ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
-    ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state().has_value());
-    ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state()->plugged().has_value());
+    ASSERT_TRUE(state_received.type_specific()->dai_interconnect().has_value());
+    ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->plug_state().has_value());
     ASSERT_TRUE(
-        state_received.type_specific()->endpoint()->plug_state()->plug_state_time().has_value());
-    EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
+        state_received.type_specific()->dai_interconnect()->plug_state()->plugged().has_value());
+    ASSERT_TRUE(state_received.type_specific()
+                    ->dai_interconnect()
+                    ->plug_state()
+                    ->plug_state_time()
+                    .has_value());
+    EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->plug_state()->plug_state_time(),
               plug_change_time_to_inject.get());
 
     EXPECT_FALSE(state_received.enabled().has_value());

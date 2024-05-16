@@ -70,12 +70,8 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     return control_client;
   }
 
-  static ElementId ring_buffer_element_id() { return kRingBufferElementId; }
-  static ElementId dai_element_id() { return kDaiElementId; }
-
- private:
-  static constexpr ElementId kRingBufferElementId = fad::kDefaultRingBufferElementId;
-  static constexpr ElementId kDaiElementId = fad::kDefaultDaiInterconnectElementId;
+  static ElementId ring_buffer_id() { return fad::kDefaultRingBufferElementId; }
+  static ElementId dai_id() { return fad::kDefaultDaiInterconnectElementId; }
 };
 
 class ControlServerCodecWarningTest : public ControlServerWarningTest {
@@ -116,8 +112,8 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
     ASSERT_EQ(ControlServer::count(), 1u);
     auto device = *adr_service()->devices().begin();
 
-    for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
-      fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+    for (auto ring_buffer_id : device->ring_buffer_ids()) {
+      fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
       auto [ring_buffer_client_end, ring_buffer_server_end] =
           CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
       auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
@@ -126,7 +122,7 @@ class ControlServerCompositeWarningTest : public ControlServerWarningTest {
 
       control_client
           ->CreateRingBuffer({{
-              ring_buffer_element_id,
+              ring_buffer_id,
               bad_options,
               std::move(ring_buffer_server_end),
           }})
@@ -263,10 +259,8 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
-  auto dai_format2 =
-      SecondDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
+  auto dai_format2 = SecondDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   auto received_callback = false;
   auto received_callback2 = false;
 
@@ -307,7 +301,7 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatInvalidFormat) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
   auto invalid_dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+      SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
   auto received_callback = false;
 
@@ -342,7 +336,7 @@ TEST_F(ControlServerCodecWarningTest, SetDaiFormatUnsupportedFormat) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
   auto unsupported_dai_format =
-      UnsupportedDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+      UnsupportedDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
@@ -375,8 +369,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -453,8 +446,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   auto received_callback = false;
   control->client()
       ->SetDaiFormat({{.dai_format = dai_format}})
@@ -504,8 +496,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
@@ -593,8 +584,7 @@ TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id(), device->dai_format_sets());
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
@@ -886,17 +876,15 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWhenAlreadyPending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
-    auto dai_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
-    auto dai_format2 =
-        SecondDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+  for (auto dai_id : device->dai_ids()) {
+    auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
+    auto dai_format2 = SecondDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
     auto received_callback = false;
     auto received_callback2 = false;
 
     control->client()
         ->SetDaiFormat({{
-            dai_element_id,
+            dai_id,
             dai_format,
         }})
         .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -905,7 +893,7 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWhenAlreadyPending) {
         });
     control->client()
         ->SetDaiFormat({{
-            dai_element_id,
+            dai_id,
             dai_format2,
         }})
         .Then([&received_callback2](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -939,15 +927,15 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatInvalidFormat) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     auto invalid_dai_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+        SafeDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
     invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
     auto received_callback = false;
 
     control->client()
         ->SetDaiFormat({{
-            dai_element_id,
+            dai_id,
             invalid_dai_format,
         }})
         .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -981,14 +969,14 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnsupportedFormat) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     auto unsupported_dai_format =
-        UnsupportedDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+        UnsupportedDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
     auto received_callback = false;
 
     control->client()
         ->SetDaiFormat({{
-            dai_element_id,
+            dai_id,
             unsupported_dai_format,
         }})
         .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -1022,15 +1010,14 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatWrongElementType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  auto ring_buffer_element_id = *device->ring_buffer_endpoint_ids().begin();
-  auto dai_element_id_unused = *device->dai_endpoint_ids().begin();
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id_unused, device->dai_format_sets());
+  auto ring_buffer_id = *device->ring_buffer_ids().begin();
+  auto dai_id_unused = *device->dai_ids().begin();
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id_unused, device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
       ->SetDaiFormat({{
-          ring_buffer_element_id,
+          ring_buffer_id,
           dai_format,
       }})
       .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -1061,15 +1048,14 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnknownElementId) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  ElementId ring_buffer_element_id = -1;
-  auto dai_element_id_unused = *device->dai_endpoint_ids().begin();
-  auto dai_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id_unused, device->dai_format_sets());
+  ElementId ring_buffer_id = -1;
+  auto dai_id_unused = *device->dai_ids().begin();
+  auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id_unused, device->dai_format_sets());
   auto received_callback = false;
 
   control->client()
       ->SetDaiFormat({{
-          ring_buffer_element_id,
+          ring_buffer_id,
           dai_format,
       }})
       .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -1192,7 +1178,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
   ASSERT_EQ(ControlServer::count(), 1u);
   auto received_callback = false;
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     auto [ring_buffer_client_end, ring_buffer_server_end] =
         CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
 
@@ -1201,7 +1187,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWrongElementType) {
 
     control->client()
         ->CreateRingBuffer({{
-            dai_element_id,
+            dai_id,
             fad::RingBufferOptions{{
                 .format = fuchsia_audio::Format{{
                     .sample_type = fuchsia_audio::SampleType::kInt16,
@@ -1353,22 +1339,22 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWhilePending) {
   auto device = *adr_service()->devices().begin();
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
-    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
     auto [ring_buffer_client_end1, ring_buffer_server_end1] =
         CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
     auto [ring_buffer_client_end2, ring_buffer_server_end2] =
         CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
     auto options = fad::RingBufferOptions{{
         .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
-            ring_buffer_element_id, device->ring_buffer_format_sets()),
+            ring_buffer_id, device->ring_buffer_format_sets()),
         .ring_buffer_min_bytes = 4096,
     }};
     bool received_callback_1 = false, received_callback_2 = false;
 
     control_client
         ->CreateRingBuffer({{
-            ring_buffer_element_id,
+            ring_buffer_id,
             options,
             std::move(ring_buffer_server_end1),
         }})
@@ -1380,7 +1366,7 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferWhilePending) {
         });
     control_client
         ->CreateRingBuffer({{
-            ring_buffer_element_id,
+            ring_buffer_id,
             options,
             std::move(ring_buffer_server_end2),
         }})
@@ -1416,13 +1402,13 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferUnknownElementId) {
   RunLoopUntilIdle();
   auto device = *adr_service()->devices().begin();
   ASSERT_EQ(ControlServer::count(), 1u);
-  auto ring_buffer_element_id_unused = *device->ring_buffer_endpoint_ids().begin();
-  // fake_driver->ReserveRingBufferSize(ring_buffer_element_id_unused, 8192);
+  auto ring_buffer_id_unused = *device->ring_buffer_ids().begin();
+  // fake_driver->ReserveRingBufferSize(ring_buffer_id_unused, 8192);
   auto [ring_buffer_client_end, ring_buffer_server_end] =
       CreateNaturalAsyncClientOrDie<fad::RingBuffer>();
   auto options = fad::RingBufferOptions{{
       .format = SafeRingBufferFormatFromElementRingBufferFormatSets(
-          ring_buffer_element_id_unused, device->ring_buffer_format_sets()),
+          ring_buffer_id_unused, device->ring_buffer_format_sets()),
       .ring_buffer_min_bytes = 2000,
   }};
   ElementId unknown_element_id = -1;
@@ -1463,11 +1449,11 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferMissingRingBufferServe
   auto device = *adr_service()->devices().begin();
   bool received_callback = false;
 
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
-    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
     control_client
         ->CreateRingBuffer({{
-            .element_id = ring_buffer_element_id,
+            .element_id = ring_buffer_id,
             .options = fad::RingBufferOptions{{
                 .format = fuchsia_audio::Format{{
                     .sample_type = fuchsia_audio::SampleType::kInt16,
@@ -1507,17 +1493,17 @@ TEST_F(ControlServerCompositeWarningTest, CreateRingBufferBadRingBufferServerEnd
   auto control_creator = CreateTestControlCreatorServer();
   auto device = *adr_service()->devices().begin();
 
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
     auto control_client = ConnectToControl(control_creator->client(), *added_id);
 
     RunLoopUntilIdle();
     ASSERT_EQ(ControlServer::count(), 1u);
     bool received_callback = false;
 
-    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+    fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
     control_client
         ->CreateRingBuffer({{
-            ring_buffer_element_id,
+            ring_buffer_id,
             fad::RingBufferOptions{{
                 .format = fuchsia_audio::Format{{
                     .sample_type = fuchsia_audio::SampleType::kInt16,

@@ -19,10 +19,8 @@ TEST(SignalProcessingUtilsTest, MapElements) {
   auto map = MapElements(kElements);
   EXPECT_EQ(map.size(), kElements.size());
 
-  EXPECT_EQ(*map.at(*kDaiEndpointElement.id()).element.type(), *kDaiEndpointElement.type());
-  EXPECT_EQ(*map.at(*kDaiEndpointElement.id()).element.type_specific()->endpoint()->type(),
-            fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect);
-  EXPECT_TRUE(map.at(*kDaiEndpointElement.id()).element.can_stop().value_or(false));
+  EXPECT_EQ(*map.at(*kDaiInterconnectElement.id()).element.type(), *kDaiInterconnectElement.type());
+  EXPECT_TRUE(map.at(*kDaiInterconnectElement.id()).element.can_stop().value_or(false));
 
   EXPECT_EQ(*map.at(*kRingBufferElement.id()).element.type(), *kRingBufferElement.type());
 
@@ -40,18 +38,17 @@ TEST(SignalProcessingUtilsTest, MapTopologies) {
 
   EXPECT_EQ(map.at(kTopologyDaiAgcDynRbId).size(), 3u);
   EXPECT_EQ(map.at(kTopologyDaiAgcDynRbId).at(0).processing_element_id_from(),
-            kDaiEndpointElementId);
+            kDaiInterconnectElementId);
   EXPECT_EQ(map.at(kTopologyDaiAgcDynRbId).at(0).processing_element_id_to(), kAgcElementId);
 
   EXPECT_EQ(map.at(kTopologyDaiRbId).size(), 1u);
-  EXPECT_EQ(map.at(kTopologyDaiRbId).front().processing_element_id_from(), kDaiEndpointElementId);
-  EXPECT_EQ(map.at(kTopologyDaiRbId).front().processing_element_id_to(),
-            kRingBufferEndpointElementId);
+  EXPECT_EQ(map.at(kTopologyDaiRbId).front().processing_element_id_from(),
+            kDaiInterconnectElementId);
+  EXPECT_EQ(map.at(kTopologyDaiRbId).front().processing_element_id_to(), kRingBufferElementId);
 
   EXPECT_EQ(map.at(kTopologyRbDaiId).size(), 1u);
-  EXPECT_EQ(map.at(kTopologyRbDaiId).front().processing_element_id_from(),
-            kRingBufferEndpointElementId);
-  EXPECT_EQ(map.at(kTopologyRbDaiId).front().processing_element_id_to(), kDaiEndpointElementId);
+  EXPECT_EQ(map.at(kTopologyRbDaiId).front().processing_element_id_from(), kRingBufferElementId);
+  EXPECT_EQ(map.at(kTopologyRbDaiId).front().processing_element_id_to(), kDaiInterconnectElementId);
 }
 
 }  // namespace

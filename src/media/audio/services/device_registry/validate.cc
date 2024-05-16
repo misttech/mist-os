@@ -915,6 +915,47 @@ bool ValidateDelayInfo(const fha::DelayInfo& delay_info) {
 }
 
 // Validate the type-specific state for this element type.
+bool ValidateDaiInterconnectElementState(const fhasp::ElementState& element_state,
+                                         const fhasp::Element& element) {
+  if (  // This must be an element of type DaiInterconnect
+      element.type() != fhasp::ElementType::kDaiInterconnect ||
+      // ... with appropriate type_specific info
+      !element.type_specific().has_value() ||
+      // A type_specific element description of type dai_interconnect() must exist
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDaiInterconnect ||
+      !element.type_specific()->dai_interconnect().has_value() ||
+      // ... specifically including plug_detect_capabilities()
+      !element.type_specific()->dai_interconnect()->plug_detect_capabilities().has_value() ||
+      // ElementState must be type DaiInterconnect (type_specific dai_interconnect() must exist)
+      !element_state.type_specific().has_value() ||
+      element_state.type_specific()->Which() !=
+          fhasp::TypeSpecificElementState::Tag::kDaiInterconnect ||
+      // A type_specific element state dai_interconnect() must exist
+      !element_state.type_specific()->dai_interconnect().has_value() ||
+      // plug_state must be present
+      !element_state.type_specific()->dai_interconnect()->plug_state().has_value() ||
+      // plugged and plug_state_time are required
+      !element_state.type_specific()->dai_interconnect()->plug_state()->plugged().has_value() ||
+      !element_state.type_specific()
+           ->dai_interconnect()
+           ->plug_state()
+           ->plug_state_time()
+           .has_value() ||
+      // plug_state_time (which is on the MONOTONIC timeline) cannot be negative
+      *element_state.type_specific()->dai_interconnect()->plug_state()->plug_state_time() < 0 ||
+      // if unplugged...
+      (!*element_state.type_specific()->dai_interconnect()->plug_state()->plugged() &&
+       // ... then the Element's capabilities must allow for that.
+       *element.type_specific()->dai_interconnect()->plug_detect_capabilities() ==
+           fhasp::PlugDetectCapabilities::kHardwired)) {
+    FX_LOGS(WARNING) << "Invalid DaiInterconnect-specific fields in ElementState";
+    return false;
+  }
+
+  return true;
+}
+
+// Validate the type-specific state for this element type.
 bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
                                   const fhasp::Element& element) {
   if (  // This must be an element of type Dynamics
@@ -982,43 +1023,6 @@ bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
       return false;
     }
     band_state_ids.insert(*band_state.id());
-  }
-
-  return true;
-}
-
-// Validate the type-specific state for this element type.
-bool ValidateEndpointElementState(const fhasp::ElementState& element_state,
-                                  const fhasp::Element& element) {
-  if (  // This must be an element of type Endpoint
-      element.type() != fhasp::ElementType::kEndpoint ||
-      // ... with appropriate type_specific info
-      !element.type_specific().has_value() ||
-      // A type_specific element description of type endpoint() must exist
-      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEndpoint ||
-      !element.type_specific()->endpoint().has_value() ||
-      // ... specifically including plug_detect_capabilities()
-      !element.type_specific()->endpoint()->type().has_value() ||
-      *element.type_specific()->endpoint()->type() !=
-          fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect ||
-      !element.type_specific()->endpoint()->plug_detect_capabilities().has_value() ||
-      // ElementState must be type DaiEndpoint as well. type_specific endpoint() must exist
-      !element_state.type_specific().has_value() ||
-      element_state.type_specific()->Which() != fhasp::TypeSpecificElementState::Tag::kEndpoint ||
-      // A type_specific element state endpoint() must exist
-      !element_state.type_specific()->endpoint().has_value() ||
-      // plug_state must be present
-      !element_state.type_specific()->endpoint()->plug_state().has_value() ||
-      // plugged and plug_state_time are required
-      !element_state.type_specific()->endpoint()->plug_state()->plugged().has_value() ||
-      !element_state.type_specific()->endpoint()->plug_state()->plug_state_time().has_value() ||
-      // if unplugged...
-      (!*element_state.type_specific()->endpoint()->plug_state()->plugged() &&
-       // ... then the Element's capabilities must allow for that.
-       *element.type_specific()->endpoint()->plug_detect_capabilities() ==
-           fhasp::PlugDetectCapabilities::kHardwired)) {
-    FX_LOGS(WARNING) << "Invalid Endpoint-specific fields in ElementState";
-    return false;
   }
 
   return true;
@@ -1161,13 +1165,13 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   }
 
   switch (*element.type()) {
-    case fhasp::ElementType::kDynamics:
-      if (!ValidateDynamicsElementState(element_state, element)) {
+    case fhasp::ElementType::kDaiInterconnect:
+      if (!ValidateDaiInterconnectElementState(element_state, element)) {
         return false;
       }
       break;
-    case fhasp::ElementType::kEndpoint:
-      if (!ValidateEndpointElementState(element_state, element)) {
+    case fhasp::ElementType::kDynamics:
+      if (!ValidateDynamicsElementState(element_state, element)) {
         return false;
       }
       break;
@@ -1252,6 +1256,20 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
 }
 
 // Validate the type-specific table for this element type.
+bool ValidateDaiInterconnectElement(const fhasp::Element& element) {
+  if (  // A type_specific info of dai_interconnect() must not be absent or empty.
+      !element.type_specific().has_value() ||
+      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kDaiInterconnect ||
+      !element.type_specific()->dai_interconnect().has_value() ||
+      // plug_detect_capabilities must be present
+      !element.type_specific()->dai_interconnect()->plug_detect_capabilities().has_value()) {
+    FX_LOGS(WARNING) << "Invalid DaiInterconnect-specific fields";
+    return false;
+  }
+  return true;
+}
+
+// Validate the type-specific table for this element type.
 bool ValidateDynamicsElement(const fhasp::Element& element) {
   if (  // A type_specific info of dynamics() must not be absent or empty.
       !element.type_specific().has_value() ||
@@ -1274,22 +1292,6 @@ bool ValidateDynamicsElement(const fhasp::Element& element) {
       return false;
     }
     band_ids.insert(*band.id());
-  }
-  return true;
-}
-
-// Validate the type-specific table for this element type.
-bool ValidateEndpointElement(const fhasp::Element& element) {
-  if (  // A type_specific info of endpoint() must not be absent or empty.
-      !element.type_specific().has_value() ||
-      element.type_specific()->Which() != fhasp::TypeSpecificElement::Tag::kEndpoint ||
-      !element.type_specific()->endpoint().has_value() ||
-      !element.type_specific()->endpoint()->type().has_value() ||
-      *element.type_specific()->endpoint()->type() != fhasp::EndpointType::kDaiInterconnect ||
-      // plug_detect_capabilities must be present
-      !element.type_specific()->endpoint()->plug_detect_capabilities().has_value()) {
-    FX_LOGS(WARNING) << "Invalid Endpoint-specific fields";
-    return false;
   }
   return true;
 }
@@ -1403,17 +1405,17 @@ bool ValidateElement(const fhasp::Element& element) {
   }
 
   switch (*element.type()) {
+    case fhasp::ElementType::kDaiInterconnect:
+      if (!ValidateDaiInterconnectElement(element)) {
+        return false;
+      }
+      break;
     case fhasp::ElementType::kDynamics: {
       if (!ValidateDynamicsElement(element)) {
         return false;
       }
       break;
     }
-    case fhasp::ElementType::kEndpoint:
-      if (!ValidateEndpointElement(element)) {
-        return false;
-      }
-      break;
     case fhasp::ElementType::kEqualizer: {
       if (!ValidateEqualizerElement(element)) {
         return false;
@@ -1515,24 +1517,24 @@ bool ValidateTopology(const fhasp::Topology& topology,
     destination_elements.insert(edge_pair.processing_element_id_to());
   }
 
-  // Check that only ENDPOINTs are terminal
+  // Check that only DaiInterconnect or RingBuffer elements are terminal
   for (auto& [id, element_record] : element_map) {
     if (source_elements.find(id) != source_elements.end() &&
         destination_elements.find(id) == destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kEndpoint &&
+      if (*element_record.element.type() != fhasp::ElementType::kDaiInterconnect &&
           *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
         FX_LOGS(WARNING) << "Element " << id
-                         << " has no incoming edges but is not an Endpoint or RingBuffer! Is "
+                         << " has no incoming edges but is not a DaiInterconnect or RingBuffer! Is "
                          << *element_record.element.type();
         return false;
       }
     }
     if (source_elements.find(id) == source_elements.end() &&
         destination_elements.find(id) != destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kEndpoint &&
+      if (*element_record.element.type() != fhasp::ElementType::kDaiInterconnect &&
           *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
         FX_LOGS(WARNING) << "Element " << id
-                         << " has no outgoing edges but is not an Endpoint or RingBuffer! Is "
+                         << " has no outgoing edges but is not a DaiInterconnect or RingBuffer! Is "
                          << *element_record.element.type();
         return false;
       }

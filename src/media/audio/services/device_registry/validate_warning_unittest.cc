@@ -1103,7 +1103,7 @@ TEST(ValidateWarningTest, TopologyInvalid) {
   // This topology includes an edge that connects one element_id to itself.
   EXPECT_FALSE(ValidateTopology(kTopologyEdgePairLoop, MapElements(kElements)));
 
-  // This topology has a terminal (source or destination) element that is not an Endpoint.
+  // This topology's terminal (source/destination) elements are not DaiInterconnect or RingBuffer.
   EXPECT_FALSE(ValidateTopology(kTopologyTerminalNotEndpoint, MapElements(kElements)));
 
   // empty element_map
@@ -1141,8 +1141,18 @@ TEST(ValidateWarningTest, ElementInvalid) {
   EXPECT_FALSE(ValidateElement(kElementEmptyDescription));
 }
 
-// Test inconsistencies in certain type_specifics
 // TODO(https://fxbug.dev/42069012): Negative-test ValidateElement
+
+// Test inconsistencies in certain type_specifics
+TEST(ValidateWarningTest, DaiInterconnectElementInvalid) {
+  {
+    auto endp_no_plug_caps = kDaiInterconnectElement;
+    endp_no_plug_caps.type_specific()->dai_interconnect()->plug_detect_capabilities(std::nullopt);
+    EXPECT_FALSE(ValidateDaiInterconnectElement(endp_no_plug_caps));
+    EXPECT_FALSE(ValidateElement(endp_no_plug_caps));
+  }
+}
+
 TEST(ValidateWarningTest, DynamicsElementInvalid) {
   {
     auto dyn_no_bands = kDynamicsElement;
@@ -1161,21 +1171,6 @@ TEST(ValidateWarningTest, DynamicsElementInvalid) {
     dyn_band_no_id.type_specific()->dynamics()->bands()->at(0).id(std::nullopt);
     EXPECT_FALSE(ValidateDynamicsElement(dyn_band_no_id));
     EXPECT_FALSE(ValidateElement(dyn_band_no_id));
-  }
-}
-
-TEST(ValidateWarningTest, EndpointElementInvalid) {
-  {
-    auto endp_no_type = kDaiEndpointElement;
-    endp_no_type.type_specific()->endpoint()->type(std::nullopt);
-    EXPECT_FALSE(ValidateEndpointElement(endp_no_type));
-    EXPECT_FALSE(ValidateElement(endp_no_type));
-  }
-  {
-    auto endp_no_plug_caps = kDaiEndpointElement;
-    endp_no_plug_caps.type_specific()->endpoint()->plug_detect_capabilities(std::nullopt);
-    EXPECT_FALSE(ValidateEndpointElement(endp_no_plug_caps));
-    EXPECT_FALSE(ValidateElement(endp_no_plug_caps));
   }
 }
 
@@ -1355,30 +1350,32 @@ TEST(ValidateWarningTest, GainElementInvalid) {
 
 // ElementState tests
 TEST(ValidateWarningTest, ElementStateWithMissingFields) {
-  EXPECT_FALSE(ValidateElementState(kElementStateEmpty, kDaiEndpointElement));
+  EXPECT_FALSE(ValidateElementState(kElementStateEmpty, kDaiInterconnectElement));
 
-  ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
+  ASSERT_TRUE(
+      ValidateElementState(kDaiInterconnectElementState, kDaiInterconnectElement));  // Baseline
 
   // The `started` field is required.
-  fhasp::ElementState state_without_started = kEndpointElementState;
+  fhasp::ElementState state_without_started = kDaiInterconnectElementState;
   state_without_started.started(std::nullopt);
-  EXPECT_FALSE(ValidateElementState(state_without_started, kDaiEndpointElement));
+  EXPECT_FALSE(ValidateElementState(state_without_started, kDaiInterconnectElement));
 
-  // For this ElementType (endpoint), `type_specific` is required.
-  fhasp::ElementState state_without_type_specific = kEndpointElementState;
+  // For this ElementType (DaiInterconnect), `type_specific` is required.
+  fhasp::ElementState state_without_type_specific = kDaiInterconnectElementState;
   state_without_type_specific.type_specific(std::nullopt);
-  EXPECT_FALSE(ValidateElementState(state_without_type_specific, kDaiEndpointElement));
+  EXPECT_FALSE(ValidateElementState(state_without_type_specific, kDaiInterconnectElement));
 }
 
 // ElementState's type_specific union must match its Element's type.
 TEST(ValidateWarningTest, ElementStateWithIncorrectTypeSpecificState) {
-  ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
+  ASSERT_TRUE(
+      ValidateElementState(kDaiInterconnectElementState, kDaiInterconnectElement));  // Baseline
 
-  // Element is an Endpoint, but the state has an Equalizer type_specific table.
-  fhasp::ElementState state_with_incorrect_type_specific = kEndpointElementState;
+  // Element is an DaiInterconnect, but the state has an Equalizer type_specific table.
+  fhasp::ElementState state_with_incorrect_type_specific = kDaiInterconnectElementState;
   state_with_incorrect_type_specific.type_specific(
       fhasp::TypeSpecificElementState::WithEqualizer({{.band_states = {{{{.id = 0}}}}}}));
-  EXPECT_FALSE(ValidateElementState(state_with_incorrect_type_specific, kDaiEndpointElement));
+  EXPECT_FALSE(ValidateElementState(state_with_incorrect_type_specific, kDaiInterconnectElement));
 }
 
 // ElementState that violates the capabilities of that element.
@@ -1392,20 +1389,65 @@ TEST(ValidateWarningTest, ElementStateInconsistent) {
   // More negative tests here that are type-specific.
 }
 
+// Here we check all the times and durations (even type-specific ones); none can be negative.
 TEST(ValidateWarningTest, ElementStateWithNegativeDurations) {
-  ASSERT_TRUE(ValidateElementState(kEndpointElementState, kDaiEndpointElement));  // Baseline
+  ASSERT_TRUE(
+      ValidateElementState(kDaiInterconnectElementState, kDaiInterconnectElement));  // Baseline
 
   // Test negative Latency here
 
   // `turn_on_delay` is optional, but if present then it cannot be negative.
-  fhasp::ElementState state_with_negative_turn_on_delay = kEndpointElementState;
+  fhasp::ElementState state_with_negative_turn_on_delay = kDaiInterconnectElementState;
   state_with_negative_turn_on_delay.turn_on_delay(ZX_NSEC(-1));
-  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_on_delay, kDaiEndpointElement));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_on_delay, kDaiInterconnectElement));
 
   // `turn_off_delay` is optional, but if present then it cannot be negative.
-  fhasp::ElementState state_with_negative_turn_off_delay = kEndpointElementState;
+  fhasp::ElementState state_with_negative_turn_off_delay = kDaiInterconnectElementState;
   state_with_negative_turn_off_delay.turn_off_delay(ZX_NSEC(-1));
-  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_off_delay, kDaiEndpointElement));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_turn_off_delay, kDaiInterconnectElement));
+
+  // `plug_state_time` cannot be negative.
+  fhasp::ElementState state_with_negative_plug_state_time = kDaiInterconnectElementState;
+  state_with_negative_plug_state_time.type_specific()
+      ->dai_interconnect()
+      ->plug_state()
+      ->plug_state_time(ZX_NSEC(-1));
+  EXPECT_FALSE(ValidateElementState(state_with_negative_plug_state_time, kDaiInterconnectElement));
+}
+
+// All the ways that a DaiInterconnect ElementState can be invalid.
+TEST(ValidateWarningTest, DaiInterconnectElementStateInvalid) {
+  {
+    auto endp_state_plug_state_none = kDaiInterconnectElementState;
+    endp_state_plug_state_none.type_specific()->dai_interconnect()->plug_state(std::nullopt);
+    EXPECT_FALSE(
+        ValidateDaiInterconnectElementState(endp_state_plug_state_none, kDaiInterconnectElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plug_state_none, kDaiInterconnectElement));
+  }
+  {
+    auto endp_state_plugged_none = kDaiInterconnectElementState;
+    endp_state_plugged_none.type_specific()->dai_interconnect()->plug_state()->plugged(
+        std::nullopt);
+    EXPECT_FALSE(
+        ValidateDaiInterconnectElementState(endp_state_plugged_none, kDaiInterconnectElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plugged_none, kDaiInterconnectElement));
+  }
+  {
+    auto endp_state_plugged_unsupported = kDaiInterconnectElementState;
+    endp_state_plugged_unsupported.type_specific()->dai_interconnect()->plug_state()->plugged(
+        false);
+    EXPECT_FALSE(
+        ValidateDaiInterconnectElementState(endp_state_plugged_unsupported, kRingBufferElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plugged_unsupported, kRingBufferElement));
+  }
+  {
+    auto endp_state_plug_time_none = kDaiInterconnectElementState;
+    endp_state_plug_time_none.type_specific()->dai_interconnect()->plug_state()->plug_state_time(
+        std::nullopt);
+    EXPECT_FALSE(
+        ValidateDaiInterconnectElementState(endp_state_plug_time_none, kDaiInterconnectElement));
+    EXPECT_FALSE(ValidateElementState(endp_state_plug_time_none, kDaiInterconnectElement));
+  }
 }
 
 // All the ways that a Dynamics-specific ElementState can be invalid.
@@ -1571,35 +1613,6 @@ TEST(ValidateWarningTest, DynamicsElementStateInvalid) {
         ZX_USEC(-1));
     EXPECT_FALSE(ValidateDynamicsElementState(dyn_state_lookahead_neg, kDynamicsElement));
     EXPECT_FALSE(ValidateElementState(dyn_state_lookahead_neg, kDynamicsElement));
-  }
-}
-
-// All the ways that an Endpoint ElementState can be invalid.
-TEST(ValidateWarningTest, EndpointElementStateInvalid) {
-  {
-    auto endp_state_plug_state_none = kEndpointElementState;
-    endp_state_plug_state_none.type_specific()->endpoint()->plug_state(std::nullopt);
-    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plug_state_none, kDaiEndpointElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plug_state_none, kDaiEndpointElement));
-  }
-  {
-    auto endp_state_plugged_none = kEndpointElementState;
-    endp_state_plugged_none.type_specific()->endpoint()->plug_state()->plugged(std::nullopt);
-    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plugged_none, kDaiEndpointElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plugged_none, kDaiEndpointElement));
-  }
-  {
-    auto endp_state_plugged_unsupported = kEndpointElementState;
-    endp_state_plugged_unsupported.type_specific()->endpoint()->plug_state()->plugged(false);
-    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plugged_unsupported, kRingBufferElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plugged_unsupported, kRingBufferElement));
-  }
-  {
-    auto endp_state_plug_time_none = kEndpointElementState;
-    endp_state_plug_time_none.type_specific()->endpoint()->plug_state()->plug_state_time(
-        std::nullopt);
-    EXPECT_FALSE(ValidateEndpointElementState(endp_state_plug_time_none, kDaiEndpointElement));
-    EXPECT_FALSE(ValidateElementState(endp_state_plug_time_none, kDaiEndpointElement));
   }
 }
 

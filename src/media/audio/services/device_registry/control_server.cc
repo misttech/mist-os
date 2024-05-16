@@ -208,10 +208,10 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       return;
     }
     element_id = *request.element_id();
-    auto& rb_ids = device_->ring_buffer_endpoint_ids();
+    auto& rb_ids = device_->ring_buffer_ids();
     if (rb_ids.find(element_id) == rb_ids.end()) {
       ADR_WARN_METHOD() << "required field 'element_id' (" << element_id
-                        << ") does not refer to an ENDPOINT of type RING_BUFFER";
+                        << ") does not refer to an element of type RING_BUFFER";
       completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
       return;
     }

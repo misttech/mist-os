@@ -262,10 +262,10 @@ inline std::ostream& operator<<(
         return (out << "EQUALIZER");
       case fuchsia_hardware_audio_signalprocessing::ElementType::kSampleRateConversion:
         return (out << "SAMPLE_RATE_CONVERSION");
-      case fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint:
-        return (out << "ENDPOINT");
       case fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer:
         return (out << "RING_BUFFER");
+      case fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect:
+        return (out << "DAI_INTERCONNECT");
       default:
         return (out << "OTHER (unknown enum)");
     }
@@ -365,24 +365,14 @@ inline std::ostream& operator<<(
 
 inline std::ostream& operator<<(
     std::ostream& out,
-    const std::optional<fuchsia_hardware_audio_signalprocessing::Endpoint>& endpoint) {
-  if (endpoint->type().has_value()) {
-    switch (*endpoint->type()) {
-      case fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect:
-        out << "DAI_INTERCONNECT ";
-        break;
-      case fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer:
-        out << "RING_BUFFER(old) ";
-        break;
-      default:
-        out << "OTHER (unknown)  ";
-        break;
-    }
-  } else {
-    out << "<none type>, ";
+    const std::optional<fuchsia_hardware_audio_signalprocessing::DaiInterconnect>&
+        dai_interconnect) {
+  if (!dai_interconnect.has_value()) {
+    return (out << "<none>");
   }
-  if (endpoint->plug_detect_capabilities().has_value()) {
-    switch (*endpoint->plug_detect_capabilities()) {
+  out << "DAI_INTERCONNECT ";
+  if (dai_interconnect->plug_detect_capabilities().has_value()) {
+    switch (*dai_interconnect->plug_detect_capabilities()) {
       case fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired:
         return (out << "HARDWIRED");
       case fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kCanAsyncNotify:

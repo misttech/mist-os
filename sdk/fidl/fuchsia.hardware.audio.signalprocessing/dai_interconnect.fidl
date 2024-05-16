@@ -4,36 +4,36 @@
 library fuchsia.hardware.audio.signalprocessing;
 using zx;
 
-/// Plug state for the endpoint.
+/// Plug state for the interconnect.
 /// If the driver reports a `plug_detect_capabilities` equal to HARDWIRED, then the driver should
-/// respond to `WatchElementState` only the first time it is called for a given endpoint, with
+/// respond to `WatchElementState` only the first time it is called for a given interconnect, with
 /// `plugged` set to true and `plug_state_time` set to time '0'.
 @available(added=12)
 type PlugState = table {
-    /// Endpoint is currently plugged in.
+    /// Indicates whether the interconnect is currently plugged in.
     ///
     /// Required
     1: plugged bool;
 
-    /// Timestamps (using `ZX_CLOCK_MONOTONIC`) the information provided in the other fields
-    /// of this table. Indicates when the transition described by this table occurred.
+    /// Indicates when the current `plugged` state was set, using `ZX_CLOCK_MONOTONIC`.
+    /// Cannot be negative.
     ///
     /// Required.
     2: plug_state_time zx.Time;
 };
 
-/// Plug detection capabilities for the endpoint.
+/// Plug detection capabilities for the interconnect.
 @available(added=12)
 type PlugDetectCapabilities = flexible enum {
-    /// Endpoint is hardwired (will always be plugged in).
+    /// Interconnect is hardwired (will always be plugged in).
     HARDWIRED = 0;
 
-    /// Endpoint can be unplugged and plugged and can asynchronously notify of plug state changes.
+    /// Interconnect can be unplugged/plugged and can asynchronously notify of plug state changes.
     CAN_ASYNC_NOTIFY = 1;
 };
 
 /// Endpoint types.
-@available(added=12)
+@available(added=12, deprecated=20)
 type EndpointType = flexible enum : uint8 {
     /// The endpoint represents a ring buffer.
     /// A ring buffer processing element's id allows for multi-ring buffer topologies to
@@ -45,9 +45,8 @@ type EndpointType = flexible enum : uint8 {
     DAI_INTERCONNECT = 2;
 };
 
-
 /// Parameters for an `Element` with `type` equal to `ENDPOINT`.
-@available(added=12)
+@available(added=12, deprecated=20)
 type Endpoint = table {
     /// Specifies what the endpoint represents.
     ///
@@ -60,14 +59,28 @@ type Endpoint = table {
 };
 
 /// State for an `Element` with `type` equal to `ENDPOINT`.
-@available(added=12)
+@available(added=12, deprecated=20)
 type EndpointElementState = table {
     /// If included the plug detect state for this endpoint.
     ///
-    /// This field should not be present in a `SetElementState` `state` since the plug state
-    /// can't be set by a client. It must be provided by the server in a `WatchElementState`
-    /// reply.
-    ///
     /// Required for servers.
+    1: plug_state PlugState;
+};
+
+/// Parameters for an `Element` with `type` equal to `DAI_INTERCONNECT`.
+@available(added=20)
+type DaiInterconnect = table {
+    /// Plug Detect Capabilities.
+    ///
+    /// Required.
+    1: plug_detect_capabilities PlugDetectCapabilities;
+};
+
+/// State for an `Element` with `type` equal to `DAI_INTERCONNECT`.
+@available(added=20)
+type DaiInterconnectElementState = table {
+    /// The plug state for this DAI interconnect.
+    ///
+    /// Required.
     1: plug_state PlugState;
 };

@@ -16,9 +16,8 @@ namespace media_audio {
 
 std::unordered_map<ElementId, ElementRecord> MapElements(
     const std::vector<fuchsia_hardware_audio_signalprocessing::Element>& elements);
-std::unordered_set<ElementId> dai_endpoints(
-    const std::unordered_map<ElementId, ElementRecord>& element_map);
-std::unordered_set<ElementId> ring_buffer_endpoints(
+std::unordered_set<ElementId> dais(const std::unordered_map<ElementId, ElementRecord>& element_map);
+std::unordered_set<ElementId> ring_buffers(
     const std::unordered_map<ElementId, ElementRecord>& element_map);
 
 std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>

@@ -606,6 +606,40 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
 
   if (element_state->type_specific().has_value()) {
     switch (element_state->type_specific()->Which()) {
+      case fhasp::TypeSpecificElementState::Tag::kDaiInterconnect:
+        if (!element_state->type_specific()->dai_interconnect().has_value()) {
+          FX_LOGS(INFO) << indent << "type_specific (DaiInterconnect)    <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO) << indent << "type_specific (DaiInterconnect)";
+        if (!element_state->type_specific()->dai_interconnect()->plug_state().has_value()) {
+          FX_LOGS(INFO) << new_indent << "     PlugState  <none> (non-compliant)";
+          break;
+        }
+        FX_LOGS(INFO)
+            << new_indent << "     PlugState  plugged          "
+            << (element_state->type_specific()
+                        ->dai_interconnect()
+                        ->plug_state()
+                        ->plugged()
+                        .has_value()
+                    ? (element_state->type_specific()->dai_interconnect()->plug_state()->plugged()
+                           ? "Plugged"
+                           : "Unplugged")
+                    : "<none> (non-compliant)");
+        FX_LOGS(INFO) << new_indent << "                plug_state_time  "
+                      << (element_state->type_specific()
+                                  ->dai_interconnect()
+                                  ->plug_state()
+                                  ->plug_state_time()
+                                  .has_value()
+                              ? std::to_string(*element_state->type_specific()
+                                                    ->dai_interconnect()
+                                                    ->plug_state()
+                                                    ->plug_state_time()) +
+                                    " nsec"
+                              : "<none> (non-compliant)");
+        break;
       case fhasp::TypeSpecificElementState::Tag::kDynamics:
         if (!element_state->type_specific()->dynamics().has_value()) {
           FX_LOGS(INFO) << indent << "type_specific (Dynamics)              <none> (non-compliant)";
@@ -613,36 +647,6 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
         }
         LogDynamicsBandStatesInternal(element_state->type_specific()->dynamics()->band_states(),
                                       indent);
-        break;
-      case fhasp::TypeSpecificElementState::Tag::kEndpoint:
-        if (!element_state->type_specific()->endpoint().has_value()) {
-          FX_LOGS(INFO) << indent << "type_specific (Endpoint)    <none> (non-compliant)";
-          break;
-        }
-        FX_LOGS(INFO) << indent << "type_specific (Endpoint)";
-        if (!element_state->type_specific()->endpoint()->plug_state().has_value()) {
-          FX_LOGS(INFO) << new_indent << "     PlugState  <none> (non-compliant)";
-          break;
-        }
-        FX_LOGS(INFO)
-            << new_indent << "     PlugState  plugged          "
-            << (element_state->type_specific()->endpoint()->plug_state()->plugged().has_value()
-                    ? (element_state->type_specific()->endpoint()->plug_state()->plugged()
-                           ? "Plugged"
-                           : "Unplugged")
-                    : "<none> (non-compliant)");
-        FX_LOGS(INFO) << new_indent << "                plug_state_time  "
-                      << (element_state->type_specific()
-                                  ->endpoint()
-                                  ->plug_state()
-                                  ->plug_state_time()
-                                  .has_value()
-                              ? std::to_string(*element_state->type_specific()
-                                                    ->endpoint()
-                                                    ->plug_state()
-                                                    ->plug_state_time()) +
-                                    " nsec"
-                              : "<none> (non-compliant)");
         break;
       case fhasp::TypeSpecificElementState::Tag::kEqualizer:
         if (!element_state->type_specific()->equalizer().has_value()) {
@@ -684,7 +688,7 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
           FX_LOGS(INFO) << new_indent << "     " << element_state->latency()->latency_time().value()
                         << " ns";
         } else {
-          FX_LOGS(INFO) << new_indent << "     <none> ns (non-compliant)";
+          FX_LOGS(INFO) << new_indent << "     <none>  (non-compliant)";
         }
         break;
       case fhasp::Latency::Tag::kLatencyFrames:
@@ -693,15 +697,15 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
           FX_LOGS(INFO) << new_indent << "     "
                         << element_state->latency()->latency_frames().value() << " frames";
         } else {
-          FX_LOGS(INFO) << new_indent << "     <none> frames (non-compliant)";
+          FX_LOGS(INFO) << new_indent << "     <none>  (non-compliant)";
         }
         break;
       default:
-        FX_LOGS(INFO) << indent << "latency <unknown union>  ( non-compliant)";
+        FX_LOGS(INFO) << indent << "latency <unknown union>  (non-compliant)";
         break;
     }
   } else {
-    FX_LOGS(INFO) << indent << "latency               <none>";
+    FX_LOGS(INFO) << indent << "latency                 <none>";
   }
 
   if (element_state->vendor_specific_data().has_value()) {
@@ -765,6 +769,10 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
   std::string ts_indent = indent + "                      ";
   if (element.type_specific().has_value()) {
     switch (element.type_specific()->Which()) {
+      case fhasp::TypeSpecificElement::Tag::kDaiInterconnect:
+        FX_LOGS(INFO) << indent << "type_specific         "
+                      << element.type_specific()->dai_interconnect().value();
+        break;
       case fhasp::TypeSpecificElement::Tag::kDynamics:
         FX_LOGS(INFO) << indent << "type_specific         DYNAMICS";
         if (element.type_specific()->dynamics().has_value()) {
@@ -822,11 +830,6 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
             fhasp::DynamicsSupportedControls::kThresholdType) {
           FX_LOGS(INFO) << ts_indent << "                    THRESHOLD_TYPE";
         }
-        //
-        break;
-      case fhasp::TypeSpecificElement::Tag::kEndpoint:
-        FX_LOGS(INFO) << indent << "type_specific         "
-                      << element.type_specific()->endpoint().value();
         //
         break;
       case fhasp::TypeSpecificElement::Tag::kEqualizer:

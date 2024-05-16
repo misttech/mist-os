@@ -712,16 +712,19 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   ASSERT_EQ(kNumberOfElements, elements_result->processing_elements().size());
   for (size_t i = 0; i < kNumberOfElements; ++i) {
     auto& element = elements_result->processing_elements()[i];
-    ASSERT_TRUE(element.type() ==
-                    fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer ||
-                element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint);
-    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+    ASSERT_TRUE(
+        element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer ||
+        element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect);
+    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect) {
       ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
-                element.type_specific()->endpoint()->plug_detect_capabilities());
+                element.type_specific()->dai_interconnect()->plug_detect_capabilities());
       auto watch_element_result = signal_client->WatchElementState(*element.id());
       ASSERT_TRUE(watch_element_result.is_ok());
-      ASSERT_EQ(true,
-                watch_element_result->state().type_specific()->endpoint()->plug_state()->plugged());
+      ASSERT_EQ(true, watch_element_result->state()
+                          .type_specific()
+                          ->dai_interconnect()
+                          ->plug_state()
+                          ->plugged());
     }
   }
   auto& element0 = elements_result->processing_elements()[0];
@@ -741,16 +744,12 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element4.type());
   ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer, element5.type());
 
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element6.type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element7.type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element8.type());
-
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
-            element6.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
-            element7.type_specific()->endpoint()->type());
-  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
-            element8.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect,
+            element6.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect,
+            element7.type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect,
+            element8.type());
 
   constexpr uint64_t kExpectedTopologyId = 1;
   constexpr uint64_t kUnrecognizedTopologyId = 2;
@@ -808,9 +807,9 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
   auto elements_result = signal_client->GetElements();
   ASSERT_TRUE(elements_result.is_ok());
 
-  // Able to set element state for all (endpoint) elements with no parameters.
+  // Able to set element state for all (dai_interconnect) elements with no parameters.
   for (auto element : elements_result->processing_elements()) {
-    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect) {
       fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest request;
       request.processing_element_id(*element.id());
       auto set_element_result = signal_client->SetElementState(std::move(request));

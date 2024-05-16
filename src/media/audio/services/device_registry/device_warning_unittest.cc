@@ -191,7 +191,7 @@ TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
   ASSERT_FALSE(notify()->codec_is_started());
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -200,7 +200,7 @@ TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
   RunLoopUntilIdle();
   EXPECT_FALSE(device->Reset());
   EXPECT_FALSE(device->CodecStop());
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
   EXPECT_FALSE(device->CodecStart());
 
   RunLoopUntilIdle();
@@ -218,7 +218,7 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -228,7 +228,7 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
   auto invalid_dai_format = SecondDaiFormatFromDaiFormatSets(dai_formats);
   invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
 
-  device->SetDaiFormat(dai_element_id(), invalid_dai_format);
+  device->SetDaiFormat(dai_id(), invalid_dai_format);
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->dai_format());
@@ -249,8 +249,8 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(), [&dai_formats](ElementId element_id,
-                                       const std::vector<fha::DaiSupportedFormats>& format_sets) {
+      dai_id(), [&dai_formats](ElementId element_id,
+                               const std::vector<fha::DaiSupportedFormats>& format_sets) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         for (const auto& format_set : format_sets) {
           dai_formats.push_back(format_set);
@@ -260,7 +260,7 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
   RunLoopUntilIdle();
 
   // Format is valid but unsupported. The call should fail, but the device should remain healthy.
-  device->SetDaiFormat(dai_element_id(), UnsupportedDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), UnsupportedDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify()->dai_format());
@@ -512,22 +512,22 @@ TEST_F(CompositeWarningTest, MakeControlCallsWithoutControl) {
   // if the Device is not controlled.
   EXPECT_FALSE(device->Reset());
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     const auto dai_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
-    device->SetDaiFormat(dai_element_id, dai_format);
+        SafeDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
+    device->SetDaiFormat(dai_id, dai_format);
   }
   EXPECT_TRUE(notify()->dai_formats().empty());
   EXPECT_TRUE(notify()->codec_format_infos().empty());
   EXPECT_TRUE(notify()->dai_format_errors().empty());
 
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
     auto callback_received = false;
     auto received_error = fad::ControlCreateRingBufferError(0);
     EXPECT_FALSE(device->CreateRingBuffer(
-        ring_buffer_element_id,
+        ring_buffer_id,
         SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
-            ring_buffer_element_id, ElementDriverRingBufferFormatSets(device)),
+            ring_buffer_id, ElementDriverRingBufferFormatSets(device)),
         requested_ring_buffer_bytes,
         [&callback_received, &received_error](
             fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
@@ -548,18 +548,17 @@ TEST_F(CompositeWarningTest, SetDaiFormatWrongElementType) {
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
 
-  auto dai_element_id = *device->dai_endpoint_ids().begin();
-  auto safe_format =
-      SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+  auto dai_id = *device->dai_ids().begin();
+  auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
   notify()->clear_dai_formats();
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
-    device->SetDaiFormat(ring_buffer_element_id, safe_format);
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
+    device->SetDaiFormat(ring_buffer_id, safe_format);
 
     RunLoopUntilIdle();
     EXPECT_TRUE(notify()->dai_formats().empty());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
-    EXPECT_TRUE(ExpectDaiFormatError(ring_buffer_element_id,
-                                     fad::ControlSetDaiFormatError::kInvalidElementId));
+    EXPECT_TRUE(
+        ExpectDaiFormatError(ring_buffer_id, fad::ControlSetDaiFormatError::kInvalidElementId));
   }
 }
 
@@ -570,19 +569,17 @@ TEST_F(CompositeWarningTest, SetDaiFormatInvalidFormat) {
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     notify()->clear_dai_formats();
-    auto bad_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+    auto bad_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
     bad_format.channels_to_use_bitmask() = (1u << bad_format.number_of_channels());  // too high
 
-    device->SetDaiFormat(dai_element_id, bad_format);
+    device->SetDaiFormat(dai_id, bad_format);
 
     RunLoopUntilIdle();
     EXPECT_TRUE(notify()->dai_formats().empty());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
-    EXPECT_TRUE(
-        ExpectDaiFormatError(dai_element_id, fad::ControlSetDaiFormatError::kInvalidDaiFormat));
+    EXPECT_TRUE(ExpectDaiFormatError(dai_id, fad::ControlSetDaiFormatError::kInvalidDaiFormat));
   }
 }
 
@@ -592,19 +589,18 @@ TEST_F(CompositeWarningTest, SetDaiFormatUnsupportedFormat) {
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     notify()->clear_dai_formats();
     auto unsupported_format =
-        UnsupportedDaiFormatFromElementDaiFormatSets(dai_element_id, device->dai_format_sets());
+        UnsupportedDaiFormatFromElementDaiFormatSets(dai_id, device->dai_format_sets());
     ASSERT_TRUE(ValidateDaiFormat(unsupported_format));
 
-    device->SetDaiFormat(dai_element_id, unsupported_format);
+    device->SetDaiFormat(dai_id, unsupported_format);
 
     RunLoopUntilIdle();
     EXPECT_TRUE(notify()->dai_formats().empty());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
-    EXPECT_TRUE(
-        ExpectDaiFormatError(dai_element_id, fad::ControlSetDaiFormatError::kFormatMismatch));
+    EXPECT_TRUE(ExpectDaiFormatError(dai_id, fad::ControlSetDaiFormatError::kFormatMismatch));
   }
 }
 
@@ -616,11 +612,11 @@ TEST_F(CompositeWarningTest, CreateRingBufferInvalidElementId) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
-  auto ring_buffer_element_id = *device->ring_buffer_endpoint_ids().begin();
-  fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
+  auto ring_buffer_id = *device->ring_buffer_ids().begin();
+  fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
   auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
-      ring_buffer_element_id, ring_buffer_format_sets_by_element);
+      ring_buffer_id, ring_buffer_format_sets_by_element);
 
   ExpectCreateRingBufferError(device, -1, fad::ControlCreateRingBufferError::kInvalidElementId,
                               safe_format);
@@ -634,14 +630,14 @@ TEST_F(CompositeWarningTest, CreateRingBufferWrongElementType) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
-  auto ring_buffer_element_id = *device->ring_buffer_endpoint_ids().begin();
-  fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
+  auto ring_buffer_id = *device->ring_buffer_ids().begin();
+  fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
   auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
-      ring_buffer_element_id, ring_buffer_format_sets_by_element);
+      ring_buffer_id, ring_buffer_format_sets_by_element);
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
-    ExpectCreateRingBufferError(device, dai_element_id,
+  for (auto dai_id : device->dai_ids()) {
+    ExpectCreateRingBufferError(device, dai_id,
                                 fad::ControlCreateRingBufferError::kInvalidElementId, safe_format);
   }
 }
@@ -654,15 +650,15 @@ TEST_F(CompositeWarningTest, CreateRingBufferInvalidFormat) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
 
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
-    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
     auto invalid_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
-        ring_buffer_element_id, ring_buffer_format_sets_by_element);
+        ring_buffer_id, ring_buffer_format_sets_by_element);
     invalid_format.pcm_format()->number_of_channels(0);
 
-    ExpectCreateRingBufferError(device, ring_buffer_element_id,
+    ExpectCreateRingBufferError(device, ring_buffer_id,
                                 fad::ControlCreateRingBufferError::kInvalidFormat, invalid_format);
   }
 }
@@ -675,15 +671,15 @@ TEST_F(CompositeWarningTest, CreateRingBufferUnsupportedFormat) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
 
-  for (auto ring_buffer_element_id : device->ring_buffer_endpoint_ids()) {
-    fake_driver->ReserveRingBufferSize(ring_buffer_element_id, 8192);
+  for (auto ring_buffer_id : device->ring_buffer_ids()) {
+    fake_driver->ReserveRingBufferSize(ring_buffer_id, 8192);
     auto unsupported_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
-        ring_buffer_element_id, ring_buffer_format_sets_by_element);
+        ring_buffer_id, ring_buffer_format_sets_by_element);
     unsupported_format.pcm_format()->frame_rate(unsupported_format.pcm_format()->frame_rate() - 1);
 
-    ExpectCreateRingBufferError(device, ring_buffer_element_id,
+    ExpectCreateRingBufferError(device, ring_buffer_id,
                                 fad::ControlCreateRingBufferError::kFormatMismatch,
                                 unsupported_format);
   }
@@ -822,20 +818,13 @@ TEST_F(StreamConfigWarningTest, NoMatchForSupportedRingBufferFormatForClientForm
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kInt16, 2,
-                      47999);
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kInt16, 2,
-                      48001);
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kInt16, 1,
-                      48000);
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kInt16, 3,
-                      48000);
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kUint8, 2,
-                      48000);
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kFloat32, 2,
-                      48000);
-  ExpectNoFormatMatch(device, ring_buffer_element_id(), fuchsia_audio::SampleType::kFloat64, 2,
-                      48000);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt16, 2, 47999);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt16, 2, 48001);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt16, 1, 48000);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt16, 3, 48000);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kUint8, 2, 48000);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kFloat32, 2, 48000);
+  ExpectNoFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kFloat64, 2, 48000);
 }
 
 TEST_F(StreamConfigWarningTest, CannotAddSameObserverTwice) {
@@ -933,7 +922,7 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
   fake_stream_config->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
@@ -946,16 +935,16 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
         EXPECT_TRUE(info.ring_buffer.reference_clock());
       });
   ASSERT_TRUE(connected_to_ring_buffer_fidl);
-  ExpectRingBufferReady(device, ring_buffer_element_id());
-  StartAndExpectValid(device, ring_buffer_element_id());
-  StopAndExpectValid(device, ring_buffer_element_id());
+  ExpectRingBufferReady(device, ring_buffer_id());
+  StartAndExpectValid(device, ring_buffer_id());
+  StopAndExpectValid(device, ring_buffer_id());
 
-  device->DropRingBuffer(ring_buffer_element_id());
+  device->DropRingBuffer(ring_buffer_id());
   ASSERT_TRUE(device->DropControl());
 
   ASSERT_TRUE(SetControl(device));
   auto reconnected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = result.value();
@@ -968,9 +957,9 @@ TEST_F(StreamConfigWarningTest, CreateRingBufferTwice) {
         EXPECT_TRUE(info.ring_buffer.reference_clock());
       });
   EXPECT_TRUE(reconnected_to_ring_buffer_fidl);
-  ExpectRingBufferReady(device, ring_buffer_element_id());
-  StartAndExpectValid(device, ring_buffer_element_id());
-  StopAndExpectValid(device, ring_buffer_element_id());
+  ExpectRingBufferReady(device, ring_buffer_id());
+  StartAndExpectValid(device, ring_buffer_id());
+  StopAndExpectValid(device, ring_buffer_id());
 }
 
 // Additional test cases for badly-behaved drivers:

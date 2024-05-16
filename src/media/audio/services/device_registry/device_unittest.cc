@@ -270,9 +270,8 @@ TEST_F(CodecTest, GetDaiFormats) {
   bool received_get_dai_formats_callback = false;
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
-      [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+      dai_id(), [&received_get_dai_formats_callback, &dai_formats](
+                    ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
@@ -302,9 +301,8 @@ TEST_F(CodecTest, SetDaiFormat) {
   bool received_get_dai_formats_callback = false;
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
-      [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+      dai_id(), [&received_get_dai_formats_callback, &dai_formats](
+                    ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
@@ -314,14 +312,14 @@ TEST_F(CodecTest, SetDaiFormat) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
   ASSERT_FALSE(notify()->dai_format());
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   // check that notify received dai_format and codec_format_info
   RunLoopUntilIdle();
   EXPECT_TRUE(notify()->dai_format());
   EXPECT_TRUE(ValidateDaiFormat(*notify()->dai_format()));
-  EXPECT_TRUE(notify()->codec_format_info(dai_element_id()));
-  EXPECT_TRUE(ValidateCodecFormatInfo(*notify()->codec_format_info(dai_element_id())));
+  EXPECT_TRUE(notify()->codec_format_info(dai_id()));
+  EXPECT_TRUE(ValidateCodecFormatInfo(*notify()->codec_format_info(dai_id())));
 }
 
 // Start and Stop
@@ -336,9 +334,8 @@ TEST_F(CodecTest, InitiallyStopped) {
   bool received_get_dai_formats_callback = false;
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
-      [&received_get_dai_formats_callback, &dai_formats](
-          ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+      dai_id(), [&received_get_dai_formats_callback, &dai_formats](
+                    ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         received_get_dai_formats_callback = true;
         for (auto& dai_format_set : formats) {
@@ -348,7 +345,7 @@ TEST_F(CodecTest, InitiallyStopped) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -370,14 +367,14 @@ TEST_F(CodecTest, Start) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -398,14 +395,14 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -417,7 +414,7 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   auto time_before_format_change = zx::clock::get_monotonic();
 
   // Change the DaiFormat
-  device->SetDaiFormat(dai_element_id(), dai_format2);
+  device->SetDaiFormat(dai_id(), dai_format2);
 
   // Expect codec to be stopped, and format to be changed.
   RunLoopUntilIdle();
@@ -425,7 +422,7 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   EXPECT_GT(notify()->codec_stop_time()->get(), time_before_format_change.get());
   EXPECT_TRUE(notify()->dai_format());
   EXPECT_EQ(*notify()->dai_format(), dai_format2);
-  EXPECT_TRUE(notify()->codec_format_info(dai_element_id()));
+  EXPECT_TRUE(notify()->codec_format_info(dai_id()));
 }
 
 TEST_F(CodecTest, SetDaiFormatNoChange) {
@@ -435,7 +432,7 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -443,7 +440,7 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
 
   RunLoopUntilIdle();
   auto safe_format = SafeDaiFormatFromDaiFormatSets(dai_formats);
-  device->SetDaiFormat(dai_element_id(), safe_format);
+  device->SetDaiFormat(dai_id(), safe_format);
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -453,9 +450,9 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   ASSERT_TRUE(notify()->codec_is_started());
   auto time_after_started = zx::clock::get_monotonic();
   // Clear out our notify's DaiFormat so we can detect a new notification of the same DaiFormat.
-  notify()->clear_dai_format(dai_element_id());
+  notify()->clear_dai_format(dai_id());
 
-  device->SetDaiFormat(dai_element_id(), safe_format);
+  device->SetDaiFormat(dai_id(), safe_format);
 
   RunLoopUntilIdle();
   // We do not expect this to reset our Start state.
@@ -472,14 +469,14 @@ TEST_F(CodecTest, StartStop) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -504,14 +501,14 @@ TEST_F(CodecTest, StartStart) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -537,14 +534,14 @@ TEST_F(CodecTest, StopStop) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
@@ -577,18 +574,18 @@ TEST_F(CodecTest, Reset) {
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
-      dai_element_id(),
+      dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
       });
 
   RunLoopUntilIdle();
-  device->SetDaiFormat(dai_element_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
+  device->SetDaiFormat(dai_id(), SafeDaiFormatFromDaiFormatSets(dai_formats));
 
   RunLoopUntilIdle();
   ASSERT_TRUE(notify()->dai_format());
-  ASSERT_TRUE(notify()->codec_format_info(dai_element_id()));
+  ASSERT_TRUE(notify()->codec_format_info(dai_id()));
   ASSERT_TRUE(notify()->codec_is_stopped());
   ASSERT_TRUE(device->CodecStart());
 
@@ -610,7 +607,7 @@ TEST_F(CodecTest, Reset) {
   EXPECT_GT(notify()->codec_stop_time()->get(), time_before_reset.get());
   // We were notified that the Codec reset its DaiFormat (none is now set).
   EXPECT_FALSE(notify()->dai_format());
-  EXPECT_FALSE(notify()->codec_format_info(dai_element_id()));
+  EXPECT_FALSE(notify()->codec_format_info(dai_id()));
   // Observe the signalprocessing Elements - were they reset?
   // Observe the signalprocessing Topology - was it reset?
 }
@@ -934,16 +931,15 @@ TEST_F(CompositeTest, SetDaiFormat) {
 
   auto dai_format_sets_by_element = device->dai_format_sets();
   ASSERT_FALSE(dai_format_sets_by_element.empty());
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     notify()->clear_dai_formats();
-    auto safe_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, dai_format_sets_by_element);
+    auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
 
-    device->SetDaiFormat(dai_element_id, safe_format);
+    device->SetDaiFormat(dai_id, safe_format);
 
     RunLoopUntilIdle();
     // check that notify received dai_format for this element_id
-    EXPECT_TRUE(ExpectDaiFormatMatches(dai_element_id, safe_format));
+    EXPECT_TRUE(ExpectDaiFormatMatches(dai_id, safe_format));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
     EXPECT_TRUE(notify()->dai_format_errors().empty());
   }
@@ -959,29 +955,28 @@ TEST_F(CompositeTest, SetDaiFormatNoChange) {
   auto dai_format_sets_by_element = device->dai_format_sets();
   ASSERT_FALSE(dai_format_sets_by_element.empty());
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     notify()->clear_dai_formats();
-    auto safe_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, dai_format_sets_by_element);
-    device->SetDaiFormat(dai_element_id, safe_format);
+    auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
+    device->SetDaiFormat(dai_id, safe_format);
 
     RunLoopUntilIdle();
-    auto format_match = notify()->dai_formats().find(dai_element_id);
+    auto format_match = notify()->dai_formats().find(dai_id);
     ASSERT_NE(format_match, notify()->dai_formats().end());
     ASSERT_TRUE(format_match->second.has_value());
     ASSERT_EQ(format_match->second, safe_format);
     ASSERT_TRUE(notify()->codec_format_infos().empty());
     ASSERT_TRUE(notify()->dai_format_errors().empty());
-    notify()->clear_dai_format(dai_element_id);
+    notify()->clear_dai_format(dai_id);
 
-    device->SetDaiFormat(dai_element_id, safe_format);
+    device->SetDaiFormat(dai_id, safe_format);
 
     RunLoopUntilIdle();
     ASSERT_FALSE(notify()->dai_format_errors().empty());
-    auto error_match = notify()->dai_format_errors().find(dai_element_id);
+    auto error_match = notify()->dai_format_errors().find(dai_id);
     ASSERT_NE(error_match, notify()->dai_format_errors().end());
     EXPECT_EQ(error_match->second, fad::ControlSetDaiFormatError(0));
-    format_match = notify()->dai_formats().find(dai_element_id);
+    format_match = notify()->dai_formats().find(dai_id);
     EXPECT_EQ(format_match, notify()->dai_formats().end());
     EXPECT_TRUE(notify()->codec_format_infos().empty());
   }
@@ -997,29 +992,27 @@ TEST_F(CompositeTest, SetDaiFormatChange) {
   auto dai_format_sets_by_element = device->dai_format_sets();
   ASSERT_FALSE(dai_format_sets_by_element.empty());
 
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
+  for (auto dai_id : device->dai_ids()) {
     notify()->clear_dai_formats();
-    auto safe_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, dai_format_sets_by_element);
-    auto safe_format2 =
-        SecondDaiFormatFromElementDaiFormatSets(dai_element_id, dai_format_sets_by_element);
-    device->SetDaiFormat(dai_element_id, safe_format);
+    auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
+    auto safe_format2 = SecondDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
+    device->SetDaiFormat(dai_id, safe_format);
 
     RunLoopUntilIdle();
-    auto format_match = notify()->dai_formats().find(dai_element_id);
+    auto format_match = notify()->dai_formats().find(dai_id);
     ASSERT_NE(format_match, notify()->dai_formats().end());
     ASSERT_TRUE(format_match->second.has_value());
     EXPECT_TRUE(ValidateDaiFormat(*format_match->second));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
     EXPECT_TRUE(notify()->dai_format_errors().empty());
-    notify()->clear_dai_format(dai_element_id);
+    notify()->clear_dai_format(dai_id);
 
-    device->SetDaiFormat(dai_element_id, safe_format2);
+    device->SetDaiFormat(dai_id, safe_format2);
 
     RunLoopUntilIdle();
     // SetDaiFormat with no-change should cause a DaiElement to emit a not-set notification with 0.
-    format_match = notify()->dai_formats().find(dai_element_id);
-    EXPECT_TRUE(ExpectDaiFormatMatches(dai_element_id, safe_format2));
+    format_match = notify()->dai_formats().find(dai_id);
+    EXPECT_TRUE(ExpectDaiFormatMatches(dai_id, safe_format2));
     EXPECT_TRUE(notify()->codec_format_infos().empty());
     EXPECT_TRUE(notify()->dai_format_errors().empty());
   }
@@ -1032,24 +1025,23 @@ TEST_F(CompositeTest, Reset) {
   ASSERT_TRUE(IsInitialized(device));
   ASSERT_TRUE(SetControl(device));
 
-  // Set DAI formats on every DAI endpoint.
+  // Set DAI formats on every DAI element.
   auto dai_format_sets_by_element = device->dai_format_sets();
   // ASSERT_FALSE(dai_format_sets_by_element.empty());
-  ASSERT_EQ(device->dai_endpoint_ids().size(), dai_format_sets_by_element.size());
-  for (auto dai_element_id : device->dai_endpoint_ids()) {
-    auto safe_format =
-        SafeDaiFormatFromElementDaiFormatSets(dai_element_id, dai_format_sets_by_element);
-    device->SetDaiFormat(dai_element_id, safe_format);
+  ASSERT_EQ(device->dai_ids().size(), dai_format_sets_by_element.size());
+  for (auto dai_id : device->dai_ids()) {
+    auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
+    device->SetDaiFormat(dai_id, safe_format);
 
     RunLoopUntilIdle();
-    ASSERT_TRUE(ExpectDaiFormatMatches(dai_element_id, safe_format));
+    ASSERT_TRUE(ExpectDaiFormatMatches(dai_id, safe_format));
   }
 
-  // Create RingBuffers on every RingBuffer endpoint.
+  // Create RingBuffers on every RingBuffer element.
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   // ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
+  for (auto element_id : device->ring_buffer_ids()) {
     fake_driver->ReserveRingBufferSize(element_id, 4096);
     auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
         element_id, ring_buffer_format_sets_by_element);
@@ -1074,14 +1066,14 @@ TEST_F(CompositeTest, Reset) {
     RunLoopUntilIdle();
     ASSERT_TRUE(callback_received);
   }
-  EXPECT_EQ(FakeCompositeRingBuffer::count(), device->ring_buffer_endpoint_ids().size());
+  EXPECT_EQ(FakeCompositeRingBuffer::count(), device->ring_buffer_ids().size());
 
   EXPECT_TRUE(device->Reset());
 
   RunLoopUntilIdle();
   // Reset should cause every DaiElement to emit DaiFormatChanged(id, std::nullopt, std::nullopt).
   // So notify()->dai_formats() should contain an entry for each Dai element, of value std::nullopt.
-  EXPECT_EQ(notify()->dai_formats().size(), device->dai_endpoint_ids().size());
+  EXPECT_EQ(notify()->dai_formats().size(), device->dai_ids().size());
   for (const auto& [element_id, format] : notify()->dai_formats()) {
     EXPECT_FALSE(format.has_value()) << "{element_id " << element_id << "}";
   }
@@ -1169,9 +1161,9 @@ TEST_F(CompositeTest, CreateRingBuffers) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     fake_driver->ReserveRingBufferSize(element_id, 8192);
 
     auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
@@ -1195,11 +1187,11 @@ TEST_F(CompositeTest, DeviceDroppedRingBuffer) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   constexpr uint32_t reserved_ring_buffer_bytes = 8192;
   constexpr uint32_t requested_ring_buffer_bytes = 4000;
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     SCOPED_TRACE(std::string("Testing DropRingBuffer: element_id ") + std::to_string(element_id));
     fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
     auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
@@ -1236,11 +1228,11 @@ TEST_F(CompositeTest, RingBufferStartAndStop) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   constexpr uint32_t reserved_ring_buffer_bytes = 8192;
   constexpr uint32_t requested_ring_buffer_bytes = 4000;
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     SCOPED_TRACE(std::string("Testing RingBuffer Start/Stop: element_id ") +
                  std::to_string(element_id));
     fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
@@ -1294,11 +1286,11 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   constexpr uint32_t reserved_ring_buffer_bytes = 8192;
   constexpr uint32_t requested_ring_buffer_bytes = 4000;
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     SCOPED_TRACE(std::string("Testing SetActiveChannels (supported): element_id ") +
                  std::to_string(element_id));
     fake_driver->EnableActiveChannelsSupport(element_id);
@@ -1365,11 +1357,11 @@ TEST_F(CompositeTest, SetActiveChannelsUnsupported) {
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   constexpr uint32_t reserved_ring_buffer_bytes = 8192;
   constexpr uint32_t requested_ring_buffer_bytes = 4000;
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     SCOPED_TRACE(std::string("Testing SetActiveChannels (unsupported): element_id ") +
                  std::to_string(element_id));
     fake_driver->DisableActiveChannelsSupport(element_id);
@@ -1414,11 +1406,11 @@ TEST_F(CompositeTest, WatchDelayInfoInitial) {
   ASSERT_TRUE(SetControl(device));
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   constexpr uint32_t reserved_ring_buffer_bytes = 8192;
   constexpr uint32_t requested_ring_buffer_bytes = 4000;
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     SCOPED_TRACE(std::string("Testing RingBuffer initial DelayInfo: element_id ") +
                  std::to_string(element_id));
     fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
@@ -1463,11 +1455,11 @@ TEST_F(CompositeTest, WatchDelayInfoUpdate) {
   ASSERT_TRUE(SetControl(device));
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
-  ASSERT_EQ(device->ring_buffer_endpoint_ids().size(), ring_buffer_format_sets_by_element.size());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   constexpr uint32_t reserved_ring_buffer_bytes = 8192;
   constexpr uint32_t requested_ring_buffer_bytes = 4000;
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     SCOPED_TRACE(std::string("Testing RingBuffer initial DelayInfo: element_id ") +
                  std::to_string(element_id));
     fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
@@ -1491,7 +1483,7 @@ TEST_F(CompositeTest, WatchDelayInfoUpdate) {
   }
 
   notify()->clear_delay_infos();
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     EXPECT_FALSE(notify()->delay_info(element_id))
         << "ControlNotify was not cleared for element_id " << element_id;
     // For each element, inject int_delay [`element_id` nsec] and ext_delay [`element_id` usec].
@@ -1501,7 +1493,7 @@ TEST_F(CompositeTest, WatchDelayInfoUpdate) {
 
   RunLoopUntilIdle();
 
-  for (auto element_id : device->ring_buffer_endpoint_ids()) {
+  for (auto element_id : device->ring_buffer_ids()) {
     // Ensure the Device received the updated values from the driver.
     ASSERT_TRUE(DeviceDelayInfo(device, element_id));
     ASSERT_TRUE(DeviceDelayInfo(device, element_id)->internal_delay());
@@ -1546,31 +1538,27 @@ TEST_F(CompositeTest, GetElements) {
     ASSERT_FALSE(element.can_disable().has_value());
     ASSERT_TRUE(element.can_stop().has_value());
     ASSERT_TRUE(element.can_bypass().has_value());
-    if (element.type() == fhasp::ElementType::kEndpoint) {
+    if (element.type() == fhasp::ElementType::kDaiInterconnect) {
       ASSERT_TRUE(element.type_specific().has_value());
-      ASSERT_TRUE(element.type_specific()->endpoint().has_value());
-      ASSERT_TRUE(element.type_specific()->endpoint()->type().has_value());
-      ASSERT_TRUE(element.type_specific()->endpoint()->plug_detect_capabilities().has_value());
+      ASSERT_TRUE(element.type_specific()->dai_interconnect().has_value());
+      ASSERT_TRUE(
+          element.type_specific()->dai_interconnect()->plug_detect_capabilities().has_value());
     }
   }
 
   EXPECT_EQ(elements->at(0).id(), FakeComposite::kSourceDaiElementId);
   EXPECT_EQ(elements->at(1).id(), FakeComposite::kDestDaiElementId);
-  EXPECT_EQ(elements->at(0).type(), fhasp::ElementType::kEndpoint);
-  EXPECT_EQ(elements->at(1).type(), fhasp::ElementType::kEndpoint);
+  EXPECT_EQ(elements->at(0).type(), fhasp::ElementType::kDaiInterconnect);
+  EXPECT_EQ(elements->at(1).type(), fhasp::ElementType::kDaiInterconnect);
   EXPECT_FALSE(*elements->at(0).can_bypass());
   EXPECT_FALSE(*elements->at(1).can_bypass());
   EXPECT_TRUE(*elements->at(0).can_stop());
   EXPECT_TRUE(*elements->at(1).can_stop());
   EXPECT_EQ(*elements->at(0).description(), *FakeComposite::kSourceDaiElement.description());
   EXPECT_EQ(*elements->at(1).description(), *FakeComposite::kDestDaiElement.description());
-  EXPECT_EQ(*elements->at(0).type_specific()->endpoint()->type(),
-            fhasp::EndpointType::kDaiInterconnect);
-  EXPECT_EQ(*elements->at(1).type_specific()->endpoint()->type(),
-            fhasp::EndpointType::kDaiInterconnect);
-  EXPECT_EQ(elements->at(0).type_specific()->endpoint()->plug_detect_capabilities(),
+  EXPECT_EQ(elements->at(0).type_specific()->dai_interconnect()->plug_detect_capabilities(),
             fhasp::PlugDetectCapabilities::kCanAsyncNotify);
-  EXPECT_EQ(elements->at(1).type_specific()->endpoint()->plug_detect_capabilities(),
+  EXPECT_EQ(elements->at(1).type_specific()->dai_interconnect()->plug_detect_capabilities(),
             fhasp::PlugDetectCapabilities::kCanAsyncNotify);
 
   EXPECT_EQ(elements->at(2).id(), FakeComposite::kSourceRbElementId);
@@ -1658,8 +1646,8 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kSourceDaiElementLatency.latency_time().value());
-  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
-  const auto& endpt_state1 = state.type_specific()->endpoint();
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kDaiInterconnect);
+  const auto& endpt_state1 = state.type_specific()->dai_interconnect();
   ASSERT_TRUE(endpt_state1.has_value());
   ASSERT_TRUE(endpt_state1->plug_state().has_value());
   ASSERT_TRUE(endpt_state1->plug_state()->plugged().has_value());
@@ -1681,8 +1669,8 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.latency()->latency_time().has_value());
   EXPECT_EQ(state.latency()->latency_time().value(),
             FakeComposite::kDestDaiElementLatency.latency_time().value());
-  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kEndpoint);
-  const auto& endpt_state2 = state.type_specific()->endpoint();
+  ASSERT_EQ(state.type_specific()->Which(), fhasp::TypeSpecificElementState::Tag::kDaiInterconnect);
+  const auto& endpt_state2 = state.type_specific()->dai_interconnect();
   ASSERT_TRUE(endpt_state2.has_value());
   ASSERT_TRUE(endpt_state2->plug_state().has_value());
   ASSERT_TRUE(endpt_state2->plug_state()->plugged().has_value());
@@ -1765,26 +1753,29 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     }
 
     // Then weed out any non-pluggable elements.
-    if (element.type() != fhasp::ElementType::kEndpoint || !element.type_specific().has_value() ||
-        !element.type_specific()->endpoint().has_value() ||
-        element.type_specific()->endpoint()->plug_detect_capabilities() !=
+    if (element.type() != fhasp::ElementType::kDaiInterconnect ||
+        !element.type_specific().has_value() ||
+        !element.type_specific()->dai_interconnect().has_value() ||
+        element.type_specific()->dai_interconnect()->plug_detect_capabilities() !=
             fhasp::PlugDetectCapabilities::kCanAsyncNotify) {
       continue;
     }
-    if (!state.type_specific().has_value() || !state.type_specific()->endpoint().has_value() ||
-        !state.type_specific()->endpoint()->plug_state().has_value() ||
-        !state.type_specific()->endpoint()->plug_state()->plugged().has_value() ||
-        !state.type_specific()->endpoint()->plug_state()->plug_state_time().has_value()) {
+    if (!state.type_specific().has_value() ||
+        !state.type_specific()->dai_interconnect().has_value() ||
+        !state.type_specific()->dai_interconnect()->plug_state().has_value() ||
+        !state.type_specific()->dai_interconnect()->plug_state()->plugged().has_value() ||
+        !state.type_specific()->dai_interconnect()->plug_state()->plug_state_time().has_value()) {
       continue;
     }
-    auto was_plugged = state.type_specific()->endpoint()->plug_state()->plugged();
+    auto was_plugged = state.type_specific()->dai_interconnect()->plug_state()->plugged();
     auto new_state = fhasp::ElementState{{
-        .type_specific = fhasp::TypeSpecificElementState::WithEndpoint(fhasp::EndpointElementState{{
-            fhasp::PlugState{{
-                !was_plugged,
-                plug_change_time_to_inject.get(),
-            }},
-        }}),
+        .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect(
+            fhasp::DaiInterconnectElementState{{
+                fhasp::PlugState{{
+                    !was_plugged,
+                    plug_change_time_to_inject.get(),
+                }},
+            }}),
         .latency = fhasp::Latency::WithLatencyTime(ZX_USEC(element_id)),
         .vendor_specific_data = {{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
                                   'D', 'E', 'F', 'Z'}},  // 'Z' is located at byte [16].
@@ -1823,36 +1814,23 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
 
       ASSERT_TRUE(state_received.bypassed().has_value());
       EXPECT_FALSE(*state_received.bypassed());
-    } else if (element_id == FakeComposite::kDestDaiElementId ||
-               element_id == FakeComposite::kSourceDaiElementId) {
-      ASSERT_TRUE(state_received.type_specific().has_value());
-      ASSERT_EQ(state_received.type_specific()->Which(),
-                fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEndpoint);
-      ASSERT_TRUE(state_received.type_specific()->endpoint().has_value());
-      ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state().has_value());
-      ASSERT_TRUE(state_received.type_specific()->endpoint()->plug_state()->plugged().has_value());
-      ASSERT_TRUE(
-          state_received.type_specific()->endpoint()->plug_state()->plug_state_time().has_value());
-      EXPECT_EQ(*state_received.type_specific()->endpoint()->plug_state()->plug_state_time(),
-                plug_change_time_to_inject.get());
-      ASSERT_TRUE(state_received.latency().has_value());
-      ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
-      EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
-
-      ASSERT_TRUE(state_received.vendor_specific_data().has_value());
-      ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
-      EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
-
-      EXPECT_FALSE(state_received.enabled().has_value());
-
-      ASSERT_TRUE(state_received.started().has_value());
-      EXPECT_TRUE(state_received.started());
-
-      ASSERT_TRUE(state_received.bypassed().has_value());
-      EXPECT_FALSE(*state_received.bypassed());
     } else {
-      EXPECT_FALSE(state_received.type_specific().has_value());
-
+      ASSERT_TRUE(state_received.type_specific().has_value());
+      ASSERT_EQ(
+          state_received.type_specific()->Which(),
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDaiInterconnect);
+      ASSERT_TRUE(state_received.type_specific()->dai_interconnect().has_value());
+      ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->plug_state().has_value());
+      ASSERT_TRUE(
+          state_received.type_specific()->dai_interconnect()->plug_state()->plugged().has_value());
+      ASSERT_TRUE(state_received.type_specific()
+                      ->dai_interconnect()
+                      ->plug_state()
+                      ->plug_state_time()
+                      .has_value());
+      EXPECT_EQ(
+          *state_received.type_specific()->dai_interconnect()->plug_state()->plug_state_time(),
+          plug_change_time_to_inject.get());
       ASSERT_TRUE(state_received.latency().has_value());
       ASSERT_EQ(state_received.latency()->Which(), fhasp::Latency::Tag::kLatencyTime);
       EXPECT_EQ(state_received.latency()->latency_time().value(), ZX_USEC(element_id));
@@ -2112,12 +2090,12 @@ TEST_F(StreamConfigTest, SupportedDriverFormatForClientFormat) {
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
 
-  auto valid_bits = ExpectFormatMatch(device, ring_buffer_element_id(),
-                                      fuchsia_audio::SampleType::kInt16, 2, 48001);
+  auto valid_bits =
+      ExpectFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt16, 2, 48001);
   EXPECT_EQ(valid_bits, 15u);
 
-  valid_bits = ExpectFormatMatch(device, ring_buffer_element_id(),
-                                 fuchsia_audio::SampleType::kInt32, 2, 48000);
+  valid_bits =
+      ExpectFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt32, 2, 48000);
   EXPECT_EQ(valid_bits, 20u);
 }
 
@@ -2281,7 +2259,7 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
         auto& info = *result;
@@ -2302,9 +2280,9 @@ TEST_F(StreamConfigTest, RingBufferProperties) {
   ASSERT_TRUE(IsInitialized(device));
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
-  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_element_id());
+  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_id());
 
-  GetRingBufferProperties(device, ring_buffer_element_id());
+  GetRingBufferProperties(device, ring_buffer_id());
 }
 
 // TODO(https://fxbug.dev/42069012): Unittest CalculateRequiredRingBufferSizes
@@ -2315,9 +2293,9 @@ TEST_F(StreamConfigTest, RingBufferGetVmo) {
   ASSERT_TRUE(IsInitialized(device));
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
-  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_element_id());
+  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_id());
 
-  GetDriverVmoAndExpectValid(device, ring_buffer_element_id());
+  GetDriverVmoAndExpectValid(device, ring_buffer_id());
 }
 
 TEST_F(StreamConfigTest, BasicStartAndStop) {
@@ -2328,7 +2306,7 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = *result;
@@ -2342,10 +2320,10 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
       });
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
 
-  ExpectRingBufferReady(device, ring_buffer_element_id());
+  ExpectRingBufferReady(device, ring_buffer_id());
 
-  StartAndExpectValid(device, ring_buffer_element_id());
-  StopAndExpectValid(device, ring_buffer_element_id());
+  StartAndExpectValid(device, ring_buffer_id());
+  StopAndExpectValid(device, ring_buffer_id());
 }
 
 TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
@@ -2356,7 +2334,7 @@ TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
 
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [&created_ring_buffer](
           const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
@@ -2367,10 +2345,10 @@ TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
 
   // Verify that the Device received the expected values from the driver.
   EXPECT_TRUE(created_ring_buffer);
-  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id()));
-  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay());
-  EXPECT_FALSE(DeviceDelayInfo(device, ring_buffer_element_id())->external_delay());
-  EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay(), 0);
+  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_id()));
+  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_id())->internal_delay());
+  EXPECT_FALSE(DeviceDelayInfo(device, ring_buffer_id())->external_delay());
+  EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_id())->internal_delay(), 0);
 
   // Verify that the ControlNotify was sent the expected values.
   ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified of initial delay info";
@@ -2386,7 +2364,7 @@ TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   ASSERT_TRUE(SetControl(device));
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [&created_ring_buffer](
           const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
@@ -2407,11 +2385,11 @@ TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   fake_driver->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id()));
-  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay());
-  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_element_id())->external_delay());
-  EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_element_id())->internal_delay(), 123'456);
-  EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_element_id())->external_delay(), 654'321);
+  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_id()));
+  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_id())->internal_delay());
+  ASSERT_TRUE(DeviceDelayInfo(device, ring_buffer_id())->external_delay());
+  EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_id())->internal_delay(), 123'456);
+  EXPECT_EQ(*DeviceDelayInfo(device, ring_buffer_id())->external_delay(), 654'321);
 
   ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified with updated delay info";
   ASSERT_TRUE(notify()->delay_info()->internal_delay());
@@ -2429,7 +2407,7 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = *result;
@@ -2443,8 +2421,8 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
       });
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
 
-  ExpectRingBufferReady(device, ring_buffer_element_id());
-  EXPECT_TRUE(device->supports_set_active_channels(ring_buffer_element_id()).value_or(false));
+  ExpectRingBufferReady(device, ring_buffer_id());
+  EXPECT_TRUE(device->supports_set_active_channels(ring_buffer_id()).value_or(false));
 }
 
 TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
@@ -2456,7 +2434,7 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_element_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = *result;
@@ -2470,8 +2448,8 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
       });
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
 
-  ExpectRingBufferReady(device, ring_buffer_element_id());
-  EXPECT_FALSE(device->supports_set_active_channels(ring_buffer_element_id()).value_or(true));
+  ExpectRingBufferReady(device, ring_buffer_id());
+  EXPECT_FALSE(device->supports_set_active_channels(ring_buffer_id()).value_or(true));
 }
 
 TEST_F(StreamConfigTest, SetActiveChannels) {
@@ -2481,11 +2459,11 @@ TEST_F(StreamConfigTest, SetActiveChannels) {
   fake_driver->AllocateRingBuffer(8192);
   fake_driver->set_active_channels_supported(true);
   ASSERT_TRUE(SetControl(device));
-  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_element_id());
+  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_id());
 
-  ExpectActiveChannels(device, ring_buffer_element_id(), 0x0003);
+  ExpectActiveChannels(device, ring_buffer_id(), 0x0003);
 
-  SetInitialActiveChannelsAndExpect(device, ring_buffer_element_id(), 0x0002);
+  SetInitialActiveChannelsAndExpect(device, ring_buffer_id(), 0x0002);
 }
 
 // TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no set_time change).

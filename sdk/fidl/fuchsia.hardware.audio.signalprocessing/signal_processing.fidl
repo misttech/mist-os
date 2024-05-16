@@ -56,13 +56,18 @@ type ElementType = flexible enum {
     SAMPLE_RATE_CONVERSION = 11;
 
     /// The start/end of a pipeline.
-    @available(added=12)
+    @available(added=12, deprecated=20)
     ENDPOINT = 12;
 
     /// Ring Buffer.
-    /// This is one of two types of elements that can start/end processing pipelines.
+    /// This is the first of two types of elements that can start/end processing pipelines.
     @available(added=20)
     RING_BUFFER = 13;
+
+    /// Digital Audio Interface Interconnect.
+    /// This is the second of two types of elements that can start/end processing pipelines.
+    @available(added=20)
+    DAI_INTERCONNECT = 14;
 };
 
 /// Type-specific Parameters for an `Element`.
@@ -79,9 +84,13 @@ type TypeSpecificElement = flexible union {
     // See dynamics.fidl.
     4: dynamics Dynamics;
 
-    // See endpoint.fidl.
-    @available(added=12)
+    // See dai_interconnect.fidl.
+    @available(added=12, deprecated=20)
     5: endpoint Endpoint;
+
+    // See dai_interconnect.fidl.
+    @available(added=20)
+    6: dai_interconnect DaiInterconnect;
 };
 
 type Latency = flexible union {
@@ -158,11 +167,17 @@ type TypeSpecificElementState = flexible union {
     // See dynamics.fidl.
     4: dynamics DynamicsElementState;
 
-    // See endpoint.fidl.
-    @available(added=12)
+    // See dai_interconnect.fidl.
+    @available(added=12, deprecated=20)
     5: endpoint EndpointElementState;
+
+    // See dai_interconnect.fidl.
+    @available(added=20)
+    6: dai_interconnect DaiInterconnectElementState;
 };
 
+/// The current state of an element, as returned from the driver. Note that this table contains
+/// fields that are not present in `SettableElementState`, since they cannot be set by clients.
 type ElementState = table {
     /// If included, type-specific state parameters for the processing element.
     ///

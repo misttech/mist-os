@@ -18,8 +18,8 @@ namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 // Element ids
 constexpr ElementId kAgcElementId = 2;
-constexpr ElementId kDaiEndpointElementId = 1;
-constexpr ElementId kRingBufferEndpointElementId = 0;
+constexpr ElementId kDaiInterconnectElementId = 1;
+constexpr ElementId kRingBufferElementId = 0;
 constexpr ElementId kDynamicsElementId = 42;
 constexpr ElementId kEqualizerElementId = 55;
 constexpr ElementId kGainElementId = 555;
@@ -36,11 +36,10 @@ const fhasp::Element kAgcElement{{
                    std::string("this string has an upper-case 'x' as the last character.  54321X"),
     .can_stop = false,
 }};
-const fhasp::Element kDaiEndpointElement{{
-    .id = kDaiEndpointElementId,
-    .type = fhasp::ElementType::kEndpoint,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kDaiInterconnect,
+const fhasp::Element kDaiInterconnectElement{{
+    .id = kDaiInterconnectElementId,
+    .type = fhasp::ElementType::kDaiInterconnect,
+    .type_specific = fhasp::TypeSpecificElement::WithDaiInterconnect({{
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
     .description = " ",
@@ -48,7 +47,7 @@ const fhasp::Element kDaiEndpointElement{{
     .can_bypass = false,
 }};
 const fhasp::Element kRingBufferElement{{
-    .id = kRingBufferEndpointElementId,  //
+    .id = kRingBufferElementId,  //
     .type = fhasp::ElementType::kRingBuffer,
     // .type_specific is missing
     // .description is missing
@@ -127,13 +126,12 @@ const fhasp::Element kElementNoType{{
 }};
 const fhasp::Element kElementWithoutRequiredTypeSpecific{{
     .id = kBadElementId,
-    .type = fhasp::ElementType::kEndpoint,
+    .type = fhasp::ElementType::kDaiInterconnect,
 }};
 const fhasp::Element kElementWrongTypeSpecific{{
     .id = kBadElementId,
     .type = fhasp::ElementType::kDynamics,
-    .type_specific = fhasp::TypeSpecificElement::WithEndpoint({{
-        .type = fhasp::EndpointType::kDaiInterconnect,
+    .type_specific = fhasp::TypeSpecificElement::WithDaiInterconnect({{
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
 }};
@@ -154,22 +152,23 @@ const fhasp::Element kElementCannotBypass{{
 }};
 
 // Collections of Elements
-const std::vector<fhasp::Element> kElements{kDaiEndpointElement, kAgcElement, kDynamicsElement,
+const std::vector<fhasp::Element> kElements{kDaiInterconnectElement, kAgcElement, kDynamicsElement,
                                             kRingBufferElement};
 const std::vector<fhasp::Element> kEmptyElements{};
-const std::vector<fhasp::Element> kElementsDuplicateId{kDaiEndpointElement, kDaiEndpointElement};
+const std::vector<fhasp::Element> kElementsDuplicateId{kDaiInterconnectElement,
+                                                       kDaiInterconnectElement};
 const std::vector<fhasp::Element> kElementsWithNoId{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement, kElementNoId};
+    kDaiInterconnectElement, kAgcElement, kDynamicsElement, kRingBufferElement, kElementNoId};
 const std::vector<fhasp::Element> kElementsWithNoType{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement, kElementNoType};
+    kDaiInterconnectElement, kAgcElement, kDynamicsElement, kRingBufferElement, kElementNoType};
 const std::vector<fhasp::Element> kElementsWithNoRequiredTypeSpecific{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement,
+    kDaiInterconnectElement, kAgcElement, kDynamicsElement, kRingBufferElement,
     kElementWithoutRequiredTypeSpecific};
 const std::vector<fhasp::Element> kElementsWithWrongTypeSpecific{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement,
+    kDaiInterconnectElement, kAgcElement, kDynamicsElement, kRingBufferElement,
     kElementWrongTypeSpecific};
 const std::vector<fhasp::Element> kElementsWithEmptyDescription{
-    kDaiEndpointElement, kAgcElement, kDynamicsElement, kRingBufferElement,
+    kDaiInterconnectElement, kAgcElement, kDynamicsElement, kRingBufferElement,
     kElementEmptyDescription};
 
 const std::unordered_map<ElementId, ElementRecord> kEmptyElementMap{};
@@ -214,8 +213,8 @@ const fhasp::ElementState kDynamicsElementState{{
     }}),
     .started = true,
 }};
-const fhasp::ElementState kEndpointElementState{{
-    .type_specific = fhasp::TypeSpecificElementState::WithEndpoint({{
+const fhasp::ElementState kDaiInterconnectElementState{{
+    .type_specific = fhasp::TypeSpecificElementState::WithDaiInterconnect({{
         .plug_state = fhasp::PlugState{{
             .plugged = true,
             .plug_state_time = 0,
@@ -302,13 +301,13 @@ constexpr TopologyId kTopologyRbDaiId = 7;
 constexpr TopologyId kBadTopologyId = 42;
 
 // EdgePairs
-const fhasp::EdgePair kEdgeDaiAgc{{kDaiEndpointElementId, kAgcElementId}};
+const fhasp::EdgePair kEdgeDaiAgc{{kDaiInterconnectElementId, kAgcElementId}};
 const fhasp::EdgePair kEdgeAgcDyn{{kAgcElementId, kDynamicsElementId}};
-const fhasp::EdgePair kEdgeDynRb{{kDynamicsElementId, kRingBufferEndpointElementId}};
-const fhasp::EdgePair kEdgeDaiRb{{kDaiEndpointElementId, kRingBufferEndpointElementId}};
-const fhasp::EdgePair kEdgeRbDai{{kRingBufferEndpointElementId, kDaiEndpointElementId}};
-const fhasp::EdgePair kEdgeToSelf{{kRingBufferEndpointElementId, kRingBufferEndpointElementId}};
-const fhasp::EdgePair kEdgeUnknownId{{kRingBufferEndpointElementId, kBadElementId}};
+const fhasp::EdgePair kEdgeDynRb{{kDynamicsElementId, kRingBufferElementId}};
+const fhasp::EdgePair kEdgeDaiRb{{kDaiInterconnectElementId, kRingBufferElementId}};
+const fhasp::EdgePair kEdgeRbDai{{kRingBufferElementId, kDaiInterconnectElementId}};
+const fhasp::EdgePair kEdgeToSelf{{kRingBufferElementId, kRingBufferElementId}};
+const fhasp::EdgePair kEdgeUnknownId{{kRingBufferElementId, kBadElementId}};
 
 // Topologies
 const fhasp::Topology kTopologyDaiAgcDynRb{{

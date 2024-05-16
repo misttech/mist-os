@@ -97,15 +97,15 @@ closed protocol Composite {
         properties CompositeProperties;
     });
 
-    /// Retrieves the ring buffer formats supported by a `RING_BUFFER` `ENDPOINT` type processing
-    /// element in the topology supported by this driver as returned by `GetElements` from
+    /// Retrieves the ring buffer formats supported by a `RING_BUFFER` processing element
+    /// in the topology supported by this driver as returned by `GetElements` from
     /// fuchsia.hardware.audio.signalprocessing.
     /// Returns `SHOULD_WAIT` if the ring buffer formats are not available at the time, the
     /// client may retry at a later time.
     /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
     /// by `GetElements`.
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
-    /// `ENDPOINT` with `EndpointType` `RING_BUFFER`.
+    /// `RING_BUFFER`.
     /// Retrieving multiple `SupportedFormats` allows for cases where exclusive combinations of
     /// the parameters in `SupportedFormats` may be supported.
     strict GetRingBufferFormats(struct {
@@ -114,31 +114,30 @@ closed protocol Composite {
         ring_buffer_formats vector<SupportedFormats>:MAX_COUNT_FORMATS;
     }) error DriverError;
 
-    /// `CreateRingBuffer` is sent by clients to select a ring buffer format for the
-    /// `RING_BUFFER` `ENDPOINT` type processing element specified by `processing_element_id`.
-    /// The format is based on information that the driver provides in `GetRingBufferFormats`,
-    /// what is supported by the client, and any other requirement.
-    /// The returned `ring_buffer` channel is used to access and control the audio buffer provided
-    /// by the driver.
+    /// `CreateRingBuffer` is sent by clients to select a ring buffer format for the `RING_BUFFER`
+    /// processing element specified by `processing_element_id`. The format is based on information
+    /// that the driver provides in `GetRingBufferFormats`, what is supported by the client, and
+    /// any other requirement. The returned `ring_buffer` channel is used to access and control the
+    /// audio buffer provided by the driver.
     /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
     /// by `GetElements`.
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
-    /// `ENDPOINT` with `EndpointType` `RING_BUFFER`.
+    /// `RING_BUFFER`.
     strict CreateRingBuffer(resource struct {
         processing_element_id uint64;
         format Format;
         ring_buffer server_end:RingBuffer;
     }) -> () error DriverError;
 
-    /// Retrieves the DAI formats supported by a `DAI_INTERCONNECT` `ENDPOINT` type processing
-    /// element in the topology supported by this driver as returned by `GetElements` from
+    /// Retrieves the DAI formats supported by a `DAI_INTERCONNECT` processing element
+    /// in the topology supported by this driver as returned by `GetElements` from
     /// fuchsia.hardware.audio.signalprocessing.
     /// Returns `SHOULD_WAIT` if the DAI formats are not available at the time, the client
     /// may retry at a later time.
     /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
     /// by `GetElements`.
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
-    /// `ENDPOINT` with `EndpointType` `DAI_INTERCONNECT`.
+    /// `DAI_INTERCONNECT`.
     /// Retrieving multiple `DaiSupportedFormats` allows for cases where exclusive combinations of
     /// the parameters in SupportedFormats may be supported.
     strict GetDaiFormats(struct {
@@ -148,13 +147,13 @@ closed protocol Composite {
     }) error DriverError;
 
     /// `SetDaiFormat` is sent by clients to select a DAI format for the `DAI_INTERCONNECT`
-    /// `ENDPOINT` type processing element specified by `processing_element_id`.
-    /// The format is based on information that the driver provides in `GetDaiFormats`, what is
-    /// supported by the client, and any other requirement.
+    /// processing element specified by `processing_element_id`. The format is based on information
+    /// that the driver provides in `GetDaiFormats`, what is supported by the client, and any other
+    /// requirement.
     /// Returns `INVALID_ARGS` if the `processing_element_id` does not match an id returned
     /// by `GetElements`.
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
-    /// `ENDPOINT` with `EndpointType` `DAI_INTERCONNECT`.
+    /// `DAI_INTERCONNECT`.
     strict SetDaiFormat(struct {
         processing_element_id uint64;
         format DaiFormat;

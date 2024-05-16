@@ -858,14 +858,14 @@ void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
   // One DAI per pipeline.
   for (size_t i = 0; i < kNumberOfPipelines; ++i) {
     fuchsia_hardware_audio_signalprocessing::Element dai;
-    fuchsia_hardware_audio_signalprocessing::Endpoint dai_endpoint;
-    dai_endpoint.type(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect)
-        .plug_detect_capabilities(
-            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+    fuchsia_hardware_audio_signalprocessing::DaiInterconnect dai_interconnect;
+    dai_interconnect.plug_detect_capabilities(
+        fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
     dai.id(kDaiIds[i])
-        .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
-        .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
-            std::move(dai_endpoint)))
+        .type(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect)
+        .type_specific(
+            fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithDaiInterconnect(
+                std::move(dai_interconnect)))
         .can_stop(false);
     elements.push_back(std::move(dai));
   }
@@ -885,15 +885,15 @@ void AudioCompositeServer::WatchElementState(WatchElementStateRequest& request,
   auto& element = element_completer->second;
   if (!element.first_response_sent) {
     element.first_response_sent = true;
-    // All elements are endpoints, hardwired hence plugged at time 0.
+    // All elements are DAI, hardwired hence plugged at time 0.
     fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
     plug_state.plugged(true).plug_state_time(0);
-    fuchsia_hardware_audio_signalprocessing::EndpointElementState endpoint_state;
-    endpoint_state.plug_state(std::move(plug_state));
+    fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
+    dai_state.plug_state(std::move(plug_state));
     fuchsia_hardware_audio_signalprocessing::ElementState element_state;
     element_state.type_specific(
-        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
-            std::move(endpoint_state)));
+        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
+            std::move(dai_state)));
     element_state.started(true);
     completer.Reply(std::move(element_state));
   } else if (element.completer) {
@@ -917,7 +917,7 @@ void AudioCompositeServer::SetElementState(SetElementStateRequest& request,
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
-  // All elements are endpoints, no field is expected or acted upon.
+  // All elements are interconnects, no field is expected or acted upon.
   completer.Reply(zx::ok());
 }
 
@@ -927,19 +927,17 @@ void AudioCompositeServer::GetTopologies(GetTopologiesCompleter::Sync& completer
   std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair> edges;
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     if (!engines_[i].config.is_input) {
-      //                        +-----------+    +-----------+
-      //        Source       -> |  ENDPOINT | -> +  ENDPOINT | ->     Destination
-      //      from client       | RingBuffer|    +    DAI    |    e.g. Bluetooth chip
-      //                        +-----------+    +-----------+
+      //                        +-------------+    +---------+
+      //        Source       -> | RING_BUFFER | -> +   DAI   | ->     Destination
+      //      from client       +-------------+    +---------+    e.g. Bluetooth chip
       fuchsia_hardware_audio_signalprocessing::EdgePair pair;
       pair.processing_element_id_from(kRingBufferIds[i])
           .processing_element_id_to(kDaiIds[engines_[i].dai_index]);
       edges.push_back(std::move(pair));
     } else {
-      //                        +-----------+    +-----------+
-      //       Source        -> |  ENDPOINT | -> +  ENDPOINT | ->     Destination
-      // e.g. Bluetooth chip    |    DAI    |    + RingBuffer|         to client
-      //                        +-----------+    +-----------+
+      //                        +---------+    +-------------+
+      //       Source        -> |   DAI   | -> + RING_BUFFER | ->     Destination
+      // e.g. Bluetooth chip    +---------+    +-------------+         to client
       fuchsia_hardware_audio_signalprocessing::EdgePair pair;
       pair.processing_element_id_from(kDaiIds[engines_[i].dai_index])
           .processing_element_id_to(kRingBufferIds[i]);
