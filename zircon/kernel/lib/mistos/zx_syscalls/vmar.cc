@@ -105,6 +105,8 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
   bool is_user_vmar =
       (vmar->base_arch_mmu_flags() & ARCH_MMU_FLAG_PERM_USER) == ARCH_MMU_FLAG_PERM_USER;
 
+  LTRACEF("options 0x%x is_user_vmar %s\n", options, is_user_vmar ? "true" : "false");
+
   // Test to see if we should even be able to map this.
   if (!(vmo_rights & ZX_RIGHT_MAP)) {
     return ZX_ERR_ACCESS_DENIED;
