@@ -13,6 +13,7 @@ the block device label (and optionally path) to run on.
 
 import logging
 import asyncio
+import time
 
 import fidl.fuchsia_blackout_test as blackout
 
@@ -21,6 +22,8 @@ from mobly import asserts, test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing.custom_types import FidlEndpoint
+import honeydew.errors
+import honeydew.utils.common
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,14 +68,20 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         asserts.assert_equal(res.err, None, "Failed to run load generation")
 
     def create_blackout_component(self) -> None:
-        self.dut.ffx.run(
-            [
-                "component",
-                "run",
-                "--recreate",
-                self.user_params["component_name"],
-                self.user_params["component_url"],
-            ]
+        # TODO(https://fxbug.dev/340586785): sometimes this fails. Until it becomes more stable (or
+        # the retry logic is put into the framework), retry it for a bit.
+        honeydew.utils.common.retry(
+            lambda: self.dut.ffx.run(
+                [
+                    "component",
+                    "run",
+                    "--recreate",
+                    self.user_params["component_name"],
+                    self.user_params["component_url"],
+                ]
+            ),
+            timeout=60,
+            wait_time=5,
         )
         ch = self.dut.fuchsia_controller.connect_device_proxy(
             FidlEndpoint(
