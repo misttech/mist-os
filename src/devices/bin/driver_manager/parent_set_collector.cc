@@ -41,7 +41,7 @@ zx::result<std::shared_ptr<Node>> ParentSetCollector::TryToAssemble(
 
   auto result =
       Node::CreateCompositeNode(composite_name_, parents_, parent_names_, parent_properties_,
-                                node_manager, dispatcher, /* is_legacy */ false, primary_index_);
+                                node_manager, dispatcher, primary_index_);
   if (result.is_error()) {
     return result.take_error();
   }
