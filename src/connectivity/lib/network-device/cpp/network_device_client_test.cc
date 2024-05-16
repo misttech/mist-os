@@ -55,50 +55,33 @@ class NetDeviceTest : public gtest::RealLoopFixture {
                                      zx::duration::infinite());
   }
 
-  tun::wire::DeviceConfig DefaultDeviceConfig() {
-    tun::wire::DeviceConfig config(alloc_);
-    config.set_blocking(true);
-    return config;
+  fidl::WireTableBuilder<tun::wire::DeviceConfig> DefaultDeviceConfig() {
+    return tun::wire::DeviceConfig::Builder(alloc_).blocking(true);
   }
 
-  tun::wire::DevicePairConfig DefaultPairConfig() {
-    tun::wire::DevicePairConfig config(alloc_);
-    return config;
+  fidl::WireTableBuilder<tun::wire::DevicePairConfig> DefaultPairConfig() {
+    return tun::wire::DevicePairConfig::Builder(alloc_);
   }
 
-  tun::wire::BasePortConfig DefaultBasePortConfig() {
-    tun::wire::BasePortConfig config(alloc_);
-    config.set_id(kPortId);
-    config.set_mtu(1500);
-    const netdev::wire::FrameType rx_types[] = {
-        netdev::wire::FrameType::kEthernet,
-    };
-    fidl::VectorView<netdev::wire::FrameType> rx_types_view(alloc_, std::size(rx_types));
-    std::copy(std::begin(rx_types), std::end(rx_types), rx_types_view.data());
-    const netdev::wire::FrameTypeSupport tx_types[] = {
-        netdev::wire::FrameTypeSupport{
+  fidl::WireTableBuilder<tun::wire::BasePortConfig> DefaultBasePortConfig() {
+    return tun::wire::BasePortConfig::Builder(alloc_)
+        .id(kPortId)
+        .mtu(1500)
+        .rx_types(std::vector{netdev::wire::FrameType::kEthernet})
+        .tx_types(std::vector{netdev::wire::FrameTypeSupport{
             .type = netdev::wire::FrameType::kEthernet,
             .features = netdev::wire::kFrameFeaturesRaw,
-        },
-    };
-    fidl::VectorView<netdev::wire::FrameTypeSupport> tx_types_view(alloc_, std::size(tx_types));
-    std::copy(std::begin(tx_types), std::end(tx_types), tx_types_view.data());
-    config.set_rx_types(alloc_, rx_types_view);
-    config.set_tx_types(alloc_, tx_types_view);
-    return config;
+        }});
   }
 
-  tun::wire::DevicePairPortConfig DefaultPairPortConfig() {
-    tun::wire::DevicePairPortConfig config(alloc_);
-    config.set_base(alloc_, DefaultBasePortConfig());
-    return config;
+  fidl::WireTableBuilder<tun::wire::DevicePairPortConfig> DefaultPairPortConfig() {
+    return tun::wire::DevicePairPortConfig::Builder(alloc_).base(DefaultBasePortConfig().Build());
   }
 
-  tun::wire::DevicePortConfig DefaultDevicePortConfig() {
-    tun::wire::DevicePortConfig config(alloc_);
-    config.set_base(alloc_, DefaultBasePortConfig());
-    config.set_online(true);
-    return config;
+  fidl::WireTableBuilder<tun::wire::DevicePortConfig> DefaultDevicePortConfig() {
+    return tun::wire::DevicePortConfig::Builder(alloc_)
+        .base(DefaultBasePortConfig().Build())
+        .online(true);
   }
 
   zx::result<fidl::ClientEnd<tun::Device>> OpenTunDevice(tun::wire::DeviceConfig config) {
@@ -164,7 +147,7 @@ class NetDeviceTest : public gtest::RealLoopFixture {
   zx::result<std::tuple<fidl::WireSharedClient<tun::Device>, fidl::WireSharedClient<tun::Port>,
                         netdev::wire::PortId>>
   OpenTunDeviceAndPort() {
-    return OpenTunDeviceAndPort(DefaultDeviceConfig(), DefaultDevicePortConfig());
+    return OpenTunDeviceAndPort(DefaultDeviceConfig().Build(), DefaultDevicePortConfig().Build());
   }
 
   static zx::result<fuchsia_hardware_network::wire::PortId> GetPortId(
@@ -207,7 +190,7 @@ class NetDeviceTest : public gtest::RealLoopFixture {
   }
 
   zx::result<fidl::WireSharedClient<tun::DevicePair>> OpenTunPair() {
-    return OpenTunPair(DefaultPairConfig());
+    return OpenTunPair(DefaultPairConfig().Build());
   }
 
   static void WaitTapOnlineInner(fidl::WireSharedClient<tun::Port>& tun_port,
@@ -292,10 +275,12 @@ TEST_F(NetDeviceTest, TestRxTx) {
   });
 
   bool wrote_frame = false;
-  tun::wire::Frame frame(alloc_);
-  frame.set_frame_type(netdev::wire::FrameType::kEthernet);
-  frame.set_data(alloc_, fidl::VectorView<uint8_t>::FromExternal(send_data));
-  frame.set_port(kPortId);
+  tun::wire::Frame frame = tun::wire::Frame::Builder(alloc_)
+                               .frame_type(netdev::wire::FrameType::kEthernet)
+                               .data(send_data)
+                               .port(kPortId)
+                               .Build();
+
   tun_device->WriteFrame(frame).ThenExactlyOnce(
       [&wrote_frame](fidl::WireUnownedResult<tun::Device::WriteFrame>& call_result) {
         if (!call_result.ok()) {
@@ -363,11 +348,12 @@ TEST_F(NetDeviceTest, TestEcho) {
     if (frame_count == kTestFrames) {
       write_bridge.completer.complete_ok();
     } else {
-      tun::wire::Frame frame(alloc_);
-      frame.set_frame_type(netdev::wire::FrameType::kEthernet);
-      frame.set_data(alloc_, fidl::VectorView<uint8_t>::FromExternal(
-                                 reinterpret_cast<uint8_t*>(&frame_count), sizeof(frame_count)));
-      frame.set_port(kPortId);
+      tun::wire::Frame frame =
+          tun::wire::Frame::Builder(alloc_)
+              .frame_type(netdev::wire::FrameType::kEthernet)
+              .data(cpp20::span(reinterpret_cast<uint8_t*>(&frame_count), sizeof(frame_count)))
+              .port(kPortId)
+              .Build();
       tun_device->WriteFrame(frame).ThenExactlyOnce(
           [&write_bridge,
            &write_frame](fidl::WireUnownedResult<tun::Device::WriteFrame>& call_result) {
@@ -456,7 +442,7 @@ TEST_F(NetDeviceTest, TestEchoPair) {
   ASSERT_OK(tun_pair->GetLeft(CreateClientRequest(&left)).status());
   ASSERT_OK(tun_pair->GetRight(CreateClientRequest(&right)).status());
   {
-    fidl::WireResult result = tun_pair.sync()->AddPort(DefaultPairPortConfig());
+    fidl::WireResult result = tun_pair.sync()->AddPort(DefaultPairPortConfig().Build());
     ASSERT_OK(result.status());
     ASSERT_TRUE(result->is_ok()) << zx_status_get_string(result->error_value());
   }
@@ -616,13 +602,11 @@ TEST_F(NetDeviceTest, PadTxFrames) {
   constexpr uint8_t kPayload[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A};
   constexpr uint32_t kMinBufferLength = static_cast<uint32_t>(sizeof(kPayload) - 2);
   constexpr size_t kSmallPayloadLength = kMinBufferLength - 2;
-  auto device_config = DefaultDeviceConfig();
-  tun::wire::BaseDeviceConfig base_config(alloc_);
-  base_config.set_min_tx_buffer_length(kMinBufferLength);
-  device_config.set_base(alloc_, std::move(base_config));
+  tun::wire::BaseDeviceConfig base_config =
+      tun::wire::BaseDeviceConfig::Builder(alloc_).min_tx_buffer_length(kMinBufferLength).Build();
+  auto device_config = DefaultDeviceConfig().base(base_config).Build();
 
-  auto tun_device_result =
-      OpenTunDeviceAndPort(std::move(device_config), DefaultDevicePortConfig());
+  auto tun_device_result = OpenTunDeviceAndPort(device_config, DefaultDevicePortConfig().Build());
   ASSERT_OK(tun_device_result.status_value());
   auto& [tun_device, tun_port, port_id] = tun_device_result.value();
 
@@ -714,11 +698,10 @@ TEST_F(NetDeviceTest, TestPortInfoWithMac) {
   };
 
   // Setup up the tun port's mac address.
-  tun::wire::DevicePortConfig config = DefaultDevicePortConfig();
-  config.set_mac(alloc_, kMacAddress);
+  tun::wire::DevicePortConfig config = DefaultDevicePortConfig().mac(kMacAddress).Build();
 
   // Create the tun device and client.
-  auto tun_device_result = OpenTunDeviceAndPort(DefaultDeviceConfig(), config);
+  auto tun_device_result = OpenTunDeviceAndPort(DefaultDeviceConfig().Build(), config);
   ASSERT_OK(tun_device_result.status_value());
   auto& [tun_device, tun_port, port_id] = tun_device_result.value();
   std::unique_ptr<NetworkDeviceClient> client;
@@ -777,11 +760,13 @@ TEST_F(NetDeviceTest, CancelsWaitOnTeardown) {
   for (size_t i = 0; i < 10; i++) {
     // NB: Not a constant because FromExternal doesn't like constant pointers.
     uint8_t kSendData[] = {1, 2, 3};
-    tun::wire::Frame frame(alloc_);
-    frame.set_frame_type(netdev::wire::FrameType::kEthernet);
-    frame.set_data(alloc_,
-                   fidl::VectorView<uint8_t>::FromExternal(kSendData, std::size(kSendData)));
-    frame.set_port(kPortId);
+    tun::wire::Frame frame =
+        tun::wire::Frame::Builder(alloc_)
+            .frame_type(netdev::wire::FrameType::kEthernet)
+            .data(fidl::VectorView<uint8_t>::FromExternal(kSendData, std::size(kSendData)))
+            .port(kPortId)
+            .Build();
+
     tun_device->WriteFrame(frame).ThenExactlyOnce(
         [](fidl::WireUnownedResult<tun::Device::WriteFrame>& call_result) {
           if (!call_result.ok()) {
@@ -920,7 +905,7 @@ class GetPortsTest : public NetDeviceTest, public testing::WithParamInterface<si
 
 TEST_P(GetPortsTest, GetPortsWithPortCount) {
   const size_t port_count = GetParam();
-  auto tun_device_result = OpenTunDevice(DefaultDeviceConfig());
+  auto tun_device_result = OpenTunDevice(DefaultDeviceConfig().Build());
   ASSERT_OK(tun_device_result.status_value());
   fidl::ClientEnd tun_device = std::move(tun_device_result.value());
   std::unique_ptr<NetworkDeviceClient> client;
@@ -937,8 +922,9 @@ TEST_P(GetPortsTest, GetPortsWithPortCount) {
   std::unordered_set<uint16_t> expect_ids;
   for (size_t i = 0; i < port_count; i++) {
     SCOPED_TRACE(i);
-    tun::wire::DevicePortConfig config = DefaultDevicePortConfig();
-    config.base().set_id(static_cast<uint8_t>(i + 1));
+    const uint8_t port_id = static_cast<uint8_t>(i + 1);
+    tun::wire::BasePortConfig base_port_config = DefaultBasePortConfig().id(port_id).Build();
+    tun::wire::DevicePortConfig config = DefaultDevicePortConfig().base(base_port_config).Build();
     zx::result status = AddTunPort(tun_device, std::move(config));
     ASSERT_OK(status.status_value());
     fidl::ClientEnd port = std::move(status.value());

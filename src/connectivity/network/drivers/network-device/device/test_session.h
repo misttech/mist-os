@@ -25,7 +25,8 @@ class TestSession {
                    uint64_t buffer_size = kDefaultBufferLength);
 
   zx_status_t Init(uint16_t descriptor_count, uint64_t buffer_size);
-  zx::result<netdev::wire::SessionInfo> GetInfo();
+  zx::result<netdev::wire::SessionInfo> GetInfo(
+      std::optional<netdev::wire::SessionFlags> with_flags = std::nullopt);
   void Setup(fidl::ClientEnd<netdev::Session> session, netdev::wire::Fifos fifos);
   [[nodiscard]] zx_status_t AttachPort(netdev::wire::PortId port_id,
                                        std::vector<netdev::wire::FrameType> frame_types);

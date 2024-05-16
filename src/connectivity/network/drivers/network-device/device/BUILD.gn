@@ -70,10 +70,6 @@ ddk_source_split("device") {
 
   ddk_deps = [ "//src/connectivity/network/drivers/network-device/mac:mac_ddk" ]
   non_ddk_deps = [ "//src/connectivity/network/drivers/network-device/mac" ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 test("test_bin") {
@@ -101,10 +97,6 @@ test("test_bin") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 fuchsia_unittest_package("network-device-lib-test") {
@@ -134,10 +126,6 @@ test("microbenchmarks_bin") {
     "//zircon/system/ulib/perftest",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 fuchsia_unittest_package("network-device-microbenchmarks") {

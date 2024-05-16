@@ -572,25 +572,6 @@ void DeviceInterface::Snoop(fuchsia_hardware_network_driver::wire::NetworkDevice
 
 void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
   LOGF_TRACE("%s", __FUNCTION__);
-  fidl::WireTableFrame<netdev::wire::DeviceInfo> frame;
-  netdev::wire::DeviceInfo device_info(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::DeviceInfo>>::FromExternal(&frame));
-
-  uint8_t min_descriptor_length = sizeof(buffer_descriptor_t) / sizeof(uint64_t);
-  uint8_t descriptor_version = NETWORK_DEVICE_DESCRIPTOR_VERSION;
-  uint16_t rx_depth = rx_fifo_depth();
-  uint16_t tx_depth = tx_fifo_depth();
-  auto tx_accel = fidl::VectorView<netdev::wire::TxAcceleration>::FromExternal(
-      device_info_.tx_accel().has_value() ? device_info_.tx_accel()->data() : nullptr,
-      device_info_.tx_accel().has_value() ? device_info_.tx_accel()->size() : 0);
-  auto rx_accel = fidl::VectorView<netdev::wire::RxAcceleration>::FromExternal(
-      device_info_.rx_accel().has_value() ? device_info_.rx_accel()->data() : nullptr,
-      device_info_.rx_accel().has_value() ? device_info_.rx_accel()->size() : 0);
-
-  fidl::WireTableFrame<netdev::wire::DeviceBaseInfo> base_info_frame;
-  netdev::wire::DeviceBaseInfo device_base_info(
-      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::DeviceBaseInfo>>::FromExternal(
-          &base_info_frame));
 
   constexpr uint32_t kDefaultBufferAlignment = 0;
   constexpr uint8_t kDefaultMaxBufferParts = 0;
@@ -599,25 +580,52 @@ void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
   constexpr uint16_t kDefaultTxHeadLength = 0;
   constexpr uint16_t kDefaultTxTailLength = 0;
 
-  device_base_info.set_rx_depth(rx_depth)
-      .set_tx_depth(tx_depth)
-      .set_buffer_alignment(device_info_.buffer_alignment().value_or(kDefaultBufferAlignment))
-      .set_max_buffer_parts(device_info_.max_buffer_parts().value_or(kDefaultMaxBufferParts))
-      .set_min_rx_buffer_length(device_info_.min_rx_buffer_length().value_or(kDefaultMinRxBufLen))
-      .set_min_tx_buffer_length(device_info_.min_tx_buffer_length().value_or(kDefaultMinTxBufLen))
-      .set_min_tx_buffer_head(device_info_.tx_head_length().value_or(kDefaultTxHeadLength))
-      .set_min_tx_buffer_tail(device_info_.tx_tail_length().value_or(kDefaultTxTailLength))
-      .set_tx_accel(fidl::ObjectView<decltype(tx_accel)>::FromExternal(&tx_accel))
-      .set_rx_accel(fidl::ObjectView<decltype(rx_accel)>::FromExternal(&rx_accel));
+  const uint8_t min_descriptor_length = sizeof(buffer_descriptor_t) / sizeof(uint64_t);
+  const uint8_t descriptor_version = NETWORK_DEVICE_DESCRIPTOR_VERSION;
+  const uint16_t rx_depth = rx_fifo_depth();
+  const uint16_t tx_depth = tx_fifo_depth();
+  const auto tx_accel = fidl::VectorView<netdev::wire::TxAcceleration>::FromExternal(
+      device_info_.tx_accel().has_value() ? device_info_.tx_accel()->data() : nullptr,
+      device_info_.tx_accel().has_value() ? device_info_.tx_accel()->size() : 0);
+  const auto rx_accel = fidl::VectorView<netdev::wire::RxAcceleration>::FromExternal(
+      device_info_.rx_accel().has_value() ? device_info_.rx_accel()->data() : nullptr,
+      device_info_.rx_accel().has_value() ? device_info_.rx_accel()->size() : 0);
+  const uint32_t buffer_alignment =
+      device_info_.buffer_alignment().value_or(kDefaultBufferAlignment);
+  const uint8_t max_buffer_parts = device_info_.max_buffer_parts().value_or(kDefaultMaxBufferParts);
+  const uint32_t min_rx_buffer_length =
+      device_info_.min_rx_buffer_length().value_or(kDefaultMinRxBufLen);
+  const uint32_t min_tx_buffer_length =
+      device_info_.min_tx_buffer_length().value_or(kDefaultMinTxBufLen);
+  const uint16_t min_tx_buffer_head = device_info_.tx_head_length().value_or(kDefaultTxHeadLength);
+  const uint16_t min_tx_buffer_tail = device_info_.tx_tail_length().value_or(kDefaultTxTailLength);
+
+  fidl::Arena arena;
+
+  auto device_base_info_builder = netdev::wire::DeviceBaseInfo::Builder(arena)
+                                      .rx_depth(rx_depth)
+                                      .tx_depth(tx_depth)
+                                      .buffer_alignment(buffer_alignment)
+                                      .max_buffer_parts(max_buffer_parts)
+                                      .min_rx_buffer_length(min_rx_buffer_length)
+                                      .min_tx_buffer_length(min_tx_buffer_length)
+                                      .min_tx_buffer_head(min_tx_buffer_head)
+                                      .min_tx_buffer_tail(min_tx_buffer_tail)
+                                      .tx_accel(tx_accel)
+                                      .rx_accel(rx_accel);
 
   const std::optional<uint32_t>& max_buffer_length = device_info_.max_buffer_length();
   if (max_buffer_length.has_value() && max_buffer_length.value() != 0) {
-    device_base_info.set_max_buffer_length(max_buffer_length.value());
+    device_base_info_builder.max_buffer_length(max_buffer_length.value());
   }
-  device_info.set_min_descriptor_length(min_descriptor_length)
-      .set_descriptor_version(descriptor_version)
-      .set_base_info(
-          fidl::ObjectView<netdev::wire::DeviceBaseInfo>::FromExternal(&device_base_info));
+
+  netdev::wire::DeviceBaseInfo device_base_info = device_base_info_builder.Build();
+
+  netdev::wire::DeviceInfo device_info = netdev::wire::DeviceInfo::Builder(arena)
+                                             .min_descriptor_length(min_descriptor_length)
+                                             .descriptor_version(descriptor_version)
+                                             .base_info(device_base_info)
+                                             .Build();
 
   completer.Reply(device_info);
 }

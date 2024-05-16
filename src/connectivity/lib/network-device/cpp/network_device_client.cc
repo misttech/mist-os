@@ -590,11 +590,6 @@ zx::result<netdev::wire::SessionInfo> NetworkDeviceClient::MakeSessionInfo(fidl:
                       "session descriptor length %ld (%ld words) overflows uint8_t",
                       session_config_.descriptor_length, descriptor_length_words);
 
-  netdev::wire::SessionInfo session_info(alloc);
-  session_info.set_descriptor_version(NETWORK_DEVICE_DESCRIPTOR_VERSION);
-  session_info.set_descriptor_length(static_cast<uint8_t>(descriptor_length_words));
-  session_info.set_descriptor_count(descriptor_count_);
-  session_info.set_options(session_config_.options);
 
   zx::vmo data_vmo;
   zx_status_t status;
@@ -602,16 +597,23 @@ zx::result<netdev::wire::SessionInfo> NetworkDeviceClient::MakeSessionInfo(fidl:
     FX_LOGS(ERROR) << "Failed to duplicate data VMO: " << zx_status_get_string(status);
     return zx::error(status);
   }
-  session_info.set_data(std::move(data_vmo));
 
   zx::vmo descriptors_vmo;
   if ((status = descriptors_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &descriptors_vmo)) != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to duplicate descriptors VMO: " << zx_status_get_string(status);
     return zx::error(status);
   }
-  session_info.set_descriptors(std::move(descriptors_vmo));
 
-  return zx::ok(std::move(session_info));
+  netdev::wire::SessionInfo session_info =
+      netdev::wire::SessionInfo::Builder(alloc)
+          .descriptor_version(NETWORK_DEVICE_DESCRIPTOR_VERSION)
+          .descriptor_length(static_cast<uint8_t>(descriptor_length_words))
+          .descriptor_count(descriptor_count_)
+          .options(session_config_.options)
+          .data(std::move(data_vmo))
+          .descriptors(std::move(descriptors_vmo))
+          .Build();
+  return zx::ok(session_info);
 }
 
 buffer_descriptor_t* NetworkDeviceClient::descriptor(uint16_t idx) {
