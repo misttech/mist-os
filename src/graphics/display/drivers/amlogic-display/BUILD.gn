@@ -229,7 +229,7 @@ test("amlogic-display-test") {
   ]
   deps = [
     ":common_srcs",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/testing/fake-mmio-reg",
