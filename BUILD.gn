@@ -111,6 +111,7 @@ group("default") {
   deps = [
     "//:tests",
     "//bundles/boot_tests",
+    "//examples/nolibc",
     "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix",
     "//zircon/kernel/lib/mistos/userloader/example:tests",
 

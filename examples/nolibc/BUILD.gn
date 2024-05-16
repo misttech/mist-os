@@ -1,0 +1,21 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Copyright 2016 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+
+resource("linux-bin") {
+  allow_binary_output_dir = true
+  sources = [ "nolibc-test.linux" ]
+  outputs = [ "test/nolibc-test.linux" ]
+}
+
+kernel_zbi_test("nolibc") {
+  args = [
+    "userboot.test.root=/",
+    "userboot.test.next=bin/nolibc-test",
+  ]
+  deps = [ ":linux-bin" ]
+}
