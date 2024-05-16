@@ -30,6 +30,8 @@ namespace display {
 
 namespace {
 
+static constexpr fdf_arena_tag_t kArenaTag = 'DISP';
+
 zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
     fdf::Namespace& incoming) {
   zx::result<fdf::ClientEnd<fuchsia_hardware_display_engine::Engine>> connect_engine_client_result =
@@ -118,13 +120,13 @@ zx::result<std::unique_ptr<EngineDriverClient>> EngineDriverClient::Create(
 }
 
 EngineDriverClient::EngineDriverClient(ddk::DisplayControllerImplProtocolClient dc)
-    : arena_(fdf::Arena(kArenaTag)), use_engine_(false), dc_(dc) {
+    : use_engine_(false), dc_(dc) {
   ZX_DEBUG_ASSERT(dc_.is_valid());
 }
 
 EngineDriverClient::EngineDriverClient(
     fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine)
-    : arena_(fdf::Arena(kArenaTag)), use_engine_(true), engine_(std::move(engine)) {
+    : use_engine_(true), engine_(std::move(engine)) {
   ZX_DEBUG_ASSERT(engine_.is_valid());
 }
 
@@ -134,8 +136,9 @@ EngineDriverClient::~EngineDriverClient() {
 
 void EngineDriverClient::ReleaseImage(DriverImageId driver_image_id) {
   if (use_engine_) {
+    fdf::Arena arena(kArenaTag);
     fdf::WireUnownedResult result =
-        engine_.buffer(arena_)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
+        engine_.buffer(arena)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
     if (!result.ok()) {
       zxlogf(ERROR, "ReleaseImage failed: %s", result.status_string());
     }
@@ -148,8 +151,9 @@ void EngineDriverClient::ReleaseImage(DriverImageId driver_image_id) {
 
 zx::result<> EngineDriverClient::ReleaseCapture(DriverCaptureImageId driver_capture_image_id) {
   if (use_engine_) {
+    fdf::Arena arena(kArenaTag);
     fdf::WireUnownedResult result =
-        engine_.buffer(arena_)->ReleaseCapture(ToFidlDriverCaptureImageId(driver_capture_image_id));
+        engine_.buffer(arena)->ReleaseCapture(ToFidlDriverCaptureImageId(driver_capture_image_id));
     return zx::make_result(result.status());
   }
 
@@ -224,8 +228,9 @@ zx::result<DriverImageId> EngineDriverClient::ImportImage(const ImageMetadata& i
 zx::result<DriverCaptureImageId> EngineDriverClient::ImportImageForCapture(
     DriverBufferCollectionId collection_id, uint32_t index) {
   if (use_engine_) {
+    fdf::Arena arena(kArenaTag);
     fdf::WireUnownedResult result =
-        engine_.buffer(arena_)->ImportImageForCapture(ToFidlDriverBufferId({
+        engine_.buffer(arena)->ImportImageForCapture(ToFidlDriverBufferId({
             .buffer_collection_id = collection_id,
             .buffer_index = index,
         }));

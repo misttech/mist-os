@@ -19,8 +19,6 @@
 
 namespace display {
 
-static constexpr fdf_arena_tag_t kArenaTag = 'DISP';
-
 class Controller;
 
 // C++ <-> Banjo/FIDL bridge for a connection to a display engine driver.
@@ -78,10 +76,6 @@ class EngineDriverClient {
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
-  // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
-  // right approach.
-  fdf::Arena arena_;
-
   // Whether to use the FIDL client. If false, use the Banjo client.
   bool use_engine_;
 
