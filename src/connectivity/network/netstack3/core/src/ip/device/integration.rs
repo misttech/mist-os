@@ -1615,3 +1615,18 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
 {
     type Data = Ipv6AddressState<BT::Instant>;
 }
+
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BT> {
+    type Data = SlaacCounters;
+    type Guard<'l> = &'l SlaacCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.slaac_counters()
+    }
+}
+
+impl<BT: BindingsTypes, L> CounterContext<SlaacCounters> for CoreCtx<'_, BT, L> {
+    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
+    }
+}

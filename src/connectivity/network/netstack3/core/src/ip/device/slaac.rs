@@ -13,7 +13,6 @@ use core::{marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duratio
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
-use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
     Witness as _,
@@ -36,7 +35,7 @@ use crate::{
         AddressRemovedReason, Ipv6DeviceAddr,
     },
     time::LocalTimerHeap,
-    BindingsContext, CoreCtx, Instant, StackState,
+    Instant,
 };
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
@@ -196,21 +195,6 @@ pub trait SlaacContext<BC: SlaacBindingsContext>: DeviceIdContext<AnyDevice> {
 pub struct SlaacCounters {
     /// Count of already exists errors when adding a generated SLAAC address.
     pub(crate) generated_slaac_addr_exists: Counter,
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for StackState<BC> {
-    type Data = SlaacCounters;
-    type Guard<'l> = &'l SlaacCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.slaac_counters()
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<SlaacCounters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
-    }
 }
 
 /// Update the instant at which an address configured via SLAAC is no longer
