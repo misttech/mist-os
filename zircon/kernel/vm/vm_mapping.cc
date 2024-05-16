@@ -141,7 +141,7 @@ void VmMapping::DumpLocked(uint depth, bool verbose) const {
 
 zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flags) {
   canary_.Assert();
-  LTRACEF("%p %#" PRIxPTR " %#x %#x\n", this, base_, flags_, new_arch_mmu_flags);
+  LTRACEF("%p %#" PRIxPTR " %#x %#x\n", this, base_locking(), flags_, new_arch_mmu_flags);
 
   if (!IS_PAGE_ALIGNED(base)) {
     return ZX_ERR_INVALID_ARGS;
@@ -437,7 +437,7 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
   [&]() TA_NO_THREAD_SAFETY_ANALYSIS { DEBUG_ASSERT(object_); }();
 
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
-          this, object_offset_locked_object(), size_, offset, len);
+          this, object_offset_locked_object(), size_locked_object(), offset, len);
 
   // If we're currently faulting and are responsible for the vmo code to be calling
   // back to us, detect the recursion and abort here.
@@ -468,7 +468,7 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
 
 void VmMapping::AspaceRemoveWriteLockedObject(uint64_t offset, uint64_t len) const {
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
-          this, object_offset_, size_, offset, len);
+          this, object_offset_locked_object(), size_locking(), offset, len);
 
   canary_.Assert();
 
@@ -526,7 +526,7 @@ void VmMapping::AspaceRemoveWriteLockedObject(uint64_t offset, uint64_t len) con
 
 void VmMapping::AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) const {
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
-          this, object_offset_, size_, offset, len);
+          this, object_offset_locked_object(), size_locking(), offset, len);
 
   canary_.Assert();
 
@@ -849,7 +849,8 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
 
 zx_status_t VmMapping::DecommitRange(size_t offset, size_t len) {
   canary_.Assert();
-  LTRACEF("%p [%#zx+%#zx], offset %#zx, len %#zx\n", this, base_, size_, offset, len);
+  LTRACEF("%p [%#zx+%#zx], offset %#zx, len %#zx\n", this, base_locking(), size_locking(), offset,
+          len);
 
   Guard<CriticalMutex> guard{lock()};
   if (state_ != LifeCycleState::ALIVE) {
