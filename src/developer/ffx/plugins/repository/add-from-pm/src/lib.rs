@@ -2,13 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use std::collections::BTreeSet;
+
+use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_error};
 use ffx_core::ffx_plugin;
 use ffx_repository_add_from_pm_args::AddFromPmCommand;
-use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_url::RepositoryUrl;
+
+enum RepoRegState {
+    New,
+    Duplicate,
+}
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -27,39 +34,136 @@ pub async fn add_from_pm(cmd: AddFromPmCommand, repos: RepositoryRegistryProxy) 
         aliases: cmd.aliases.into_iter().collect(),
     };
 
-    match repos.add_repository(repo_name, &repo_spec.into()).await? {
-        Ok(()) => {
-            println!("added repository {}", repo_name);
+    match repo_registered_state(&repos, repo_name, &repo_spec).await? {
+        RepoRegState::Duplicate => {
+            tracing::info!("attempt to re-add {repo_name} using the same parameters, ignoring");
             Ok(())
         }
-        Err(err) => {
-            let err = RepositoryError::from(err);
-            ffx_bail!("Adding repository {} failed: {}", repo_name, err);
+        RepoRegState::New => match repos.add_repository(repo_name, &repo_spec.into()).await? {
+            Ok(()) => {
+                println!("added repository {}", repo_name);
+                Ok(())
+            }
+            Err(err) => {
+                let err = RepositoryError::from(err);
+                ffx_bail!("Adding repository {} failed: {}", repo_name, err);
+            }
+        },
+    }
+}
+
+async fn repo_registered_state(
+    repos: &RepositoryRegistryProxy,
+    repo_name: &str,
+    repo_spec: &RepositorySpec,
+) -> Result<RepoRegState> {
+    let (client, server) =
+        ffx_core::macro_deps::fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
+    repos.list_repositories(server).context("listing repositories")?;
+    let client = client.into_proxy().context("creating repository iterator proxy")?;
+    let (repo_path, repo_aliases) = match repo_spec {
+        RepositorySpec::Pm { path, aliases } => (Some(path.to_string()), aliases),
+        _ => return Err(anyhow!("only pm style repositories are supported")),
+    };
+
+    loop {
+        let batch = client.next().await.context("fetching next batch of repositories")?;
+        if batch.is_empty() {
+            break;
+        }
+
+        for repo in batch {
+            if repo.name == repo_name {
+                // If the same path and aliases are specified, we can continue with a warning.
+                match repo.spec {
+                    fidl_fuchsia_developer_ffx::RepositorySpec::Pm(spec) => {
+                        let spec_aliases = if let Some(aliases) = spec.aliases {
+                            BTreeSet::from_iter(aliases.into_iter())
+                        } else {
+                            BTreeSet::new()
+                        };
+                        if repo_path == spec.path && *repo_aliases == spec_aliases {
+                            return Ok(RepoRegState::Duplicate);
+                        }
+                    }
+                    _ => {
+                        return Err(anyhow!("repository {repo_name} is registered using different settings, it could be removed by running `ffx repository remove {repo_name}"));
+                    }
+                }
+            }
         }
     }
+
+    Ok(RepoRegState::New)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_developer_ffx::{PmRepositorySpec, RepositoryRegistryRequest, RepositorySpec};
+    use fidl_fuchsia_developer_ffx::{
+        PmRepositorySpec, RepositoryConfig, RepositoryIteratorRequest, RepositoryRegistryMarker,
+        RepositoryRegistryRequest, RepositoryRegistryRequestStream, RepositorySpec,
+    };
     use fuchsia_async as fasync;
-    use futures::channel::oneshot::channel;
+    use futures::{SinkExt, StreamExt, TryStreamExt};
+
+    struct FakeRepositoryRegistry;
+
+    impl FakeRepositoryRegistry {
+        fn new(
+            mut stream: RepositoryRegistryRequestStream,
+            mut sender: futures::channel::mpsc::Sender<(String, RepositorySpec)>,
+        ) -> () {
+            ffx_core::macro_deps::fuchsia_async::Task::local(async move {
+                let mut repos = vec![];
+                let mut sent = false;
+                while let Ok(Some(req)) = stream.try_next().await {
+                    match req {
+                        RepositoryRegistryRequest::AddRepository {
+                            name,
+                            repository,
+                            responder,
+                        } => {
+                            sender.send((name.clone(), repository.clone())).await.unwrap();
+                            repos.push(RepositoryConfig { name: name, spec: repository });
+                            responder.send(Ok(())).unwrap();
+                        }
+                        RepositoryRegistryRequest::ListRepositories { iterator, .. } => {
+                            let mut iterator = iterator.into_stream().unwrap();
+                            while let Some(Ok(req)) = iterator.next().await {
+                                match req {
+                                    RepositoryIteratorRequest::Next { responder } => {
+                                        if !sent {
+                                            sent = true;
+                                            responder.send(&repos).unwrap();
+                                        } else {
+                                            responder.send(&[]).unwrap()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        other => panic!("Unexpected request: {:?}", other),
+                    }
+                }
+            })
+            .detach();
+        }
+    }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_add_from_pm() {
         let tmp = tempfile::tempdir().unwrap();
 
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = setup_fake_repos(move |req| match req {
-            RepositoryRegistryRequest::AddRepository { name, repository, responder } => {
-                sender.take().unwrap().send((name, repository)).unwrap();
-                responder.send(Ok(())).unwrap();
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
+        let (sender, mut receiver) = futures::channel::mpsc::channel::<_>(1);
+
+        let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
+            RepositoryRegistryMarker,
+        >()
+        .unwrap();
+
+        let _ = FakeRepositoryRegistry::new(stream, sender);
 
         add_from_pm(
             AddFromPmCommand {
@@ -72,9 +176,8 @@ mod test {
         .await
         .unwrap();
 
-        let got = receiver.await.unwrap();
         assert_eq!(
-            got,
+            receiver.next().await.unwrap(),
             (
                 "my-repo".to_owned(),
                 RepositorySpec::Pm(PmRepositorySpec {
@@ -106,5 +209,74 @@ mod test {
                 Err(_)
             );
         }
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_add_from_pm_exits_when_existing_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        let (sender, mut receiver) = futures::channel::mpsc::channel::<_>(1);
+
+        let (repos, stream) = ffx_core::macro_deps::fidl::endpoints::create_proxy_and_stream::<
+            RepositoryRegistryMarker,
+        >()
+        .unwrap();
+
+        let _ = FakeRepositoryRegistry::new(stream, sender);
+
+        add_from_pm(
+            AddFromPmCommand {
+                repository: "my-repo".to_owned(),
+                pm_repo_path: tmp.path().to_path_buf(),
+                aliases: vec![],
+            },
+            repos.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            receiver.next().await.unwrap(),
+            (
+                "my-repo".to_owned(),
+                RepositorySpec::Pm(PmRepositorySpec {
+                    path: Some(tmp.path().canonicalize().unwrap().to_str().unwrap().to_string()),
+                    ..Default::default()
+                })
+            )
+        );
+
+        // Adding the same repo (same name, same config)
+        // is expected to be successful, as add_from_pm
+        // will ignore request in this case.
+        assert_eq!(
+            add_from_pm(
+                AddFromPmCommand {
+                    repository: "my-repo".to_owned(),
+                    pm_repo_path: tmp.path().to_path_buf(),
+                    aliases: vec![],
+                },
+                repos.clone(),
+            )
+            .await
+            .is_err(),
+            false
+        );
+
+        // Adding a repo under the same name with a different config
+        // should fail, as it would overwrite the already added repo.
+        assert_eq!(
+            add_from_pm(
+                AddFromPmCommand {
+                    repository: "my-repo".to_owned(),
+                    pm_repo_path: "/foo".into(),
+                    aliases: vec![],
+                },
+                repos,
+            )
+            .await
+            .is_err(),
+            true
+        );
     }
 }
