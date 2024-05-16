@@ -463,18 +463,20 @@ fn translate_expose(
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
                 for (source, source_dictionary) in &sources {
-                    let (source, availability) = derive_source_and_availability(
-                        expose.availability.as_ref(),
-                        source.clone(),
-                        expose.source_availability.as_ref(),
-                        all_capability_names,
-                        all_children,
-                        all_collections,
-                    );
+                    let DerivedSourceInfo { source, source_dictionary, availability } =
+                        derive_source_and_availability(
+                            expose.availability.as_ref(),
+                            source.clone(),
+                            source_dictionary.clone(),
+                            expose.source_availability.as_ref(),
+                            all_capability_names,
+                            all_children,
+                            all_collections,
+                        );
                     out_exposes.push(fdecl::Expose::Service(fdecl::ExposeService {
                         source: Some(source),
                         source_name: Some(source_name.clone().into()),
-                        source_dictionary: source_dictionary.clone(),
+                        source_dictionary,
                         target_name: Some(target_name.clone().into()),
                         target: Some(target.clone()),
                         availability: Some(availability),
@@ -490,18 +492,20 @@ fn translate_expose(
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
-                let (source, availability) = derive_source_and_availability(
-                    expose.availability.as_ref(),
-                    source.clone(),
-                    expose.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        expose.availability.as_ref(),
+                        source.clone(),
+                        source_dictionary.clone(),
+                        expose.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_exposes.push(fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
-                    source_dictionary: source_dictionary.clone(),
+                    source_dictionary,
                     target_name: Some(target_name.clone().into()),
                     target: Some(target.clone()),
                     availability: Some(availability),
@@ -517,18 +521,20 @@ fn translate_expose(
             let subdir = extract_expose_subdir(expose);
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
-                let (source, availability) = derive_source_and_availability(
-                    expose.availability.as_ref(),
-                    source.clone(),
-                    expose.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        expose.availability.as_ref(),
+                        source.clone(),
+                        source_dictionary.clone(),
+                        expose.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_exposes.push(fdecl::Expose::Directory(fdecl::ExposeDirectory {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
-                    source_dictionary: source_dictionary.clone(),
+                    source_dictionary,
                     target_name: Some(target_name.clone().into()),
                     target: Some(target.clone()),
                     rights,
@@ -576,18 +582,20 @@ fn translate_expose(
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
-                let (source, availability) = derive_source_and_availability(
-                    expose.availability.as_ref(),
-                    source.clone(),
-                    expose.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        expose.availability.as_ref(),
+                        source.clone(),
+                        source_dictionary.clone(),
+                        expose.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_exposes.push(fdecl::Expose::Dictionary(fdecl::ExposeDictionary {
                     source: Some(source),
                     source_name: Some(source_name.clone().into()),
-                    source_dictionary: source_dictionary.clone(),
+                    source_dictionary,
                     target_name: Some(target_name.clone().into()),
                     target: Some(target.clone()),
                     availability: Some(availability),
@@ -601,14 +609,16 @@ fn translate_expose(
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
-                let (source, availability) = derive_source_and_availability(
-                    expose.availability.as_ref(),
-                    source.clone(),
-                    expose.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary: _, availability } =
+                    derive_source_and_availability(
+                        expose.availability.as_ref(),
+                        source.clone(),
+                        source_dictionary.clone(),
+                        expose.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_exposes.push(fdecl::Expose::Config(fdecl::ExposeConfiguration {
                     source: Some(source.clone()),
                     source_name: Some(source_name.clone().into()),
@@ -639,16 +649,23 @@ fn annotate_type<T>(val: T) -> T {
     val
 }
 
+struct DerivedSourceInfo {
+    source: fdecl::Ref,
+    source_dictionary: Option<String>,
+    availability: fdecl::Availability,
+}
+
 /// If the `source` is not found and `source_availability` is `Unknown`, returns a `Void` source.
 /// Otherwise, returns the source unchanged.
 fn derive_source_and_availability(
     availability: Option<&Availability>,
     source: fdecl::Ref,
+    source_dictionary: Option<String>,
     source_availability: Option<&SourceAvailability>,
     all_capability_names: &BTreeSet<&Name>,
     all_children: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
-) -> (fdecl::Ref, fdecl::Availability) {
+) -> DerivedSourceInfo {
     let availability = availability.map(|a| match a {
         Availability::Required => fdecl::Availability::Required,
         Availability::Optional => fdecl::Availability::Optional,
@@ -656,34 +673,45 @@ fn derive_source_and_availability(
         Availability::Transitional => fdecl::Availability::Transitional,
     });
     if source_availability != Some(&SourceAvailability::Unknown) {
-        return (source, availability.unwrap_or(fdecl::Availability::Required));
+        return DerivedSourceInfo {
+            source,
+            source_dictionary,
+            availability: availability.unwrap_or(fdecl::Availability::Required),
+        };
     }
     match &source {
         fdecl::Ref::Child(fdecl::ChildRef { name, .. })
             if !all_children.contains(&Name::new(name.clone()).unwrap()) =>
         {
-            (
-                fdecl::Ref::VoidType(fdecl::VoidRef {}),
-                availability.unwrap_or(fdecl::Availability::Optional),
-            )
+            DerivedSourceInfo {
+                source: fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                source_dictionary: None,
+                availability: availability.unwrap_or(fdecl::Availability::Optional),
+            }
         }
         fdecl::Ref::Collection(fdecl::CollectionRef { name, .. })
             if !all_collections.contains(&Name::new(name.clone()).unwrap()) =>
         {
-            (
-                fdecl::Ref::VoidType(fdecl::VoidRef {}),
-                availability.unwrap_or(fdecl::Availability::Optional),
-            )
+            DerivedSourceInfo {
+                source: fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                source_dictionary: None,
+                availability: availability.unwrap_or(fdecl::Availability::Optional),
+            }
         }
         fdecl::Ref::Capability(fdecl::CapabilityRef { name, .. })
             if !all_capability_names.contains(&Name::new(name.clone()).unwrap()) =>
         {
-            (
-                fdecl::Ref::VoidType(fdecl::VoidRef {}),
-                availability.unwrap_or(fdecl::Availability::Optional),
-            )
+            DerivedSourceInfo {
+                source: fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                source_dictionary: None,
+                availability: availability.unwrap_or(fdecl::Availability::Optional),
+            }
         }
-        _ => (source, availability.unwrap_or(fdecl::Availability::Required)),
+        _ => DerivedSourceInfo {
+            source,
+            source_dictionary,
+            availability: availability.unwrap_or(fdecl::Availability::Required),
+        },
     }
 }
 
@@ -762,14 +790,16 @@ fn translate_offer(
                 all_collections,
             )?;
             for (source, source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_offers.push(fdecl::Offer::Service(fdecl::OfferService {
                     source: Some(source),
                     source_name: Some(source_name.into()),
@@ -790,14 +820,16 @@ fn translate_offer(
                 all_collections,
             )?;
             for (source, source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_offers.push(fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(source),
                     source_name: Some(source_name.into()),
@@ -821,14 +853,16 @@ fn translate_offer(
                 all_collections,
             )?;
             for (source, source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_offers.push(fdecl::Offer::Directory(fdecl::OfferDirectory {
                     source: Some(source),
                     source_name: Some(source_name.into()),
@@ -853,15 +887,17 @@ fn translate_offer(
                 all_children,
                 all_collections,
             )?;
-            for (source, _source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+            for (source, source_dictionary, source_name, target, target_name) in entries {
+                let DerivedSourceInfo { source, source_dictionary: _, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_offers.push(fdecl::Offer::Storage(fdecl::OfferStorage {
                     source: Some(source),
                     source_name: Some(source_name.into()),
@@ -918,15 +954,17 @@ fn translate_offer(
                 all_children,
                 all_collections,
             )?;
-            for (source, _source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+            for (source, source_dictionary, source_name, target, target_name) in entries {
+                let DerivedSourceInfo { source, source_dictionary: _, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 let scopes = match offer.scope.clone() {
                     Some(value) => Some(annotate_type::<Vec<EventScope>>(value.into())),
                     None => None,
@@ -967,14 +1005,16 @@ fn translate_offer(
                 all_collections,
             )?;
             for (source, source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_offers.push(fdecl::Offer::Dictionary(fdecl::OfferDictionary {
                     source: Some(source),
                     source_name: Some(source_name.into()),
@@ -998,14 +1038,16 @@ fn translate_offer(
                 all_collections,
             )?;
             for (source, source_dictionary, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
+                let DerivedSourceInfo { source, source_dictionary: _, availability } =
+                    derive_source_and_availability(
+                        offer.availability.as_ref(),
+                        source,
+                        source_dictionary,
+                        offer.source_availability.as_ref(),
+                        all_capability_names,
+                        all_children,
+                        all_collections,
+                    );
                 out_offers.push(fdecl::Offer::Config(fdecl::OfferConfiguration {
                     source: Some(source),
                     source_name: Some(source_name.into()),
@@ -3671,13 +3713,20 @@ mod tests {
         },
 
         test_compile_expose_source_availability_unknown => {
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "expose": [
                     {
                         "protocol": "fuchsia.logger.Log",
                         "from": "#non-existent",
                         "as": "fuchsia.logger.LegacyLog_non_existent",
-                        "to": "parent",
+                        "availability": "optional",
+                        "source_availability": "unknown"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#non-existent/dict",
+                        "as": "fuchsia.logger.LegacyLog_non_existent2",
                         "availability": "optional",
                         "source_availability": "unknown"
                     },
@@ -3685,7 +3734,6 @@ mod tests {
                         "protocol": "fuchsia.logger.Log",
                         "from": "#logger",
                         "as": "fuchsia.logger.LegacyLog_child_exist",
-                        "to": "parent",
                         "availability": "optional",
                         "source_availability": "unknown"
                     },
@@ -3711,6 +3759,16 @@ mod tests {
                     ),
                     fdecl::Expose::Protocol (
                         fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::VoidType(fdecl::VoidRef { })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("fuchsia.logger.LegacyLog_non_existent2".to_string()),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Protocol (
+                        fdecl::ExposeProtocol {
                             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                                 name: "logger".to_string(),
                                 collection: None,
@@ -3723,17 +3781,119 @@ mod tests {
                         }
                     ),
                 ]),
-                offers: None,
-                capabilities: None,
                 children: Some(vec![
                     fdecl::Child {
                         name: Some("logger".to_string()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        environment: None,
-                        on_terminate: None,
                         ..Default::default()
                     }
+                ]),
+                ..default_component_decl()
+            },
+        },
+
+        test_compile_offer_source_availability_unknown => {
+            features = FeatureSet::from(vec![Feature::Dictionaries]),
+            input = json!({
+                "offer": [
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#non-existent",
+                        "as": "fuchsia.logger.LegacyLog_non_existent",
+                        "to": "#target",
+                        "availability": "optional",
+                        "source_availability": "unknown"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#non-existent/dict",
+                        "as": "fuchsia.logger.LegacyLog_non_existent2",
+                        "to": "#target",
+                        "availability": "optional",
+                        "source_availability": "unknown"
+                    },
+                    {
+                        "protocol": "fuchsia.logger.Log",
+                        "from": "#logger",
+                        "as": "fuchsia.logger.LegacyLog_child_exist",
+                        "to": "#target",
+                        "availability": "optional",
+                        "source_availability": "unknown"
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "logger",
+                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                    },
+                    {
+                        "name": "target",
+                        "url": "#meta/target.cm"
+                    },
+                ],
+            }),
+            output = fdecl::Component {
+                offers: Some(vec![
+                    fdecl::Offer::Protocol (
+                        fdecl::OfferProtocol {
+                            source: Some(fdecl::Ref::VoidType(fdecl::VoidRef { })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "target".to_string(),
+                                collection: None,
+                            })),
+                            target_name: Some("fuchsia.logger.LegacyLog_non_existent".to_string()),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Protocol (
+                        fdecl::OfferProtocol {
+                            source: Some(fdecl::Ref::VoidType(fdecl::VoidRef { })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "target".to_string(),
+                                collection: None,
+                            })),
+                            target_name: Some("fuchsia.logger.LegacyLog_non_existent2".to_string()),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Protocol (
+                        fdecl::OfferProtocol {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".to_string(),
+                                collection: None,
+                            })),
+                            source_name: Some("fuchsia.logger.Log".to_string()),
+                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "target".to_string(),
+                                collection: None,
+                            })),
+                            target_name: Some("fuchsia.logger.LegacyLog_child_exist".to_string()),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
+                            availability: Some(fdecl::Availability::Optional),
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                children: Some(vec![
+                    fdecl::Child {
+                        name: Some("logger".to_string()),
+                        url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    },
+                    fdecl::Child {
+                        name: Some("target".to_string()),
+                        url: Some("#meta/target.cm".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    },
                 ]),
                 ..default_component_decl()
             },
@@ -3755,15 +3915,6 @@ mod tests {
                         "to": [ "#modular" ], // Verifies compilation of "to:" as array of one element.
                         "as": "fuchsia.logger.LegacySysLog",
                         "dependency": "strong"
-                    },
-                    {
-                        "protocol": "fuchsia.logger.LegacyLog2",
-                        "from": "#non-existent",
-                        "to": [ "#modular" ], // Verifies compilation of "to:" as array of one element.
-                        "as": "fuchsia.logger.LegacySysLog2",
-                        "dependency": "strong",
-                        "availability": "optional",
-                        "source_availability": "unknown"
                     },
                     {
                         "protocol": [
@@ -3930,19 +4081,6 @@ mod tests {
                             target_name: Some("fuchsia.logger.LegacySysLog".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Offer::Protocol (
-                        fdecl::OfferProtocol {
-                            source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
-                            source_name: Some("fuchsia.logger.LegacyLog2".to_string()),
-                            target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
-                                name: "modular".to_string(),
-                            })),
-                            target_name: Some("fuchsia.logger.LegacySysLog2".to_string()),
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            availability: Some(fdecl::Availability::Optional),
                             ..Default::default()
                         }
                     ),
