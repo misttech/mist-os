@@ -98,7 +98,6 @@ class LoaderApp {
   bool allow_magma_icds() const { return allow_magma_icds_; }
   bool allow_goldfish_icd() const { return allow_goldfish_icd_; }
   bool allow_lavapipe_icd() const { return allow_lavapipe_icd_; }
-  std::string lavapipe_icd_url() const { return lavapipe_icd_url_; }
 
  private:
   friend class LoaderActionToken;
@@ -147,7 +146,6 @@ class LoaderApp {
   bool allow_magma_icds_ = false;
   bool allow_goldfish_icd_ = false;
   bool allow_lavapipe_icd_ = false;
-  std::string lavapipe_icd_url_;
 };
 
 #endif  // SRC_GRAPHICS_BIN_VULKAN_LOADER_APP_H_

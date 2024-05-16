@@ -12,25 +12,24 @@
 
 // static
 std::unique_ptr<LavapipeDevice> LavapipeDevice::Create(LoaderApp* app, const std::string& name,
-                                                       inspect::Node* parent,
-                                                       const std::string& lavapipe_icd_url) {
+                                                       inspect::Node* parent) {
   std::unique_ptr<LavapipeDevice> device(new LavapipeDevice(app));
-  if (!device->Initialize(name, parent, lavapipe_icd_url))
+  if (!device->Initialize(name, parent))
     return nullptr;
   return device;
 }
 
-bool LavapipeDevice::Initialize(const std::string& name, inspect::Node* parent,
-                                const std::string& lavapipe_icd_url) {
+bool LavapipeDevice::Initialize(const std::string& name, inspect::Node* parent) {
   FIT_DCHECK_IS_THREAD_VALID(main_thread_);
   node() = parent->CreateChild("lavapipe-" + name);
   icd_list_.Initialize(&node());
   auto pending_action_token = app()->GetPendingActionToken();
 
   auto data = node().CreateChild(name);
-  data.RecordString("component_url", lavapipe_icd_url);
+  std::string component_url = "fuchsia-pkg://fuchsia.com/libvulkan_lavapipe#meta/vulkan.cm";
+  data.RecordString("component_url", component_url);
 
-  zx::result icd_component = app()->CreateIcdComponent(lavapipe_icd_url);
+  zx::result icd_component = app()->CreateIcdComponent(component_url);
   if (icd_component.is_error()) {
     FX_LOGS(ERROR) << "Failed to create ICD component: " << icd_component.status_string();
   }

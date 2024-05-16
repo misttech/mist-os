@@ -67,9 +67,8 @@ executable("pkg-server-bin") {
   ]
 }
 
-fuchsia_component("vulkan_loader_test_lib_provider_cmp") {
+fuchsia_component("vulkan_loader_test_lib_provider") {
   testonly = true
-  component_name = "vulkan_loader_test_lib_provider"
   manifest = "meta/vulkan_loader_test_lib_provider.cml"
   deps = [ ":pkg-server-bin" ]
 }
@@ -122,7 +121,7 @@ fuchsia_test_package("vulkan_loader_tests") {
     ":manifest-json",
     ":test_realm",
     ":test_vulkan_driver",
-    ":vulkan_loader_test_lib_provider_cmp",
+    ":vulkan_loader_test_lib_provider",
     ":vulkan_loader_unittest_driver",
     "..:default_config_values",
     "..:vulkan_loader_cmp",
@@ -132,9 +131,4 @@ fuchsia_test_package("vulkan_loader_tests") {
       max_severity = "ERROR"
     }
   }
-}
-
-fuchsia_package("vulkan_loader_test_lib_provider") {
-  testonly = true
-  deps = [ ":vulkan_loader_test_lib_provider_cmp" ]
 }
