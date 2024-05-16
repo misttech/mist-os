@@ -17,6 +17,18 @@ extern "C" {
     fn hermetic_copy(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
     fn hermetic_copy_end();
 
+    // Performs a data copy like `strncpy`.
+    //
+    // Returns the last accessed destination address when `ret_dest` is `true`,
+    // or the last accessed source address when `ret_dest` is `false`.
+    fn hermetic_copy_until_null_byte(
+        dest: *mut u8,
+        source: *const u8,
+        len: usize,
+        ret_dest: bool,
+    ) -> usize;
+    fn hermetic_copy_until_null_byte_end();
+
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
 
@@ -109,9 +121,6 @@ type HermeticCopyFn =
 type HermeticZeroFn = unsafe extern "C" fn(dest: *mut u8, len: usize) -> usize;
 
 pub struct Usercopy {
-    // Pointer to the hermetic_copy_until_null_byte routine loaded into memory.
-    hermetic_copy_until_null_byte_fn: HermeticCopyFn,
-
     // Pointer to the hermetic_zero routine loaded into memory.
     hermetic_zero_fn: HermeticZeroFn,
 
@@ -282,10 +291,9 @@ impl Usercopy {
         let hermetic_copy_addr_range =
             hermetic_copy as *const () as usize..hermetic_copy_end as *const () as usize;
 
-        let hermetic_copy_until_null_byte_addr_range =
-            get_hermetic_copy_bin("/pkg/hermetic_copy_until_null_byte.bin")?;
-        let hermetic_copy_until_null_byte_fn: HermeticCopyFn =
-            unsafe { std::mem::transmute(hermetic_copy_until_null_byte_addr_range.start) };
+        let hermetic_copy_until_null_byte_addr_range = hermetic_copy_until_null_byte as *const ()
+            as usize
+            ..hermetic_copy_until_null_byte_end as *const () as usize;
 
         let hermetic_zero_addr_range = get_hermetic_copy_bin("/pkg/hermetic_zero.bin")?;
         let hermetic_zero_fn: HermeticZeroFn =
@@ -414,7 +422,6 @@ impl Usercopy {
         };
 
         Ok(Self {
-            hermetic_copy_until_null_byte_fn,
             hermetic_zero_fn,
             shutdown_event,
             join_handle: Some(join_handle),
@@ -549,7 +556,7 @@ impl Usercopy {
                 // buffer.
                 unsafe {
                     do_hermetic_copy(
-                        self.hermetic_copy_until_null_byte_fn,
+                        hermetic_copy_until_null_byte,
                         dest.as_ptr() as usize,
                         source_addr,
                         dest.len(),
