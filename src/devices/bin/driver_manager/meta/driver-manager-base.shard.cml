@@ -27,6 +27,10 @@
             runner: "driver",
             path: "/svc/fuchsia.component.runner.ComponentRunner",
         },
+        {
+            runner: "driver-host2",
+            path: "/svc/fuchsia.component.runner.DriverHostRunner",
+        },
     ],
     use: [
         {
@@ -104,6 +108,10 @@
         },
         {
             runner: "driver",
+            from: "self",
+        },
+        {
+            runner: "driver-host2",
             from: "self",
         },
         {
