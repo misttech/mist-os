@@ -9,11 +9,7 @@ use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
 
 use dense_map::{DenseMap, EntryKey};
 use derivative::Derivative;
-use lock_order::{
-    lock::{LockFor, RwLockFor},
-    relation::LockBefore,
-    wrap::prelude::*,
-};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{ethernet::Mac, ip::IpVersion};
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::{
@@ -24,13 +20,13 @@ use packet_formats::{
 use crate::{
     context::{ContextPair, SendFrameContext},
     device::{
-        self, AnyDevice, Device, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination,
+        AnyDevice, Device, DeviceIdContext, DeviceLayerTypes, FrameDestination,
         StrongDeviceIdentifier as _, WeakDeviceId, WeakDeviceIdentifier as _,
     },
-    for_any_device_id,
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
-    CoreCtx, StackState,
 };
+
+mod integration;
 
 /// A selector for frames based on link-layer protocol number.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -125,7 +121,7 @@ impl<S, D> StrongSocketId for StrongId<S, D> {
 /// Holds shared state for sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(super) struct Sockets<Primary, Strong> {
+pub struct Sockets<Primary, Strong> {
     /// Holds strong (but not owning) references to sockets that aren't
     /// targeting a particular device.
     any_device_sockets: RwLock<AnyDeviceSockets<Strong>>,
@@ -176,13 +172,13 @@ pub struct Target<D> {
 pub struct DeviceSockets<Id>(HashSet<Id>);
 
 /// Convenience alias for use in device state storage.
-pub(super) type HeldDeviceSockets<BT> =
+pub type HeldDeviceSockets<BT> =
     DeviceSockets<StrongId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>>;
 
 /// Convenience alias for use in shared storage.
 ///
-/// The type parameter is expected to implement [`crate::BindingsContext`].
-pub(super) type HeldSockets<BT> = Sockets<
+/// The type parameter is expected to implement [`DeviceSocketTypes`].
+pub type HeldSockets<BT> = Sockets<
     PrimaryId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>,
     StrongId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>,
 >;
@@ -767,172 +763,17 @@ where
     }
 }
 
-impl<BC: crate::BindingsContext, L> DeviceSocketContextTypes for CoreCtx<'_, BC, L> {
-    type SocketId = StrongId<BC::SocketState, WeakDeviceId<BC>>;
-}
-
-impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
-    DeviceSocketContext<BC> for CoreCtx<'_, BC, L>
-{
-    type SocketTablesCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::AnyDeviceSockets>;
-
-    fn create_socket(&mut self, state: BC::SocketState) -> Self::SocketId {
-        let mut sockets = self.lock();
-        let AllSockets(sockets) = &mut *sockets;
-        let entry = sockets.push_with(|index| {
-            PrimaryId(PrimaryRc::new(SocketState {
-                all_sockets_index: index,
-                external_state: state,
-                target: Mutex::new(Target::default()),
-            }))
-        });
-        let PrimaryId(primary) = &entry.get();
-        StrongId(PrimaryRc::clone_strong(primary))
-    }
-
-    fn remove_socket(&mut self, socket: Self::SocketId) {
-        let mut state = self.lock();
-        let AllSockets(sockets) = &mut *state;
-
-        let PrimaryId(primary) = sockets.remove(socket.get_key_index()).expect("unknown socket ID");
-        // Make sure to drop the strong ID before trying to unwrap the primary
-        // ID.
-        drop(socket);
-
-        let _: SocketState<_, _> = PrimaryRc::unwrap(primary);
-    }
-
-    fn with_any_device_sockets<
-        F: FnOnce(&AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
-        R,
-    >(
-        &mut self,
-        cb: F,
-    ) -> R {
-        let (sockets, mut locked) = self.read_lock_and::<crate::lock_ordering::AnyDeviceSockets>();
-        cb(&*sockets, &mut locked)
-    }
-
-    fn with_any_device_sockets_mut<
-        F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
-        R,
-    >(
-        &mut self,
-        cb: F,
-    ) -> R {
-        let (mut sockets, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::AnyDeviceSockets>();
-        cb(&mut *sockets, &mut locked)
+impl<Primary, Strong> OrderedLockAccess<AnyDeviceSockets<Strong>> for Sockets<Primary, Strong> {
+    type Lock = RwLock<AnyDeviceSockets<Strong>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.any_device_sockets)
     }
 }
 
-impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
-    SocketStateAccessor<BC> for CoreCtx<'_, BC, L>
-{
-    fn with_socket_state<F: FnOnce(&BC::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
-        &mut self,
-        StrongId(strong): &Self::SocketId,
-        cb: F,
-    ) -> R {
-        let SocketState { external_state, target, all_sockets_index: _ } = &**strong;
-        cb(external_state, &*target.lock())
-    }
-
-    fn with_socket_state_mut<
-        F: FnOnce(&BC::SocketState, &mut Target<Self::WeakDeviceId>) -> R,
-        R,
-    >(
-        &mut self,
-        StrongId(primary): &Self::SocketId,
-        cb: F,
-    ) -> R {
-        let SocketState { external_state, target, all_sockets_index: _ } = &**primary;
-        cb(external_state, &mut *target.lock())
-    }
-}
-
-impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
-    DeviceSocketAccessor<BC> for CoreCtx<'_, BC, L>
-{
-    type DeviceSocketCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::DeviceSockets>;
-
-    fn with_device_sockets<
-        F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
-        R,
-    >(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> R {
-        for_any_device_id!(
-            DeviceId,
-            device,
-            device => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (device_sockets, mut locked) = core_ctx_and_resource
-                        .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&*device_sockets, &mut locked.cast_core_ctx())
-                },
-            )
-        )
-    }
-
-    fn with_device_sockets_mut<
-        F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
-        R,
-    >(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> R {
-        for_any_device_id!(
-            DeviceId,
-            device,
-            device => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (mut device_sockets, mut locked) = core_ctx_and_resource
-                        .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&mut *device_sockets, &mut locked.cast_core_ctx())
-                },
-            )
-        )
-    }
-}
-
-impl<BC: crate::BindingsContext> RwLockFor<crate::lock_ordering::AnyDeviceSockets>
-    for StackState<BC>
-{
-    type Data = AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>>
-        where Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, AnyDeviceSockets<StrongId<BC::SocketState, WeakDeviceId<BC>>>>
-        where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.device.shared_sockets.any_device_sockets.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.device.shared_sockets.any_device_sockets.write()
-    }
-}
-
-impl<BC: crate::BindingsContext> LockFor<crate::lock_ordering::AllDeviceSockets>
-    for StackState<BC>
-{
-    type Data = AllSockets<PrimaryId<BC::SocketState, WeakDeviceId<BC>>>;
-    type Guard<'l> = crate::sync::LockGuard<'l, AllSockets<PrimaryId<BC::SocketState, WeakDeviceId<BC>>>>
-        where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.device.shared_sockets.all_sockets.lock()
+impl<Primary, Strong> OrderedLockAccess<AllSockets<Primary>> for Sockets<Primary, Strong> {
+    type Lock = Mutex<AllSockets<Primary>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.all_sockets)
     }
 }
 
@@ -990,7 +831,7 @@ mod tests {
             testutil::{
                 FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
             },
-            DeviceIdentifier, StrongDeviceIdentifier,
+            DeviceId, DeviceIdentifier, StrongDeviceIdentifier,
         },
         testutil::CtxPairExt as _,
     };

@@ -94,6 +94,28 @@ pub trait OrderedLockAccess<T> {
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock>;
 }
 
+/// Marks a type as offering ordered lock access for some inner type `T`
+/// *through* the [`OrderedLockAccess`] implementation of `Inner`.
+///
+/// See [`OrderedLockAccess`] for more details.
+pub trait DelegatedOrderedLockAccess<T> {
+    /// The inner type acting as a proxy for ordered access to T.
+    type Inner: OrderedLockAccess<T> + 'static;
+    /// Returns the inner type.
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner;
+}
+
+impl<T, O> OrderedLockAccess<T> for O
+where
+    O: DelegatedOrderedLockAccess<T>,
+{
+    type Lock = <O::Inner as OrderedLockAccess<T>>::Lock;
+
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        self.delegate_ordered_lock_access().ordered_lock_access()
+    }
+}
+
 /// A borrowed order-aware lock.
 pub struct OrderedLockRef<'a, T>(&'a T);
 
