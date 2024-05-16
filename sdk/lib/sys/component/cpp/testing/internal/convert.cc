@@ -48,6 +48,22 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
   return result;
 }
 
+namespace {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+std::string NameFromDictionaryRef(const DictionaryRef& ref) {
+  size_t delim = ref.path.find('/');
+  if (delim == std::string_view::npos || ref.path.substr(0, delim) != "self") {
+    ZX_PANIC("DictionaryRef path must be of the form self/<dictionary_name>");
+  }
+  std::string_view name = ref.path.substr(delim + 1, ref.path.size());
+  if (name.find('/') != std::string_view::npos) {
+    ZX_PANIC("DictionaryRef path must be of the form self/<dictionary_name>");
+  }
+  return std::string(name);
+}
+#endif
+}  // namespace
+
 fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto child_ref = cpp17_get_if<ChildRef>(&ref)) {
     fuchsia::component::decl::ChildRef result;
@@ -71,6 +87,13 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto _ = cpp17_get_if<SelfRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithSelf(fuchsia::component::decl::SelfRef());
   }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (auto dictionary_ref = cpp17_get_if<DictionaryRef>(&ref)) {
+    fuchsia::component::decl::CapabilityRef result;
+    result.name = NameFromDictionaryRef(*dictionary_ref);
+    return fuchsia::component::decl::Ref::WithCapability(std::move(result));
+  }
+#endif
 
   ZX_PANIC("ConvertToFidl(Ref) reached unreachable block!");
 }

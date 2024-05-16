@@ -186,6 +186,15 @@ Realm& Realm::AddConfiguration(std::vector<ConfigCapability> configurations) {
 }
 #endif
 
+#if __Fuchsia_API_level__ >= 20
+Realm& Realm::AddCapability(fuchsia::component::decl::Capability capability) {
+  fuchsia::component::test::Realm_AddCapability_Result result;
+  ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
+      "Realm/AddCapability", realm_proxy_->AddCapability(std::move(capability), &result), result);
+  return *this;
+}
+#endif
+
 void Realm::ReplaceComponentDecl(const std::string& child_name,
                                  fuchsia::component::decl::Component decl) {
   fuchsia::component::test::Realm_ReplaceComponentDecl_Result result;
@@ -345,6 +354,13 @@ RealmBuilder& RealmBuilder::InitMutableConfigToEmpty(const std::string& name) {
 #if __Fuchsia_API_level__ >= 20
 RealmBuilder& RealmBuilder::AddConfiguration(std::vector<ConfigCapability> configurations) {
   root_.AddConfiguration(std::move(configurations));
+  return *this;
+}
+#endif
+
+#if __Fuchsia_API_level__ >= 20
+RealmBuilder& RealmBuilder::AddCapability(fuchsia::component::decl::Capability capability) {
+  root_.AddCapability(std::move(capability));
   return *this;
 }
 #endif

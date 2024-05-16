@@ -280,7 +280,14 @@ struct FrameworkRef {};
 // "void".
 struct VoidRef {};
 
-using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef>;
+// A reference to a dictiory capability defined by this component. `path` must
+// have the format "self/<dictionary_name>".
+struct DictionaryRef {
+  std::string_view path;
+};
+
+using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef,
+                           DictionaryRef>;
 
 struct Route {
   std::vector<Capability> capabilities;

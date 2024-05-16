@@ -224,6 +224,28 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromRelativeChild) {
   EXPECT_EQ(response, fidl::StringPtr("hello"));
 }
 
+TEST_F(RealmBuilderTest, RoutesProtocolFromDictionary) {
+  static constexpr char kEchoServer[] = "echo_server";
+
+  auto realm_builder = RealmBuilder::Create();
+  realm_builder.AddChild(kEchoServer, kEchoServerFragmentOnlyUrl);
+  fuchsia::component::decl::Dictionary dict;
+  dict.set_name("dict");
+  realm_builder.AddCapability(
+      fuchsia::component::decl::Capability::WithDictionary(std::move(dict)));
+  realm_builder.AddRoute(Route{.capabilities = {Protocol{test::placeholders::Echo::Name_}},
+                               .source = ChildRef{kEchoServer},
+                               .targets = {DictionaryRef{"self/dict"}}});
+  auto protocol = Protocol{.name = test::placeholders::Echo::Name_, .from_dictionary = "dict"};
+  realm_builder.AddRoute(
+      Route{.capabilities = {protocol}, .source = SelfRef(), .targets = {ParentRef()}});
+  auto realm = realm_builder.Build(dispatcher());
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
+  fidl::StringPtr response;
+  ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
+  EXPECT_EQ(response, fidl::StringPtr("hello"));
+}
+
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 #if __Fuchsia_API_level__ < 17
 class LocalEchoServerByPtr : public test::placeholders::Echo, public LocalComponent {
