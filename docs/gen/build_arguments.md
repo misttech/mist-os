@@ -288,7 +288,7 @@ Base) for a product. These packages are never evicted by the system.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -296,7 +296,7 @@ From //BUILD.gn:45
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -840,7 +840,7 @@ dependency of anything else, and so are "build only".
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -848,7 +848,7 @@ From //build/input/BUILD.gn:9
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:20
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -914,7 +914,7 @@ pressure arises or other policies indicate.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
@@ -922,7 +922,7 @@ From //BUILD.gn:54
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
@@ -1494,7 +1494,7 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
@@ -1502,7 +1502,7 @@ From //BUILD.gn:115
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
@@ -2740,7 +2740,7 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2748,7 +2748,7 @@ From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -3659,7 +3659,7 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
@@ -3667,7 +3667,7 @@ From //BUILD.gn:96
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
@@ -3720,7 +3720,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:26
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
@@ -3728,7 +3728,7 @@ From //BUILD.gn:110
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:26
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
@@ -7981,7 +7981,7 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
@@ -7989,7 +7989,7 @@ From //BUILD.gn:100
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
@@ -8129,7 +8129,7 @@ include those labels in this variable.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -8137,7 +8137,7 @@ From //BUILD.gn:63
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -8290,19 +8290,7 @@ Set to true to enable distributed compilation using Goma.
 This has lower precedence than `use_reclient_cxx` in
 //build/toolchain/rbe.gni.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:14
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/goma.gni:13
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:14
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/goma.gni:13
 
