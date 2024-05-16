@@ -10,7 +10,7 @@ use core::{
 };
 
 use derivative::Derivative;
-use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpVersion, Ipv4, Ipv6},
@@ -20,8 +20,7 @@ use packet::Buf;
 
 use crate::{
     context::{
-        CounterContext, HandleableTimer, InstantContext, ReferenceNotifiers, TimerBindingsTypes,
-        TimerHandler,
+        HandleableTimer, InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
     },
     counters::Counter,
     device::{
@@ -35,21 +34,13 @@ use crate::{
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
         queue::{rx::ReceiveQueueBindingsContext, tx::TransmitQueueBindingsContext},
         socket::{self, HeldSockets},
-        state::{DeviceStateSpec, IpLinkDeviceStateInner},
+        state::DeviceStateSpec,
     },
     filter::FilterBindingsTypes,
     inspect::Inspectable,
-    ip::{
-        device::{
-            nud::{LinkResolutionContext, NudCounters},
-            state::IpDeviceFlags,
-            IpDeviceIpExt, IpDeviceStateContext,
-        },
-        forwarding::IpForwardingDeviceContext,
-        types::RawMetric,
-    },
+    ip::device::nud::{LinkResolutionContext, NudCounters},
     sync::RwLock,
-    BindingsContext, CoreCtx, Inspector, StackState,
+    Inspector,
 };
 
 pub(crate) use netstack3_base::{AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext};
@@ -78,16 +69,16 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 /// Implements `Iterator<Item=DeviceId<C>>` by pulling from provided loopback
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
-pub struct DevicesIter<'s, BC: BindingsContext> {
+pub struct DevicesIter<'s, BT: DeviceLayerTypes> {
     pub(super) ethernet:
-        alloc::collections::hash_map::Values<'s, EthernetDeviceId<BC>, EthernetPrimaryDeviceId<BC>>,
+        alloc::collections::hash_map::Values<'s, EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
     pub(super) pure_ip:
-        alloc::collections::hash_map::Values<'s, PureIpDeviceId<BC>, PureIpPrimaryDeviceId<BC>>,
-    pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BC>>,
+        alloc::collections::hash_map::Values<'s, PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
+    pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BT>>,
 }
 
-impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
-    type Item = DeviceId<BC>;
+impl<'s, BT: DeviceLayerTypes> Iterator for DevicesIter<'s, BT> {
+    type Item = DeviceId<BT>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, pure_ip, loopback } = self;
@@ -96,25 +87,6 @@ impl<'s, BC: BindingsContext> Iterator for DevicesIter<'s, BC> {
             .chain(pure_ip.map(|primary| primary.clone_strong().into()))
             .chain(loopback.map(|primary| primary.clone_strong().into()))
             .next()
-    }
-}
-
-impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpForwardingDeviceContext<I> for CoreCtx<'_, BC, L>
-where
-    Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
-{
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        crate::device::integration::with_ip_device_state(self, device_id, |state| {
-            *state.unlocked_access::<crate::lock_ordering::RoutingMetric>()
-        })
-    }
-
-    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
-        IpDeviceStateContext::<I, _>::with_ip_device_flags(
-            self,
-            device_id,
-            |IpDeviceFlags { ip_enabled }| *ip_enabled,
-        )
     }
 }
 
@@ -233,7 +205,7 @@ pub struct Devices<BT: DeviceLayerTypes> {
 }
 
 /// The state associated with the device layer.
-pub(crate) struct DeviceLayerState<BT: DeviceLayerTypes> {
+pub struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub(super) devices: RwLock<Devices<BT>>,
     pub(super) origin: OriginTracker,
     pub(super) shared_sockets: HeldSockets<BT>,
@@ -264,6 +236,13 @@ impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
 
     pub(crate) fn arp_counters(&self) -> &ArpCounters {
         &self.arp_counters
+    }
+}
+
+impl<BT: DeviceLayerTypes> OrderedLockAccess<Devices<BT>> for DeviceLayerState<BT> {
+    type Lock = RwLock<Devices<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.devices)
     }
 }
 
@@ -328,33 +307,6 @@ impl Inspectable for DeviceCounters {
         crate::counters::inspect_device_counters(inspector, self)
     }
 }
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BC> {
-    type Data = DeviceCounters;
-    type Guard<'l> = &'l DeviceCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.device_counters()
-    }
-}
-
-impl<T, BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters>
-    for IpLinkDeviceStateInner<T, BC>
-{
-    type Data = DeviceCounters;
-    type Guard<'l> = &'l DeviceCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.counters
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::DeviceCounters>())
-    }
-}
-
 /// Light-weight tracker for recording the source of some instance.
 ///
 /// This should be held as a field in a parent type that is cloned into each
@@ -550,6 +502,7 @@ pub(crate) mod testutil {
             Ipv6DeviceConfigurationUpdate,
         },
         testutil::{Ctx, CtxPairExt as _},
+        BindingsContext,
     };
 
     #[cfg(test)]

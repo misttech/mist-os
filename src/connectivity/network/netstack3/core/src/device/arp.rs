@@ -7,7 +7,6 @@
 use alloc::fmt::Debug;
 use core::time::Duration;
 
-use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, Witness as _,
@@ -34,7 +33,6 @@ use crate::{
         NudBindingsTypes, NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState,
         NudTimerId, NudUserConfig,
     },
-    BindingsContext, CoreCtx, StackState,
 };
 
 // NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
@@ -97,21 +95,6 @@ pub struct ArpCounters {
     pub tx_requests_dropped_no_local_addr: Counter,
     /// Count of ARP response packets sent.
     pub tx_responses: Counter,
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for StackState<BC> {
-    type Data = ArpCounters;
-    type Guard<'l> = &'l ArpCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.arp_counters()
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<ArpCounters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::ArpCounters>())
-    }
 }
 
 /// An execution context for the ARP protocol that allows sending IP packets to
