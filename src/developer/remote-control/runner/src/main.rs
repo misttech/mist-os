@@ -2,28 +2,115 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    argh::FromArgs,
-    compat_info::{CompatibilityInfo, CompatibilityState, ConnectionInfo},
-    fidl_fuchsia_developer_remotecontrol_connector::ConnectorMarker,
-    fuchsia_component::client::connect_to_protocol,
-    futures::future::select,
-    futures::io::BufReader,
-    futures::prelude::*,
-    std::os::fd::{AsRawFd, FromRawFd, OwnedFd},
-    version_history::{AbiRevision, HISTORY},
-};
+use anyhow::Result;
+use argh::FromArgs;
+use compat_info::{CompatibilityInfo, CompatibilityState, ConnectionInfo};
+use fidl_fuchsia_developer_remotecontrol_connector::ConnectorMarker;
+use fuchsia_component::client::connect_to_protocol;
+use futures::future::{poll_fn, select};
+use futures::io::BufReader;
+use futures::prelude::*;
+use std::io;
+use std::os::fd::{FromRawFd, OwnedFd};
+use std::os::unix::io::AsRawFd;
+use std::pin::pin;
+use std::task::{ready, Poll};
+use version_history::{AbiRevision, HISTORY};
 
 const BUFFER_SIZE: usize = 65536;
 
-async fn buffered_copy<R, W>(mut from: R, mut to: W, buffer_size: usize) -> std::io::Result<u64>
+#[derive(Copy, Clone)]
+enum CopyDirection {
+    StdIn,
+    StdOut,
+}
+
+impl CopyDirection {
+    fn log_read_fail(&self, err: io::Error) {
+        match self {
+            CopyDirection::StdIn => tracing::warn!("Failed receiving data from host: {err:?}"),
+            CopyDirection::StdOut => tracing::warn!("Failed receiving data from RCS: {err:?}"),
+        }
+    }
+
+    fn log_write_fail(&self, err: io::Error) {
+        match self {
+            CopyDirection::StdIn => tracing::warn!("Failed sending data to RCS: {err:?}"),
+            CopyDirection::StdOut => tracing::warn!("Failed sending data to host: {err:?}"),
+        }
+    }
+
+    fn log_write_zero(&self) {
+        match self {
+            CopyDirection::StdIn => tracing::error!(
+                "Writing to RCS socket returned zero-byte success. This should be impossible?!"
+            ),
+            CopyDirection::StdOut => tracing::error!(
+                "Writing to RCS socket returned zero-byte success. This should be impossible?!"
+            ),
+        }
+    }
+
+    fn log_flush_error(&self, err: io::Error) {
+        match self {
+            CopyDirection::StdIn => {
+                tracing::warn!("Flushing data toward RCS after shutdown gave {err:?}")
+            }
+            CopyDirection::StdOut => {
+                tracing::warn!("Flushing data toward the host after shutdown gave {err:?}")
+            }
+        }
+    }
+
+    fn log_closed(&self) {
+        match self {
+            CopyDirection::StdIn => {
+                tracing::info!("Stream from the host toward RCS terminated normally")
+            }
+            CopyDirection::StdOut => {
+                tracing::info!("Stream from RCS toward the host terminated normally")
+            }
+        }
+    }
+}
+
+async fn buffered_copy<R, W>(mut from: R, mut to: W, dir: CopyDirection)
 where
     R: AsyncRead + std::marker::Unpin,
     W: AsyncWrite + std::marker::Unpin,
 {
-    let mut buf_from = BufReader::with_capacity(buffer_size, &mut from);
-    futures::io::copy_buf(&mut buf_from, &mut to).await
+    let mut from = pin!(BufReader::with_capacity(BUFFER_SIZE, &mut from));
+    let mut to = pin!(to);
+    poll_fn(move |cx| loop {
+        let buffer = match ready!(from.as_mut().poll_fill_buf(cx)) {
+            Ok(x) => x,
+            Err(e) => {
+                dir.log_read_fail(e);
+                return Poll::Ready(());
+            }
+        };
+        if buffer.is_empty() {
+            if let Err(e) = ready!(to.as_mut().poll_flush(cx)) {
+                dir.log_flush_error(e)
+            }
+            dir.log_closed();
+            return Poll::Ready(());
+        }
+
+        let i = match ready!(to.as_mut().poll_write(cx, buffer)) {
+            Ok(x) => x,
+            Err(e) => {
+                dir.log_write_fail(e);
+                return Poll::Ready(());
+            }
+        };
+        if i == 0 {
+            dir.log_write_zero();
+            return Poll::Ready(());
+        }
+        from.as_mut().consume(i);
+    })
+    .await
 }
 
 fn print_prelude_info(
@@ -129,21 +216,11 @@ async fn main() -> Result<()> {
     let mut stdin = fidl::AsyncSocket::from_socket(fidl::Socket::from(stdin));
     let mut stdout = fidl::AsyncSocket::from_socket(fidl::Socket::from(stdout));
 
-    let in_fut = buffered_copy(&mut stdin, &mut tx_socket, BUFFER_SIZE);
-    let out_fut = buffered_copy(&mut rx_socket, &mut stdout, BUFFER_SIZE);
-    futures::pin_mut!(in_fut);
-    futures::pin_mut!(out_fut);
-    match select(in_fut, out_fut).await {
-        future::Either::Left((v, _)) => {
-            tracing::warn!("stdin copy: {v:?}");
-            v.context("stdin copy")
-        }
-        future::Either::Right((v, _)) => {
-            tracing::warn!("stdout copy: {v:?}");
-            v.context("stdout copy")
-        }
-    }
-    .map(|_| ())
+    let in_fut = buffered_copy(&mut stdin, &mut tx_socket, CopyDirection::StdIn);
+    let out_fut = buffered_copy(&mut rx_socket, &mut stdout, CopyDirection::StdOut);
+    select(pin!(in_fut), pin!(out_fut)).await;
+
+    Ok(())
 }
 
 #[cfg(test)]
