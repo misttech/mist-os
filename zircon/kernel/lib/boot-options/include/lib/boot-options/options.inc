@@ -844,6 +844,16 @@ DEPRECATED - This option is scheduled to be removed in an upcoming release.  Do 
 critical dependencies on it.
 )""")
 
+DEFINE_OPTION("kernel.ubsan.action", CheckFailAction, ubsan_action, {CheckFailAction::kPanic}, R"""(
+When the kernel is instrumented with UndefinedBehaviorSanitizer, problems
+it detects are reported on the serial console.  These can be fatal or not.
+Values must be one of:
+ * `oops`
+   - Detected undefined behavior causes a non-fatal kernel OOPS.
+ * `panic`
+   - Detected undefined behavior causes a fatal kernel panic.
+)""")
+
 // Machine-specific options are included here for all the kernel places.
 // In the generator program, they're included separately.
 

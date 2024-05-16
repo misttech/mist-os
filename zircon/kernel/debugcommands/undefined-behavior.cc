@@ -13,10 +13,18 @@
 // from optimizing the operations away or throwing warnings.
 
 #include <inttypes.h>
+#include <lib/boot-options/boot-options.h>
 #include <lib/console.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include <ktl/algorithm.h>
+#include <ktl/iterator.h>
+#include <ktl/span.h>
+#include <ktl/string_view.h>
+
+#include <ktl/enforce.h>
 
 #if __has_feature(undefined_behavior_sanitizer)
 
@@ -145,6 +153,9 @@ void unreachable() {
   // Execute unreachable code.
   printf("About to execute unreachable code\n");
 
+  // There is no version of unreachable code that can be recovered from,
+  // because the compiler will always treat it as a "noreturn" path and omit
+  // the epilogue of the function entirely.
   __builtin_unreachable();
 }
 
@@ -163,71 +174,81 @@ void undefined_enum() {
   printf("load of invalid enum value: %d\n", b);
 }
 
-}  // namespace
+struct UndefinedBehaviorCommand {
+  ktl::string_view name;
+  void (*func)();
+  const char* description;
+  bool cannot_continue;
+};
 
-static int cmd_ub(int argc, const cmd_args* argv, uint32_t flags);
+constexpr UndefinedBehaviorCommand kUbCommands[] = {
+    {"all", nullptr, "run each subcommand in turn (requires kernel.ubsan.panic=false)"},
+    {"array_oob", &array_oob, "array out of bounds access"},
+    {"invalid_builtin_clz", &invalid_builtin_clz, "call __builtin_clz with 0"},
+    {"invalid_builtin_ctz", &invalid_builtin_ctz, "call __builtin_ctz with 0"},
+    {"misaligned_ptr", &misaligned_ptr, "use a misaligned pointer"},
+    {"nonnull_return", &nonnull_return, "return nullptr from returns_nonnull function"},
+    {"nullability_return", &nullability_return, "return nullptr from _Nonnull function"},
+    {"overflow_ptr", &overflow_ptr, "pointer arithmetic that overflows"},
+    {"overflow_signed_int_add", &overflow_signed_int_add, "signed integer addition that overflows"},
+    {"overflow_signed_int_shift", &overflow_signed_int_shift,
+     "signed integer shift that overflows"},
+    {"unaligned_assumption", &unaligned_assumption, "make a wrong alignment assumption"},
+    {"undefined_enum", &undefined_enum, "use an undefined value in a enum"},
+    {"undefined_bool", &undefined_bool, "use a bool that is not true nor false"},
+    {"unreachable", &unreachable, "execute unreachable code.", true},
+};
+
+constexpr size_t kMaxCommandNameSize = [] {
+  size_t size = 0;
+  for (const auto& ub_cmd : kUbCommands) {
+    size = ktl::max(size, ub_cmd.name.size());
+  }
+  return size;
+}();
+
+int cmd_usage(const char* cmd_name) {
+  printf("usage:\n");
+  for (const auto& ub_cmd : kUbCommands) {
+    printf("%s %-*s : %s\n", cmd_name, static_cast<int>(kMaxCommandNameSize), ub_cmd.name.data(),
+           ub_cmd.description);
+  }
+  return ZX_ERR_INTERNAL;
+}
+
+int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
+  const char* name = argv[0].str;
+  if (argc != 2) {
+    printf("Exactly one argument required.\n");
+    return cmd_usage(name);
+  }
+
+  ktl::string_view subcommand = argv[1].str;
+  for (const auto& ub_cmd : kUbCommands) {
+    if (ub_cmd.name == subcommand) {
+      if (ub_cmd.func) {
+        ub_cmd.func();
+      } else {
+        for (const auto& next_ub_cmd : ktl::span(kUbCommands).subspan(1)) {
+          if (gBootOptions->ubsan_action == CheckFail::kOops && next_ub_cmd.cannot_continue) {
+            printf("*** Skipping `ub %s`, which cannot avoid panic ***\n", next_ub_cmd.name.data());
+          } else {
+            printf("*** ub %s\n", next_ub_cmd.name.data());
+            next_ub_cmd.func();
+          }
+        }
+      }
+      return 0;
+    }
+  }
+
+  return cmd_usage(name);
+}
 
 STATIC_COMMAND_START
 STATIC_COMMAND("ub", "trigger undefined behavior", &cmd_ub)
 STATIC_COMMAND_END(mem)
 
-static int cmd_usage(const char* cmd_name) {
-  printf("usage:\n");
-  printf("%s array_oob                : array out of bounds access\n", cmd_name);
-  printf("%s invalid_builtin_clz      : call __builtin_clz with 0\n", cmd_name);
-  printf("%s invalid_builtin_ctz      : call __builtin_ctz with 0\n", cmd_name);
-  printf("%s misaligned_ptr           : use a misaligned pointer\n", cmd_name);
-  printf("%s nonnull_return           : return nullptr from returns_nonnull function\n", cmd_name);
-  printf("%s nullability_return       : return nullptr from _Nonnull function\n", cmd_name);
-  printf("%s overflow_ptr             : pointer arithmetic that overflows\n", cmd_name);
-  printf("%s overflow_signed_int_add  : signed integer addition that overflows\n", cmd_name);
-  printf("%s overflow_signed_int_shift: signed integer shift that overflows\n", cmd_name);
-  printf("%s unaligned_assumption     : make a wrong alignment assumption\n", cmd_name);
-  printf("%s undefined_enum           : use an undefined value in a enum\n", cmd_name);
-  printf("%s undefined_bool           : use a bool that is not true nor false\n", cmd_name);
-  printf("%s unreachable              : execute unreachable code.\n", cmd_name);
-
-  return ZX_ERR_INTERNAL;
-}
-
-static int cmd_ub(int argc, const cmd_args* argv, uint32_t flags) {
-  const char* name = argv[0].str;
-  if (argc < 2) {
-    printf("Not enough arguments.\n");
-    return cmd_usage(name);
-  }
-
-  if (!strcmp(argv[1].str, "array_oob")) {
-    array_oob();
-  } else if (!strcmp(argv[1].str, "invalid_builtin_clz")) {
-    invalid_builtin_clz();
-  } else if (!strcmp(argv[1].str, "invalid_builtin_ctz")) {
-    invalid_builtin_ctz();
-  } else if (!strcmp(argv[1].str, "misaligned_ptr")) {
-    misaligned_ptr();
-  } else if (!strcmp(argv[1].str, "nonnull_return")) {
-    nonnull_return();
-  } else if (!strcmp(argv[1].str, "nullability_return")) {
-    nullability_return();
-  } else if (!strcmp(argv[1].str, "overflow_ptr")) {
-    overflow_ptr();
-  } else if (!strcmp(argv[1].str, "overflow_signed_int_add")) {
-    overflow_signed_int_add();
-  } else if (!strcmp(argv[1].str, "overflow_signed_int_shift")) {
-    overflow_signed_int_shift();
-  } else if (!strcmp(argv[1].str, "unaligned_assumption")) {
-    unaligned_assumption();
-  } else if (!strcmp(argv[1].str, "undefined_enum")) {
-    undefined_enum();
-  } else if (!strcmp(argv[1].str, "undefined_bool")) {
-    undefined_bool();
-  } else if (!strcmp(argv[1].str, "unreachable")) {
-    unreachable();
-  } else if (!strcmp(argv[1].str, "help")) {
-    return cmd_usage(name);
-  }
-
-  return 0;
-}
+}  // namespace
 
 #endif  // __has_feature(undefined_behavior_sanitizer)

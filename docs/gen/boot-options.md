@@ -994,6 +994,18 @@ this option trades off improved performance in favor of reduced power consumptio
 DEPRECATED - This option is scheduled to be removed in an upcoming release.  Do not take any
 critical dependencies on it.
 
+### kernel.ubsan.action=\[oops | panic\]
+
+**Default:** `panic`
+
+When the kernel is instrumented with UndefinedBehaviorSanitizer, problems
+it detects are reported on the serial console.  These can be fatal or not.
+Values must be one of:
+ * `oops`
+   - Detected undefined behavior causes a non-fatal kernel OOPS.
+ * `panic`
+   - Detected undefined behavior causes a fatal kernel panic.
+
 
 ## Options available only on arm64 machines
 
