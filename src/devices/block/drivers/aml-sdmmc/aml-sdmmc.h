@@ -29,7 +29,6 @@
 #include <mutex>
 #include <vector>
 
-#include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
 #include "src/devices/block/drivers/aml-sdmmc/aml_sdmmc_config.h"

@@ -9,8 +9,6 @@
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
-#include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/power-support.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/mmio/mmio.h>
@@ -36,6 +34,8 @@
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "aml-sdmmc-regs.h"
+#include "sdk/lib/driver/power/cpp/element-description-builder.h"
+#include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace {
 
