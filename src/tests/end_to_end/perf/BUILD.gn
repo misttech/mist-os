@@ -6,14 +6,6 @@ import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/testing/perf/test.gni")
 
-# This directory contains Dart wrappers for running performance tests
-# that are defined elsewhere in the Fuchsia tree.
-#
-# The test wrappers in this directory are split into multiple test
-# executables (dart_test targets here) because the Fuchsia Infra tools
-# for retrying tests and tracking flakes operate on the granularity of
-# test executables.
-
 _tests = [
   {
     name = "flatland_benchmark"
@@ -61,12 +53,11 @@ _tests = [
   },
 ]
 
-_python_benchmarks = []
+_benchmarks = []
 foreach(test, _tests) {
   _name = test.name
-  _test_name = "py_${_name}"
   if (is_host) {
-    python_perf_test(_test_name) {
+    python_perf_test(_name) {
       main_source = "test/${_name}.py"
       forward_variables_from(test,
                              [
@@ -85,25 +76,10 @@ foreach(test, _tests) {
       }
     }
   }
-  _python_benchmarks += [ ":${_test_name}($host_toolchain)" ]
+  _benchmarks += [ ":${_name}($host_toolchain)" ]
 }
 
-if (is_host) {
-  host_test_data("runtime_deps") {
-    sources = [
-      "$root_out_dir/catapult_converter",
-      "$root_out_dir/trace2json",
-    ]
-    outputs = [ "$target_gen_dir/runtime_deps/{{source_file_part}}" ]
-
-    deps = [
-      "//src/performance/trace2json:bin",
-      "//src/testing/catapult_converter:converter_bin",
-    ]
-  }
-}
-
-_python_benchmarks += [
+_benchmarks += [
   "//src/connectivity/network:benchmarks",
   "//src/devices/bin/driver_runtime/microbenchmarks",
   "//src/diagnostics:benchmarks",
@@ -120,7 +96,7 @@ _python_benchmarks += [
 group("test") {
   testonly = true
 
-  deps = _python_benchmarks
+  deps = _benchmarks
 
   deps += [
     # Many tests use sl4f to communicate with the target.

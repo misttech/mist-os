@@ -1,68 +1,41 @@
 # Performance tests
 
-This directory contains performance tests. In many cases, the code in this
-directory is just an [SL4F] wrapper (that is, Dart code using the SL4F
-framework) for a test that is located elsewhere in the Fuchsia source tree.
+This directory contains performance tests.
 
 Check the [instructions][instructions] to run these test locally.
 
-This directory contains the following performance tests written in Dart:
+This directory contains some performance tests written in Python using
+[Lacewing][lacewing]. It also contains all the expected metrics that performance
+tests may generate. Finally, it includes a GN group that contains all benchmarks
+in the tree.
 
-*   `audio_mixer_profiler_test` - SL4F wrapper for profiling the different
-    steps in the audio mixing process.
+This directory contains the following performance tests:
 
-*   `fidl_microbenchmarks_test` - SL4F wrapper for running FIDL
-    microbenchmarks which test FIDL bindings for multiple languages.
-
-*   `flatland_benchmarks_test` - Tests the performance of Flatland's
+*   `flatland_benchmark` - Tests the performance of Flatland's
     end-to-end present latency, measured by tracing flow events, for minimal
     Flatland client (`flatland-view-provider`).
 
-*   `input_latency_benchmarks_test` - Tests the performance of
-    end-to-end input latency, measured by tracing flow events, for minimal
-    Scenic clients (`simplest_app`).
-
-*   `kernel_boot_stats_test` - SL4F wrapper for a test that records the
-    time taken by different parts of the kernel boot process.
-
-*   `microbenchmarks_test` - SL4F wrapper for [fuchsia_microbenchmarks].
-    The microbenchmarks this contains tend to be for low-level operations
-    such as Zircon syscalls.
-
-*   `netstack_benchmarks_test` - SL4F wrapper for benchmarks of TCP, UDP, and
-    ICMP echo sockets. These benchmarks run against Netstack2, Netstack2 with
-    Fast UDP enabled, and a "fake netstack" that does minimal work in order to
-    isolate the API overhead.
-
-*   `netstack_iperf_test` - Tests network stack performance using the
-    benchmarking tool `iperf3`.
-
-*   `rust_inspect_benchmarks_test` - Tests the performance of various Rust
-    [Inspect] operations, such as creating and deleting nodes and updating
-    properties.
-
-This directory contains the following performance test written in Python using
-Lacewing:
-
-*   `py_flatland_benchmark` - Tests the performance of Flatland's
-    end-to-end present latency, measured by tracing flow events, for minimal
-    Flatland client (`flatland-view-provider`).
-
-*   `py_input_latency_benchmark` - Tests the performance of
+*   `input_latency_benchmark` - Tests the performance of
     end-to-end input latency, measured by tracing flow events, for minimal
     Scenic clients (`simplest-app-flatland-session`).
 
-As well as the following examples:
+*  `tracing_microbenchmarks_test` - Tests the performance of the tracing
+    subsystem.
+
+The following examples:
 
 *   `perf_publish_example` - Simple example test that publishes a performance
     metric.
+
+And the following tests:
+
+*   `perftest_trace_events_test` - Tests that we correctly read events from a
+    trace session.
 
 You can view the test results from CI builds in [Chromeperf][chromeperf].
 
 <!-- Reference links -->
 
-[SL4F]: /docs/concepts/testing/sl4f.md
-[Inspect]: /docs/development/inspect/README.md
-[fuchsia_microbenchmarks]: /src/tests/microbenchmarks
 [chromeperf]: /docs/development/performance/chromeperf_user_guide.md
 [instructions]: /docs/development/performance/running_performance_tests.md
+[lacewing]: /src/testing/end_to_end/README.md
