@@ -7,7 +7,7 @@ use {
     crate::{
         client::types,
         config_management::{Credential, HistoricalListsByBssid},
-        util::pseudo_energy::SignalData,
+        util::pseudo_energy::EwmaSignalData,
     },
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
@@ -329,9 +329,9 @@ pub fn generate_connect_selection() -> types::ConnectSelection {
     }
 }
 
-pub fn generate_random_signal_data() -> SignalData {
+pub fn generate_random_ewma_signal_data() -> EwmaSignalData {
     let mut rng = rand::thread_rng();
-    SignalData::new(
+    EwmaSignalData::new(
         rng.gen_range(-80..-20),
         rng.gen_range(0..80),
         rng.gen_range(0..10) as usize,

@@ -83,14 +83,15 @@ pub fn calculate_pseudodecibel_velocity(historical_pdb: Vec<f64>) -> Result<f64,
     Ok(velocity.into())
 }
 
+// Struct for tracking the exponentially weighted moving average (EWMA) signal measurements.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SignalData {
+pub struct EwmaSignalData {
     pub ewma_rssi: EwmaPseudoDecibel,
     pub ewma_snr: EwmaPseudoDecibel,
     pub ewma_rssi_velocity: EwmaPseudoDecibel,
 }
 
-impl SignalData {
+impl EwmaSignalData {
     pub fn new(
         initial_rssi: impl Into<f64>,
         initial_snr: impl Into<f64>,
@@ -229,7 +230,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_update_with_new_measurements() {
-        let mut signal_data = SignalData::new(-40, 30, 10, 3);
+        let mut signal_data = EwmaSignalData::new(-40, 30, 10, 3);
         signal_data.update_with_new_measurement(-60, 15);
         assert_lt!(signal_data.ewma_rssi.get(), -40.0);
         assert_gt!(signal_data.ewma_rssi.get(), -60.0);

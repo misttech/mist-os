@@ -24,7 +24,7 @@ use {
                 ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate,
                 Message::NotifyListeners,
             },
-            pseudo_energy::SignalData,
+            pseudo_energy::EwmaSignalData,
             state_machine::{self, ExitReason, IntoStateExt},
         },
     },
@@ -557,7 +557,7 @@ async fn connected_state(
     let mut connect_start_time = fasync::Time::now();
 
     // Track the EWMA signal and velocity for metrics
-    let signal_data = SignalData::new(
+    let signal_data = EwmaSignalData::new(
         options.ap_state.tracked.signal.rssi_dbm,
         options.ap_state.tracked.signal.snr_db,
         EWMA_SMOOTHING_FACTOR,
@@ -774,7 +774,7 @@ async fn record_disconnect(
     options: &ConnectedOptions,
     connect_start_time: fasync::Time,
     reason: types::DisconnectReason,
-    signal_data: Option<SignalData>,
+    signal_data: Option<EwmaSignalData>,
 ) {
     if let Some(signal_data) = signal_data {
         let curr_time = fasync::Time::now();
@@ -1307,7 +1307,7 @@ mod tests {
                 disconnect_time: fasync::Time::now(),
                 connection_uptime: zx::Duration::from_minutes(0),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: SignalData::new(
+                signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
@@ -1929,7 +1929,7 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::FidlStopClientConnectionsRequest,
-                signal_data_at_disconnect: SignalData::new(
+                signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
@@ -2011,7 +2011,7 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: SignalData::new(
+                signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
@@ -2211,7 +2211,7 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(5),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
-                signal_data_at_disconnect: SignalData::new(
+                signal_data_at_disconnect: EwmaSignalData::new(
                     bss_description.rssi_dbm,
                     bss_description.snr_db,
                     EWMA_SMOOTHING_FACTOR,
@@ -2453,7 +2453,7 @@ mod tests {
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::ProactiveNetworkSwitch,
-                signal_data_at_disconnect: SignalData::new(
+                signal_data_at_disconnect: EwmaSignalData::new(
                     first_bss_desc.rssi_dbm,
                     first_bss_desc.snr_db,
                     EWMA_SMOOTHING_FACTOR,
@@ -2736,7 +2736,7 @@ mod tests {
 
         // The tracked signal data uses the RSS/SNR data from the time of connection and the first
         // stats are sent after updated with the first signal report data.
-        let mut expected_signal_data = SignalData::new(
+        let mut expected_signal_data = EwmaSignalData::new(
             init_rssi,
             init_snr,
             EWMA_SMOOTHING_FACTOR,

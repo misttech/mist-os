@@ -6,7 +6,7 @@ use {
     crate::{
         client::{connection_selection::scoring_functions, roaming::lib::*, types},
         telemetry::{TelemetryEvent, TelemetrySender},
-        util::pseudo_energy::SignalData,
+        util::pseudo_energy::EwmaSignalData,
     },
     fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::channel::mpsc,
@@ -30,7 +30,7 @@ pub trait RoamMonitorApi: Send + Sync {
         stats: fidl_internal::SignalReportIndication,
     ) -> Result<u8, anyhow::Error>;
 
-    fn get_signal_data(&self) -> SignalData;
+    fn get_signal_data(&self) -> EwmaSignalData;
 }
 
 /// Keeps record of connection data and a valid roam sender, and can trigger roam search requests,
@@ -111,14 +111,14 @@ impl RoamMonitorApi for RoamMonitor {
     }
 
     // Return the signal data for the tracked connection.
-    fn get_signal_data(&self) -> SignalData {
+    fn get_signal_data(&self) -> EwmaSignalData {
         self.connection_data.signal_data
     }
 }
 
 // Return roam reasons if the signal measurements fall below given thresholds.
 fn check_signal_thresholds(
-    signal_data: SignalData,
+    signal_data: EwmaSignalData,
     channel: types::WlanChan,
 ) -> (Vec<RoamReason>, u8) {
     let mut roam_reasons = vec![];
@@ -155,7 +155,7 @@ mod test {
     #[fuchsia::test]
     fn test_check_signal_thresholds_2g() {
         let (roam_reasons, _) = check_signal_thresholds(
-            SignalData::new(
+            EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_2G - 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_2G - 1.0,
                 EWMA_SMOOTHING_FACTOR,
@@ -167,7 +167,7 @@ mod test {
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
 
         let (roam_reasons, _) = check_signal_thresholds(
-            SignalData::new(
+            EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_2G + 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_2G + 1.0,
                 EWMA_SMOOTHING_FACTOR,
@@ -181,7 +181,7 @@ mod test {
     #[fuchsia::test]
     fn test_check_signal_thresholds_5g() {
         let (roam_reasons, _) = check_signal_thresholds(
-            SignalData::new(
+            EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_5G - 1.0,
                 EWMA_SMOOTHING_FACTOR,
@@ -193,7 +193,7 @@ mod test {
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
 
         let (roam_reasons, _) = check_signal_thresholds(
-            SignalData::new(
+            EwmaSignalData::new(
                 LOCAL_ROAM_THRESHOLD_RSSI_5G + 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_5G + 1.0,
                 EWMA_SMOOTHING_FACTOR,
@@ -241,7 +241,7 @@ mod test {
         let init_rssi = -75;
         let init_snr = 15;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let mut signal_data = SignalData::new(
+        let mut signal_data = EwmaSignalData::new(
             init_rssi,
             init_snr,
             EWMA_SMOOTHING_FACTOR,
@@ -297,7 +297,7 @@ mod test {
         let init_rssi = -70;
         let init_snr = 20;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let signal_data = SignalData::new(
+        let signal_data = EwmaSignalData::new(
             init_rssi,
             init_snr,
             EWMA_SMOOTHING_FACTOR,
@@ -360,7 +360,7 @@ mod test {
         let init_rssi = -80;
         let init_snr = 10;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let signal_data = SignalData::new(
+        let signal_data = EwmaSignalData::new(
             init_rssi,
             init_snr,
             EWMA_SMOOTHING_FACTOR,
