@@ -17,13 +17,6 @@ type AndroidVendorSupport = table {
     2: minor_version uint8;
 };
 
-/// Bitmask of features supported by the vendor.
-type BtVendorFeatures = flexible bits : uint32 {
-    SET_ACL_PRIORITY_COMMAND = 0x1;
-    ANDROID_VENDOR_EXTENSIONS = 0x2;
-    // Bits 2-31 reserved.
-};
-
 /// Table of features supported by the vendor.
 type VendorFeatures = table {
     /// Supports the SetAclPriority command
@@ -34,32 +27,14 @@ type VendorFeatures = table {
     2: android_vendor_extensions AndroidVendorSupport;
 };
 
-type BtVendorAclPriority = flexible enum : uint8 {
-    NORMAL = 1;
-    HIGH = 2;
-};
-
 type VendorAclPriority = flexible enum : uint8 {
     NORMAL = 1;
     HIGH = 2;
 };
 
-type BtVendorAclDirection = flexible enum : uint8 {
-    SOURCE = 1;
-    SINK = 2;
-};
-
 type VendorAclDirection = flexible enum : uint8 {
     SOURCE = 1;
     SINK = 2;
-};
-
-type BtVendorSetAclPriorityParams = struct {
-    connection_handle uint16;
-    priority BtVendorAclPriority;
-    /// The direction data should be prioritized in. May not be supported by all
-    /// vendors. Ignored when priority is normal.
-    direction BtVendorAclDirection;
 };
 
 type VendorSetAclPriorityParams = table {
@@ -71,10 +46,6 @@ type VendorSetAclPriorityParams = table {
     3: direction VendorAclDirection;
 };
 
-type BtVendorCommand = flexible union {
-    1: set_acl_priority BtVendorSetAclPriorityParams;
-};
-
 type VendorCommand = flexible union {
     1: set_acl_priority VendorSetAclPriorityParams;
 };
@@ -82,11 +53,6 @@ type VendorCommand = flexible union {
 /// The BtVendor protocol may be implemented by vendor drivers to support feature interrogation
 /// and vendor command encoding.
 open protocol Vendor {
-    /// Returns bitmask of the features the vendor supports.
-    flexible GetFeatures() -> (struct {
-        features BtVendorFeatures;
-    });
-
     /// Transmits the Vendor Features supported by this controller.
     /// Shall be sent after the protocol is opened.
     flexible -> OnFeatures(VendorFeatures);
@@ -98,14 +64,10 @@ open protocol Vendor {
         encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
     }) error zx.Status;
 
-    /// Encodes the vendor HCI command `command` using `params` and returns the encoded command as
-    /// a buffer. `params` must contain the parameter struct for the specified command, as
-    /// documented in `BtVendorCommand`.
-    /// Returns an error status if the command is not supported or the paramaters are invalid.
-    flexible EncodeCommand(struct {
-        command BtVendorCommand;
-    }) -> (struct {
-        @buffer
+    /// Encode the vendor HCI command and return the encoded command.
+    /// See `VendorCommand` for possible commands and parameters.
+    /// Returns an error status if the command is not supported or paramaters cannot be encoded.
+    flexible EncodeCommand(VendorCommand) -> (struct {
         encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
     }) error zx.Status;
 

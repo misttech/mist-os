@@ -365,10 +365,10 @@ void FidlController::EncodeVendorCommand(
 
   auto command = fhbt::VendorCommand::WithSetAclPriority(priority_params);
 
-  vendor_->NewEncodeCommand(std::move(command))
+  vendor_->EncodeCommand(std::move(command))
       .ThenExactlyOnce(
           [cb = std::move(callback)](
-              fidl::Result<fuchsia_hardware_bluetooth::Vendor::NewEncodeCommand>& result) mutable {
+              fidl::Result<fuchsia_hardware_bluetooth::Vendor::EncodeCommand>& result) mutable {
             if (!result.is_ok()) {
               bt_log(ERROR, "controllers", "Failed to encode vendor command: %s",
                      result.error_value().FormatDescription().c_str());

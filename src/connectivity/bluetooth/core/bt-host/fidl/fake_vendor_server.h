@@ -37,8 +37,8 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
   void set_open_hci_error(bool val) { open_hci_error_ = val; }
 
  private:
-  void NewEncodeCommand(NewEncodeCommandRequest& request,
-                        NewEncodeCommandCompleter::Sync& completer) override {
+  void EncodeCommand(EncodeCommandRequest& request,
+                     EncodeCommandCompleter::Sync& completer) override {
     BT_ASSERT(request.set_acl_priority()->priority().has_value());
     BT_ASSERT(request.set_acl_priority()->direction().has_value());
     std::vector<uint8_t> tmp{static_cast<unsigned char>(
@@ -67,9 +67,8 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
   }
 
   // Deprecating interfaces.
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {}
-  void EncodeCommand(EncodeCommandRequest& request,
-                     EncodeCommandCompleter::Sync& completer) override {}
+  void NewEncodeCommand(NewEncodeCommandRequest& request,
+                        NewEncodeCommandCompleter::Sync& completer) override {}
 
   void InitializeWait(async::WaitBase& wait, zx::channel& channel) {
     BT_ASSERT(channel.is_valid());

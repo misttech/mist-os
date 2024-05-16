@@ -256,8 +256,8 @@ void EmulatorDevice::WatchLegacyAdvertisingStates(
   MaybeUpdateLegacyAdvertisingStates();
 }
 
-void EmulatorDevice::NewEncodeCommand(NewEncodeCommandRequestView request,
-                                      NewEncodeCommandCompleter::Sync& completer) {
+void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
+                                   EncodeCommandCompleter::Sync& completer) {
   uint8_t data_buffer[bt_hci_broadcom::kBcmSetAclPriorityCmdSize];
   switch (request->Which()) {
     case fuchsia_hardware_bluetooth::wire::VendorCommand::Tag::kSetAclPriority: {

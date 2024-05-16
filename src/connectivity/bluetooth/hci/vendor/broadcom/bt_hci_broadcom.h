@@ -45,13 +45,17 @@ class BtHciBroadcom final
   static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
 
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
-  void NewEncodeCommand(NewEncodeCommandRequestView request,
-                        NewEncodeCommandCompleter::Sync& completer) override;
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // Deprecating interfaces.
+  void NewEncodeCommand(NewEncodeCommandRequestView request,
+                        NewEncodeCommandCompleter::Sync& completer) override {}
 
   // fuchsia_hardware_bluetooth::Hci protocol interface implementations.
   void OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -70,11 +74,6 @@ class BtHciBroadcom final
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
-
-  // Deprecating interfaces.
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {}
-  void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override {}
 
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
   // Truly private, internal helper methods:

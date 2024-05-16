@@ -441,8 +441,8 @@ void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pend
   }
 }
 
-void LoopbackDevice::NewEncodeCommand(NewEncodeCommandRequestView request,
-                                      NewEncodeCommandCompleter::Sync& completer) {
+void LoopbackDevice::EncodeCommand(EncodeCommandRequestView request,
+                                   EncodeCommandCompleter::Sync& completer) {
   // This interface is not implemented.
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }

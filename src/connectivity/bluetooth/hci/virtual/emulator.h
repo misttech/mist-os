@@ -76,17 +76,16 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
       WatchLegacyAdvertisingStatesCompleter::Sync& completer) override;
 
   // fuchsia_hardware_bluetooth::Vendor overrides:
-  void NewEncodeCommand(NewEncodeCommandRequestView request,
-                        NewEncodeCommandCompleter::Sync& completer) override;
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Deprecating interfaces.
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {}
-  void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override {}
+  void NewEncodeCommand(NewEncodeCommandRequestView request,
+                        NewEncodeCommandCompleter::Sync& completer) override {}
 
   // fuchsia_hardware_bluetooth::Hci overrides:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -116,7 +115,7 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   // child of EmulatorDevice device node
   zx_status_t AddHciDeviceChildNode();
 
-  // Helper function for fuchsia.hardware.bluetooth.Vendor.NewEncodeCommand
+  // Helper function for fuchsia.hardware.bluetooth.Vendor.EncodeCommand
   void EncodeSetAclPriorityCommand(
       fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer);
 
