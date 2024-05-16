@@ -38,6 +38,27 @@ use {
     vfs::execution_scope::ExecutionScope,
 };
 
+pub fn build_program_output_dictionary(
+    component: &Arc<ComponentInstance>,
+    children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    decl: &cm_rust::ComponentDecl,
+    component_input: &ComponentInput,
+    program_output_dict: &Dict,
+    declared_dictionaries: &Dict,
+) {
+    for capability in &decl.capabilities {
+        extend_dict_with_capability(
+            component,
+            children,
+            decl,
+            capability,
+            component_input,
+            program_output_dict,
+            &declared_dictionaries,
+        );
+    }
+}
+
 /// Once a component has been resolved and its manifest becomes known, this function produces the
 /// various dicts the component needs based on the contents of its manifest.
 pub fn build_component_sandbox(
@@ -51,9 +72,8 @@ pub fn build_component_sandbox(
     child_inputs: &mut StructuredDictMap<ComponentInput>,
     collection_inputs: &mut StructuredDictMap<ComponentInput>,
     environments: &mut StructuredDictMap<ComponentEnvironment>,
+    mut declared_dictionaries: Dict,
 ) {
-    let mut declared_dictionaries = Dict::new();
-
     for environment_decl in &decl.environments {
         environments
             .insert(
@@ -90,18 +110,6 @@ pub fn build_component_sandbox(
         }
         let input = ComponentInput::new(environment);
         collection_inputs.insert(collection.name.clone(), input).ok();
-    }
-
-    for capability in &decl.capabilities {
-        extend_dict_with_capability(
-            component,
-            children,
-            decl,
-            capability,
-            component_input,
-            program_output_dict,
-            &declared_dictionaries,
-        );
     }
 
     for use_ in &decl.uses {

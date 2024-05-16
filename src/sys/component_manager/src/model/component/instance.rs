@@ -6,7 +6,10 @@ use {
     crate::{
         bedrock::{
             program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-            sandbox_construction::{self, build_component_sandbox, extend_dict_with_offers},
+            sandbox_construction::{
+                self, build_component_sandbox, build_program_output_dictionary,
+                extend_dict_with_offers,
+            },
         },
         framework::controller,
         model::{
@@ -467,6 +470,15 @@ impl ResolvedInstanceState {
         };
         state.add_static_children(component).await?;
 
+        let declared_dictionaries = Dict::new();
+        build_program_output_dictionary(
+            component,
+            &state.children,
+            &decl,
+            &state.component_input,
+            &state.program_output_dict,
+            &declared_dictionaries,
+        );
         let mut child_inputs = Default::default();
         build_component_sandbox(
             component,
@@ -479,6 +491,7 @@ impl ResolvedInstanceState {
             &mut child_inputs,
             &mut state.collection_inputs,
             &mut state.bedrock_environments,
+            declared_dictionaries,
         );
         state.discover_static_children(child_inputs).await;
         Ok(state)
