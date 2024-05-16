@@ -33,6 +33,10 @@
 
 class ProcessDispatcher;
 
+#if _KERNEL_MISTOS
+class TaskDispatcher;
+#endif
+
 class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAULT_THREAD_RIGHTS>,
                                public fbl::DoublyLinkedListable<ThreadDispatcher*> {
  public:
@@ -297,6 +301,14 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
     return CoreThreadObservation{core_thread_, &core_thread_lock_.lock()};
   }
 
+#if _KERNEL_MISTOS
+  // Set Starnix Task in current thread
+  void SetTask(fbl::RefPtr<TaskDispatcher> task);
+
+  // Get tarnix Task in current thread
+  const fbl::RefPtr<TaskDispatcher> task() const;
+#endif
+
  private:
   ThreadDispatcher(fbl::RefPtr<ProcessDispatcher> process, uint32_t flags);
   ThreadDispatcher(const ThreadDispatcher&) = delete;
@@ -423,6 +435,13 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   // through to clean up after a session as when a new session is created, the koid recorded in
   // `sampler_id_` will no longer match.
   uint64_t sampler_id_ TA_GUARDED(get_lock()){0};
+
+#if _KERNEL_MISTOS
+  // The Starnix Task used to get CurrentTask in starnix syscalls.
+  //
+  // It is inject before the Process::Start call.
+  fbl::RefPtr<TaskDispatcher> task_;
+#endif
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_THREAD_DISPATCHER_H_

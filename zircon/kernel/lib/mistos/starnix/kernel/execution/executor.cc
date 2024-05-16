@@ -1,4 +1,5 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -12,9 +13,11 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/task_wrapper.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
 #include <lib/mistos/zx/job.h>
 #include <lib/mistos/zx/process.h>
 #include <lib/mistos/zx/thread.h>
+#include <lib/mistos/zx_syscalls/util.h>
 #include <trace.h>
 #include <zircon/types.h>
 
@@ -24,6 +27,8 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
+#include <object/dispatcher.h>
+#include <object/process_dispatcher.h>
 
 #include "../kernel_priv.h"
 
@@ -91,18 +96,35 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
   // Start the process going.
   auto& thread = current_task->thread();
   if (thread.has_value()) {
-    fbl::AllocChecker ac;
-    // Set the task wrapper reference this will be used in syscalls
-    // thread->get()->task_wrapper() =
-    //    fbl::MakeRefCountedChecked<TaskWrapper>(&ac, current_task.task());
-    // if (!ac.check()) {
-    //  return fit::error(ZX_ERR_NO_MEMORY);
-    //}
-
     auto& process = current_task->thread_group()->process();
+
+    ProcessDispatcher* up = nullptr;
+    bool is_user_thread = ThreadDispatcher::GetCurrent() != nullptr;
+    if (is_user_thread) {
+      up = ProcessDispatcher::GetCurrent();
+    }
+
+    fbl::RefPtr<ThreadDispatcher> thread_dispatcher;
     zx_status_t status =
-        process.start(thread.value(), current_task.thread_state().registers.real_registers.rip,
-                      current_task.thread_state().registers.real_registers.rsp, {}, 0);
+        handle_table(up).GetDispatcher(*up, thread.value().get(), &thread_dispatcher);
+    if (status != ZX_OK) {
+      TRACEF("failed to find current thread dispatcher %d\n", status);
+      return fit::error(status);
+    }
+    ASSERT(thread_dispatcher);
+
+    // Make task handle
+    KernelHandle<TaskDispatcher> task_handle;
+    zx_rights_t task_rights;
+    status = TaskDispatcher::Create(current_task.task(), &task_handle, &task_rights);
+    if (status != ZX_OK) {
+      TRACEF("failed to create task dispatcher %d\n", status);
+      return fit::error(status);
+    }
+    thread_dispatcher->SetTask(task_handle.release());
+
+    status = process.start(thread.value(), current_task.thread_state().registers.real_registers.rip,
+                           current_task.thread_state().registers.real_registers.rsp, {}, 0);
     if (status != ZX_OK) {
       TRACEF("failed to start process %d\n", status);
       return fit::error(status);

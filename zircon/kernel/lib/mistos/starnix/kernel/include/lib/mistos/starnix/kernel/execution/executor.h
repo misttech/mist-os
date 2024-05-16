@@ -23,7 +23,16 @@ fit::result<zx_status_t, TaskInfo> create_zircon_process(
     fbl::RefPtr<Kernel> kernel, std::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t pid,
     fbl::RefPtr<ProcessGroup> process_group, const fbl::String& name);
 
-// NOTE: We keep the name from Rust/Starnix but it is not creating a shared process now.
+/// NOTE: We keep the name from Rust/Starnix but it is not creating a shared process now.
+/// Creates a process that shares half its address space with this process.
+///
+/// The created process will also share its handle table and futex context with `self`.
+///
+/// Returns the created process and a handle to the created process' restricted address space.
+///
+/// Wraps the
+/// [zx_process_create_shared](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create_shared.md)
+/// syscall.
 fit::result<zx_status_t, std::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
                                                                          const fbl::String& name);
 

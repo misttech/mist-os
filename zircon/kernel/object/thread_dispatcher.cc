@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/counters.h>
+#if _KERNEL_MISTOS
+#include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
+#endif
 #include <platform.h>
 #include <string.h>
 #include <trace.h>
@@ -912,3 +915,16 @@ zx_koid_t ThreadDispatcher::get_related_koid() const {
 
   return process_->get_koid();
 }
+
+#if _KERNEL_MISTOS
+void ThreadDispatcher::SetTask(fbl::RefPtr<TaskDispatcher> task) {
+  canary_.Assert();
+  ASSERT(!task_);
+  task_ = ktl::move(task);
+}
+
+const fbl::RefPtr<TaskDispatcher> ThreadDispatcher::task() const {
+  ASSERT(task_);
+  return task_;
+}
+#endif
