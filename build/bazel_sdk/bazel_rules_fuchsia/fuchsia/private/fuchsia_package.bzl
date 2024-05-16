@@ -11,6 +11,7 @@ load(
     ":fuchsia_debug_symbols.bzl",
     "FUCHSIA_DEBUG_SYMBOLS_ATTRS",
     "collect_debug_symbols",
+    "find_and_process_unstripped_binaries",
     "get_build_id_dirs",
     "strip_resources",
 )
@@ -18,6 +19,7 @@ load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
+    "FuchsiaDebugSymbolInfo",
     "FuchsiaDriverToolInfo",
     "FuchsiaPackageInfo",
     "FuchsiaPackageResourcesInfo",
@@ -111,10 +113,17 @@ def fuchsia_package(
     if _FUCHSIA_OS_PLATFORM not in target_compat:
         target_compat.append(_FUCHSIA_OS_PLATFORM)
 
+    processed_binaries = "%s_fuchsia_package.elf_binaries" % name
+    find_and_process_unstripped_binaries(
+        name = processed_binaries,
+        deps = components + resources + tools,
+    )
+
     _build_fuchsia_package(
         name = "%s_fuchsia_package" % name,
         components = components,
         resources = resources,
+        processed_binaries = processed_binaries,
         tools = tools,
         subpackages = subpackages,
         subpackages_to_flatten = subpackages_to_flatten,
@@ -162,11 +171,19 @@ def _fuchsia_test_package(
     if _FUCHSIA_OS_PLATFORM not in target_compat:
         target_compat.append(_FUCHSIA_OS_PLATFORM)
 
+    processed_binaries = "%s_fuchsia_package.elf_binaries" % name
+    find_and_process_unstripped_binaries(
+        name = processed_binaries,
+        deps = _components + resources + _test_component_mapping.values(),
+        testonly = True,
+    )
+
     _build_fuchsia_package_test(
         name = "%s_fuchsia_package" % name,
         test_components = _test_component_mapping.values(),
         components = _components,
         resources = resources,
+        processed_binaries = processed_binaries,
         subpackages = subpackages,
         subpackages_to_flatten = subpackages_to_flatten,
         package_name = package_name or name,
@@ -319,8 +336,6 @@ def _build_fuchsia_package_impl(ctx):
                 ),
             )
             resources_to_strip.extend([r for r in component_info.resources])
-        elif FuchsiaDriverToolInfo in dep:
-            resources_to_strip.extend(dep[FuchsiaDriverToolInfo].resources)
         elif FuchsiaPackageResourcesInfo in dep:
             # Don't strip debug symbols from resources.
             package_resources.extend(dep[FuchsiaPackageResourcesInfo].resources)
@@ -335,6 +350,9 @@ def _build_fuchsia_package_impl(ctx):
     # Grab all of our stripped resources
     stripped_resources, _debug_info = strip_resources(ctx, resources_to_strip, build_id_path = build_id_path)
     package_resources.extend(stripped_resources)
+
+    # Add the resources for stripped ELF binaries.
+    package_resources.extend(ctx.attr.processed_binaries[FuchsiaPackageResourcesInfo].resources)
 
     # Write our package_manifest file. If we have subpackage to flatten, we will
     # parse the subpackages contents, and append them into package manifest of
@@ -505,6 +523,7 @@ def _build_fuchsia_package_impl(ctx):
             ctx.attr.test_components,
             ctx.attr.components,
             ctx.attr.resources,
+            ctx.attr.processed_binaries,
             ctx.attr.tools,
             ctx.attr._fuchsia_sdk_debug_symbols,
         ),
@@ -543,6 +562,10 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "resources": attr.label_list(
             doc = "The list of resources included in this package",
             providers = [FuchsiaPackageResourcesInfo],
+        ),
+        "processed_binaries": attr.label(
+            doc = "Label to a find_and_process_unstripped_binaries() target for this package.",
+            providers = [FuchsiaPackageResourcesInfo, FuchsiaDebugSymbolInfo],
         ),
         "tools": attr.label_list(
             doc = "The list of tools included in this package",

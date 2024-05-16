@@ -10,7 +10,7 @@ load(":providers.bzl", "FuchsiaDriverToolInfo", "FuchsiaPackageInfo")
 def _fuchsia_task_run_driver_tool_impl(ctx, make_ffx_task):
     repo = ctx.attr.repository
     package = ctx.attr.package[FuchsiaPackageInfo].package_name
-    tool_binary = ctx.attr.tool[FuchsiaDriverToolInfo].binary.dest
+    tool_binary = ctx.attr.tool[FuchsiaDriverToolInfo].tool_path
     url = "fuchsia-pkg://%s/%s#%s" % (repo, package, tool_binary)
     return make_ffx_task(prepend_args = [
         "driver",
