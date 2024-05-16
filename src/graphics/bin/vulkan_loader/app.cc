@@ -51,6 +51,8 @@ LoaderApp::LoaderApp(component::OutgoingDirectory* outgoing_dir, async_dispatche
   allow_magma_icds_ = structured_config.allow_magma_icds();
   allow_goldfish_icd_ = structured_config.allow_goldfish_icd();
   allow_lavapipe_icd_ = structured_config.allow_lavapipe_icd();
+  lavapipe_icd_url_ = structured_config.lavapipe_icd_url();
+
   structured_config.RecordInspect(&config_node_);
 }
 LoaderApp::~LoaderApp() = default;
@@ -163,7 +165,7 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   }
 
   if (allow_lavapipe_icd_) {
-    auto device = LavapipeDevice::Create(this, "0", &devices_node_);
+    auto device = LavapipeDevice::Create(this, "0", &devices_node_, lavapipe_icd_url_);
     if (device) {
       devices_.emplace_back(std::move(device));
     }
