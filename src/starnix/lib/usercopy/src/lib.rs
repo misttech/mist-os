@@ -4,7 +4,6 @@
 
 use std::{mem::MaybeUninit, ops::Range};
 
-use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
@@ -28,6 +27,12 @@ extern "C" {
         ret_dest: bool,
     ) -> usize;
     fn hermetic_copy_until_null_byte_end();
+
+    // This function performs a `memset` to 0.
+    //
+    // Returns the last accessed destination address.
+    fn hermetic_zero(dest: *mut u8, len: usize) -> usize;
+    fn hermetic_zero_end();
 
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
@@ -118,12 +123,8 @@ pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
 
 type HermeticCopyFn =
     unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
-type HermeticZeroFn = unsafe extern "C" fn(dest: *mut u8, len: usize) -> usize;
 
 pub struct Usercopy {
-    // Pointer to the hermetic_zero routine loaded into memory.
-    hermetic_zero_fn: HermeticZeroFn,
-
     // This is an event used to signal the exception handling thread to shut down.
     shutdown_event: zx::Event,
 
@@ -212,21 +213,6 @@ fn set_registers_for_atomic_error(regs: &mut zx::sys::zx_thread_state_general_re
     }
 }
 
-fn get_hermetic_copy_bin(path: &str) -> Result<Range<usize>, zx::Status> {
-    let blob =
-        fdio::open_fd(path, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)?;
-    let exec_vmo = fdio::get_vmo_exec_from_file(&blob)?;
-    let copy_size = exec_vmo.get_size()?;
-    let mapped_addr = fuchsia_runtime::vmar_root_self().map(
-        0,
-        &exec_vmo,
-        0,
-        copy_size as usize,
-        zx::VmarFlags::PERM_READ_IF_XOM_UNSUPPORTED | zx::VmarFlags::PERM_EXECUTE,
-    )?;
-    Ok(mapped_addr..mapped_addr + copy_size as usize)
-}
-
 /// Assumes the buffer's first `initialized_until` bytes are initialized and
 /// returns the initialized and uninitialized portions.
 ///
@@ -295,9 +281,8 @@ impl Usercopy {
             as usize
             ..hermetic_copy_until_null_byte_end as *const () as usize;
 
-        let hermetic_zero_addr_range = get_hermetic_copy_bin("/pkg/hermetic_zero.bin")?;
-        let hermetic_zero_fn: HermeticZeroFn =
-            unsafe { std::mem::transmute(hermetic_zero_addr_range.start) };
+        let hermetic_zero_addr_range =
+            hermetic_zero as *const () as usize..hermetic_zero_end as *const () as usize;
 
         let atomic_load_relaxed_range = atomic_load_u32_relaxed as *const () as usize
             ..atomic_load_u32_relaxed_end as *const () as usize;
@@ -421,12 +406,7 @@ impl Usercopy {
             }
         };
 
-        Ok(Self {
-            hermetic_zero_fn,
-            shutdown_event,
-            join_handle: Some(join_handle),
-            restricted_address_range,
-        })
+        Ok(Self { shutdown_event, join_handle: Some(join_handle), restricted_address_range })
     }
 
     /// Copies bytes from the source address to the destination address.
@@ -458,7 +438,7 @@ impl Usercopy {
             return 0;
         }
 
-        let unset_address = unsafe { (self.hermetic_zero_fn)(dest_addr as *mut u8, count) };
+        let unset_address = unsafe { hermetic_zero(dest_addr as *mut u8, count) };
         debug_assert!(
             unset_address >= dest_addr,
             "unset_address={:#x}, dest_addr={:#x}",

@@ -85,6 +85,7 @@ static_library("usercopy_assembly_routines") {
   arch_dir = "arch/${target_cpu}"
   sources = rebase_path([
                           "hermetic_copy.S",
+                          "hermetic_zero.S",
                           "hermetic_copy_until_null_byte.S",
                           "hermetic_copy_error.S",
                           "atomic_load.S",
@@ -106,8 +107,6 @@ rustc_library("usercopy") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:zerocopy",
