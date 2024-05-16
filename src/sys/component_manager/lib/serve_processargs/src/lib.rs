@@ -160,8 +160,8 @@ fn visit_map(
             None => return Err(DeliveryError::NotInDict(key.to_owned())),
         }
     }
-    if dict.enumerate().count() > 0 {
-        let keys = dict.enumerate().map(|(key, _)| key).collect();
+    let keys: Vec<_> = dict.keys().collect();
+    if !keys.is_empty() {
         return Err(DeliveryError::UnusedCapabilities(keys));
     }
     Ok(())

@@ -9,8 +9,11 @@ using fuchsia.io;
 /// Maximum number of bytes in a [DataCapability].
 const MAX_DATA_LENGTH uint32 = 8192;
 
-/// Maximum number of items returned by [DictionaryIterator].
+/// Maximum number of items returned by [DictionaryItemIterator].
 const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
+
+/// Maximum number of items returned by [DictionaryKeyIterator].
+const MAX_DICTIONARY_KEYS_CHUNK uint32 = 128;
 
 @available(added=HEAD)
 type OneShotHandle = resource struct {
@@ -128,13 +131,20 @@ open protocol Dictionary {
         dictionary client_end:Dictionary;
     });
 
-    /// Enumerates the entries in this dictionary.
+    /// Enumerates the items in this dictionary.
     ///
     /// Creates a clone of each item during enumeration.
     @available(added=HEAD)
     flexible Enumerate(resource struct {
-        contents server_end:DictionaryIterator;
+        iterator server_end:DictionaryItemIterator;
     });
+
+    /// Enumerates the keys in this dictionary.
+    @available(added=HEAD)
+    flexible Keys(resource struct {
+        iterator server_end:DictionaryKeyIterator;
+    });
+
 
     /// Removes all the entries in this dictionary.
     ///
@@ -142,14 +152,21 @@ open protocol Dictionary {
     /// enumerating them.
     @available(added=HEAD)
     flexible Drain(resource struct {
-        contents server_end:<DictionaryIterator, optional>;
+        iterator server_end:<DictionaryItemIterator, optional>;
     });
 };
 
 @available(added=HEAD)
-open protocol DictionaryIterator {
+open protocol DictionaryItemIterator {
     flexible GetNext() -> (resource struct {
         items vector<DictionaryItem>:MAX_DICTIONARY_ITEMS_CHUNK;
+    });
+};
+
+@available(added=HEAD)
+open protocol DictionaryKeyIterator {
+    flexible GetNext() -> (resource struct {
+        keys vector<DictionaryKey>:MAX_DICTIONARY_KEYS_CHUNK;
     });
 };
 

@@ -37,7 +37,7 @@ pub struct Dict {
     #[derivative(Debug = "ignore")]
     not_found: Arc<dyn Fn(&str) -> () + 'static + Send + Sync>,
 
-    /// Tasks that serve [DictionaryIterator]s.
+    /// Tasks that serve dictionary iterators.
     #[derivative(Debug = "ignore")]
     iterator_tasks: fasync::TaskGroup,
 }
@@ -112,6 +112,12 @@ impl Dict {
     /// Returns an iterator over a clone of the entries, sorted by key.
     pub fn enumerate(&self) -> impl Iterator<Item = (Key, Capability)> {
         self.lock_entries().clone().into_iter()
+    }
+
+    /// Returns an iterator over the keys, in sorted order.
+    pub fn keys(&self) -> impl Iterator<Item = Key> {
+        let keys: Vec<_> = self.lock_entries().keys().cloned().collect();
+        keys.into_iter()
     }
 
     /// Removes all entries from the Dict and returns them as an iterator.
@@ -195,19 +201,25 @@ impl Dict {
                     self.shallow_copy().serve_and_register(stream, koid);
                     responder.send(client_end)?;
                 }
-                fsandbox::DictionaryRequest::Enumerate { contents: server_end, .. } => {
+                fsandbox::DictionaryRequest::Enumerate { iterator: server_end, .. } => {
                     let items = self.enumerate().collect();
                     let stream = server_end.into_stream().unwrap();
-                    let task = fasync::Task::spawn(serve_dict_iterator(items, stream));
+                    let task = fasync::Task::spawn(serve_dict_item_iterator(items, stream));
                     self.iterator_tasks.add(task);
                 }
-                fsandbox::DictionaryRequest::Drain { contents: server_end, .. } => {
+                fsandbox::DictionaryRequest::Keys { iterator: server_end, .. } => {
+                    let keys = self.keys().collect();
+                    let stream = server_end.into_stream().unwrap();
+                    let task = fasync::Task::spawn(serve_dict_key_iterator(keys, stream));
+                    self.iterator_tasks.add(task);
+                }
+                fsandbox::DictionaryRequest::Drain { iterator: server_end, .. } => {
                     // Take out entries, replacing with an empty BTreeMap.
                     // They are dropped if the caller does not request an iterator.
                     if let Some(server_end) = server_end {
                         let items = self.drain().collect();
                         let stream = server_end.into_stream().unwrap();
-                        let task = fasync::Task::spawn(serve_dict_iterator(items, stream));
+                        let task = fasync::Task::spawn(serve_dict_item_iterator(items, stream));
                         self.iterator_tasks.add(task);
                     }
                 }
@@ -271,10 +283,9 @@ impl CapabilityTrait for Dict {
     }
 }
 
-/// Serves the `fuchsia.sandbox.DictionaryIterator` protocol, providing items from the given iterator.
-async fn serve_dict_iterator(
+async fn serve_dict_item_iterator(
     items: Vec<(Key, Capability)>,
-    mut stream: fsandbox::DictionaryIteratorRequestStream,
+    mut stream: fsandbox::DictionaryItemIteratorRequestStream,
 ) {
     let mut chunks = items
         .chunks(fsandbox::MAX_DICTIONARY_ITEMS_CHUNK as usize)
@@ -282,9 +293,9 @@ async fn serve_dict_iterator(
         .collect::<Vec<_>>()
         .into_iter();
 
-    while let Some(request) = stream.try_next().await.expect("failed to read request from stream") {
+    while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            fsandbox::DictionaryIteratorRequest::GetNext { responder } => match chunks.next() {
+            fsandbox::DictionaryItemIteratorRequest::GetNext { responder } => match chunks.next() {
                 Some(chunk) => {
                     let items = chunk
                         .into_iter()
@@ -293,20 +304,52 @@ async fn serve_dict_iterator(
                             value: value.into_fidl(),
                         })
                         .collect();
-                    responder.send(items).expect("failed to send response");
+                    if let Err(_) = responder.send(items) {
+                        return;
+                    }
                 }
                 None => {
-                    responder.send(vec![]).expect("failed to send response");
+                    let _ = responder.send(vec![]);
                     return;
                 }
             },
-            fsandbox::DictionaryIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!("Received unknown DictionaryIterator request with ordinal {ordinal}");
+            fsandbox::DictionaryItemIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryItemIterator request");
             }
         }
     }
 }
 
+async fn serve_dict_key_iterator(
+    keys: Vec<Key>,
+    mut stream: fsandbox::DictionaryKeyIteratorRequestStream,
+) {
+    let mut chunks = keys
+        .chunks(fsandbox::MAX_DICTIONARY_KEYS_CHUNK as usize)
+        .map(|chunk: &[Key]| chunk.to_vec())
+        .collect::<Vec<_>>()
+        .into_iter();
+
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            fsandbox::DictionaryKeyIteratorRequest::GetNext { responder } => match chunks.next() {
+                Some(chunk) => {
+                    let keys: Vec<_> = chunk.into_iter().map(|k| k.to_string()).collect();
+                    if let Err(_) = responder.send(&keys) {
+                        return;
+                    }
+                }
+                None => {
+                    let _ = responder.send(&[]);
+                    return;
+                }
+            },
+            fsandbox::DictionaryKeyIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryKeyIterator request");
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489,61 +532,6 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia::test]
-    async fn serve_enumerate() {
-        let mut dict = Dict::new();
-
-        let (dict_proxy, dict_stream) =
-            create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-        let _server = fasync::Task::spawn(async move { dict.serve_dict(dict_stream).await });
-
-        // Create two Data capabilities.
-        let mut data_caps: Vec<_> = (1..3).map(|i| Data::Int64(i)).collect();
-
-        // Add the Data capabilities to the dict.
-        dict_proxy
-            .insert("cap1", data_caps.remove(0).into_fidl())
-            .await
-            .expect("failed to call Insert")
-            .expect("failed to insert");
-        dict_proxy
-            .insert("cap2", data_caps.remove(0).into_fidl())
-            .await
-            .expect("failed to call Insert")
-            .expect("failed to insert");
-
-        // Now read the entries back.
-        let (iterator, server_end) = endpoints::create_proxy().unwrap();
-        dict_proxy.enumerate(server_end).unwrap();
-        let mut items = vec![];
-        loop {
-            let mut next = iterator.get_next().await.unwrap();
-            if next.is_empty() {
-                break;
-            }
-            items.append(&mut next);
-        }
-        assert_eq!(items.len(), 2);
-        assert_matches!(
-            items.remove(0),
-            fsandbox::DictionaryItem {
-                key,
-                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
-            }
-            if key == "cap1"
-            && num == 1
-        );
-        assert_matches!(
-            items.remove(0),
-            fsandbox::DictionaryItem {
-                key,
-                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
-            }
-            if key == "cap2"
-            && num == 2
-        );
-    }
-
     /// Tests that `copy` produces a new Dict with cloned entries.
     #[fuchsia::test]
     async fn copy() -> Result<()> {
@@ -626,9 +614,57 @@ mod tests {
         Ok(())
     }
 
-    /// Tests that `Dict.Enumerate` creates a [DictionaryIterator] that returns entries.
+    /// Tests basic functionality of Enumerate and Keys APIs.
     #[fuchsia::test]
-    async fn enumerate() -> Result<()> {
+    async fn read() {
+        let mut dict = Dict::new();
+
+        let (dict_proxy, dict_stream) =
+            create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
+        let _server = fasync::Task::spawn(async move { dict.serve_dict(dict_stream).await });
+
+        // Create two Data capabilities.
+        let mut data_caps: Vec<_> = (1..3).map(|i| Data::Int64(i)).collect();
+
+        // Add the Data capabilities to the dict.
+        dict_proxy.insert("cap1", data_caps.remove(0).into_fidl()).await.unwrap().unwrap();
+        dict_proxy.insert("cap2", data_caps.remove(0).into_fidl()).await.unwrap().unwrap();
+
+        // Now read the entries back.
+        let (iterator, server_end) = endpoints::create_proxy().unwrap();
+        dict_proxy.enumerate(server_end).unwrap();
+        let mut items = iterator.get_next().await.unwrap();
+        assert!(iterator.get_next().await.unwrap().is_empty());
+        assert_eq!(items.len(), 2);
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictionaryItem {
+                key,
+                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
+            }
+            if key == "cap1"
+            && num == 1
+        );
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictionaryItem {
+                key,
+                value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
+            }
+            if key == "cap2"
+            && num == 2
+        );
+
+        let (iterator, server_end) = endpoints::create_proxy().unwrap();
+        dict_proxy.keys(server_end).unwrap();
+        let keys = iterator.get_next().await.unwrap();
+        assert!(iterator.get_next().await.unwrap().is_empty());
+        assert_eq!(keys, ["cap1", "cap2"]);
+    }
+
+    /// Tests batching for Enumerate and Keys iterators.
+    #[fuchsia::test]
+    async fn read_batches() {
         // Number of entries in the Dict that will be enumerated.
         //
         // This value was chosen such that that GetNext returns multiple chunks of different sizes.
@@ -648,18 +684,21 @@ mod tests {
         let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
 
-        let (iter_proxy, iter_server_end) =
-            create_proxy::<fsandbox::DictionaryIteratorMarker>().unwrap();
-        dict_proxy.enumerate(iter_server_end).expect("failed to call Enumerate");
+        let (item_iterator, server_end) = create_proxy().unwrap();
+        dict_proxy.enumerate(server_end).unwrap();
+        let (key_iterator, server_end) = create_proxy().unwrap();
+        dict_proxy.keys(server_end).unwrap();
 
         // Get all the entries from the Dict with `GetNext`.
         let mut num_got_items: u32 = 0;
         for expected_len in EXPECTED_CHUNK_LENGTHS {
-            let items = iter_proxy.get_next().await.expect("failed to call GetNext");
-            if items.is_empty() {
+            let items = item_iterator.get_next().await.unwrap();
+            let keys = key_iterator.get_next().await.unwrap();
+            if items.is_empty() && keys.is_empty() {
                 break;
             }
             assert_eq!(*expected_len, items.len() as u32);
+            assert_eq!(*expected_len, keys.len() as u32);
             num_got_items += items.len() as u32;
             for item in items {
                 assert_eq!(item.value, Unit::default().into_fidl());
@@ -667,12 +706,10 @@ mod tests {
         }
 
         // GetNext should return no items once all items have been returned.
-        let items = iter_proxy.get_next().await.expect("failed to call GetNext");
-        assert!(items.is_empty());
+        assert!(item_iterator.get_next().await.unwrap().is_empty());
+        assert!(key_iterator.get_next().await.unwrap().is_empty());
 
         assert_eq!(num_got_items, NUM_ENTRIES);
-
-        Ok(())
     }
 
     #[fuchsia::test]
