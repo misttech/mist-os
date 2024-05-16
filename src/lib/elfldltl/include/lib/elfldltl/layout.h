@@ -326,10 +326,15 @@ struct Elf : private Layout<Class, Data> {
           [[likely]];
           break;
         case ElfType::kExec:
+#if _KERNEL_MISTOS
+          [[likely]];
+          break;
+#else
           diagnostics.FormatError(
               "loading ET_EXEC files is not supported, only ET_DYN files;"
               " be sure to compile and link as PIE (-fPIE, -pie)"sv);
           return false;
+#endif
         case ElfType::kRel:
           diagnostics.FormatError("ET_REL files cannot be loaded"sv);
           return false;
