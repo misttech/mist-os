@@ -375,10 +375,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        BC::unwrap_or_notify_with_new_reference_notifier(
-            primary,
-            |Ipv4AddressEntry { addr_sub, state: _ }| addr_sub,
-        )
+        BC::unwrap_or_notify_with_new_reference_notifier(primary, |entry| *entry.addr_sub())
     }
 
     fn get_address_id(
@@ -665,12 +662,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
-        BC::unwrap_or_notify_with_new_reference_notifier(
-            primary,
-            |Ipv6AddressEntry { addr_sub, dad_state: _, state: _ }| {
-                addr_sub.to_witness::<SpecifiedAddr<_>>()
-            },
-        )
+        BC::unwrap_or_notify_with_new_reference_notifier(primary, |entry| {
+            entry.addr_sub().to_witness::<SpecifiedAddr<_>>()
+        })
     }
 
     fn get_address_id(

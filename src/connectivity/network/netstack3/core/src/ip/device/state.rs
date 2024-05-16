@@ -9,14 +9,18 @@ use core::{
     fmt::Debug,
     hash::Hash,
     num::{NonZeroU16, NonZeroU8},
+    ops::{Deref, DerefMut},
     time::Duration,
 };
 
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
-use lock_order::lock::{LockFor, RwLockFor, UnlockedAccess};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
-    ip::{AddrSubnet, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{
+        AddrSubnet, GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersionMarker, Ipv4,
+        Ipv4Addr, Ipv6, Ipv6Addr,
+    },
     SpecifiedAddr,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -34,8 +38,8 @@ use crate::{
             route_discovery::Ipv6RouteDiscoveryState,
             router_solicitation::RsState,
             slaac::{SlaacConfiguration, SlaacState},
-            IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv6DeviceAddr,
-            Ipv6DeviceTimerId, WeakIpAddressId,
+            IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceTimerId,
+            Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
         },
         gmp::{
             igmp::{IgmpGroupState, IgmpState, IgmpTimerId},
@@ -47,8 +51,6 @@ use crate::{
     sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc},
     Instant,
 };
-
-use super::Ipv4DeviceTimerId;
 
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
@@ -205,6 +207,34 @@ pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindi
     pub gmp: GmpState<I, BT>,
 }
 
+/// A container for the default hop limit kept by [`IpDeviceState`].
+///
+/// This type makes the [`OrderedLockAccess`] implementation clearer by
+/// newtyping the `NonZeroU8` value and adding a version marker.
+#[derive(Copy, Clone, Debug)]
+pub struct DefaultHopLimit<I: Ip>(NonZeroU8, IpVersionMarker<I>);
+
+impl<I: Ip> Deref for DefaultHopLimit<I> {
+    type Target = NonZeroU8;
+    fn deref(&self) -> &NonZeroU8 {
+        let Self(value, IpVersionMarker { .. }) = self;
+        value
+    }
+}
+
+impl<I: Ip> DerefMut for DefaultHopLimit<I> {
+    fn deref_mut(&mut self) -> &mut NonZeroU8 {
+        let Self(value, IpVersionMarker { .. }) = self;
+        value
+    }
+}
+
+impl<I: Ip> Default for DefaultHopLimit<I> {
+    fn default() -> Self {
+        Self(DEFAULT_HOP_LIMIT, IpVersionMarker::new())
+    }
+}
+
 /// The state common to all IP devices.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -215,108 +245,69 @@ pub struct IpDeviceState<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> 
     /// Detection).
     ///
     /// Does not contain any duplicates.
-    pub addrs: RwLock<IpDeviceAddresses<I, BT>>,
+    addrs: RwLock<IpDeviceAddresses<I, BT>>,
 
     /// Multicast groups and GMP handling state.
-    pub multicast_groups: RwLock<IpDeviceMulticastGroups<I, BT>>,
+    multicast_groups: RwLock<IpDeviceMulticastGroups<I, BT>>,
 
     /// The default TTL (IPv4) or hop limit (IPv6) for outbound packets sent
     /// over this device.
-    pub default_hop_limit: RwLock<NonZeroU8>,
+    default_hop_limit: RwLock<DefaultHopLimit<I>>,
 
     /// The flags for this device.
-    flags: Mutex<IpDeviceFlags>,
+    flags: Mutex<IpMarked<I, IpDeviceFlags>>,
 }
 
 impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
-    RwLockFor<crate::lock_ordering::IpDeviceAddresses<I>> for DualStackIpDeviceState<BT>
+    OrderedLockAccess<IpDeviceAddresses<I, BT>> for DualStackIpDeviceState<BT>
 {
-    type Data = IpDeviceAddresses<I, BT>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, BT>>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, BT>>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ip_state::<I>().addrs.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ip_state::<I>().addrs.write()
+    type Lock = RwLock<IpDeviceAddresses<I, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ip_state::<I>().addrs)
     }
 }
 
 impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
-    RwLockFor<crate::lock_ordering::IpDeviceGmp<I>> for DualStackIpDeviceState<BT>
+    OrderedLockAccess<IpDeviceMulticastGroups<I, BT>> for DualStackIpDeviceState<BT>
 {
-    type Data = IpDeviceMulticastGroups<I, BT>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceMulticastGroups<I, BT>>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceMulticastGroups<I, BT>>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ip_state::<I>().multicast_groups.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ip_state::<I>().multicast_groups.write()
+    type Lock = RwLock<IpDeviceMulticastGroups<I, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ip_state::<I>().multicast_groups)
     }
 }
 
-impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
-    RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<I>> for DualStackIpDeviceState<BT>
-{
-    type Data = NonZeroU8;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ip_state::<I>().default_hop_limit.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ip_state::<I>().default_hop_limit.write()
-    }
-}
-
-impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
-    LockFor<crate::lock_ordering::IpDeviceFlags<I>> for DualStackIpDeviceState<BT>
-{
-    type Data = IpDeviceFlags;
-    type Guard<'l> = crate::sync::LockGuard<'l, IpDeviceFlags>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.ip_state::<I>().flags.lock()
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceSlaac>
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> OrderedLockAccess<DefaultHopLimit<I>>
     for DualStackIpDeviceState<BT>
 {
-    type Data = SlaacState<BT>;
-    type Guard<'l> = crate::sync::LockGuard<'l, SlaacState<BT>>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.ipv6.slaac_state.lock()
+    type Lock = RwLock<DefaultHopLimit<I>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ip_state::<I>().default_hop_limit)
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::RoutingMetric>
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes>
+    OrderedLockAccess<IpMarked<I, IpDeviceFlags>> for DualStackIpDeviceState<BT>
+{
+    type Lock = Mutex<IpMarked<I, IpDeviceFlags>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ip_state::<I>().flags)
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<SlaacState<BT>>
     for DualStackIpDeviceState<BT>
 {
-    type Data = RawMetric;
+    type Lock = Mutex<SlaacState<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ipv6.slaac_state)
+    }
+}
 
-    type Guard<'l> = &'l RawMetric
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.metric
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> IpDeviceState<I, BT> {
+    /// A direct accessor to `IpDeviceAddresses` available in tests.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn addrs(&self) -> &RwLock<IpDeviceAddresses<I, BT>> {
+        &self.addrs
     }
 }
 
@@ -332,7 +323,7 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
                 gmp_proto: I::new_gmp_state::<_, CC, _>(bindings_ctx, device_id.clone()),
                 gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
             }),
-            default_hop_limit: RwLock::new(DEFAULT_HOP_LIMIT),
+            default_hop_limit: Default::default(),
             flags: Default::default(),
         }
     }
@@ -409,25 +400,16 @@ impl<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Iterator
 
 /// The state common to all IPv4 devices.
 pub struct Ipv4DeviceState<BT: IpDeviceStateBindingsTypes> {
-    pub(crate) ip_state: IpDeviceState<Ipv4, BT>,
-    pub(super) config: RwLock<Ipv4DeviceConfiguration>,
+    ip_state: IpDeviceState<Ipv4, BT>,
+    config: RwLock<Ipv4DeviceConfiguration>,
 }
 
-impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv4DeviceConfiguration>
     for DualStackIpDeviceState<BT>
 {
-    type Data = Ipv4DeviceConfiguration;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceConfiguration>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4DeviceConfiguration>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ipv4.config.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ipv4.config.write()
+    type Lock = RwLock<Ipv4DeviceConfiguration>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ipv4.config)
     }
 }
 
@@ -624,63 +606,37 @@ impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv6DeviceLearnedParams>
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6NetworkLearnedParameters>
     for DualStackIpDeviceState<BT>
 {
-    type Data = Ipv6NetworkLearnedParameters;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6NetworkLearnedParameters>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6NetworkLearnedParameters>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ipv6.learned_params.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ipv6.learned_params.write()
+    type Lock = RwLock<Ipv6NetworkLearnedParameters>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ipv6.learned_params)
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6RouteDiscoveryState<BT>>
     for DualStackIpDeviceState<BT>
 {
-    type Data = Ipv6RouteDiscoveryState<BT>;
-    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState<BT>>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.ipv6.route_discovery.lock()
+    type Lock = Mutex<Ipv6RouteDiscoveryState<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ipv6.route_discovery)
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
-    for DualStackIpDeviceState<BT>
-{
-    type Data = RsState<BT>;
-    type Guard<'l> = crate::sync::LockGuard<'l, RsState<BT>>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.ipv6.router_solicitations.lock()
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<RsState<BT>> for DualStackIpDeviceState<BT> {
+    type Lock = Mutex<RsState<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ipv6.router_solicitations)
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6DeviceConfiguration>
     for DualStackIpDeviceState<BT>
 {
-    type Data = Ipv6DeviceConfiguration;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceConfiguration>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6DeviceConfiguration>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.ipv6.config.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.ipv6.config.write()
+    type Lock = RwLock<Ipv6DeviceConfiguration>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.ipv6.config)
     }
 }
 
@@ -706,12 +662,12 @@ impl Ipv6NetworkLearnedParameters {
 
 /// The state common to all IPv6 devices.
 pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
-    pub(super) learned_params: RwLock<Ipv6NetworkLearnedParameters>,
-    pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState<BT>>,
-    pub(super) router_solicitations: Mutex<RsState<BT>>,
-    pub(crate) ip_state: IpDeviceState<Ipv6, BT>,
-    pub(crate) config: RwLock<Ipv6DeviceConfiguration>,
-    pub(crate) slaac_state: Mutex<SlaacState<BT>>,
+    learned_params: RwLock<Ipv6NetworkLearnedParameters>,
+    route_discovery: Mutex<Ipv6RouteDiscoveryState<BT>>,
+    router_solicitations: Mutex<RsState<BT>>,
+    ip_state: IpDeviceState<Ipv6, BT>,
+    config: RwLock<Ipv6DeviceConfiguration>,
+    slaac_state: Mutex<SlaacState<BT>>,
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
@@ -771,13 +727,13 @@ impl<BT> IpDeviceStateBindingsTypes for BT where
 /// IPv4 and IPv6 state combined.
 pub(crate) struct DualStackIpDeviceState<BT: IpDeviceStateBindingsTypes> {
     /// IPv4 state.
-    pub ipv4: Ipv4DeviceState<BT>,
+    ipv4: Ipv4DeviceState<BT>,
 
     /// IPv6 state.
-    pub ipv6: Ipv6DeviceState<BT>,
+    ipv6: Ipv6DeviceState<BT>,
 
     /// The device's routing metric.
-    pub metric: RawMetric,
+    metric: RawMetric,
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
@@ -807,6 +763,11 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
 }
 
 impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
+    /// Returns the [`RawMetric`] for this device.
+    pub fn metric(&self) -> &RawMetric {
+        &self.metric
+    }
+
     pub(crate) fn ip_state<I: IpDeviceStateIpExt>(&self) -> &IpDeviceState<I, BT> {
         I::map_ip(
             IpInvariant(self),
@@ -886,8 +847,8 @@ impl<I> Default for Ipv4AddrConfig<I> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Ipv4AddressEntry<BT: IpDeviceStateBindingsTypes> {
-    pub(crate) addr_sub: AddrSubnet<Ipv4Addr>,
-    pub(crate) state: RwLock<Ipv4AddressState<BT::Instant>>,
+    addr_sub: AddrSubnet<Ipv4Addr>,
+    state: RwLock<Ipv4AddressState<BT::Instant>>,
 }
 
 impl<BT: IpDeviceStateBindingsTypes> Ipv4AddressEntry<BT> {
@@ -904,21 +865,12 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv4AddressEntry<BT> {
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv4DeviceAddressState>
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv4AddressState<BT::Instant>>
     for Ipv4AddressEntry<BT>
 {
-    type Data = Ipv4AddressState<BT::Instant>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv4AddressState<BT::Instant>>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4AddressState<BT::Instant>>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.write()
+    type Lock = RwLock<Ipv4AddressState<BT::Instant>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.state)
     }
 }
 
@@ -1061,9 +1013,9 @@ impl<Instant: crate::Instant> Inspectable for Ipv6AddressState<Instant> {
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
 pub struct Ipv6AddressEntry<BT: IpDeviceStateBindingsTypes> {
-    pub(crate) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    pub(crate) dad_state: Mutex<Ipv6DadState<BT>>,
-    pub(crate) state: RwLock<Ipv6AddressState<BT::Instant>>,
+    addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
+    dad_state: Mutex<Ipv6DadState<BT>>,
+    state: RwLock<Ipv6AddressState<BT::Instant>>,
 }
 
 impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
@@ -1092,33 +1044,19 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> LockFor<crate::lock_ordering::Ipv6DeviceAddressDad>
-    for Ipv6AddressEntry<BT>
-{
-    type Data = Ipv6DadState<BT>;
-    type Guard<'l> = crate::sync::LockGuard<'l, Ipv6DadState<BT>>
-        where
-            Self: 'l;
-    fn lock(&self) -> Self::Guard<'_> {
-        self.dad_state.lock()
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6DadState<BT>> for Ipv6AddressEntry<BT> {
+    type Lock = Mutex<Ipv6DadState<BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.dad_state)
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState>
+impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv6AddressState<BT::Instant>>
     for Ipv6AddressEntry<BT>
 {
-    type Data = Ipv6AddressState<BT::Instant>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Ipv6AddressState<BT::Instant>>
-        where
-            Self: 'l;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6AddressState<BT::Instant>>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.write()
+    type Lock = RwLock<Ipv6AddressState<BT::Instant>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.state)
     }
 }
 

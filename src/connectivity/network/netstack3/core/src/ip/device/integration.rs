@@ -14,12 +14,12 @@ use core::{
 };
 
 use lock_order::{
-    lock::{LockFor, UnlockedAccess},
+    lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
     relation::LockBefore,
     wrap::prelude::*,
 };
 use net_types::{
-    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
+    ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{EmptyBuf, Serializer};
@@ -57,14 +57,16 @@ use crate::{
                 SlaacContext, SlaacCounters, SlaacState,
             },
             state::{
-                DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, Ipv4AddressEntry,
-                Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags,
-                Ipv6AddressState, Ipv6DeviceConfiguration, SlaacConfig,
+                DefaultHopLimit, DualStackIpDeviceState, IpDeviceAddresses, IpDeviceConfiguration,
+                IpDeviceFlags, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
+                Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+                Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
+                Ipv6DeviceConfiguration, SlaacConfig,
             },
             AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
             IpAddressState, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceEvent, IpDeviceIpExt,
-            IpDeviceStateContext, IpDeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceTimerId,
+            IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv6DeviceAddr,
+            Ipv6DeviceTimerId,
         },
         gmp::{
             self,
@@ -73,7 +75,7 @@ use crate::{
             GmpHandler, GmpQueryHandler, GmpStateRef, MulticastGroupSet,
         },
         socket::ipv6_source_address_selection::SasCandidate,
-        types::AddableMetric,
+        types::{AddableMetric, RawMetric},
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
@@ -152,7 +154,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             let (addrs, mut locked) =
                 state.read_lock_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
             addrs.iter().for_each(|entry| {
-                let addr_sub = entry.addr_sub;
+                let addr_sub = *entry.addr_sub();
                 let mut locked = locked.adopt(&**entry);
                 let mut state = locked
                     .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| {
@@ -204,7 +206,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             config,
         )
         .map(|entry| {
-            let addr_sub = entry.addr_sub;
+            let addr_sub = entry.addr_sub();
             let mut locked = core_ctx.core_ctx.adopt(entry.deref());
             let mut state = locked
                 .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
@@ -630,8 +632,6 @@ where
     >: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
         + GmpHandler<I, BC>
         + NudIpHandler<I, BC>,
-    DualStackIpDeviceState<BC>:
-        LockFor<crate::lock_ordering::IpDeviceFlags<I>, Data = IpDeviceFlags>,
     crate::lock_ordering::IpDeviceConfiguration<I>:
         LockBefore<crate::lock_ordering::IpDeviceFlags<I>>,
 {
@@ -1527,4 +1527,91 @@ impl<I: IpDeviceIpExt, BT: BindingsTypes, L>
     ) -> BT::DispatchId {
         dispatch_id.into()
     }
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceAddresses<I>
+{
+    type Data = IpDeviceAddresses<I, BT>;
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceGmp<I>
+{
+    type Data = IpDeviceMulticastGroups<I, BT>;
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceDefaultHopLimit<I>
+{
+    type Data = DefaultHopLimit<I>;
+}
+
+impl<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceFlags<I>
+{
+    type Data = IpMarked<I, IpDeviceFlags>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceSlaac
+{
+    type Data = SlaacState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> UnlockedAccessMarkerFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::RoutingMetric
+{
+    type Data = RawMetric;
+    fn unlocked_access(t: &DualStackIpDeviceState<BT>) -> &Self::Data {
+        t.metric()
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceConfiguration<Ipv4>
+{
+    type Data = Ipv4DeviceConfiguration;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceLearnedParams
+{
+    type Data = Ipv6NetworkLearnedParameters;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceRouteDiscovery
+{
+    type Data = Ipv6RouteDiscoveryState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::Ipv6DeviceRouterSolicitations
+{
+    type Data = RsState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
+    for crate::lock_ordering::IpDeviceConfiguration<Ipv6>
+{
+    type Data = Ipv6DeviceConfiguration;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv4AddressEntry<BT>>
+    for crate::lock_ordering::Ipv4DeviceAddressState
+{
+    type Data = Ipv4AddressState<BT::Instant>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
+    for crate::lock_ordering::Ipv6DeviceAddressDad
+{
+    type Data = Ipv6DadState<BT>;
+}
+
+impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
+    for crate::lock_ordering::Ipv6DeviceAddressState
+{
+    type Data = Ipv6AddressState<BT::Instant>;
 }

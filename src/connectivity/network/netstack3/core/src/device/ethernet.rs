@@ -2113,9 +2113,8 @@ mod tests {
         assert_eq!(
             eth_device
                 .ip
-                .ipv6
-                .ip_state
-                .addrs
+                .ip_state::<Ipv6>()
+                .addrs()
                 .read()
                 .iter()
                 .map(|entry| entry.addr_sub().addr().get())
@@ -2132,9 +2131,8 @@ mod tests {
         // Assert that the new address got added.
         let addr_subs: Vec<_> = eth_device
             .ip
-            .ipv6
-            .ip_state
-            .addrs
+            .ip_state::<Ipv6>()
+            .addrs()
             .read()
             .iter()
             .map(|entry| entry.addr_sub().addr().into())
