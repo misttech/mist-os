@@ -317,9 +317,9 @@ CallFromDestructor<Callable>::CallFromDestructor(CallFromDestructor&& rhs)
 
 template <typename Callable>
 CallFromDestructor<Callable>& CallFromDestructor<Callable>::operator=(CallFromDestructor&& rhs) {
-  callback_ = std::move(callback_);
+  callback_ = std::move(rhs.callback_);
   moved_from_ = false;
-  rhs.moved_from = true;
+  rhs.moved_from_ = true;
   return *this;
 }
 
