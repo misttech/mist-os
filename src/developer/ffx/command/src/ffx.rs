@@ -215,9 +215,9 @@ pub struct Ffx {
     /// apply operations across single or multiple targets
     pub target: Option<String>,
 
-    #[argh(option, short = 'T')]
+    #[argh(option)]
     #[ffx_config_default(key = "proxy.timeout_secs", default = "1.0")]
-    /// override default proxy timeout
+    /// override default proxy timeout (default is 1 second)
     pub timeout: Option<f64>,
 
     #[argh(option, short = 'l', long = "log-level")]

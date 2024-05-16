@@ -99,8 +99,8 @@
       },
       "optionality": "optional",
       "long": "--timeout",
-      "short": "T",
-      "description": "override default proxy timeout",
+      "short": null,
+      "description": "override default proxy timeout (default is 1 second)",
       "hidden": false
     },
     {
