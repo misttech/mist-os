@@ -97,7 +97,7 @@ tests written in Python that deal with performance metrics.
 
 
 [dart-wrappers]: /src/tests/end_to_end/perf/test/
-[flatland_benchmark]: /src/tests/end_to_end/perf/test/flatland_benchmark.py
+[flatland_benchmark]: /src/graphics/benchmarks/flatland_benchmark.py
 [fuchsia-criterion Rust library]: /src/developer/fuchsia-criterion/
 [Fuchsiaperf Rust library]: /src/performance/lib/fuchsiaperf/src/lib.rs
 [go-benchmarking]: /src/lib/go-benchmarking/

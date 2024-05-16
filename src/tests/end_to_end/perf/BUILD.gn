@@ -2,27 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/testing/environments.gni")
-import("//build/testing/host_test_data.gni")
 import("//build/testing/perf/test.gni")
 
 _tests = [
-  {
-    name = "flatland_benchmark"
-    expected_metric_filenames = [ "fuchsia.app_render_latency.txt" ]
-    libraries = [
-      "//src/performance/lib/trace_processing",
-      "//src/performance/lib/perf_publish",
-    ]
-  },
-  {
-    name = "input_latency_benchmark"
-    expected_metric_filenames = [ "fuchsia.input_latency.simplest_app.txt" ]
-    libraries = [
-      "//src/performance/lib/trace_processing",
-      "//src/performance/lib/perf_publish",
-    ]
-  },
   {
     name = "perf_publish_example"
     expected_metric_filenames = [ "fuchsia.example.txt" ]
@@ -83,6 +65,7 @@ _benchmarks += [
   "//src/connectivity/network:benchmarks",
   "//src/devices/bin/driver_runtime/microbenchmarks",
   "//src/diagnostics:benchmarks",
+  "//src/graphics/benchmarks",
   "//src/lib/diagnostics:benchmarks",
   "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
   "//src/starnix:benchmarks",
@@ -101,9 +84,6 @@ group("test") {
   deps += [
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
-
-    # These are used by flatland_benchmarks and input_latency_benchmarks
-    "//src/ui/examples:flatland-examples",
   ]
 }
 

@@ -9,25 +9,17 @@ This directory contains some performance tests written in Python using
 tests may generate. Finally, it includes a GN group that contains all benchmarks
 in the tree.
 
-This directory contains the following performance tests:
-
-*   `flatland_benchmark` - Tests the performance of Flatland's
-    end-to-end present latency, measured by tracing flow events, for minimal
-    Flatland client (`flatland-view-provider`).
-
-*   `input_latency_benchmark` - Tests the performance of
-    end-to-end input latency, measured by tracing flow events, for minimal
-    Scenic clients (`simplest-app-flatland-session`).
+This directory contains the following performance test:
 
 *  `tracing_microbenchmarks_test` - Tests the performance of the tracing
     subsystem.
 
-The following examples:
+The following example:
 
 *   `perf_publish_example` - Simple example test that publishes a performance
     metric.
 
-And the following tests:
+And the following test:
 
 *   `perftest_trace_events_test` - Tests that we correctly read events from a
     trace session.
