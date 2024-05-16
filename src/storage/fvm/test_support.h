@@ -125,9 +125,6 @@ class BlockDeviceAdapter : public DeviceRef {
   // Returns ZX_OK if the device became visible before the deadlines.
   zx_status_t WaitUntilVisible() const;
 
-  // Returns ZX_OK if the driver Rebind completed within a deadline.
-  zx_status_t Rebind();
-
   virtual const DeviceRef* device() const { return this; }
   virtual DeviceRef* device() { return this; }
 };

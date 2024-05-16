@@ -170,19 +170,6 @@ zx_status_t BlockDeviceAdapter::WaitUntilVisible() const {
   return channel.status_value();
 }
 
-zx_status_t BlockDeviceAdapter::Rebind() {
-  if (zx_status_t status = RebindBlockDevice(device()); status != ZX_OK) {
-    return status;
-  }
-
-  // Block device is visible again.
-  if (zx_status_t status = WaitUntilVisible(); status != ZX_OK) {
-    return status;
-  }
-
-  return ZX_OK;
-}
-
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> VPartitionAdapter::GetController() {
   return fvm::GetController(device());
 }
