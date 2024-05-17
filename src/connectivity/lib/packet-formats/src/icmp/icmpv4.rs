@@ -16,8 +16,8 @@ use crate::error::{ParseError, ParseResult};
 
 use super::common::{IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpTimeExceeded};
 use super::{
-    peek_message_type, IcmpIpExt, IcmpMessageType, IcmpPacket, IcmpParseArgs, IcmpUnusedCode,
-    IdAndSeq, OriginalPacket,
+    peek_message_type, IcmpIpExt, IcmpMessageType, IcmpPacket, IcmpPacketRaw, IcmpParseArgs,
+    IcmpUnusedCode, IdAndSeq, OriginalPacket,
 };
 
 /// An ICMPv4 packet with a dynamic message type.
@@ -87,6 +87,68 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv4Addr>> for Icmpv4Packet<B
         Ok(mtch!(
             buffer,
             args,
+            EchoReply => IcmpEchoReply,
+            DestUnreachable => IcmpDestUnreachable,
+            Redirect => Icmpv4Redirect,
+            EchoRequest => IcmpEchoRequest,
+            TimeExceeded => IcmpTimeExceeded,
+            ParameterProblem => Icmpv4ParameterProblem,
+            TimestampRequest => Icmpv4TimestampRequest,
+            TimestampReply  => Icmpv4TimestampReply,
+        ))
+    }
+}
+
+/// A raw ICMPv4 packet with a dynamic message type.
+///
+/// Unlike `IcmpPacketRaw`, `Packet` only supports ICMPv4, and does not
+/// require a static message type. Each enum variant contains an `IcmpPacketRaw`
+/// of the appropriate static type, making it easier to call `parse` without
+/// knowing the message type ahead of time while still getting the benefits of a
+/// statically-typed packet struct after parsing is complete.
+#[allow(missing_docs)]
+pub enum Icmpv4PacketRaw<B: ByteSlice> {
+    EchoReply(IcmpPacketRaw<Ipv4, B, IcmpEchoReply>),
+    DestUnreachable(IcmpPacketRaw<Ipv4, B, IcmpDestUnreachable>),
+    Redirect(IcmpPacketRaw<Ipv4, B, Icmpv4Redirect>),
+    EchoRequest(IcmpPacketRaw<Ipv4, B, IcmpEchoRequest>),
+    TimeExceeded(IcmpPacketRaw<Ipv4, B, IcmpTimeExceeded>),
+    ParameterProblem(IcmpPacketRaw<Ipv4, B, Icmpv4ParameterProblem>),
+    TimestampRequest(IcmpPacketRaw<Ipv4, B, Icmpv4TimestampRequest>),
+    TimestampReply(IcmpPacketRaw<Ipv4, B, Icmpv4TimestampReply>),
+}
+
+impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv4PacketRaw<B> {
+    type Error = ParseError;
+
+    fn parse_metadata(&self) -> ParseMetadata {
+        use self::Icmpv4PacketRaw::*;
+        match self {
+            EchoReply(p) => p.parse_metadata(),
+            DestUnreachable(p) => p.parse_metadata(),
+            Redirect(p) => p.parse_metadata(),
+            EchoRequest(p) => p.parse_metadata(),
+            TimeExceeded(p) => p.parse_metadata(),
+            ParameterProblem(p) => p.parse_metadata(),
+            TimestampRequest(p) => p.parse_metadata(),
+            TimestampReply(p) => p.parse_metadata(),
+        }
+    }
+
+    fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> ParseResult<Self> {
+        macro_rules! mtch {
+            ($buffer:expr, $($variant:ident => $type:ty,)*) => {
+                match peek_message_type($buffer.as_ref())? {
+                    $(Icmpv4MessageType::$variant => {
+                        let packet = <IcmpPacketRaw<Ipv4, B, $type> as ParsablePacket<_, _>>::parse($buffer, ())?;
+                        Icmpv4PacketRaw::$variant(packet)
+                    })*
+                }
+            }
+        }
+
+        Ok(mtch!(
+            buffer,
             EchoReply => IcmpEchoReply,
             DestUnreachable => IcmpDestUnreachable,
             Redirect => Icmpv4Redirect,

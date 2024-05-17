@@ -24,7 +24,7 @@ use zerocopy::{
 };
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
-use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpUnusedCode, MessageBody};
+use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode, MessageBody};
 
 /// An ICMPv6 packet with an MLD message.
 #[allow(missing_docs)]
@@ -34,6 +34,16 @@ pub enum MldPacket<B: ByteSlice> {
     MulticastListenerReport(IcmpPacket<Ipv6, B, MulticastListenerReport>),
     MulticastListenerDone(IcmpPacket<Ipv6, B, MulticastListenerDone>),
     MulticastListenerReportV2(IcmpPacket<Ipv6, B, MulticastListenerReportV2>),
+}
+
+/// A raw ICMPv6 packet with an MLD message.
+#[allow(missing_docs)]
+#[derive(Debug)]
+pub enum MldPacketRaw<B: ByteSlice> {
+    MulticastListenerQuery(IcmpPacketRaw<Ipv6, B, MulticastListenerQuery>),
+    MulticastListenerReport(IcmpPacketRaw<Ipv6, B, MulticastListenerReport>),
+    MulticastListenerDone(IcmpPacketRaw<Ipv6, B, MulticastListenerDone>),
+    MulticastListenerReportV2(IcmpPacketRaw<Ipv6, B, MulticastListenerReportV2>),
 }
 
 create_protocol_enum!(

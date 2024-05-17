@@ -18,7 +18,7 @@ use crate::error::{ParseError, ParseResult};
 use super::common::{IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpTimeExceeded};
 use super::{
     mld, ndp, peek_message_type, HeaderPrefix, IcmpIpExt, IcmpMessageType, IcmpPacket,
-    IcmpParseArgs, IcmpUnusedCode, OriginalPacket,
+    IcmpPacketRaw, IcmpParseArgs, IcmpUnusedCode, OriginalPacket,
 };
 
 /// An ICMPv6 packet with a dynamic message type.
@@ -38,39 +38,6 @@ pub enum Icmpv6Packet<B: ByteSlice> {
     EchoReply(IcmpPacket<Ipv6, B, IcmpEchoReply>),
     Ndp(ndp::NdpPacket<B>),
     Mld(mld::MldPacket<B>),
-}
-
-impl<B: ByteSliceMut> Icmpv6Packet<B> {
-    pub(super) fn header_prefix_mut(&mut self) -> &mut HeaderPrefix {
-        use Icmpv6Packet::*;
-        match self {
-            DestUnreachable(p) => &mut p.header.prefix,
-            PacketTooBig(p) => &mut p.header.prefix,
-            TimeExceeded(p) => &mut p.header.prefix,
-            ParameterProblem(p) => &mut p.header.prefix,
-            EchoRequest(p) => &mut p.header.prefix,
-            EchoReply(p) => &mut p.header.prefix,
-            Ndp(p) => {
-                use ndp::NdpPacket::*;
-                match p {
-                    RouterSolicitation(p) => &mut p.header.prefix,
-                    RouterAdvertisement(p) => &mut p.header.prefix,
-                    NeighborSolicitation(p) => &mut p.header.prefix,
-                    NeighborAdvertisement(p) => &mut p.header.prefix,
-                    Redirect(p) => &mut p.header.prefix,
-                }
-            }
-            Mld(p) => {
-                use mld::MldPacket::*;
-                match p {
-                    MulticastListenerQuery(p) => &mut p.header.prefix,
-                    MulticastListenerReport(p) => &mut p.header.prefix,
-                    MulticastListenerDone(p) => &mut p.header.prefix,
-                    MulticastListenerReportV2(p) => &mut p.header.prefix,
-                }
-            }
-        }
-    }
 }
 
 impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {
@@ -158,21 +125,137 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
             buffer,
             args,
             packet,
-            DestUnreachable           => DestUnreachable(packet)              => IcmpDestUnreachable,
-            PacketTooBig              => PacketTooBig(packet)                 => Icmpv6PacketTooBig,
-            TimeExceeded              => TimeExceeded(packet)                 => IcmpTimeExceeded,
-            ParameterProblem          => ParameterProblem(packet)             => Icmpv6ParameterProblem,
-            EchoRequest               => EchoRequest(packet)                  => IcmpEchoRequest,
-            EchoReply                 => EchoReply(packet)                    => IcmpEchoReply,
-            RouterSolicitation        => Ndp(RouterSolicitation(packet))      => ndp::RouterSolicitation,
-            RouterAdvertisement       => Ndp(RouterAdvertisement(packet))     => ndp::RouterAdvertisement,
-            NeighborSolicitation      => Ndp(NeighborSolicitation(packet))    => ndp::NeighborSolicitation,
-            NeighborAdvertisement     => Ndp(NeighborAdvertisement(packet))   => ndp::NeighborAdvertisement,
-            Redirect                  => Ndp(Redirect(packet))                => ndp::Redirect,
-            MulticastListenerQuery    => Mld(MulticastListenerQuery(packet))  => mld::MulticastListenerQuery,
-            MulticastListenerReport   => Mld(MulticastListenerReport(packet)) => mld::MulticastListenerReport,
+            DestUnreachable           => DestUnreachable(packet)                => IcmpDestUnreachable,
+            PacketTooBig              => PacketTooBig(packet)                   => Icmpv6PacketTooBig,
+            TimeExceeded              => TimeExceeded(packet)                   => IcmpTimeExceeded,
+            ParameterProblem          => ParameterProblem(packet)               => Icmpv6ParameterProblem,
+            EchoRequest               => EchoRequest(packet)                    => IcmpEchoRequest,
+            EchoReply                 => EchoReply(packet)                      => IcmpEchoReply,
+            RouterSolicitation        => Ndp(RouterSolicitation(packet))        => ndp::RouterSolicitation,
+            RouterAdvertisement       => Ndp(RouterAdvertisement(packet))       => ndp::RouterAdvertisement,
+            NeighborSolicitation      => Ndp(NeighborSolicitation(packet))      => ndp::NeighborSolicitation,
+            NeighborAdvertisement     => Ndp(NeighborAdvertisement(packet))     => ndp::NeighborAdvertisement,
+            Redirect                  => Ndp(Redirect(packet))                  => ndp::Redirect,
+            MulticastListenerQuery    => Mld(MulticastListenerQuery(packet))    => mld::MulticastListenerQuery,
+            MulticastListenerReport   => Mld(MulticastListenerReport(packet))   => mld::MulticastListenerReport,
             MulticastListenerReportV2 => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
-            MulticastListenerDone     => Mld(MulticastListenerDone(packet))   => mld::MulticastListenerDone,
+            MulticastListenerDone     => Mld(MulticastListenerDone(packet))     => mld::MulticastListenerDone,
+        ))
+    }
+}
+
+/// A raw ICMPv6 packet with a dynamic message type.
+///
+/// Unlike `IcmpPacketRaw`, `Packet` only supports ICMPv6, and does not
+/// require a static message type. Each enum variant contains an `IcmpPacketRaw`
+/// of the appropriate static type, making it easier to call `parse` without
+/// knowing the message type ahead of time while still getting the benefits of a
+/// statically-typed packet struct after parsing is complete.
+#[allow(missing_docs)]
+pub enum Icmpv6PacketRaw<B: ByteSlice> {
+    DestUnreachable(IcmpPacketRaw<Ipv6, B, IcmpDestUnreachable>),
+    PacketTooBig(IcmpPacketRaw<Ipv6, B, Icmpv6PacketTooBig>),
+    TimeExceeded(IcmpPacketRaw<Ipv6, B, IcmpTimeExceeded>),
+    ParameterProblem(IcmpPacketRaw<Ipv6, B, Icmpv6ParameterProblem>),
+    EchoRequest(IcmpPacketRaw<Ipv6, B, IcmpEchoRequest>),
+    EchoReply(IcmpPacketRaw<Ipv6, B, IcmpEchoReply>),
+    Ndp(ndp::NdpPacketRaw<B>),
+    Mld(mld::MldPacketRaw<B>),
+}
+
+impl<B: ByteSliceMut> Icmpv6PacketRaw<B> {
+    pub(super) fn header_prefix_mut(&mut self) -> &mut HeaderPrefix {
+        use Icmpv6PacketRaw::*;
+        match self {
+            DestUnreachable(p) => &mut p.header.prefix,
+            PacketTooBig(p) => &mut p.header.prefix,
+            TimeExceeded(p) => &mut p.header.prefix,
+            ParameterProblem(p) => &mut p.header.prefix,
+            EchoRequest(p) => &mut p.header.prefix,
+            EchoReply(p) => &mut p.header.prefix,
+            Ndp(p) => {
+                use ndp::NdpPacketRaw::*;
+                match p {
+                    RouterSolicitation(p) => &mut p.header.prefix,
+                    RouterAdvertisement(p) => &mut p.header.prefix,
+                    NeighborSolicitation(p) => &mut p.header.prefix,
+                    NeighborAdvertisement(p) => &mut p.header.prefix,
+                    Redirect(p) => &mut p.header.prefix,
+                }
+            }
+            Mld(p) => {
+                use mld::MldPacketRaw::*;
+                match p {
+                    MulticastListenerQuery(p) => &mut p.header.prefix,
+                    MulticastListenerReport(p) => &mut p.header.prefix,
+                    MulticastListenerDone(p) => &mut p.header.prefix,
+                    MulticastListenerReportV2(p) => &mut p.header.prefix,
+                }
+            }
+        }
+    }
+}
+
+impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
+    type Error = ParseError;
+
+    fn parse_metadata(&self) -> ParseMetadata {
+        use self::Icmpv6PacketRaw::*;
+        use mld::MldPacketRaw::*;
+        use ndp::NdpPacketRaw::*;
+        match self {
+            DestUnreachable(p) => p.parse_metadata(),
+            PacketTooBig(p) => p.parse_metadata(),
+            TimeExceeded(p) => p.parse_metadata(),
+            ParameterProblem(p) => p.parse_metadata(),
+            EchoRequest(p) => p.parse_metadata(),
+            EchoReply(p) => p.parse_metadata(),
+            Ndp(RouterSolicitation(p)) => p.parse_metadata(),
+            Ndp(RouterAdvertisement(p)) => p.parse_metadata(),
+            Ndp(NeighborSolicitation(p)) => p.parse_metadata(),
+            Ndp(NeighborAdvertisement(p)) => p.parse_metadata(),
+            Ndp(Redirect(p)) => p.parse_metadata(),
+            Mld(MulticastListenerQuery(p)) => p.parse_metadata(),
+            Mld(MulticastListenerReport(p)) => p.parse_metadata(),
+            Mld(MulticastListenerDone(p)) => p.parse_metadata(),
+            Mld(MulticastListenerReportV2(p)) => p.parse_metadata(),
+        }
+    }
+
+    fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> ParseResult<Self> {
+        use self::Icmpv6PacketRaw::*;
+        use mld::MldPacketRaw::*;
+        use ndp::NdpPacketRaw::*;
+
+        macro_rules! mtch {
+            ($buffer:expr, $pkt_name:ident, $($msg_variant:ident => $pkt_variant:expr => $type:ty,)*) => {
+                match peek_message_type($buffer.as_ref())? {
+                    $(Icmpv6MessageType::$msg_variant => {
+                        let $pkt_name = <IcmpPacketRaw<Ipv6, B, $type> as ParsablePacket<_, _>>::parse($buffer, ())?;
+                        $pkt_variant
+                    })*
+                }
+            }
+        }
+
+        Ok(mtch!(
+            buffer,
+            packet,
+            DestUnreachable           => DestUnreachable(packet)                => IcmpDestUnreachable,
+            PacketTooBig              => PacketTooBig(packet)                   => Icmpv6PacketTooBig,
+            TimeExceeded              => TimeExceeded(packet)                   => IcmpTimeExceeded,
+            ParameterProblem          => ParameterProblem(packet)               => Icmpv6ParameterProblem,
+            EchoRequest               => EchoRequest(packet)                    => IcmpEchoRequest,
+            EchoReply                 => EchoReply(packet)                      => IcmpEchoReply,
+            RouterSolicitation        => Ndp(RouterSolicitation(packet))        => ndp::RouterSolicitation,
+            RouterAdvertisement       => Ndp(RouterAdvertisement(packet))       => ndp::RouterAdvertisement,
+            NeighborSolicitation      => Ndp(NeighborSolicitation(packet))      => ndp::NeighborSolicitation,
+            NeighborAdvertisement     => Ndp(NeighborAdvertisement(packet))     => ndp::NeighborAdvertisement,
+            Redirect                  => Ndp(Redirect(packet))                  => ndp::Redirect,
+            MulticastListenerQuery    => Mld(MulticastListenerQuery(packet))    => mld::MulticastListenerQuery,
+            MulticastListenerReport   => Mld(MulticastListenerReport(packet))   => mld::MulticastListenerReport,
+            MulticastListenerReportV2 => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
+            MulticastListenerDone     => Mld(MulticastListenerDone(packet))     => mld::MulticastListenerDone,
         ))
     }
 }

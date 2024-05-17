@@ -18,9 +18,9 @@ use packet_formats::{
             RouterSolicitation,
         },
         IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder,
-        IcmpPacketRaw, IcmpPacketType as _, IcmpParseArgs, IcmpTimeExceeded, Icmpv4MessageType,
-        Icmpv4Packet, Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType,
-        Icmpv6Packet, Icmpv6PacketTooBig, Icmpv6ParameterProblem,
+        IcmpPacketRaw, IcmpPacketTypeRaw as _, IcmpTimeExceeded, Icmpv4MessageType,
+        Icmpv4PacketRaw, Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType,
+        Icmpv6PacketRaw, Icmpv6PacketTooBig, Icmpv6ParameterProblem,
     },
     igmp::{self, IgmpPacketBuilder},
     ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto},
@@ -952,7 +952,7 @@ fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHea
 pub enum ParsedTransportHeaderMut<'a, I: IpExt> {
     Tcp(TcpSegment<&'a mut [u8]>),
     Udp(UdpPacket<&'a mut [u8]>),
-    Icmp(I::IcmpPacketType<&'a mut [u8]>),
+    Icmp(I::IcmpPacketTypeRaw<&'a mut [u8]>),
 }
 
 impl<'a, I: IpExt> ParsedTransportHeaderMut<'a, I> {
@@ -985,9 +985,7 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv4> {
             Ipv4Proto::Proto(IpProto::Tcp) => Some(Self::Tcp(
                 TcpSegment::parse_mut(body, TcpParseArgs::new(src_ip, dst_ip)).ok()?,
             )),
-            Ipv4Proto::Icmp => Some(Self::Icmp(
-                Icmpv4Packet::parse_mut(body, IcmpParseArgs::new(src_ip, dst_ip)).ok()?,
-            )),
+            Ipv4Proto::Icmp => Some(Self::Icmp(Icmpv4PacketRaw::parse_mut(body, ()).ok()?)),
             Ipv4Proto::Proto(IpProto::Reserved) | Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
         }
     }
@@ -1007,9 +1005,7 @@ impl<'a> ParsedTransportHeaderMut<'a, Ipv6> {
             Ipv6Proto::Proto(IpProto::Tcp) => Some(Self::Tcp(
                 TcpSegment::parse_mut(body, TcpParseArgs::new(src_ip, dst_ip)).ok()?,
             )),
-            Ipv6Proto::Icmpv6 => Some(Self::Icmp(
-                Icmpv6Packet::parse_mut(body, IcmpParseArgs::new(src_ip, dst_ip)).ok()?,
-            )),
+            Ipv6Proto::Icmpv6 => Some(Self::Icmp(Icmpv6PacketRaw::parse_mut(body, ()).ok()?)),
             Ipv6Proto::Proto(IpProto::Reserved) | Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => {
                 None
             }
