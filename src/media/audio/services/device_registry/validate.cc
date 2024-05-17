@@ -1516,16 +1516,6 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
     FX_LOGS(WARNING) << "WatchElementState: ElementState.enabled is deprecated; use `bypassed`";
   }
 
-  if (element_state.latency().has_value()) {
-    FX_LOGS(WARNING) << "WatchElementState: .latency is deprecated; use `processing_delay`";
-    if (element_state.latency()->Which() == fhasp::Latency::Tag::kLatencyTime &&
-        element_state.latency()->latency_time().value() < 0) {
-      FX_LOGS(WARNING)
-          << "WatchElementState: ElementState.latency, if a duration, must not be negative";
-      return false;
-    }
-  }
-
   if (element_state.vendor_specific_data().has_value()) {
     // vendor_specific_data is opaque to us, so we can't really perform any other structured checks.
     if (element_state.vendor_specific_data()->empty()) {

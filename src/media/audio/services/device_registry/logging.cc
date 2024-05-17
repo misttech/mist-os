@@ -687,35 +687,6 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
                   << " (non-compliant -- deprecated)";
   }
 
-  if (element_state->latency().has_value()) {
-    switch (element_state->latency()->Which()) {
-      case fhasp::Latency::Tag::kLatencyTime:
-        FX_LOGS(INFO) << indent << "latency (time)";
-        if (element_state->latency()->latency_time().has_value()) {
-          FX_LOGS(INFO) << new_indent << "     " << element_state->latency()->latency_time().value()
-                        << " ns  (deprecated)";
-        } else {
-          FX_LOGS(INFO) << new_indent << "     <none>  (non-compliant)";
-        }
-        break;
-      case fhasp::Latency::Tag::kLatencyFrames:
-        FX_LOGS(INFO) << indent << "latency (frames)";
-        if (element_state->latency()->latency_frames().has_value()) {
-          FX_LOGS(INFO) << new_indent << "     "
-                        << element_state->latency()->latency_frames().value()
-                        << " frames  (deprecated)";
-        } else {
-          FX_LOGS(INFO) << new_indent << "     <none>  (non-compliant)";
-        }
-        break;
-      default:
-        FX_LOGS(INFO) << indent << "latency <unknown union>  (non-compliant)";
-        break;
-    }
-  } else {
-    FX_LOGS(INFO) << indent << "latency                 <none>";
-  }
-
   if (element_state->vendor_specific_data().has_value()) {
     FX_LOGS(INFO) << indent << "vendor_specific_data  ["
                   << element_state->vendor_specific_data()->size() << "]  (not shown here)"

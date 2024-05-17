@@ -93,7 +93,7 @@ type TypeSpecificElement = flexible union {
     6: dai_interconnect DaiInterconnect;
 };
 
-@available(deprecated=20)
+@available(removed=20)
 type Latency = flexible union {
     /// Latency added to the pipeline as a zx.Duration.
     1: latency_time zx.Duration;
@@ -209,7 +209,7 @@ type ElementState = table {
     /// `WatchElementState` reply.
     ///
     /// Optional.
-    @available(deprecated=20)
+    @available(removed=20)
     3: latency Latency;
 
     /// If included, an opaque object of octets for exchanging vendor specific information.

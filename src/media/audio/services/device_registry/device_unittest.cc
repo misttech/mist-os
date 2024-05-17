@@ -1636,7 +1636,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(states.size(), FakeComposite::kElements.size());
 
   auto state = states.find(FakeComposite::kSourceDaiElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
@@ -1656,7 +1655,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestDaiElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
@@ -1676,7 +1674,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
@@ -1687,7 +1684,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceRbElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kDestRbElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
@@ -1697,7 +1693,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kMuteElementId)->second;
-  EXPECT_FALSE(state.latency().has_value());
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
   ASSERT_TRUE(state.bypassed().has_value());

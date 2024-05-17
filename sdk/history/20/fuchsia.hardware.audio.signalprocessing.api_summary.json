@@ -301,12 +301,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.latency",
-        "ordinal": "3",
-        "type": "fuchsia.hardware.audio.signalprocessing/Latency"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/ElementState.processing_delay",
         "ordinal": "9",
         "type": "int64"
@@ -726,23 +720,6 @@
         "name": "fuchsia.hardware.audio.signalprocessing/GainType",
         "strictness": "strict",
         "type": "uint8"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Latency.latency_frames",
-        "ordinal": "2",
-        "type": "uint32"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Latency.latency_time",
-        "ordinal": "1",
-        "type": "int64"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.audio.signalprocessing/Latency",
-        "strictness": "flexible"
     },
     {
         "kind": "enum/member",
