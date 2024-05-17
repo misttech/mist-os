@@ -56,7 +56,7 @@ type ElementType = flexible enum {
     SAMPLE_RATE_CONVERSION = 11;
 
     /// The start/end of a pipeline.
-    @available(added=12, deprecated=20)
+    @available(added=12, removed=20)
     ENDPOINT = 12;
 
     /// Ring Buffer.
@@ -85,7 +85,7 @@ type TypeSpecificElement = flexible union {
     4: dynamics Dynamics;
 
     // See dai_interconnect.fidl.
-    @available(added=12, deprecated=20)
+    @available(added=12, removed=20)
     5: endpoint Endpoint;
 
     // See dai_interconnect.fidl.
@@ -169,7 +169,7 @@ type TypeSpecificElementState = flexible union {
     4: dynamics DynamicsElementState;
 
     // See dai_interconnect.fidl.
-    @available(added=12, deprecated=20)
+    @available(added=12, removed=20)
     5: endpoint EndpointElementState;
 
     // See dai_interconnect.fidl.
