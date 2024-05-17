@@ -15,17 +15,41 @@
 
 #include <unordered_set>
 
+#include <fbl/intrusive_double_list.h>
+
 #include "src/devices/lib/log/log.h"
 
 namespace driver_manager {
 
 class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner> {
  public:
+  class DriverHost : public fbl::DoublyLinkedListable<std::unique_ptr<DriverHost>> {
+   public:
+    DriverHost(zx::process process, zx::thread thread, zx::vmar root_vmar)
+        : process_(std::move(process)),
+          thread_(std::move(thread)),
+          root_vmar_(std::move(root_vmar)) {}
+
+    // Returns duplicate handles that can be passed to the loader process.
+    zx_status_t GetDuplicateHandles(zx::process* out_process, zx::thread* out_thread,
+                                    zx::vmar* out_root_vmar);
+
+    const zx::process& process() { return process_; }
+
+   private:
+    zx::process process_;
+    zx::thread thread_;
+    zx::vmar root_vmar_;
+  };
+
   DriverHostRunner(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_component::Realm> realm);
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
 
   zx::result<> StartDriverHost();
+
+  // Returns all started driver hosts. This will be used by tests.
+  std::unordered_set<const DriverHost*> DriverHosts();
 
  private:
   // The started component from the perspective of the Component Framework.
@@ -40,7 +64,11 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                 StartCallback callback);
-  void LoadDriverHost(const fuchsia_component_runner::ComponentStartInfo& start_info);
+  void LoadDriverHost(const fuchsia_component_runner::ComponentStartInfo& start_info,
+                      std::string_view name);
+
+  // Creates the process and starting thread for a driver host.
+  zx::result<DriverHost*> CreateDriverHost(std::string_view name);
 
   zx::result<> CallCallback(zx_koid_t koid, zx::result<StartedComponent> component);
 
@@ -50,6 +78,7 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
   fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> bindings_;
 
   uint64_t next_driver_host_id_ = 0;
+  fbl::DoublyLinkedList<std::unique_ptr<DriverHost>> driver_hosts_;
 };
 
 }  // namespace driver_manager

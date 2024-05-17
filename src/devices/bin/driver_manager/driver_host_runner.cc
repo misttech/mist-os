@@ -119,24 +119,82 @@ void DriverHostRunner::PublishComponentRunner(component::OutgoingDirectory& outg
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 
+zx::result<DriverHostRunner::DriverHost*> DriverHostRunner::CreateDriverHost(
+    std::string_view name) {
+  zx::process process;
+  zx::thread thread;
+  zx::vmar root_vmar;
+  zx_status_t status =
+      zx::process::create(*zx::job::default_job(), name.data(), static_cast<uint32_t>(name.size()),
+                          0, &process, &root_vmar);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  status = zx::thread::create(process, name.data(), static_cast<uint32_t>(name.size()), 0, &thread);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  auto driver_host =
+      std::make_unique<DriverHost>(std::move(process), std::move(thread), std::move(root_vmar));
+  DriverHost* driver_host_ptr = driver_host.get();
+  driver_hosts_.push_back(std::move(driver_host));
+  return zx::ok(driver_host_ptr);
+}
+
+zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_process,
+                                                              zx::thread* out_thread,
+                                                              zx::vmar* out_root_vmar) {
+  zx::process process;
+  zx::thread thread;
+  zx::vmar root_vmar;
+  zx_status_t status = process_.duplicate(ZX_RIGHT_SAME_RIGHTS, &process);
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to duplicate process handle: %s", zx_status_get_string(status));
+    return status;
+  }
+  status = thread_.duplicate(ZX_RIGHT_SAME_RIGHTS, &thread);
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to duplicate thread handle: %s", zx_status_get_string(status));
+    return status;
+  }
+  status = root_vmar_.duplicate(ZX_RIGHT_SAME_RIGHTS, &root_vmar);
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to duplicate vmar handle: %s", zx_status_get_string(status));
+    return status;
+  }
+  *out_process = std::move(process);
+  *out_thread = std::move(thread);
+  *out_root_vmar = std::move(root_vmar);
+  return ZX_OK;
+}
+
 zx::result<> DriverHostRunner::StartDriverHost() {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
   StartDriverHostComponent(
       name, kUrl,
-      [this](zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
+      [this,
+       name](zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
           LOGF(ERROR, "Failed to start driver host: %s", component.status_string());
           return;
         }
-        LoadDriverHost(component->info);
+        LoadDriverHost(component->info, name);
       });
   return zx::ok();
 }
 
+std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::DriverHosts() {
+  std::unordered_set<const DriverHostRunner::DriverHost*> result_hosts;
+  for (auto& host : driver_hosts_) {
+    result_hosts.insert(&host);
+  }
+  return result_hosts;
+}
+
 void DriverHostRunner::LoadDriverHost(
-    const fuchsia_component_runner::ComponentStartInfo& start_info) {
+    const fuchsia_component_runner::ComponentStartInfo& start_info, std::string_view name) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_info.program());
@@ -166,6 +224,23 @@ void DriverHostRunner::LoadDriverHost(
                                   : ZX_ERR_BAD_HANDLE));
     return;
   }
+
+  zx::result<DriverHost*> driver_host = CreateDriverHost(name);
+  if (driver_host.is_error()) {
+    LOGF(ERROR, "Failed to create driver host env: %s", driver_host.status_string());
+    return;
+  }
+
+  zx::process process;
+  zx::thread thread;
+  zx::vmar root_vmar;
+
+  zx_status_t status = (*driver_host)->GetDuplicateHandles(&process, &thread, &root_vmar);
+  if (status != ZX_OK) {
+    LOGF(ERROR, "GetDuplicateHandles failed: %s", zx_status_get_string(status));
+    return;
+  }
+
   // TODO(https://fxbug.dev/330775896) call the loader.
 }
 
