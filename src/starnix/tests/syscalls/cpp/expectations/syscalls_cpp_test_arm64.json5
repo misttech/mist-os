@@ -4,8 +4,18 @@
 {
     actions: [
         {
-            type: "expect_failure",
-            matchers: [],
+            type: "skip",
+            matchers: [
+                // TODO(b/341233321): fuse-overlayfs has issues on Arm.
+                "FuseTest.*",
+            ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                // TODO(b/341233321): ReadWriteUnMountedDevFuse doesn't require fuse-overlayfs
+                "FuseTest.ReadWriteUnMountedDevFuse",
+            ],
         },
     ],
 }
