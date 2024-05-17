@@ -591,12 +591,13 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
   for (size_t i = 0; i < stack.size(); i++) {
     if (!stack[i]->GetLocation().has_symbols())
       continue;
+    // TODO(https://fxbug.dev/339724188): Traverse nested scopes.
     std::string func_name(StripTemplate(stack[i]->GetLocation().symbol().Get()->GetFullName()));
     std::string expr;
     if (func_name == "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run") {
-      expr = "self.ehandle.inner->data.task_state.data.value.all_tasks";
+      expr = "self.ehandle.root_scope.inner->data.state.data.value.all_tasks";
     } else if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
-      expr = "self.inner->data.task_state.data.value.all_tasks";
+      expr = "self.root_scope.inner->data.state.data.value.all_tasks";
     } else {
       continue;
     }

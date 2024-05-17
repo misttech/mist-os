@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use super::super::timer::TimerHeap;
-use super::common::{with_local_timer_heap, ExecutorTime, Inner};
+use super::common::{with_local_timer_heap, Executor, ExecutorTime};
+use super::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
 use futures::FutureExt;
@@ -29,7 +30,9 @@ use std::{
 /// words, zircon objects backed by a `SendExecutor` must be dropped before it.
 pub struct SendExecutor {
     /// The inner executor state.
-    inner: Arc<Inner>,
+    inner: Arc<Executor>,
+    /// The root scope.
+    root_scope: ScopeRef,
     /// Worker thread handles
     threads: Vec<thread::JoinHandle<()>>,
 }
@@ -44,13 +47,14 @@ impl SendExecutor {
     /// Create a new multi-threaded executor.
     #[allow(deprecated)]
     pub fn new(num_threads: usize) -> Self {
-        let inner = Arc::new(Inner::new(
+        let inner = Arc::new(Executor::new(
             ExecutorTime::RealTime,
             /* is_local */ false,
             num_threads.try_into().expect("no more than 256 threads are supported"),
         ));
-        inner.clone().set_local(TimerHeap::default());
-        Self { inner, threads: Vec::default() }
+        let root_scope = ScopeRef::root(inner.clone());
+        Executor::set_local(root_scope.clone(), TimerHeap::default());
+        Self { inner, root_scope, threads: Vec::default() }
     }
 
     /// Run `future` to completion, using this thread and `num_threads` workers in a pool to
@@ -70,8 +74,9 @@ impl SendExecutor {
         let pair2 = pair.clone();
 
         // Spawn a future which will set the result upon completion.
-        Inner::spawn_main(
+        Executor::spawn_main(
             &self.inner,
+            &self.root_scope,
             AtomicFuture::new(
                 future.map(move |fut_result| {
                     let (lock, cvar) = &*pair2;
@@ -132,14 +137,21 @@ impl SendExecutor {
         result.take().unwrap()
     }
 
+    #[doc(hidden)]
+    /// Returns the root scope of the executor.
+    pub fn root_scope(&self) -> &ScopeRef {
+        &self.root_scope
+    }
+
     /// Add `self.num_threads` worker threads to the executor's thread pool.
     /// `timers`: timers from the "main" thread which would otherwise be lost.
     fn create_worker_threads(&mut self, mut timers: Option<TimerHeap>) {
         for _ in 0..self.inner.num_threads {
             let inner = self.inner.clone();
+            let root_scope = self.root_scope.clone();
             let timers = timers.take().unwrap_or(TimerHeap::default());
             self.threads.push(thread::spawn(move || {
-                inner.clone().set_local(timers);
+                Executor::set_local(root_scope, timers);
                 inner.worker_lifecycle::</* UNTIL_STALLED: */ false>();
             }));
         }
@@ -163,7 +175,7 @@ impl SendExecutor {
 impl Drop for SendExecutor {
     fn drop(&mut self) {
         self.join_all();
-        self.inner.on_parent_drop();
+        self.inner.on_parent_drop(&self.root_scope);
     }
 }
 

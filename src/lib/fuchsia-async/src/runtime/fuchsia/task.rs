@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::EHandle;
+use crate::{EHandle, ScopeRef};
 use futures::prelude::*;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -21,7 +21,7 @@ use std::task::{Context, Poll};
 #[must_use]
 #[derive(Debug)]
 pub struct Task<T> {
-    executor: EHandle,
+    scope: ScopeRef,
     task_id: usize,
     phantom: PhantomData<T>,
 }
@@ -54,7 +54,7 @@ impl Task<()> {
     ///
     /// can meet your needs.
     pub fn detach(mut self) {
-        self.executor.detach(self.task_id);
+        self.scope.detach(self.task_id);
         self.task_id = 0;
     }
 }
@@ -76,8 +76,18 @@ impl<T: Send + 'static> Task<T> {
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn spawn(future: impl Future<Output = T> + Send + 'static) -> Task<T> {
         let executor = EHandle::local();
-        let task_id = executor.spawn(future);
-        Task { executor, task_id, phantom: PhantomData }
+        let scope = executor.root_scope();
+        let task_id = executor.spawn(scope, future);
+        Task { scope: scope.clone(), task_id, phantom: PhantomData }
+    }
+
+    pub(crate) fn spawn_on(
+        scope: ScopeRef,
+        future: impl Future<Output = T> + Send + 'static,
+    ) -> Task<T> {
+        let executor = EHandle::local();
+        let task_id = executor.spawn(&scope, future);
+        Task { scope, task_id, phantom: PhantomData }
     }
 }
 
@@ -98,8 +108,9 @@ impl<T: 'static> Task<T> {
     #[cfg_attr(trace_level_logging, track_caller)]
     pub fn local(future: impl Future<Output = T> + 'static) -> Task<T> {
         let executor = EHandle::local();
-        let task_id = executor.spawn_local(future);
-        Task { executor, task_id, phantom: PhantomData }
+        let scope = executor.root_scope();
+        let task_id = executor.spawn_local(scope, future);
+        Task { scope: scope.clone(), task_id, phantom: PhantomData }
     }
 }
 
@@ -114,7 +125,7 @@ impl<T: 'static> Task<T> {
     /// are guaranteed to be released.
     pub fn cancel(mut self) -> Option<T> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.executor.cancel(self.task_id) };
+        let result = unsafe { self.scope.cancel(self.task_id) };
         self.task_id = 0;
         result
     }
@@ -124,7 +135,7 @@ impl<T> Drop for Task<T> {
     fn drop(&mut self) {
         if self.task_id != 0 {
             // SAFETY: We spawned the task so the return type should be correct.
-            unsafe { self.executor.cancel::<T>(self.task_id) };
+            unsafe { self.scope.cancel::<T>(self.task_id) };
         }
     }
 }
@@ -133,7 +144,7 @@ impl<T: 'static> Future for Task<T> {
     type Output = T;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.executor.poll_join_result(self.task_id, cx) };
+        let result = unsafe { self.scope.poll_join_result(self.task_id, cx) };
         if result.is_ready() {
             self.task_id = 0;
         }

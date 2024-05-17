@@ -4,8 +4,9 @@
 
 use super::super::timer::TimerHeap;
 use super::{
-    common::{with_local_timer_heap, EHandle, ExecutorTime, Inner, MAIN_TASK_ID},
+    common::{with_local_timer_heap, EHandle, Executor, ExecutorTime, MAIN_TASK_ID},
     time::Time,
+    ScopeRef,
 };
 use crate::atomic_future::AtomicFuture;
 use futures::{
@@ -39,20 +40,21 @@ pub struct LocalExecutor {
 
 impl fmt::Debug for LocalExecutor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalExecutor").field("port", &self.ehandle.inner.port).finish()
+        f.debug_struct("LocalExecutor").field("port", &self.ehandle.inner().port).finish()
     }
 }
 
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
     pub fn new() -> Self {
-        let inner = Arc::new(Inner::new(
+        let inner = Arc::new(Executor::new(
             ExecutorTime::RealTime,
             /* is_local */ true,
             /* num_threads */ 1,
         ));
-        inner.clone().set_local(TimerHeap::default());
-        Self { ehandle: EHandle { inner } }
+        let root_scope = ScopeRef::root(inner.clone());
+        Executor::set_local(root_scope.clone(), TimerHeap::default());
+        Self { ehandle: EHandle { root_scope } }
     }
 
     /// Run a single future to completion on a single thread, also polling other active tasks.
@@ -61,7 +63,7 @@ impl LocalExecutor {
         F: Future,
     {
         assert!(
-            self.ehandle.inner.is_real_time(),
+            self.ehandle.inner().is_real_time(),
             "Error: called `run_singlethreaded` on an executor using fake time"
         );
 
@@ -85,40 +87,48 @@ impl LocalExecutor {
 
         // SAFETY: Erasing the lifetime is safe because we make sure to drop the main task within
         // the required lifetime.
-        self.ehandle.inner.spawn_main(unsafe { remove_lifetime(main_future) });
+        self.ehandle
+            .inner()
+            .spawn_main(&self.ehandle.root_scope, unsafe { remove_lifetime(main_future) });
 
-        struct DropMainTask<'a>(&'a Inner);
+        struct DropMainTask<'a>(&'a EHandle);
         impl Drop for DropMainTask<'_> {
             fn drop(&mut self) {
                 // SAFETY: drop_main_tasks requires that the executor isn't running
                 // i.e. worker_lifecycle isn't running, which will be the case when this runs.
-                unsafe { self.0.drop_main_task() };
+                unsafe { self.0.inner().drop_main_task(&self.0.root_scope) };
             }
         }
-        let _drop_main_task = DropMainTask(&self.ehandle.inner);
+        let _drop_main_task = DropMainTask(&self.ehandle);
 
-        self.ehandle.inner.worker_lifecycle::<UNTIL_STALLED>();
+        self.ehandle.inner().worker_lifecycle::<UNTIL_STALLED>();
 
         // SAFETY: We spawned the task earlier, so `R` (the return type) will be the correct type
         // here.
         unsafe {
-            self.ehandle.inner.poll_join_result(
+            self.ehandle.root_scope().poll_join_result(
                 MAIN_TASK_ID,
                 &mut Context::from_waker(&futures::task::noop_waker()),
             )
         }
     }
 
+    #[doc(hidden)]
+    /// Returns the root scope of the executor.
+    pub fn root_scope(&self) -> &ScopeRef {
+        self.ehandle.root_scope()
+    }
+
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.ehandle.inner.collector.snapshot()
+        self.ehandle.inner().collector.snapshot()
     }
 }
 
 impl Drop for LocalExecutor {
     fn drop(&mut self) {
-        self.ehandle.inner.mark_done();
-        self.ehandle.inner.on_parent_drop();
+        self.ehandle.inner().mark_done();
+        self.ehandle.inner().on_parent_drop(&self.ehandle.root_scope);
     }
 }
 
@@ -137,18 +147,19 @@ impl TestExecutor {
 
     /// Create a new single-threaded executor running with fake time.
     pub fn new_with_fake_time() -> Self {
-        let inner = Arc::new(Inner::new(
+        let inner = Arc::new(Executor::new(
             ExecutorTime::FakeTime(AtomicI64::new(Time::INFINITE_PAST.into_nanos())),
             /* is_local */ true,
             /* num_threads */ 1,
         ));
-        inner.clone().set_local(TimerHeap::default());
-        Self { local: LocalExecutor { ehandle: EHandle { inner } } }
+        let root_scope = ScopeRef::root(inner.clone());
+        Executor::set_local(root_scope.clone(), TimerHeap::default());
+        Self { local: LocalExecutor { ehandle: EHandle { root_scope } } }
     }
 
     /// Return the current time according to the executor.
     pub fn now(&self) -> Time {
-        self.local.ehandle.inner.now()
+        self.local.ehandle.inner().now()
     }
 
     /// Set the fake time to a given value.
@@ -157,7 +168,13 @@ impl TestExecutor {
     ///
     /// If the executor was not created with fake time
     pub fn set_fake_time(&self, t: Time) {
-        self.local.ehandle.inner.set_fake_time(t)
+        self.local.ehandle.inner().set_fake_time(t)
+    }
+
+    #[doc(hidden)]
+    /// Returns the root scope of the executor.
+    pub fn root_scope(&self) -> &ScopeRef {
+        self.local.root_scope()
     }
 
     /// Run a single future to completion on a single thread, also polling other active tasks.
@@ -168,7 +185,7 @@ impl TestExecutor {
         self.local.run_singlethreaded(main_future)
     }
 
-    /// PollResult the future. If it is not ready, dispatch available packets and possibly try
+    /// Poll the future. If it is not ready, dispatch available packets and possibly try
     /// again. Timers will only fire if this executor uses fake time. Never blocks.
     ///
     /// This function is for testing. DO NOT use this function in tests or applications that
@@ -185,14 +202,14 @@ impl TestExecutor {
         let mut main_future = pin!(main_future);
 
         // Set up an instance of UntilStalledData that works with `poll_until_stalled`.
-        struct Cleanup(Arc<Inner>);
+        struct Cleanup(Arc<Executor>);
         impl Drop for Cleanup {
             fn drop(&mut self) {
                 *self.0.owner_data.lock() = None;
             }
         }
-        let _cleanup = Cleanup(self.local.ehandle.inner.clone());
-        *self.local.ehandle.inner.owner_data.lock() =
+        let _cleanup = Cleanup(self.local.ehandle.inner().clone());
+        *self.local.ehandle.inner().owner_data.lock() =
             Some(Box::new(UntilStalledData { watcher: None }));
 
         loop {
@@ -266,7 +283,7 @@ impl TestExecutor {
 
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> super::instrumentation::Snapshot {
-        self.local.ehandle.inner.collector.snapshot()
+        self.local.ehandle.inner().collector.snapshot()
     }
 
     /// Advances fake time to the specified time.  This will only work if the executor is being run
@@ -283,11 +300,11 @@ impl TestExecutor {
             let _: Poll<_> = Self::poll_until_stalled(future::pending::<()>()).await;
             if let Some(next_timer) = Self::next_timer() {
                 if next_timer <= time {
-                    ehandle.inner.set_fake_time(next_timer);
+                    ehandle.inner().set_fake_time(next_timer);
                     continue;
                 }
             }
-            ehandle.inner.set_fake_time(time);
+            ehandle.inner().set_fake_time(time);
             break;
         }
     }
@@ -370,7 +387,7 @@ fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
     const MESSAGE: &str = "poll_until_stalled only works if the executor is being run \
                            with TestExecutor::run_until_stalled";
     f(&mut EHandle::local()
-        .inner
+        .inner()
         .owner_data
         .lock()
         .as_mut()
@@ -580,7 +597,7 @@ mod tests {
         let run = |n| {
             let mut executor = LocalExecutor::new();
             executor.run_singlethreaded(multi_wake(n));
-            let snapshot = executor.ehandle.inner.collector.snapshot();
+            let snapshot = executor.ehandle.inner().collector.snapshot();
             snapshot.wakeups_notification
         };
         assert_eq!(run(5), run(10)); // Same number of notifications independent of wakeup calls
