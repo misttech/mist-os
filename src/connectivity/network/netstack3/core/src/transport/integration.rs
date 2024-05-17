@@ -21,7 +21,7 @@ use crate::{
             },
             TcpCounters,
         },
-        udp::{self, UdpSocketId, UdpSocketSet, UdpSocketState},
+        udp::{self, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState},
         TransportLayerTimerId,
     },
     uninstantiable::{Uninstantiable, UninstantiableWrapper},
@@ -604,24 +604,9 @@ impl<I: crate::transport::tcp::socket::DualStackIpExt, BC: BindingsContext>
 }
 
 impl<I: datagram::IpExt, D: WeakDeviceIdentifier, BT: BindingsTypes>
-    RwLockFor<crate::lock_ordering::UdpSocketState<I>> for UdpSocketId<I, D, BT>
+    LockLevelFor<UdpSocketId<I, D, BT>> for crate::lock_ordering::UdpSocketState<I>
 {
     type Data = UdpSocketState<I, D, BT>;
-
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
-    where
-        Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data>
-    where
-        Self: 'l ;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state_for_locking().read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state_for_locking().write()
-    }
 }
 
 impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpBoundMap<I>>
@@ -654,7 +639,7 @@ impl<I: datagram::IpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::UdpA
     }
 }
 
-impl<BC: crate::BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::TcpCounters<I>>
+impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::TcpCounters<I>>
     for StackState<BC>
 {
     type Data = TcpCounters<I>;
@@ -665,8 +650,25 @@ impl<BC: crate::BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::Tcp
     }
 }
 
-impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
+impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::TcpCounters<I>>())
+    }
+}
+
+impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
+    for StackState<BC>
+{
+    type Data = UdpCounters<I>;
+    type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.udp_counters()
+    }
+}
+
+impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
+    fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::UdpCounters<I>>())
     }
 }

@@ -14,10 +14,10 @@ use core::{
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
-use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 
 use derivative::Derivative;
 use either::Either;
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
@@ -73,7 +73,7 @@ use crate::{
         SocketMapStateSpec,
     },
     sync::{RemoveResourceResultWithContext, RwLock, StrongRc},
-    trace_duration, transport, CoreCtx, StackState,
+    trace_duration,
 };
 
 /// A builder for UDP layer state.
@@ -192,23 +192,6 @@ pub struct UdpCountersInner {
     /// Count of outgoing UDP datagrams which failed to be sent out of the
     /// transport layer.
     pub tx_error: Counter,
-}
-
-impl<BC: crate::BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
-    for StackState<BC>
-{
-    type Data = UdpCounters<I>;
-    type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.udp_counters()
-    }
-}
-
-impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::UdpCounters<I>>())
-    }
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
@@ -1032,10 +1015,21 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Debug for UdpSocke
     }
 }
 
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>
+    OrderedLockAccess<UdpSocketState<I, D, BT>> for UdpSocketId<I, D, BT>
+{
+    type Lock = RwLock<UdpSocketState<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        let Self(rc) = self;
+        OrderedLockRef::new(&rc.state)
+    }
+}
+
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, BT> {
-    /// Returns the inner state for this socket, to be used in conjunction with
-    /// lock ordering mechanisms.
-    pub(crate) fn state_for_locking(&self) -> &RwLock<UdpSocketState<I, D, BT>> {
+    #[cfg(any(test, feature = "testutils"))]
+    /// Returns the inner state for this socket, sidestepping locking
+    /// mechanisms.
+    pub fn state(&self) -> &RwLock<UdpSocketState<I, D, BT>> {
         let Self(rc) = self;
         &rc.state
     }
@@ -1467,7 +1461,7 @@ fn try_deliver<
                 original_bound_addr: _,
             }) => match socket_type {
                 DatagramBoundSocketStateType::Connected { state, sharing: _ } => {
-                    match transport::udp::BoundStateContext::dual_stack_context(core_ctx) {
+                    match BoundStateContext::dual_stack_context(core_ctx) {
                         MaybeDualStack::DualStack(dual_stack) => {
                             match dual_stack.converter().convert(state) {
                                 DualStackConnState::ThisStack(state) => state.should_receive(),
@@ -2830,11 +2824,11 @@ mod tests {
     /// Utilities for accessing locked internal state in tests.
     impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, BT> {
         fn get(&self) -> impl Deref<Target = UdpSocketState<I, D, BT>> + '_ {
-            self.state_for_locking().read()
+            self.state().read()
         }
 
         fn get_mut(&self) -> impl DerefMut<Target = UdpSocketState<I, D, BT>> + '_ {
-            self.state_for_locking().write()
+            self.state().write()
         }
     }
 
@@ -6451,7 +6445,7 @@ mod tests {
                 device: None,
             };
 
-            transport::udp::DualStackBoundStateContext::with_both_bound_sockets_mut(
+            DualStackBoundStateContext::with_both_bound_sockets_mut(
                 get_dual_stack_context(&mut core_ctx.bound_sockets),
                 |_core_ctx, v6_sockets, v4_sockets| {
                     let v4 = v4_sockets.bound_sockets.listeners().get_by_addr(&V4_LISTENER_ADDR);
