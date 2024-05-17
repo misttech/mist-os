@@ -40,7 +40,9 @@ pub trait IpProtoExt: Ip {
         + Debug
         + Display
         + PartialEq
-        + Eq;
+        + Eq
+        + PartialOrd
+        + Ord;
 }
 
 impl IpProtoExt for Ipv4 {
@@ -284,7 +286,7 @@ create_protocol_enum!(
     ///
     /// [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     #[allow(missing_docs)]
-    #[derive(Copy, Clone, Hash, Eq, PartialEq)]
+    #[derive(Copy, Clone, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub enum IpProto: u8 {
         Tcp, 6, "TCP";
         Udp, 17, "UDP";
@@ -299,7 +301,7 @@ create_protocol_enum!(
     ///
     /// [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     #[allow(missing_docs)]
-    #[derive(Copy, Clone, Hash, Eq, PartialEq)]
+    #[derive(Copy, Clone, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub enum Ipv4Proto: u8 {
         Icmp, 1, "ICMP";
         Igmp, 2, "IGMP";
@@ -321,7 +323,7 @@ create_protocol_enum!(
     ///
     /// [protocol-numbers]: https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     #[allow(missing_docs)]
-    #[derive(Copy, Clone, Hash, Eq, PartialEq)]
+    #[derive(Copy, Clone, Hash, Eq, Ord, PartialEq, PartialOrd)]
     pub enum Ipv6Proto: u8 {
         Icmpv6, 58, "ICMPv6";
         NoNextHeader, 59, "NO NEXT HEADER";

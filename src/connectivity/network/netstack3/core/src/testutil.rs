@@ -35,6 +35,7 @@ use net_types::{
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{Buf, BufferMut};
+use zerocopy::ByteSlice;
 
 #[cfg(test)]
 use crate::context::testutil::{FakeNetwork, FakeNetworkLinks, FakeNetworkSpec};
@@ -66,7 +67,7 @@ use crate::{
             IpDeviceEvent,
         },
         icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
-        raw::RawIpSocketsBindingsTypes,
+        raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -1171,6 +1172,16 @@ impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for Fake
         raw_frame: &[u8],
     ) {
         state.lock().push((device.downgrade(), raw_frame.into()));
+    }
+}
+
+impl<I: crate::IpExt> RawIpSocketsBindingsContext<I> for FakeBindingsCtx {
+    fn receive_packet<B: ByteSlice>(
+        &self,
+        _socket: &RawIpSocketId<I, Self>,
+        _packet: &I::Packet<B>,
+    ) {
+        unimplemented!()
     }
 }
 

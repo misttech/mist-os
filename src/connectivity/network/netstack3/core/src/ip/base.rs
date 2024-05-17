@@ -64,7 +64,7 @@ use crate::{
         ipv6,
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
-        raw::{RawIpSocketMap, RawIpSocketsBindingsTypes},
+        raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes, RawIpSocketsIpExt},
         reassembly::{
             FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
             IpPacketFragmentCache,
@@ -165,7 +165,7 @@ impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, 
 }
 
 /// An [`Ip`] extension trait adding functionality specific to the IP layer.
-pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt {
+pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt + RawIpSocketsIpExt {
     /// The type used to specify an IP packet's source address in a call to
     /// [`IpTransportContext::receive_ip_packet`].
     ///
@@ -1005,6 +1005,7 @@ pub(crate) trait IpLayerIngressContext<
     + IpLayerContext<I, BC>
     + FragmentHandler<I, BC>
     + FilterHandlerProvider<I, BC>
+    + RawIpSocketHandler<I, BC>
 {
     // This is working around the fact that currently, where clauses are only
     // elaborated for supertraits, and not, for example, bounds on associated types
@@ -1024,7 +1025,8 @@ impl<
             + IcmpErrorHandler<I, BC>
             + IpLayerContext<I, BC>
             + FragmentHandler<I, BC>
-            + FilterHandlerProvider<I, BC>,
+            + FilterHandlerProvider<I, BC>
+            + RawIpSocketHandler<I, BC>,
     > IpLayerIngressContext<I, BC> for CC
 where
     Self::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
@@ -1577,6 +1579,9 @@ fn dispatch_receive_ipv4_packet<
         );
         return Ok(());
     };
+
+    core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+
     let buffer = Buf::new(packet.body_mut(), ..);
 
     core_ctx
@@ -1663,6 +1668,9 @@ fn dispatch_receive_ipv6_packet<
         );
         return Ok(());
     };
+
+    core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+
     let buffer = Buf::new(packet.body_mut(), ..);
 
     let result = core_ctx

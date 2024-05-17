@@ -27,7 +27,7 @@ use crate::{
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
         },
         icmp::{IcmpBindingsContext, IcmpBindingsTypes},
-        raw::RawIpSocketsBindingsTypes,
+        raw::{RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
@@ -48,6 +48,7 @@ pub trait IpExt:
     + ip::device::IpDeviceIpExt
     + transport::tcp::socket::DualStackIpExt
     + socket::datagram::DualStackIpExt
+    + ip::raw::RawIpSocketsIpExt
 {
 }
 
@@ -58,6 +59,7 @@ impl<O> IpExt for O where
         + ip::device::IpDeviceIpExt
         + transport::tcp::socket::DualStackIpExt
         + socket::datagram::DualStackIpExt
+        + ip::raw::RawIpSocketsIpExt
 {
 }
 
@@ -147,6 +149,7 @@ pub trait IpBindingsContext<I: IpExt>:
     + TcpBindingsContext
     + FilterBindingsContext
     + IcmpBindingsContext<I, DeviceId<Self>>
+    + RawIpSocketsBindingsContext<I>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
     + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<Self>>
@@ -167,6 +170,7 @@ where
         + TcpBindingsContext
         + FilterBindingsContext
         + IcmpBindingsContext<I, DeviceId<Self>>
+        + RawIpSocketsBindingsContext<I>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>
         + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<Self>>

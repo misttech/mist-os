@@ -1960,7 +1960,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_send<I: Ip + IpSocketIpExt + IpLayerIpExt>()
+    fn test_send<I: Ip + crate::IpExt + TestIpExt>()
     where
         for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
             + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>

@@ -10,8 +10,11 @@ use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_types::ip::Ip;
-use netstack3_core::ip::RawIpSocketsBindingsTypes;
+use netstack3_core::ip::{
+    RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, RawIpSocketsIpExt,
+};
 use tracing::error;
+use zerocopy::ByteSlice;
 use zx::{HandleBased, Peered};
 
 use crate::bindings::{BindingsCtx, Ctx};
@@ -24,6 +27,16 @@ use super::{
 impl RawIpSocketsBindingsTypes for BindingsCtx {
     // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
     type RawIpSocketState<I: Ip> = ();
+}
+
+impl<I: RawIpSocketsIpExt> RawIpSocketsBindingsContext<I> for BindingsCtx {
+    fn receive_packet<B: ByteSlice>(
+        &self,
+        _socket: &RawIpSocketId<I, Self>,
+        _packet: &I::Packet<B>,
+    ) {
+        // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
+    }
 }
 
 #[derive(Debug)]

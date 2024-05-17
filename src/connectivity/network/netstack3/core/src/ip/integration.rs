@@ -266,9 +266,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         body: B,
         transport_override: Option<TransparentLocalDelivery<Ipv4>>,
     ) -> Result<(), TransportReceiveError> {
-        // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
-        // sockets.
-
         match proto {
             Ipv4Proto::Icmp => {
                 <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
@@ -330,9 +327,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         body: B,
         transport_override: Option<TransparentLocalDelivery<Ipv6>>,
     ) -> Result<(), TransportReceiveError> {
-        // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
-        // sockets.
-
         match proto {
             Ipv6Proto::Icmpv6 => {
                 <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(

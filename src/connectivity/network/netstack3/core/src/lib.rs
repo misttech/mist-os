@@ -196,7 +196,9 @@ pub mod ip {
         },
         AddressRemovedReason, IpAddressState, IpDeviceEvent,
     };
-    pub use raw::RawIpSocketsBindingsTypes;
+    pub use raw::{
+        RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, RawIpSocketsIpExt,
+    };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }
 

@@ -9,17 +9,20 @@ use lock_order::{lock::LockLevelFor, relation::LockBefore, wrap::LockedWrapperAp
 
 use crate::{
     ip::{
-        base::IpLayerIpExt,
         raw::{
             RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
-            RawIpSocketState, RawIpSocketStateContext,
+            RawIpSocketState, RawIpSocketStateContext, RawIpSocketsIpExt,
         },
+        IpLayerIpExt,
     },
     lock_ordering, BindingsTypes, CoreCtx,
 };
 
-impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::RawIpSocketState<I>>>
-    RawIpSocketStateContext<I, BT> for CoreCtx<'_, BT, L>
+impl<
+        I: RawIpSocketsIpExt,
+        BT: BindingsTypes,
+        L: LockBefore<lock_ordering::RawIpSocketState<I>>,
+    > RawIpSocketStateContext<I, BT> for CoreCtx<'_, BT, L>
 {
     fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I>) -> O>(
         &mut self,
@@ -55,7 +58,7 @@ impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSo
     }
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<RawIpSocketState<I, BT>>
+impl<I: RawIpSocketsIpExt, BT: BindingsTypes> LockLevelFor<RawIpSocketState<I, BT>>
     for lock_ordering::RawIpSocketState<I>
 {
     type Data = RawIpSocketLockedState<I>;

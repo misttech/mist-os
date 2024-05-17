@@ -39,10 +39,11 @@ impl<I: IpProtoExt, BT: RawIpSocketsBindingsTypes> RawIpSocketState<I, BT> {
     ) -> RawIpSocketState<I, BT> {
         RawIpSocketState { external_state, protocol, locked_state: Default::default() }
     }
-    // TODO(https://fxbug.dev/42175797): Use this method during rx.
-    #[allow(dead_code)]
     pub(super) fn protocol(&self) -> &RawIpSocketProtocol<I> {
         &self.protocol
+    }
+    pub(super) fn external_state(&self) -> &BT::RawIpSocketState<I> {
+        &self.external_state
     }
     pub(super) fn into_external_state(self) -> BT::RawIpSocketState<I> {
         let RawIpSocketState { protocol: _, locked_state: _, external_state } = self;

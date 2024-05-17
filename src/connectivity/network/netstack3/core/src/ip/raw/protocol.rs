@@ -9,7 +9,7 @@ use packet_formats::ip::{IpProto, IpProtoExt, Ipv4Proto, Ipv6Proto};
 
 /// A witness type enforcing that the contained protocol is not the
 /// "reserved" IANA Internet protocol.
-#[derive(Clone, Copy, Debug, GenericOverIp, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, GenericOverIp, Ord, PartialEq, PartialOrd)]
 #[generic_over_ip(I, Ip)]
 pub struct Protocol<I: IpProtoExt>(I::Proto);
 
@@ -30,7 +30,7 @@ impl<I: IpProtoExt> Protocol<I> {
 }
 
 /// The supported protocols of raw IP sockets.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum RawIpSocketProtocol<I: IpProtoExt> {
     /// Analogous to `IPPROTO_RAW` on Linux.
     ///
