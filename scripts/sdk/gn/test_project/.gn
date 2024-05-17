@@ -7,7 +7,8 @@ buildconfig = "//build/BUILDCONFIG.gn"
 script_executable = ""
 
 # Hardcode API level until test is removed.
-# TODO: Remove test project and associated tests when GN SDK is deprecated.
+# TODO(https://fxbug.dev/42080529): Remove test project and associated tests
+# when there are no more uses of the GN SDK downstream.
 default_args = {
-  fuchsia_target_api_level = 11
+  fuchsia_target_api_level = 15
 }

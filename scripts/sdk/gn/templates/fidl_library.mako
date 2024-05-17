@@ -21,6 +21,6 @@ fidl_library("${data.name}") {
 
 group("all"){
   deps = [
-    ":${data.name}",
+    ":${data.name}_cpp",
   ]
 }

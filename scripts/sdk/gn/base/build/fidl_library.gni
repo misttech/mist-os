@@ -507,8 +507,14 @@ template("fidl_library") {
       layer = "cpp_wire_types"
       headers = [ "fidl/${library_name}/cpp/wire_types.h" ]
       sources = [ "fidl/${library_name}/cpp/wire_types.cc" ]
-
       layer_deps = [ "cpp_common" ]
+
+      # This is required by driver layers that depend on this layer.
+      # This cannot be limited to a `driver` variant of this layer cannot be
+      # created because two layers cannot build the same source files, and
+      # there is not a separate `driver/` instance of these files. See
+      # https://fxbug.dev/340944762.
+      public_deps = [ "${fuchsia_sdk}/pkg/fidl_driver" ]
     },
 
     {
@@ -534,6 +540,10 @@ template("fidl_library") {
       sources = [ "fidl/${library_name}/cpp/natural_types.cc" ]
       public_deps = [ "${fuchsia_sdk}/pkg/fidl_cpp_base_v2" ]
       layer_deps = [ "cpp_common" ]
+
+      # See the comment for the same line in "cpp_wire_types" and
+      # https://fxbug.dev/340944762.
+      public_deps += [ "${fuchsia_sdk}/pkg/fidl_driver_natural" ]
     },
 
     {

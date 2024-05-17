@@ -82,10 +82,6 @@ template("fuchsia_package_tool") {
         "--published-name",
         package_name,
         "--depfile",
-
-        # TODO(https://fxbug.dev/337904808): Remove this once it's no longer
-        # necessary - or more likely, when all this code is deleted.
-        "--deprecated-ignore-api-level-unsupported-errors",
       ]
 
       if (fuchsia_target_api_level != -1) {
