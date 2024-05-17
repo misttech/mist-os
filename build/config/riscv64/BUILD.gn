@@ -30,3 +30,37 @@ config("riscv64") {
 riscv64_abi_config("no-vector") {
   exclude_letters = [ "v" ]
 }
+
+config("lto-workarounds") {
+  # TODO(https://fxbug.dev/42086180): These workarounds can be safely removed
+  # once our toolchains handle passing riscv target features in LTO.
+  if (current_cpu == "riscv64") {
+    riscv64_extra_mattr = [
+      "+c",
+      "+f",
+      "+d",
+      "+relax",
+    ]
+
+    # Use the long option to pass -mllvm -mattr= to LLD.
+    mllvm_mattr = "--mllvm=-mattr"
+
+    rust_linkarg = "-Clink-args="
+
+    if (!is_fuchsia) {
+      # On non-Fuchsia platforms, rustc calls clang, which calls lld.
+      rust_linkarg += "-Wl,"
+    }
+
+    ldflags = []
+    rustflags = []
+
+    # TODO(https://fxbug.dev/42086180): The linker flags below are required to avoid code
+    # generation bugs during LTO. They can be removed once LTO properly handles
+    # target features
+    foreach(attr, riscv64_extra_mattr) {
+      ldflags += [ "-Wl,${mllvm_mattr}=$attr" ]
+      rustflags += [ "${rust_linkarg}${mllvm_mattr}=${attr}" ]
+    }
+  }
+}
