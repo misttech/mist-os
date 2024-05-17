@@ -2,12 +2,89 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::config::SshConfig;
+use crate::parse::ParseSshConnectionError;
 use anyhow::Context as _;
 use anyhow::{anyhow, Result};
 use ffx_config::EnvironmentContext;
+use fuchsia_async::TimeoutExt;
+use std::time::Duration;
 use std::{net::SocketAddr, path::PathBuf, process::Command};
+use tokio::io::AsyncRead;
 
 const SSH_PRIV: &str = "ssh.priv";
+
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+pub enum SshError {
+    Unknown(String),
+    PermissionDenied,
+    ConnectionRefused,
+    UnknownNameOrService,
+    Timeout,
+    KeyVerificationFailure,
+    NoRouteToHost,
+    NetworkUnreachable,
+    InvalidArgument,
+    TargetIncompatible,
+}
+
+impl From<String> for SshError {
+    fn from(s: String) -> Self {
+        if s.contains("Permission denied") {
+            return Self::PermissionDenied;
+        }
+        if s.contains("Connection refused") {
+            return Self::ConnectionRefused;
+        }
+        if s.contains("Name or service not known") {
+            return Self::UnknownNameOrService;
+        }
+        if s.contains("Connection timed out") {
+            return Self::Timeout;
+        }
+        if s.contains("Host key verification failed") {
+            return Self::KeyVerificationFailure;
+        }
+        if s.contains("No route to host") {
+            return Self::NoRouteToHost;
+        }
+        if s.contains("Network is unreachable") {
+            return Self::NetworkUnreachable;
+        }
+        if s.contains("Invalid argument") {
+            return Self::InvalidArgument;
+        }
+        if s.contains("not compatible") {
+            return Self::TargetIncompatible;
+        }
+        return Self::Unknown(s);
+    }
+}
+
+impl From<&str> for SshError {
+    fn from(s: &str) -> Self {
+        Self::from(s.to_owned())
+    }
+}
+
+pub async fn extract_ssh_error<R: AsyncRead + Unpin>(
+    stderr_reader: &mut R,
+    logtofile: bool,
+) -> SshError {
+    // Flush any remaining lines, but let's not wait more than one second
+    let mut lb = crate::parse::LineBuffer::new();
+    let mut last_line = "".to_string();
+    while let Ok(line) = crate::parse::read_ssh_line(&mut lb, stderr_reader)
+        .on_timeout(Duration::from_secs(1), || Err(ParseSshConnectionError::Timeout))
+        .await
+    {
+        if logtofile {
+            crate::parse::write_ssh_log("E", &line).await;
+        }
+        tracing::error!("SSH stderr: {line}");
+        last_line = line;
+    }
+    SshError::from(last_line)
+}
 
 #[cfg(not(test))]
 pub async fn get_ssh_key_paths() -> Result<Vec<String>> {
@@ -159,7 +236,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use std::io::BufRead;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_build_ssh_command_ipv4() {
         let config = SshConfig::new().expect("default ssh config");
         let addr = "192.168.0.1:22".parse().unwrap();
@@ -177,7 +254,7 @@ mod test {
         assert_eq!(actual_args, expected_args);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_build_ssh_command_ipv6() {
         let config = SshConfig::new().expect("default ssh config");
         let addr = "[fe80::12%5]:8022".parse().unwrap();
@@ -204,7 +281,7 @@ mod test {
         assert_eq!(actual_args, expected_args);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_apply_auth_sock() {
         let env = ffx_config::test_init().await.unwrap();
         let expect_path =
@@ -230,7 +307,7 @@ mod test {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_build_ssh_command_with_ssh_config() {
         let mut config = SshConfig::new().expect("default ssh config");
         let addr = "[fe80::12%5]:8022".parse().unwrap();
@@ -249,5 +326,24 @@ mod test {
 
         // Check the override
         assert!(actual_args.contains(&"LogLevel=DEBUG3".to_string()));
+    }
+
+    #[fuchsia::test]
+    fn test_host_pipe_err_from_str() {
+        assert_eq!(SshError::from("Permission denied"), SshError::PermissionDenied);
+        assert_eq!(SshError::from("Connection refused"), SshError::ConnectionRefused);
+        assert_eq!(SshError::from("Name or service not known"), SshError::UnknownNameOrService);
+        assert_eq!(SshError::from("Connection timed out"), SshError::Timeout);
+        assert_eq!(
+            SshError::from("Host key verification failedddddd"),
+            SshError::KeyVerificationFailure
+        );
+        assert_eq!(SshError::from("There is No route to host"), SshError::NoRouteToHost);
+        assert_eq!(SshError::from("The Network is unreachable"), SshError::NetworkUnreachable);
+        assert_eq!(SshError::from("Invalid argument"), SshError::InvalidArgument);
+        assert_eq!(SshError::from("ABI 123 is not compatible"), SshError::TargetIncompatible);
+
+        let unknown_str = "OIHWOFIHOIWHFW";
+        assert_eq!(SshError::from(unknown_str), SshError::Unknown(String::from(unknown_str)));
     }
 }

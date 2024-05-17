@@ -4,8 +4,9 @@
 
 use crate::reboot;
 use anyhow::{anyhow, Context as _, Result};
-use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use ffx_daemon_events::TargetEvent;
 use ffx_daemon_target::target::Target;
+use ffx_ssh::ssh::SshError;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx::{self as ffx};
@@ -154,8 +155,8 @@ pub(crate) async fn wait_for_rcs(
         t.events
             .wait_for(None, move |e| match e {
                 TargetEvent::RcsActivated => true,
-                TargetEvent::SshHostPipeErr(host_pipe_err) => {
-                    *se_clone.borrow_mut() = Some(host_pipe_err);
+                TargetEvent::SshHostPipeErr(ssh_error) => {
+                    *se_clone.borrow_mut() = Some(ssh_error);
                     true
                 }
                 _ => false,
@@ -166,21 +167,21 @@ pub(crate) async fn wait_for_rcs(
 }
 
 #[tracing::instrument]
-fn host_pipe_err_to_fidl(h: HostPipeErr) -> ffx::TargetConnectionError {
-    match h {
-        HostPipeErr::Unknown(s) => {
+fn host_pipe_err_to_fidl(ssh_err: SshError) -> ffx::TargetConnectionError {
+    match ssh_err {
+        SshError::Unknown(s) => {
             tracing::warn!("Unknown host-pipe error received: '{}'", s);
             ffx::TargetConnectionError::UnknownError
         }
-        HostPipeErr::NetworkUnreachable => ffx::TargetConnectionError::NetworkUnreachable,
-        HostPipeErr::PermissionDenied => ffx::TargetConnectionError::PermissionDenied,
-        HostPipeErr::ConnectionRefused => ffx::TargetConnectionError::ConnectionRefused,
-        HostPipeErr::UnknownNameOrService => ffx::TargetConnectionError::UnknownNameOrService,
-        HostPipeErr::Timeout => ffx::TargetConnectionError::Timeout,
-        HostPipeErr::KeyVerificationFailure => ffx::TargetConnectionError::KeyVerificationFailure,
-        HostPipeErr::NoRouteToHost => ffx::TargetConnectionError::NoRouteToHost,
-        HostPipeErr::InvalidArgument => ffx::TargetConnectionError::InvalidArgument,
-        HostPipeErr::TargetIncompatible => ffx::TargetConnectionError::TargetIncompatible,
+        SshError::NetworkUnreachable => ffx::TargetConnectionError::NetworkUnreachable,
+        SshError::PermissionDenied => ffx::TargetConnectionError::PermissionDenied,
+        SshError::ConnectionRefused => ffx::TargetConnectionError::ConnectionRefused,
+        SshError::UnknownNameOrService => ffx::TargetConnectionError::UnknownNameOrService,
+        SshError::Timeout => ffx::TargetConnectionError::Timeout,
+        SshError::KeyVerificationFailure => ffx::TargetConnectionError::KeyVerificationFailure,
+        SshError::NoRouteToHost => ffx::TargetConnectionError::NoRouteToHost,
+        SshError::InvalidArgument => ffx::TargetConnectionError::InvalidArgument,
+        SshError::TargetIncompatible => ffx::TargetConnectionError::TargetIncompatible,
     }
 }
 
@@ -207,43 +208,40 @@ mod tests {
     #[test]
     fn test_host_pipe_err_to_fidl_conversion() {
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::Unknown(String::from("foobar"))),
+            host_pipe_err_to_fidl(SshError::Unknown(String::from("foobar"))),
             ffx::TargetConnectionError::UnknownError
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::InvalidArgument),
+            host_pipe_err_to_fidl(SshError::InvalidArgument),
             ffx::TargetConnectionError::InvalidArgument
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::NoRouteToHost),
+            host_pipe_err_to_fidl(SshError::NoRouteToHost),
             ffx::TargetConnectionError::NoRouteToHost
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::KeyVerificationFailure),
+            host_pipe_err_to_fidl(SshError::KeyVerificationFailure),
             ffx::TargetConnectionError::KeyVerificationFailure
         );
+        assert_eq!(host_pipe_err_to_fidl(SshError::Timeout), ffx::TargetConnectionError::Timeout);
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::Timeout),
-            ffx::TargetConnectionError::Timeout
-        );
-        assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::UnknownNameOrService),
+            host_pipe_err_to_fidl(SshError::UnknownNameOrService),
             ffx::TargetConnectionError::UnknownNameOrService
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::ConnectionRefused),
+            host_pipe_err_to_fidl(SshError::ConnectionRefused),
             ffx::TargetConnectionError::ConnectionRefused
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::PermissionDenied),
+            host_pipe_err_to_fidl(SshError::PermissionDenied),
             ffx::TargetConnectionError::PermissionDenied
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::NetworkUnreachable),
+            host_pipe_err_to_fidl(SshError::NetworkUnreachable),
             ffx::TargetConnectionError::NetworkUnreachable
         );
         assert_eq!(
-            host_pipe_err_to_fidl(HostPipeErr::TargetIncompatible),
+            host_pipe_err_to_fidl(SshError::TargetIncompatible),
             ffx::TargetConnectionError::TargetIncompatible
         );
     }

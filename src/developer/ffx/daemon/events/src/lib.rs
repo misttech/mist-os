@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ffx_ssh::ssh::SshError;
 use ffx_target::Description;
 use rcs::RcsConnection;
 use std::{net::SocketAddr, time::Instant};
@@ -40,63 +41,10 @@ pub enum DaemonEvent {
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
-pub enum HostPipeErr {
-    Unknown(String),
-    PermissionDenied,
-    ConnectionRefused,
-    UnknownNameOrService,
-    Timeout,
-    KeyVerificationFailure,
-    NoRouteToHost,
-    NetworkUnreachable,
-    InvalidArgument,
-    TargetIncompatible,
-}
-
-impl From<String> for HostPipeErr {
-    fn from(s: String) -> Self {
-        if s.contains("Permission denied") {
-            return Self::PermissionDenied;
-        }
-        if s.contains("Connection refused") {
-            return Self::ConnectionRefused;
-        }
-        if s.contains("Name or service not known") {
-            return Self::UnknownNameOrService;
-        }
-        if s.contains("Connection timed out") {
-            return Self::Timeout;
-        }
-        if s.contains("Host key verification failed") {
-            return Self::KeyVerificationFailure;
-        }
-        if s.contains("No route to host") {
-            return Self::NoRouteToHost;
-        }
-        if s.contains("Network is unreachable") {
-            return Self::NetworkUnreachable;
-        }
-        if s.contains("Invalid argument") {
-            return Self::InvalidArgument;
-        }
-        if s.contains("not compatible") {
-            return Self::TargetIncompatible;
-        }
-        return Self::Unknown(s);
-    }
-}
-
-impl From<&str> for HostPipeErr {
-    fn from(s: &str) -> Self {
-        Self::from(s.to_owned())
-    }
-}
-
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum TargetEvent {
     RcsActivated,
     Rediscovered,
-    SshHostPipeErr(HostPipeErr),
+    SshHostPipeErr(SshError),
 
     /// LHS is previous state, RHS is current state.
     ConnectionStateChanged(TargetConnectionState, TargetConnectionState),
@@ -189,30 +137,5 @@ mod tests {
         assert!(!TargetConnectionState::Disconnected.is_product());
         assert!(!TargetConnectionState::Disconnected.is_rcs());
         assert!(!TargetConnectionState::Disconnected.is_manual());
-    }
-
-    #[test]
-    fn test_host_pipe_err_from_str() {
-        assert_eq!(HostPipeErr::from("Permission denied"), HostPipeErr::PermissionDenied);
-        assert_eq!(HostPipeErr::from("Connection refused"), HostPipeErr::ConnectionRefused);
-        assert_eq!(
-            HostPipeErr::from("Name or service not known"),
-            HostPipeErr::UnknownNameOrService
-        );
-        assert_eq!(HostPipeErr::from("Connection timed out"), HostPipeErr::Timeout);
-        assert_eq!(
-            HostPipeErr::from("Host key verification failedddddd"),
-            HostPipeErr::KeyVerificationFailure
-        );
-        assert_eq!(HostPipeErr::from("There is No route to host"), HostPipeErr::NoRouteToHost);
-        assert_eq!(
-            HostPipeErr::from("The Network is unreachable"),
-            HostPipeErr::NetworkUnreachable
-        );
-        assert_eq!(HostPipeErr::from("Invalid argument"), HostPipeErr::InvalidArgument);
-        assert_eq!(HostPipeErr::from("ABI 123 is not compatible"), HostPipeErr::TargetIncompatible);
-
-        let unknown_str = "OIHWOFIHOIWHFW";
-        assert_eq!(HostPipeErr::from(unknown_str), HostPipeErr::Unknown(String::from(unknown_str)));
     }
 }
