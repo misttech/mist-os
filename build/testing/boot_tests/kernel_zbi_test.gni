@@ -35,8 +35,18 @@ template("_cuckoo_product_bundle") {
   assert(defined(invoker.kernel_zbi))
 
   target_environments = [ emu_env ]
-  if (defined(invoker.environments)) {
-    target_environments = invoker.environments
+  if (defined(invoker.device_types)) {
+    # Translate `device_types` to environments.
+    target_environments = []
+    foreach(device_type, invoker.device_types) {
+      target_environments += [
+        {
+          dimensions = {
+            device_type = device_type
+          }
+        },
+      ]
+    }
   }
 
   if ((!defined(invoker.disabled) && disable_cuckoo_tests) ||
@@ -205,6 +215,7 @@ template("kernel_zbi_test") {
                                [
                                  "disabled",
                                  "timeout",
+                                 "device_types",
                                ])
         kernel_zbi = ":$main_target.zbi"
         kernel_image_name = "$main_target"
