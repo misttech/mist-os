@@ -91,16 +91,27 @@ impl Stream {
         &mut self.endpoint
     }
 
+    fn media_codec_config(&self) -> Option<MediaCodecConfig> {
+        find_codec_capability(&self.endpoint.capabilities())
+            .and_then(|x| MediaCodecConfig::try_from(x).ok())
+    }
+
+    /// Returns true if the config given is a supported configuration of this stream
+    /// Used when the stream is being configured to a specific configuration
     fn config_supported(&self, config: &MediaCodecConfig) -> bool {
-        let supported_cap = match find_codec_capability(&self.endpoint.capabilities()) {
-            None => return false,
-            Some(cap) => cap,
-        };
-        let supported = match MediaCodecConfig::try_from(supported_cap) {
-            Err(_) => return false,
-            Ok(config) => config,
+        let Some(supported) = self.media_codec_config() else {
+            return false;
         };
         supported.supports(&config)
+    }
+
+    /// Returns true if this stream and the given config are compatible - a valid configuration
+    /// of this stream can be found within the capabilities of the given config.
+    fn config_compatible(&self, config: &MediaCodecConfig) -> bool {
+        let Some(supported) = self.media_codec_config() else {
+            return false;
+        };
+        MediaCodecConfig::negotiate(&supported, config).is_some()
     }
 
     fn build_media_task(
@@ -378,6 +389,12 @@ pub struct Streams {
     inspect_node: fuchsia_inspect::Node,
 }
 
+impl fmt::Debug for Streams {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Streams").field("streams", &self.streams).finish()
+    }
+}
+
 impl Streams {
     /// Makes a copy of this set of streams, but with all streams copied with their states set to
     /// idle.
@@ -427,7 +444,7 @@ impl Streams {
 
     /// Finds streams in the set which are compatible with `codec_config`.
     pub fn compatible(&self, codec_config: MediaCodecConfig) -> impl Iterator<Item = &Stream> {
-        self.streams.values().filter(move |s| s.config_supported(&codec_config))
+        self.streams.values().filter(move |s| s.config_compatible(&codec_config))
     }
 }
 
@@ -473,6 +490,22 @@ pub(crate) mod tests {
         }
     }
 
+    pub(crate) fn aac_mediacodec_capability(bitrate: u32) -> avdtp::ServiceCapability {
+        let codec_info = AacCodecInfo::new(
+            AacObjectType::MANDATORY_SRC,
+            AacSamplingFrequency::FREQ48000HZ,
+            AacChannels::TWO,
+            true,
+            bitrate,
+        )
+        .expect("should work");
+        ServiceCapability::MediaCodec {
+            media_type: avdtp::MediaType::Audio,
+            codec_type: avdtp::MediaCodecType::AUDIO_AAC,
+            codec_extra: codec_info.to_bytes().to_vec(),
+        }
+    }
+
     pub(crate) fn make_sbc_endpoint(seid: u8, direction: avdtp::EndpointType) -> StreamEndpoint {
         StreamEndpoint::new(
             seid,
@@ -483,19 +516,38 @@ pub(crate) mod tests {
         .expect("endpoint creation should succeed")
     }
 
-    fn make_stream(seid: u8) -> Stream {
-        Stream::build(
-            make_sbc_endpoint(seid, avdtp::EndpointType::Source),
-            TestMediaTaskBuilder::new().builder(),
+    const LOW_BITRATE: u32 = 320_000;
+    const HIGH_BITRATE: u32 = 393_216;
+
+    pub(crate) fn make_aac_endpoint(seid: u8, direction: avdtp::EndpointType) -> StreamEndpoint {
+        StreamEndpoint::new(
+            seid,
+            avdtp::MediaType::Audio,
+            direction,
+            vec![avdtp::ServiceCapability::MediaTransport, aac_mediacodec_capability(LOW_BITRATE)],
         )
+        .expect("endpoint creation should succeed")
+    }
+
+    fn make_stream(seid: u8, codec_type: avdtp::MediaCodecType) -> Stream {
+        let endpoint = match codec_type {
+            avdtp::MediaCodecType::AUDIO_SBC => {
+                make_sbc_endpoint(seid, avdtp::EndpointType::Source)
+            }
+            avdtp::MediaCodecType::AUDIO_AAC => {
+                make_aac_endpoint(seid, avdtp::EndpointType::Source)
+            }
+            _ => panic!("Unsupported codec_type"),
+        };
+        Stream::build(endpoint, TestMediaTaskBuilder::new().builder())
     }
 
     #[fuchsia::test]
     fn streams_basic_functionality() {
         let mut streams = Streams::default();
 
-        streams.insert(make_stream(1));
-        streams.insert(make_stream(6));
+        streams.insert(make_stream(1, avdtp::MediaCodecType::AUDIO_SBC));
+        streams.insert(make_stream(6, avdtp::MediaCodecType::AUDIO_AAC));
 
         let first_id = 1_u8.try_into().expect("good id");
         let missing_id = 5_u8.try_into().expect("good id");
@@ -508,7 +560,7 @@ pub(crate) mod tests {
 
         let expected_info = vec![
             make_sbc_endpoint(1, avdtp::EndpointType::Source).information(),
-            make_sbc_endpoint(6, avdtp::EndpointType::Source).information(),
+            make_aac_endpoint(6, avdtp::EndpointType::Source).information(),
         ];
 
         let infos = streams.information();
@@ -522,6 +574,30 @@ pub(crate) mod tests {
             assert_eq!(expected_info[0], infos[1]);
             assert_eq!(expected_info[1], infos[0]);
         }
+    }
+
+    #[fuchsia::test]
+    fn streams_filters_compatible_codecs() {
+        let mut streams = Streams::default();
+        streams.insert(make_stream(1, avdtp::MediaCodecType::AUDIO_SBC));
+        streams.insert(make_stream(6, avdtp::MediaCodecType::AUDIO_AAC));
+
+        // Even if the other bitrate is higher, we can negotiate to the lower bitrate.
+        let config_high_bitrate_aac =
+            MediaCodecConfig::try_from(&aac_mediacodec_capability(HIGH_BITRATE)).unwrap();
+
+        let compatible: Vec<_> = streams.compatible(config_high_bitrate_aac).collect();
+        assert_eq!(compatible.len(), 1);
+        let codec_capability = compatible[0]
+            .endpoint()
+            .capabilities()
+            .into_iter()
+            .find(|x| x.category() == avdtp::ServiceCategory::MediaCodec)
+            .expect("should have a codec");
+        assert_eq!(
+            MediaCodecConfig::try_from(codec_capability).unwrap().codec_type(),
+            &avdtp::MediaCodecType::AUDIO_AAC
+        );
     }
 
     #[fuchsia::test]

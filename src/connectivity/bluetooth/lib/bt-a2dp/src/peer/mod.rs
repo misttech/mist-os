@@ -20,25 +20,21 @@ use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc,
-    future::BoxFuture,
-    select,
-    stream::FuturesUnordered,
-    task::{Context, Poll, Waker},
-    Future, FutureExt, StreamExt,
-};
-use std::{
-    collections::{HashMap, HashSet},
-    pin::Pin,
-    sync::{Arc, Weak},
-};
-use tracing::{info, trace, warn};
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
+use futures::task::{Context, Poll, Waker};
+use futures::{select, Future, FutureExt, StreamExt};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use tracing::{debug, info, trace, warn};
 
 /// For sending out-of-band commands over the A2DP peer.
 mod controller;
 pub use controller::ControllerPool;
 
+use crate::codec::MediaCodecConfig;
 use crate::permits::{Permit, Permits};
 use crate::stream::{Stream, Streams};
 
@@ -375,15 +371,34 @@ impl Peer {
                 (stream.local_id().clone(), stream.capabilities().clone())
             };
 
-            let local_categories: HashSet<_> =
-                local_capabilities.iter().map(ServiceCapability::category).collect();
+            let local_by_cat: HashMap<ServiceCategory, ServiceCapability> =
+                local_capabilities.into_iter().map(|i| (i.category(), i)).collect();
+
             // Filter things out if they don't have a match in the local capabilities.
-            let mut shared_capabilities: Vec<ServiceCapability> = capabilities
-                .into_iter()
-                .filter(|cap| local_categories.contains(&cap.category()))
-                .collect();
             // Order them by the ServiceCategory ordinal - some noncompliant devices care about it.
-            shared_capabilities.sort_by_key(ServiceCapability::category);
+            let shared_capabilities: BTreeMap<ServiceCategory, ServiceCapability> = capabilities
+                .into_iter()
+                .filter_map(|cap| {
+                    let Some(local_cap) = local_by_cat.get(&cap.category()) else {
+                        return None;
+                    };
+                    if cap.category() == ServiceCategory::MediaCodec {
+                        let Ok(a) = MediaCodecConfig::try_from(&cap) else {
+                            return None;
+                        };
+                        let Ok(b) = MediaCodecConfig::try_from(local_cap) else {
+                            return None;
+                        };
+                        let Some(negotiated) = MediaCodecConfig::negotiate(&a, &b) else {
+                            return None;
+                        };
+                        Some((cap.category(), (&negotiated).into()))
+                    } else {
+                        Some((cap.category(), cap))
+                    }
+                })
+                .collect();
+            let shared_capabilities: Vec<_> = shared_capabilities.into_values().collect();
 
             trace!("Starting stream {local_id} to remote {remote_id} with {shared_capabilities:?}");
 
@@ -394,7 +409,7 @@ impl Peer {
             }
             avdtp.open(&remote_id).await?;
 
-            info!(%peer_id, "Connecting transport channel");
+            debug!(%peer_id, "Connecting transport channel");
             let channel = profile
                 .connect(
                     &peer_id.into(),
@@ -720,7 +735,7 @@ impl PeerInner {
         local_id: &StreamEndpointId,
         remote_id: &StreamEndpointId,
     ) -> avdtp::Result<()> {
-        trace!("Making outgoing start request: {permit:?}");
+        trace!(?permit, ?local_id, ?remote_id, "Making outgoing start request");
         let to_start = &[remote_id.clone()];
         avdtp.start(to_start).await?;
         trace!("Start response received: {permit:?}");
@@ -763,6 +778,7 @@ impl PeerInner {
     ) -> avdtp::Result<&StreamEndpoint> {
         let config = codec_params.try_into()?;
         let our_direction = self.remote_endpoint(remote_id).map(|e| e.endpoint_type().opposite());
+        debug!(?codec_params, local = ?self.local, "Looking for compatible local stream");
         self.local
             .compatible(config)
             .find(|s| our_direction.map_or(true, |d| &d == s.endpoint().endpoint_type()))
@@ -1846,8 +1862,8 @@ mod tests {
                         ServiceCapability::DelayReporting,
                         ServiceCapability::MediaCodec {
                             media_type: avdtp::MediaType::Audio,
-                            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
-                            codec_extra: vec![0x11, 0x45, 51, 250],
+                            codec_type: avdtp::MediaCodecType::AUDIO_AAC,
+                            codec_extra: vec![128, 0, 132, 134, 0, 0],
                         },
                     ];
                     responder.send(&caps[..])
