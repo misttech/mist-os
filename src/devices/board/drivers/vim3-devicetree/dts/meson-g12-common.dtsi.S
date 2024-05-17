@@ -316,7 +316,8 @@
 			g-tx-fifo-size = <128 4 128 16>;
 			g-turnaround-time = <9>;
 			dma-burst-len = <5>;
-			boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS MACADDR_WIFI*/
+			boot-metadata = <0x43414D6D 0>, /*DEVICE_METADATA_MAC_ADDRESS*/
+				<0x4e4c5253 0>; /*DEVICE_METADATA_SERIAL_NUMBER*/
 		};
 
 		xhci: usb@ff500000 {

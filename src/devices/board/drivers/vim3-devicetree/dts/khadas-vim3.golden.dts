@@ -455,7 +455,7 @@
 		};
 
 		usb@ff400000 {
-			boot-metadata = "CAMm\0\0\0";
+			boot-metadata = "CAMm\0\0\0\0NLRS\0\0\0";
 			compatible = "snps,dwc2";
 			dma-burst-len = <0x05>;
 			g-np-tx-fifo-size = <0x20>;

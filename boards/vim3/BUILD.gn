@@ -62,7 +62,10 @@ _base = {
   kernel = {
     contiguous_physical_pages = true
   }
+}
 
+board_configuration("vim3") {
+  forward_variables_from(_base, "*")
   platform = {
     connectivity = {
       network = {
@@ -73,21 +76,30 @@ _base = {
             "/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device"
       }
     }
-
     development_support = {
       # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
       enable_debug_access_port_for_soc = "amlogic-a311d"
     }
   }
-}
-
-board_configuration("vim3") {
-  forward_variables_from(_base, "*")
   input_bundles += [ ":board_driver" ]
 }
 
 board_configuration("vim3-devicetree") {
   forward_variables_from(_base, "*")
+  platform = {
+    connectivity = {
+      network = {
+        # Prefer using the built-in NIC to the CDC-ether interface.
+        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
+        # netdevice migration.
+        netsvc_interface = "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device"
+      }
+    }
+    development_support = {
+      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+      enable_debug_access_port_for_soc = "amlogic-a311d"
+    }
+  }
   input_bundles += [ ":devicetree_board_driver" ]
   devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
 }
