@@ -4,10 +4,12 @@
 
 //! RX device queues.
 
+use core::fmt::Debug;
+
 #[cfg(test)]
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use packet::ParseBuffer;
+use packet::BufferMut;
 
 use crate::{
     device::{
@@ -69,7 +71,7 @@ pub trait ReceiveQueueTypes<D: Device, BC>: DeviceIdContext<D> {
     type Meta;
 
     /// The type of buffer holding an RX frame.
-    type Buffer: ParseBuffer;
+    type Buffer: BufferMut + Debug;
 }
 
 /// The execution context for a receive queue.

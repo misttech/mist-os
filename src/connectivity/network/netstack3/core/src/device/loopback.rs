@@ -5,30 +5,38 @@
 //! The loopback device.
 
 use alloc::vec::Vec;
-use core::convert::Infallible as Never;
+use core::{convert::Infallible as Never, fmt::Debug};
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpAddress, Mtu},
+    ip::{Ip, IpAddress, Ipv4, Ipv6, Mtu},
     SpecifiedAddr,
 };
-use packet::{Buf, BufferMut, Serializer};
-use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, EthernetIpExt};
+use packet::{Buf, Buffer as _, BufferMut, Serializer};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
+};
+use tracing::trace;
 
 use crate::{
-    context::{CoreTimerContext, ResourceCounterContext, SendableFrameMeta, TimerContext},
+    context::{
+        CoreTimerContext, RecvFrameContext, ResourceCounterContext, SendableFrameMeta, TimerContext,
+    },
     device::{
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
         queue::{
-            rx::{ReceiveQueue, ReceiveQueueState},
+            rx::{ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes},
             tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
             DequeueState, TransmitQueueFrameError,
         },
-        socket::{DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams},
+        socket::{
+            DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+            ReceivedFrame,
+        },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec,
-        EthernetDeviceCounters, WeakDeviceIdentifier,
+        EthernetDeviceCounters, FrameDestination, RecvIpFrameMeta, WeakDeviceIdentifier,
     },
     sync::Mutex,
 };
@@ -153,6 +161,89 @@ impl DeviceSocketSendTypes for LoopbackDevice {
     /// When `None`, data will be sent as a raw Ethernet frame without any
     /// system-applied headers.
     type Metadata = Option<EthernetHeaderParams>;
+}
+
+impl<CC, BC> ReceiveDequeFrameContext<LoopbackDevice, BC> for CC
+where
+    CC: DeviceIdContext<LoopbackDevice>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>
+        + ResourceCounterContext<CC::DeviceId, EthernetDeviceCounters>
+        + DeviceSocketHandler<LoopbackDevice, BC>
+        + ReceiveQueueTypes<LoopbackDevice, BC, Meta = LoopbackRxQueueMeta>,
+    CC::Buffer: BufferMut + Debug,
+{
+    fn handle_frame(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        LoopbackRxQueueMeta: Self::Meta,
+        mut buf: Self::Buffer,
+    ) {
+        self.increment(device_id, |counters: &DeviceCounters| &counters.recv_frame);
+        let (frame, whole_body) = match buf
+            .parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
+        {
+            Err(e) => {
+                self.increment(device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
+                trace!("dropping invalid ethernet frame over loopback: {:?}", e);
+                return;
+            }
+            Ok(e) => e,
+        };
+
+        let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
+        let ethertype = frame.ethertype();
+
+        DeviceSocketHandler::<LoopbackDevice, _>::handle_frame(
+            self,
+            bindings_ctx,
+            device_id,
+            ReceivedFrame::from_ethernet(frame, frame_dest).into(),
+            whole_body,
+        );
+
+        let ethertype = match ethertype {
+            Some(e) => e,
+            None => {
+                self.increment(device_id, |counters: &EthernetDeviceCounters| {
+                    &counters.recv_no_ethertype
+                });
+                trace!("dropping ethernet frame without ethertype");
+                return;
+            }
+        };
+
+        match ethertype {
+            EtherType::Ipv4 => {
+                self.increment(device_id, |counters: &DeviceCounters| {
+                    &counters.recv_ipv4_delivered
+                });
+                self.receive_frame(
+                    bindings_ctx,
+                    RecvIpFrameMeta::<_, Ipv4>::new(device_id.clone(), Some(frame_dest)),
+                    buf,
+                );
+            }
+            EtherType::Ipv6 => {
+                self.increment(device_id, |counters: &DeviceCounters| {
+                    &counters.recv_ipv6_delivered
+                });
+                self.receive_frame(
+                    bindings_ctx,
+                    RecvIpFrameMeta::<_, Ipv6>::new(device_id.clone(), Some(frame_dest)),
+                    buf,
+                );
+            }
+            ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {
+                self.increment(device_id, |counters: &EthernetDeviceCounters| {
+                    &counters.recv_unsupported_ethertype
+                });
+                trace!("not handling loopback frame of type {:?}", ethertype)
+            }
+        }
+    }
 }
 
 impl<CC, BC> SendableFrameMeta<CC, BC> for DeviceSocketMetadata<LoopbackDevice, CC::DeviceId>
@@ -294,9 +385,8 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
 
-    use net_types::ip::{AddrSubnet, Ipv4, Ipv6};
+    use net_types::ip::AddrSubnet;
     use packet::ParseBuffer;
-    use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
     use crate::{
         device::queue::rx::ReceiveQueueContext,

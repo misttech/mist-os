@@ -109,14 +109,12 @@ pub mod device {
 
 /// Device socket API.
 pub mod device_socket {
-    pub use crate::device::{
-        base::FrameDestination,
-        socket::{
-            DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-            EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SendFrameError,
-            SentFrame, SocketId, SocketInfo, TargetDevice,
-        },
+    pub use crate::device::socket::{
+        DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
+        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SendFrameError, SentFrame,
+        SocketId, SocketInfo, TargetDevice,
     };
+    pub use netstack3_base::FrameDestination;
 }
 
 /// Generic netstack errors.

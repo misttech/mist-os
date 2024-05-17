@@ -4,6 +4,12 @@
 
 //! Common traits and types for dealing with abstracted frames.
 
+use net_types::{
+    ethernet::Mac,
+    ip::{Ip, IpVersionMarker},
+    BroadcastAddr, MulticastAddr,
+};
+
 use core::{convert::Infallible as Never, fmt::Debug};
 use packet::{BufferMut, Serializer};
 
@@ -12,7 +18,7 @@ use packet::{BufferMut, Serializer};
 /// Note: Use this trait as trait bounds, but always implement
 /// [`ReceivableFrameMeta`] instead, which generates a `RecvFrameContext`
 /// implementation.
-pub trait RecvFrameContext<BC, Meta> {
+pub trait RecvFrameContext<Meta, BC> {
     /// Receive a frame.
     ///
     /// `receive_frame` receives a frame with the given metadata.
@@ -47,7 +53,7 @@ pub trait ReceivableFrameMeta<CC, BC> {
     fn receive_meta<B: BufferMut + Debug>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, frame: B);
 }
 
-impl<CC, BC, Meta> RecvFrameContext<BC, Meta> for CC
+impl<CC, BC, Meta> RecvFrameContext<Meta, BC> for CC
 where
     Meta: ReceivableFrameMeta<CC, BC>,
 {
@@ -102,6 +108,78 @@ where
         S::Buffer: BufferMut,
     {
         metadata.send_meta(self, bindings_ctx, frame)
+    }
+}
+
+/// The type of address used as the destination address in a device-layer frame.
+///
+/// `FrameDestination` is used to implement RFC 1122 section 3.2.2 and RFC 4443
+/// section 2.4.e, which govern when to avoid sending an ICMP error message for
+/// ICMP and ICMPv6 respectively.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FrameDestination {
+    /// A unicast address - one which is neither multicast nor broadcast.
+    Individual {
+        /// Whether the frame's destination address belongs to the receiver.
+        local: bool,
+    },
+    /// A multicast address; if the addressing scheme supports overlap between
+    /// multicast and broadcast, then broadcast addresses should use the
+    /// `Broadcast` variant.
+    Multicast,
+    /// A broadcast address; if the addressing scheme supports overlap between
+    /// multicast and broadcast, then broadcast addresses should use the
+    /// `Broadcast` variant.
+    Broadcast,
+}
+
+impl FrameDestination {
+    /// Is this `FrameDestination::Broadcast`?
+    pub fn is_broadcast(self) -> bool {
+        self == FrameDestination::Broadcast
+    }
+
+    /// Creates a `FrameDestination` from a `mac` and `local_mac` destination.
+    pub fn from_dest(destination: Mac, local_mac: Mac) -> Self {
+        BroadcastAddr::new(destination)
+            .map(Into::into)
+            .or_else(|| MulticastAddr::new(destination).map(Into::into))
+            .unwrap_or_else(|| FrameDestination::Individual { local: destination == local_mac })
+    }
+}
+
+impl From<BroadcastAddr<Mac>> for FrameDestination {
+    fn from(_value: BroadcastAddr<Mac>) -> Self {
+        Self::Broadcast
+    }
+}
+
+impl From<MulticastAddr<Mac>> for FrameDestination {
+    fn from(_value: MulticastAddr<Mac>) -> Self {
+        Self::Multicast
+    }
+}
+
+/// The metadata required for a packet to get into the IP layer.
+pub struct RecvIpFrameMeta<D, I: Ip> {
+    /// The device on which the IP frame was received.
+    pub device: D,
+    /// The link-layer destination address from the link-layer frame, if any.
+    /// `None` if the IP frame originated above the link-layer (e.g. pure IP
+    /// devices).
+    // NB: In the future, this field may also be `None` to represent link-layer
+    // protocols without destination addresses (i.e. PPP), but at the moment no
+    // such protocols are supported.
+    pub frame_dst: Option<FrameDestination>,
+    /// A marker for the Ip version in this frame.
+    pub marker: IpVersionMarker<I>,
+}
+
+impl<D, I: Ip> RecvIpFrameMeta<D, I> {
+    /// Creates a new `RecvIpFrameMeta` originating from `device` and `frame_dst`
+    /// option.
+    pub fn new(device: D, frame_dst: Option<FrameDestination>) -> RecvIpFrameMeta<D, I> {
+        RecvIpFrameMeta { device, frame_dst, marker: IpVersionMarker::new() }
     }
 }
 

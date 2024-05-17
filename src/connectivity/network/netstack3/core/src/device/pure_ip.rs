@@ -158,8 +158,8 @@ impl DeviceSocketSendTypes for PureIpDevice {
 impl<CC, BC> ReceivableFrameMeta<CC, BC> for PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
 where
     CC: DeviceIdContext<PureIpDevice>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
         + DeviceSocketHandler<PureIpDevice, BC>,
 {
@@ -183,16 +183,26 @@ where
         );
 
         match ip_version {
-            IpVersion::V4 => core_ctx.receive_frame(
-                bindings_ctx,
-                RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
-                buffer,
-            ),
-            IpVersion::V6 => core_ctx.receive_frame(
-                bindings_ctx,
-                RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
-                buffer,
-            ),
+            IpVersion::V4 => {
+                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
+                    &counters.recv_ipv4_delivered
+                });
+                core_ctx.receive_frame(
+                    bindings_ctx,
+                    RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
+                    buffer,
+                )
+            }
+            IpVersion::V6 => {
+                core_ctx.increment(&device_id, |counters: &DeviceCounters| {
+                    &counters.recv_ipv6_delivered
+                });
+                core_ctx.receive_frame(
+                    bindings_ctx,
+                    RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
+                    buffer,
+                )
+            }
         }
     }
 }

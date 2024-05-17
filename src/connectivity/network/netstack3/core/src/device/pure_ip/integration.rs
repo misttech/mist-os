@@ -5,17 +5,16 @@
 //! Implementations of traits defined in foreign modules for the types defined
 //! in the pure_ip module.
 
-use alloc::{fmt::Debug, vec::Vec};
+use alloc::vec::Vec;
 use lock_order::{
     lock::{LockLevelFor, UnlockedAccessMarkerFor},
     relation::LockBefore,
     wrap::LockedWrapperApi,
 };
-use net_types::ip::{Ip, Ipv4, Ipv6};
-use packet::{Buf, BufferMut};
+use net_types::ip::Ip;
+use packet::Buf;
 
 use crate::{
-    context::{ReceivableFrameMeta, ResourceCounterContext},
     device::{
         config::DeviceConfigurationContext,
         pure_ip::{
@@ -32,8 +31,7 @@ use crate::{
         },
         socket::{IpFrame, ParseSentFrameError, SentFrame},
         state::IpLinkDeviceState,
-        DeviceCollectionContext, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher,
-        DeviceSendFrameError, RecvIpFrameMeta,
+        DeviceCollectionContext, DeviceIdContext, DeviceLayerEventDispatcher, DeviceSendFrameError,
     },
     neighbor::NudUserConfig,
     BindingsContext, BindingsTypes, CoreCtx,
@@ -81,36 +79,6 @@ where
     ) -> O {
         // PureIp doesn't support NUD.
         f(None)
-    }
-}
-
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
-    ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>
-{
-    fn receive_meta<B: BufferMut + Debug>(
-        self,
-        core_ctx: &mut CoreCtx<'_, BC, L>,
-        bindings_ctx: &mut BC,
-        frame: B,
-    ) {
-        let Self { device, frame_dst, _marker: _ } = self;
-        core_ctx.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv4_delivered);
-        crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
-    }
-}
-
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
-    ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>
-{
-    fn receive_meta<B: BufferMut + Debug>(
-        self,
-        core_ctx: &mut CoreCtx<'_, BC, L>,
-        bindings_ctx: &mut BC,
-        frame: B,
-    ) {
-        let Self { device, frame_dst, _marker: _ } = self;
-        core_ctx.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv6_delivered);
-        crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 
@@ -254,7 +222,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::{
-        ip::{AddrSubnet, IpAddress as _, IpVersion, Mtu},
+        ip::{AddrSubnet, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu},
         Witness, ZonedAddr,
     };
     use packet::Serializer as _;

@@ -130,8 +130,7 @@ where
     ///
     /// Using a frame length of 0 improves efficiency by avoiding unnecessary
     /// padding at this layer. The expectation is that the implementation of
-    /// [`DeviceLayerEventDispatcher::send_frame`] will add any padding required
-    /// by the implementation.
+    /// bindings will add any padding required by the implementation.
     const MIN_BODY_LEN: usize = 0;
 
     let local_mac = get_mac(core_ctx, device_id);
@@ -514,8 +513,8 @@ where
         + DeviceSocketBindingsContext<CC::DeviceId>
         + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
         + ArpPacketHandler<EthernetLinkDevice, BC>
         + DeviceSocketHandler<EthernetLinkDevice, BC>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>

@@ -43,7 +43,10 @@ pub use error::{
     RemoteAddressError, SocketError, ZonedAddressError,
 };
 pub use event::{CoreEventContext, EventContext};
-pub use frame::{ReceivableFrameMeta, RecvFrameContext, SendFrameContext, SendableFrameMeta};
+pub use frame::{
+    FrameDestination, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta, SendFrameContext,
+    SendableFrameMeta,
+};
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{

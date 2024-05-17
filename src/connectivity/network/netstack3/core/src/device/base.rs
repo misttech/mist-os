@@ -5,7 +5,6 @@
 use alloc::{collections::HashMap, vec::Vec};
 use core::{
     fmt::{Debug, Display},
-    marker::PhantomData,
     num::NonZeroU64,
 };
 
@@ -14,7 +13,6 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpVersion, Ipv4, Ipv6},
-    BroadcastAddr, MulticastAddr,
 };
 use packet::Buf;
 
@@ -43,26 +41,9 @@ use crate::{
     Inspector,
 };
 
-pub(crate) use netstack3_base::{AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext};
-
-pub(super) struct RecvIpFrameMeta<D, I: Ip> {
-    /// The device on which the IP frame was received.
-    pub(super) device: D,
-    /// The link-layer destination address from the link-layer frame, if any.
-    /// `None` if the IP frame originated above the link-layer (e.g. pure IP
-    /// devices).
-    // NB: In the future, this field may also be `None` to represent link-layer
-    // protocols without destination addresses (i.e. PPP), but at the moment no
-    // such protocols are supported.
-    pub(super) frame_dst: Option<FrameDestination>,
-    pub(super) _marker: PhantomData<I>,
-}
-
-impl<D, I: Ip> RecvIpFrameMeta<D, I> {
-    pub(super) fn new(device: D, frame_dst: Option<FrameDestination>) -> RecvIpFrameMeta<D, I> {
-        RecvIpFrameMeta { device, frame_dst, _marker: PhantomData }
-    }
-}
+pub(crate) use netstack3_base::{
+    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, FrameDestination, RecvIpFrameMeta,
+};
 
 /// Iterator over devices.
 ///
@@ -145,54 +126,6 @@ where
         match id {
             DeviceLayerTimerIdInner::Ethernet(id) => core_ctx.handle_timer(bindings_ctx, id),
         }
-    }
-}
-
-/// The type of address used as the destination address in a device-layer frame.
-///
-/// `FrameDestination` is used to implement RFC 1122 section 3.2.2 and RFC 4443
-/// section 2.4.e, which govern when to avoid sending an ICMP error message for
-/// ICMP and ICMPv6 respectively.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum FrameDestination {
-    /// A unicast address - one which is neither multicast nor broadcast.
-    Individual {
-        /// Whether the frame's destination address belongs to the receiver.
-        local: bool,
-    },
-    /// A multicast address; if the addressing scheme supports overlap between
-    /// multicast and broadcast, then broadcast addresses should use the
-    /// `Broadcast` variant.
-    Multicast,
-    /// A broadcast address; if the addressing scheme supports overlap between
-    /// multicast and broadcast, then broadcast addresses should use the
-    /// `Broadcast` variant.
-    Broadcast,
-}
-
-impl FrameDestination {
-    /// Is this `FrameDestination::Broadcast`?
-    pub(crate) fn is_broadcast(self) -> bool {
-        self == FrameDestination::Broadcast
-    }
-
-    pub(crate) fn from_dest(destination: Mac, local_mac: Mac) -> Self {
-        BroadcastAddr::new(destination)
-            .map(Into::into)
-            .or_else(|| MulticastAddr::new(destination).map(Into::into))
-            .unwrap_or_else(|| FrameDestination::Individual { local: destination == local_mac })
-    }
-}
-
-impl From<BroadcastAddr<Mac>> for FrameDestination {
-    fn from(_value: BroadcastAddr<Mac>) -> Self {
-        Self::Broadcast
-    }
-}
-
-impl From<MulticastAddr<Mac>> for FrameDestination {
-    fn from(_value: MulticastAddr<Mac>) -> Self {
-        Self::Multicast
     }
 }
 
@@ -580,7 +513,7 @@ mod tests {
     use net_declare::net_mac;
     use net_types::{
         ip::{AddrSubnet, Mtu},
-        SpecifiedAddr, UnicastAddr, Witness as _,
+        MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
     };
     use test_case::test_case;
 
