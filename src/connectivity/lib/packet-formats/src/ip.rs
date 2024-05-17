@@ -149,6 +149,9 @@ pub trait IpPacket<B: ByteSlice, I: IpExt>:
     ) -> IpParseResult<I, Self>
     where
         B: ByteSliceMut;
+
+    /// Copies the full packet into a `Vec`.
+    fn to_vec(&self) -> Vec<u8>;
 }
 
 impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
@@ -195,6 +198,10 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     {
         crate::ipv4::reassemble_fragmented_packet(buffer, header, body_fragments)
     }
+
+    fn to_vec(&self) -> Vec<u8> {
+        self.to_vec()
+    }
 }
 
 impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
@@ -238,6 +245,10 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
         B: ByteSliceMut,
     {
         crate::ipv6::reassemble_fragmented_packet(buffer, header, body_fragments)
+    }
+
+    fn to_vec(&self) -> Vec<u8> {
+        self.to_vec()
     }
 }
 

@@ -534,6 +534,18 @@ impl<B: ByteSlice> Ipv4Packet<B> {
             Ipv4Proto::Proto(IpProto::Reserved) => Nat64TranslationResult::Drop,
         }
     }
+
+    /// Copies the packet (Header + Options + Body) into a `Vec`.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let Ipv4Packet { hdr_prefix, options, body } = self;
+        let mut buf = Vec::with_capacity(
+            hdr_prefix.bytes().len() + options.bytes().len() + body.as_bytes().len(),
+        );
+        buf.extend(hdr_prefix.bytes());
+        buf.extend(options.bytes());
+        buf.extend(body.as_bytes());
+        buf
+    }
 }
 
 impl<B> Ipv4Packet<B>
@@ -1193,6 +1205,7 @@ mod tests {
         let packet = body.parse::<Ipv4Packet<_>>().unwrap();
         verify_ipv4_packet(&packet, IPV4_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1201,6 +1214,9 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV4_PACKET.bytes);
     }
 
     #[test]
@@ -1215,6 +1231,7 @@ mod tests {
         let packet = body.parse::<Ipv4Packet<_>>().unwrap();
         verify_ipv4_packet(&packet, IPV4_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1223,6 +1240,26 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV4_PACKET.bytes);
+    }
+
+    #[test]
+    fn test_parse_serialize_with_options() {
+        // NB; Use IGMPv2 as test data arbitrarily, because it includes IP
+        // header options.
+        use crate::testdata::igmpv2_membership::report::*;
+
+        let mut buf = IP_PACKET_BYTES;
+        let packet = buf.parse::<Ipv4Packet<_>>().unwrap();
+        assert_eq!(packet.iter_options().count(), 1);
+
+        // NB: Don't verify serialization via builders, as they omit IP header
+        // options.
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IP_PACKET_BYTES);
     }
 
     fn hdr_prefix_to_bytes(hdr_prefix: HeaderPrefix) -> [u8; 20] {

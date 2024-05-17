@@ -765,6 +765,18 @@ impl<B: ByteSlice> Ipv6Packet<B> {
             Ipv6Proto::Proto(IpProto::Reserved) => Nat64TranslationResult::Drop,
         }
     }
+
+    /// Copies the packet (Header + Extensions + Body) into a `Vec`.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let Ipv6Packet { fixed_hdr, extension_hdrs, body, proto: _ } = self;
+        let mut buf = Vec::with_capacity(
+            fixed_hdr.bytes().len() + extension_hdrs.bytes().len() + body.as_bytes().len(),
+        );
+        buf.extend(fixed_hdr.bytes());
+        buf.extend(extension_hdrs.bytes());
+        buf.extend(body.as_bytes());
+        buf
+    }
 }
 
 impl<B: ByteSliceMut> Ipv6Packet<B> {
@@ -1281,6 +1293,7 @@ mod tests {
         let packet = body.parse::<Ipv6Packet<_>>().unwrap();
         verify_ipv6_packet(&packet, IPV6_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1289,6 +1302,9 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV6_PACKET.bytes);
     }
 
     #[test]
@@ -1303,6 +1319,7 @@ mod tests {
         let packet = body.parse::<Ipv6Packet<_>>().unwrap();
         verify_ipv6_packet(&packet, IPV6_PACKET);
 
+        // Verify serialization via builders.
         let buffer = packet
             .body()
             .into_serializer()
@@ -1311,6 +1328,26 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], IPV6_PACKET.bytes);
+    }
+
+    #[test]
+    fn test_parse_serialize_with_extension_headers() {
+        // NB; Use MLD as test data arbitrarily, because it includes IPv6
+        // extension headers.
+        use crate::testdata::mld_router_report::*;
+
+        let mut buf = REPORT;
+        let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
+        assert_eq!(packet.iter_extension_hdrs().count(), 1);
+
+        // NB: Don't verify serialization via builders, as they omit IPv6
+        // extension headers.
+
+        // Verify serialization via `to_vec`.
+        assert_eq!(&packet.to_vec()[..], REPORT);
     }
 
     fn fixed_hdr_to_bytes(fixed_hdr: FixedHeader) -> [u8; IPV6_FIXED_HDR_LEN] {
