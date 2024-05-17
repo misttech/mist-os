@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_CONTROLLER_H_
 #define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_CONTROLLER_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -910,6 +910,15 @@ class Controller {
  public:
   virtual ~Controller() = default;
 
+  // Called by children device of this controller for invoking AddChild() or instantiating
+  // compat::DeviceServer.
+  virtual fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() = 0;
+  virtual std::string_view driver_name() const = 0;
+  virtual const std::shared_ptr<fdf::Namespace>& driver_incoming() const = 0;
+  virtual std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() = 0;
+  virtual const std::optional<std::string>& driver_node_name() const = 0;
+  virtual fdf::Logger& driver_logger() = 0;
+
   // Size of metadata struct required for each command transaction by this controller. This metadata
   // struct must include scsi::DiskOp as its first (and possibly only) member.
   virtual size_t BlockOpSize() = 0;
@@ -987,9 +996,9 @@ class Controller {
   zx_status_t SendDiagnostic(uint8_t target, uint16_t lun, SelfTestCode code);
 
   // Check the status of each LU and bind it. This function returns the number of LUs found.
-  zx::result<uint32_t> ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
-                                               uint32_t max_transfer_bytes, uint16_t max_lun,
-                                               LuCallback lu_callback, DiskOptions disk_options);
+  zx::result<uint32_t> ScanAndBindLogicalUnits(uint8_t target, uint32_t max_transfer_bytes,
+                                               uint16_t max_lun, LuCallback lu_callback,
+                                               DiskOptions disk_options);
 };
 
 }  // namespace scsi

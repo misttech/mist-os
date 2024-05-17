@@ -5,22 +5,22 @@
 #include <endian.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
-#include <lib/ddk/debug.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/scsi/disk.h>
 #include <netinet/in.h>
 #include <zircon/process.h>
 
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/block/lib/common/include/common-dfv1.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace scsi {
 
-zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* controller,
-                                         uint8_t target, uint16_t lun, uint32_t max_transfer_bytes,
-                                         DiskOptions disk_options) {
+zx::result<std::unique_ptr<Disk>> Disk::Bind(Controller* controller, uint8_t target, uint16_t lun,
+                                             uint32_t max_transfer_bytes,
+                                             DiskOptions disk_options) {
   fbl::AllocChecker ac;
-  auto disk = fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun, disk_options);
+  auto disk = fbl::make_unique_checked<Disk>(&ac, controller, target, lun, disk_options);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -28,7 +28,7 @@ zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* contro
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(disk);
+  return zx::ok(std::move(disk));
 }
 
 zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
@@ -38,8 +38,8 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   }
   // Check that its a direct access block device first.
   if (inquiry_data.value().peripheral_device_type != 0) {
-    zxlogf(ERROR, "Device is not direct access block device!, device type: 0x%x",
-           inquiry_data.value().peripheral_device_type);
+    FDF_LOGL(ERROR, logger(), "Device is not direct access block device!, device type: 0x%x",
+             inquiry_data.value().peripheral_device_type);
     return ZX_ERR_IO;
   }
 
@@ -52,8 +52,8 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   // illegal characters.
   vendor_id = std::string(vendor_id.c_str());
   product_id = std::string(product_id.c_str());
-  zxlogf(INFO, "Target %u LUN %u: Vendor ID = %s, Product ID = %s", target_, lun_,
-         vendor_id.c_str(), product_id.c_str());
+  FDF_LOGL(INFO, logger(), "Target %u LUN %u: Vendor ID = %s, Product ID = %s", target_, lun_,
+           vendor_id.c_str(), product_id.c_str());
 
   removable_ = inquiry_data.value().removable_media();
 
@@ -61,10 +61,11 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   if (zx_status_t status = controller_->TestUnitReady(target_, lun_); status != ZX_OK) {
     // TestUnitReady returns ZX_ERR_UNAVAILABLE status if a unit attention error occurred.
     if (status != ZX_ERR_UNAVAILABLE) {
-      zxlogf(ERROR, "Failed SCSI TEST UNIT READY command: %s", zx_status_get_string(status));
+      FDF_LOGL(ERROR, logger(), "Failed SCSI TEST UNIT READY command: %s",
+               zx_status_get_string(status));
       return status;
     }
-    zxlogf(DEBUG, "Expected Unit Attention error: %s", zx_status_get_string(status));
+    FDF_LOGL(DEBUG, logger(), "Expected Unit Attention error: %s", zx_status_get_string(status));
 
     // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
     // condition which needs to be serviced before the logical unit can process commands.
@@ -74,16 +75,16 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
     zx_status_t clear_uac_status =
         controller_->RequestSense(target_, lun_, {&request_sense_data, sizeof(request_sense_data)});
     if (clear_uac_status != ZX_OK) {
-      zxlogf(ERROR, "Failed SCSI REQUEST SENSE command: %s",
-             zx_status_get_string(clear_uac_status));
+      FDF_LOGL(ERROR, logger(), "Failed SCSI REQUEST SENSE command: %s",
+               zx_status_get_string(clear_uac_status));
       return clear_uac_status;
     }
 
     // Verify that the Lun is ready. This command expects a success.
     clear_uac_status = controller_->TestUnitReady(target_, lun_);
     if (clear_uac_status != ZX_OK) {
-      zxlogf(ERROR, "Failed SCSI TEST UNIT READY command: %s",
-             zx_status_get_string(clear_uac_status));
+      FDF_LOGL(ERROR, logger(), "Failed SCSI TEST UNIT READY command: %s",
+               zx_status_get_string(clear_uac_status));
       return clear_uac_status;
     }
   }
@@ -92,9 +93,9 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
       controller_->ModeSenseDpoFuaAndWriteProtectedEnabled(target_, lun_,
                                                            disk_options_.use_mode_sense_6);
   if (parameter.is_error()) {
-    zxlogf(WARNING,
-           "Failed to get DPO FUA and write protected parameter for target %u, lun %u: %s.",
-           target_, lun_, zx_status_get_string(parameter.status_value()));
+    FDF_LOGL(WARNING, logger(),
+             "Failed to get DPO FUA and write protected parameter for target %u, lun %u: %s.",
+             target_, lun_, zx_status_get_string(parameter.status_value()));
     return parameter.error_value();
   }
   std::tie(dpo_fua_available_, write_protected_) = parameter.value();
@@ -102,8 +103,8 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   zx::result write_cache_enabled =
       controller_->ModeSenseWriteCacheEnabled(target_, lun_, disk_options_.use_mode_sense_6);
   if (write_cache_enabled.is_error()) {
-    zxlogf(WARNING, "Failed to get write cache status for target %u, lun %u: %s.", target_, lun_,
-           zx_status_get_string(write_cache_enabled.status_value()));
+    FDF_LOGL(WARNING, logger(), "Failed to get write cache status for target %u, lun %u: %s.",
+             target_, lun_, zx_status_get_string(write_cache_enabled.status_value()));
     // Assume write cache is enabled so that flush operations are not ignored.
     write_cache_enabled_ = true;
   } else {
@@ -114,7 +115,7 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   if (status != ZX_OK) {
     return status;
   }
-  zxlogf(INFO, "%ld blocks of %d bytes", block_count_, block_size_bytes_);
+  FDF_LOGL(INFO, logger(), "%ld blocks of %d bytes", block_count_, block_size_bytes_);
 
   zx::result<VPDBlockLimits> block_limits = controller_->InquiryBlockLimits(target_, lun_);
   if (block_limits.is_ok()) {
@@ -134,8 +135,9 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
     max_transfer_blocks_ = UINT32_MAX;
   } else {
     if (max_transfer_bytes_ % block_size_bytes_ != 0) {
-      zxlogf(ERROR, "Max transfer size (%u bytes) is not a multiple of the block size (%u bytes).",
-             max_transfer_bytes_, block_size_bytes_);
+      FDF_LOGL(ERROR, logger(),
+               "Max transfer size (%u bytes) is not a multiple of the block size (%u bytes).",
+               max_transfer_bytes_, block_size_bytes_);
       return ZX_ERR_BAD_STATE;
     }
     max_transfer_blocks_ = max_transfer_bytes_ / block_size_bytes_;
@@ -157,17 +159,50 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
     }
   }
 
-  status = DdkAdd(DiskName().c_str());
-  if (status == ZX_OK) {
-    AddRef();
-  }
-  return status;
-}
+  {
+    const std::string path_from_parent = std::string(controller_->driver_name()) + "/";
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_BLOCK_IMPL] = block_impl_server_.callback();
 
-void Disk::DdkRelease() {
-  if (Release()) {
-    delete this;
+    zx::result<> result = compat_server_.Initialize(
+        controller_->driver_incoming(), controller_->driver_outgoing(),
+        controller_->driver_node_name(), DiskName(), compat::ForwardMetadata::None(),
+        std::move(banjo_config), path_from_parent);
+    if (result.is_error()) {
+      return result.status_value();
+    }
   }
+
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+
+  node_controller_.Bind(std::move(controller_client_end));
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_BLOCK_IMPL);
+
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, DiskName())
+                        .offers2(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  fidl::WireResult<fuchsia_driver_framework::Node::AddChild> result =
+      controller_->root_node()->AddChild(args, std::move(controller_server_end), {});
+  if (!result.ok()) {
+    FDF_LOGL(ERROR, logger(), "Failed to call AddChild: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    fuchsia_driver_framework::NodeError node_error = result->error_value();
+    FDF_LOGL(ERROR, logger(), "AddChild returned failure: %u", static_cast<uint32_t>(node_error));
+    return ZX_ERR_INTERNAL;
+  }
+  return ZX_OK;
 }
 
 void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
@@ -187,7 +222,8 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
   switch (op->command.opcode) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE: {
-      if (zx_status_t status = block::CheckIoRange(op->rw, block_count_, max_transfer_blocks_);
+      if (zx_status_t status =
+              block::CheckIoRange(op->rw, block_count_, max_transfer_blocks_, logger());
           status != ZX_OK) {
         completion_cb(cookie, status, op);
         return;
@@ -229,7 +265,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       return;
     }
     case BLOCK_OPCODE_FLUSH: {
-      if (zx_status_t status = block::CheckFlushValid(op->rw); status != ZX_OK) {
+      if (zx_status_t status = block::CheckFlushValid(op->rw, logger()); status != ZX_OK) {
         completion_cb(cookie, status, op);
         return;
       }
@@ -256,7 +292,8 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
         completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);
         return;
       }
-      if (zx_status_t status = block::CheckIoRange(op->trim, block_count_, max_transfer_blocks_);
+      if (zx_status_t status =
+              block::CheckIoRange(op->trim, block_count_, max_transfer_blocks_, logger());
           status != ZX_OK) {
         completion_cb(cookie, status, op);
         return;
@@ -292,5 +329,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       return;
   }
 }
+
+fdf::Logger& Disk::logger() { return controller_->driver_logger(); }
 
 }  // namespace scsi
