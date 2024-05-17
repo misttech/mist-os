@@ -108,13 +108,6 @@ pub struct PackageBuildCommand {
     #[argh(option)]
     pub api_level: ApiLevel,
 
-    /// if true, and --api-level specifies an API level that is no longer
-    /// supported, ignore the error and print a warning instead.
-    //
-    // TODO(https://fxbug.dev/337904808): Remove this escape hatch.
-    #[argh(switch)]
-    pub deprecated_ignore_api_level_unsupported_errors: bool,
-
     /// name of the package
     #[argh(option)]
     pub published_name: Option<String>,

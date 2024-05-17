@@ -19,8 +19,6 @@ use {
     },
     tempfile::NamedTempFile,
     tempfile_ext::NamedTempFileExt as _,
-    tracing::warn,
-    version_history::ApiLevelError,
 };
 
 const META_FAR_NAME: &str = "meta.far";
@@ -46,16 +44,6 @@ pub async fn cmd_package_build_with_history(
         Ok(abi_revision) => abi_revision,
         // TODO(https://fxbug.dev/337904808): Remove this case and return an
         // error whenever check_api_level_for_build fails.
-        Err(ApiLevelError::Unsupported { version, supported })
-            if cmd.deprecated_ignore_api_level_unsupported_errors =>
-        {
-            warn!(
-                "Downgrading error to warning due to
---deprecated-ignore-api-level-unsupported-errors: {}",
-                ApiLevelError::Unsupported { version: version.clone(), supported }
-            );
-            version.abi_revision
-        }
         Err(err) => return Err(err.into()),
     };
 
@@ -264,7 +252,6 @@ mod test {
             package_build_manifest_path: root.join("invalid path"),
             out: Utf8PathBuf::from("out"),
             api_level: 8.into(),
-            deprecated_ignore_api_level_unsupported_errors: false,
             repository: None,
             published_name: None,
             depfile: false,
@@ -289,7 +276,6 @@ mod test {
             package_build_manifest_path,
             out,
             api_level: 8.into(),
-            deprecated_ignore_api_level_unsupported_errors: false,
             repository: None,
             published_name: None,
             depfile: false,
@@ -324,7 +310,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: 8.into(),
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: None,
                 published_name: None,
                 depfile: false,
@@ -405,7 +390,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: ApiLevel::HEAD,
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: None,
                 published_name: None,
                 depfile: false,
@@ -495,7 +479,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: 8.into(),
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: Some("my-repository".into()),
                 published_name: None,
                 depfile: false,
@@ -649,7 +632,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: 9.into(),
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: None,
                 published_name: Some("published-name".into()),
                 depfile: true,
@@ -790,7 +772,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: ApiLevel::HEAD,
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: None,
                 published_name: Some("published-name".into()),
                 depfile: true,
@@ -830,7 +811,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: 3221225472.into(), // Arbitrary big number.
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: None,
                 published_name: None,
                 depfile: false,
@@ -871,7 +851,6 @@ mod test {
                 package_build_manifest_path,
                 out: out.clone(),
                 api_level: 6.into(),
-                deprecated_ignore_api_level_unsupported_errors: false,
                 repository: None,
                 published_name: None,
                 depfile: false,
@@ -888,56 +867,6 @@ mod test {
         assert!(
             err_string.contains("no longer supports API level 6"),
             "Wrong error message: {err_string}"
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_build_package_unsupported_api_level_override() {
-        let tempdir = tempfile::tempdir().unwrap();
-        let root = Utf8Path::from_path(tempdir.path()).unwrap();
-        let out = root.join("out");
-
-        let meta_package_path = root.join("package");
-        let meta_package_file = File::create(&meta_package_path).unwrap();
-        let meta_package = MetaPackage::from_name_and_variant_zero("my-package".parse().unwrap());
-        meta_package.serialize(meta_package_file).unwrap();
-
-        let package_build_manifest_path = root.join("package-build.manifest");
-        let mut package_build_manifest = File::create(&package_build_manifest_path).unwrap();
-
-        package_build_manifest
-            .write_all(format!("meta/package={meta_package_path}").as_bytes())
-            .unwrap();
-
-        cmd_package_build_with_history(
-            PackageBuildCommand {
-                package_build_manifest_path,
-                out: out.clone(),
-                api_level: 6.into(),
-                deprecated_ignore_api_level_unsupported_errors: true,
-                repository: None,
-                published_name: None,
-                depfile: false,
-                blobs_json: false,
-                blobs_manifest: false,
-                subpackages_build_manifest_path: None,
-            },
-            FAKE_VERSION_HISTORY,
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(
-            read_meta_far_contents(&out.join(META_FAR_NAME)),
-            BTreeMap::from([
-                ("meta/contents".into(), "".into()),
-                ("meta/package".into(), r#"{"name":"my-package","version":"0"}"#.into()),
-                (
-                    "meta/fuchsia.abi/abi-revision".into(),
-                    // ABI revision for unsupported API level 6.
-                    "6f3b9f0c4b2a33ff".into()
-                ),
-            ]),
         );
     }
 }
