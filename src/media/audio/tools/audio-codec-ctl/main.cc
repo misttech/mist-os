@@ -57,9 +57,7 @@ Commands:
   f[ormats]                         : Retrieves the DAI formats supported by the codec.
   i[nfo]                            : Retrieves textual information about the codec.
   c[apabilities_plug_detect]        : Retrieves Plug Detect Capabilities.
-  b[ridgeable]                      : Returns whether a codec is bridgeable.
   r[eset]                           : Resets the codec.
-  m[ode_bridged] true|false         : Sets a codec bridged mode to true or false.
   d[ai] <number_of_channels>        : Sets the DAI format to be used in the codec interface.
     <number_of_channels>: Number of channels.
     <channels_to_use_bitmask>: Sets which channels are active via a bitmask. The least significant
@@ -117,20 +115,10 @@ Examples:
   Executing on device: /dev/class/codec/706
   fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired
 
-  Returns whether the codec is bridgeable:
-  $ audio-codec-ctl b
-  Executing on device: /dev/class/codec/706
-  Bridged mode: false
-
   Resets the codec:
   $ audio-codec-ctl r
   Executing on device: /dev/class/codec/706
   Reset done
-
-  Sets a codec's bridged mode:
-  $ audio-codec-ctl m true
-  Setting bridged mode to: true
-  Executing on device: /dev/class/codec/706
 
   Sets the DAI format to be used in the codec interface:
   $ audio-codec-ctl d 2 1 s i 48000 16 32
@@ -287,37 +275,6 @@ int main(int argc, char** argv) {
         return -1;
       }
       std::cout << FidlString(result->formats()) << std::endl;
-      return 0;
-    }
-
-    case 'b': {
-      auto result = GetCodecClient(path)->IsBridgeable();
-      if (!result.is_ok()) {
-        std::cerr << "is bridgeable failed: " << result.error_value().FormatDescription()
-                  << std::endl;
-        return -1;
-      }
-      std::cout << "Is bridgeable: " << FidlString(result->supports_bridged_mode()) << std::endl;
-      return 0;
-    }
-
-    case 'm': {
-      bool mode = false;
-      if (args.size() == 0) {  // Must have a mode.
-        ShowUsage(false);
-        return -1;
-      }
-      if (args.front()[0] == 't') {
-        mode = true;
-      }
-      args.pop_front();
-      auto result = GetCodecClient(path)->SetBridgedMode(mode);
-      std::cout << "Setting bridged mode to: " << (mode ? "true" : "false") << std::endl;
-      if (!result.is_ok()) {
-        std::cerr << "set bridged mode failed: " << result.error_value().FormatDescription()
-                  << std::endl;
-        return -1;
-      }
       return 0;
     }
 

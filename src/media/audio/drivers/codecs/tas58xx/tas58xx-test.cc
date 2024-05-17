@@ -298,9 +298,6 @@ TEST_F(Tas58xxTest, GetInfo5825) {
 }
 
 TEST_F(Tas58xxTest, CheckState) {
-  auto info = client_.IsBridgeable();
-  EXPECT_EQ(info.value(), false);
-
   auto format = client_.GetGainFormat();
   EXPECT_EQ(format.value().min_gain, -103.0);
   EXPECT_EQ(format.value().max_gain, 24.0);

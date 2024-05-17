@@ -47,9 +47,6 @@ class VirtualAudioCodec : public VirtualAudioCodecDeviceType,
                                SignalProcessingConnectCompleter::Sync& completer) override;
 
   void GetProperties(GetPropertiesCompleter::Sync& completer) override;
-  void IsBridgeable(IsBridgeableCompleter::Sync& completer) override;
-  void SetBridgedMode(SetBridgedModeRequest& request,
-                      SetBridgedModeCompleter::Sync& completer) override;
 
   void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override;
   void SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) override;

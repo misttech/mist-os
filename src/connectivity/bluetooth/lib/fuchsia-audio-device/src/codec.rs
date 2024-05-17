@@ -277,11 +277,6 @@ impl SoftCodec {
                     // TODO(https://fxbug.dev/323576893): Support the Signal Processing connect.
                     let _ = protocol.close_with_epitaph(zx::Status::NOT_SUPPORTED);
                 }
-                IsBridgeable { responder } => {
-                    let _ = responder.send(false);
-                }
-                // Not supported, deprecated.  Ignore.
-                SetBridgedMode { .. } => {}
                 Reset { responder } => {
                     // TODO(https://fxbug.dev/324247020): Support resetting.
                     responder.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);

@@ -1510,8 +1510,6 @@ mod tests {
                 }
                 CodecRequest::Stop { responder: _ } => {}
                 CodecRequest::Start { responder: _ } => {}
-                CodecRequest::IsBridgeable { responder: _ } => {}
-                CodecRequest::SetBridgedMode { enable_bridged_mode: _, control_handle: _ } => {}
                 CodecRequest::GetDaiFormats { responder } => {
                     let formats = &[DaiSupportedFormats {
                         number_of_channels: vec![2],

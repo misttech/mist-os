@@ -169,18 +169,6 @@ zx::result<Info> SimpleCodecClient::GetInfo() {
   return zx::ok(std::move(info));
 }
 
-zx::result<bool> SimpleCodecClient::IsBridgeable() {
-  const auto result = codec_.sync()->IsBridgeable();
-  if (result.ok()) {
-    return zx::ok(result.value().supports_bridged_mode);
-  }
-  return zx::error(result.status());
-}
-
-zx_status_t SimpleCodecClient::SetBridgedMode(bool bridged) {
-  return codec_->SetBridgedMode(bridged).status();
-}
-
 zx::result<DaiSupportedFormats> SimpleCodecClient::GetDaiFormats() {
   auto result = codec_.sync()->GetDaiFormats();
   if (!result.ok()) {

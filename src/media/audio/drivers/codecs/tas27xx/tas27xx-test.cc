@@ -324,26 +324,6 @@ TEST_F(Tas27xxTest, ExternalConfig) {
   mock_i2c_.VerifyAndClear();
 }
 
-TEST_F(Tas27xxTest, CodecBridgedMode) {
-  auto fake_parent = MockDevice::FakeRootParent();
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
-      fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
-  auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
-  auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
-  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
-  SimpleCodecClient client;
-  client.SetCodec(std::move(*codec_client));
-  {
-    auto bridgeable = client.IsBridgeable();
-    ASSERT_FALSE(bridgeable.value());
-  }
-  client.SetBridgedMode(false);
-
-  mock_i2c_.VerifyAndClear();
-}
-
 TEST_F(Tas27xxTest, CodecDaiFormat) {
   auto fake_parent = MockDevice::FakeRootParent();
 

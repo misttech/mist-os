@@ -16,11 +16,7 @@ to play, record, and configure audio streams.
 ```none
   audio-codec-ctl [-d|--device <device>] f[ormats]
 
-  audio-codec-ctl [-d|--device <device>] b[ridgeable]
-
   audio-codec-ctl [-d|--device <device>] r[eset]
-
-  audio-codec-ctl [-d|--device <device>] m[ode_bridged] true|false
 
   audio-codec-ctl [-d|--device <device>] d[ai] <number_of_channels>
     <channels_to_use_bitmask> pdm|upcm|spcm|fpcm none|i2s|left-stereo|right-stereo|1tdm|2tdm|3tdm
@@ -75,14 +71,6 @@ Retrieves textual information about the codec.
 
 Retrieves Plug Detect Capabilities.
 
-### `bridgeable` {#bridgeable}
-
-```none
-  audio-codec-ctl [-d|--device <device>] b[ridgeable]
-```
-
-Returns whether a codec is bridgeable.
-
 ### `reset` {#reset}
 
 ```none
@@ -90,14 +78,6 @@ Returns whether a codec is bridgeable.
 ```
 
 Resets the codec.
-
-### `mode_bridged` {#bridged}
-
-```none
-  audio-codec-ctl [-d|--device <device>] m[ode_bridged] true|false
-```
-
-Sets a codec bridged mode to true or false.
 
 ### `dai` {#dai}
 

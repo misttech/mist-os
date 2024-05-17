@@ -337,13 +337,6 @@ void Server::Start(StartCompleter::Sync& completer) {
 
 void Server::GetHealthState(GetHealthStateCompleter::Sync& completer) { completer.Reply({}); }
 
-void Server::IsBridgeable(IsBridgeableCompleter::Sync& completer) { completer.Reply(false); }
-
-void Server::SetBridgedMode(SetBridgedModeRequestView request,
-                            SetBridgedModeCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void Server::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware
   fidl::Arena arena;

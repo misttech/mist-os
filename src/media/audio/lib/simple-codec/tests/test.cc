@@ -60,8 +60,6 @@ class TestCodec : public SimpleCodecServer {
   }
   zx_status_t Stop() override { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t Start() override { return ZX_OK; }
-  bool IsBridgeable() override { return false; }
-  void SetBridgedMode(bool enable_bridged_mode) override {}
   DaiSupportedFormats GetDaiFormats() override { return {}; }
   zx::result<CodecFormatInfo> SetDaiFormat(const DaiFormat& format) override {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -103,8 +101,6 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
   }
   zx_status_t Stop() override { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t Start() override { return ZX_OK; }
-  bool IsBridgeable() override { return false; }
-  void SetBridgedMode(bool enable_bridged_mode) override {}
   bool SupportsSignalProcessing() override { return true; }
   void SignalProcessingConnect(
       fidl::InterfaceRequest<signal_fidl::SignalProcessing> signal_processing) override {

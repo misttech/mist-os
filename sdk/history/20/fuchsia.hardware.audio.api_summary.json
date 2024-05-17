@@ -64,26 +64,10 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.IsBridgeable",
-        "strictness": "strict",
-        "ordinal": "2787842859468818668",
-        "direction": "two_way",
-        "response": "fuchsia.hardware.audio/CodecIsBridgeableResponse"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.hardware.audio/Codec.Reset",
         "strictness": "strict",
         "ordinal": "5797675221316517227",
         "direction": "two_way"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.SetBridgedMode",
-        "strictness": "strict",
-        "ordinal": "3159547541812455990",
-        "direction": "one_way",
-        "request": "fuchsia.hardware.audio/CodecSetBridgedModeRequest"
     },
     {
         "kind": "protocol/member",
@@ -191,16 +175,6 @@
         "name": "fuchsia.hardware.audio/CodecGetPropertiesResponse"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.audio/CodecIsBridgeableResponse.supports_bridged_mode",
-        "ordinal": "1",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.audio/CodecIsBridgeableResponse"
-    },
-    {
         "kind": "table/member",
         "name": "fuchsia.hardware.audio/CodecProperties.is_input",
         "ordinal": "1",
@@ -233,16 +207,6 @@
     {
         "kind": "table",
         "name": "fuchsia.hardware.audio/CodecProperties"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.audio/CodecSetBridgedModeRequest.enable_bridged_mode",
-        "ordinal": "1",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.audio/CodecSetBridgedModeRequest"
     },
     {
         "kind": "struct/member",

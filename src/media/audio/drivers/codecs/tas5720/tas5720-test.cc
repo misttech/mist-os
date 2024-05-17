@@ -220,33 +220,6 @@ TEST_F(Tas5720Test, CodecReset) {
   mock_i2c_.VerifyAndClear();
 }
 
-TEST_F(Tas5720Test, CodecBridgedMode) {
-  auto fake_parent = MockDevice::FakeRootParent();
-  uint32_t instance_count = 0;
-  fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &instance_count, sizeof(instance_count));
-
-  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
-  auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
-  auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
-  zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
-  ASSERT_OK(codec_client.status_value());
-  SimpleCodecClient client;
-  client.SetCodec(std::move(*codec_client));
-  {
-    auto bridgeable = client.IsBridgeable();
-    ASSERT_FALSE(bridgeable.value());
-  }
-  { client.SetBridgedMode(false); }
-
-  // Shutdown.
-  mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({0x01}).ExpectReadStop({0xff}).ExpectWriteStop({0x01, 0xfe});
-
-  child_dev->ReleaseOp();
-  mock_i2c_.VerifyAndClear();
-}
-
 TEST_F(Tas5720Test, CodecDaiFormat) {
   auto fake_parent = MockDevice::FakeRootParent();
   uint32_t instance_count = 0;

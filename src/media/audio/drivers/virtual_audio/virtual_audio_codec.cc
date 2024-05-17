@@ -132,21 +132,6 @@ void VirtualAudioCodec::GetProperties(
   completer.Reply(std::move(properties));
 }
 
-void VirtualAudioCodec::IsBridgeable(IsBridgeableCompleter::Sync& completer) {
-  auto parent = parent_.lock();
-  ZX_ASSERT(parent);
-  completer.Reply(false);
-}
-
-void VirtualAudioCodec::SetBridgedMode(SetBridgedModeRequest& request,
-                                       SetBridgedModeCompleter::Sync& completer) {
-  auto parent = parent_.lock();
-  ZX_ASSERT(parent);
-  if (request.enable_bridged_mode()) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
-  }
-}
-
 void VirtualAudioCodec::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
   auto parent = parent_.lock();
   ZX_ASSERT(parent);

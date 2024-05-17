@@ -205,7 +205,7 @@ closed protocol Codec {
     ///
     /// Not supported anymore, bridged configurations are no longer changeable at runtime.
     /// A driver can still be configured to operate in bridged mode or not at boot time.
-    @available(deprecated=17)
+    @available(deprecated=17, removed=20)
     strict IsBridgeable() -> (struct {
         supports_bridged_mode bool;
     });
@@ -217,7 +217,7 @@ closed protocol Codec {
     ///
     /// Not supported anymore, bridged configurations are no longer changeable at runtime.
     /// A driver can still be configured to operate in bridged mode or not at boot time.
-    @available(deprecated=17)
+    @available(deprecated=17, removed=20)
     strict SetBridgedMode(struct {
         enable_bridged_mode bool;
     });
