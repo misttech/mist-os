@@ -7,14 +7,18 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <gtest/gtest.h>
+#include <thread>
 
-TEST(TimerFD, RealtimeAbsolute) {
+#include <gtest/gtest.h>
+#include <linux/capability.h>
+
+#include "src/starnix/tests/syscalls/cpp/test_helper.h"
+
+void run_timerfd_test(clockid_t clock_id) {
   timespec begin = {};
   ASSERT_EQ(0, clock_gettime(CLOCK_REALTIME, &begin));
 
-  // int fd = timerfd_create(CLOCK_REALTIME, 0);
-  int fd = timerfd_create(CLOCK_REALTIME, 0);
+  int fd = timerfd_create(clock_id, 0);
   ASSERT_NE(-1, fd) << errno;
 
   // Test timer 1 second in the future.
@@ -22,6 +26,8 @@ TEST(TimerFD, RealtimeAbsolute) {
   its.it_value = begin;
   its.it_value.tv_sec += 1;
   EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &its, nullptr));
+
+  std::this_thread::sleep_for(std::chrono::seconds(1));
 
   uint64_t val = 0;
   EXPECT_EQ(ssize_t(sizeof(val)), read(fd, &val, sizeof(val))) << errno;
@@ -43,4 +49,17 @@ TEST(TimerFD, RealtimeAbsolute) {
   EXPECT_EQ(1u, val);  // Timer went off one time.
 
   close(fd);
+}
+
+TEST(TimerFD, RealtimeAbsolute) { run_timerfd_test(CLOCK_REALTIME); }
+
+TEST(TimerFD, RealtimeAlarm) {
+  // The CAP_WAKE_ALARM capability is required to create a CLOCK_REALTIME_ALARM timer. If the test
+  // process does not have the capability, the timerfd_create call should fail.
+  if (test_helper::HasCapability(CAP_WAKE_ALARM)) {
+    run_timerfd_test(CLOCK_REALTIME_ALARM);
+  } else {
+    int fd = timerfd_create(CLOCK_REALTIME_ALARM, 0);
+    ASSERT_EQ(-1, fd) << errno;
+  }
 }

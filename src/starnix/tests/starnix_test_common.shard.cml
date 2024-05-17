@@ -30,6 +30,10 @@
             name: "fake-system-activity-governor",
             url: "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
         },
+        {
+            name: "fake-hrtimer",
+            url: "fake-hrtimer#meta/fake-hrtimer.cm",
+        },
     ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
@@ -124,6 +128,11 @@
                 "#fake-system-activity-governor",
                 "#netstack",
             ],
+        },
+        {
+            directory: "dev-hrtimer",
+            from: "#fake-hrtimer",
+            to: [ "#kernel" ],
         },
     ],
     environments: [
