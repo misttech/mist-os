@@ -9,6 +9,8 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devicetree/visitors/load-visitors.h>
 
+#include "vim3-adc-buttons.h"
+
 namespace vim3_dt {
 
 zx::result<> Vim3Devicetree::Start() {
@@ -26,6 +28,13 @@ zx::result<> Vim3Devicetree::Start() {
     FDF_LOG(ERROR, "Failed to create visitors: %s", visitors.status_string());
     return visitors.take_error();
   }
+
+  // Insert visitors with workarounds for vim3.
+  auto custom_visitors = (*visitors)->RegisterVisitor(std::make_unique<Vim3AdcButtonsVisitor>());
+  if (custom_visitors.is_error()) {
+    FDF_LOG(ERROR, "Failed to register vim3 adc buttons visitor");
+    return custom_visitors.take_error();
+  };
 
   visitors_ = std::move(*visitors);
 

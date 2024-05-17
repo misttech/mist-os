@@ -62,6 +62,10 @@
 		pwms = <&pwm 8 0 0>; //PWM_AO_C
 		pwm-names = "LCD_BRIGHTNESS";
 	};
+
+	function_button: adc-buttons {
+		compatible = "fuchsia,adc-buttons";
+	};
 };
 
 &gpio {

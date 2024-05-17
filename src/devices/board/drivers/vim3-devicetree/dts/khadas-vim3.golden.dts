@@ -7,6 +7,10 @@
 	interrupt-parent = <0x01>;
 	model = "Khadas Vim3";
 
+	adc-buttons {
+		compatible = "fuchsia,adc-buttons";
+	};
+
 	backlight {
 		gpio-names = "LCD_BACKLIGHT_ENABLE";
 		gpios = <0x24 0x01 0x00>;

@@ -11,6 +11,13 @@
                     "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.ADC_BUTTONS"
                 }
+            },
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"fuchsia,adc-buttons\""
+                }
             }
         ]
     },

@@ -12,6 +12,7 @@ namespace {
 TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/adc-9000",
+      "sys/platform/adc-buttons/adc-buttons_group/adc-buttons",
       "sys/platform/arm-mali-0",
       "sys/platform/audio-controller-ff642000/audio-controller-ff642000_group/aml-g12-audio-composite",
       "sys/platform/canvas-ff638000/aml-canvas",

@@ -38,6 +38,7 @@ class Vim3DevicetreeTest : public testing::Test {
 TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
   std::vector<std::string> device_node_paths = {
       "sys/platform/adc-9000",
+      "sys/platform/adc-buttons",
       "sys/platform/arm-mali-0",
       "sys/platform/audio-controller-ff642000",
       "sys/platform/canvas-ff638000",
