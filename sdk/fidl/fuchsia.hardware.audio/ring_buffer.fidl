@@ -61,7 +61,7 @@ type RingBufferProperties = table {
     /// # Deprecation
     ///
     /// Not needed anymore since the functionality is available via `WatchDelayInfo` below.
-    @available(deprecated=9, removed=HEAD)
+    @available(deprecated=9, removed=20)
     1: external_delay zx.Duration;
 
     /// Size (in bytes) of the temporary buffer used by the driver when consuming or generating ring
@@ -97,7 +97,7 @@ type RingBufferProperties = table {
     /// # Deprecation
     ///
     /// Not needed anymore since the functionality is available via `driver_transfer_bytes` below.
-    @available(deprecated=9, removed=HEAD)
+    @available(deprecated=9, removed=20)
     2: fifo_depth uint32;
 
     /// When set to true, indicates that the ring buffer runs in a different cache coherency domain,

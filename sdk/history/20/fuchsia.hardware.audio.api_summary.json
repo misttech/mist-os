@@ -1340,18 +1340,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.hardware.audio/RingBufferProperties.external_delay",
-        "ordinal": "1",
-        "type": "int64"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio/RingBufferProperties.fifo_depth",
-        "ordinal": "2",
-        "type": "uint32"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.hardware.audio/RingBufferProperties.needs_cache_flush_or_invalidate",
         "ordinal": "3",
         "type": "bool"

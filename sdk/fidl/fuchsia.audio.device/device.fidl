@@ -54,8 +54,7 @@ const DEFAULT_DAI_INTERCONNECT_ELEMENT_ID ElementId = 1;
 /// # Deprecation
 ///
 /// Codec, Dai and StreamConfig are not supported anymore, instead use an
-/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
-/// , see
+/// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite), see
 /// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
 @available(deprecated=HEAD)
 type DriverClient = flexible resource union {
