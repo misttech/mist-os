@@ -1021,7 +1021,6 @@ struct network_socket : public base_socket<T> {
           case IP_PKTINFO:
             return proc.Process(client()->GetIpPacketInfo(),
                                 [](const auto& response) { return response.value; });
-#if __Fuchsia_API_level__ >= 15
           case SO_ORIGINAL_DST:
             return proc.Process(client()->GetOriginalDestination(),
                                 [](const auto& response) { return response.value; });
@@ -1031,7 +1030,6 @@ struct network_socket : public base_socket<T> {
           case IP_TRANSPARENT:
             return proc.Process(client()->GetIpTransparent(),
                                 [](const auto& response) { return response.value; });
-#endif
           default:
             return SockOptResult::Errno(ENOPROTOOPT);
         }
@@ -1223,7 +1221,6 @@ struct network_socket : public base_socket<T> {
           case IP_PKTINFO:
             return proc.Process<IntOrChar>(
                 [this](IntOrChar value) { return client()->SetIpPacketInfo(value.value != 0); });
-#if __Fuchsia_API_level__ >= 15
           case IP_RECVORIGDSTADDR:
             return proc.Process<IntOrChar>([this](IntOrChar value) {
               return client()->SetIpReceiveOriginalDestinationAddress(value.value != 0);
@@ -1231,7 +1228,6 @@ struct network_socket : public base_socket<T> {
           case IP_TRANSPARENT:
             return proc.Process<IntOrChar>(
                 [this](IntOrChar value) { return client()->SetIpTransparent(value.value != 0); });
-#endif
           case MCAST_JOIN_GROUP:
             return SockOptResult::Errno(ENOTSUP);
           default:
@@ -1722,14 +1718,12 @@ class FidlControlDataProcessor {
       total += StoreControlMessage(IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
     }
 
-#if __Fuchsia_API_level__ >= 15
     if (requested.ip_recvorigdstaddr() && control_data.has_original_destination_address()) {
       struct sockaddr_storage addr;
       socklen_t addr_len =
           fidl_to_sockaddr(control_data.original_destination_address(), &addr, sizeof(addr));
       total += StoreControlMessage(IPPROTO_IP, IP_RECVORIGDSTADDR, &addr, addr_len);
     }
-#endif
 
     return total;
   }
@@ -2007,7 +2001,7 @@ ParseControlMessages<fuchsia_posix_socket_packet::wire::SendControlData>(fidl::A
 template <typename R, typename = int>
 struct FitResultHasValue : std::false_type {};
 template <typename R>
-struct FitResultHasValue<R, decltype(&R::value, 0)> : std::true_type {};
+struct FitResultHasValue<R, decltype(&R::value, 0)> : std::true_type{};
 template <typename T, typename R>
 typename std::enable_if<FitResultHasValue<R>::value>::type HandleSendMsgResponse(const R& result,
                                                                                  size_t total) {
