@@ -12,7 +12,6 @@ rustc_test("bin") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
-    "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

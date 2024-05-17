@@ -6,7 +6,6 @@ use {
     anyhow::Result,
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus},
-    fidl_fuchsia_power_suspend as fsuspend,
     fidl_fuchsia_power_system::{
         self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
         WakeHandlingLevel,
@@ -46,11 +45,6 @@ async fn create_test_env() -> TestEnv {
         .await
         .expect("Failed to add child: power-broker");
 
-    let fake_suspend_ref = builder
-        .add_child("fake-suspend", "#meta/fake-suspend.cm", ChildOptions::new())
-        .await
-        .expect("Failed to add child: fake-suspend");
-
     // Expose capabilities from power-broker.
     builder
         .add_route(
@@ -68,18 +62,6 @@ async fn create_test_env() -> TestEnv {
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.broker.Topology"))
                 .from(&power_broker_ref)
-                .to(&component_ref),
-        )
-        .await
-        .unwrap();
-
-    // Expose capabilities from fake-suspend to fake-system-activity-governor.
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("test.suspendcontrol.Device"))
-                .capability(Capability::service_by_name("fuchsia.hardware.suspend.SuspendService"))
-                .from(&fake_suspend_ref)
                 .to(&component_ref),
         )
         .await
@@ -106,58 +88,24 @@ async fn create_test_env() -> TestEnv {
 }
 
 #[fuchsia::test]
-async fn test_fsuspend_stats() -> Result<()> {
-    let env = create_test_env().await;
-
-    let stats = env.connect_to_protocol::<fsuspend::StatsMarker>();
-    let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
-
-    let current_stats = stats.watch().await?;
-    // Return default values.
-    assert_eq!(Some(0), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(None, current_stats.last_time_in_suspend);
-
-    // Trigger a suspend-resume cycle.
-    let mut required_state = fctrl::SystemActivityGovernorState {
-        execution_state_level: Some(ExecutionStateLevel::Active),
-        application_activity_level: Some(ApplicationActivityLevel::Active),
-        full_wake_handling_level: Some(FullWakeHandlingLevel::Inactive),
-        wake_handling_level: Some(WakeHandlingLevel::Inactive),
-        ..Default::default()
-    };
-    let _ = sag_ctrl_state.set(&required_state).await.unwrap().unwrap();
-
-    assert_eq!(sag_ctrl_state.watch().await.unwrap(), required_state);
-
-    required_state = fctrl::SystemActivityGovernorState {
-        execution_state_level: Some(ExecutionStateLevel::Inactive),
-        application_activity_level: Some(ApplicationActivityLevel::Inactive),
-        full_wake_handling_level: Some(FullWakeHandlingLevel::Inactive),
-        wake_handling_level: Some(WakeHandlingLevel::Inactive),
-        ..Default::default()
-    };
-    let _ = sag_ctrl_state.set(&required_state).await.unwrap().unwrap();
-
-    assert_eq!(sag_ctrl_state.watch().await.unwrap(), required_state);
-
-    // Check updated suspend stats.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(1), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(Some(1), current_stats.last_time_in_suspend);
-    Ok(())
-}
-
-#[fuchsia::test]
 async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Result<()> {
     let env = create_test_env().await;
 
     let activity_governor = env.connect_to_protocol::<fsystem::ActivityGovernorMarker>();
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
     let topology = env.connect_to_protocol::<fbroker::TopologyMarker>();
+
+    // Check initial booting state [2, 0, 0, 0].
+    assert_eq!(
+        sag_ctrl_state.watch().await.unwrap(),
+        fctrl::SystemActivityGovernorState {
+            execution_state_level: Some(ExecutionStateLevel::Active),
+            application_activity_level: Some(ApplicationActivityLevel::Inactive),
+            full_wake_handling_level: Some(FullWakeHandlingLevel::Inactive),
+            wake_handling_level: Some(WakeHandlingLevel::Inactive),
+            ..Default::default()
+        }
+    );
 
     let power_elements = activity_governor.get_power_elements().await?;
     let es_token = power_elements.execution_state.unwrap().passive_dependency_token.unwrap();
@@ -481,6 +429,17 @@ async fn test_set_invalid_sag_states() -> Result<()> {
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
 
     // Check initial booting state [2, 0, 0, 0].
+    assert_eq!(
+        sag_ctrl_state.watch().await.unwrap(),
+        fctrl::SystemActivityGovernorState {
+            execution_state_level: Some(ExecutionStateLevel::Active),
+            application_activity_level: Some(ApplicationActivityLevel::Inactive),
+            full_wake_handling_level: Some(FullWakeHandlingLevel::Inactive),
+            wake_handling_level: Some(WakeHandlingLevel::Inactive),
+            ..Default::default()
+        }
+    );
+
     let mut state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
         application_activity_level: Some(ApplicationActivityLevel::Inactive),

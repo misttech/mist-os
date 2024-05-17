@@ -27,10 +27,7 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.power.broker.Topology",
-                "test.suspendcontrol.Device",
-            ],
+            protocol: [ "fuchsia.power.broker.Topology" ],
         },
         {
             protocol: [
@@ -49,11 +46,6 @@
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "parent",
             to: [ "#system-activity-governor" ],
-        },
-        {
-            service: "fuchsia.hardware.suspend.SuspendService",
-            from: "parent",
-            to: "#system-activity-governor",
         },
     ],
     expose: [
