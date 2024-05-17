@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/binding.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <zircon/errors.h>
@@ -10,6 +9,7 @@
 #include <algorithm>
 #include <memory>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -88,25 +88,25 @@ zx_status_t SimpleCodecServer::CreateAndAddToDdkInternal() {
       simple_codec_.CreateString("unique_id", std::to_string(driver_ids_.instance_count),
                                  &inspect_);
     }
-    zx_device_prop_t props[] = {
-        {BIND_PLATFORM_DEV_VID, 0, driver_ids_.vendor_id},
-        {BIND_PLATFORM_DEV_DID, 0, driver_ids_.device_id},
-        {BIND_CODEC_INSTANCE, 0, driver_ids_.instance_count},
+    zx_device_str_prop_t props[] = {
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, driver_ids_.vendor_id),
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, driver_ids_.device_id),
+        ddk::MakeStrProperty(bind_fuchsia::CODEC_INSTANCE, driver_ids_.instance_count),
     };
     return DdkAdd(ddk::DeviceAddArgs(info.product_name.c_str())
-                      .set_props(props)
+                      .set_str_props(props)
                       .set_proto_id(ZX_PROTOCOL_CODEC)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel())
                       .set_inspect_vmo(inspect_.DuplicateVmo())
                       .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
   }
-  zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, driver_ids_.vendor_id},
-      {BIND_PLATFORM_DEV_DID, 0, driver_ids_.device_id},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, driver_ids_.vendor_id),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, driver_ids_.device_id),
   };
   return DdkAdd(ddk::DeviceAddArgs(info.product_name.c_str())
-                    .set_props(props)
+                    .set_str_props(props)
                     .set_proto_id(ZX_PROTOCOL_CODEC)
                     .set_fidl_service_offers(offers)
                     .set_outgoing_dir(endpoints->client.TakeChannel())

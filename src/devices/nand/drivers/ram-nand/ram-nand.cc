@@ -4,7 +4,6 @@
 
 #include "ram-nand.h"
 
-#include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/zbi-format/partition.h>
@@ -19,6 +18,8 @@
 #include <algorithm>
 #include <utility>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/nand/cpp/bind.h>
 #include <ddk/metadata/bad-block.h>
 #include <ddk/metadata/nand.h>
 #include <fbl/algorithm.h>
@@ -135,9 +136,10 @@ zx_status_t NandDevice::Bind(fuchsia_hardware_nand::wire::RamNandInfo& info) {
   if (info.export_partition_map) {
     export_partition_map_ = ExtractPartitionMap(info);
   }
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_NAND},
-      {BIND_NAND_CLASS, 0, params_.nand_class},
+
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_nand::BIND_PROTOCOL_DEVICE),
+      ddk::MakeStrProperty(bind_fuchsia::NAND_CLASS, params_.nand_class),
   };
 
   fail_after_ = static_cast<uint64_t>(info.fail_after) * params_.page_size;
@@ -145,7 +147,7 @@ zx_status_t NandDevice::Bind(fuchsia_hardware_nand::wire::RamNandInfo& info) {
     zxlogf(INFO, "fail-after: %lu", fail_after_);
   }
 
-  return DdkAdd(ddk::DeviceAddArgs(device_name->data()).set_props(props));
+  return DdkAdd(ddk::DeviceAddArgs(device_name->data()).set_str_props(props));
 }
 
 void NandDevice::DdkInit(ddk::InitTxn txn) {

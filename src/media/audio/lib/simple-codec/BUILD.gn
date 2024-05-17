@@ -22,6 +22,7 @@ zx_library("simple-codec") {
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/fidl/fuchsia.hardware.audio.signalprocessing:fuchsia.hardware.audio.signalprocessing_hlcpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -34,8 +35,6 @@ zx_library("simple-codec") {
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   deps = [
-    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
   ]
