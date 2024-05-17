@@ -550,12 +550,6 @@
             from: "self",
             to: "#session",
         },
-        {
-            resolver: "full-resolver",
-            from: "parent",
-            to: "#session",
-            availability: "same_as_target",
-        },
     ],
     expose: [
         // Served by session_manager.
