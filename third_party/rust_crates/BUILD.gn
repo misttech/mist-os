@@ -1035,7 +1035,7 @@ group("tracing-core") {
 }
 
 group("tracing-log") {
-  public_deps = [ ":tracing-log-v0_1_3" ]
+  public_deps = [ ":tracing-log-v0_2_0" ]
 }
 
 group("tracing-mutex") {
@@ -16050,15 +16050,47 @@ rust_library("tracing-log-v0_1_3") {
     "--edition=2018",
     "-Cmetadata=419a5251c4973e5b",
     "-Cextra-filename=-419a5251c4973e5b",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"log-tracer\"",
     "--cfg=feature=\"std\"",
-    "--cfg=feature=\"trace-logger\"",
   ]
 
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":tracing-log-v0_1_3.license" ]
+}
+
+license("tracing-log-v0_2_0.license") {
+  public_package_name = "tracing_log"
+  license_files =
+      [ "//third_party/rust_crates/vendor/tracing-log-0.2.0/LICENSE" ]
+}
+
+rust_library("tracing-log-v0_2_0") {
+  crate_name = "tracing_log"
+  crate_root = "//third_party/rust_crates/vendor/tracing-log-0.2.0/src/lib.rs"
+  output_name = "tracing_log-575e9bcc83b55bcc"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":tracing-core-v0_1_32" ]
+  deps += [ ":log-v0_4_20" ]
+  deps += [ ":once_cell-v1_17_1" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=575e9bcc83b55bcc",
+    "-Cextra-filename=-575e9bcc83b55bcc",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"log-tracer\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":tracing-log-v0_2_0.license" ]
 }
 
 license("tracing-mutex-v0_3_0.license") {
