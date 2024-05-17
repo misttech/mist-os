@@ -11,7 +11,7 @@ import (
 	"text/template"
 
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither"
-	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/c"
+	"go.fuchsia.dev/fuchsia/zircon/tools/zither/backends/mistos/c"
 )
 
 const syscallCDeclTemplate = `

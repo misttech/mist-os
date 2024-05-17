@@ -5,19 +5,10 @@
 
 import("//build/go/go_library.gni")
 
-go_library("mistos") {
+go_library("c") {
   visibility = [ "//zircon/tools/zither/*" ]
-  sources = [
-    "mistos.go",
-    "syscall_cdecl.go",
-    "templates/category.inc.tmpl",
-    "templates/kernel-wrappers.inc.tmpl",
-    "templates/kernel.inc.tmpl",
-    "templates/syscalls.inc.tmpl",
-    "templates/zx-syscall-numbers.h.tmpl",
-  ]
+  sources = [ "c.go" ]
   deps = [
-    "c",
     "//tools/fidl/lib/fidlgen",
     "//zircon/tools/zither:common",
   ]

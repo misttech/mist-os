@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,69 +6,14 @@
 package c
 
 import (
-	"embed"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"text/template"
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 	"go.fuchsia.dev/fuchsia/zircon/tools/zither"
 )
-
-//go:embed templates/*
-var templates embed.FS
-
-// Generator provides C data layout bindings.
-type Generator struct {
-	fidlgen.Generator
-	outputNamespaceOverride string
-}
-
-func NewGenerator(formatter fidlgen.Formatter, outputNamespaceOverride string) *Generator {
-	gen := fidlgen.NewGenerator("CTemplates", templates, formatter, template.FuncMap{
-		"LowerCaseWithUnderscores": LowerCaseWithUnderscores,
-		"UpperCaseWithUnderscores": UpperCaseWithUnderscores,
-		"Append":                   Append,
-		"PrimitiveTypeName":        PrimitiveTypeName,
-		"HeaderGuard": func(summary zither.FileSummary) string {
-			return zither.CHeaderGuard(summary, "c", outputNamespaceOverride)
-		},
-		"StandardIncludes": StandardIncludes,
-		"TypeName":         TypeName,
-		"ConstMemberName":  ConstMemberName,
-		"ConstValue":       ConstValue,
-		"EnumMemberValue":  EnumMemberValue,
-		"BitsMemberValue":  BitsMemberValue,
-		"DescribeType":     DescribeType,
-	})
-	return &Generator{*gen, outputNamespaceOverride}
-}
-
-func (gen Generator) DeclOrder() zither.DeclOrder { return zither.DependencyDeclOrder }
-
-func (gen Generator) DeclCallback(zither.Decl) {}
-
-func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
-	var outputs []string
-	for _, summary := range summary.Files {
-		output := filepath.Join(outputDir, zither.CHeaderPath(summary, "c", gen.outputNamespaceOverride))
-		if err := gen.GenerateFile(output, "GenerateCFile", summary); err != nil {
-			return nil, err
-		}
-		outputs = append(outputs, output)
-	}
-
-	readme := filepath.Join(outputDir, "README.md")
-	if err := zither.WriteReadme(readme, summary); err != nil {
-		return nil, err
-	}
-	outputs = append(outputs, readme)
-
-	return outputs, nil
-}
 
 //
 // Template functions.
@@ -76,12 +22,6 @@ func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) 
 // LowerCaseWithUnderscores is a wrapper around the zither-defined utility that
 // also includes the library name.
 func LowerCaseWithUnderscores(el zither.Element) string {
-	decl, ok := el.(zither.Decl)
-	if ok {
-		libParts := decl.GetName().LibraryName().Parts()
-		prefix := fidlgen.ToSnakeCase(strings.Join(libParts, "_"))
-		return prefix + "_" + zither.LowerCaseWithUnderscores(el)
-	}
 	return zither.LowerCaseWithUnderscores(el)
 }
 
@@ -114,6 +54,10 @@ func PrimitiveTypeName(typ fidlgen.PrimitiveSubtype) string {
 
 func TypeName(decl zither.Decl) string {
 	return LowerCaseWithUnderscores(decl) + "_t"
+}
+
+func StructTypeName(decl zither.Decl) string {
+	return "struct " + LowerCaseWithUnderscores(decl)
 }
 
 func ConstMemberName(parent zither.Decl, member zither.Member) string {
@@ -220,7 +164,9 @@ func DescribeType(desc zither.TypeDescriptor) TypeInfo {
 	switch desc.Kind {
 	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize:
 		return TypeInfo{Type: PrimitiveTypeName(fidlgen.PrimitiveSubtype(desc.Type))}
-	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct,
+	case zither.TypeKindStruct:
+		return TypeInfo{Type: StructTypeName(desc.Decl)}
+	case zither.TypeKindEnum, zither.TypeKindBits,
 		zither.TypeKindOverlay, zither.TypeKindAlias, zither.TypeKindHandle:
 		return TypeInfo{Type: TypeName(desc.Decl)}
 	case zither.TypeKindArray:
