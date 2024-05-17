@@ -318,6 +318,24 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
       break;
     }
 
+    case SimManagementFrame::FRAME_TYPE_DEAUTH: {
+      auto deauth_frame = std::static_pointer_cast<const SimDeauthFrame>(mgmt_frame);
+      // Ignore requests that are not for us
+      if (deauth_frame->dst_addr_ != bssid_) {
+        return;
+      }
+
+      // Make sure the client is already authenticated
+      for (auto client : clients_) {
+        if (client->mac_addr_ == deauth_frame->src_addr_ &&
+            (client->status_ == Client::AUTHENTICATED || client->status_ == Client::ASSOCIATED)) {
+          RemoveClient(deauth_frame->src_addr_);
+          return;
+        }
+      }
+      break;
+    }
+
     case SimManagementFrame::FRAME_TYPE_AUTH: {
       auto auth_req_frame = std::static_pointer_cast<const SimAuthFrame>(mgmt_frame);
       if (auth_req_frame->dst_addr_ != bssid_) {
@@ -397,8 +415,9 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
             if (auth_req_frame->seq_num_ == 3) {
               if (security_.expect_challenge_failure) {
                 // Refuse authentication if this AP has been configured to.
-                // TODO(https://fxbug.dev/42139397): Actually check the challenge response rather than hardcoding
-                // authentication kSuccess or failure using expect_challenge_failure.
+                // TODO(https://fxbug.dev/42139397): Actually check the challenge response rather
+                // than hardcoding authentication kSuccess or failure using
+                // expect_challenge_failure.
                 RemoveClient(auth_req_frame->src_addr_);
                 ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kChallengeFailure);
                 return;
@@ -513,6 +532,21 @@ zx_status_t FakeAp::DisassocSta(const common::MacAddr& sta_mac, wlan_ieee80211::
     if (client->mac_addr_ == sta_mac && client->status_ == Client::ASSOCIATED) {
       // Client is already associated
       environment_->Tx(disassoc_req_frame, tx_info_, this);
+      RemoveClient(sta_mac);
+      return ZX_OK;
+    }
+  }
+  // client not found
+  return ZX_ERR_INVALID_ARGS;
+}
+
+zx_status_t FakeAp::DeauthSta(const common::MacAddr& sta_mac, wlan_ieee80211::ReasonCode reason) {
+  // Make sure the client is already associated
+  SimDeauthFrame deauth_frame(bssid_, sta_mac, reason);
+  for (const auto& client : clients_) {
+    if (client->mac_addr_ == sta_mac && client->status_ == Client::ASSOCIATED) {
+      // Client is already associated
+      environment_->Tx(deauth_frame, tx_info_, this);
       RemoveClient(sta_mac);
       return ZX_OK;
     }

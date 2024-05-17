@@ -17,6 +17,8 @@
 #include <bind/fuchsia/wlan/fullmac/cpp/bind.h>
 #include <fbl/string_buffer.h>
 
+#include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
+
 namespace wlan::brcmfmac {
 
 // static
@@ -212,6 +214,9 @@ void SimInterface::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
 
 void SimInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
                                 DisassocConfCompleter::Sync& completer) {
+  const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcBaseDisassocConfRequest{
+      .resp = {.status = request->resp.status}};
+  stats_.disassoc_results.emplace_back(disassoc_conf);
   completer.buffer(arena).Reply();
 }
 
@@ -368,6 +373,21 @@ void SimInterface::AssociateWith(const simulation::FakeAp& ap, std::optional<zx:
   } else {
     StartConnect(ap.GetBssid(), ap.GetSsid(), ap.GetChannel());
   }
+}
+
+void SimInterface::DisassociateFrom(const common::MacAddr& bssid,
+                                    wlan_ieee80211::ReasonCode reason) {
+  // This should only be performed on a Client interface
+  ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
+
+  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseDisassocRequest::Builder(test_arena_);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), bssid.byte, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(reason);
+
+  auto result = client_.buffer(test_arena_)->Disassoc(builder.Build());
+  ZX_ASSERT(result.ok());
 }
 
 void SimInterface::DeauthenticateFrom(const common::MacAddr& bssid,

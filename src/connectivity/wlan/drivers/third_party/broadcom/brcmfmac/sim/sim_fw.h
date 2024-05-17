@@ -42,6 +42,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_errinj.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_hw.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_iovar.h"
+#include "wlan/common/macaddr.h"
 #include "wlan/drivers/components/frame_storage.h"
 
 namespace wlan::brcmfmac {
@@ -240,6 +241,7 @@ class SimFirmware {
   uint16_t GetNumClients(uint16_t ifidx);
 
   void TriggerFirmwareDisassoc(wlan_ieee80211::ReasonCode reason);
+  void TriggerFirmwareDeauth(wlan_ieee80211::ReasonCode reason);
 
   // Firmware iovar accessors
   zx_status_t IovarsSet(uint16_t ifidx, const char* name, const void* value, size_t value_len,
@@ -431,7 +433,10 @@ class SimFirmware {
   void AuthHandleFailure();
   void DisassocStart(brcmf_scb_val_le* scb_val);
   void DisassocLocalClient(wlan_ieee80211::ReasonCode reason);
+  void DeauthLocalClient(wlan_ieee80211::ReasonCode reason);
   void SetStateToDisassociated(wlan_ieee80211::ReasonCode reason, bool locally_initiated);
+  void SetStateToDeauthenticated(wlan_ieee80211::ReasonCode reason, bool locally_initiated,
+                                 const common::MacAddr& bssid);
   // Get the Sim firmware ready for a target_bss_info iovar request.
   void SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf);
   void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts, wlan_common::WlanChannel& channel);

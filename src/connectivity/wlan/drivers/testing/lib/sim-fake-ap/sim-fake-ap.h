@@ -107,6 +107,9 @@ class FakeAp final : public StationIfc {
   // Disassociate a Station
   zx_status_t DisassocSta(const common::MacAddr& sta_mac, wlan_ieee80211::ReasonCode reason);
 
+  // Deauthenticate a Station
+  zx_status_t DeauthSta(const common::MacAddr& sta_mac, wlan_ieee80211::ReasonCode reason);
+
   // Send a BSS Transition Management request.
   void SendBtmReq(const simulation::SimBtmReqFrame& btm_req);
 

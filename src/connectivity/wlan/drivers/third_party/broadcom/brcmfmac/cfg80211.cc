@@ -6198,8 +6198,8 @@ static zx_status_t brcmf_process_link_event(struct brcmf_if* ifp, const struct b
   return ZX_OK;
 }
 
-static zx_status_t brcmf_process_deauth_ind_event(struct brcmf_if* ifp, const struct brcmf_event_msg* e,
-                                                  void* data) {
+static zx_status_t brcmf_process_deauth_ind_event(struct brcmf_if* ifp,
+                                                  const struct brcmf_event_msg* e, void* data) {
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
   brcmf_proto_delete_peer(ifp->drvr, ifp->ifidx, (uint8_t*)e->addr);
