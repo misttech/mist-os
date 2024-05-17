@@ -2,6 +2,7 @@
 # https://android.googlesource.com/kernel/configs/+/refs/heads/main/t/android-5.15/android-base.config
 # with additional configs from
 # https://android.googlesource.com/kernel/configs/+/refs/heads/main/t/android-5.15/android-base-conditional.xml
+# with additional tweaking to pass Android CTS
 #
 #  KEEP ALPHABETICALLY SORTED
 # CONFIG_ANDROID_LOW_MEMORY_KILLER is not set
@@ -242,6 +243,7 @@ CONFIG_STACKPROTECTOR=y
 CONFIG_STACKPROTECTOR_STRONG=y
 CONFIG_STAGING=y
 CONFIG_STATIC_USERMODEHELPER=y
+CONFIG_STATIC_USERMODEHELPER_PATH=""
 CONFIG_STRICT_KERNEL_RWX=y
 CONFIG_STRICT_MODULE_RWX=y
 CONFIG_SUSPEND=y
