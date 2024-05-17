@@ -3272,6 +3272,15 @@ From //build/images/vbmeta.gni:40
 
 From //build/images/args.gni:115
 
+### fat_lto_objects
+
+Whether to enable -ffat-lto-objects in LTO builds.
+https://llvm.org/docs/FatLTO.html
+
+**Current value (from the default):** `true`
+
+From //build/config/lto/config.gni:14
+
 ### ffmpeg_profile
 
 **Current value (from the default):** `"default"`
@@ -5241,7 +5250,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 * `profile`: optimized for coverage/profile data collection
 * `coverage`: optimized for coverage data collection
 
-**Current value (from the default):** `"size"`
+**Current value (from the default):** `"size_lto"`
 
 From //build/config/compiler.gni:23
 
