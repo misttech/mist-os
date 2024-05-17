@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.buildinfo.test") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "Unknown"
+  sdk_area = "Product Assembly"
 
   sources = [ "buildinfotest.fidl" ]
 
