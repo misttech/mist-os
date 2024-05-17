@@ -584,7 +584,7 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
   auto& element0 = elements.value()->processing_elements[0];
   ASSERT_EQ(element0.id(), kHeadphoneGainPeId);
   ASSERT_EQ(element0.type(), fuchsia_hardware_audio_signalprocessing::ElementType::kGain);
-  ASSERT_EQ(element0.can_disable(), false);
+  ASSERT_EQ(element0.can_stop(), false);
   fidl::StringView& description = element0.description();
   EXPECT_EQ(std::string(description.data(), description.size()).compare("Headphones gain"), 0);
 

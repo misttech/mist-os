@@ -1315,8 +1315,6 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
     EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
               ZX_MSEC(element_id));
 
-    EXPECT_FALSE(state_received.enabled().has_value());
-
     ASSERT_TRUE(state_received.vendor_specific_data().has_value());
     ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
     EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');

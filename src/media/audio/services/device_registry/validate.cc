@@ -1511,11 +1511,6 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
       break;
   }
 
-  // enabled is deprecated. Show a warning, but don't cause a driver error in the meantime.
-  if (element_state.enabled().has_value()) {
-    FX_LOGS(WARNING) << "WatchElementState: ElementState.enabled is deprecated; use `bypassed`";
-  }
-
   if (element_state.vendor_specific_data().has_value()) {
     // vendor_specific_data is opaque to us, so we can't really perform any other structured checks.
     if (element_state.vendor_specific_data()->empty()) {
@@ -1809,11 +1804,6 @@ bool ValidateElement(const fhasp::Element& element) {
         return false;
       }
       break;
-  }
-
-  // can_disable is deprecated. Show a warning, but don't cause a driver error in the meantime.
-  if (element.can_disable().has_value()) {
-    FX_LOGS(WARNING) << "SignalProcessing.element.can_disable is deprecated and should be removed";
   }
 
   if (element.description().has_value() && element.description()->empty()) {

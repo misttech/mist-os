@@ -493,7 +493,7 @@ void Server::GetElements(GetElementsCompleter::Sync& completer) {
             .type_specific(
                 fuchsia_hardware_audio_signalprocessing::wire::TypeSpecificElement::WithGain(
                     arena, gain.Build()))
-            .can_disable(false)
+            .can_stop(false)
             .description("Headphones gain");
 
     fidl::VectorView<fuchsia_hardware_audio_signalprocessing::wire::Element> elements(arena, 1);

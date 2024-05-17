@@ -249,12 +249,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/Element.can_disable",
-        "ordinal": "4",
-        "type": "bool"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/Element.can_stop",
         "ordinal": "6",
         "type": "bool"
@@ -291,12 +285,6 @@
         "kind": "table/member",
         "name": "fuchsia.hardware.audio.signalprocessing/ElementState.bypassed",
         "ordinal": "6",
-        "type": "bool"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio.signalprocessing/ElementState.enabled",
-        "ordinal": "2",
         "type": "bool"
     },
     {

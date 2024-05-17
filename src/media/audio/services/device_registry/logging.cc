@@ -681,12 +681,6 @@ void LogElementStateInternal(const std::optional<fhasp::ElementState>& element_s
     FX_LOGS(INFO) << indent << "type_specific <none> (non-compliant)";
   }
 
-  if (element_state->enabled().has_value()) {
-    FX_LOGS(INFO) << indent << "enabled               "
-                  << (*element_state->enabled() ? "TRUE" : "FALSE")
-                  << " (non-compliant -- deprecated)";
-  }
-
   if (element_state->vendor_specific_data().has_value()) {
     FX_LOGS(INFO) << indent << "vendor_specific_data  ["
                   << element_state->vendor_specific_data()->size() << "]  (not shown here)"
@@ -1002,11 +996,6 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
     }
   } else {
     FX_LOGS(INFO) << indent << "type_specific         <none>";
-  }
-
-  if (element.can_disable().has_value()) {
-    FX_LOGS(INFO) << indent << "can_disable <deprecated> "
-                  << (*element.can_disable() ? "TRUE" : "FALSE") << " (non-compliant)";
   }
 
   FX_LOGS(INFO) << indent << "description           "

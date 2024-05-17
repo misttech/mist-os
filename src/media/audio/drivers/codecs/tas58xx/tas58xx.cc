@@ -323,14 +323,14 @@ void Tas58xx::GetElements(signal_fidl::SignalProcessing::GetElementsCallback cal
     signal_fidl::Element pe;
     pe.set_id(kAglPeId);
     pe.set_type(signal_fidl::ElementType::AUTOMATIC_GAIN_LIMITER);
-    pe.set_can_disable(true);
+    pe.set_can_stop(true);
     pes.emplace_back(std::move(pe));
   }
   {
     signal_fidl::Element pe;
     pe.set_id(kGainPeId);
     pe.set_type(signal_fidl::ElementType::GAIN);
-    pe.set_can_disable(true);
+    pe.set_can_stop(true);
     signal_fidl::Gain gain;
     gain.set_type(signal_fidl::GainType::DECIBELS);
     gain.set_min_gain(kMinGain);
@@ -343,7 +343,7 @@ void Tas58xx::GetElements(signal_fidl::SignalProcessing::GetElementsCallback cal
     signal_fidl::Element pe;
     pe.set_id(kMutePeId);
     pe.set_type(signal_fidl::ElementType::MUTE);
-    pe.set_can_disable(true);
+    pe.set_can_stop(true);
     pes.emplace_back(std::move(pe));
   }
 

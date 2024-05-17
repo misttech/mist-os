@@ -128,7 +128,7 @@ type Element = table {
     /// # Deprecation
     ///
     /// Use `can_bypass` instead.
-    @available(deprecated=20)
+    @available(removed=20)
     4: can_disable bool;
 
     /// If included, a textual description of the processing element.
@@ -200,7 +200,7 @@ type ElementState = table {
     /// # Deprecation
     ///
     /// Use `bypassed` instead.
-    @available(deprecated=20)
+    @available(removed=20)
     2: enabled bool;
 
     /// If included, how much latency is added to the pipeline if this processing element is

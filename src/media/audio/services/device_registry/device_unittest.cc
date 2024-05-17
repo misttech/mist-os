@@ -1535,7 +1535,6 @@ TEST_F(CompositeTest, GetElements) {
     ASSERT_TRUE(element.id().has_value());
     ASSERT_TRUE(elements->at(0).type().has_value());
     ASSERT_TRUE(element.description().has_value());
-    ASSERT_FALSE(element.can_disable().has_value());
     ASSERT_TRUE(element.can_stop().has_value());
     ASSERT_TRUE(element.can_bypass().has_value());
     if (element.type() == fhasp::ElementType::kDaiInterconnect) {
@@ -1638,8 +1637,8 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   auto state = states.find(FakeComposite::kSourceDaiElementId)->second;
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
   EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceDaiElementProcessingDelay.get());
@@ -1652,13 +1651,14 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(state.vendor_specific_data()->size(), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 1u);
   EXPECT_EQ(state.vendor_specific_data()->at(7), 8u);
+  EXPECT_FALSE(*state.started());
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kDestDaiElementId)->second;
   ASSERT_TRUE(state.type_specific().has_value());
   ASSERT_TRUE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
   EXPECT_EQ(*state.processing_delay(), FakeComposite::kDestDaiElementProcessingDelay.get());
@@ -1671,34 +1671,38 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_EQ(state.vendor_specific_data()->size(), 9u);
   EXPECT_EQ(state.vendor_specific_data()->at(0), 8u);
   EXPECT_EQ(state.vendor_specific_data()->at(8), 0u);
+  EXPECT_FALSE(*state.started());
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
+  EXPECT_TRUE(*state.started());
   EXPECT_FALSE(*state.bypassed());
   EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceRbElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kDestRbElementId)->second;
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   ASSERT_FALSE(state.processing_delay().has_value());
 
+  EXPECT_TRUE(*state.started());
   EXPECT_FALSE(*state.bypassed());
 
   state = states.find(FakeComposite::kMuteElementId)->second;
   EXPECT_FALSE(state.type_specific().has_value());
   EXPECT_FALSE(state.vendor_specific_data().has_value());
+  ASSERT_TRUE(state.started().has_value());
   ASSERT_TRUE(state.bypassed().has_value());
-  EXPECT_FALSE(state.enabled().has_value());
   EXPECT_FALSE(state.processing_delay().has_value());
 
+  EXPECT_TRUE(*state.started());
   EXPECT_TRUE(*state.bypassed());
 }
 
@@ -1724,7 +1728,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
     // Handle the Mute node
     if (element.type() == fhasp::ElementType::kMute && element.can_bypass().value_or(false)) {
       // By configuration, our Mute starts bypassed (we activate it as our ElementState change).
-      EXPECT_FALSE(state.enabled().has_value());
       ASSERT_TRUE(state.started().has_value());
       EXPECT_TRUE(*state.started());
       ASSERT_TRUE(state.bypassed().has_value());
@@ -1789,8 +1792,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_FALSE(state_received.type_specific().has_value());
       EXPECT_FALSE(state_received.vendor_specific_data().has_value());
 
-      EXPECT_FALSE(state_received.enabled().has_value());
-
       ASSERT_TRUE(state_received.started().has_value());
       EXPECT_TRUE(*state_received.started());
 
@@ -1827,8 +1828,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       ASSERT_EQ(state_received.vendor_specific_data()->size(), 17u);
       EXPECT_EQ(state_received.vendor_specific_data()->at(16), 'Z');
 
-      EXPECT_FALSE(state_received.enabled().has_value());
-
       ASSERT_TRUE(state_received.started().has_value());
       EXPECT_TRUE(state_received.started());
 
@@ -1838,6 +1837,7 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       ASSERT_TRUE(state_received.processing_delay().has_value());
       EXPECT_EQ(*state_received.processing_delay(), ZX_USEC(element_id));
     }
+
     // Compare to what we injected.
     ASSERT_FALSE(element_states_to_inject.find(element_id) == element_states_to_inject.end())
         << "WatchElementState response received for unknown element_id " << element_id;
@@ -1929,8 +1929,6 @@ TEST_F(CompositeTest, SetElementState) {
 
   EXPECT_FALSE(new_state.type_specific().has_value());
   EXPECT_FALSE(new_state.vendor_specific_data().has_value());
-
-  EXPECT_FALSE(new_state.enabled().has_value());
 
   ASSERT_TRUE(new_state.started().has_value());
   EXPECT_TRUE(*new_state.started());
