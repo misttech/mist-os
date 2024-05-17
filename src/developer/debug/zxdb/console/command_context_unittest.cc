@@ -74,7 +74,7 @@ TEST_F(CommandContextTest, CommandReport) {
   EXPECT_TRUE(cmd_context->has_error());
   EXPECT_TRUE(report.err.has_error());
   EXPECT_EQ(report.err.type(), ErrType::kGeneral);
-  EXPECT_EQ(report.err.msg(), "The string \"1234\" is not a valid verb.");
+  EXPECT_EQ(report.err.msg(), "The string \"1234\" is not a valid verb. Did you mean \"bp\"?");
   EXPECT_EQ(static_cast<Verb>(report.verb_id), Verb::kNone);
   EXPECT_TRUE(report.arguments.empty());
   EXPECT_TRUE(report.nouns.empty());

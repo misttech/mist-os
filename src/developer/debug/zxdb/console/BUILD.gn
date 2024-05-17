@@ -145,6 +145,8 @@ static_library("console") {
     "console_impl.h",
     "console_noninteractive.cc",
     "console_noninteractive.h",
+    "did_you_mean.cc",
+    "did_you_mean.h",
     "fd_streamer.cc",
     "fd_streamer.h",
     "format_context.cc",

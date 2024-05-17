@@ -126,11 +126,11 @@ TEST(CommandParser, ParserBasicErrors) {
   // Unknown command in different contexts.
   Err err = ParseCommand("zzyzx", &output);
   EXPECT_TRUE(err.has_error());
-  EXPECT_EQ("The string \"zzyzx\" is not a valid verb.", err.msg());
+  EXPECT_EQ("The string \"zzyzx\" is not a valid verb. Did you mean \"x\"?", err.msg());
 
   err = ParseCommand("process 1 zzyzx", &output);
   EXPECT_TRUE(err.has_error());
-  EXPECT_EQ("The string \"zzyzx\" is not a valid verb.", err.msg());
+  EXPECT_EQ("The string \"zzyzx\" is not a valid verb. Did you mean \"x\"?", err.msg());
 
   err = ParseCommand("process 1 process pause", &output);
   EXPECT_TRUE(err.has_error());

@@ -12,6 +12,7 @@
 
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/console/command.h"
+#include "src/developer/debug/zxdb/console/did_you_mean.h"
 #include "src/developer/debug/zxdb/console/nouns.h"
 #include "src/developer/debug/zxdb/expr/parse_string.h"
 
@@ -134,15 +135,15 @@ class Parser {
 
  private:
   struct State {
-    bool (Parser::*advance)();
+    bool (Parser::* advance)();
 
     // Completer callback. The first argument is a prefix we expect all
     // completions to share. The second is a vector to which we should append
     // full single tokens which would be valid completions.
-    void (Parser::*complete)(const std::string&, std::vector<std::string>*);
+    void (Parser::* complete)(const std::string&, std::vector<std::string>*);
 
-    State(bool (Parser::*advance)(),
-          void (Parser::*complete)(const std::string&, std::vector<std::string>*))
+    State(bool (Parser::* advance)(),
+          void (Parser::* complete)(const std::string&, std::vector<std::string>*))
         : advance(advance), complete(complete) {}
   };
 
@@ -448,7 +449,13 @@ bool Parser::DoVerbState() {
   const auto& verb_strings = GetStringVerbMap();
   auto found_verb_str = verb_strings.find(token_str());
   if (found_verb_str == verb_strings.end()) {
-    return Fail("The string \"" + token_str() + "\" is not a valid verb.");
+    const auto& nouns_strings = GetStringNounMap();
+    std::optional<std::string> suggestion = DidYouMean(token_str(), nouns_strings, verb_strings, 5);
+    std::string msg = "The string \"" + token_str() + "\" is not a valid verb.";
+    if (suggestion) {
+      msg += " Did you mean \"" + *suggestion + "\"?";
+    }
+    return Fail(msg);
   }
 
   command_->set_verb(found_verb_str->second);
