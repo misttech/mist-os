@@ -50,7 +50,7 @@ inline zx_ticks_t get_raw_ticks() {
 // to allow the offset to be changed as a result of coming out of system
 // suspend.
 __EXPORT zx_ticks_t _zx_ticks_get(void) {
-  return get_raw_ticks() + DATA_CONSTANTS.raw_ticks_to_ticks_offset;
+  return get_raw_ticks() + DATA_TIME_VALUES.raw_ticks_to_ticks_offset;
 }
 
 #if __aarch64__
@@ -63,7 +63,7 @@ __EXPORT zx_ticks_t _zx_ticks_get(void) {
 // kernel to mitigate the errata.  It will be selected by the kernel during VDSO
 // construction if needed.
 VDSO_KERNEL_EXPORT zx_ticks_t CODE_ticks_get_arm_a73(void) {
-  return get_raw_ticks_arm_a73() + DATA_CONSTANTS.raw_ticks_to_ticks_offset;
+  return get_raw_ticks_arm_a73() + DATA_TIME_VALUES.raw_ticks_to_ticks_offset;
 }
 #endif
 

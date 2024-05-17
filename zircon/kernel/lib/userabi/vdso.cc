@@ -6,6 +6,7 @@
 
 #include <lib/affine/ratio.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/time-values-abi.h>
 #include <lib/userabi/vdso-constants.h>
 #include <lib/userabi/vdso.h>
 #include <lib/version.h>
@@ -180,8 +181,8 @@ void CheckBuildId(const fbl::RefPtr<VmObject>& vmo) {
   ASSERT(note == kVdsoBuildIdNote);
 }
 
-// Fill out the contents of the vdso_constants struct.
-void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
+// Fill out the contents of the time_values struct.
+void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
   zx_ticks_t per_second = ticks_per_second();
 
   // Grab a copy of the ticks to mono ratio; we need this to initialize the
@@ -195,6 +196,31 @@ void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
   ASSERT(ticks_to_mono_ratio.numerator() != 0);
   ASSERT(ticks_to_mono_ratio.denominator() != 0);
 
+  // Initialize the time values that should be visible to the vDSO.
+  internal::TimeValues values = {
+      .version = 1,
+      .ticks_per_second = per_second,
+      .raw_ticks_to_ticks_offset = platform_get_raw_ticks_to_ticks_offset(),
+      .ticks_to_mono_numerator = ticks_to_mono_ratio.numerator(),
+      .ticks_to_mono_denominator = ticks_to_mono_ratio.denominator(),
+      .usermode_can_access_ticks = platform_usermode_can_access_tick_registers() &&
+                                   !gBootOptions->vdso_ticks_get_force_syscall,
+#if ARCH_ARM64
+      .use_a73_errata_mitigation = arch_quirks_needs_arm_erratum_858921_mitigation(),
+#else
+      .use_a73_errata_mitigation = false,
+#endif
+  };
+
+  // Write the time values to the appropriate section in the vDSO.
+  ktl::span bytes = ktl::as_bytes(ktl::span{&values, 1});
+  zx_status_t status = vmo->Write(bytes.data(), VDSO_DATA_TIME_VALUES, bytes.size());
+  ASSERT_MSG(status == ZX_OK, "vDSO Time Values VMO Write of %zu bytes at %#" PRIx64 " failed: %d",
+             bytes.size(), uint64_t{VDSO_DATA_TIME_VALUES}, status);
+}
+
+// Fill out the contents of the vdso_constants struct.
+void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
   ktl::string_view version = VersionString();
   ASSERT_MSG(version.size() <= kMaxVersionString, "version string size %zu > max %zu: \"%.*s\"",
              version.size(), kMaxVersionString, static_cast<int>(version.size()), version.data());
@@ -216,10 +242,6 @@ void SetConstants(const fbl::RefPtr<VmObject>& vmo) {
       arch_icache_line_size(),
       PAGE_SIZE,
       0,  // Padding.
-      per_second,
-      platform_get_raw_ticks_to_ticks_offset(),
-      ticks_to_mono_ratio.numerator(),
-      ticks_to_mono_ratio.denominator(),
       pmm_count_total_bytes(),
       version.size(),
   };
@@ -309,7 +331,8 @@ VDso::VDso(KernelHandle<VmObjectDispatcher>* vmo_kernel_handle)
     : RoDso("vdso/next", vdso_image, VDSO_CODE_END, VDSO_CODE_START, vmo_kernel_handle) {}
 
 // This is called exactly once, at boot time.
-const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles) {
+const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
+                         KernelHandle<VmObjectDispatcher>* time_values_handle) {
   ASSERT(!instance_);
 
   fbl::AllocChecker ac;
@@ -324,7 +347,14 @@ const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles) {
 
   PatchTimeSyscalls(VDsoMutator{vdso->vmo()->vmo()});
 
+  // Fill out the contents of the time_values struct.
+  SetTimeValues(vdso->vmo()->vmo());
+
   DEBUG_ASSERT(!(vdso->vmo_rights() & ZX_RIGHT_WRITE));
+  // Create the standalone time values VMO for use by fasttime.
+  vdso->CreateTimeValuesVmo(time_values_handle);
+
+  // Create the vDSO variants.
   for (size_t v = static_cast<size_t>(Variant::STABLE); v < static_cast<size_t>(Variant::COUNT);
        ++v)
     vdso->CreateVariant(static_cast<Variant>(v), &vmo_kernel_handles[v]);
@@ -335,6 +365,25 @@ const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles) {
 
 uintptr_t VDso::base_address(const fbl::RefPtr<VmMapping>& code_mapping) {
   return code_mapping->base_locked() - VDSO_CODE_START;
+}
+
+// The time_values_vmo is a child slice of the read-only section of the vDSO that contains just the
+// time_values structure.
+void VDso::CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_handle) {
+  fbl::RefPtr<VmObject> new_vmo;
+  zx_status_t status = vmo()->CreateChild(ZX_VMO_CHILD_SLICE, VDSO_DATA_TIME_VALUES,
+                                          VDSO_DATA_TIME_VALUES_SIZE, false, &new_vmo);
+  ASSERT(status == ZX_OK);
+
+  zx_rights_t rights;
+  status = VmObjectDispatcher::Create(ktl::move(new_vmo), VDSO_DATA_TIME_VALUES_SIZE,
+                                      VmObjectDispatcher::InitialMutability::kMutable,
+                                      time_values_handle, &rights);
+  ASSERT(status == ZX_OK);
+
+  status =
+      time_values_handle->dispatcher()->set_name(kTimeValuesVmoName, strlen(kTimeValuesVmoName));
+  ASSERT(status == ZX_OK);
 }
 
 // Each vDSO variant VMO is made via a COW clone of the next vDSO
