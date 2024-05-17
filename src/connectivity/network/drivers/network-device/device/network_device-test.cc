@@ -258,7 +258,7 @@ class NetworkDeviceTest : public ::testing::Test {
       return status;
     }
     port13_.SetStatus({.mtu = 2048});
-    return port13_.AddPort(kPort13, impl_dispatcher_, OpenConnection(), impl_);
+    return port13_.AddPort(kPort13, impl_dispatcher_.get(), OpenConnection(), impl_.client());
   }
 
   zx_status_t OpenSession(TestSession* session,
@@ -1694,7 +1694,7 @@ TEST_F(NetworkDeviceTest, OnlyReceiveOnSubscribedPorts) {
 }
 
 TEST_F(NetworkDeviceTest, SessionsAttachToPort) {
-  port13_.SetMac(mac_impl_.Bind(dispatcher()));
+  port13_.SetMac(mac_impl_.Bind(dispatcher().get()));
   ASSERT_OK(CreateDeviceWithPort13());
   TestSession session;
   ASSERT_OK(OpenSession(&session));
@@ -1725,7 +1725,8 @@ TEST_F(NetworkDeviceTest, RejectsInvalidPortIds) {
   {
     // Add a port with an invalid ID.
     FakeNetworkPortImpl fake_port;
-    ASSERT_EQ(fake_port.AddPortNoWait(MAX_PORTS, impl_dispatcher_, OpenConnection(), impl_),
+    ASSERT_EQ(fake_port.AddPortNoWait(MAX_PORTS, impl_dispatcher_.get(), OpenConnection(),
+                                      impl_.client()),
               ZX_ERR_INVALID_ARGS);
     ASSERT_FALSE(fake_port.removed());
   }
@@ -1733,8 +1734,9 @@ TEST_F(NetworkDeviceTest, RejectsInvalidPortIds) {
   {
     // Add a port with a duplicate ID.
     FakeNetworkPortImpl fake_port;
-    ASSERT_EQ(fake_port.AddPortNoWait(kPort13, impl_dispatcher_, OpenConnection(), impl_),
-              ZX_ERR_ALREADY_EXISTS);
+    ASSERT_EQ(
+        fake_port.AddPortNoWait(kPort13, impl_dispatcher_.get(), OpenConnection(), impl_.client()),
+        ZX_ERR_ALREADY_EXISTS);
     ASSERT_FALSE(fake_port.removed());
   }
 }
@@ -1744,7 +1746,7 @@ TEST_F(NetworkDeviceTest, TxBadPorts) {
   // returned with an error.
   ASSERT_OK(CreateDeviceWithPort13());
   FakeNetworkPortImpl port5;
-  ASSERT_OK(port5.AddPort(5, impl_dispatcher_, OpenConnection(), impl_));
+  ASSERT_OK(port5.AddPort(5, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
   auto cleanup = fit::defer([&port5]() { port5.RemoveSync(); });
 
   TestSession session;
@@ -2136,7 +2138,7 @@ TEST_F(NetworkDeviceTest, PortGetStatus) {
 }
 
 TEST_F(NetworkDeviceTest, PortGetMac) {
-  port13_.SetMac(mac_impl_.Bind(dispatcher()));
+  port13_.SetMac(mac_impl_.Bind(dispatcher().get()));
   ASSERT_OK(CreateDeviceWithPort13());
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
@@ -2218,7 +2220,7 @@ TEST_F(NetworkDeviceTest, MultiplePortsAndSessions) {
   constexpr uint8_t kPortCount = 2;
   std::array<FakeNetworkPortImpl, kPortCount> ports;
   for (uint8_t i = 0; i < kPortCount; i++) {
-    ASSERT_OK(ports[i].AddPort(i + 1, impl_dispatcher_, OpenConnection(), impl_));
+    ASSERT_OK(ports[i].AddPort(i + 1, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
   }
   auto remove_ports = fit::defer([&ports]() {
     for (auto& port : ports) {
@@ -2314,7 +2316,7 @@ TEST_F(NetworkDeviceTest, ListenSessionPortFiltering) {
   constexpr uint8_t kPortCount = 2;
   std::array<FakeNetworkPortImpl, kPortCount> ports;
   for (uint8_t i = 0; i < static_cast<uint8_t>(ports.size()); i++) {
-    ASSERT_OK(ports[i].AddPort(i + 1, impl_dispatcher_, OpenConnection(), impl_));
+    ASSERT_OK(ports[i].AddPort(i + 1, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
   }
   auto remove_ports = fit::defer([&ports]() {
     for (auto& port : ports) {
@@ -2442,7 +2444,7 @@ TEST_F(NetworkDeviceTest, PortWatcher) {
   constexpr uint8_t kOtherPortId = 1;
   {
     FakeNetworkPortImpl port;
-    ASSERT_OK(port.AddPort(kOtherPortId, impl_dispatcher_, OpenConnection(), impl_));
+    ASSERT_OK(port.AddPort(kOtherPortId, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
     netdev::wire::PortId other_salted_id = GetSaltedPortId(kOtherPortId);
     auto remove_port = fit::defer([&port]() { port.RemoveSync(); });
     ASSERT_NO_FATAL_FAILURE(
@@ -2468,7 +2470,7 @@ TEST_F(NetworkDeviceTest, PortWatcher) {
 
   for (auto& port_id : install_rounds) {
     FakeNetworkPortImpl port;
-    ASSERT_OK(port.AddPort(kOtherPortId, impl_dispatcher_, OpenConnection(), impl_));
+    ASSERT_OK(port.AddPort(kOtherPortId, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
     port_id = GetSaltedPortId(kOtherPortId);
     port.RemoveSync();
   }
@@ -2528,8 +2530,8 @@ TEST_F(NetworkDeviceTest, PortWatcherEnforcesQueueLimit) {
       port = nullptr;
     } else {
       port = std::make_unique<FakeNetworkPortImpl>();
-      ASSERT_OK(
-          port->AddPort((event_count / 2) % MAX_PORTS, impl_dispatcher_, OpenConnection(), impl_));
+      ASSERT_OK(port->AddPort((event_count / 2) % MAX_PORTS, impl_dispatcher_.get(),
+                              OpenConnection(), impl_.client()));
     }
   }
   zx::result status = WaitClosedAndReadEpitaph(watcher.channel());
@@ -3047,7 +3049,7 @@ TEST_F(NetworkDeviceTest, PortIdSaltChangesOnFlap) {
     // removal.
     const uint8_t expect_salt = base_salt + i;
     FakeNetworkPortImpl port;
-    ASSERT_OK(port.AddPort(kPort13, impl_dispatcher_, OpenConnection(), impl_));
+    ASSERT_OK(port.AddPort(kPort13, impl_dispatcher_.get(), OpenConnection(), impl_.client()));
     // Check internal ID and salt.
     {
       netdev::wire::PortId id = GetSaltedPortId(kPort13);

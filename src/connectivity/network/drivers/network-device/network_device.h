@@ -6,60 +6,59 @@
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_NETWORK_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/driver.h>
-#include <lib/sync/cpp/completion.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <memory>
-
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-#include <ddktl/protocol/empty-protocol.h>
 
 #include "device/public/network_device.h"
 
 namespace network {
 
 class NetworkDevice;
-using DeviceType =
-    ddk::Device<NetworkDevice, ddk::Messageable<fuchsia_hardware_network::DeviceInstance>::Mixin,
-                ddk::Unbindable, ddk::Suspendable>;
 
 // Creates `fuchsia_hardware_network_driver::NetworkDeviceImpl` endpoints for a
 // parent device that is backed by the FIDL based driver runtime.
 class FidlNetworkDeviceImplBinder : public NetworkDeviceImplBinder {
  public:
-  explicit FidlNetworkDeviceImplBinder(NetworkDevice* parent) : parent_(parent) {}
+  explicit FidlNetworkDeviceImplBinder(std::weak_ptr<fdf::Namespace> incoming)
+      : incoming_(std::move(incoming)) {}
 
   zx::result<fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkDeviceImpl>> Bind() override;
 
  private:
-  NetworkDevice* parent_;
+  std::weak_ptr<fdf::Namespace> incoming_;
 };
 
-class NetworkDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_NETWORK_DEVICE> {
+class NetworkDevice : public fdf::DriverBase,
+                      public fidl::WireServer<fuchsia_hardware_network::DeviceInstance> {
  public:
-  explicit NetworkDevice(zx_device_t* parent) : DeviceType(parent) {}
+  NetworkDevice(fdf::DriverStartArgs start_args,
+                fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   ~NetworkDevice() override;
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  void DdkUnbind(ddk::UnbindTxn unbindTxn);
-
-  void DdkRelease();
-
-  void DdkSuspend(ddk::SuspendTxn suspendTxn);
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;
 
   NetworkDeviceInterface* GetInterface() { return device_.get(); }
 
  private:
+  void Connect(fidl::ServerEnd<fuchsia_hardware_network::DeviceInstance> request);
+  zx::result<std::unique_ptr<NetworkDeviceImplBinder>> CreateImplBinder();
+
   std::unique_ptr<OwnedDeviceInterfaceDispatchers> dispatchers_;
   std::unique_ptr<OwnedShimDispatchers> shim_dispatchers_;
 
   std::unique_ptr<NetworkDeviceInterface> device_;
+
+  // These are used for the child node created to enable discovery through devfs. The child node has
+  // to be kept alive for the child to remain alive and discoverable through devfs.
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> child_node_;
+  driver_devfs::Connector<fuchsia_hardware_network::DeviceInstance> devfs_connector_{
+      fit::bind_member<&NetworkDevice::Connect>(this)};
+  fidl::ServerBindingGroup<fuchsia_hardware_network::DeviceInstance> bindings_;
 };
 
 }  // namespace network

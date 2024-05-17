@@ -2,37 +2,35 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Generates two `source_set` definitions, for use with and without the ddk.
+# Generates two `source_set` definitions, for use with and without the driver framework.
 #
 # This template allows us to have a different source_set definition for targets that will become a
 # driver and targets that will not. Notably, network-device libraries' tests and the network-tun
-# component use the source_set without the DDK symbols.
+# component use the source_set without the driver symbols.
 #
-# The DDK target will have DDK libraries added to its public deps and `NETDEV_DDK` to its defines.
-# The non-DDK target will have the syslog library added to its public deps. Both targets have the
-# `_ALL_SOURCE` define added.
+# The driver target will have driver libraries added to its public deps and `NETDEV_DRIVER` to its
+# defines. The non-driver target will have the syslog library added to its public deps. Both targets
+# have the `_ALL_SOURCE` define added.
 #
 # Parameters
 # - sources and public_deps work as expected.
-template("ddk_source_split") {
-  source_set(target_name + "_ddk") {
+template("driver_source_split") {
+  source_set(target_name + "_driver") {
     defines = [ "_ALL_SOURCE" ]
     forward_variables_from(invoker,
                            [
                              "sources",
                              "public_deps",
                              "public_configs",
+                             "testonly",
                            ])
     if (defined(invoker.configs)) {
       configs += invoker.configs
     }
-    defines += [ "NETDEV_DDK" ]
-    public_deps += [
-      "//src/lib/ddk",
-      "//src/lib/ddktl",
-    ]
-    if (defined(invoker.ddk_deps)) {
-      public_deps += invoker.ddk_deps
+    defines += [ "NETDEV_DRIVER" ]
+    public_deps += [ "//sdk/lib/driver/logging/cpp:cpp" ]
+    if (defined(invoker.driver_deps)) {
+      public_deps += invoker.driver_deps
     }
   }
 
@@ -43,13 +41,17 @@ template("ddk_source_split") {
                              "sources",
                              "public_deps",
                              "public_configs",
+                             "testonly",
                            ])
     if (defined(invoker.configs)) {
       configs += invoker.configs
     }
-    public_deps += [ "//zircon/system/ulib/syslog" ]
-    if (defined(invoker.non_ddk_deps)) {
-      public_deps += invoker.non_ddk_deps
+    public_deps += [
+      "//sdk/lib/driver/logging/cpp:cpp",
+      "//zircon/system/ulib/syslog",
+    ]
+    if (defined(invoker.non_driver_deps)) {
+      public_deps += invoker.non_driver_deps
     }
   }
 }

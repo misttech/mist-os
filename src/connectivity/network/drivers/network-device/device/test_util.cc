@@ -120,14 +120,14 @@ void FakeNetworkPortImpl::GetMac(fdf::Arena& arena, GetMacCompleter::Sync& compl
   completer.buffer(arena).Reply(std::move(client));
 }
 
-zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id, const fdf::Dispatcher& dispatcher,
+zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id, fdf_dispatcher_t* dispatcher,
                                          fidl::WireSyncClient<netdev::Device> device,
-                                         FakeNetworkDeviceImpl& parent) {
+                                         NetDevIfcClient& netdev_ifc) {
   if (port_added_) {
     return ZX_ERR_ALREADY_EXISTS;
   }
   id_ = port_id;
-  parent_ = &parent;
+  netdev_ifc_ = &netdev_ifc;
 
   zx::result fidl_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::PortWatcher>();
   if (fidl_endpoints.is_error()) {
@@ -153,11 +153,11 @@ zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id, const fdf::Dispatcher&
     return endpoints.status_value();
   }
 
-  binding_ = fdf::BindServer(dispatcher.get(), std::move(endpoints->server), this);
+  binding_ = fdf::BindServer(dispatcher, std::move(endpoints->server), this);
 
   fdf::Arena arena('NETD');
   auto add_port_status =
-      parent.client().sync().buffer(arena)->AddPort(port_id, std::move(endpoints->client));
+      netdev_ifc_->sync().buffer(arena)->AddPort(port_id, std::move(endpoints->client));
   if (!add_port_status.ok() || add_port_status->status != ZX_OK) {
     return add_port_status.ok() ? add_port_status->status : add_port_status.status();
   }
@@ -176,14 +176,14 @@ zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id, const fdf::Dispatcher&
   return ZX_OK;
 }
 
-zx_status_t FakeNetworkPortImpl::AddPortNoWait(uint8_t port_id, const fdf::Dispatcher& dispatcher,
+zx_status_t FakeNetworkPortImpl::AddPortNoWait(uint8_t port_id, fdf_dispatcher_t* dispatcher,
                                                fidl::WireSyncClient<netdev::Device> device,
-                                               FakeNetworkDeviceImpl& parent) {
+                                               NetDevIfcClient& netdev_ifc) {
   if (port_added_) {
     return ZX_ERR_ALREADY_EXISTS;
   }
   id_ = port_id;
-  parent_ = &parent;
+  netdev_ifc_ = &netdev_ifc;
 
   auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_network_driver::NetworkPort>();
   if (endpoints.is_error()) {
@@ -191,13 +191,12 @@ zx_status_t FakeNetworkPortImpl::AddPortNoWait(uint8_t port_id, const fdf::Dispa
   }
 
   binding_ = fdf::BindServer(
-      dispatcher.get(), std::move(endpoints->server), this,
+      dispatcher, std::move(endpoints->server), this,
       [](fdf::WireServer<fuchsia_hardware_network_driver::NetworkPort>*, fidl::UnbindInfo foo,
          fdf::ServerEnd<fuchsia_hardware_network_driver::NetworkPort> /*unused*/) {});
 
   fdf::Arena arena('NETD');
-  auto status =
-      parent.client().sync().buffer(arena)->AddPort(port_id, std::move(endpoints->client));
+  auto status = netdev_ifc_->sync().buffer(arena)->AddPort(port_id, std::move(endpoints->client));
   if (!status.ok() || status->status != ZX_OK) {
     return status.ok() ? status->status : status.status();
   }
@@ -213,7 +212,7 @@ void FakeNetworkPortImpl::RemoveSync() {
     return;
   }
   fdf::Arena arena('NETD');
-  EXPECT_TRUE(parent_->client().buffer(arena)->RemovePort(id_).ok());
+  EXPECT_TRUE(netdev_ifc_->buffer(arena)->RemovePort(id_).ok());
   WaitForPortRemoval();
 }
 
@@ -225,17 +224,18 @@ void FakeNetworkPortImpl::SetOnline(bool online) {
 
 void FakeNetworkPortImpl::SetStatus(const PortStatus& status) {
   status_ = status;
-  if (parent_ != nullptr && parent_->client().is_valid()) {
+  if (netdev_ifc_ && netdev_ifc_->is_valid()) {
     fidl::Arena fidl_arena;
     auto builder = fuchsia_hardware_network::wire::PortStatus::Builder(fidl_arena);
     builder.mtu(status_.mtu).flags(status_.flags);
     fdf::Arena arena('NETD');
-    EXPECT_TRUE(parent_->client().buffer(arena)->PortStatusChanged(id_, builder.Build()).ok());
+    EXPECT_TRUE(netdev_ifc_->buffer(arena)->PortStatusChanged(id_, builder.Build()).ok());
   }
 }
 
-FakeNetworkDeviceImpl::FakeNetworkDeviceImpl()
-    : info_({
+FakeNetworkDeviceImpl::FakeNetworkDeviceImpl(fdf_dispatcher_t* dispatcher)
+    : dispatcher_(dispatcher),
+      info_({
           .tx_depth = kDefaultTxDepth,
           .rx_depth = kDefaultRxDepth,
           .rx_threshold = kDefaultRxDepth / 2,

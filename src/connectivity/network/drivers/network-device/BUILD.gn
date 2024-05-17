@@ -24,14 +24,13 @@ source_set("src") {
   ]
   public_deps = [
     ":network-device_bind",
-    "device:banjo_shims_ddk",
-    "device:device_ddk",
+    "device:banjo_shims_driver",
+    "device:device_driver",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
+    "//sdk/lib/driver/compat/cpp:cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 
@@ -39,10 +38,7 @@ fuchsia_driver("network-device-driver") {
   output_name = "network-device"
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
-  deps = [
-    ":src",
-    "//src/devices/lib/driver",
-  ]
+  deps = [ ":src" ]
 }
 
 fuchsia_driver_component("network-device") {
@@ -71,22 +67,13 @@ group("tests") {
 
 test("driver-test") {
   output_name = "network-device-test"
-  sources = [
-    "device/test_session.cc",
-    "device/test_session.h",
-    "device/test_util.h",
-    "device/test_util_banjo.cc",
-    "device/test_util_banjo.h",
-    "mac/test_util.h",
-    "mac/test_util_banjo.cc",
-    "mac/test_util_banjo.h",
-    "network_device_test.cc",
-  ]
+  sources = [ "network_device_test.cc" ]
   deps = [
     ":src",
-    "//src/devices/lib/driver",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
+    "device:test_util_driver",
+    "mac:test_util_driver",
+    "//sdk/lib/driver/compat/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//zircon/system/ulib/zx",

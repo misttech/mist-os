@@ -20,11 +20,11 @@ FakeMacDeviceImpl::FakeMacDeviceImpl()
 }
 
 fdf::ClientEnd<fuchsia_hardware_network_driver::MacAddr> FakeMacDeviceImpl::Bind(
-    const fdf::Dispatcher& dispatcher) {
+    fdf_dispatcher_t* dispatcher) {
   auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_network_driver::MacAddr>();
   EXPECT_TRUE(!endpoints.is_error());
 
-  binding_ = fdf::BindServer(dispatcher.get(), std::move(endpoints->server), this);
+  binding_ = fdf::BindServer(dispatcher, std::move(endpoints->server), this);
 
   return std::move(endpoints->client);
 }

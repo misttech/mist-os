@@ -4,13 +4,12 @@
 
 #include "network_device.h"
 
-#include <ddktl/device.h>
-#include <gtest/gtest.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
 #include "device/test_session.h"
-#include "device/test_util_banjo.h"
-#include "mac/test_util_banjo.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "device/test_util.h"
+#include "mac/test_util.h"
+#include "network_device_test_banjo.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace {
@@ -18,70 +17,87 @@ namespace {
 constexpr zx::duration kTestTimeout = zx::duration::infinite();
 }  // namespace
 
-namespace network {
-namespace testing {
+namespace network::testing {
 
-class NetDeviceDriverTest : public ::testing::Test {
- protected:
+// The environment represents what exists before the driver starts. This includes the parent driver
+// which implements NetworkDeviceImpl. In the tests this is done by FakeNetworkDeviceImpl, therefore
+// an object of that type must live in the environment to provide a discoverable service for the
+// network device driver to connect to.
+struct TestFixtureEnvironment : public fdf_testing::Environment {
+  zx::result<> Serve(fdf::OutgoingDirectory& outgoing) override {
+    zx::result result = outgoing.AddService<fuchsia_hardware_network_driver::Service>(
+        fuchsia_hardware_network_driver::Service::InstanceHandler(
+            {.network_device_impl =
+                 device_impl_.bind_handler(fdf::Dispatcher::GetCurrent()->get())}));
+    if (result.is_error()) {
+      return result;
+    }
+    return zx::ok();
+  }
+
+  FakeNetworkDeviceImpl device_impl_{fdf::Dispatcher::GetCurrent()->get()};
+};
+
+struct TestFixtureConfig {
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = false;
+
+  using DriverType = network::NetworkDevice;
+  using EnvironmentType = TestFixtureEnvironment;
+};
+
+class NetDeviceDriverTest : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
+ public:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;
 
-  NetDeviceDriverTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
-    loop_.StartThread("net-device-driver-test");
-  }
+  void TearDown() override { ShutdownDriver(); }
 
-  void TearDown() override { UnbindAndRelease(); }
-
-  void UnbindAndRelease() {
-    if (MockDevice* dev = parent_->GetLatestChild(); dev != nullptr) {
-      dev->UnbindOp();
-      EXPECT_OK(dev->WaitUntilUnbindReplyCalled(zx::deadline_after(kTestTimeout)));
-      dev->ReleaseOp();
+  void ShutdownDriver() {
+    if (shutdown_) {
+      return;
     }
+    EXPECT_OK(StopDriver().status_value());
+    shutdown_ = true;
   }
 
   zx_status_t CreateDevice(bool with_mac = false) {
-    auto proto = device_impl_.proto();
-    parent_->AddProtocol(ZX_PROTOCOL_NETWORK_DEVICE_IMPL, proto.ops, proto.ctx);
     if (with_mac) {
-      port_impl_.SetMac(mac_impl_.proto());
+      port_impl_.SetMac(mac_impl_.Bind(port_dispatcher_));
     }
-    port_impl_.SetStatus(
-        {.flags = static_cast<uint32_t>(netdev::wire::StatusFlags::kOnline), .mtu = 2048});
-    if (zx_status_t status = NetworkDevice::Create(nullptr, parent_.get()); status != ZX_OK) {
-      return status;
-    }
-    if (zx_status_t status = port_impl_.AddPort(kPortId, device_impl_.client()); status != ZX_OK) {
-      return status;
-    }
-    return ZX_OK;
+    port_impl_.SetStatus({.mtu = 2048, .flags = netdev::wire::StatusFlags::kOnline});
+
+    fidl::WireSyncClient<netdev::Device> client;
+    RunInDriverContext([&](network::NetworkDevice& driver) {
+      auto [client_end, server_end] = fidl::Endpoints<netdev::Device>::Create();
+      driver.GetInterface()->Bind(std::move(server_end));
+      client.Bind(std::move(client_end));
+    });
+    return RunInEnvironmentTypeContext<zx_status_t>([&](TestFixtureEnvironment& env) {
+      return port_impl_.AddPort(kPortId, port_dispatcher_, std::move(client),
+                                env.device_impl_.client());
+    });
   }
 
   zx::result<fidl::WireSyncClient<netdev::Device>> ConnectNetDevice() {
-    zx::result endpoints = fidl::CreateEndpoints<netdev::Device>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    zx::result client = [this]() -> zx::result<fidl::WireSyncClient<netdev::DeviceInstance>> {
-      auto [client_end, server_end] = fidl::Endpoints<netdev::DeviceInstance>::Create();
-      fidl::BindServer(loop_.dispatcher(), std::move(server_end),
-                       parent_->GetLatestChild()->GetDeviceContext<NetworkDevice>());
-      return zx::ok(fidl::WireSyncClient(std::move(client_end)));
-    }();
-    if (client.is_error()) {
-      return client.take_error();
-    }
-    auto [client_end, server_end] = std::move(*endpoints);
-    fidl::Status result = client->GetDevice(std::move(server_end));
+    auto [inst_client_end, inst_server_end] = fidl::Endpoints<netdev::DeviceInstance>::Create();
+    RunInDriverContext(
+        [this, server_end = std::move(inst_server_end)](network::NetworkDevice& driver) mutable {
+          fidl::BindServer(fidl_dispatcher_, std::move(server_end), &driver);
+        });
+    fidl::WireSyncClient instance_client(std::move(inst_client_end));
+
+    auto [dev_client_end, dev_server_end] = fidl::Endpoints<netdev::Device>::Create();
+    fidl::Status result = instance_client->GetDevice(std::move(dev_server_end));
     if (zx_status_t status = result.status(); status != ZX_OK) {
       return zx::error(status);
     }
 
-    return zx::ok(fidl::WireSyncClient(std::move(client_end)));
+    return zx::ok(fidl::WireSyncClient(std::move(dev_client_end)));
   }
 
-  const banjo::FakeNetworkDeviceImpl& device_impl() const { return device_impl_; }
-  banjo::FakeNetworkPortImpl& port_impl() { return port_impl_; }
+  FakeNetworkPortImpl& port_impl() { return port_impl_; }
 
   zx::result<netdev::wire::PortId> GetSaltedPortId(uint8_t base_id) {
     // List all existing ports from the device until we find the right port id.
@@ -122,12 +138,8 @@ class NetDeviceDriverTest : public ::testing::Test {
     }
   }
 
-  zx_status_t AttachSessionPort(TestSession& session, banjo::FakeNetworkPortImpl& impl) {
-    std::vector<netdev::wire::FrameType> rx_types;
-    for (uint8_t frame_type :
-         cpp20::span(impl.port_info().rx_types_list, impl.port_info().rx_types_count)) {
-      rx_types.push_back(static_cast<netdev::wire::FrameType>(frame_type));
-    }
+  zx_status_t AttachSessionPort(TestSession& session, FakeNetworkPortImpl& impl) {
+    std::vector<netdev::wire::FrameType> rx_types = impl.port_info().rx_types;
     zx::result port_id = GetSaltedPortId(impl.id());
     if (port_id.is_error()) {
       return port_id.status_value();
@@ -135,43 +147,61 @@ class NetDeviceDriverTest : public ::testing::Test {
     return session.AttachPort(port_id.value(), std::move(rx_types));
   }
 
- private:
-  const std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
-  async::Loop loop_;
+  zx_status_t WaitForEvent(zx_signals_t event, zx::duration timeout = kTestTimeout) {
+    // Don't wait inside the environment context as that might be running on the dispatcher that
+    // triggers the event. Waiting on it would then deadlock.
+    zx::unowned_event events = RunInEnvironmentTypeContext<zx::unowned_event>(
+        [&](TestFixtureEnvironment& env) { return env.device_impl_.events().borrow(); });
+    return events->wait_one(event, zx::deadline_after(timeout), nullptr);
+  }
 
-  banjo::FakeMacDeviceImpl mac_impl_;
-  banjo::FakeNetworkDeviceImpl device_impl_;
-  banjo::FakeNetworkPortImpl port_impl_;
+ private:
+  bool shutdown_ = false;
+  async_dispatcher_t* fidl_dispatcher_ = runtime().StartBackgroundDispatcher()->async_dispatcher();
+  fdf_dispatcher_t* port_dispatcher_ = runtime().StartBackgroundDispatcher()->get();
+  FakeMacDeviceImpl mac_impl_;
+  FakeNetworkPortImpl port_impl_;
 };
 
-TEST_F(NetDeviceDriverTest, TestCreateSimple) { ASSERT_OK(CreateDevice()); }
+// Create a stand-alone empty test fixture class for use with typed tests. This allows us to run the
+// same tests with both FIDL and Banjo test fixtures without having to repeat the same tests. Gtest
+// only provides typed tests through template parameters so this sub-class is used to inherit from
+// either the FIDL or Banjo based test fixture. Once the Banjo shims are removed these can all
+// revert to regular tests.
+template <typename Base>
+class NetDeviceDriverTestFixture : public Base {};
 
-TEST_F(NetDeviceDriverTest, TestOpenSession) {
-  ASSERT_OK(CreateDevice());
+// Create the test suite with the two different test fixtures.
+using TestTypes = ::testing::Types<NetDeviceDriverTest, BanjoNetDeviceDriverTest>;
+TYPED_TEST_SUITE(NetDeviceDriverTestFixture, TestTypes);
+
+TYPED_TEST(NetDeviceDriverTestFixture, TestCreateSimple) { ASSERT_OK(this->CreateDevice()); }
+
+TYPED_TEST(NetDeviceDriverTestFixture, TestOpenSession) {
+  ASSERT_OK(this->CreateDevice());
   TestSession session;
-  zx::result connect_result = ConnectNetDevice();
+  zx::result connect_result = this->ConnectNetDevice();
   ASSERT_OK(connect_result.status_value());
   fidl::WireSyncClient<netdev::Device>& netdevice = connect_result.value();
   ASSERT_OK(session.Open(netdevice, "test-session"));
-  ASSERT_OK(AttachSessionPort(session, port_impl()));
-  ASSERT_OK(device_impl().events().wait_one(kEventStartInitiated, zx::deadline_after(kTestTimeout),
-                                            nullptr));
-  UnbindAndRelease();
+  ASSERT_OK(this->AttachSessionPort(session, this->port_impl()));
+  ASSERT_OK(this->WaitForEvent(kEventStartInitiated));
+  this->ShutdownDriver();
   ASSERT_OK(session.WaitClosed(zx::deadline_after(kTestTimeout)));
   // netdevice should also have been closed after device unbind:
   ASSERT_OK(netdevice.client_end().channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
                                                       zx::deadline_after(kTestTimeout), nullptr));
 }
 
-TEST_F(NetDeviceDriverTest, TestWatcherDestruction) {
+TYPED_TEST(NetDeviceDriverTestFixture, TestWatcherDestruction) {
   // Test that on device removal watcher channels get closed.
-  ASSERT_OK(CreateDevice());
+  ASSERT_OK(this->CreateDevice());
 
-  zx::result connect_result = ConnectNetDevice();
+  zx::result connect_result = this->ConnectNetDevice();
   ASSERT_OK(connect_result.status_value());
   fidl::WireSyncClient<netdev::Device>& netdevice = connect_result.value();
 
-  zx::result maybe_port_id = GetSaltedPortId(kPortId);
+  zx::result maybe_port_id = this->GetSaltedPortId(this->kPortId);
   ASSERT_OK(maybe_port_id.status_value());
   const netdev::wire::PortId& port_id = maybe_port_id.value();
 
@@ -183,7 +213,7 @@ TEST_F(NetDeviceDriverTest, TestWatcherDestruction) {
   ASSERT_OK(port->GetStatusWatcher(std::move(server_end), 1).status());
   fidl::WireSyncClient watcher{std::move(client_end)};
   ASSERT_OK(watcher->WatchStatus().status());
-  UnbindAndRelease();
+  this->ShutdownDriver();
   // Watcher, port, and netdevice should all observe channel closure.
   ASSERT_OK(watcher.client_end().channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
                                                     zx::deadline_after(kTestTimeout), nullptr));
@@ -193,5 +223,4 @@ TEST_F(NetDeviceDriverTest, TestWatcherDestruction) {
                                                       zx::deadline_after(kTestTimeout), nullptr));
 }
 
-}  // namespace testing
-}  // namespace network
+}  // namespace network::testing
