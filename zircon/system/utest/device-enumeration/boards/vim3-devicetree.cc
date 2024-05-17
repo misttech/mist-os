@@ -22,7 +22,6 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio-init",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio/gpio-93/fusb302-22_group/fusb302",
-      "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-24",
@@ -73,6 +72,15 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/register-controller-1000",
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
       "sys/platform/video-decoder-ffd00000",
+
+#ifdef include_packaged_drivers
+      // RTC
+      "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-81/rtc",
+
+      // GPU
+      "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
+#endif
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

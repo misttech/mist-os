@@ -140,6 +140,11 @@
 					compatible = "khadas,vim3-mcu";
 					reg = <0x18>;
 				};
+
+				rtc@51 {
+					compatible = "nxp,pcf8563";
+					reg = <0x51>;
+				};
 			};
 		};
 

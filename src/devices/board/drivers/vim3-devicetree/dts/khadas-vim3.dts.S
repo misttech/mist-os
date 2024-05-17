@@ -96,6 +96,11 @@
 		gpios = <&gpio A311D_GPIOAO(8) 0>;
 		gpio-names = "USB_POWER_DELIVERY";
 	};
+
+	rtc@51 {
+		compatible = "nxp,pcf8563";
+		reg = <0x51>;
+	};
 };
 
 &i2c3 {

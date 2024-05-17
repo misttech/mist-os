@@ -58,6 +58,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/pt",
       "sys/platform/pt/dt-root",
       "sys/platform/pt/khadas-mcu-18",
+      "sys/platform/pt/rtc-51",
       "sys/platform/pt/suspend",
       "sys/platform/pwm_a-regulator",
       "sys/platform/pwm_a0_d-regulator",

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
+#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/visitors/common-types.h>
@@ -96,6 +97,18 @@ zx::result<> I2cBusVisitor::ParseChild(I2cController& controller, fdf_devicetree
   channel.name() = child.name();
   FDF_LOG(DEBUG, "I2c channel added at address 0x%x to controller '%s'", address,
           parent.name().c_str());
+
+  // TODO(https://fxbug.dev/339981930) : RTC driver for nxp,pcf8563 is frozen and needs this hack
+  // until it can be updated to devicetree new bind rules.
+  if (child.properties().find("compatible") != child.properties().end() &&
+      child.properties().at("compatible").AsString() == "nxp,pcf8563") {
+    channel.vid() = PDEV_VID_NXP;
+    channel.pid() = PDEV_PID_GENERIC;
+    channel.did() = PDEV_DID_PCF8563_RTC;
+    controller.channels.emplace_back(channel);
+    return zx::ok();
+  }
+
   controller.channels.emplace_back(channel);
   return AddChildNodeSpec(child, controller.bus_id, address);
 }
