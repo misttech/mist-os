@@ -44,5 +44,8 @@ python_mobly_test("soft_reboot_test_fc_preferred") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":soft_reboot_test_fc($host_toolchain)" ]
+  public_deps = [
+    ":soft_reboot_test_fc($host_toolchain)",
+    ":soft_reboot_test_fc_preferred($host_toolchain)",
+  ]
 }

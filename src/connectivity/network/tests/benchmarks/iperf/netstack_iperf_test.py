@@ -9,9 +9,10 @@ import logging
 import json
 import os
 import statistics
+import subprocess
 import time
 from enum import Enum
-from typing import Any, Self
+from typing import Any
 
 import honeydew
 from fuchsia_base_test import fuchsia_base_test
@@ -196,9 +197,11 @@ def generate_result(label: str, key: str, values: list[Any]) -> dict[str, Any]:
 
 
 class IperfServer:
-    def __init__(self, port: int, ssh: honeydew.transports.ssh.SSH) -> None:
-        self._process = ssh.popen(
-            f"iperf3 --server --port {port} --json", get_ssh_addr_timeout=None
+    def __init__(self, port: int, ffx: honeydew.transports.ffx.FFX) -> None:
+        self._process = ffx.popen(
+            ["target", "ssh", f"iperf3 --server --port {port} --json"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
     def dump_output_to_file(self, path: str) -> None:
@@ -258,7 +261,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             # TODO(https://fxbug.dev/42124566): Currently, we are using the link used for ssh to
             # also inject data traffic. This is prone to interference to ssh and to the tests.
             # On NUC7, we can use a separate usb-ethernet interface for the test traffic.
-            else self._device.ssh.get_target_address(timeout=None).ip
+            else self._device.ffx.get_target_ssh_address(timeout=None).ip
         )
         results: list[dict[str, Any]] = []
         for message_size in [64, 1024, 1400]:
@@ -348,13 +351,12 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def _start_iperf3_server(self, index: int) -> IperfServer:
         port: int = FIRST_LISTEN_PORT + index
-        server = IperfServer(port, self._device.ssh)
+        server = IperfServer(port, self._device.ffx)
         while True:
             try:
-                output = self._device.ssh.run(
-                    f"iperf3 -n 1 -c 127.0.0.1 -p {port}",
+                output = self._device.ffx.run_ssh_cmd(
+                    cmd=f"iperf3 -n 1 -c 127.0.0.1 -p {port}",
                     timeout=None,
-                    get_ssh_addr_timeout=None,
                 )
                 asserts.assert_not_in(
                     "iperf3: error - unable to connect to server: Connection refused",
@@ -372,7 +374,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                     output.endswith("iperf Done."), "output has expected end"
                 )
                 return server
-            except honeydew.errors.SSHCommandError as err:
+            except Exception:  # pylint: disable=broad-except
                 time.sleep(1)
 
     async def _execute_iperf3_commands(
@@ -440,10 +442,9 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         self, cmd_args: list[str], output_filename: str
     ) -> str:
         args = " ".join(cmd_args)
-        output = self._device.ssh.run(
-            f"iperf3 {args}",
+        output = self._device.ffx.run_ssh_cmd(
+            cmd=f"iperf3 {args}",
             timeout=None,
-            get_ssh_addr_timeout=None,
         )
         # We're writing to a file so that the output is available for troubleshooting purposes when
         # run in Infra.
@@ -503,12 +504,11 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def _cleanup_iperf_tasks(self) -> None:
         try:
-            self._device.ssh.run(
-                "killall iperf3",
+            self._device.ffx.run_ssh_cmd(
+                cmd="killall iperf3",
                 timeout=None,
-                get_ssh_addr_timeout=None,
             )
-        except honeydew.errors.SSHCommandError as err:
+        except Exception:  # pylint: disable=broad-except
             # killall returns -1 and prints "no tasks found" in its output
             # when there's no tasks to kill.
             pass

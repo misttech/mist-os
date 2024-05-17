@@ -47,15 +47,12 @@ from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
-from honeydew.transports import ssh as ssh_transport
 from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
-    "ssh_private_key": "/tmp/.ssh/pkey",
-    "ssh_user": "root",
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
@@ -138,11 +135,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_fc_create_context,
             mock.patch.object(
-                ssh_transport.SSH,
-                "check_connection",
-                autospec=True,
-            ) as mock_ssh_check_connection,
-            mock.patch.object(
                 ffx_transport.FFX,
                 "check_connection",
                 autospec=True,
@@ -155,7 +147,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ):
             self.fd_obj = fc_fuchsia_device.FuchsiaDevice(
                 device_name=_INPUT_ARGS["device_name"],
-                ssh_private_key=_INPUT_ARGS["ssh_private_key"],
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 
@@ -166,88 +157,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
             mock_ffx_check_connection.assert_called()
 
-            mock_ssh_check_connection.assert_called()
-
-    # # List all the tests related to __init__
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "all_optional_params",
-                    "mandatory_params": {
-                        "device_name": _INPUT_ARGS["device_name"],
-                        "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
-                    },
-                    "optional_params": {
-                        "ssh_user": _INPUT_ARGS["ssh_user"],
-                    },
-                },
-            ),
-            (
-                {
-                    "label": "no_optional_params",
-                    "mandatory_params": {
-                        "device_name": _INPUT_ARGS["device_name"],
-                        "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
-                    },
-                    "optional_params": {},
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
-    @mock.patch.object(
-        fuchsia_controller_transport.FuchsiaController,
-        "check_connection",
-        autospec=True,
-    )
-    @mock.patch.object(
-        fuchsia_controller_transport.FuchsiaController,
-        "create_context",
-        autospec=True,
-    )
-    @mock.patch.object(
-        ffx_transport.FFX,
-        "check_connection",
-        autospec=True,
-    )
-    @mock.patch.object(
-        ssh_transport.SSH,
-        "check_connection",
-        autospec=True,
-    )
-    def test_fuchsia_device_init(
-        self,
-        parameterized_dict: dict[str, Any],
-        mock_ssh_check_connection: mock.Mock,
-        mock_ffx_check_connection: mock.Mock,
-        mock_fc_create_context: mock.Mock,
-        mock_fc_check_connection: mock.Mock,
-    ) -> None:
-        """Verify FuchsiaDevice class instantiation"""
-        optional_params: dict[str, Any] = parameterized_dict["optional_params"]
-
-        device_name: str = parameterized_dict["mandatory_params"]["device_name"]
-        ssh_private_key: str = parameterized_dict["mandatory_params"][
-            "ssh_private_key"
-        ]
-
-        self.fd_obj = fc_fuchsia_device.FuchsiaDevice(
-            device_name=device_name,
-            ssh_private_key=ssh_private_key,
-            ffx_config=_INPUT_ARGS["ffx_config"],
-            **optional_params,
-        )
-
-        mock_fc_create_context.assert_called_once_with(
-            self.fd_obj.fuchsia_controller
-        )
-        mock_fc_check_connection.assert_called()
-
-        mock_ffx_check_connection.assert_called()
-
-        mock_ssh_check_connection.assert_called()
-
+    # List all the tests related to __init__
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
         self.assertIsInstance(
@@ -275,13 +185,6 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj.ffx,
             ffx_transport.FFX,
-        )
-
-    def test_ssh_transport(self) -> None:
-        """Test case to make sure fc_fuchsia_device supports ssh transport."""
-        self.assertIsInstance(
-            self.fd_obj.ssh,
-            ssh_transport.SSH,
         )
 
     def test_sl4f_transport(self) -> None:
@@ -509,17 +412,14 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
-    @mock.patch.object(ssh_transport.SSH, "check_connection", autospec=True)
     def test_health_check(
         self,
-        mock_ssh_check_connection: mock.Mock,
         mock_ffx_check_connection: mock.Mock,
         mock_fc_check_connection: mock.Mock,
     ) -> None:
         """Testcase for FuchsiaDevice.health_check()"""
         self.fd_obj.health_check()
         mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
-        mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
         mock_fc_check_connection.assert_called_once_with(
             self.fd_obj.fuchsia_controller
         )

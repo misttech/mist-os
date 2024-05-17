@@ -47,13 +47,8 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         device_name: Device name returned by `ffx target list`.
         ffx_config: Config that need to be used while running FFX commands.
         device_ip_port: IP Address and port of the device.
-        ssh_private_key: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device.
-        ssh_user: Username to be used to SSH into fuchsia device.
-            Default is "fuchsia".
 
     Raises:
-        errors.SSHCommandError: if SSH connection check fails.
         errors.FFXCommandError: if FFX connection check fails.
         errors.FuchsiaControllerError: if FC connection check fails.
         errors.Sl4fError: if SL4F connection check fails.
@@ -64,16 +59,12 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         device_name: str,
         ffx_config: custom_types.FFXConfig,
         device_ip_port: custom_types.IpPort | None = None,
-        ssh_private_key: str | None = None,
-        ssh_user: str | None = None,
     ) -> None:
         _LOGGER.debug(
             "Initializing Fuchsia-Controller-Preferred based FuchsiaDevice"
         )
 
-        super().__init__(
-            device_name, ffx_config, device_ip_port, ssh_private_key, ssh_user
-        )
+        super().__init__(device_name, ffx_config, device_ip_port)
 
         _LOGGER.debug(
             "Initialized Fuchsia-Controller-Preferred based FuchsiaDevice"
@@ -145,7 +136,6 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         """Ensure device is healthy.
 
         Raises:
-            errors.SshConnectionError
             errors.FfxConnectionError
             errors.FuchsiaControllerConnectionError
         """

@@ -39,10 +39,6 @@ class Sl4fError(TransportError):
     """Exception for errors raised by SL4F requests."""
 
 
-class SSHCommandError(TransportError):
-    """Exception for errors raised by SSH commands running on host machine."""
-
-
 class FfxCommandError(TransportError):
     """Exception for errors raised by ffx commands running on host machine."""
 

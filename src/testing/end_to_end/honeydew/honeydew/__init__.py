@@ -27,8 +27,6 @@ def create_device(
     transport: custom_types.TRANSPORT,
     ffx_config: custom_types.FFXConfig,
     device_ip_port: custom_types.IpPort | None = None,
-    ssh_private_key: str | None = None,
-    ssh_user: str | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -41,12 +39,6 @@ def create_device(
             commands.
 
         device_ip_port: IP Address and port of the device.
-
-        ssh_private_key: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device.
-
-        ssh_user: Username to be used to SSH into fuchsia device.
-            Default is "fuchsia".
 
     Returns:
         Fuchsia device object
@@ -70,16 +62,12 @@ def create_device(
                 device_name,
                 ffx_config,
                 device_ip_port,
-                ssh_private_key,
-                ssh_user,
             )
         else:  # transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED:
             return fc_preferred_fuchsia_device.FuchsiaDevice(
                 device_name,
                 ffx_config,
                 device_ip_port,
-                ssh_private_key,
-                ssh_user,
             )
     except Exception as err:
         raise errors.FuchsiaDeviceError(
