@@ -8,7 +8,6 @@
 #include <lib/magma/platform/platform_connection_client.h>
 #include <lib/magma/util/dlog.h>
 #include <lib/magma/util/utils.h>
-#include <zircon/availability.h>
 
 #include <vector>
 
@@ -27,10 +26,8 @@ static_assert(static_cast<uint64_t>(MapFlags::kWrite) == MAGMA_MAP_FLAG_WRITE, "
 static_assert(static_cast<uint64_t>(MapFlags::kExecute) == MAGMA_MAP_FLAG_EXECUTE, "mismatch");
 static_assert(static_cast<uint64_t>(MapFlags::kGrowable) == MAGMA_MAP_FLAG_GROWABLE, "mismatch");
 static_assert(static_cast<uint64_t>(MapFlags::kVendorFlag0) == MAGMA_MAP_FLAG_VENDOR_0, "mismatch");
-#if __Fuchsia_API_level__ >= 13
 using fuchsia_gpu_magma::wire::ImportFlags;
 static_assert(static_cast<uint64_t>(ImportFlags::kSemaphoreOneShot) == MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, "mismatch");
-#endif
 
 // clang-format on
 
@@ -157,10 +154,8 @@ PrimaryWrapper::PrimaryWrapper(zx::channel channel, uint64_t max_inflight_messag
   }
 }
 
-#if __Fuchsia_API_level__ >= 13
 static_assert(static_cast<uint32_t>(magma::PlatformObject::SEMAPHORE) ==
               static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kSemaphore));
-#endif
 static_assert(static_cast<uint32_t>(magma::PlatformObject::BUFFER) ==
               static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kBuffer));
 
@@ -175,7 +170,6 @@ magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
       return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Invalid handle");
   }
 
-#if __Fuchsia_API_level__ >= 13
   uint64_t size = 0;
   auto wire_object = fuchsia_gpu_magma::wire::Object();
 
@@ -220,9 +214,6 @@ magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
     UpdateFlowControl(size);
   }
   return magma::FromZxStatus(status).get();
-#else
-  return DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED, "Unimplemented for this API level");
-#endif  // #if __Fuchsia_API_level__ >= 13
 }
 
 magma_status_t PrimaryWrapper::ReleaseObject(uint64_t object_id,
@@ -280,7 +271,6 @@ magma_status_t PrimaryWrapper::ExecuteCommand(
   return magma::FromZxStatus(status).get();
 }
 
-#if __Fuchsia_API_level__ >= 15
 magma_status_t PrimaryWrapper::ExecuteInlineCommands(
     uint32_t context_id, ::fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand> commands) {
   std::lock_guard<std::mutex> lock(flow_control_mutex_);
@@ -291,21 +281,6 @@ magma_status_t PrimaryWrapper::ExecuteInlineCommands(
   }
   return magma::FromZxStatus(status).get();
 }
-#else
-magma_status_t PrimaryWrapper::ExecuteImmediateCommands(uint32_t context_id,
-                                                        ::fidl::VectorView<uint8_t> command_data,
-                                                        ::fidl::VectorView<uint64_t> semaphores) {
-  std::lock_guard<std::mutex> lock(flow_control_mutex_);
-  FlowControl();
-  zx_status_t status =
-      client_->ExecuteImmediateCommands(context_id, std::move(command_data), std::move(semaphores))
-          .status();
-  if (status == ZX_OK) {
-    UpdateFlowControl();
-  }
-  return magma::FromZxStatus(status).get();
-}
-#endif
 
 magma_status_t PrimaryWrapper::MapBuffer(uint64_t buffer_id, uint64_t hw_va, uint64_t offset,
                                          uint64_t length, fuchsia_gpu_magma::wire::MapFlags flags) {
@@ -656,7 +631,6 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
       uint64_t command_bytes = 0;
       uint32_t num_semaphores = 0;
 
-#if __Fuchsia_API_level__ >= 15
       int buffers_to_send =
           FitCommands(fuchsia_gpu_magma::wire::kMaxInlineCommandsDataSize, num_buffers, buffers,
                       buffers_sent, &command_bytes, &num_semaphores);
@@ -682,29 +656,6 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
       magma_status_t result = client_.ExecuteInlineCommands(
           context_id,
           fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand>::FromExternal(commands));
-#else
-      int buffers_to_send =
-          FitCommands(fuchsia_gpu_magma::wire::kMaxImmediateCommandsDataSize, num_buffers, buffers,
-                      buffers_sent, &command_bytes, &num_semaphores);
-
-      // TODO(https://fxbug.dev/42081618): Figure out how to move command and semaphore bytes across the FIDL
-      //               interface without copying.
-      std::vector<uint8_t> command_vec;
-      command_vec.reserve(command_bytes);
-      std::vector<uint64_t> semaphore_vec;
-      semaphore_vec.reserve(num_semaphores);
-
-      for (int i = 0; i < buffers_to_send; ++i) {
-        const auto& buffer = buffers[buffers_sent + i];
-        const auto buffer_data = static_cast<uint8_t*>(buffer.data);
-        std::copy(buffer_data, buffer_data + buffer.size, std::back_inserter(command_vec));
-        std::copy(buffer.semaphore_ids, buffer.semaphore_ids + buffer.semaphore_count,
-                  std::back_inserter(semaphore_vec));
-      }
-      magma_status_t result = client_.ExecuteImmediateCommands(
-          context_id, fidl::VectorView<uint8_t>::FromExternal(command_vec),
-          fidl::VectorView<uint64_t>::FromExternal(semaphore_vec));
-#endif  // #if __Fuchsia_API_level__ >= 15
 
       if (result != MAGMA_STATUS_OK) {
         return result;
