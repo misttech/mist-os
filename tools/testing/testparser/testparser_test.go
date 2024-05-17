@@ -1324,6 +1324,8 @@ TestBeds:
 Requested Tests:
 - test_goodbye
 - test_hello
+- test_skipped
+- test_error
 Type: TestNameList
 ---
 Begin Time: 1668122321142
@@ -1431,6 +1433,71 @@ Type: Summary
 			CaseName:    "test_error",
 			Status:      runtests.TestCrashed,
 			Duration:    6 * time.Millisecond,
+			Format:      "Mobly",
+		},
+	}
+
+	testCaseCmp(t, stdout, want)
+}
+
+func TestParseMoblyTestError(t *testing.T) {
+	stdout := `
+Running [InfraDriver]
+======== Mobly config content ========
+MoblyParams:
+  LogPath: /tmp
+TestBeds:
+- Controllers:
+    FuchsiaDevice:
+    - name: fuchsia-emulator
+      transport: fuchsia-controller
+  Name: InfraTestbed
+  TestParams: {}
+
+======================================
+
+[=====MOBLY RESULTS=====]
+---
+Requested Tests:
+- test_goodbye
+- test_hello
+- test_skipped
+- test_error
+Type: TestNameList
+---
+Begin Time: 1668122321142
+Details: null
+End Time: 1668122321143
+Extra Errors: {}
+Extras: null
+Result: PASS
+Retry Parent: null
+Signature: test_goodbye-1668122321142
+Stacktrace: null
+Termination Signal Type: null
+Test Class: GreetingsTest
+Test Name: test_goodbye
+Type: Record
+UID: null
+
+`
+
+	want := []runtests.TestCaseResult{
+		{
+			DisplayName: "GreetingsTest.test_goodbye",
+			FailReason:  "",
+			SuiteName:   "GreetingsTest",
+			CaseName:    "test_goodbye",
+			Status:      runtests.TestSuccess,
+			Duration:    1 * time.Millisecond,
+			Format:      "Mobly",
+		},
+		{
+			DisplayName: "TestparserError",
+			FailReason:  "Unexpected number of requested/reported test results [requested: 4, reported: 1]",
+			SuiteName:   "Synthetic",
+			CaseName:    "Synthetic",
+			Status:      runtests.TestAborted,
 			Format:      "Mobly",
 		},
 	}

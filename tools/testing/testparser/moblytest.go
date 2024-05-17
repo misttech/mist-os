@@ -29,20 +29,25 @@ var (
 	moblyTestResultYAMLHeaderPattern = regexp.MustCompile(moblyTestResultYAMLHeaderPatternStr)
 )
 
+type moblyTestList struct {
+	RequestedTests []string `yaml:"Requested Tests"`
+	Type           string   `yaml:"Type"`
+}
+
 type moblyTestCase struct {
-	BeginTimeMillis int `yaml:"Begin Time,omitempty"`
+	BeginTimeMillis int `yaml:"Begin Time"`
 	// Description of the cause for test case termination.
 	// This is set to empty string for passed test cases.
-	Details       string `yaml:"Details,omitempty"`
-	EndTimeMillis int    `yaml:"End Time,omitempty"`
-	Result        string `yaml:"Result,omitempty"`
-	TestClass     string `yaml:"Test Class,omitempty"`
-	TestName      string `yaml:"Test Name,omitempty"`
+	Details       string `yaml:"Details"`
+	EndTimeMillis int    `yaml:"End Time"`
+	Result        string `yaml:"Result"`
+	TestClass     string `yaml:"Test Class"`
+	TestName      string `yaml:"Test Name"`
 	// TerminationSignal is name of the Python exception class raised on crash/failure.
-	TerminationSignal string `yaml:"Termination Signal Type,omitempty"`
+	TerminationSignal string `yaml:"Termination Signal Type"`
 	// Type describes the Mobly YAML document entry type which is in the set of
 	// (Record, TestNameList, Summary, ControllerInfo, UserData)
-	Type string `yaml:"Type,omitempty"`
+	Type string `yaml:"Type"`
 }
 
 func matchYAMLHeader(lines [][]byte) [][]byte {
@@ -71,8 +76,15 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 	d := yaml.NewDecoder(reader)
 
 	// Mobly's result YAML file contains multiple YAML documents.
+	// The first record contains a list of all tests that are expected to run.
+	var testList moblyTestList
+	if err := d.Decode(&testList); err != nil {
+		fmt.Fprintf(os.Stderr, "Error unmarshaling YAML for Mobly test list: %s\n", err)
+		return res
+	}
+
 	// Since yaml.Unmarshal() is only capable of parsing a single document,
-	// here we use a for-loop and yaml.Decoder() to handle multiple documents.
+	// we use a for-loop and yaml.Decoder() to handle the remaining documents.
 	for {
 		var tc moblyTestCase
 		if err := d.Decode(&tc); err != nil {
@@ -114,6 +126,21 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 			CaseName:    tc.TestName,
 			Status:      status,
 			Duration:    time.Duration(tc.EndTimeMillis-tc.BeginTimeMillis) * time.Millisecond,
+			Format:      "Mobly",
+		})
+	}
+
+	if len(testList.RequestedTests) == 0 || len(testList.RequestedTests) != len(res) {
+		// Generate a synthetic result if there's an unexpected number of tests
+		// requested (scheduled to run) or reported (actually run). This may
+		// occur on infra timeout where the requested tests are recorded but
+		// their test results are not.
+		res = append(res, runtests.TestCaseResult{
+			DisplayName: "TestparserError",
+			FailReason:  fmt.Sprintf("Unexpected number of requested/reported test results [requested: %d, reported: %d]", len(testList.RequestedTests), len(res)),
+			SuiteName:   "Synthetic",
+			CaseName:    "Synthetic",
+			Status:      runtests.TestAborted,
 			Format:      "Mobly",
 		})
 	}
