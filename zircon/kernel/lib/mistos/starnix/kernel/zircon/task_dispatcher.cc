@@ -6,7 +6,6 @@
 
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/task_wrapper.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 
 #include <fbl/ref_ptr.h>

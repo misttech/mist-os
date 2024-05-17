@@ -9,7 +9,6 @@
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/task_wrapper.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>

@@ -7,7 +7,6 @@
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
-#include <lib/mistos/starnix/kernel/task/task_wrapper.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
@@ -83,13 +82,5 @@ fbl::RefPtr<Task> Task::get_task(pid_t pid) {
 pid_t Task::get_pid() const { return thread_group_->leader(); }
 
 pid_t Task::get_tid() const { return id_; }
-
-TaskWrapper::TaskWrapper(fbl::RefPtr<Task> task) : task_(std::move(task)) {}
-TaskWrapper::~TaskWrapper() {}
-
-fbl::RefPtr<Task> TaskWrapper::task() const {
-  ASSERT_MSG(task_, "called `operator->` empty Task");
-  return task_;
-}
 
 }  // namespace starnix
