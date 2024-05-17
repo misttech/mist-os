@@ -54,7 +54,7 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 	return &Generator{*gen}
 }
 
-func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrder }
+func (gen Generator) DeclOrder() zither.DeclOrder { return zither.DependencyDeclOrder }
 
 func (gen Generator) DeclCallback(zither.Decl) {}
 
