@@ -19,10 +19,9 @@ namespace {
 
 constexpr int kRealmSwitch = 1;
 
-const char kShortHelp[] = "run-test: Run the test.";
-const char kHelp[] =
-    R"(run-test [ -r <realm> ] <url> [ <case filter>* ]
-
+const char kRunTestShortHelp[] = "run-test: Run the test.";
+const char kRunTestUsage[] = "run-test [ -r <realm> ] <url> [ <case filter>* ]";
+const char kRunTestHelp[] = R"(
   Runs the test with the given URL. Optional case filters can be provided to
   specify the test cases to run. The test will be launched in a similar fashion
   as "ffx test run" on host or "run-test-suite" on Fuchsia.
@@ -110,7 +109,8 @@ void RunTest(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetRunTestVerbRecord() {
-  VerbRecord verb{&RunTest, {"run-test"}, kShortHelp, kHelp, CommandGroup::kProcess};
+  VerbRecord verb{&RunTest,      {"run-test"}, kRunTestShortHelp,
+                  kRunTestUsage, kRunTestHelp, CommandGroup::kProcess};
   verb.switches.emplace_back(kRealmSwitch, true, "realm", 'r');
   return verb;
 }

@@ -26,9 +26,8 @@ enum class LookupType {
 };
 
 const char kHandleShortHelp[] = "handle[s]: Print handle list or details.";
-const char kHandleHelp[] =
-    R"(handle[s] [-k] [-x] [ <expression> ]
-
+const char kHandleUsage[] = "handle[s] [-k] [-x] [ <expression> ]";
+const char kHandleHelp[] = R"(
   With no arguments, prints all handles for the process.
 
   If an expression or number is given, more detailed information for the given
@@ -143,8 +142,8 @@ void RunVerbHandle(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetHandleVerbRecord() {
-  VerbRecord handle(&RunVerbHandle, {"handle", "handles"}, kHandleShortHelp, kHandleHelp,
-                    CommandGroup::kQuery);
+  VerbRecord handle(&RunVerbHandle, {"handle", "handles"}, kHandleShortHelp, kHandleUsage,
+                    kHandleHelp, CommandGroup::kQuery);
   handle.param_type = VerbRecord::kOneParam;
   handle.switches.emplace_back(kKoidSwitch, false, "", 'k');
   handle.switches.emplace_back(kHexSwitch, false, "", 'x');

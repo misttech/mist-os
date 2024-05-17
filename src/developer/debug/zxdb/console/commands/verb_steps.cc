@@ -24,9 +24,8 @@ namespace zxdb {
 namespace {
 
 const char kStepsShortHelp[] = "steps / ss: Step into specific call.";
-const char kStepsHelp[] =
-    R"(steps / ss: Step into specific call.
-
+const char kStepsUsage[] = "steps / ss";
+const char kStepsHelp[] = R"(
   Alias: ss
 
   Finds function calls from the current source line and interactively asks which
@@ -111,7 +110,7 @@ void RunVerbSteps(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetStepsVerbRecord() {
-  return VerbRecord(&RunVerbSteps, {"steps", "ss"}, kStepsShortHelp, kStepsHelp,
+  return VerbRecord(&RunVerbSteps, {"steps", "ss"}, kStepsShortHelp, kStepsUsage, kStepsHelp,
                     CommandGroup::kStep, SourceAffinity::kSource);
 }
 

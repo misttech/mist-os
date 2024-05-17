@@ -127,13 +127,14 @@ struct VerbRecord {
 
   // The help will be referenced by pointer. It is expected to be a static string.
   VerbRecord(CommandExecutor exec, std::initializer_list<std::string> aliases,
-             const char* short_help, const char* help, CommandGroup group,
+             const char* short_help, const char* usage, const char* help, CommandGroup group,
              SourceAffinity source_affinity = SourceAffinity::kNone);
 
   // This variant takes a completer.
   VerbRecord(CommandExecutor exec, CommandCompleter complete,
-             std::initializer_list<std::string> aliases, const char* short_help, const char* help,
-             CommandGroup group, SourceAffinity source_affinity = SourceAffinity::kNone);
+             std::initializer_list<std::string> aliases, const char* short_help, const char* usage,
+             const char* help, CommandGroup group,
+             SourceAffinity source_affinity = SourceAffinity::kNone);
 
   ~VerbRecord();
 
@@ -146,6 +147,7 @@ struct VerbRecord {
   std::vector<std::string> aliases;
 
   const char* short_help = nullptr;  // One-line help.
+  const char* usage = nullptr;
   const char* help = nullptr;
   std::vector<SwitchRecord> switches;  // Switches supported by this verb.
 

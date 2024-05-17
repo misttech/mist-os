@@ -19,9 +19,8 @@ namespace zxdb {
 namespace {
 
 const char kDisplayShortHelp[] = "display: Print an expression on every stop.";
-const char kDisplayHelp[] =
-    R"(display <expression>
-
+const char kDisplayUsage[] = "display <expression>";
+const char kDisplayHelp[] = R"(
   Adds the given expression to the global list that will be evaluated and
   printed for every stop.
 
@@ -131,7 +130,7 @@ void RunVerbDisplay(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 }  // namespace
 
 VerbRecord GetDisplayVerbRecord() {
-  VerbRecord record(&RunVerbDisplay, {"display"}, kDisplayShortHelp, kDisplayHelp,
+  VerbRecord record(&RunVerbDisplay, {"display"}, kDisplayShortHelp, kDisplayUsage, kDisplayHelp,
                     CommandGroup::kQuery);
   record.param_type = VerbRecord::kOneParam;  // Allows arbitrary unquoted input.
   return record;

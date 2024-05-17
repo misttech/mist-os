@@ -200,9 +200,8 @@ Err GetSettingContext(ConsoleContext* context, const Command& cmd, const std::st
 // get ---------------------------------------------------------------------------------------------
 
 const char kGetShortHelp[] = "get: Prints setting values.";
-const char kGetHelp[] =
-    R"([ <object> ] get [ --value-only ] [ <setting-name> ]
-
+const char kGetUsage[] = "[ <object> ] get [ --value-only ] [ <setting-name> ]";
+const char kGetHelp[] = R"(
   Prints setting values.
 
   Settings are hierarchical for processes and threads. This means that
@@ -328,9 +327,8 @@ void DoGet(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 // set ---------------------------------------------------------------------------------------------
 
 const char kSetShortHelp[] = "set: Set a setting value.";
-const char kSetHelp[] =
-    R"([ <object> ] set <setting-name> [ <modification-type> ] <value>*
-
+const char kSetUsage[] = "[ <object> ] set <setting-name> [ <modification-type> ] <value>*";
+const char kSetHelp[] = R"(
   Sets the value of a setting.
 
   See which settings are available, their names and current values with
@@ -787,11 +785,12 @@ ErrOr<ExecutionScope> ParseExecutionScope(ConsoleContext* console_context,
 }
 
 void AppendSettingsVerbs(std::map<Verb, VerbRecord>* verbs) {
-  VerbRecord get(&DoGet, {"get"}, kGetShortHelp, kGetHelp, CommandGroup::kGeneral);
+  VerbRecord get(&DoGet, {"get"}, kGetShortHelp, kGetUsage, kGetHelp, CommandGroup::kGeneral);
   get.switches.emplace_back(kValueOnlySwitch, false, "value-only");
   (*verbs)[Verb::kGet] = std::move(get);
 
-  VerbRecord set(&DoSet, &CompleteSet, {"set"}, kSetShortHelp, kSetHelp, CommandGroup::kGeneral);
+  VerbRecord set(&DoSet, &CompleteSet, {"set"}, kSetShortHelp, kSetUsage, kSetHelp,
+                 CommandGroup::kGeneral);
   set.param_type = VerbRecord::kOneParam;
   set.needs_elision = true;
   (*verbs)[Verb::kSet] = std::move(set);

@@ -59,9 +59,8 @@ FormatStackOptions GetFormatStackOptions(const Command& cmd, ConsoleContext* con
 // Frames ------------------------------------------------------------------------------------------
 
 const char kFrameShortHelp[] = "frame / f: Select or list stack frames.";
-const char kFrameHelp[] =
-    R"(frame [ -v ] [ <id> [ <command> ... ] ]
-
+const char kFrameUsage[] = "frame [ -v ] [ <id> [ <command> ... ] ]";
+const char kFrameHelp[] = R"(
   Selects or lists stack frames. Stack frames are only available for threads
   that are stopped. Selecting or listing frames for running threads will
   fail.
@@ -159,9 +158,8 @@ bool HandleFrameNoun(ConsoleContext* console_context, const Command& cmd,
 // Filters -----------------------------------------------------------------------------------------
 
 const char kFilterShortHelp[] = "filter: Select or list process filters.";
-const char kFilterHelp[] =
-    R"(filter [ <id> [ <command> ... ] ]
-
+const char kFilterUsage[] = "filter [ <id> [ <command> ... ] ]";
+const char kFilterHelp[] = R"(
   Selects or lists process filters. Process filters allow you to attach to
   processes that spawn in the system as soon as they spawn. You can use "attach"
   to create a new filter.
@@ -223,9 +221,8 @@ bool HandleFilterNoun(ConsoleContext* console_context, const Command& cmd,
 // Threads -----------------------------------------------------------------------------------------
 
 const char kThreadShortHelp[] = "thread / t: Select or list threads.";
-const char kThreadHelp[] =
-    R"(thread [ <id> [ <command> ... ] ]
-
+const char kThreadUsage[] = "thread [ <id> [ <command> ... ] ]";
+const char kThreadHelp[] = R"(
   Selects or lists threads.
 
   By itself, "thread" will list the threads in the current process.
@@ -366,9 +363,8 @@ bool HandleThreadNoun(ConsoleContext* console_context, const Command& cmd,
 // Processes ---------------------------------------------------------------------------------------
 
 const char kProcessShortHelp[] = "process / pr: Select or list process contexts.";
-const char kProcessHelp[] =
-    R"(process [ <id> [ <command> ... ] ]
-
+const char kProcessUsage[] = "process [ <id> [ <command> ... ] ]";
+const char kProcessHelp[] = R"(
   Alias: "pr"
 
   Selects or lists process contexts.
@@ -427,9 +423,8 @@ bool HandleProcessNoun(ConsoleContext* console_context, const Command& cmd,
 // Global ------------------------------------------------------------------------------------------
 
 const char kGlobalShortHelp[] = "global / gl: Global override for commands.";
-const char kGlobalHelp[] =
-    R"("global <command> ...
-
+const char kGlobalUsage[] = "global <command> ...";
+const char kGlobalHelp[] = R"(
   Alias: "gl"
 
   The "global" noun allows explicitly scoping a command to the global scope
@@ -449,9 +444,8 @@ bool HandleGlobalNoun(ConsoleContext* console_context, const Command& cmd,
 // Breakpoints -------------------------------------------------------------------------------------
 
 const char kBreakpointShortHelp[] = "breakpoint / bp: Select or list breakpoints.";
-const char kBreakpointHelp[] =
-    R"(breakpoint [ <id> [ <command> ... ] ]
-
+const char kBreakpointUsage[] = "breakpoint [ <id> [ <command> ... ] ]";
+const char kBreakpointHelp[] = R"(
   Alias: "bp"
 
   Selects or lists breakpoints. Not to be confused with the "break" / "b"
@@ -697,9 +691,8 @@ bool HandleBreakpointNoun(ConsoleContext* console_context, const Command& cmd,
 // Symbol Servers ----------------------------------------------------------------------------------
 
 const char kSymServerShortHelp[] = "sym-server: Select or list symbol servers.";
-const char kSymServerHelp[] =
-    R"(sym-server [ <id> [ <command> ... ] ]
-
+const char kSymServerUsage[] = "sym-server [ <id> [ <command> ... ] ]";
+const char kSymServerHelp[] = R"(
   Selects or lists symbol servers.
 
   By itself, "sym-server" will list all symbol servers with their IDs.
@@ -832,8 +825,12 @@ bool HandleSymbolServerNoun(ConsoleContext* console_context, const Command& cmd,
 
 NounRecord::NounRecord() = default;
 NounRecord::NounRecord(std::initializer_list<std::string> aliases, const char* short_help,
-                       const char* help, CommandGroup command_group)
-    : aliases(aliases), short_help(short_help), help(help), command_group(command_group) {}
+                       const char* usage, const char* help, CommandGroup command_group)
+    : aliases(aliases),
+      short_help(short_help),
+      usage(usage),
+      help(help),
+      command_group(command_group) {}
 NounRecord::~NounRecord() = default;
 
 const std::map<Noun, NounRecord>& GetNouns() {
@@ -854,6 +851,14 @@ std::string NounToString(Noun n) {
   if (found == nouns.end())
     return std::string();
   return found->second.aliases[0];
+}
+
+const NounRecord* NounToRecord(Noun n) {
+  const auto& nouns = GetNouns();
+  auto found = nouns.find(n);
+  if (found == nouns.end())
+    return nullptr;
+  return &found->second;
 }
 
 const std::map<std::string, Noun>& GetStringNounMap() {
@@ -899,22 +904,23 @@ void AppendNouns(std::map<Noun, NounRecord>* nouns) {
   // If non-kNone, the "command groups" on the noun will cause the help for that noun to additionall
   // appear under that section (people expect the "thread" command to appear in the process
   // section).
-  (*nouns)[Noun::kBreakpoint] = NounRecord({"breakpoint", "bp"}, kBreakpointShortHelp,
-                                           kBreakpointHelp, CommandGroup::kBreakpoint);
+  (*nouns)[Noun::kBreakpoint] =
+      NounRecord({"breakpoint", "bp"}, kBreakpointShortHelp, kBreakpointUsage, kBreakpointHelp,
+                 CommandGroup::kBreakpoint);
 
   (*nouns)[Noun::kFrame] =
-      NounRecord({"frame", "f"}, kFrameShortHelp, kFrameHelp, CommandGroup::kQuery);
+      NounRecord({"frame", "f"}, kFrameShortHelp, kFrameUsage, kFrameHelp, CommandGroup::kQuery);
 
-  (*nouns)[Noun::kThread] =
-      NounRecord({"thread", "t"}, kThreadShortHelp, kThreadHelp, CommandGroup::kProcess);
-  (*nouns)[Noun::kProcess] =
-      NounRecord({"process", "pr"}, kProcessShortHelp, kProcessHelp, CommandGroup::kProcess);
-  (*nouns)[Noun::kGlobal] =
-      NounRecord({"global", "gl"}, kGlobalShortHelp, kGlobalHelp, CommandGroup::kNone);
-  (*nouns)[Noun::kSymServer] =
-      NounRecord({"sym-server"}, kSymServerShortHelp, kSymServerHelp, CommandGroup::kSymbol);
+  (*nouns)[Noun::kThread] = NounRecord({"thread", "t"}, kThreadShortHelp, kThreadUsage, kThreadHelp,
+                                       CommandGroup::kProcess);
+  (*nouns)[Noun::kProcess] = NounRecord({"process", "pr"}, kProcessShortHelp, kProcessUsage,
+                                        kProcessHelp, CommandGroup::kProcess);
+  (*nouns)[Noun::kGlobal] = NounRecord({"global", "gl"}, kGlobalShortHelp, kGlobalUsage,
+                                       kGlobalHelp, CommandGroup::kNone);
+  (*nouns)[Noun::kSymServer] = NounRecord({"sym-server"}, kSymServerShortHelp, kSymServerUsage,
+                                          kSymServerHelp, CommandGroup::kSymbol);
   (*nouns)[Noun::kFilter] =
-      NounRecord({"filter"}, kFilterShortHelp, kFilterHelp, CommandGroup::kProcess);
+      NounRecord({"filter"}, kFilterShortHelp, kFilterUsage, kFilterHelp, CommandGroup::kProcess);
 }
 
 const std::vector<SwitchRecord>& GetNounSwitches() {

@@ -30,9 +30,8 @@ namespace {
 constexpr int kDwarfExprSwitch = 1;
 
 const char kSymInfoShortHelp[] = "sym-info: Print information about a symbol.";
-const char kSymInfoHelp[] =
-    R"(sym-info <name>
-
+const char kSymInfoUsage[] = "sym-info <name>";
+const char kSymInfoHelp[] = R"(
   Displays information about a given named symbol.
 
   It will also show the demangled name if the input is a mangled symbol.
@@ -40,7 +39,7 @@ const char kSymInfoHelp[] =
 Options
 
 )" DWARF_EXPR_COMMAND_SWTICH_HELP
-    R"(
+                            R"(
 Example
 
   sym-info i
@@ -166,7 +165,7 @@ void RunVerbSymInfo(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 }  // namespace
 
 VerbRecord GetSymInfoVerbRecord() {
-  VerbRecord sym_info(&RunVerbSymInfo, {"sym-info"}, kSymInfoShortHelp, kSymInfoHelp,
+  VerbRecord sym_info(&RunVerbSymInfo, {"sym-info"}, kSymInfoShortHelp, kSymInfoUsage, kSymInfoHelp,
                       CommandGroup::kSymbol);
 
   SwitchRecord dwarf_expr_switch(kDwarfExprSwitch, true, "dwarf-expr");

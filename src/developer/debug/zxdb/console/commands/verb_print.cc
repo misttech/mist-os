@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kPrintShortHelp[] = "print / p: Print a variable or expression.";
-const char kPrintHelp[] =
-    R"(print <expression>
-
+const char kPrintUsage[] = "print <expression>";
+const char kPrintHelp[] = R"(
   Alias: p
 
   Evaluates a simple expression or variable name and prints the result.
@@ -32,7 +31,7 @@ const char kPrintHelp[] =
 Arguments
 
 )" PRINT_COMMAND_SWITCH_HELP
-    R"(
+                          R"(
 Examples
 
   p foo
@@ -76,7 +75,7 @@ void RunVerbPrint(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetPrintVerbRecord() {
-  VerbRecord print(&RunVerbPrint, {"print", "p"}, kPrintShortHelp, kPrintHelp,
+  VerbRecord print(&RunVerbPrint, {"print", "p"}, kPrintShortHelp, kPrintUsage, kPrintHelp,
                    CommandGroup::kQuery);
   AppendPrintCommandSwitches(&print);
   print.param_type = VerbRecord::kOneParam;

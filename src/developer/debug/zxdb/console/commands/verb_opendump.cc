@@ -18,10 +18,9 @@ namespace zxdb {
 
 namespace {
 
-const char kOpenDumpShortHelp[] = R"(opendump: Open a dump file for debugging.)";
-const char kOpenDumpHelp[] =
-    R"(opendump <path>
-
+const char kOpenDumpShortHelp[] = "opendump: Open a dump file for debugging.";
+const char kOpenDumpUsage[] = "opendump <path>";
+const char kOpenDumpHelp[] = R"(
   Opens a dump file. Currently only the 'minidump' format is supported.
 
   With the dump open, you will be able to list processes and threads, view the
@@ -102,8 +101,9 @@ void RunVerbOpendump(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
 }  // namespace
 
 VerbRecord GetOpendumpVerbRecord() {
-  auto record = VerbRecord(&RunVerbOpendump, &DoCompleteOpenDump, {"opendump"}, kOpenDumpShortHelp,
-                           kOpenDumpHelp, CommandGroup::kGeneral, SourceAffinity::kNone);
+  auto record =
+      VerbRecord(&RunVerbOpendump, &DoCompleteOpenDump, {"opendump"}, kOpenDumpShortHelp,
+                 kOpenDumpUsage, kOpenDumpHelp, CommandGroup::kGeneral, SourceAffinity::kNone);
   record.param_type = VerbRecord::ParamType::kOneParam;
   record.needs_elision = true;
   return record;

@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kJumpShortHelp[] = "jump / jmp: Set the instruction pointer to a different address.";
-const char kJumpHelp[] =
-    R"(jump <location>
-
+const char kJumpUsage[] = "jump <location>";
+const char kJumpHelp[] = R"(
   Alias: "jmp"
 
   Sets the instruction pointer of the thread to the given address. It does not
@@ -71,7 +70,7 @@ void RunVerbJump(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 
 VerbRecord GetJumpVerbRecord() {
   return VerbRecord(&RunVerbJump, &CompleteInputLocation, {"jump", "jmp"}, kJumpShortHelp,
-                    kJumpHelp, CommandGroup::kStep);
+                    kJumpUsage, kJumpHelp, CommandGroup::kStep);
 }
 
 }  // namespace zxdb

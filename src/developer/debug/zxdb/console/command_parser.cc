@@ -182,6 +182,15 @@ class Parser {
     return false;
   }
 
+  bool FailWithUsage(const std::string& msg) {
+    if (const char* usage = GetUsage()) {
+      err_ = Err(msg + " Usage: " + usage);
+    } else {
+      err_ = Err(msg);
+    }
+    return false;
+  }
+
   bool Accept() { return false; }
 
   bool DoNounState();
@@ -214,6 +223,8 @@ class Parser {
     err_ = TokenizeCommand(input, &tokens_);
     return !err_.has_error();
   }
+
+  const char* GetUsage() const;
 
   const std::string input_;
 
@@ -343,7 +354,7 @@ bool Parser::DoSwitchesState() {
   }
 
   if (token_str().size() == 1) {
-    return Fail("Invalid switch \"-\".");
+    return FailWithUsage("Invalid switch \"-\".");
   }
 
   if (token_str()[1] == '-') {
@@ -351,6 +362,16 @@ bool Parser::DoSwitchesState() {
   } else {
     return GoTo(Parser::kSwitchState);
   }
+}
+
+const char* Parser::GetUsage() const {
+  if (verb_record_) {
+    return verb_record_->usage;
+  }
+  if (const NounRecord* noun_record = NounToRecord(noun_)) {
+    return noun_record->usage;
+  }
+  return nullptr;
 }
 
 bool Parser::DoLongSwitchState() {
@@ -361,7 +382,7 @@ bool Parser::DoLongSwitchState() {
   size_t equals_index = std::string::npos;
   sw_record_ = FindLongSwitch(token_str(), switches, &equals_index);
   if (!sw_record_) {
-    return Fail("Unknown switch \"" + token_str() + "\".");
+    return FailWithUsage("Unknown switch \"" + token_str() + "\".");
   }
 
   sw_name_ = std::string("--") + sw_record_->name;
@@ -385,7 +406,7 @@ bool Parser::DoSwitchState() {
   char switch_char = token_str()[1];
   sw_record_ = FindSwitch(switch_char, switches);
   if (!sw_record_) {
-    return Fail(std::string("Unknown switch \"-") + switch_char + "\".");
+    return FailWithUsage(std::string("Unknown switch \"-") + switch_char + "\".");
   }
 
   sw_name_ = std::string("-") + sw_record_->ch;
@@ -404,14 +425,14 @@ bool Parser::DoSwitchArgState() {
   }
 
   if (!sw_record_->has_value) {
-    return Fail(std::string("--") + sw_record_->name + " takes no argument.");
+    return FailWithUsage(std::string("--") + sw_record_->name + " takes no argument.");
   }
 
   if (sw_value_) {
     command_->SetSwitch(sw_record_->id, std::move(*sw_value_));
     return GoTo(Parser::kSwitchesState);
   } else if (at_end()) {
-    return Fail("Argument needed for \"" + sw_name_ + "\".");
+    return FailWithUsage("Argument needed for \"" + sw_name_ + "\".");
   } else {
     command_->SetSwitch(sw_record_->id, token_str());
     return Consume(Parser::kSwitchesState);

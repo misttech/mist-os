@@ -68,9 +68,8 @@ constexpr int kVerbose = 1;
 constexpr int kMoreVerbose = 2;
 
 const char kAsyncBacktraceShortHelp[] = "async-backtrace / abt: Display all async tasks.";
-const char kAsyncBacktraceHelp[] =
-    R"(async-backtrace
-
+const char kAsyncBacktraceUsage[] = "async-backtrace";
+const char kAsyncBacktraceHelp[] = R"(
   Alias: "abt"
 
   Print a tree of async tasks from the main future in the current thread.
@@ -654,7 +653,7 @@ void RunVerbAsyncBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_c
 
 VerbRecord GetAsyncBacktraceVerbRecord() {
   VerbRecord abt(&RunVerbAsyncBacktrace, {"async-backtrace", "abt"}, kAsyncBacktraceShortHelp,
-                 kAsyncBacktraceHelp, CommandGroup::kQuery);
+                 kAsyncBacktraceUsage, kAsyncBacktraceHelp, CommandGroup::kQuery);
   abt.switches.emplace_back(kVerbose, false, "verbose", 'v');
   abt.switches.emplace_back(kMoreVerbose, false, "more-verbose", 0);
   return abt;

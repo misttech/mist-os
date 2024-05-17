@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kWatchShortHelp[] = "watch: Create a hardware write breakpoint on a variable.";
-const char kWatchHelp[] =
-    R"*(watch <expression>
-
+const char kWatchUsage[] = "watch <expression>";
+const char kWatchHelp[] = R"*(
   The "watch" command is an easier way to create a hardware data write
   breakpoint. It will stop the program when the given value changes.
 
@@ -130,7 +129,7 @@ void RunVerbWatch(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetWatchVerbRecord() {
-  return VerbRecord(&RunVerbWatch, {"watch"}, kWatchShortHelp, kWatchHelp,
+  return VerbRecord(&RunVerbWatch, {"watch"}, kWatchShortHelp, kWatchUsage, kWatchHelp,
                     CommandGroup::kBreakpoint);
 }
 

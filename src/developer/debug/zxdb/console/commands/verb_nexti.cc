@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kNextiShortHelp[] = "nexti / ni: Single-step over one machine instruction.";
-const char kNextiHelp[] =
-    R"(nexti / ni
-
+const char kNextiUsage[] = "nexti / ni";
+const char kNextiHelp[] = R"(
   When a thread is stopped, "nexti" will execute one machine instruction,
   stepping over subroutine call instructions, and stop the thread again.
   If the thread is running it will issue an error.
@@ -71,7 +70,7 @@ void RunVerbNexti(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetNextiVerbRecord() {
-  return VerbRecord(&RunVerbNexti, {"nexti", "ni"}, kNextiShortHelp, kNextiHelp,
+  return VerbRecord(&RunVerbNexti, {"nexti", "ni"}, kNextiShortHelp, kNextiUsage, kNextiHelp,
                     CommandGroup::kAssembly, SourceAffinity::kAssembly);
 }
 

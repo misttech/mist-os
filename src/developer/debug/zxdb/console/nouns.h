@@ -37,8 +37,8 @@ enum class Noun {
 
 struct NounRecord {
   NounRecord();
-  NounRecord(std::initializer_list<std::string> aliases, const char* short_help, const char* help,
-             CommandGroup command_group);
+  NounRecord(std::initializer_list<std::string> aliases, const char* short_help, const char* usage,
+             const char* help, CommandGroup command_group);
   ~NounRecord();
 
   // These are the user-typed strings that will name this noun. The [0]th one
@@ -46,6 +46,7 @@ struct NounRecord {
   std::vector<std::string> aliases;
 
   const char* short_help = nullptr;  // One-line help.
+  const char* usage = nullptr;
   const char* help = nullptr;
 
   // What logical place this command should appear in the help under, in addition to the "nouns"
@@ -58,6 +59,9 @@ const std::map<Noun, NounRecord>& GetNouns();
 
 // Converts the given noun to the canonical name.
 std::string NounToString(Noun n);
+
+// Converts the given noun its record, if any.
+const NounRecord* NounToRecord(Noun n);
 
 // Returns the mapping from possible inputs to the noun. This is an inverted version of the map
 // returned by GetNouns().

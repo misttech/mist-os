@@ -24,9 +24,9 @@ constexpr int kSwitchWeak = 3;
 constexpr int kSwitchRecursive = 4;
 
 const char kAttachShortHelp[] = "attach: Attach to processes.";
-const char kAttachHelp[] =
-    R"(attach [ --job / -j <pid/koid> ] [ --exact ] [ --weak ] [ --recursive / -r ] [ <what> ]
-
+const char kAttachUsage[] =
+    "attach [ --job / -j <pid/koid> ] [ --exact ] [ --weak ] [ --recursive / -r ] [ <what> ]";
+const char kAttachHelp[] = R"(
   Attaches to current or future process.
 
 Arguments
@@ -295,7 +295,7 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetAttachVerbRecord() {
-  VerbRecord attach(&RunVerbAttach, {"attach"}, kAttachShortHelp, kAttachHelp,
+  VerbRecord attach(&RunVerbAttach, {"attach"}, kAttachShortHelp, kAttachUsage, kAttachHelp,
                     CommandGroup::kProcess);
   attach.switches.emplace_back(kSwitchJob, true, "job", 'j');
   attach.switches.emplace_back(kSwitchExact, false, "exact");

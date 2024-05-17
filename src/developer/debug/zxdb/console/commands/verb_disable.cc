@@ -18,9 +18,8 @@ namespace zxdb {
 namespace {
 
 const char kDisableShortHelp[] = "disable: Disable a breakpoint.";
-const char kDisableHelp[] =
-    R"(disable [ <location> ]
-
+const char kDisableUsage[] = "disable [ <location> ]";
+const char kDisableHelp[] = R"(
   By default, "disable" will disable the current active breakpoint. It is the
   opposite of "enable". It can be combined with an explicit breakpoint prefix
   to indicate a specific breakpoint to disable.
@@ -37,7 +36,7 @@ const char kDisableHelp[] =
 Location arguments
 
 )" LOCATION_ARG_HELP("disable")
-        R"(
+    R"(
 See also
 
   "help break": To create breakpoints.
@@ -75,7 +74,7 @@ void RunVerbDisable(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 }  // namespace
 
 VerbRecord GetDisableVerbRecord() {
-  return VerbRecord(&RunVerbDisable, {"disable"}, kDisableShortHelp, kDisableHelp,
+  return VerbRecord(&RunVerbDisable, {"disable"}, kDisableShortHelp, kDisableUsage, kDisableHelp,
                     CommandGroup::kBreakpoint);
 }
 

@@ -21,10 +21,9 @@ namespace {
 constexpr int kUnixSwitch = 1;
 constexpr int kQuietSwitch = 2;
 
-const char kConnectShortHelp[] = R"(connect: Connect to a remote system for debugging.)";
-const char kConnectHelp[] =
-    R"(connect [ <remote_address> ]
-
+const char kConnectShortHelp[] = "connect: Connect to a remote system for debugging.";
+const char kConnectUsage[] = "connect [ <remote_address> ]";
+const char kConnectHelp[] = R"(
   Connects to a debug_agent at the given address/port. With no arguments,
   attempts to reconnect to the previously used remote address.
 
@@ -150,7 +149,7 @@ VerbRecord GetConnectVerbRecord() {
   SwitchRecord unix_switch(kUnixSwitch, false, "unix-socket", 'u');
   SwitchRecord quiet_switch(kQuietSwitch, false, "quiet", 'q');
   VerbRecord connect_record = VerbRecord(&RunVerbConnect, {"connect"}, kConnectShortHelp,
-                                         kConnectHelp, CommandGroup::kGeneral);
+                                         kConnectUsage, kConnectHelp, CommandGroup::kGeneral);
   connect_record.switches.push_back(unix_switch);
   connect_record.switches.push_back(quiet_switch);
   connect_record.needs_elision = true;

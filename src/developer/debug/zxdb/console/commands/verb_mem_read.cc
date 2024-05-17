@@ -31,10 +31,9 @@ void MemoryReadComplete(MemoryDump dump, fxl::RefPtr<CommandContext> cmd_context
   cmd_context->Output(FormatMemory(dump, dump.address(), static_cast<uint32_t>(dump.size()), opts));
 }
 
-const char kMemReadShortHelp[] = R"(mem-read / x: Read memory from debugged process.)";
-const char kMemReadHelp[] =
-    R"(mem-read [ --size=<bytes> ] <address-expression>
-
+const char kMemReadShortHelp[] = "mem-read / x: Read memory from debugged process.";
+const char kMemReadUsage[] = "mem-read [ --size=<bytes> ] <address-expression>";
+const char kMemReadHelp[] = R"(
   Alias: "x"
 
   Reads memory from the process at the given address and prints it to the
@@ -122,7 +121,7 @@ void RunVerbMemRead(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
 VerbRecord GetMemReadVerbRecord() {
   // Mem-read. Note: "x" is the GDB command to read memory.
   VerbRecord mem_read(&RunVerbMemRead, &CompleteInputLocation, {"mem-read", "x"}, kMemReadShortHelp,
-                      kMemReadHelp, CommandGroup::kQuery);
+                      kMemReadUsage, kMemReadHelp, CommandGroup::kQuery);
   mem_read.switches.emplace_back(kSizeSwitch, true, "size", 's');
   mem_read.param_type = VerbRecord::kOneParam;
   return mem_read;

@@ -20,9 +20,8 @@ namespace zxdb {
 namespace {
 
 const char kUntilShortHelp[] = "until / u: Runs a thread until a location is reached.";
-const char kUntilHelp[] =
-    R"(until <location>
-
+const char kUntilUsage[] = "until <location>";
+const char kUntilHelp[] = R"(
   Alias: "u"
 
   Continues execution of a thread or a process until a given location is
@@ -40,7 +39,7 @@ Location arguments
     until
 
 )" LOCATION_ARG_HELP("until")
-        R"(
+    R"(
 Examples
 
   u
@@ -138,7 +137,7 @@ void RunVerbUntil(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 
 VerbRecord GetUntilVerbRecord() {
   return VerbRecord(&RunVerbUntil, &CompleteInputLocation, {"until", "u"}, kUntilShortHelp,
-                    kUntilHelp, CommandGroup::kStep);
+                    kUntilUsage, kUntilHelp, CommandGroup::kStep);
 }
 
 }  // namespace zxdb

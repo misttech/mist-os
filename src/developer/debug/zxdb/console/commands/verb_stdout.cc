@@ -18,6 +18,7 @@ namespace zxdb {
 namespace {
 
 const char kStdoutShortHelp[] = "stdout: Show process output.";
+const char kStdoutUsage[] = "stdout";
 
 template <typename ContainerType>
 std::string OutputContainer(const ContainerType& container) {
@@ -34,13 +35,11 @@ void RunVerbStdout(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetStdoutVerbRecord() {
-  return VerbRecord(&RunVerbStdout, {"stdout"}, kStdoutShortHelp, kStdioHelp,
+  return VerbRecord(&RunVerbStdout, {"stdout"}, kStdoutShortHelp, kStdoutUsage, kStdioHelp,
                     CommandGroup::kProcess);
 }
 
-const char kStdioHelp[] =
-    R"(stdout | stderr
-
+const char kStdioHelp[] = R"(
   Shows the stdout/stderr (depending on the command) for a given process.
 
   zxdb will store the output of a debugged process in a ring buffer in order to

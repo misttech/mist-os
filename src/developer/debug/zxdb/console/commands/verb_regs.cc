@@ -25,9 +25,8 @@ namespace {
 using debug::RegisterCategory;
 
 const char kRegsShortHelp[] = "regs / rg: Show the current registers for a thread.";
-const char kRegsHelp[] =
-    R"(regs [(--category|-c)=<category>] [(--extended|-e)] [<regexp>]
-
+const char kRegsUsage[] = "regs [(--category|-c)=<category>] [(--extended|-e)] [<regexp>]";
+const char kRegsHelp[] = R"(
   Alias: "rg"
 
   Shows the current registers for a stack frame. The thread must be stopped.
@@ -246,7 +245,8 @@ void RunVerbRegs(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 
 VerbRecord GetRegsVerbRecord() {
   // regs
-  VerbRecord regs(&RunVerbRegs, {"regs", "rg"}, kRegsShortHelp, kRegsHelp, CommandGroup::kAssembly);
+  VerbRecord regs(&RunVerbRegs, {"regs", "rg"}, kRegsShortHelp, kRegsUsage, kRegsHelp,
+                  CommandGroup::kAssembly);
   regs.switches.emplace_back(kRegsAllSwitch, false, "all", 'a');
   regs.switches.emplace_back(kRegsGeneralSwitch, false, "general", 'g');
   regs.switches.emplace_back(kRegsFloatingPointSwitch, false, "float", 'f');

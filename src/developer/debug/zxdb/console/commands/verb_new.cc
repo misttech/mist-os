@@ -18,9 +18,8 @@ namespace zxdb {
 namespace {
 
 const char kNewShortHelp[] = "new: Create a new debugger object.";
-const char kNewHelp[] =
-    R"(<object-type> new
-
+const char kNewUsage[] = "<object-type> new";
+const char kNewHelp[] = R"(
   Creates a new object of type <object-type>.
 
 filter new
@@ -87,7 +86,8 @@ void RunVerbNew(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetNewVerbRecord() {
-  return VerbRecord(&RunVerbNew, {"new"}, kNewShortHelp, kNewHelp, CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbNew, {"new"}, kNewShortHelp, kNewUsage, kNewHelp,
+                    CommandGroup::kGeneral);
 }
 
 }  // namespace zxdb

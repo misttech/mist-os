@@ -325,10 +325,9 @@ Attaching/Removing Processes
   or use the "set auto-attach-limbo" command at the [zxdb] prompt.
 )";
 
-const char kHelpShortHelp[] = R"(help / h: Help.)";
-const char kHelpHelp[] =
-    R"(help
-
+const char kHelpShortHelp[] = "help / h: Help.";
+const char kHelpUsage[] = "help";
+const char kHelpHelp[] = R"(
   Yo dawg, I heard you like help on your help so I put help on the help in
   the help.)";
 
@@ -452,6 +451,7 @@ void RunVerbHelp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   }
   const std::string& on_what = cmd.args()[0];
 
+  const char* usage = nullptr;
   const char* help = nullptr;
 
   // Check for a noun.
@@ -460,7 +460,9 @@ void RunVerbHelp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   if (found_string_noun != string_noun.end()) {
     // Find the noun record to get the help. This is guaranteed to exist.
     const auto& nouns = GetNouns();
-    help = nouns.find(found_string_noun->second)->second.help;
+    const auto& record = nouns.find(found_string_noun->second)->second;
+    help = record.help;
+    usage = record.usage;
   } else {
     // Check for a verb
     const auto& string_verb = GetStringVerbMap();
@@ -468,7 +470,9 @@ void RunVerbHelp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
     if (found_string_verb != string_verb.end()) {
       // Find the verb record to get the help. This is guaranteed to exist.
       const auto& verbs = GetVerbs();
-      help = verbs.find(found_string_verb->second)->second.help;
+      const auto& record = verbs.find(found_string_verb->second)->second;
+      usage = record.usage;
+      help = record.help;
     } else {
       // Check for standalone topic.
       if (on_what == kExpressionsName) {
@@ -485,6 +489,9 @@ void RunVerbHelp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   }
 
   OutputBuffer out;
+  if (usage) {
+    out.FormatHelp(usage);
+  }
   out.FormatHelp(help);
   cmd_context->Output(out);
 }
@@ -492,7 +499,8 @@ void RunVerbHelp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetHelpVerbRecord() {
-  return VerbRecord(&RunVerbHelp, {"help", "h"}, kHelpShortHelp, kHelpHelp, CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbHelp, {"help", "h"}, kHelpShortHelp, kHelpUsage, kHelpHelp,
+                    CommandGroup::kGeneral);
 }
 
 }  // namespace zxdb

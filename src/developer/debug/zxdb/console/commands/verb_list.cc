@@ -34,9 +34,8 @@ constexpr int kListContextSwitch = 2;
 constexpr int kListFilePaths = 3;
 
 const char kListShortHelp[] = "list / l: List source code.";
-const char kListHelp[] =
-    R"(list [ -a ] [ -c <num_lines> ] [ <location> ]
-
+const char kListUsage[] = "list [ -a ] [ -c <num_lines> ] [ <location> ]";
+const char kListHelp[] = R"(
   Alias: "l"
 
   Lists source code.
@@ -64,7 +63,7 @@ Switches
 Location arguments
 
 )" LOCATION_ARG_HELP("list")
-        R"(
+    R"(
 Examples
 
   l
@@ -272,8 +271,8 @@ void RunVerbList(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetListVerbRecord() {
-  VerbRecord list(&RunVerbList, &CompleteInputLocation, {"list", "l"}, kListShortHelp, kListHelp,
-                  CommandGroup::kQuery, SourceAffinity::kSource);
+  VerbRecord list(&RunVerbList, &CompleteInputLocation, {"list", "l"}, kListShortHelp, kListUsage,
+                  kListHelp, CommandGroup::kQuery, SourceAffinity::kSource);
   list.switches.emplace_back(kListAllSwitch, false, "all", 'a');
   list.switches.emplace_back(kListContextSwitch, true, "context", 'c');
   list.switches.emplace_back(kListFilePaths, false, "with-filename", 'f');

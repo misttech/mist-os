@@ -18,9 +18,8 @@ namespace zxdb {
 namespace {
 
 const char kFinishShortHelp[] = "finish / fi: Finish execution of a stack frame.";
-const char kFinishHelp[] =
-    R"(finish / fi
-
+const char kFinishUsage[] = "finish / fi";
+const char kFinishHelp[] = R"(
   Alias: "fi"
 
   Resume thread execution until the selected stack frame returns. This means
@@ -70,7 +69,7 @@ void RunVerbFinish(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 }  // namespace
 
 VerbRecord GetFinishVerbRecord() {
-  return VerbRecord(&RunVerbFinish, {"finish", "fi"}, kFinishShortHelp, kFinishHelp,
+  return VerbRecord(&RunVerbFinish, {"finish", "fi"}, kFinishShortHelp, kFinishUsage, kFinishHelp,
                     CommandGroup::kStep);
 }
 

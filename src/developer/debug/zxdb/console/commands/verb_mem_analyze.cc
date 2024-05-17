@@ -17,9 +17,9 @@ namespace zxdb {
 namespace {
 
 const char kMemAnalyzeShortHelp[] = "mem-analyze / ma: Analyze a memory region.";
-const char kMemAnalyzeHelp[] =
-    R"(mem-analyze [ --num=<lines> ] [ --size=<size> ] <address-expression>
-
+const char kMemAnalyzeUsage[] =
+    "mem-analyze [ --num=<lines> ] [ --size=<size> ] <address-expression>";
+const char kMemAnalyzeHelp[] = R"(
   Alias: "ma"
 
   Prints a memory analysis. A memory analysis attempts to find pointers to
@@ -131,7 +131,7 @@ const uint32_t kDefaultAnalyzeByteSize = 160;
 
 VerbRecord GetMemAnalyzeVerbRecord() {
   VerbRecord mem_analyze(&RunVerbMemAnalyze, {"mem-analyze", "ma"}, kMemAnalyzeShortHelp,
-                         kMemAnalyzeHelp, CommandGroup::kQuery);
+                         kMemAnalyzeUsage, kMemAnalyzeHelp, CommandGroup::kQuery);
   mem_analyze.switches.emplace_back(kMemAnalyzeSizeSwitch, true, "size", 's');
   mem_analyze.switches.emplace_back(kMemAnalyzeNumSwitch, true, "num", 'n');
   mem_analyze.param_type = VerbRecord::kOneParam;

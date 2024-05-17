@@ -19,7 +19,8 @@ namespace {
 
 constexpr int kForceQuitSwitch = 1;
 
-const char kQuitShortHelp[] = R"(quit / q / exit: Quits the debugger.)";
+const char kQuitShortHelp[] = "quit / q / exit: Quits the debugger.";
+const char kQuitUsage[] = "quit";
 const char kQuitHelp[] =
     R"(quit
 
@@ -86,7 +87,7 @@ void RunVerbQuit(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetQuitVerbRecord() {
-  VerbRecord quit(&RunVerbQuit, {"quit", "q", "exit"}, kQuitShortHelp, kQuitHelp,
+  VerbRecord quit(&RunVerbQuit, {"quit", "q", "exit"}, kQuitShortHelp, kQuitUsage, kQuitHelp,
                   CommandGroup::kGeneral);
   quit.switches = {SwitchRecord(kForceQuitSwitch, false, "force", 'f')};
   return quit;

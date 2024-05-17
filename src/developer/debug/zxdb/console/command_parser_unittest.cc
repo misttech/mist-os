@@ -152,7 +152,7 @@ TEST(CommandParser, NounSwitches) {
 
   Err err = ParseCommand("frame -", &output);
   EXPECT_TRUE(err.has_error());
-  EXPECT_EQ("Invalid switch \"-\".", err.msg());
+  EXPECT_EQ("Invalid switch \"-\". Usage: frame [ -v ] [ <id> [ <command> ... ] ]", err.msg());
 
   // Valid short switch.
   err = ParseCommand("frame -v", &output);
@@ -187,7 +187,8 @@ TEST(CommandParser, VerbSwitches) {
 
   Err err = ParseCommand("mem-read -", &output);
   EXPECT_TRUE(err.has_error());
-  EXPECT_EQ("Invalid switch \"-\".", err.msg());
+  EXPECT_EQ("Invalid switch \"-\". Usage: mem-read [ --size=<bytes> ] <address-expression>",
+            err.msg());
 
   // Valid long switch with no equals.
   err = ParseCommand("mem-read --size 234 next", &output);
@@ -225,7 +226,9 @@ TEST(CommandParser, VerbSwitches) {
   // Expects a value for a long switch.
   err = ParseCommand("mem-read --size", &output);
   EXPECT_TRUE(err.has_error());
-  EXPECT_EQ("Argument needed for \"--size\".", err.msg());
+  EXPECT_EQ(
+      "Argument needed for \"--size\". Usage: mem-read [ --size=<bytes> ] <address-expression>",
+      err.msg());
 
   // Valid short switch with value following.
   err = ParseCommand("mem-read -s 567 next", &output);
@@ -254,7 +257,8 @@ TEST(CommandParser, VerbSwitches) {
   // Expects a value for a short switch.
   err = ParseCommand("mem-read -s", &output);
   EXPECT_TRUE(err.has_error());
-  EXPECT_EQ("Argument needed for \"-s\".", err.msg());
+  EXPECT_EQ("Argument needed for \"-s\". Usage: mem-read [ --size=<bytes> ] <address-expression>",
+            err.msg());
 }
 
 // Some verbs take all arguments as one large string, ignoring whitespace. "print" is one of these.

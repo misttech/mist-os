@@ -22,9 +22,8 @@ namespace zxdb {
 namespace {
 
 const char kSaveDumpShortHelp[] = "savedump: Save a minidump file of the current process.";
-const char kSaveDumpHelp[] =
-    R"(savedump <file>
-
+const char kSaveDumpUsage[] = "savedump <file>";
+const char kSaveDumpHelp[] = R"(
   Save a minidump file of the current process.
 
   <file> is the path to the saved file. The parent directory must already exist.
@@ -96,8 +95,8 @@ void RunVerbSaveDump(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
 }  // namespace
 
 VerbRecord GetSaveDumpVerbRecord() {
-  auto record = VerbRecord(&RunVerbSaveDump, {"savedump"}, kSaveDumpShortHelp, kSaveDumpHelp,
-                           CommandGroup::kGeneral, SourceAffinity::kNone);
+  auto record = VerbRecord(&RunVerbSaveDump, {"savedump"}, kSaveDumpShortHelp, kSaveDumpUsage,
+                           kSaveDumpHelp, CommandGroup::kGeneral, SourceAffinity::kNone);
   record.needs_elision = true;
   return record;
 }

@@ -17,9 +17,8 @@ namespace zxdb {
 namespace {
 
 const char kNextShortHelp[] = "next / n: Single-step over one source line.";
-const char kNextHelp[] =
-    R"(next / n
-
+const char kNextUsage[] = "next / n";
+const char kNextHelp[] = R"(
   When a thread is stopped, "next" will execute one source line, stepping over
   subroutine call instructions, and stop the thread again. If the thread is
   running it will issue an error.
@@ -67,8 +66,8 @@ void RunVerbNext(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetNextVerbRecord() {
-  return VerbRecord(&RunVerbNext, {"next", "n"}, kNextShortHelp, kNextHelp, CommandGroup::kStep,
-                    SourceAffinity::kSource);
+  return VerbRecord(&RunVerbNext, {"next", "n"}, kNextShortHelp, kNextUsage, kNextHelp,
+                    CommandGroup::kStep, SourceAffinity::kSource);
 }
 
 }  // namespace zxdb

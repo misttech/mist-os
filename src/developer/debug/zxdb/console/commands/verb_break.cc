@@ -34,9 +34,8 @@ constexpr int kTypeSwitch = 4;
 constexpr int kOneShotSwitch = 5;
 
 const char kBreakShortHelp[] = "break / b: Create a breakpoint.";
-const char kBreakHelp[] =
-    R"(break [ <location> ] [ if <expr> ]
-
+const char kBreakUsage[] = "break [ <location> ] [ if <expr> ]";
+const char kBreakHelp[] = R"(
   Alias: "b"
 
   Creates or modifies a breakpoint. Not to be confused with the "breakpoint" /
@@ -52,7 +51,7 @@ Location arguments
       break
 
 )" LOCATION_ARG_HELP("break") LOCATION_EXPRESSION_HELP("break")
-        R"(  You can also specify the magic symbol "$main" to break on the process'
+    R"(  You can also specify the magic symbol "$main" to break on the process'
   entrypoint:
       break $main
 
@@ -91,7 +90,7 @@ Options
       The type of the breakpoint. Defaults to "software". Possible values are:
 
 )" BREAKPOINT_TYPE_HELP("      ")
-            R"(
+        R"(
 Scoping to processes and threads
 
   Explicit context can be provided to scope a breakpoint to a single process
@@ -360,7 +359,7 @@ VerbRecord GetBreakVerbRecord() {
   SwitchRecord type_switch(kTypeSwitch, true, ClientSettings::Breakpoint::kType, 't');
 
   VerbRecord break_record(&RunVerbBreak, &CompleteInputLocation, {"break", "b"}, kBreakShortHelp,
-                          kBreakHelp, CommandGroup::kBreakpoint);
+                          kBreakUsage, kBreakHelp, CommandGroup::kBreakpoint);
   break_record.param_type = VerbRecord::kOneParam;  // Don't require quoting for expressions.
 
   break_record.switches.push_back(disabled_switch);

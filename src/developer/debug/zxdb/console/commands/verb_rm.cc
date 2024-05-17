@@ -18,9 +18,8 @@ namespace zxdb {
 namespace {
 
 const char kRmShortHelp[] = "rm: Remove a debugger object.";
-const char kRmHelp[] =
-    R"(<object-type> [ <object-id> ] rm
-
+const char kRmUsage[] = "<object-type> [ <object-id> ] rm";
+const char kRmHelp[] = R"(
   Removes the given object(s). Specify an explicit object id ("filter 2 rm") to
   remove that object, omit it ("filter rm") to remove the current one (if
   there is one), or a wildcard (filter * rm) to remove all objects. To see a
@@ -114,7 +113,7 @@ void RunVerbRm(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
 }  // namespace
 
 VerbRecord GetRmVerbRecord() {
-  return VerbRecord(&RunVerbRm, {"rm"}, kRmShortHelp, kRmHelp, CommandGroup::kGeneral);
+  return VerbRecord(&RunVerbRm, {"rm"}, kRmShortHelp, kRmUsage, kRmHelp, CommandGroup::kGeneral);
 }
 
 }  // namespace zxdb
