@@ -267,7 +267,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		vars["rustc_prefix"] = filepath.Join(contextSpec.RustToolchainDir)
 	}
 
-	// 'use_goma' is ignored, and effectively false.
+	vars["use_goma"] = staticSpec.UseGoma
 	vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
 	vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
 	vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
