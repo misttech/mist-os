@@ -370,29 +370,6 @@ template("test_spec") {
 
   _environments = []
 
-  # Also adds NUC11s if "nuc" environment was specified.
-  # TODO(b/326499130): Delete this hack after adding nuc11 as env.
-  foreach(env, target_envs) {
-    dims = []
-    dims = env.dimensions
-
-    if (defined(dims.device_type) &&
-        dims.device_type == "Intel NUC Kit NUC7i5DNHE" &&
-        target_name != "core-tests-hpet" && target_name != "device-enumeration-test-nuc7_test_device-enumeration-test-nuc7_component") {
-      new_nuc11_env = {
-      }
-      new_nuc11_env = {
-        forward_variables_from(env, "*", [ "dimensions" ])
-        dimensions = {
-          device_type = "Intel NUC Kit NUC11TNHv5"
-        }
-      }
-      target_envs += [ new_nuc11_env ]
-      target_envs -= [ new_nuc11_env ]
-      target_envs += [ new_nuc11_env ]
-    }
-  }
-
   foreach(env, target_envs) {
     dims = []  # Clear from previous iteration.
     dims = env.dimensions
