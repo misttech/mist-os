@@ -498,6 +498,12 @@ impl TryFromEnv for EnvironmentContext {
     }
 }
 
+#[async_trait(?Send)]
+impl<T> TryFromEnv for PhantomData<T> {
+    async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
+        Ok(PhantomData)
+    }
+}
 #[cfg(test)]
 mod tests {
     use ffx_command::Error;
