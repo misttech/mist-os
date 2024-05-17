@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
-use fidl::endpoints::create_endpoints;
+use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
@@ -379,6 +379,7 @@ impl SystemActivityGovernor {
                 ExecutionStateLevel::Active.into_primitive(),
             ],
         )
+        .initial_current_level(ExecutionStateLevel::Active.into_primitive())
         .build()
         .await
         .expect("PowerElementContext encountered error while building execution_state");
@@ -532,15 +533,42 @@ impl SystemActivityGovernor {
     pub async fn run(self: Rc<Self>) -> Result<()> {
         tracing::info!("Handling power elements");
         self.execution_state_manager.set_suspend_resume_listener(self.clone());
-        self.inspect_root.atomic_update(|node| {
-            node.record_child("power_elements", |elements_node| {
+
+        tracing::info!("System is booting. Acquiring boot control lease.");
+        let boot_control_lease = self
+            .boot_control
+            .lessor
+            .lease(BootControlLevel::Active.into())
+            .await
+            .expect("Failed to request boot control lease")
+            .expect("Failed to acquire boot control lease")
+            .into_proxy()?;
+
+        // TODO(https://fxbug.dev/333947976): Use RequiredLevel when LeaseStatus is removed.
+        let mut lease_status = fbroker::LeaseStatus::Unknown;
+        while lease_status != fbroker::LeaseStatus::Satisfied {
+            lease_status = boot_control_lease.watch_status(lease_status).await.unwrap();
+        }
+
+        let res = self.boot_control.current_level.update(BootControlLevel::Active.into()).await;
+        if let Err(error) = res {
+            tracing::warn!(?error, "failed to update boot_control level to Active");
+        }
+
+        let this = self.clone();
+        self.inspect_root.atomic_update(move |node| {
+            node.record_child("power_elements", move |elements_node| {
                 let (es_suspend_tx, es_suspend_rx) = mpsc::channel(1);
-                self.run_suspend_task(es_suspend_rx);
-                self.run_execution_state(&elements_node, es_suspend_tx);
-                self.run_application_activity(&elements_node, &node);
-                self.run_full_wake_handling(&elements_node);
-                self.run_wake_handling(&elements_node);
-                self.run_execution_resume_latency(elements_node);
+                this.run_suspend_task(es_suspend_rx);
+                this.run_execution_state(&elements_node, es_suspend_tx);
+                this.run_application_activity(
+                    &elements_node,
+                    &node,
+                    boot_control_lease.into_client_end().expect("failed to convert to ClientEnd"),
+                );
+                this.run_full_wake_handling(&elements_node);
+                this.run_wake_handling(&elements_node);
+                this.run_execution_resume_latency(elements_node);
             });
         });
 
@@ -577,10 +605,16 @@ impl SystemActivityGovernor {
             let element_name = sag.execution_state_manager.name().await;
             let required_level = sag.execution_state_manager.required_level_proxy().await;
 
+            // Since the initial value sent to RequiredLevel.Watch is acquired on creation of
+            // execution_state, it will always be 0.
+            // Clear the initial value to remove the starting 0 power level.
+            // TODO(b/339092750): Remove this when the most up-to-date required level is returned.
+            let _ = required_level.watch().await;
+
             run_power_element(
                 &element_name,
                 &required_level,
-                ExecutionStateLevel::Inactive.into_primitive(),
+                ExecutionStateLevel::Active.into_primitive(),
                 Some(execution_state_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let sag = sag.clone();
@@ -606,27 +640,15 @@ impl SystemActivityGovernor {
         self: &Rc<Self>,
         inspect_node: &fuchsia_inspect::Node,
         root_node: &fuchsia_inspect::Node,
+        boot_control_lease: fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>,
     ) {
         let application_activity_node = inspect_node.create_child("application_activity");
-        let booting_node = Rc::new(root_node.create_bool("booting", false));
+        let booting_node = Rc::new(root_node.create_bool("booting", true));
         let this = self.clone();
         let this_clone = self.clone();
 
         fasync::Task::local(async move {
             let update_fn = Rc::new(basic_update_fn_factory(&this.application_activity));
-
-            tracing::info!("System is booting. Acquiring boot control lease.");
-            let boot_control_lease = this
-                .boot_control
-                .lessor
-                .lease(BootControlLevel::Active.into())
-                .await
-                .expect("Failed to acquire boot control lease");
-            booting_node.set(true);
-            let res = this.boot_control.current_level.update(BootControlLevel::Active.into()).await;
-            if let Err(error) = res {
-                tracing::warn!(?error, "update boot_control level to active failed");
-            }
             let boot_control_lease = Rc::new(RefCell::new(Some(boot_control_lease)));
 
             run_power_element(
@@ -650,7 +672,6 @@ impl SystemActivityGovernor {
                         {
                             tracing::info!("System has booted. Dropping boot control lease.");
                             boot_control_lease.borrow_mut().take();
-                            booting_node.set(false);
                             let res = this
                                 .boot_control
                                 .current_level
@@ -662,6 +683,7 @@ impl SystemActivityGovernor {
                                     "update boot_control level to inactive failed"
                                 );
                             }
+                            booting_node.set(false);
                         }
                     }
                     .boxed_local()

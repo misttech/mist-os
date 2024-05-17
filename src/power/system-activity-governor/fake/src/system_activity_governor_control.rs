@@ -127,22 +127,12 @@ impl SystemActivityGovernorControl {
             .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
             .collect();
 
-        // execution_state power level is initially Inactive and quickly changes to Active upon SAG
-        // start. Usually when the status_endpoints are fetched, SAG has finished this transition
-        // from Inactive to Active. The stable state initial state of execution_state is Active.
         let es_status = status_endpoints.remove("execution_state".into()).unwrap();
-        let mut initial_execution_state_level = ExecutionStateLevel::from_primitive(
+        let initial_execution_state_level = ExecutionStateLevel::from_primitive(
             es_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
-        // In rare cases, this transition hasn't happened. Get the stable state power level in a
-        // second watch call.
-        if initial_execution_state_level == ExecutionStateLevel::Inactive {
-            initial_execution_state_level = ExecutionStateLevel::from_primitive(
-                es_status.watch_power_level().await.unwrap().unwrap(),
-            )
-            .unwrap();
-        }
+
         let aa_status = status_endpoints.remove("application_activity".into()).unwrap();
         let initial_application_activity_level = ApplicationActivityLevel::from_primitive(
             aa_status.watch_power_level().await.unwrap().unwrap(),

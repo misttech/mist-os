@@ -18,7 +18,7 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use futures::{channel::mpsc, StreamExt};
 use power_broker_client::PowerElementContext;
 use realm_proxy_client::RealmProxyClient;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 const REALM_FACTORY_CHILD_NAME: &str = "test_realm_factory";
 
@@ -1561,14 +1561,13 @@ async fn test_element_info_provider() -> Result<()> {
         .unwrap()
     );
 
-    let status_endpoints: std::collections::HashMap<String, fbroker::StatusProxy> =
-        element_info_provider
-            .get_status_endpoints()
-            .await?
-            .unwrap()
-            .into_iter()
-            .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
-            .collect();
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .collect();
 
     let es_status = status_endpoints.get("execution_state".into()).unwrap();
     let aa_status = status_endpoints.get("application_activity".into()).unwrap();
@@ -1662,5 +1661,36 @@ async fn test_element_info_provider() -> Result<()> {
         assert_eq!(erl_status.watch_power_level().await?.unwrap(), 0);
     }
 
+    Ok(())
+}
+
+// It is not possible to deterministically catch a bad initial state with current APIs.
+// Instead, ensure that the simplest connect and assert always passes.
+// If the initial state is not correct at least some of the time, this test will flake.
+#[fuchsia::test]
+async fn test_execution_state_always_starts_at_active_power_level() -> Result<()> {
+    let (realm, _) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .collect();
+
+    let es_status = status_endpoints.get("execution_state".into()).unwrap();
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
     Ok(())
 }
