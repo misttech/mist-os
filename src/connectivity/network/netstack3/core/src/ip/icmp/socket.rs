@@ -12,6 +12,7 @@ use core::{
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
 };
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
 use derivative::Derivative;
 use either::Either;
@@ -57,11 +58,29 @@ impl<O: datagram::IpExt + IcmpIpExt> IpExt for O {}
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct IcmpSockets<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> {
-    pub(crate) bound_and_id_allocator: RwLock<BoundSockets<I, D, BT>>,
+pub struct IcmpSockets<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> {
+    bound_and_id_allocator: RwLock<BoundSockets<I, D, BT>>,
     // Destroy all_sockets last so the strong references in the demux are
     // dropped before the primary references in the set.
-    pub(crate) all_sockets: RwLock<IcmpSocketSet<I, D, BT>>,
+    all_sockets: RwLock<IcmpSocketSet<I, D, BT>>,
+}
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
+    OrderedLockAccess<BoundSockets<I, D, BT>> for IcmpSockets<I, D, BT>
+{
+    type Lock = RwLock<BoundSockets<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.bound_and_id_allocator)
+    }
+}
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
+    OrderedLockAccess<IcmpSocketSet<I, D, BT>> for IcmpSockets<I, D, BT>
+{
+    type Lock = RwLock<IcmpSocketSet<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.all_sockets)
+    }
 }
 
 /// An ICMP socket.
@@ -122,7 +141,8 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> Debug
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, BT> {
     /// Returns the inner state for this socket, to be used in conjunction with
     /// lock ordering mechanisms.
-    pub(crate) fn state_for_locking(&self) -> &RwLock<IcmpSocketState<I, D, BT>> {
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn state(&self) -> &RwLock<IcmpSocketState<I, D, BT>> {
         let Self(rc) = self;
         &rc.state
     }
@@ -143,6 +163,16 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<
     pub fn external_data(&self) -> &BT::ExternalData<I> {
         let Self(rc) = self;
         &rc.external_data
+    }
+}
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
+    OrderedLockAccess<IcmpSocketState<I, D, BT>> for IcmpSocketId<I, D, BT>
+{
+    type Lock = RwLock<IcmpSocketState<I, D, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        let Self(rc) = self;
+        OrderedLockRef::new(&rc.state)
     }
 }
 

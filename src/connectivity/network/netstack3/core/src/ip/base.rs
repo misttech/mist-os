@@ -15,12 +15,7 @@ use core::{
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
-use lock_order::lock::UnlockedAccess;
-use lock_order::{
-    lock::{LockFor, RwLockFor},
-    relation::LockBefore,
-    wrap::prelude::*,
-};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 #[cfg(test)]
 use net_types::ip::IpVersion;
 use net_types::{
@@ -32,7 +27,7 @@ use net_types::{
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::{
     error::IpParseError,
-    ip::{IpPacket as _, IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto},
+    ip::{IpPacket as _, IpPacketBuilder as _},
     ipv4::{Ipv4FragmentType, Ipv4Packet},
     ipv6::Ipv6Packet,
 };
@@ -45,10 +40,9 @@ use crate::{
         NestedIntoCoreTimerCtx, TimerContext, TimerHandler, TracingContext,
     },
     counters::Counter,
-    data_structures::token_bucket::TokenBucket,
     device::{
-        AnyDevice, DeviceId, DeviceIdContext, DeviceIdentifier as _, FrameDestination,
-        StrongDeviceIdentifier, WeakDeviceId, WeakDeviceIdentifier,
+        AnyDevice, DeviceIdContext, DeviceIdentifier as _, FrameDestination,
+        StrongDeviceIdentifier, WeakDeviceIdentifier,
     },
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
@@ -63,12 +57,9 @@ use crate::{
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
-            self,
-            socket::{IcmpEchoBindingsTypes, IcmpSocketId, IcmpSocketSet, IcmpSocketState},
-            IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt,
-            IcmpIpTransportContext, Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State,
-            Icmpv4StateBuilder, Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
-            InnerIcmpContext,
+            IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error,
+            Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State,
+            Icmpv6StateBuilder,
         },
         ipv6,
         ipv6::Ipv6PacketAction,
@@ -84,11 +75,7 @@ use crate::{
             WrapBroadcastMarker,
         },
     },
-    socket::datagram,
-    sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
-    uninstantiable::UninstantiableWrapper,
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
+    sync::{Mutex, RwLock},
 };
 
 /// Default IPv4 TTL.
@@ -112,28 +99,7 @@ pub(crate) const IPV6_DEFAULT_SUBNET: Subnet<Ipv6Addr> =
 
 /// An error encountered when receiving a transport-layer packet.
 #[derive(Debug)]
-pub(crate) struct TransportReceiveError {
-    inner: TransportReceiveErrorInner,
-}
-
-impl TransportReceiveError {
-    // NOTE: We don't expose a constructor for the "protocol unsupported" case.
-    // This ensures that the only way that we send a "protocol unsupported"
-    // error is if the implementation of `IpTransportContext` provided for a
-    // given protocol number is `()`. That's because `()` is the only type whose
-    // `receive_ip_packet` function is implemented in this module, and thus it's
-    // the only type that is able to construct a "protocol unsupported"
-    // `TransportReceiveError`.
-
-    /// Constructs a new `TransportReceiveError` to indicate an unreachable
-    /// port.
-    pub(crate) fn new_port_unreachable() -> TransportReceiveError {
-        TransportReceiveError { inner: TransportReceiveErrorInner::PortUnreachable }
-    }
-}
-
-#[derive(Debug)]
-enum TransportReceiveErrorInner {
+pub enum TransportReceiveError {
     ProtocolUnsupported,
     PortUnreachable,
 }
@@ -228,7 +194,7 @@ impl IpExt for Ipv6 {
 
 #[derive(Debug, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) struct TransparentLocalDelivery<I: IpExt> {
+pub struct TransparentLocalDelivery<I: IpExt> {
     pub addr: SpecifiedAddr<I::Addr>,
     pub port: NonZeroU16,
 }
@@ -300,10 +266,7 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
         buffer: B,
         _transport_override: Option<TransparentLocalDelivery<I>>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        Err((
-            buffer,
-            TransportReceiveError { inner: TransportReceiveErrorInner::ProtocolUnsupported },
-        ))
+        Err((buffer, TransportReceiveError::ProtocolUnsupported))
     }
 }
 
@@ -1010,53 +973,6 @@ impl<
     }
 }
 
-impl<BC: BindingsContext, I: IpLayerIpExt, L> CounterContext<IpCounters<I>> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
-    }
-}
-
-impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
-where
-    I: IpLayerIpExt,
-    BC: BindingsContext,
-    L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
-
-    // These bounds ensure that we can fulfill all the traits for the associated
-    // type `IpDeviceIdCtx` below and keep the compiler happy where we don't
-    // have implementations that are generic on Ip.
-    for<'a> CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>:
-        DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-            + IpForwardingDeviceContext<I>
-            + IpDeviceStateContext<I, BC>,
-{
-    type IpDeviceIdCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>;
-
-    fn with_ip_routing_table<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (cache, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<I>>();
-        cb(&mut locked, &cache)
-    }
-
-    fn with_ip_routing_table_mut<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut cache, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<I>>();
-        cb(&mut locked, &mut cache)
-    }
-}
-
 /// The IP context providing dispatch to the available transport protocols.
 ///
 /// This trait acts like a demux on the transport protocol for ingress IP
@@ -1142,138 +1058,6 @@ where
     Self::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
     type DeviceId_ = Self::DeviceId;
-}
-
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv4>>>
-    IpTransportDispatchContext<Ipv4, BC> for CoreCtx<'_, BC, L>
-{
-    fn dispatch_receive_ip_packet<B: BufferMut>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &Self::DeviceId,
-        src_ip: Ipv4Addr,
-        dst_ip: SpecifiedAddr<Ipv4Addr>,
-        proto: Ipv4Proto,
-        body: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
-    ) -> Result<(), TransportReceiveError> {
-        // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
-        // sockets.
-
-        match proto {
-            Ipv4Proto::Icmp => {
-                <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
-                    self,
-                    bindings_ctx,
-                    device,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    transport_override,
-                )
-                .map_err(|(_body, err)| err)
-            }
-            Ipv4Proto::Igmp => {
-                device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body);
-                Ok(())
-            }
-            Ipv4Proto::Proto(IpProto::Udp) => {
-                <UdpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
-                    self,
-                    bindings_ctx,
-                    device,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    transport_override,
-                )
-                .map_err(|(_body, err)| err)
-            }
-            Ipv4Proto::Proto(IpProto::Tcp) => {
-                <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
-                    self,
-                    bindings_ctx,
-                    device,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    transport_override,
-                )
-                .map_err(|(_body, err)| err)
-            }
-            // TODO(joshlf): Once all IP protocol numbers are covered, remove
-            // this default case.
-            _ => Err(TransportReceiveError {
-                inner: TransportReceiveErrorInner::ProtocolUnsupported,
-            }),
-        }
-    }
-}
-
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv6>>>
-    IpTransportDispatchContext<Ipv6, BC> for CoreCtx<'_, BC, L>
-{
-    fn dispatch_receive_ip_packet<B: BufferMut>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &Self::DeviceId,
-        src_ip: Ipv6SourceAddr,
-        dst_ip: SpecifiedAddr<Ipv6Addr>,
-        proto: Ipv6Proto,
-        body: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
-    ) -> Result<(), TransportReceiveError> {
-        // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
-        // sockets.
-
-        match proto {
-            Ipv6Proto::Icmpv6 => {
-                <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
-                    self,
-                    bindings_ctx,
-                    device,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    transport_override,
-                )
-                .map_err(|(_body, err)| err)
-            }
-            // A value of `Ipv6Proto::NoNextHeader` tells us that there is no
-            // header whatsoever following the last lower-level header so we stop
-            // processing here.
-            Ipv6Proto::NoNextHeader => Ok(()),
-            Ipv6Proto::Proto(IpProto::Tcp) => {
-                <TcpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
-                    self,
-                    bindings_ctx,
-                    device,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    transport_override,
-                )
-                .map_err(|(_body, err)| err)
-            }
-            Ipv6Proto::Proto(IpProto::Udp) => {
-                <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
-                    self,
-                    bindings_ctx,
-                    device,
-                    src_ip,
-                    dst_ip,
-                    body,
-                    transport_override,
-                )
-                .map_err(|(_body, err)| err)
-            }
-            // TODO(joshlf): Once all IP Next Header numbers are covered, remove
-            // this default case.
-            _ => Err(TransportReceiveError {
-                inner: TransportReceiveErrorInner::ProtocolUnsupported,
-            }),
-        }
-    }
 }
 
 /// A builder for IPv4 state.
@@ -1410,145 +1194,39 @@ impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     }
 }
 
-impl<I, BT> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for StackState<BT>
-where
-    I: IpLayerIpExt,
-    BT: BindingsTypes,
+impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<IpPacketFragmentCache<I, BT>>
+    for IpStateInner<I, D, BT>
 {
-    type Data = IpPacketFragmentCache<I, BT>;
-    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, BT>> where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.inner_ip_state().fragment_cache.lock()
+    type Lock = Mutex<IpPacketFragmentCache<I, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.fragment_cache)
     }
 }
 
-impl<I, BT> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for StackState<BT>
-where
-    I: IpLayerIpExt,
-    BT: BindingsTypes,
+impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<PmtuCache<I, BT>>
+    for IpStateInner<I, D, BT>
 {
-    type Data = PmtuCache<I, BT>;
-    type Guard<'l> = LockGuard<'l, PmtuCache<I, BT>> where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.inner_ip_state().pmtu_cache.lock()
+    type Lock = Mutex<PmtuCache<I, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.pmtu_cache)
     }
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
-    for StackState<BT>
+impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<ForwardingTable<I, D>>
+    for IpStateInner<I, D, BT>
 {
-    type Data = ForwardingTable<I, DeviceId<BT>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<I, DeviceId<BT>>>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<BT>>>
-        where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.inner_ip_state().table.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.inner_ip_state().table.write()
+    type Lock = RwLock<ForwardingTable<I, D>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.table)
     }
 }
 
-impl<I, BT> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for StackState<BT>
-where
-    I: datagram::DualStackIpExt,
-    BT: BindingsTypes,
+impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<RawIpSocketMap<I, BT>>
+    for IpStateInner<I, D, BT>
 {
-    type Data = icmp::socket::BoundSockets<I, WeakDeviceId<BT>, BT>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.inner_icmp_state().sockets.bound_and_id_allocator.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.inner_icmp_state().sockets.bound_and_id_allocator.write()
-    }
-}
-
-impl<I: datagram::DualStackIpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
-    RwLockFor<crate::lock_ordering::IcmpSocketState<I>> for IcmpSocketId<I, D, BT>
-{
-    type Data = IcmpSocketState<I, D, BT>;
-
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Self::Data>
-    where
-        Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Self::Data>
-    where
-        Self: 'l ;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state_for_locking().read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state_for_locking().write()
-    }
-}
-
-impl<I, BT> RwLockFor<crate::lock_ordering::IcmpAllSocketsSet<I>> for StackState<BT>
-where
-    I: datagram::DualStackIpExt,
-    BT: BindingsTypes,
-{
-    type Data = IcmpSocketSet<I, WeakDeviceId<BT>, BT>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.inner_icmp_state().sockets.all_sockets.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.inner_icmp_state().sockets.all_sockets.write()
-    }
-}
-
-impl<I, BT> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for StackState<BT>
-where
-    I: datagram::DualStackIpExt,
-    BT: BindingsTypes,
-{
-    type Data = TokenBucket<BT::Instant>;
-    type Guard<'l> = LockGuard<'l, TokenBucket<BT::Instant>>
-        where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.inner_icmp_state::<I>().error_send_bucket.lock()
-    }
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
-    for StackState<BC>
-{
-    type Data = AtomicU16;
-    type Guard<'l> = &'l AtomicU16 where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv4.next_packet_id
-    }
-}
-
-impl<I: IpLayerIpExt, BT: BindingsTypes> RwLockFor<crate::lock_ordering::AllRawIpSockets<I>>
-    for StackState<BT>
-{
-    type Data = RawIpSocketMap<I, BT>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data>
-        where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.inner_ip_state().raw_sockets.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.inner_ip_state().raw_sockets.write()
+    type Lock = RwLock<RawIpSocketMap<I, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.raw_sockets)
     }
 }
 
@@ -1648,17 +1326,6 @@ impl Inspectable for Ipv6RxCounters {
         inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
         inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
         inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
-    }
-}
-
-impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
-    for StackState<BC>
-{
-    type Data = IpCounters<I>;
-    type Guard<'l> = &'l IpCounters<I> where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.ip_counters()
     }
 }
 
@@ -1800,8 +1467,8 @@ impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
             #[generic_over_ip(I, Ip)]
             struct ErrorHolder<I: Ip + IcmpHandlerIpExt>(I::IcmpError);
 
-            let ErrorHolder(err) = match err.inner {
-                TransportReceiveErrorInner::ProtocolUnsupported => I::map_ip(
+            let ErrorHolder(err) = match err {
+                TransportReceiveError::ProtocolUnsupported => I::map_ip(
                     header_len,
                     |header_len| {
                         ErrorHolder(Icmpv4Error {
@@ -1811,7 +1478,7 @@ impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
                     },
                     |header_len| ErrorHolder(Icmpv6ErrorKind::ProtocolUnreachable { header_len }),
                 ),
-                TransportReceiveErrorInner::PortUnreachable => I::map_ip(
+                TransportReceiveError::PortUnreachable => I::map_ip(
                     header_len,
                     |header_len| {
                         ErrorHolder(Icmpv4Error {
@@ -3302,280 +2969,6 @@ where
     }
 }
 
-impl<
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
-            + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
-            + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv4>>,
-    > InnerIcmpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
-{
-    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
-    type DualStackContext = UninstantiableWrapper<Self>;
-
-    fn receive_icmp_error(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        original_src_ip: Option<SpecifiedAddr<Ipv4Addr>>,
-        original_dst_ip: SpecifiedAddr<Ipv4Addr>,
-        original_proto: Ipv4Proto,
-        original_body: &[u8],
-        err: Icmpv4ErrorCode,
-    ) {
-        self.increment(|counters: &IpCounters<Ipv4>| &counters.receive_icmp_error);
-        trace!("InnerIcmpContext<Ipv4>::receive_icmp_error({:?})", err);
-
-        match original_proto {
-            Ipv4Proto::Icmp => {
-                <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_icmp_error(
-                    self,
-                    bindings_ctx,
-                    device,
-                    original_src_ip,
-                    original_dst_ip,
-                    original_body,
-                    err,
-                )
-            }
-            Ipv4Proto::Proto(IpProto::Tcp) => {
-                <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_icmp_error(
-                    self,
-                    bindings_ctx,
-                    device,
-                    original_src_ip,
-                    original_dst_ip,
-                    original_body,
-                    err,
-                )
-            }
-            Ipv4Proto::Proto(IpProto::Udp) => {
-                <UdpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_icmp_error(
-                    self,
-                    bindings_ctx,
-                    device,
-                    original_src_ip,
-                    original_dst_ip,
-                    original_body,
-                    err,
-                )
-            }
-            // TODO(joshlf): Once all IP protocol numbers are covered,
-            // remove this default case.
-            _ => <() as IpTransportContext<Ipv4, _, _>>::receive_icmp_error(
-                self,
-                bindings_ctx,
-                device,
-                original_src_ip,
-                original_dst_ip,
-                original_body,
-                err,
-            ),
-        }
-    }
-
-    fn with_icmp_ctx_and_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::socket::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut sockets, mut core_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv4>>();
-        cb(&mut core_ctx, &mut sockets)
-    }
-
-    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        cb(&mut self.lock::<crate::lock_ordering::IcmpTokenBucket<Ipv4>>())
-    }
-}
-
-impl<
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv6>>
-            + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>
-            + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv6>>,
-    > InnerIcmpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
-{
-    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
-    type DualStackContext = UninstantiableWrapper<Self>;
-    fn receive_icmp_error(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        original_src_ip: Option<SpecifiedAddr<Ipv6Addr>>,
-        original_dst_ip: SpecifiedAddr<Ipv6Addr>,
-        original_next_header: Ipv6Proto,
-        original_body: &[u8],
-        err: Icmpv6ErrorCode,
-    ) {
-        self.increment(|counters: &IpCounters<Ipv6>| &counters.receive_icmp_error);
-        trace!("InnerIcmpContext<Ipv6>::receive_icmp_error({:?})", err);
-
-        match original_next_header {
-            Ipv6Proto::Icmpv6 => {
-                <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_icmp_error(
-                    self,
-                    bindings_ctx,
-                    device,
-                    original_src_ip,
-                    original_dst_ip,
-                    original_body,
-                    err,
-                )
-            }
-            Ipv6Proto::Proto(IpProto::Tcp) => {
-                <TcpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_icmp_error(
-                    self,
-                    bindings_ctx,
-                    device,
-                    original_src_ip,
-                    original_dst_ip,
-                    original_body,
-                    err,
-                )
-            }
-            Ipv6Proto::Proto(IpProto::Udp) => {
-                <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_icmp_error(
-                    self,
-                    bindings_ctx,
-                    device,
-                    original_src_ip,
-                    original_dst_ip,
-                    original_body,
-                    err,
-                )
-            }
-            // TODO(joshlf): Once all IP protocol numbers are covered,
-            // remove this default case.
-            _ => <() as IpTransportContext<Ipv6, _, _>>::receive_icmp_error(
-                self,
-                bindings_ctx,
-                device,
-                original_src_ip,
-                original_dst_ip,
-                original_body,
-                err,
-            ),
-        }
-    }
-
-    fn with_icmp_ctx_and_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::socket::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut sockets, mut core_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv6>>();
-        cb(&mut core_ctx, &mut sockets)
-    }
-
-    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        cb(&mut self.lock::<crate::lock_ordering::IcmpTokenBucket<Ipv6>>())
-    }
-}
-
-impl<L, BC: BindingsContext> icmp::IcmpStateContext for CoreCtx<'_, BC, L> {}
-
-#[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<
-        I,
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<I>>
-            + LockBefore<crate::lock_ordering::TcpDemux<I>>
-            + LockBefore<crate::lock_ordering::UdpBoundMap<I>>,
-    > icmp::socket::StateContext<I, BC> for CoreCtx<'_, BC, L>
-{
-    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketState<I>>;
-
-    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        cb(&mut self.write_lock::<crate::lock_ordering::IcmpAllSocketsSet<I>>())
-    }
-
-    fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        cb(&self.read_lock::<crate::lock_ordering::IcmpAllSocketsSet<I>>())
-    }
-
-    fn with_socket_state<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,
-    >(
-        &mut self,
-        id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
-        cb: F,
-    ) -> O {
-        let mut locked = self.adopt(id);
-        let (socket_state, mut restricted) =
-            locked.read_lock_with_and::<crate::lock_ordering::IcmpSocketState<I>, _>(|c| c.right());
-        let mut restricted = restricted.cast_core_ctx();
-        cb(&mut restricted, &socket_state)
-    }
-
-    fn with_socket_state_mut<
-        O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &mut IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,
-    >(
-        &mut self,
-        id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
-        cb: F,
-    ) -> O {
-        let mut locked = self.adopt(id);
-        let (mut socket_state, mut restricted) = locked
-            .write_lock_with_and::<crate::lock_ordering::IcmpSocketState<I>, _>(|c| c.right());
-        let mut restricted = restricted.cast_core_ctx();
-        cb(&mut restricted, &mut socket_state)
-    }
-
-    fn with_bound_state_context<O, F: FnOnce(&mut Self::SocketStateCtx<'_>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        cb(&mut self.cast_locked())
-    }
-
-    fn for_each_socket<
-        F: FnMut(
-            &mut Self::SocketStateCtx<'_>,
-            &IcmpSocketId<I, Self::WeakDeviceId, BC>,
-            &IcmpSocketState<I, Self::WeakDeviceId, BC>,
-        ),
-    >(
-        &mut self,
-        mut cb: F,
-    ) {
-        let (all_sockets, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::IcmpAllSocketsSet<I>>();
-        all_sockets.keys().for_each(|id| {
-            let id = IcmpSocketId::from(id.clone());
-            let mut locked = locked.adopt(&id);
-            let (socket_state, mut restricted) = locked
-                .read_lock_with_and::<crate::lock_ordering::IcmpSocketState<I>, _>(|c| c.right());
-            let mut restricted = restricted.cast_core_ctx();
-            cb(&mut restricted, &id, &socket_state);
-        });
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
@@ -3747,7 +3140,7 @@ mod tests {
             Icmpv4DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig,
             Icmpv6ParameterProblemCode, MessageBody,
         },
-        ip::{IpPacketBuilder, Ipv6ExtHdrType},
+        ip::{IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto},
         ipv4::Ipv4PacketBuilder,
         ipv6::{ext_hdrs::ExtensionHeaderOptionAction, Ipv6PacketBuilder},
         testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
@@ -3762,6 +3155,7 @@ mod tests {
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::set_forwarding_enabled,
+            DeviceId,
         },
         ip::{
             device::{
@@ -3778,7 +3172,7 @@ mod tests {
             FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             TEST_ADDRS_V4, TEST_ADDRS_V6,
         },
-        UnlockedCoreCtx,
+        BindingsContext, StackState, UnlockedCoreCtx,
     };
 
     // Some helper functions

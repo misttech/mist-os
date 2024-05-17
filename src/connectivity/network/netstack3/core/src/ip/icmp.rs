@@ -13,7 +13,7 @@ use core::{
     ops::ControlFlow,
 };
 
-use lock_order::{lock::UnlockedAccess, relation::LockBefore, wrap::prelude::*};
+use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ip::{
         GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
@@ -77,7 +77,6 @@ use crate::{
         AddrVec,
     },
     sync::Mutex,
-    BindingsContext, CoreCtx, StackState,
 };
 
 /// The IP packet hop limit for all NDP packets.
@@ -155,15 +154,27 @@ impl From<Icmpv6ErrorCode> for IcmpErrorCode {
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) struct IcmpState<
+pub struct IcmpState<
     I: IpExt + datagram::DualStackIpExt,
     D: WeakDeviceIdentifier,
     BT: IcmpBindingsTypes,
 > {
     pub(crate) sockets: IcmpSockets<I, D, BT>,
-    pub(crate) error_send_bucket: Mutex<TokenBucket<BT::Instant>>,
+    error_send_bucket: Mutex<IpMarked<I, TokenBucket<BT::Instant>>>,
     pub(crate) tx_counters: IcmpTxCounters<I>,
     pub(crate) rx_counters: IcmpRxCounters<I>,
+}
+
+impl<I, D, BT> OrderedLockAccess<IpMarked<I, TokenBucket<BT::Instant>>> for IcmpState<I, D, BT>
+where
+    I: IpExt + datagram::DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: IcmpBindingsTypes,
+{
+    type Lock = Mutex<IpMarked<I, TokenBucket<BT::Instant>>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.error_send_bucket)
+    }
 }
 
 /// ICMP tx path counters.
@@ -253,59 +264,6 @@ pub struct NdpCounters {
     pub tx: NdpTxCounters,
 }
 
-impl<BC: BindingsContext, I: datagram::DualStackIpExt>
-    UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>> for StackState<BC>
-{
-    type Data = IcmpTxCounters<I>;
-    type Guard<'l> = &'l IcmpTxCounters<I> where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.inner_icmp_state().tx_counters
-    }
-}
-
-impl<BC: BindingsContext, I: datagram::DualStackIpExt, L> CounterContext<IcmpTxCounters<I>>
-    for CoreCtx<'_, BC, L>
-{
-    fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IcmpTxCounters<I>>())
-    }
-}
-
-impl<BC: BindingsContext, I: datagram::DualStackIpExt>
-    UnlockedAccess<crate::lock_ordering::IcmpRxCounters<I>> for StackState<BC>
-{
-    type Data = IcmpRxCounters<I>;
-    type Guard<'l> = &'l IcmpRxCounters<I> where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.inner_icmp_state().rx_counters
-    }
-}
-
-impl<BC: BindingsContext, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCounters<I>>
-    for CoreCtx<'_, BC, L>
-{
-    fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IcmpRxCounters<I>>())
-    }
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::NdpCounters> for StackState<BC> {
-    type Data = NdpCounters;
-    type Guard<'l> = &'l NdpCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.ndp_counters()
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<NdpCounters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::NdpCounters>())
-    }
-}
-
 /// A builder for ICMPv4 state.
 #[derive(Copy, Clone)]
 pub(crate) struct Icmpv4StateBuilder {
@@ -341,7 +299,9 @@ impl Icmpv4StateBuilder {
         Icmpv4State {
             inner: IcmpState {
                 sockets: Default::default(),
-                error_send_bucket: Mutex::new(TokenBucket::new(self.errors_per_second)),
+                error_send_bucket: Mutex::new(IpMarked::new(TokenBucket::new(
+                    self.errors_per_second,
+                ))),
                 tx_counters: Default::default(),
                 rx_counters: Default::default(),
             },
@@ -353,7 +313,7 @@ impl Icmpv4StateBuilder {
 /// The state associated with the ICMPv4 protocol.
 pub(crate) struct Icmpv4State<D: WeakDeviceIdentifier, BT: IcmpBindingsTypes> {
     pub(crate) inner: IcmpState<Ipv4, D, BT>,
-    send_timestamp_reply: bool,
+    pub(crate) send_timestamp_reply: bool,
 }
 
 // Used by `receive_icmp_echo_reply`.
@@ -393,7 +353,9 @@ impl Icmpv6StateBuilder {
         Icmpv6State {
             inner: IcmpState {
                 sockets: Default::default(),
-                error_send_bucket: Mutex::new(TokenBucket::new(self.errors_per_second)),
+                error_send_bucket: Mutex::new(IpMarked::new(TokenBucket::new(
+                    self.errors_per_second,
+                ))),
                 tx_counters: Default::default(),
                 rx_counters: Default::default(),
             },
@@ -832,29 +794,6 @@ pub(crate) trait InnerIcmpv4Context<BC: IcmpBindingsContext<Ipv4, Self::DeviceId
 {
     /// Returns true if a timestamp reply may be sent.
     fn should_send_timestamp_reply(&self) -> bool;
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>
-    for StackState<BC>
-{
-    type Data = bool;
-    type Guard<'l> = &'l bool where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv4.icmp.send_timestamp_reply
-    }
-}
-
-impl<
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
-            + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
-            + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv4>>,
-    > InnerIcmpv4Context<BC> for CoreCtx<'_, BC, L>
-{
-    fn should_send_timestamp_reply(&self) -> bool {
-        *self.unlocked_access::<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>()
-    }
 }
 
 /// The execution context for ICMPv6.
@@ -3259,11 +3198,11 @@ mod tests {
     /// Utilities for accessing locked internal state in tests.
     impl<I: socket::IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, BT> {
         fn get(&self) -> impl Deref<Target = IcmpSocketState<I, D, BT>> + '_ {
-            self.state_for_locking().read()
+            self.state().read()
         }
 
         fn get_mut(&self) -> impl DerefMut<Target = IcmpSocketState<I, D, BT>> + '_ {
-            self.state_for_locking().write()
+            self.state().write()
         }
     }
 

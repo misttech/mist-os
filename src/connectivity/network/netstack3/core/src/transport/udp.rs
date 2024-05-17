@@ -1438,7 +1438,7 @@ fn receive_ip_packet<
     if !was_delivered && StateContext::<I, _>::should_send_port_unreachable(core_ctx) {
         buffer.undo_parse(meta);
         core_ctx.increment(|counters| &counters.rx_unknown_dest_port);
-        Err((buffer, TransportReceiveError::new_port_unreachable()))
+        Err((buffer, TransportReceiveError::PortUnreachable))
     } else {
         Ok(())
     }
