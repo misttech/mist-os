@@ -354,6 +354,7 @@
 
                 // getdents_test
                 "GetdentsTest/0.TooLargeSize",
+                "GetdentsTest/1.TooLargeSize",
 
                 // Assumes structure of root directory.
                 "ReaddirTest.RootContainsBasicDirectories",
@@ -576,6 +577,9 @@
                 // packet_socket_dgram_test
                 "AllInetTests/CookedPacketTest.BindDrop/*",
                 "AllInetTests/CookedPacketTest.ReceiveOutbound/*",
+
+                // tcp_socket_test
+                "AllInetTests/TcpSocketTest.SetPMTUD/*",
 
                 // packet_socket_test
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
