@@ -8,7 +8,8 @@
 
 #include <string>
 
-PandoraGrpcServer::PandoraGrpcServer(async_dispatcher_t* dispatcher) : host_service_(dispatcher) {}
+PandoraGrpcServer::PandoraGrpcServer(async_dispatcher_t* dispatcher)
+    : host_service_(dispatcher), a2dp_service_(dispatcher) {}
 
 PandoraGrpcServer::~PandoraGrpcServer() { Shutdown(); }
 

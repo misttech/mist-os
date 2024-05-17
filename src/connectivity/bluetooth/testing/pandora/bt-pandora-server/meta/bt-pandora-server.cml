@@ -21,6 +21,10 @@
                 "fuchsia.posix.socket.Provider",
             ],
         },
+        {
+            protocol: "fuchsia.bluetooth.a2dp.AudioMode",
+            availability: "optional",
+        },
     ],
     expose: [
         {

@@ -62,6 +62,38 @@ class HostService : public pandora::Host::Service {
   ::grpc::Status SetConnectabilityMode(::grpc::ServerContext* context,
                                        const ::pandora::SetConnectabilityModeRequest* request,
                                        ::google::protobuf::Empty* response) override;
+
+ private:
+  class PairingDelegateImpl : public fidl::Server<fuchsia_bluetooth_sys::PairingDelegate> {
+    void OnPairingRequest(OnPairingRequestRequest& request,
+                          OnPairingRequestCompleter::Sync& completer) override;
+    void OnPairingComplete(OnPairingCompleteRequest& request,
+                           OnPairingCompleteCompleter::Sync& completer) override;
+    void OnRemoteKeypress(OnRemoteKeypressRequest& request,
+                          OnRemoteKeypressCompleter::Sync& completer) override {}
+  };
+
+  // Wait for a Peer with the given |addr| to become known. If |enforce_connected| is set, wait
+  // until the Peer is also connected. Returns an iterator to the peer.
+  std::vector<fuchsia_bluetooth_sys::Peer>::const_iterator WaitForPeer(
+      const std::string& addr, bool enforce_connected = false);
+
+  // The synchronization primitives are utilized for configuring waiting/timeouts on FIDL callbacks
+  // and enforcing mutual exclusivity when writing/reading the structures that cache the updated
+  // state information that is received in these callbacks.
+  fidl::SharedClient<fuchsia_bluetooth_sys::HostWatcher> host_watcher_client_;
+  std::condition_variable cv_host_watcher_;
+  std::mutex m_host_watcher_;
+  std::vector<fuchsia_bluetooth_sys::HostInfo> hosts_;
+  bool host_watching_{false};
+
+  fidl::SharedClient<fuchsia_bluetooth_sys::Access> access_client_;
+  std::condition_variable cv_access_;
+  std::mutex m_access_;
+  std::vector<fuchsia_bluetooth_sys::Peer> peers_;
+  bool peer_watching_{false};
+
+  fidl::SyncClient<fuchsia_bluetooth_sys::Pairing> pairing_client_;
 };
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_TESTING_PANDORA_BT_PANDORA_SERVER_SRC_GRPC_SERVICES_HOST_H_
