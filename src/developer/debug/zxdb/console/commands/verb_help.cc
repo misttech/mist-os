@@ -6,10 +6,12 @@
 
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <string>
 
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/console.h"
+#include "src/developer/debug/zxdb/console/did_you_mean.h"
 #include "src/developer/debug/zxdb/console/nouns.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/console/verbs.h"
@@ -481,9 +483,13 @@ void RunVerbHelp(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
         help = kJitdHelp;
       } else {
         // Not a valid command.
-        return cmd_context->ReportError(Err("\"" + on_what +
-                                            "\" is not a valid command.\n"
-                                            "Try just \"help\" to get a list."));
+        std::string msg = "\"" + on_what + "\" is not a valid command.";
+        std::optional<std::string> suggestion = DidYouMean(on_what, string_noun, string_verb, 5);
+        if (suggestion) {
+          msg += " Did you mean \"" + *suggestion + "\"?";
+        }
+        msg += "\nTry just \"help\" to get a list.";
+        return cmd_context->ReportError(Err(msg));
       }
     }
   }
