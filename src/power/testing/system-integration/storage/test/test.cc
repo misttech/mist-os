@@ -83,15 +83,15 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
     auto data = result.take_value();
     for (const auto& datum : data) {
       if (datum.moniker() == pb_moniker && datum.payload().has_value()) {
-        auto topology =
-            datum.payload().value()->GetByPath({"topology", "fuchsia.inspect.Graph", "topology"});
+        auto topology = datum.payload().value()->GetByPath(
+            {"broker", "topology", "fuchsia.inspect.Graph", "topology"});
         if (topology == nullptr) {
           return zx::error(ZX_ERR_BAD_STATE);
         }
         for (const auto& child : topology->children()) {
           auto name = datum
-                          .GetByPath({"root", "topology", "fuchsia.inspect.Graph", "topology",
-                                      child.name(), "meta", "name"})
+                          .GetByPath({"root", "broker", "topology", "fuchsia.inspect.Graph",
+                                      "topology", child.name(), "meta", "name"})
                           .GetString();
           if (name == power_element_name) {
             return zx::ok(child.name());
@@ -106,7 +106,7 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
   fidl::ClientEnd<test_sagcontrol::State> sag_control_state_client_end_;
 };
 
-TEST_F(PowerSystemIntegration, AmlSdmmcSuspendResumeTest) {
+TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
   // To enable changing SAG's power levels, first trigger the "boot complete" logic. This is done by
   // setting both exec state level and app activity level to active.
   test_sagcontrol::SystemActivityGovernorState state;
@@ -121,29 +121,54 @@ TEST_F(PowerSystemIntegration, AmlSdmmcSuspendResumeTest) {
   diagnostics::reader::ArchiveReader reader(dispatcher(), {}, std::move(result.value()));
 
   const std::string sag_moniker = "bootstrap/system-activity-governor/system-activity-governor";
-  const std::vector<std::string> sag_inspect_path = {"root", "power_elements", "execution_state",
-                                                     "power_level"};
+  const std::vector<std::string> sag_exec_state_level = {"root", "power_elements",
+                                                         "execution_state", "power_level"};
 
   const std::string pb_moniker = "bootstrap/power-broker";
-  const auto pb_aml_sdmmc_element_id = GetPowerElementId(reader, pb_moniker, "aml-sdmmc-hardware");
-  ASSERT_TRUE(pb_aml_sdmmc_element_id.is_ok());
-  const std::vector<std::string> pb_inspect_path_required = {"root", "required-levels",
-                                                             pb_aml_sdmmc_element_id.value()};
-  const std::vector<std::string> pb_inspect_path_current = {"root", "current-levels",
-                                                            pb_aml_sdmmc_element_id.value()};
+  const auto aml_sdmmc_element_id = GetPowerElementId(reader, pb_moniker, "aml-sdmmc-hardware");
+  ASSERT_TRUE(aml_sdmmc_element_id.is_ok());
+  const std::vector<std::string> aml_sdmmc_required_level = {
+      "root",     "broker",
+      "topology", "fuchsia.inspect.Graph",
+      "topology", aml_sdmmc_element_id.value(),
+      "meta",     "required_level"};
+  const std::vector<std::string> aml_sdmmc_current_level = {
+      "root",     "broker",
+      "topology", "fuchsia.inspect.Graph",
+      "topology", aml_sdmmc_element_id.value(),
+      "meta",     "current_level"};
+  const auto core_sdmmc_element_id = GetPowerElementId(reader, pb_moniker, "sdmmc-hardware");
+  ASSERT_TRUE(core_sdmmc_element_id.is_ok());
+  const std::vector<std::string> core_sdmmc_required_level = {
+      "root",     "broker",
+      "topology", "fuchsia.inspect.Graph",
+      "topology", core_sdmmc_element_id.value(),
+      "meta",     "required_level"};
+  const std::vector<std::string> core_sdmmc_current_level = {
+      "root",     "broker",
+      "topology", "fuchsia.inspect.Graph",
+      "topology", core_sdmmc_element_id.value(),
+      "meta",     "current_level"};
 
   const std::string aml_sdmmc_moniker = "bootstrap/boot-drivers:dev.sys.platform.05_00_8.aml_emmc";
-  const std::vector<std::string> aml_sdmmc_inspect_path = {"root", "aml-sdmmc-portC",
-                                                           "power_suspended"};
+  const std::vector<std::string> aml_sdmmc_suspended = {"root", "aml-sdmmc-portC",
+                                                        "power_suspended"};
+
+  const std::string core_sdmmc_moniker =
+      "bootstrap/boot-drivers:dev.sys.platform.05_00_8.aml_emmc.aml-sd-emmc";
+  const std::vector<std::string> core_sdmmc_suspended = {"root", "sdmmc_core", "power_suspended"};
 
   // Verify boot complete state using inspect data:
   // - SAG: exec state level active
   // - Power Broker: aml-sdmmc's power element on.
-  // - aml-sdmmc: not suspended
-  MatchInspectData(reader, sag_moniker, sag_inspect_path, uint64_t{2});         // kActive
-  MatchInspectData(reader, pb_moniker, pb_inspect_path_required, uint64_t{1});  // On
-  MatchInspectData(reader, pb_moniker, pb_inspect_path_current, uint64_t{1});   // On
-  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_inspect_path, false);
+  // - aml-sdmmc, core sdmmc: not suspended
+  MatchInspectData(reader, sag_moniker, sag_exec_state_level, uint64_t{2});      // kActive
+  MatchInspectData(reader, pb_moniker, aml_sdmmc_required_level, uint64_t{1});   // On
+  MatchInspectData(reader, pb_moniker, aml_sdmmc_current_level, uint64_t{1});    // On
+  MatchInspectData(reader, pb_moniker, core_sdmmc_required_level, uint64_t{1});  // On
+  MatchInspectData(reader, pb_moniker, core_sdmmc_current_level, uint64_t{1});   // On
+  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_suspended, false);
+  MatchInspectData(reader, core_sdmmc_moniker, core_sdmmc_suspended, false);
 
   // Emulate system suspend.
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kInactive);
@@ -153,11 +178,14 @@ TEST_F(PowerSystemIntegration, AmlSdmmcSuspendResumeTest) {
   // Verify suspend state using inspect data:
   // - SAG: exec state level inactive
   // - Power Broker: aml-sdmmc's power element off.
-  // - aml-sdmmc: suspended
-  MatchInspectData(reader, sag_moniker, sag_inspect_path, uint64_t{0});         // kInactive
-  MatchInspectData(reader, pb_moniker, pb_inspect_path_required, uint64_t{0});  // Off
-  MatchInspectData(reader, pb_moniker, pb_inspect_path_current, uint64_t{0});   // Off
-  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_inspect_path, true);
+  // - aml-sdmmc, core sdmmc: suspended
+  MatchInspectData(reader, sag_moniker, sag_exec_state_level, uint64_t{0});      // kInactive
+  MatchInspectData(reader, pb_moniker, aml_sdmmc_required_level, uint64_t{0});   // Off
+  MatchInspectData(reader, pb_moniker, aml_sdmmc_current_level, uint64_t{0});    // Off
+  MatchInspectData(reader, pb_moniker, core_sdmmc_required_level, uint64_t{0});  // Off
+  MatchInspectData(reader, pb_moniker, core_sdmmc_current_level, uint64_t{0});   // Off
+  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_suspended, true);
+  MatchInspectData(reader, core_sdmmc_moniker, core_sdmmc_suspended, true);
 
   // Emulate system resume.
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
@@ -167,9 +195,12 @@ TEST_F(PowerSystemIntegration, AmlSdmmcSuspendResumeTest) {
   // Verify resume state using inspect data:
   // - SAG: exec state level active
   // - Power Broker: aml-sdmmc's power element on.
-  // - aml-sdmmc: not suspended
-  MatchInspectData(reader, sag_moniker, sag_inspect_path, uint64_t{2});         // kActive
-  MatchInspectData(reader, pb_moniker, pb_inspect_path_required, uint64_t{1});  // On
-  MatchInspectData(reader, pb_moniker, pb_inspect_path_current, uint64_t{1});   // On
-  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_inspect_path, false);
+  // - aml-sdmmc, core sdmmc: not suspended
+  MatchInspectData(reader, sag_moniker, sag_exec_state_level, uint64_t{2});      // kActive
+  MatchInspectData(reader, pb_moniker, aml_sdmmc_required_level, uint64_t{1});   // On
+  MatchInspectData(reader, pb_moniker, aml_sdmmc_current_level, uint64_t{1});    // On
+  MatchInspectData(reader, pb_moniker, core_sdmmc_required_level, uint64_t{1});  // On
+  MatchInspectData(reader, pb_moniker, core_sdmmc_current_level, uint64_t{1});   // On
+  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_suspended, false);
+  MatchInspectData(reader, core_sdmmc_moniker, core_sdmmc_suspended, false);
 }
