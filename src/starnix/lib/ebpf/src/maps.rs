@@ -4,7 +4,7 @@
 
 use linux_uapi::bpf_map_type;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapSchema {
     pub map_type: bpf_map_type,
     pub key_size: u32,

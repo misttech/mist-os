@@ -26,6 +26,7 @@ rustc_library("ebpf") {
     "src/visitor.rs",
   ]
   deps = [
+    "//src/lib/fuchsia-sync",
     "//src/starnix/lib/linux_uapi",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:static_assertions",
@@ -46,6 +47,7 @@ rustc_library("ebpf") {
   inputs = [
     "src/test_grammar.pest",
     "src/tests/err-write-r10.data",
+    "src/tests/exponential-verification.data",
     "src/tests/null-checks-propagated.data",
     "src/tests/read-only-helper.data",
     "src/tests/write-only-helper.data",

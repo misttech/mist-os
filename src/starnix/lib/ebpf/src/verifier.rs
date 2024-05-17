@@ -10,8 +10,14 @@ use crate::{
     REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
+use fuchsia_sync::Mutex;
 use linux_uapi::bpf_insn;
-use std::{collections::HashMap, ops::Deref};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap, HashSet},
+    ops::Deref,
+    sync::Arc,
+};
 use zerocopy::AsBytes;
 
 /// A trait to receive the log from the verifier.
@@ -32,7 +38,7 @@ impl VerifierLogger for NullVerifierLogger {
 /// An identifier for a memory buffer accessible by an ebpf program. The identifiers are built as a
 /// chain of unique identifier so that a buffer can contain multiple pointers to the same type and
 /// the verifier can distinguish between the different instances.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MemoryId {
     id: u64,
     parent: Option<Box<MemoryId>>,
@@ -57,7 +63,7 @@ impl MemoryId {
 }
 
 /// The target type of a pointer type in a struct.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FieldType {
     /// The offset at which the pointer is loacted.
     pub offset: u64,
@@ -80,7 +86,7 @@ impl FieldType {
 
 /// A mapping for a field in a struct where the original ebpf program knows a different offset and
 /// data size than the one it receives from the kernel.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FieldMapping {
     /// The offset of the field as known by the original ebpf program.
     pub source_offset: i16,
@@ -152,7 +158,7 @@ impl MappingVec for Vec<FieldMapping> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MemoryParameterSize {
     /// The memory buffer have the given size.
     Value(u64),
@@ -175,7 +181,7 @@ impl MemoryParameterSize {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     /// A number.
     ScalarValue {
@@ -249,6 +255,71 @@ pub enum Type {
     NullOrParameter(Box<Type>),
     /// A function parameter that must be a pointer to memory with the given id.
     StructParameter { id: MemoryId },
+}
+
+/// Defines a partial ordering on `Type` instances, capturing the notion of how "broad"
+/// a type is in terms of the set of potential values it represents.
+///
+/// The ordering is defined such that `t1 > t2` if a proof that an eBPF program terminates
+/// in a state where a register or memory location has type `t1` is also a proof that
+/// the program terminates in a state where that location has type `t2`.
+///
+/// In other words, a "broader" type represents a larger set of possible values, and
+/// proving termination with a broader type implies termination with any narrower type.
+///
+/// Examples:
+/// * `Type::ScalarValue { unknown_mask: 0, .. }` (a known scalar value) is less than
+///   `Type::ScalarValue { unknown_mask: u64::MAX, .. }` (an unknown scalar value).
+impl PartialOrd for Type {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        fn mask_is_larger(m1: u64, m2: u64) -> bool {
+            m1 & m2 == m2 && m1 | m2 == m1
+        }
+
+        // If the values are equals, return the known result.
+        if self == other {
+            return Some(Ordering::Equal);
+        }
+
+        // If one value is not initialized, the types are ordered.
+        if self == &NOT_INIT {
+            return Some(Ordering::Greater);
+        }
+        if other == &NOT_INIT {
+            return Some(Ordering::Less);
+        }
+
+        // Otherwise, only scalars are comparables.
+        match (self, other) {
+            (
+                Self::ScalarValue {
+                    value: value1,
+                    unknown_mask: unknown_mask1,
+                    unwritten_mask: unwritten_mask1,
+                },
+                Self::ScalarValue {
+                    value: value2,
+                    unknown_mask: unknown_mask2,
+                    unwritten_mask: unwritten_mask2,
+                },
+            ) => {
+                if mask_is_larger(*unwritten_mask1, *unwritten_mask2)
+                    && mask_is_larger(*unknown_mask1, *unknown_mask2)
+                    && value1 & !unknown_mask1 == value2 & !unknown_mask1
+                {
+                    return Some(Ordering::Greater);
+                }
+                if mask_is_larger(*unwritten_mask2, *unwritten_mask1)
+                    && mask_is_larger(*unknown_mask2, *unknown_mask1)
+                    && value1 & !unknown_mask2 == value2 & !unknown_mask2
+                {
+                    return Some(Ordering::Less);
+                }
+                None
+            }
+            _ => None,
+        }
+    }
 }
 
 const NOT_INIT: Type = Type::ScalarValue {
@@ -417,6 +488,29 @@ impl Type {
             _ => {}
         }
     }
+
+    /// Partially Compares two iterators of comparable items.
+    ///
+    /// This function iterates through both input iterators simultaneously and compares the corresponding elements.
+    /// The comparison continues until:
+    /// 1. Both iterators are exhausted and all elements were considered equal, in which case it returns `Some(Ordering::Equal)`.
+    /// 2. All pairs of corresponding elements that are not equal have the same ordering (`Ordering::Less` or `Ordering::Greater`), in which case it returns `Some(Ordering)` reflecting that consistent ordering.
+    /// 3. One iterator is exhausted before the other, or any comparison between elements yields `None`, or not all non-equal pairs have the same ordering, in which case it returns `None`.
+    fn compare_list<'a>(
+        mut l1: impl Iterator<Item = &'a Self>,
+        mut l2: impl Iterator<Item = &'a Self>,
+    ) -> Option<Ordering> {
+        let mut result = Ordering::Equal;
+        loop {
+            match (l1.next(), l2.next()) {
+                (None, None) => return Some(result),
+                (_, None) | (None, _) => return None,
+                (Some(v1), Some(v2)) => {
+                    result = associate_orderings(result, v1.partial_cmp(v2)?)?;
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -475,9 +569,32 @@ pub fn verify(
         code: &code,
         counter: 0,
         iteration: 0,
+        terminating_contexts: Default::default(),
         transformations: Default::default(),
     };
     while let Some(mut context) = verification_context.states.pop() {
+        if let Some(terminating_contexts) =
+            verification_context.terminating_contexts.get(&context.pc)
+        {
+            // Check whether there exist a context that terminate and prove that this context does
+            // also terminate.
+            if let Some(ending_context) =
+                terminating_contexts.iter().find(|c| c.computation_context >= context)
+            {
+                // One such context has been found, this proves the current context terminates.
+                // If the context has a parent, register the data dependencies and try to terminate
+                // it.
+                if let Some(parent) = context.parent.take() {
+                    parent.dependencies.lock().push(ending_context.dependencies.clone());
+                    if let Some(parent) = Arc::into_inner(parent) {
+                        parent
+                            .terminate(&mut verification_context)
+                            .map_err(EbpfError::ProgramLoadError)?;
+                    }
+                }
+                continue;
+            }
+        }
         if verification_context.iteration > 10 * BPF_MAX_INSTS {
             return error_and_log(verification_context.logger, "bpf byte code does not terminate");
         }
@@ -519,6 +636,10 @@ struct VerificationContext<'a> {
     /// The current iteration of the verifier. Used to ensure termination by limiting the number of
     /// iteration before bailing out.
     iteration: usize,
+    /// Keep track of the context that terminates at a given pc. The list of context will all be
+    /// incomparables as each time a bigger context is computed, the smaller ones are removed from
+    /// the list.
+    terminating_contexts: BTreeMap<ProgramCounter, Vec<TerminatingContext>>,
     /// The current list of transformation to apply. This is also used to ensure that a given
     /// instruction that acts on a mapped field always requires the same transformation. If this is
     /// not the case, the verifier will reject the program.
@@ -558,7 +679,7 @@ impl<'a> VerificationContext<'a> {
 
 /// An offset inside the stack. The offset is from the end of the stack.
 /// downward.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StackOffset(u64);
 
 impl Default for StackOffset {
@@ -622,24 +743,32 @@ impl std::ops::SubAssign<u64> for StackOffset {
     }
 }
 
-/// The state of the stack
-#[derive(Clone, Debug)]
-struct Stack {
-    data: Vec<Type>,
-}
+const STACK_MAX_INDEX: usize = BPF_STACK_SIZE / std::mem::size_of::<u64>();
 
-impl Default for Stack {
-    fn default() -> Self {
-        Self { data: vec![Type::default(); BPF_STACK_SIZE / std::mem::size_of::<u64>()] }
-    }
+/// The state of the stack
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Stack {
+    data: HashMap<usize, Type>,
 }
 
 impl Stack {
     /// Replace all instances of the NullOr type with the given `null_id` to either 0 or the
     /// subtype depending on `is_null`
     fn set_null(&mut self, null_id: &MemoryId, is_null: bool) {
-        for i in 0..self.data.len() {
-            self.data[i].set_null(null_id, is_null);
+        for (_, t) in self.data.iter_mut() {
+            t.set_null(null_id, is_null);
+        }
+    }
+
+    fn get(&self, index: usize) -> &Type {
+        self.data.get(&index).unwrap_or(&NOT_INIT)
+    }
+
+    fn set(&mut self, index: usize, t: Type) {
+        if t == NOT_INIT {
+            self.data.remove(&index);
+        } else {
+            self.data.insert(index, t);
         }
     }
 
@@ -694,13 +823,13 @@ impl Stack {
             return true;
         }
         let mut end_offset = offset + bytes;
-        if (end_offset - 1).array_index() as usize >= self.data.len() {
+        if (end_offset - 1).array_index() as usize >= STACK_MAX_INDEX {
             return false;
         }
         // Handle the case where all the data is contained in a single u64.
         if offset.array_index() == (end_offset - 1).array_index() {
             return can_read(
-                &self.data[offset.array_index()],
+                &self.get(offset.array_index()),
                 offset.sub_index(),
                 end_offset.sub_index(),
             );
@@ -709,7 +838,7 @@ impl Stack {
         // Handle the first element, that might be partial
         if offset.sub_index() != 0 {
             if !can_read(
-                &self.data[offset.array_index()],
+                &self.get(offset.array_index()),
                 offset.sub_index(),
                 std::mem::size_of::<u64>(),
             ) {
@@ -720,7 +849,7 @@ impl Stack {
 
         // Handle the last element, that might be partial
         if end_offset.sub_index() != 0 {
-            if !can_read(&self.data[end_offset.array_index()], 0, end_offset.sub_index()) {
+            if !can_read(&self.get(end_offset.array_index()), 0, end_offset.sub_index()) {
                 return false;
             }
             end_offset -= end_offset.sub_index() as u64;
@@ -728,7 +857,7 @@ impl Stack {
 
         // Handle the any full type between beginning and end.
         for i in offset.array_index()..end_offset.array_index() {
-            if !can_read(&self.data[i], 0, std::mem::size_of::<u64>()) {
+            if !can_read(&self.get(i), 0, std::mem::size_of::<u64>()) {
                 return false;
             }
         }
@@ -743,7 +872,7 @@ impl Stack {
         value: Type,
         width: DataWidth,
     ) -> Result<(), String> {
-        if offset.array_index() >= self.data.len() {
+        if offset.array_index() >= STACK_MAX_INDEX {
             return Err(format!("out of bound store at pc {}", pc));
         }
         if offset.sub_index() % width.bytes() != 0 {
@@ -752,13 +881,13 @@ impl Stack {
 
         let index = offset.array_index();
         if width == DataWidth::U64 {
-            self.data[index] = value;
+            self.set(index, value);
         } else {
             match value {
                 Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
-                    let (old_value, old_unknown_mask, old_unwritten_mask) = match self.data[index] {
+                    let (old_value, old_unknown_mask, old_unwritten_mask) = match self.get(index) {
                         Type::ScalarValue { value, unknown_mask, unwritten_mask } => {
-                            (value, unknown_mask, unwritten_mask)
+                            (*value, *unknown_mask, *unwritten_mask)
                         }
                         _ => {
                             // The value in the stack is not a scalar. Let consider it an scalar
@@ -781,7 +910,7 @@ impl Stack {
                         width,
                         sub_index,
                     );
-                    self.data[index] = Type::ScalarValue { value, unknown_mask, unwritten_mask };
+                    self.set(index, Type::ScalarValue { value, unknown_mask, unwritten_mask });
                 }
                 _ => {
                     return Err(format!(
@@ -800,7 +929,7 @@ impl Stack {
         offset: StackOffset,
         width: DataWidth,
     ) -> Result<Type, String> {
-        if offset.array_index() >= self.data.len() {
+        if offset.array_index() >= STACK_MAX_INDEX {
             return Err(format!("out of bound load at pc {}", context.pc));
         }
         if offset.sub_index() % width.bytes() != 0 {
@@ -808,7 +937,7 @@ impl Stack {
         }
 
         let index = offset.array_index();
-        let loaded_type = self.data[index].clone();
+        let loaded_type = self.get(index).clone();
         if width == DataWidth::U64 {
             Ok(loaded_type)
         } else {
@@ -828,6 +957,41 @@ impl Stack {
     }
 }
 
+/// Two types are ordered with `t1` > `t2` if a proof that a program in a state `t1` finish is also
+/// a proof that a program in a state `t2` finish.
+impl PartialOrd for Stack {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let mut result = Ordering::Equal;
+        let mut data_iter1 = self.data.iter().peekable();
+        let mut data_iter2 = other.data.iter().peekable();
+        loop {
+            let k1 = data_iter1.peek().map(|(k, _)| *k);
+            let k2 = data_iter2.peek().map(|(k, _)| *k);
+            let k = match (k1, k2) {
+                (None, None) => return Some(result),
+                (Some(k), None) => {
+                    data_iter1.next();
+                    *k
+                }
+                (None, Some(k)) => {
+                    data_iter2.next();
+                    *k
+                }
+                (Some(k1), Some(k2)) => {
+                    if k1 <= k2 {
+                        data_iter1.next();
+                    }
+                    if k2 <= k1 {
+                        data_iter2.next();
+                    }
+                    *std::cmp::min(k1, k2)
+                }
+            };
+            result = associate_orderings(result, self.get(k).partial_cmp(other.get(k))?)?;
+        }
+    }
+}
+
 macro_rules! bpf_log {
     ($context:ident, $verification_context:ident, $($msg:tt)*) => {
         let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code);
@@ -837,16 +1001,46 @@ macro_rules! bpf_log {
 }
 
 /// The state of the computation as known by the verifier at a given point in time.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 struct ComputationContext {
+    /// The program counter.
+    pc: ProgramCounter,
     /// Register 0 to 9.
     registers: [Type; GENERAL_REGISTER_COUNT as usize],
     /// The state of the stack.
     stack: Stack,
-    /// The program counter.
-    pc: ProgramCounter,
     /// The dynamically known bounds of buffers indexed by their ids.
-    array_bounds: HashMap<MemoryId, u64>,
+    array_bounds: BTreeMap<MemoryId, u64>,
+    /// The previous context in the computation.
+    parent: Option<Arc<ComputationContext>>,
+    /// The data dependencies of this context. This is used to broaden a known ending context to
+    /// help cutting computation branches.
+    dependencies: Mutex<Vec<DataDependencies>>,
+}
+
+impl Clone for ComputationContext {
+    fn clone(&self) -> Self {
+        Self {
+            pc: self.pc,
+            registers: self.registers.clone(),
+            stack: self.stack.clone(),
+            array_bounds: self.array_bounds.clone(),
+            parent: self.parent.clone(),
+            // dependencies are erased as they must always be used on the same instance of the
+            // context.
+            dependencies: Default::default(),
+        }
+    }
+}
+
+/// parent and dependencies are ignored for the comparison, as they do not matter for termination.
+impl PartialEq for ComputationContext {
+    fn eq(&self, other: &Self) -> bool {
+        self.pc == other.pc
+            && self.registers == other.registers
+            && self.stack == other.stack
+            && self.array_bounds == other.array_bounds
+    }
 }
 
 impl ComputationContext {
@@ -893,18 +1087,25 @@ impl ComputationContext {
     }
 
     fn next(&self) -> Result<Self, String> {
-        self.jump_with_offset(0)
+        let parent = Some(Arc::new(self.clone()));
+        self.jump_with_offset(0, parent)
     }
 
     /// Returns a new `ComputationContext` where the pc has jump by `offset + 1`. In particular,
     /// the next instruction is reached with `jump_with_offset(0)`.
-    fn jump_with_offset(&self, offset: i16) -> Result<Self, String> {
+    fn jump_with_offset(&self, offset: i16, parent: Option<Arc<Self>>) -> Result<Self, String> {
         let pc = self
             .pc
             .checked_add_signed((offset + 1).into())
             .ok_or_else(|| format!("jump outside of program at pc {}", self.pc))?;
-        let mut result = self.clone();
-        result.pc = pc;
+        let result = Self {
+            pc,
+            registers: self.registers.clone(),
+            stack: self.stack.clone(),
+            array_bounds: self.array_bounds.clone(),
+            parent,
+            dependencies: Default::default(),
+        };
         Ok(result)
     }
 
@@ -940,23 +1141,28 @@ impl ComputationContext {
         Ok(())
     }
 
+    /// If `field` is mapped in `addr`, returns the actual field to use, if not returns None.
+    fn apply_mapping(&self, addr: &Type, field: Field) -> Result<Option<Field>, String> {
+        if let Type::PtrToMemory { offset: 0, mappings, .. } = addr {
+            if let Some(field) = mappings.find_mapping(self, field)? {
+                return Ok(Some(field));
+            }
+        }
+        Ok(None)
+    }
+
     /// If `field` is mapped in `addr`, returns the actual field to use, if not returns `field`.
     /// This method will also register any required transformation if needed, or register that none
     /// is needed.
-    fn apply_mapping(
+    fn apply_and_register_mapping(
         &mut self,
         context: &mut VerificationContext<'_>,
         addr: &Type,
         field: Field,
     ) -> Result<Field, String> {
-        if let Type::PtrToMemory { offset: 0, mappings, .. } = addr {
-            if let Some(field) = mappings.find_mapping(self, field)? {
-                context.register_transformation(self.pc, Some(field))?;
-                return Ok(field);
-            }
-        }
-        context.register_transformation(self.pc, None)?;
-        Ok(field)
+        let mapped_field = self.apply_mapping(addr, field)?;
+        context.register_transformation(self.pc, mapped_field)?;
+        Ok(mapped_field.unwrap_or(field))
     }
 
     fn store_memory(&mut self, addr: &Type, field: Field, value: Type) -> Result<(), String> {
@@ -1262,7 +1468,11 @@ impl ComputationContext {
     ) -> Result<(), String> {
         self.log_atomic_operation(op_name, verification_context, fetch, dst, offset, src);
         let addr = self.reg(dst)?.clone();
-        let field = self.apply_mapping(verification_context, &addr, Field::new(offset, width))?;
+        let field = self.apply_and_register_mapping(
+            verification_context,
+            &addr,
+            Field::new(offset, width),
+        )?;
         let value = self.reg(src)?;
         let loaded_type = self.load_memory(addr.clone(), field)?;
         let result = op(loaded_type.clone(), value.clone())?;
@@ -1315,7 +1525,11 @@ impl ComputationContext {
             JumpWidth::W64 => DataWidth::U64,
         };
         let addr = self.reg(dst)?.clone();
-        let field = self.apply_mapping(verification_context, &addr, Field::new(offset, width))?;
+        let field = self.apply_and_register_mapping(
+            verification_context,
+            &addr,
+            Field::new(offset, width),
+        )?;
         let dst = self.load_memory(addr.clone(), field)?;
         let value = self.reg(src)?;
         let r0 = self.reg(0)?;
@@ -1425,7 +1639,7 @@ impl ComputationContext {
                 Ok(None)
             }
 
-            _ => Err(format!("non permitted comparaison at pc {}", self.pc)),
+            _ => Err(format!("non permitted comparison at pc {}", self.pc)),
         }
     }
 
@@ -1471,20 +1685,892 @@ impl ComputationContext {
             Ok(next)
         };
         let branch = self.compute_branch(jump_width, &op1, &op2, op)?;
+        let parent = Some(Arc::new(self.clone()));
         if branch.unwrap_or(true) {
             // Do the jump
-            verification_context
-                .states
-                .push(apply_constraints_and_register(self.jump_with_offset(offset)?, jump_type)?);
+            verification_context.states.push(apply_constraints_and_register(
+                self.jump_with_offset(offset, parent.clone())?,
+                jump_type,
+            )?);
         }
         if !branch.unwrap_or(false) {
             // Skip the jump
-            verification_context
-                .states
-                .push(apply_constraints_and_register(self.next()?, jump_type.invert())?);
+            verification_context.states.push(apply_constraints_and_register(
+                self.jump_with_offset(0, parent)?,
+                jump_type.invert(),
+            )?);
         }
         Ok(())
     }
+
+    /// Handles the termination of a `ComputationContext`, performing branch cutting optimization.
+    ///
+    /// This method is called when it has been proven that the current context terminates (e.g.,
+    /// reaches an `exit` instruction).
+    ///
+    /// The following steps are performed:
+    /// 1. **Dependency Calculation:** The data dependencies of the context are computed based on
+    ///    the dependencies of its terminated children and the instruction at the current PC.
+    /// 2. **Context Broadening:** The context's state is broadened by clearing registers and stack
+    ///    slots that are *not* in the calculated data dependencies. This optimization assumes that
+    ///    data not used by the terminated branch is irrelevant for future execution paths.
+    /// 3. **Termination Registration:** The broadened context is added to the set of terminating
+    ///    contexts if it is not less than any existing terminating context at the same PC.
+    /// 4. **Parent Termination:** If all the children of the current context have terminated,
+    ///    its parent context is recursively terminated.
+    fn terminate(self, verification_context: &mut VerificationContext<'_>) -> Result<(), String> {
+        let mut next = Some(self);
+        // Because of the potential length of the parent chain, do not use recursion.
+        while let Some(mut current) = next.take() {
+            // Take the parent to process it at the end and not keep it in the terminating
+            // contexts.
+            let parent = current.parent.take();
+
+            // 1. Compute the dependencies of the context using the dependencies of its children
+            //    and the actual operation.
+            let mut dependencies = DataDependencies::default();
+            for dependency in current.dependencies.get_mut().iter() {
+                dependencies.merge(dependency);
+            }
+
+            dependencies.visit(
+                &mut DataDependenciesVisitorContext {
+                    calling_context: &verification_context.calling_context,
+                    computation_context: &current,
+                },
+                &verification_context.code[current.pc..],
+            )?;
+
+            // 2. Clear the state depending on the dependencies states
+            for register in 0..GENERAL_REGISTER_COUNT {
+                if !dependencies.registers.contains(&register) {
+                    current.set_reg(register, Default::default())?;
+                }
+            }
+            current.stack.data.retain(|k, _| dependencies.stack.contains(k));
+
+            // 3. Add the cleared state to the set of `terminating_contexts`
+            let terminating_contexts =
+                verification_context.terminating_contexts.entry(current.pc).or_default();
+            let mut is_dominated = false;
+            terminating_contexts.retain(|c| match c.computation_context.partial_cmp(&current) {
+                Some(Ordering::Less) => false,
+                Some(Ordering::Equal) | Some(Ordering::Greater) => {
+                    // If the list contains a context greater or equal to the current one, it
+                    // should not be added.
+                    is_dominated = true;
+                    true
+                }
+                _ => true,
+            });
+            if !is_dominated {
+                terminating_contexts.push(TerminatingContext {
+                    computation_context: current,
+                    dependencies: dependencies.clone(),
+                });
+            }
+
+            // 4. Register the computed dependencies in our parent, and terminate it if all
+            //    dependencies has been computed.
+            if let Some(parent) = parent {
+                parent.dependencies.lock().push(dependencies);
+                // To check whether all dependencies have been computed, rely on the fact that the Arc
+                // count of the parent keep track of how many dependencies are left.
+                next = Arc::into_inner(parent);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for ComputationContext {
+    fn drop(&mut self) {
+        let mut next = self.parent.take().and_then(Arc::into_inner);
+        // Because of the potential length of the parent chain, do not use recursion.
+        while let Some(mut current) = next {
+            next = current.parent.take().and_then(Arc::into_inner);
+        }
+    }
+}
+
+/// Two types are ordered with `t1` > `t2` if a proof that a program in a state `t1` finish is also
+/// a proof that a program in a state `t2` finish.
+impl PartialOrd for ComputationContext {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.pc != other.pc {
+            return None;
+        }
+        let mut result = self.stack.partial_cmp(&other.stack)?;
+        result = associate_orderings(
+            result,
+            Type::compare_list(self.registers.iter(), other.registers.iter())?,
+        )?;
+        let mut array_bound_iter1 = self.array_bounds.iter().peekable();
+        let mut array_bound_iter2 = other.array_bounds.iter().peekable();
+        let result = loop {
+            match (array_bound_iter1.peek().cloned(), array_bound_iter2.peek().cloned()) {
+                (None, None) => break result,
+                (None, _) => break associate_orderings(result, Ordering::Greater)?,
+                (_, None) => break associate_orderings(result, Ordering::Less)?,
+                (Some((k1, v1)), Some((k2, v2))) => match k1.cmp(k2) {
+                    Ordering::Equal => {
+                        array_bound_iter1.next();
+                        array_bound_iter2.next();
+                        result = associate_orderings(result, v2.cmp(v1))?;
+                    }
+                    v @ Ordering::Less => {
+                        array_bound_iter1.next();
+                        result = associate_orderings(result, v)?;
+                    }
+                    v @ Ordering::Greater => {
+                        array_bound_iter2.next();
+                        result = associate_orderings(result, v)?;
+                    }
+                },
+            }
+        };
+        Some(result)
+    }
+}
+
+/// Represents the read data dependencies of an eBPF program branch.
+///
+/// This struct tracks which registers and stack positions are *read* by the
+/// instructions within a branch of the eBPF program.  This information is used
+/// during branch cutting optimization to broaden terminating contexts.
+///
+/// The verifier assumes that data not read by a terminated branch is irrelevant
+/// for future execution paths and can be safely cleared.
+#[derive(Clone, Debug, Default)]
+struct DataDependencies {
+    /// The set of registers read by the children of a context.
+    registers: HashSet<Register>,
+    /// The stack positions read by the children of a context.
+    stack: HashSet<usize>,
+}
+
+impl DataDependencies {
+    fn merge(&mut self, other: &DataDependencies) {
+        self.registers.extend(other.registers.iter());
+        self.stack.extend(other.stack.iter());
+    }
+
+    fn alu(&mut self, dst: Register, src: Source) -> Result<(), String> {
+        // Only do something if the dst is read, otherwise the computation doesn't matter.
+        if self.registers.contains(&dst) {
+            if let Source::Reg(src) = src {
+                self.registers.insert(src);
+            }
+        }
+        Ok(())
+    }
+
+    fn jmp(&mut self, dst: Register, src: Source) -> Result<(), String> {
+        self.registers.insert(dst);
+        if let Source::Reg(src) = src {
+            self.registers.insert(src);
+        }
+        Ok(())
+    }
+
+    fn atomic(
+        &mut self,
+        context: &ComputationContext,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        width: DataWidth,
+        is_cmpxchg: bool,
+    ) -> Result<(), String> {
+        let mut is_read = false;
+        if is_cmpxchg && self.registers.contains(&0) {
+            is_read = true;
+        }
+        if fetch && self.registers.contains(&src) {
+            is_read = true;
+        }
+        let addr = context.reg(dst)?.clone();
+        if let Type::PtrToStack { offset: stack_offset } = addr {
+            let field = Field::new(offset, width);
+            let final_field = context.apply_mapping(&addr, field)?.unwrap_or(field);
+            let stack_offset = stack_offset + final_field.offset_as_u64();
+            if is_read || self.stack.contains(&stack_offset.array_index()) {
+                is_read = true;
+                self.stack.insert(stack_offset.array_index());
+            }
+        }
+        if is_read {
+            self.registers.insert(0);
+            self.registers.insert(src);
+        }
+        self.registers.insert(dst);
+        Ok(())
+    }
+}
+
+struct DataDependenciesVisitorContext<'a> {
+    calling_context: &'a CallingContext,
+    computation_context: &'a ComputationContext,
+}
+
+impl BpfVisitor for DataDependencies {
+    type Context<'a> = DataDependenciesVisitorContext<'a>;
+
+    fn add<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn add64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn and<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn and64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn arsh<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn arsh64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn div<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn div64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn lsh<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn lsh64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn r#mod<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn mod64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn mul<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn mul64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn or<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn or64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn rsh<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn rsh64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn sub<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn sub64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn xor<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+    fn xor64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.alu(dst, src)
+    }
+
+    fn mov<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        if src == Source::Reg(dst) || !self.registers.contains(&dst) {
+            return Ok(());
+        }
+        if let Source::Reg(src) = src {
+            self.registers.insert(src);
+        }
+        self.registers.remove(&dst);
+        Ok(())
+    }
+    fn mov64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String> {
+        self.mov(context, dst, src)
+    }
+
+    fn neg<'a>(&mut self, _context: &mut Self::Context<'a>, _dst: Register) -> Result<(), String> {
+        // This is reading and writing the same value. This induces no change in dependencies.
+        Ok(())
+    }
+    fn neg64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        _dst: Register,
+    ) -> Result<(), String> {
+        // This is reading and writing the same value. This induces no change in dependencies.
+        Ok(())
+    }
+
+    fn be<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        _dst: Register,
+        _width: DataWidth,
+    ) -> Result<(), String> {
+        // This is reading and writing the same value. This induces no change in dependencies.
+        Ok(())
+    }
+    fn le<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        _dst: Register,
+        _width: DataWidth,
+    ) -> Result<(), String> {
+        // This is reading and writing the same value. This induces no change in dependencies.
+        Ok(())
+    }
+
+    fn call_external<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        index: u32,
+    ) -> Result<(), String> {
+        let Some(signature) = context.calling_context.functions.get(&index).cloned() else {
+            return Err(format!("unknown external function {}", index));
+        };
+        self.registers.remove(&0);
+        for register in 0..signature.args.len() {
+            self.registers.insert((register + 1) as Register);
+        }
+        Ok(())
+    }
+
+    fn exit<'a>(&mut self, _context: &mut Self::Context<'a>) -> Result<(), String> {
+        // This read r0 unconditionally.
+        self.registers.insert(0);
+        Ok(())
+    }
+
+    fn jump<'a>(&mut self, _context: &mut Self::Context<'a>, _offset: i16) -> Result<(), String> {
+        // This doesn't do anything with values.
+        Ok(())
+    }
+
+    fn jeq<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jeq64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jne<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jne64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jge<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jge64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jgt<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jgt64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jle<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jle64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jlt<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jlt64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jsge<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jsge64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jsgt<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jsgt64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jsle<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jsle64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jslt<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jslt64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jset<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+    fn jset64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String> {
+        self.jmp(dst, src)
+    }
+
+    fn atomic_add<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U32, false)
+    }
+
+    fn atomic_add64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U64, false)
+    }
+
+    fn atomic_and<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U32, false)
+    }
+
+    fn atomic_and64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U64, false)
+    }
+
+    fn atomic_or<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U32, false)
+    }
+
+    fn atomic_or64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U64, false)
+    }
+
+    fn atomic_xor<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U32, false)
+    }
+
+    fn atomic_xor64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U64, false)
+    }
+
+    fn atomic_xchg<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U32, false)
+    }
+
+    fn atomic_xchg64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        fetch: bool,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, fetch, dst, offset, src, DataWidth::U64, false)
+    }
+
+    fn atomic_cmpxchg<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, true, dst, offset, src, DataWidth::U32, true)
+    }
+
+    fn atomic_cmpxchg64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+    ) -> Result<(), String> {
+        self.atomic(&context.computation_context, true, dst, offset, src, DataWidth::U64, true)
+    }
+
+    fn load<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Register,
+        width: DataWidth,
+    ) -> Result<(), String> {
+        let context = &context.computation_context;
+        if self.registers.contains(&dst) {
+            let addr = context.reg(src)?.clone();
+            if let Type::PtrToStack { offset: stack_offset } = addr {
+                let field = Field::new(offset, width);
+                let final_field = context.apply_mapping(&addr, field)?.unwrap_or(field);
+                let stack_offset = stack_offset + final_field.offset_as_u64();
+                self.stack.insert(stack_offset.array_index());
+            }
+        }
+        self.registers.insert(src);
+        Ok(())
+    }
+
+    fn load64<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        _value: u64,
+        _jump_offset: i16,
+    ) -> Result<(), String> {
+        self.registers.remove(&dst);
+        Ok(())
+    }
+
+    fn store<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        offset: i16,
+        src: Source,
+        width: DataWidth,
+    ) -> Result<(), String> {
+        let context = &context.computation_context;
+        let addr = context.reg(dst)?.clone();
+        if let Type::PtrToStack { offset: stack_offset } = addr {
+            let field = Field::new(offset, width);
+            let final_field = context.apply_mapping(&addr, field)?.unwrap_or(field);
+            let stack_offset = stack_offset + final_field.offset_as_u64();
+            if self.stack.remove(&stack_offset.array_index()) {
+                if let Source::Reg(src) = src {
+                    self.registers.insert(src);
+                }
+            }
+        } else {
+            if let Source::Reg(src) = src {
+                self.registers.insert(src);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct TerminatingContext {
+    computation_context: ComputationContext,
+    dependencies: DataDependencies,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1959,13 +3045,16 @@ impl BpfVisitor for ComputationContext {
         if !matches!(self.reg(0)?, Type::ScalarValue { unwritten_mask: 0, .. }) {
             return Err(format!("register 0 is incorrect at exit time at pc {}", self.pc));
         }
+        let this = self.clone();
+        this.terminate(context)?;
         // Nothing to do, the program terminated with a valid scalar value.
         Ok(())
     }
 
     fn jump<'a>(&mut self, context: &mut Self::Context<'a>, offset: i16) -> Result<(), String> {
         bpf_log!(self, context, "ja {}", offset);
-        context.states.push(self.jump_with_offset(offset)?);
+        let parent = Some(Arc::new(self.clone()));
+        context.states.push(self.jump_with_offset(offset, parent)?);
         Ok(())
     }
 
@@ -2615,7 +3704,7 @@ impl BpfVisitor for ComputationContext {
             print_offset(offset)
         );
         let addr = self.reg(src)?.clone();
-        let field = self.apply_mapping(context, &addr, Field::new(offset, width))?;
+        let field = self.apply_and_register_mapping(context, &addr, Field::new(offset, width))?;
         let loaded_type = self.load_memory(addr, field)?;
         let mut next = self.next()?;
         next.set_reg(dst, loaded_type)?;
@@ -2638,7 +3727,8 @@ impl BpfVisitor for ComputationContext {
             } else {
                 Type::from(value)
             };
-        let mut next = self.jump_with_offset(jump_offset)?;
+        let parent = Some(Arc::new(self.clone()));
+        let mut next = self.jump_with_offset(jump_offset, parent)?;
         next.set_reg(dst, value.into())?;
         context.states.push(next);
         Ok(())
@@ -2680,7 +3770,7 @@ impl BpfVisitor for ComputationContext {
         };
         let mut next = self.next()?;
         let addr = self.reg(dst)?.clone();
-        let field = self.apply_mapping(context, &addr, Field::new(offset, width))?;
+        let field = self.apply_and_register_mapping(context, &addr, Field::new(offset, width))?;
         next.store_memory(&addr, field, value)?;
         context.states.push(next);
         Ok(())
@@ -2727,4 +3817,102 @@ fn error_and_log<T>(
     let msg = msg.to_string();
     logger.log(msg.as_bytes());
     return Err(EbpfError::ProgramLoadError(msg));
+}
+
+fn associate_orderings(o1: Ordering, o2: Ordering) -> Option<Ordering> {
+    match (o1, o2) {
+        (o1, o2) if o1 == o2 => Some(o1),
+        (o, Ordering::Equal) | (Ordering::Equal, o) => Some(o),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_type_ordering() {
+        let t0 = Type::from(0);
+        let t1 = Type::from(1);
+        let random = Type::AliasParameter { parameter_index: 8 };
+        let unknown_written = Type::unknown_written_scalar_value();
+        let unwritten = Type::default();
+
+        assert_eq!(t0.partial_cmp(&t0), Some(Ordering::Equal));
+        assert_eq!(t0.partial_cmp(&t1), None);
+        assert_eq!(t0.partial_cmp(&random), None);
+        assert_eq!(t0.partial_cmp(&unknown_written), Some(Ordering::Less));
+        assert_eq!(t0.partial_cmp(&unwritten), Some(Ordering::Less));
+
+        assert_eq!(t1.partial_cmp(&t0), None);
+        assert_eq!(t1.partial_cmp(&t1), Some(Ordering::Equal));
+        assert_eq!(t1.partial_cmp(&random), None);
+        assert_eq!(t1.partial_cmp(&unknown_written), Some(Ordering::Less));
+        assert_eq!(t1.partial_cmp(&unwritten), Some(Ordering::Less));
+
+        assert_eq!(random.partial_cmp(&t0), None);
+        assert_eq!(random.partial_cmp(&t1), None);
+        assert_eq!(random.partial_cmp(&random), Some(Ordering::Equal));
+        assert_eq!(random.partial_cmp(&unknown_written), None);
+        assert_eq!(random.partial_cmp(&unwritten), Some(Ordering::Less));
+
+        assert_eq!(unknown_written.partial_cmp(&t0), Some(Ordering::Greater));
+        assert_eq!(unknown_written.partial_cmp(&t1), Some(Ordering::Greater));
+        assert_eq!(unknown_written.partial_cmp(&random), None);
+        assert_eq!(unknown_written.partial_cmp(&unknown_written), Some(Ordering::Equal));
+        assert_eq!(unknown_written.partial_cmp(&unwritten), Some(Ordering::Less));
+
+        assert_eq!(unwritten.partial_cmp(&t0), Some(Ordering::Greater));
+        assert_eq!(unwritten.partial_cmp(&t1), Some(Ordering::Greater));
+        assert_eq!(unwritten.partial_cmp(&random), Some(Ordering::Greater));
+        assert_eq!(unwritten.partial_cmp(&unknown_written), Some(Ordering::Greater));
+        assert_eq!(unwritten.partial_cmp(&unwritten), Some(Ordering::Equal));
+    }
+
+    #[test]
+    fn test_stack_ordering() {
+        let mut s1 = Stack::default();
+        let mut s2 = Stack::default();
+
+        assert_eq!(s1.partial_cmp(&s2), Some(Ordering::Equal));
+        s1.set(0, 0.into());
+        assert_eq!(s1.partial_cmp(&s2), Some(Ordering::Less));
+        assert_eq!(s2.partial_cmp(&s1), Some(Ordering::Greater));
+        s2.set(1, 1.into());
+        assert_eq!(s1.partial_cmp(&s2), None);
+        assert_eq!(s2.partial_cmp(&s1), None);
+    }
+
+    #[test]
+    fn test_context_ordering() {
+        let mut c1 = ComputationContext::default();
+        let mut c2 = ComputationContext::default();
+
+        assert_eq!(c1.partial_cmp(&c2), Some(Ordering::Equal));
+
+        c1.array_bounds.insert(1.into(), 5);
+        assert_eq!(c1.partial_cmp(&c2), Some(Ordering::Less));
+        assert_eq!(c2.partial_cmp(&c1), Some(Ordering::Greater));
+
+        c2.array_bounds.insert(1.into(), 7);
+        assert_eq!(c1.partial_cmp(&c2), Some(Ordering::Greater));
+        assert_eq!(c2.partial_cmp(&c1), Some(Ordering::Less));
+
+        c1.array_bounds.insert(2.into(), 9);
+        assert_eq!(c1.partial_cmp(&c2), None);
+        assert_eq!(c2.partial_cmp(&c1), None);
+
+        c2.array_bounds.insert(2.into(), 9);
+        assert_eq!(c1.partial_cmp(&c2), Some(Ordering::Greater));
+        assert_eq!(c2.partial_cmp(&c1), Some(Ordering::Less));
+
+        c2.array_bounds.insert(3.into(), 12);
+        assert_eq!(c1.partial_cmp(&c2), Some(Ordering::Greater));
+        assert_eq!(c2.partial_cmp(&c1), Some(Ordering::Less));
+
+        c1.pc = 8;
+        assert_eq!(c1.partial_cmp(&c2), None);
+        assert_eq!(c2.partial_cmp(&c1), None);
+    }
 }
