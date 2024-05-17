@@ -268,7 +268,7 @@ From //products/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:37
+From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -276,7 +276,7 @@ From //products/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:37
+From //BUILD.gn:38
 
 ### base_package_labels
 
@@ -292,7 +292,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:44
+From //BUILD.gn:45
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -300,7 +300,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:44
+From //BUILD.gn:45
 
 ### basic_env_names
 
@@ -918,7 +918,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:53
+From //BUILD.gn:54
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -926,7 +926,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:53
+From //BUILD.gn:54
 
 ### camera_debug
 
@@ -1316,7 +1316,7 @@ From //build/toolchain/rbe.gni:203
 ### cxx_rbe_enable
 
 Set to true to enable distributed compilation of C++ using RBE.
-Remote execution offers increased build parallelism and caching.
+Enabling this takes precedence over `use_goma`.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
@@ -1427,7 +1427,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:36
+From //build/config/BUILD.gn:37
 
 ### dev_bootfs_labels
 
@@ -1498,7 +1498,7 @@ From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:114
+From //BUILD.gn:115
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1506,7 +1506,7 @@ From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:114
+From //BUILD.gn:115
 
 ### devicetree_board_driver
 
@@ -2714,7 +2714,7 @@ As these cannot be part of the legacy AIB for a product, there is no
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:74
+From //BUILD.gn:75
 
 ### dont_profile_source_files
 
@@ -2744,7 +2744,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:103
+From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2752,7 +2752,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:103
+From //BUILD.gn:104
 
 ### emu_window_size_height
 
@@ -2807,7 +2807,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:32
+From //build/config/BUILD.gn:33
 
 ### enable_grpc_ares
 
@@ -3168,7 +3168,7 @@ packages instead of explicitly adding the labels of the
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:88
+From //BUILD.gn:89
 
 ### extra_bazel_assembly_targets
 
@@ -3547,6 +3547,15 @@ From //build/go/go_build.gni:23
 
 From //build/go/go_build.gni:19
 
+### goma_dir
+
+Directory containing the Goma source code.  This can be a GN
+source-absolute path ("//...") or a system absolute path.
+
+**Current value (from the default):** `"//prebuilt/third_party/goma/linux-x64"`
+
+From //build/toolchain/goma.gni:17
+
 ### gpt_image
 
 GUID Partition Table (GPT) image.
@@ -3663,7 +3672,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:95
+From //BUILD.gn:96
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3671,7 +3680,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:95
+From //BUILD.gn:96
 
 ### host_byteorder
 
@@ -3697,7 +3706,7 @@ From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:121
+From //BUILD.gn:122
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3705,7 +3714,7 @@ From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:121
+From //BUILD.gn:122
 
 ### host_os
 
@@ -3724,7 +3733,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3732,7 +3741,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 ### host_tools_base_path_override
 
@@ -4375,13 +4384,13 @@ From //build/config/BUILDCONFIG.gn:1651
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:45
+From //BUILD.gn:46
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:54
+From //BUILD.gn:55
 
 ### link_rbe_check
 
@@ -7401,7 +7410,7 @@ From //products/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:131
+From //BUILD.gn:132
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7409,7 +7418,7 @@ From //products/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:131
+From //BUILD.gn:132
 
 ### sdk_cross_compile_host_tools
 
@@ -7972,7 +7981,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:127
+From //BUILD.gn:128
 
 ### test_package_labels
 
@@ -7985,7 +7994,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:99
+From //BUILD.gn:100
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7993,7 +8002,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:99
+From //BUILD.gn:100
 
 ### testonly_in_containers
 
@@ -8133,7 +8142,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:62
+From //BUILD.gn:63
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -8141,7 +8150,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:62
+From //BUILD.gn:63
 
 ### update_goldens
 
@@ -8283,6 +8292,16 @@ From //build/images/args.gni:27
 **Current value (from the default):** `false`
 
 From //build/config/features.gni:12
+
+### use_goma
+
+Set to true to enable distributed compilation using Goma.
+This has lower precedence than `use_reclient_cxx` in
+//build/toolchain/rbe.gni.
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/goma.gni:13
 
 ### use_llvm_libc_string_functions
 
