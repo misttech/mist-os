@@ -83,10 +83,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // Deprecating interfaces.
-  void NewEncodeCommand(NewEncodeCommandRequestView request,
-                        NewEncodeCommandCompleter::Sync& completer) override {}
-
   // fuchsia_hardware_bluetooth::Hci overrides:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override;

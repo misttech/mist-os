@@ -60,13 +60,6 @@ open protocol Vendor {
     /// Encode the vendor HCI command and return the encoded command.
     /// See `VendorCommand` for possible commands and parameters.
     /// Returns an error status if the command is not supported or paramaters cannot be encoded.
-    flexible NewEncodeCommand(VendorCommand) -> (struct {
-        encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
-    }) error zx.Status;
-
-    /// Encode the vendor HCI command and return the encoded command.
-    /// See `VendorCommand` for possible commands and parameters.
-    /// Returns an error status if the command is not supported or paramaters cannot be encoded.
     flexible EncodeCommand(VendorCommand) -> (struct {
         encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
     }) error zx.Status;

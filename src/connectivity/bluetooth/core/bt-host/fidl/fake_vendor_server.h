@@ -66,10 +66,6 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
     // Not implemented
   }
 
-  // Deprecating interfaces.
-  void NewEncodeCommand(NewEncodeCommandRequest& request,
-                        NewEncodeCommandCompleter::Sync& completer) override {}
-
   void InitializeWait(async::WaitBase& wait, zx::channel& channel) {
     BT_ASSERT(channel.is_valid());
     wait.Cancel();

@@ -85,10 +85,6 @@ class Device : public DeviceType,
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // Deprecating interfaces.
-  void NewEncodeCommand(NewEncodeCommandRequestView request,
-                        NewEncodeCommandCompleter::Sync& completer) override {}
-
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
 
   zx_status_t LoadSecureFirmware(zx::channel* cmd, zx::channel* acl);
