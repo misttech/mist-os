@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/devicetree/devicetree.h>
 #include <zircon/errors.h>
 
@@ -55,6 +56,8 @@ class Node {
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
 
   void AddSmc(fuchsia_hardware_platform_bus::Smc smc);
+
+  void AddPowerConfig(fuchsia_hardware_power::PowerElementConfiguration config);
 
   // Publish this node.
   // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.
@@ -151,12 +154,14 @@ class ParentNode {
     return node_->properties();
   }
 
+  Node* GetNode() const { return node_; }
+
   ParentNode parent() const { return node_->parent(); }
 
   ReferenceNode MakeReferenceNode() const { return ReferenceNode(node_); }
 
  private:
-  const Node* node_;
+  Node* node_;
 };
 
 class ChildNode {

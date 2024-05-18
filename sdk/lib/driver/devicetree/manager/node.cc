@@ -119,6 +119,14 @@ void Node::AddSmc(fuchsia_hardware_platform_bus::Smc smc) {
   add_platform_device_ = true;
 }
 
+void Node::AddPowerConfig(fuchsia_hardware_power::PowerElementConfiguration power_config) {
+  if (!pbus_node_.power_config()) {
+    pbus_node_.power_config() = std::vector<fuchsia_hardware_power::PowerElementConfiguration>();
+  }
+  pbus_node_.power_config()->emplace_back(std::move(power_config));
+  add_platform_device_ = true;
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr,
                            fidl::SyncClient<fuchsia_driver_framework::Node> &fdf_node) {
