@@ -87,7 +87,7 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   constexpr const Soname& name() const { return name_; }
 
   // TODO(https://fxbug.dev/333920495): pass in the symbolizer_modid.
-  [[nodiscard]] static std::unique_ptr<ModuleHandle> Create(Soname name, fbl::AllocChecker& ac) {
+  [[nodiscard]] static std::unique_ptr<ModuleHandle> Create(fbl::AllocChecker& ac, Soname name) {
     std::unique_ptr<ModuleHandle> module{new (ac) ModuleHandle};
     if (module) [[likely]] {
       module->name_ = name;
@@ -162,10 +162,10 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   // A fbl::AllocChecker& caller_ac is passed in to require the caller to check
   // for allocation success/failure. This function will arm the caller_ac with
   // the allocation results of its local calls.
-  [[nodiscard]] static std::unique_ptr<LoadModule> Create(Soname name,
-                                                          fbl::AllocChecker& caller_ac) {
+  [[nodiscard]] static std::unique_ptr<LoadModule> Create(fbl::AllocChecker& caller_ac,
+                                                          Soname name) {
     fbl::AllocChecker ac;
-    auto module = ModuleHandle::Create(name, ac);
+    auto module = ModuleHandle::Create(ac, name);
     if (!ac.check()) [[unlikely]] {
       caller_ac.arm(sizeof(ModuleHandle), false);
       return nullptr;

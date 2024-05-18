@@ -174,7 +174,7 @@ class RuntimeDynamicLinker {
         }
 
         fbl::AllocChecker ac;
-        auto load_module = LoadModule<Loader>::Create(needed_entry, ac);
+        auto load_module = LoadModule<Loader>::Create(ac, needed_entry);
         if (!ac.check()) [[unlikely]] {
           diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
           return fit::error(false);
@@ -189,7 +189,7 @@ class RuntimeDynamicLinker {
     // ModuleHandle::Create so that failed allocations can be handled
     // separately.
     fbl::AllocChecker ac;
-    auto root_module = LoadModule<Loader>::Create(soname, ac);
+    auto root_module = LoadModule<Loader>::Create(ac, soname);
     if (!ac.check()) [[unlikely]] {
       diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
       return {};
