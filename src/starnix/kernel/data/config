@@ -15,7 +15,9 @@
 # CONFIG_MODULE_FORCE_UNLOAD is not set
 # CONFIG_NFSD is not set
 # CONFIG_NFS_FS is not set
+# CONFIG_PAGE_TABLE_ISOLATION is not set, the Zircon kernel does not yet fully implement page table isolation (http://b/42106389)
 # CONFIG_PM_AUTOSLEEP is not set
+# CONFIG_RANDOMIZE_BASE is not set, the Zircon kernel does not yet fully implement KASLR (http://b/42098994)
 # CONFIG_RT_GROUP_SCHED is not set
 # CONFIG_SYSVIPC is not set
 # CONFIG_USELIB is not set
