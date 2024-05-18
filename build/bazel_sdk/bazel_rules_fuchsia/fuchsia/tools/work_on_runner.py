@@ -359,23 +359,14 @@ class WatchForTarget(Step):
         ctx.log("checking for target compatibility")
         ctx.ffx().run("--target", target, "target", "wait", "-t", "60")
         result = json.loads(
-            ctx.ffx().run("--target", target, "target", "show", "--json")
+            ctx.ffx().run(
+                "--machine", "json", "--target", target, "target", "show"
+            )
         )
 
-        sdk_version = ""
-        product = ""
-        board = ""
-        for entry in result:
-            if entry["label"] == "build":
-                for child in entry["child"]:
-                    label = child["label"]
-                    if label == "version":
-                        sdk_version = child["value"]
-                    elif label == "product":
-                        product = child["value"]
-                    elif label == "board":
-                        board = child["value"]
-
+        sdk_version = result["build"]["version"]
+        product = result["build"]["product"]
+        board = result["build"]["board"]
         product_dot_board = f"{product}.{board}"
 
         # Ignore names that end in '-dfv2' since they are not actually different
