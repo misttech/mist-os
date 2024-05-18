@@ -28,6 +28,7 @@
 #include <fbl/string.h>
 #include <object/dispatcher.h>
 #include <object/process_dispatcher.h>
+#include <object/vm_address_region_dispatcher.h>
 
 #include "../kernel_priv.h"
 
@@ -98,10 +99,12 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
     auto& process = current_task->thread_group()->process();
 
     ProcessDispatcher* up = nullptr;
-    bool is_user_thread = ThreadDispatcher::GetCurrent() != nullptr;
-    if (is_user_thread) {
+    bool is_kernel_space = ThreadDispatcher::GetCurrent() == nullptr;
+    if (!is_kernel_space) {
       up = ProcessDispatcher::GetCurrent();
     }
+
+    TRACEF("Running task from %s space.\n", is_kernel_space ? "kernel" : "user");
 
     fbl::RefPtr<ThreadDispatcher> thread_dispatcher;
     zx_status_t status =
@@ -121,6 +124,18 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
       return fit::error(status);
     }
     thread_dispatcher->SetTask(task_handle.release());
+
+    // When running from kernel (bootstrapping) we need to transfer handles
+    if (is_kernel_space) {
+      // Transfer handles to child process
+      Guard<Mutex> lock(current_task->mm()->mm_state_rw_lock());
+
+      zx_handle_t new_handle;
+      TransferHandle<VmAddressRegionDispatcher>(
+          process.get(), current_task->mm()->state().user_vmar().get(), &new_handle);
+
+      current_task->mm()->state().user_vmar().reset(new_handle);
+    }
 
     status = process.start(thread.value(), current_task.thread_state().registers.real_registers.rip,
                            current_task.thread_state().registers.real_registers.rsp, {}, 0);
