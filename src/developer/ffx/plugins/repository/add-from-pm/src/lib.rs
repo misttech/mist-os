@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::BTreeSet;
-
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_error};
 use ffx_core::ffx_plugin;
@@ -61,10 +59,6 @@ async fn repo_registered_state(
         ffx_core::macro_deps::fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
     repos.list_repositories(server).context("listing repositories")?;
     let client = client.into_proxy().context("creating repository iterator proxy")?;
-    let (repo_path, repo_aliases) = match repo_spec {
-        RepositorySpec::Pm { path, aliases } => (Some(path.to_string()), aliases),
-        _ => return Err(anyhow!("only pm style repositories are supported")),
-    };
 
     loop {
         let batch = client.next().await.context("fetching next batch of repositories")?;
@@ -74,21 +68,12 @@ async fn repo_registered_state(
 
         for repo in batch {
             if repo.name == repo_name {
-                // If the same path and aliases are specified, we can continue with a warning.
-                match repo.spec {
-                    fidl_fuchsia_developer_ffx::RepositorySpec::Pm(spec) => {
-                        let spec_aliases = if let Some(aliases) = spec.aliases {
-                            BTreeSet::from_iter(aliases.into_iter())
-                        } else {
-                            BTreeSet::new()
-                        };
-                        if repo_path == spec.path && *repo_aliases == spec_aliases {
-                            return Ok(RepoRegState::Duplicate);
-                        }
-                    }
-                    _ => {
-                        return Err(anyhow!("repository {repo_name} is registered using different settings, it could be removed by running `ffx repository remove {repo_name}"));
-                    }
+                let spec = RepositorySpec::try_from(repo.spec)?;
+                // If the repo specs match, we can continue with a warning.
+                if spec == *repo_spec {
+                    return Ok(RepoRegState::Duplicate);
+                } else {
+                    return Err(anyhow!("repository {repo_name} is registered using different settings, it could be removed by running `ffx repository remove {repo_name}"));
                 }
             }
         }
