@@ -42,8 +42,15 @@ config("no-fat-lto-objects") {
 
 config("lto-clang") {
   cflags = [ "-flto" ]
+
   configs = [ ":fat-lto-objects" ]
-  configs += [ "//build/config/riscv64:lto-workarounds" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs += [ "//build/config/riscv64:lto-workarounds" ]
+  }
 
   if (!is_fuchsia || is_kernel) {
     configs += [ ":lto-whole-program-devirtualization" ]
@@ -93,7 +100,13 @@ config("lto-rust") {
     "-Clinker-plugin-lto",
     "-Zsplit-lto-unit",
   ]
-  configs = [ "//build/config/riscv64:lto-workarounds" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs = [ "//build/config/riscv64:lto-workarounds" ]
+  }
 }
 
 # This can be appended with:
@@ -124,7 +137,13 @@ config("thinlto-clang") {
   cflags = [ "-flto=thin" ]
   ldflags = cflags
   configs = [ ":fat-lto-objects" ]
-  configs += [ "//build/config/riscv64:lto-workarounds" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs += [ "//build/config/riscv64:lto-workarounds" ]
+  }
 
   # These switches have the same meaning but different spellings for
   # lld-link vs ld.lld.
@@ -175,7 +194,13 @@ config("thinlto-rust") {
   }
 
   rustflags += [ "${rust_linkarg}${_cache_dir}${thinlto_cache_dir}" ]
-  configs = [ "//build/config/riscv64:lto-workarounds" ]
+
+  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
+  # avoid code generation bugs during LTO. They can be removed once LTO
+  # properly handles riscv target features
+  if (current_cpu == "riscv64") {
+    configs = [ "//build/config/riscv64:lto-workarounds" ]
+  }
 }
 
 variant("thinlto") {
