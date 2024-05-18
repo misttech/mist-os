@@ -7,8 +7,11 @@
 /include/ "amlogic-a311d.dtsi"
 
 #include <lib/ddk/platform-defs.h>
+#include <soc/aml-a311d/a311d-hw.h>
+#include <soc/aml-a311d/a311d-gpio.h>
 
-#include "src/devices/lib/amlogic/include/soc/aml-a311d/a311d-gpio.h"
+#include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
+
 
 / {
 	compatible = "khadas,vim3", "amlogic,a311d";
@@ -66,6 +69,16 @@
 	function_button: adc-buttons {
 		compatible = "fuchsia,adc-buttons";
 	};
+
+	bt_uart: bt-uart@ffd24000 {
+		compatible = "amlogic,bt-uart";
+		reg = <0x0 A311D_UART_EE_A_BASE 0x0 A311D_UART_EE_A_LENGTH>;
+		interrupts = <GIC_SPI 26 GIC_IRQ_MODE_EDGE_RISING>;
+		serial-port = <2 6 3>;
+		boot-metadata = <0x43414D6D 0>;
+		pinctrl-0 = <&bt_uart_pins>;
+		pwm-init = <&pwm_init>;
+	};
 };
 
 &gpio {
@@ -78,6 +91,12 @@
 		pins = <A311D_GPIOA(15) A311D_GPIOA(14)>;
 		function = <0 A311D_GPIOA_15_I2C_EE_M3_SCL_FN>;
 	};
+
+	bt_uart_pins: bt-uart-pins {
+		pins = <A311D_GPIOX(12) A311D_GPIOX(13) A311D_GPIOX(14) A311D_GPIOX(15)>;
+		function = <0 1>;
+	};
+
 };
 
 &i2c_AO {

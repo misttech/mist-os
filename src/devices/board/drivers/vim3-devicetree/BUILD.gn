@@ -16,23 +16,36 @@ group("tests") {
   ]
 }
 
-devicetree_fragment("amlogic-a311d") {
-  sources = [ "dts/amlogic-a311d.dtsi.S" ]
-  deps = [ "//src/devices/lib/amlogic" ]
-}
-
 devicetree_fragment("meson-g12-common") {
   sources = [ "dts/meson-g12-common.dtsi.S" ]
 }
 
-devicetree("vim3") {
-  sources = [ "dts/khadas-vim3.dts.S" ]
+devicetree_fragment("amlogic-a311d") {
+  sources = [ "dts/amlogic-a311d.dtsi.S" ]
+  deps = [
+    ":meson-g12-common",
+    "//src/devices/lib/amlogic",
+  ]
+}
+
+devicetree_fragment("khadas-vim3-board") {
+  sources = [ "dts/khadas-vim3-board.dtsi.S" ]
   deps = [
     ":amlogic-a311d",
-    ":meson-g12-common",
+    "//src/devices/lib/amlogic",
     "//zircon/system/ulib/ddk-platform-defs",
   ]
-  golden = "dts/khadas-vim3.golden.dts"
+}
+
+devicetree_fragment("vim3-power-config") {
+  sources = [ "dts/vim3-power-config.dtsi" ]
+  deps = [ ":khadas-vim3-board" ]
+}
+
+devicetree("vim3") {
+  sources = [ "dts/vim3.dts" ]
+  deps = [ ":vim3-power-config" ]
+  golden = "dts/vim3.golden.dts"
 }
 
 driver_bind_rules("vim3-devicetree-bind") {

@@ -18,6 +18,50 @@
 		pwms = <0x0f 0x08 0x00 0x00>;
 	};
 
+	bt-uart@ffd24000 {
+		boot-metadata = "CAMm\0\0\0";
+		compatible = "amlogic,bt-uart";
+		interrupts = <0x00 0x1a 0x01>;
+		pinctrl-0 = <0x25>;
+		pwm-init = <0x16>;
+		reg = <0x00 0xffd24000 0x00 0x18>;
+		serial-port = <0x02 0x06 0x03>;
+
+		power-elements {
+
+			aml-uart-wake-on-interrupt-element {
+
+				power-levels {
+
+					handling-level {
+						level = <0x01>;
+						level-dependencies = <0x26 0x01>;
+
+						level-transition-table {
+
+							transition-to-off {
+								latency-us = <0x00>;
+								target-level = <0x00>;
+							};
+						};
+					};
+
+					off-level {
+						level = <0x00>;
+
+						level-transition-table {
+
+							transition-to-handling {
+								latency-us = <0x00>;
+								target-level = <0x01>;
+							};
+						};
+					};
+				};
+			};
+		};
+	};
+
 	canvas@ff638000 {
 		compatible = "amlogic,canvas";
 		iommus = <0x03 0x02>;
@@ -231,6 +275,12 @@
 				function = <0x00 0x02>;
 				phandle = <0x0c>;
 				pins = <0x14>;
+			};
+
+			bt-uart-pins {
+				function = <0x00 0x01>;
+				phandle = <0x25>;
+				pins = <0x44 0x45 0x46 0x47>;
 			};
 
 			emmc-clk-cfg {
@@ -496,6 +546,65 @@
 
 	suspend {
 		compatible = "amlogic,suspend";
+	};
+
+	system-activity-governor {
+
+		power-elements {
+
+			application-activity-element {
+
+				power-levels {
+
+					active-level {
+						level = <0x01>;
+					};
+
+					inactive-level {
+						level = <0x00>;
+					};
+				};
+			};
+
+			execution-resume-latency-element {
+
+				power-levels {
+				};
+			};
+
+			execution-state-element {
+
+				power-levels {
+
+					active-level {
+						level = <0x02>;
+					};
+
+					inactive-level {
+						level = <0x00>;
+					};
+
+					wake-handling-level {
+						level = <0x01>;
+					};
+				};
+			};
+
+			wake-handling-element {
+
+				power-levels {
+
+					active-level {
+						level = <0x01>;
+						phandle = <0x26>;
+					};
+
+					inactive-level {
+						level = <0x00>;
+					};
+				};
+			};
+		};
 	};
 
 	thermal-zones {

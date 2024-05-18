@@ -15,6 +15,12 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/adc-buttons/adc-buttons_group/adc-buttons",
       "sys/platform/arm-mali-0",
       "sys/platform/audio-controller-ff642000/audio-controller-ff642000_group/aml-g12-audio-composite",
+
+      // bt-transport-uart is not included in bootfs on vim3.
+      "sys/platform/bt-uart-ffd24000/bt-uart-ffd24000_group/aml-uart",
+      // TODO(b/291154545): Add bluetooth paths when firmware is publicly available.
+      // "sys/platform/bt-uart-ffd24000/bt-uart-ffd24000_group/aml-uart/bt-transport-uart/bt-hci-broadcom",
+
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/clock-controller-ff63c000/clocks",
       "sys/platform/clock-controller-ff63c000/clocks/clock-init",

@@ -41,6 +41,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/adc-buttons",
       "sys/platform/arm-mali-0",
       "sys/platform/audio-controller-ff642000",
+      "sys/platform/bt-uart-ffd24000",
       "sys/platform/canvas-ff638000",
       "sys/platform/clock-controller-ff63c000",
       "sys/platform/dwmac-ff3f0000",

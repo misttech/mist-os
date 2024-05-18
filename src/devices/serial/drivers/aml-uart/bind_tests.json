@@ -12,6 +12,13 @@
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.UART",
                     "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC"
                 }
+            },
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,bt-uart\""
+                }
             }
         ]
     },

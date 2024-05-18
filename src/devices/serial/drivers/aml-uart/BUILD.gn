@@ -22,6 +22,7 @@ driver_bind_rules("aml_uart_bind") {
   tests = "bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.pwm",
