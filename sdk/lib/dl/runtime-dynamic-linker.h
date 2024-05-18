@@ -86,18 +86,19 @@ class RuntimeDynamicLinker {
     }
 
     // A ModuleHandle for `file` does not yet exist; proceed to loading the
-    // file and all it's dependencies.
+    // file and all its dependencies.
 
     // Use a non-scoped diagnostics object for the main module. Because errors
     // are generated on this module directly, it's name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto load_modules = Load<Loader>(diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file));
-    if (load_modules.is_empty()) [[unlikely]] {
+    auto pending_load_modules =
+        Load<Loader>(diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file));
+    if (pending_load_modules.is_empty()) [[unlikely]] {
       return diag.take_error();
     }
 
-    if (!Relocate(diag, load_modules)) {
+    if (!Relocate(diag, pending_load_modules)) {
       return diag.take_error();
     }
 
@@ -105,15 +106,15 @@ class RuntimeDynamicLinker {
     // module back to the caller and add the loaded modules to the dynamic
     // linker's bookkeeping. This will be abstracted away into another function
     // eventually.
-    while (!load_modules.is_empty()) {
-      auto load_module = load_modules.pop_front();
-      auto module = std::move(*load_module).take_module();
-      loaded_modules_.push_back(std::move(module));
+    while (!pending_load_modules.is_empty()) {
+      auto pending_load_module = pending_load_modules.pop_front();
+      auto module = std::move(*pending_load_module).take_module();
+      modules_.push_back(std::move(module));
     }
 
     // TODO(caslyn): This assumes the dlopen-ed module is the first module in
-    // loaded_modules_.
-    return diag.ok(&loaded_modules_.front());
+    // modules_.
+    return diag.ok(&modules_.front());
   }
 
  private:
@@ -136,15 +137,14 @@ class RuntimeDynamicLinker {
 
     // This is the list of modules to load and process. The first module of this
     // list will always be the file that was `dlopen`-ed.
-    ModuleList<LoadModule<Loader>> pending_modules;
+    ModuleList<LoadModule<Loader>> load_modules;
 
     // This lambda will retrieve the module's file, load the module into the
     // system image, and then create a new LoadModule for each of its
-    // dependencies and enqueue it onto the `pending_modules` list. A
+    // dependencies and enqueue it onto the `load_modules` list. A
     // fit::result<bool> is returned to the caller where the boolean indicates
     // if the file was found, so that the caller can handle the "not-found"
-    // error case. This lambda is called to load the root module, and
-    // then in a loop to load all its dependencies.
+    // error case.
     auto load_and_enqueue_deps = [&](auto& module) -> fit::result<bool> {
       auto file = retrieve_file(diag, module.name().str());
       if (file.is_error()) [[unlikely]] {
@@ -167,9 +167,9 @@ class RuntimeDynamicLinker {
       for (const auto& needed_entry : *result) {
         // TODO(https://fxbug.dev/333573264): Check if the module was already
         // loaded by a previous dlopen call or at startup.
-        // Skip if this dependency was already added to the pending_modules list.
-        if (std::find(pending_modules.begin(), pending_modules.end(), needed_entry) !=
-            pending_modules.end()) {
+        // Skip if this dependency was already added to the load_modules list.
+        if (std::find(load_modules.begin(), load_modules.end(), needed_entry) !=
+            load_modules.end()) {
           continue;
         }
 
@@ -179,7 +179,7 @@ class RuntimeDynamicLinker {
           diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
           return fit::error(false);
         }
-        pending_modules.push_back(std::move(load_module));
+        load_modules.push_back(std::move(load_module));
       }
 
       return fit::ok();
@@ -195,19 +195,19 @@ class RuntimeDynamicLinker {
       return {};
     }
 
-    pending_modules.push_back(std::move(root_module));
+    load_modules.push_back(std::move(root_module));
 
     // Load the root module and enqueue all its dependencies.
-    if (auto result = load_and_enqueue_deps(pending_modules.front()); result.is_error()) {
+    if (auto result = load_and_enqueue_deps(load_modules.front()); result.is_error()) {
       if (result.error_value()) {
-        diag.SystemError(pending_modules.front().name().str(), " not found");
+        diag.SystemError(load_modules.front().name().str(), " not found");
       }
       return {};
     }
 
     // Proceed to load and enqueue the root module's dependencies and their
     // dependencies in a breadth-first order.
-    for (auto it = std::next(pending_modules.begin()); it != pending_modules.end(); it++) {
+    for (auto it = std::next(load_modules.begin()); it != load_modules.end(); it++) {
       if (auto result = load_and_enqueue_deps(*it); result.is_error()) {
         if (result.error_value()) {
           // TODO(https://fxbug.dev/336633049): harmonize this error message
@@ -219,7 +219,7 @@ class RuntimeDynamicLinker {
       }
     }
 
-    return pending_modules;
+    return load_modules;
   }
 
   // TODO(https://fxbug.dev/324136831): Include global modules in `modules`.
@@ -239,7 +239,7 @@ class RuntimeDynamicLinker {
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   // TODO(https://fxbug.dev/324136831): support startup modules
-  ModuleList<ModuleHandle> loaded_modules_;
+  ModuleList<ModuleHandle> modules_;
 };
 
 }  // namespace dl

@@ -58,8 +58,7 @@ using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
 // an ELF file is first loaded by `dlopen`. Whereas a LoadModule is ephemeral
 // and lives only as long as it takes to load a module and its dependencies in
 // `dlopen`, the ModuleHandle is a "permanent" data structure that is kept alive
-// in the RuntimeDynamicLinker's `loaded_modules` list until the module is
-// unloaded.
+// in the RuntimeDynamicLinker's `modules_` list until the module is unloaded.
 
 // While this is an internal API, a ModuleHandle* is the void* handle returned
 // by the public <dlfcn.h> API.
@@ -73,7 +72,7 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   ModuleHandle(const ModuleHandle&) = delete;
   ModuleHandle(ModuleHandle&&) = default;
 
-  // See unmap-[posix|zircon|.cc for the dtor. On destruction, the module's load
+  // See unmap-[posix|zircon].cc for the dtor. On destruction, the module's load
   // image is unmapped per the semantics of the OS implementation.
   ~ModuleHandle();
 
@@ -115,8 +114,8 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   AbiModule abi_module_;
 };
 
-// Use a AllocCheckerContainer that supports fallible allocations; methods return
-// a boolean value to signify allocation success or failure.
+// Use a AllocCheckerContainer that supports fallible allocations; methods
+// return a boolean value to signify allocation success or failure.
 template <typename T>
 using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
 
