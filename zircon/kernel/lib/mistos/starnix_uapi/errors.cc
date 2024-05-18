@@ -5,16 +5,7 @@
 
 #include <lib/mistos/starnix_uapi/errors.h>
 
-// clang-format off
 #include <linux/errno.h>
-// clang-format on
-
-zx_status_t From(const Errno& code) {
-  switch (code.code_.error_code()) {
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-}
 
 // There isn't really a mapping from zx::Status to Errno. The correct mapping is context-speific
 // but this converter is a reasonable first-approximation. The translation matches

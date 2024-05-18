@@ -8,6 +8,8 @@
 
 #include <zircon/types.h>
 
+#include <linux/errno.h>
+
 class ErrnoCode {
  public:
   explicit ErrnoCode(uint32_t code) : code_(code) {}
