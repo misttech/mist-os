@@ -8,6 +8,8 @@
 #include <lib/mistos/starnix/kernel/task/module.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
 
+#include <linux/errno.h>
+
 namespace starnix {
 
 fit::result<Errno, FsString> MemoryXattrStorage::get_xattr(const FsStr& name) const {

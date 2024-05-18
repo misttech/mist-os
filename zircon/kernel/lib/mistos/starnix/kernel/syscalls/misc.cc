@@ -13,9 +13,11 @@
 #include <lib/mistos/util/cprng.h>
 #include <trace.h>
 
+#include "../kernel_priv.h"
+
 #include <linux/random.h>
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 using namespace starnix_uapi;
 

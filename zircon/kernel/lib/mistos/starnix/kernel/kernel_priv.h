@@ -13,6 +13,6 @@
 // This lets one edit just that one file to switch that `0` to `1`,
 // or edit this file to replace `local` with `1` and get all those
 // files at once.
-#define STARNIX_KERNEL_GLOBAL_TRACE(local) local
+#define STARNIX_KERNEL_GLOBAL_TRACE(local) (local | 0)
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_KERNEL_PRIV_H_

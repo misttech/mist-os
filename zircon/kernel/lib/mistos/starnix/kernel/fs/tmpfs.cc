@@ -22,9 +22,7 @@
 #include <fbl/alloc_checker.h>
 #include <ktl/unique_ptr.h>
 
-// clang-format off
 #include <linux/magic.h>
-// clang-format on
 
 namespace starnix {
 

@@ -20,9 +20,7 @@
 #include <fbl/ref_counted.h>
 #include <ktl/optional.h>
 
-// clang-format off
 #include <linux/fcntl.h>
-// clang-format on
 
 namespace starnix {
 

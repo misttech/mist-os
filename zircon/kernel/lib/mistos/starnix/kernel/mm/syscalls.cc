@@ -17,9 +17,7 @@
 #include <lib/mistos/util/bitflags.h>
 #include <zircon/compiler.h>
 
-// clang-format off
 #include <linux/mman.h>
-// clang-format on
 
 namespace starnix {
 

@@ -34,12 +34,10 @@
 #include <ktl/unique_ptr.h>
 #include <ktl/variant.h>
 
-// clang-format off
+#include <asm/stat.h>
 #include <linux/falloc.h>
 #include <linux/fsverity.h>
 #include <linux/xattr.h>
-#include <asm/stat.h>
-// clang-format on
 
 namespace starnix {
 

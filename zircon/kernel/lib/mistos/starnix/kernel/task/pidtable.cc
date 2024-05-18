@@ -10,11 +10,10 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <cassert>
 #include <optional>
 #include <variant>
 
-#include "fbl/ref_ptr.h"
+#include <fbl/ref_ptr.h>
 
 namespace {
 #if 0

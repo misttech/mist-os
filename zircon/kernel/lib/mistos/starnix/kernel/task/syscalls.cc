@@ -11,6 +11,8 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 
+#include <linux/errno.h>
+
 namespace {
 
 fbl::RefPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,

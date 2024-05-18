@@ -15,7 +15,6 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <cassert>
 #include <utility>
 
 #include <fbl/ref_ptr.h>

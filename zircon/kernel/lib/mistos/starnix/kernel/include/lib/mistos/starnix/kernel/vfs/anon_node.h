@@ -15,9 +15,7 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 
-// clang-format off
 #include <linux/magic.h>
-// clang-format on
 
 namespace starnix {
 

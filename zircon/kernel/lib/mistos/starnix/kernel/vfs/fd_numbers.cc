@@ -5,9 +5,7 @@
 
 #include "lib/mistos/starnix/kernel/vfs/fd_numbers.h"
 
-// clang-format off
 #include <linux/fcntl.h>
-// clang-format on
 
 namespace starnix {
 

@@ -29,10 +29,8 @@
 #include <ktl/unique_ptr.h>
 #include <ktl/variant.h>
 
-// clang-format off
 #include <asm-generic/statfs.h>
 #include <linux/stat.h>
-// clang-format on
 
 namespace starnix {
 

@@ -15,9 +15,7 @@
 
 #include <charconv>
 
-// clang-format off
 #include <linux/stat.h>
-// clang-format on
 
 #define FILE_MODE(type, mode) \
   starnix_uapi::FileMode::from_bits(mode | starnix_uapi::FileMode::type.bits())

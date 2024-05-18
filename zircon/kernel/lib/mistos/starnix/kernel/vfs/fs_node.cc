@@ -21,6 +21,8 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 
+#include <linux/errno.h>
+
 namespace starnix {
 
 FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kernel> kernel,

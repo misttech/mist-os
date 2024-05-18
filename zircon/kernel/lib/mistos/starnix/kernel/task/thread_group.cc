@@ -16,6 +16,8 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 
+#include <linux/errno.h>
+
 namespace starnix {
 
 ThreadGroupMutableState::ThreadGroupMutableState() = default;
