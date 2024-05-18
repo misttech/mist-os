@@ -101,7 +101,6 @@ class InfraDriver(base.BaseDriver):
                 test_params = common.read_yaml_from_file(self._params_path)
             botanist_honeydew_translation_map: dict[str, str] = {
                 "nodename": "name",
-                "ssh_key": "ssh_private_key",
             }
             config = api_mobly.new_testbed_config(
                 testbed_name=self._TESTBED_NAME,

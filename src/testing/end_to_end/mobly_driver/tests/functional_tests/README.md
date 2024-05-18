@@ -58,7 +58,6 @@ The exact schema of `targetInfo` is defined in //tools/botanist/cmd/run.go.
        "ipv4":"192.168.42.112",
        "ipv6":"",
        "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
-       "ssh_private_key":"/etc/botanist/keys/pkey_infra"
     }
 ]
 ```

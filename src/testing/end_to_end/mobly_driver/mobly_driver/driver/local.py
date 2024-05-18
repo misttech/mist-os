@@ -118,9 +118,6 @@ class LocalDriver(base.BaseDriver):
             fx_device = {
                 "type": api_infra.FUCHSIA_DEVICE,
                 "name": target,
-                # Assume connected devices are provisioned with default
-                # Fuchsia.git SSH credentials.
-                "ssh_private_key": "~/.ssh/fuchsia_ed25519",
             }
 
             # Check if the target connected is "local" or "remote".

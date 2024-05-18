@@ -69,10 +69,9 @@ Every Mobly test requires a testbed configuration file to be provided to specify
 the device(s) under test (DUTs) that the E2E test will need to interact with.
 
 For local testing, Lacewing generates a default Mobly config based on the host
-environment. This is a best-effort algorithm that assumes that all detected
-Fuchsia device can be accessed using the `~/.ssh/fuchsia_ed25519` SSH private
-key. This generated config file should serve the majority of in-tree use cases
-where devices and emulators are paved/flashed/built directly from Fuchsia.git).
+environment. This is a best-effort algorithm. This generated config file should
+serve the majority of in-tree use cases where devices and emulators are
+paved/flashed/built directly from Fuchsia.git).
 
 If the default config generation does not fit your use-case, see the
 [Local Manual Mobly Config section](#local-manual-mobly-config) to create a YAML
@@ -277,11 +276,10 @@ TestBeds:
     Controllers:
       FuchsiaDevice:
         - name: $FUCHSIA_NODENAME
-          ssh_private_key: $PKEY
 ```
 
-`$FUCHSIA_NODENAME` and `$PKEY` need to be manually substituted to fit your
-local development environment (More info on each of these fields in the sections
+`$FUCHSIA_NODENAME` need to be manually substituted to fit your
+local development environment (More info on this field is in the section
 below).
 
 After updating the content of this file, update BUILD.gn to include it in the
@@ -311,27 +309,3 @@ The `$FUCSHIA_NODENAME` in the above example would be `fuchsia-emulator`.
 
 NOTE: This may be an emulator or a physical device. If there are multiple
 accessible devices, choose only the one to target in the host test.
-
-#### $PKEY
-
-The `ssh_private_key: $PKEY` value should match the path of the SSH private key
-that can be used to connect to the DUT. This is the key that pairs with the
-`authorized_keys` used in paving workflows or exists in the emulator image.
-The path to the private key is configurable, and can be retrieved with
-`ffx config get ssh.priv`. The authorized_keys path is `ffx config get ssh.pub`.
-In most cases, the ssh keys are generated and used when flashing, `ffx target flash`
-or starting an emulator `ffx emu start`.
-
-A quick way to confirm that Fuchsia's default SSH key works is the following:
-
-```sh
-$ fx set-device $FUCHSIA_NODENAME
-$ fx shell ls
-```
-
-If the above succeeds, then the following command returns the working SSH key
-path:
-
-```sh
-$ ffx config get ssh.priv
-```
