@@ -92,29 +92,30 @@ class RuntimeDynamicLinker {
     // are generated on this module directly, it's name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto pending_load_modules =
+    auto [pending_modules, pending_load_modules] =
         Load<Loader>(diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file));
     if (pending_load_modules.is_empty()) [[unlikely]] {
+      assert(pending_modules.is_empty() == pending_load_modules.is_empty());
       return diag.take_error();
     }
 
+    // TODO(https://fxbug.dev/324136831): This does not include global modules
+    // yet.
     if (!Relocate(diag, pending_load_modules)) {
       return diag.take_error();
     }
 
-    // TODO(caslyn): These are actions needed to return a reference to the main
-    // module back to the caller and add the loaded modules to the dynamic
-    // linker's bookkeeping. This will be abstracted away into another function
-    // eventually.
-    while (!pending_load_modules.is_empty()) {
-      auto pending_load_module = pending_load_modules.pop_front();
-      auto module = std::move(*pending_load_module).take_module();
-      modules_.push_back(std::move(module));
-    }
+    // Obtain a reference to the root module for the dlopen-ed file to return
+    // back to the caller.
+    ModuleHandle& root_module = pending_modules.front();
 
-    // TODO(caslyn): This assumes the dlopen-ed module is the first module in
-    // modules_.
-    return diag.ok(&modules_.front());
+    // TODO(https://fxbug.dev/333573264): this assumes that all pending modules
+    // are not already in modules_.
+    // After successful loading and relocation, append the new permanent modules
+    // created by this dlopen session to the dynamic linker's module list.
+    modules_.splice(modules_.end(), pending_modules);
+
+    return diag.ok(&root_module);
   }
 
  private:
@@ -124,24 +125,30 @@ class RuntimeDynamicLinker {
   // a module for `file` was not found.
   fit::result<Error, ModuleHandle*> CheckOpen(const char* file, int mode);
 
-  // Load the root module and all its dependencies, returning the list of all
-  // loaded modules. Starting with the file that was `dlopen`-ed, a LoadModule
-  // is created for each file that is to be loaded, decoded, and its
-  // dependencies parsed and enqueued to be processed in the same manner.
+  // TODO(https://fxbug.dev/333573264): Talk about how previously-loaded modules
+  // that happen to be a dependency in this dlopen session are represented in
+  // these lists.
+  // Load the root module and all its dependencies, constructing two lists of
+  // module data structures in the process:
+  // - List of ModuleHandles: This is the list of permanent module data
+  //   structures that will eventually be installed in the runtime dynamic
+  //   linker's module list and managed by the runtime dynamic linker.
+  // - List of LoadModules: This is the list of temporary load module data
+  //   structures needed to perform loading, decoding, relocations, etc. The
+  //   elements in this list live only as long as the current dlopen session.
   // The `retrieve_file` argument is a callable passed down from `Open` and is
   // invoked to retrieve the module's file from the file system for processing.
   template <class Loader, typename RetrieveFile>
-  static ModuleList<LoadModule<Loader>> Load(Diagnostics& diag, Soname soname,
-                                             RetrieveFile&& retrieve_file) {
+  std::pair<ModuleHandleList, LoadModuleList<Loader>> Load(Diagnostics& diag, Soname soname,
+                                                           RetrieveFile&& retrieve_file) {
     static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
 
-    // This is the list of modules to load and process. The first module of this
-    // list will always be the file that was `dlopen`-ed.
-    ModuleList<LoadModule<Loader>> load_modules;
+    LoadModuleList<Loader> load_modules;
+    ModuleHandleList modules;
 
     // This lambda will retrieve the module's file, load the module into the
-    // system image, and then create a new LoadModule for each of its
-    // dependencies and enqueue it onto the `load_modules` list. A
+    // system image, and then create new modules for each of its dependencies
+    // to enqueue onto load_modules list for future processing. A
     // fit::result<bool> is returned to the caller where the boolean indicates
     // if the file was found, so that the caller can handle the "not-found"
     // error case.
@@ -159,43 +166,24 @@ class RuntimeDynamicLinker {
         return fit::error(true);
       }
 
-      auto result = module.Load(diag, *std::move(file));
-      if (!result) [[unlikely]] {
-        return fit::error(false);
+      if (auto result = module.Load(diag, *std::move(file))) {
+        // Create a module for each dependency from the LoadModule.Load result
+        // and enqueue it onto `load_modules` to be processed and loaded in the
+        // future.
+        auto enqueue_dep = [this, &diag, &modules, &load_modules](const Soname& name) {
+          return EnqueueModule(diag, name, modules, load_modules);
+        };
+        if (std::all_of(std::begin(*result), std::end(*result), enqueue_dep)) {
+          return fit::ok();
+        }
       }
 
-      for (const auto& needed_entry : *result) {
-        // TODO(https://fxbug.dev/333573264): Check if the module was already
-        // loaded by a previous dlopen call or at startup.
-        // Skip if this dependency was already added to the load_modules list.
-        if (std::find(load_modules.begin(), load_modules.end(), needed_entry) !=
-            load_modules.end()) {
-          continue;
-        }
-
-        fbl::AllocChecker ac;
-        auto load_module = LoadModule<Loader>::Create(ac, needed_entry);
-        if (!ac.check()) [[unlikely]] {
-          diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
-          return fit::error(false);
-        }
-        load_modules.push_back(std::move(load_module));
-      }
-
-      return fit::ok();
+      return fit::error(false);
     };
 
-    // TODO(https://fxbug.dev/338123289): Separate LoadModule::Create and
-    // ModuleHandle::Create so that failed allocations can be handled
-    // separately.
-    fbl::AllocChecker ac;
-    auto root_module = LoadModule<Loader>::Create(ac, soname);
-    if (!ac.check()) [[unlikely]] {
-      diag.OutOfMemory("LoadModule", sizeof(LoadModule<Loader>));
+    if (!EnqueueModule(diag, soname, modules, load_modules)) {
       return {};
     }
-
-    load_modules.push_back(std::move(root_module));
 
     // Load the root module and enqueue all its dependencies.
     if (auto result = load_and_enqueue_deps(load_modules.front()); result.is_error()) {
@@ -219,14 +207,53 @@ class RuntimeDynamicLinker {
       }
     }
 
-    return load_modules;
+    return std::make_pair(std::move(modules), std::move(load_modules));
   }
 
-  // TODO(https://fxbug.dev/324136831): Include global modules in `modules`.
+  // Create new ModuleHandle and LoadModule data structures for `soname` and
+  // enqueue these data structures to the `modules` and `load_modules` list.
+  template <class Loader>
+  bool EnqueueModule(Diagnostics& diag, Soname soname, ModuleHandleList& modules,
+                     LoadModuleList<Loader>& load_modules) {
+    if (std::find(load_modules.begin(), load_modules.end(), soname) != load_modules.end()) {
+      // The module was already added to the load_modules list in this dlopen
+      // session.
+      return true;
+    }
+
+    // TODO(https://fxbug.dev/333573264): Check if the module was already
+    // loaded by a previous dlopen call or at startup and use that reference
+    // instead.
+
+    // TODO(https://fxbug.dev/338229987): This is just to make sure we're not
+    // exercising deps from modules already loaded yet.
+    assert(!FindModule(soname));
+
+    fbl::AllocChecker module_ac;
+    auto module = ModuleHandle::Create(module_ac, soname);
+    if (!module_ac.check()) [[unlikely]] {
+      diag.OutOfMemory("permanent module data structure", sizeof(ModuleHandle));
+      return false;
+    }
+    fbl::AllocChecker load_module_ac;
+    auto load_module = LoadModule<Loader>::Create(load_module_ac, *module);
+    if (!load_module_ac.check()) [[unlikely]] {
+      diag.OutOfMemory("temporary module data structure", sizeof(LoadModule<Loader>));
+      return false;
+    }
+
+    modules.push_back(std::move(module));
+    load_modules.push_back(std::move(load_module));
+
+    return true;
+  }
+
+  // TODO(https://fxbug.dev/324136831): Include global modules in `modules` (and
+  // remember to skip relocating previously-loaded modules).
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
   template <class Loader>
-  bool Relocate(Diagnostics& diag, ModuleList<LoadModule<Loader>>& modules) {
+  bool Relocate(Diagnostics& diag, LoadModuleList<Loader>& modules) {
     // Scope diagnostics to the root module so that its name will prefix error
     // messages.
     auto relocate = [&](auto& module) -> bool {
@@ -239,7 +266,7 @@ class RuntimeDynamicLinker {
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   // TODO(https://fxbug.dev/324136831): support startup modules
-  ModuleList<ModuleHandle> modules_;
+  ModuleHandleList modules_;
 };
 
 }  // namespace dl

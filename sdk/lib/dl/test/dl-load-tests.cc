@@ -306,4 +306,78 @@ TYPED_TEST(DlTests, MissingTransitiveDependency) {
   }
 }
 
+// Test that calling dlopen twice on a file will return the same pointer,
+// indicating that the dynamic linker is storing the module in its bookkeeping.
+// dlsym() should return a pointer to the same symbol from the same module as
+// well.
+TYPED_TEST(DlTests, BasicModuleReuse) {
+  constexpr const char* kBasicFile = "ret17.module.so";
+
+  this->ExpectRootModule(kBasicFile);
+
+  auto res1 = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  auto ptr1 = res1.value();
+  EXPECT_TRUE(ptr1);
+
+  auto res2 = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  auto ptr2 = res2.value();
+  EXPECT_TRUE(ptr2);
+
+  EXPECT_EQ(ptr1, ptr2);
+
+  auto sym1 = this->DlSym(ptr1, "TestStart");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  auto sym1_ptr = sym1.value();
+  EXPECT_TRUE(sym1_ptr);
+
+  auto sym2 = this->DlSym(ptr2, "TestStart");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  auto sym2_ptr = sym2.value();
+  EXPECT_TRUE(sym2_ptr);
+
+  EXPECT_EQ(sym1_ptr, sym2_ptr);
+}
+
+// Test that different mutually-exclusive files that were dlopen-ed do not share
+// pointers or resolved symbols.
+TYPED_TEST(DlTests, UniqueModules) {
+  constexpr const char* kRet17 = "ret17.module.so";
+  constexpr int64_t kReturnValue17 = 17;
+  constexpr const char* kRet23 = "ret23.module.so";
+  constexpr int64_t kReturnValue23 = 23;
+
+  this->ExpectRootModule(kRet17);
+
+  auto ret17 = this->DlOpen(kRet17, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(ret17.is_ok()) << ret17.error_value();
+  auto ret17_ptr = ret17.value();
+  EXPECT_TRUE(ret17_ptr);
+
+  this->ExpectRootModule(kRet23);
+
+  auto ret23 = this->DlOpen(kRet23, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(ret23.is_ok()) << ret23.error_value();
+  auto ret23_ptr = ret23.value();
+  EXPECT_TRUE(ret23_ptr);
+
+  EXPECT_NE(ret17_ptr, ret23_ptr);
+
+  auto sym17 = this->DlSym(ret17_ptr, "TestStart");
+  ASSERT_TRUE(sym17.is_ok()) << sym17.error_value();
+  auto sym17_ptr = sym17.value();
+  EXPECT_TRUE(sym17_ptr);
+
+  auto sym23 = this->DlSym(ret23_ptr, "TestStart");
+  ASSERT_TRUE(sym23.is_ok()) << sym23.error_value();
+  auto sym23_ptr = sym23.value();
+  EXPECT_TRUE(sym23_ptr);
+
+  EXPECT_NE(sym17_ptr, sym23_ptr);
+
+  EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), kReturnValue17);
+  EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), kReturnValue23);
+}
+
 }  // namespace

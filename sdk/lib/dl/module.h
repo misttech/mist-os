@@ -41,8 +41,18 @@ inline constexpr size_t kMaxSegments = 8;
 inline constexpr size_t kMaxPhdrs = 32;
 static_assert(kMaxPhdrs > kMaxSegments);
 
-template <class ModuleType>
-using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
+class ModuleHandle;
+// A list of unique "permanent" ModuleHandle data structures used to represent
+// a loaded file in the system image.
+// TODO(caslyn): talk about relationship with LoadModuleList.
+using ModuleHandleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleHandle>>;
+
+template <class Loader>
+class LoadModule;
+// A list of unique "temporary" LoadModule data structures used for loading a
+// file.
+template <class Loader>
+using LoadModuleList = fbl::DoublyLinkedList<std::unique_ptr<LoadModule<Loader>>>;
 
 // TODO(https://fxbug.dev/324136831): comment on how ModuleHandle relates to
 // startup modules when the latter is supported.
@@ -54,11 +64,12 @@ using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<ModuleType>>;
 // ld::abi::Abi<...>::Module data structure that describes the module in the
 // passive ABI (see //sdk/lib/ld/module.h).
 
-// A ModuleHandle is created by its corresponding LoadModule (see below) when
-// an ELF file is first loaded by `dlopen`. Whereas a LoadModule is ephemeral
-// and lives only as long as it takes to load a module and its dependencies in
-// `dlopen`, the ModuleHandle is a "permanent" data structure that is kept alive
-// in the RuntimeDynamicLinker's `modules_` list until the module is unloaded.
+// A ModuleHandle has a corresponding LoadModule (see below) to represent the
+// ELF file when it is first loaded by `dlopen`. Whereas a LoadModule is
+// ephemeral and lives only as long as it takes to load a module and its
+// dependencies in `dlopen`, the ModuleHandle is a "permanent" data structure
+// that is kept alive in the RuntimeDynamicLinker's `modules_` list until the
+// module is unloaded.
 
 // While this is an internal API, a ModuleHandle* is the void* handle returned
 // by the public <dlfcn.h> API.
@@ -152,48 +163,21 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
       Elf, elfldltl::ElfDynTag::kNeeded, Vector<size_type>, kNeededError>;
 
-  // The LoadModule::Create(...) creates and takes temporary ownership of the
-  // ModuleHandle for the file in order to set information on the data structure
-  // during the loading process. When the loading process has completed,
-  // `take_module()` should  be called on the load module before it's destroyed
-  // to transfer ownership of the module handle to the caller. Otherwise, if an
-  // error occurs during loading, the load module will clean up the module
-  // handle in its own destruction.
-  // A fbl::AllocChecker& caller_ac is passed in to require the caller to check
-  // for allocation success/failure. This function will arm the caller_ac with
-  // the allocation results of its local calls.
-  [[nodiscard]] static std::unique_ptr<LoadModule> Create(fbl::AllocChecker& caller_ac,
-                                                          Soname name) {
-    fbl::AllocChecker ac;
-    auto module = ModuleHandle::Create(ac, name);
-    if (!ac.check()) [[unlikely]] {
-      caller_ac.arm(sizeof(ModuleHandle), false);
-      return nullptr;
+  // The LoadModule::Create(...) takes a reference to the ModuleHandle for the
+  // file, setting information on it during the loading, decoding, and
+  // relocation process.
+  [[nodiscard]] static std::unique_ptr<LoadModule> Create(fbl::AllocChecker& ac,
+                                                          ModuleHandle& module) {
+    std::unique_ptr<LoadModule> load_module{new (ac) LoadModule(module)};
+    if (load_module) [[likely]] {
+      load_module->set_name(module.name());
+      // Have the underlying DecodedModule (see <lib/ld/decoded-module.h>) point to
+      // the ABIModule embedded in the ModuleHandle, so that its information will
+      // be filled out during decoding operations.
+      load_module->decoded().set_module(module.module());
     }
-    std::unique_ptr<LoadModule> load_module{new (ac) LoadModule};
-    if (!ac.check()) [[unlikely]] {
-      caller_ac.arm(sizeof(LoadModule), false);
-      return nullptr;
-    }
-    // TODO(https://fxbug.dev/335921712): Have ModuleHandle own the name string.
-    load_module->set_name(name);
-    // Have the underlying DecodedModule (see <lib/ld/decoded-module.h>) point to
-    // the ABIModule embedded in the ModuleHandle, so that its information will
-    // be filled out during decoding operations.
-    load_module->decoded().set_module(module->module());
-    load_module->module_ = std::move(module);
-
-    // Signal to the caller all allocations have succeeded.
-    caller_ac.arm(sizeof(LoadModule), true);
-    return std::move(load_module);
+    return load_module;
   }
-
-  // This must be the last method called on LoadModule and can only be called
-  // with `std::move(load_module).take_module();`.
-  // Calling this method indicates that the module has been loaded successfully
-  // and will give the caller ownership of the module, handing off the
-  // responsibility for managing its lifetime and unmapping.
-  std::unique_ptr<ModuleHandle> take_module() && { return std::move(module_); }
 
   // Load `file` into the system image, decode phdrs and save the metadata in
   // the the ABI module. Decode the module's dependencies (if any), and
@@ -247,7 +231,7 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // list of modules as needed.
-  bool Relocate(Diagnostics& diag, ModuleList<LoadModule>& modules) {
+  bool Relocate(Diagnostics& diag, LoadModuleList<Loader>& modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kNoTlsDesc);
@@ -258,9 +242,14 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
 
  private:
   // A LoadModule can only be created with LoadModule::Create...).
-  LoadModule() = default;
+  explicit LoadModule(ModuleHandle& module) : module_(module) {}
 
-  std::unique_ptr<ModuleHandle> module_;
+  // This is a reference to the "permanent" module data structure that this
+  // LoadModule is responsible for: runtime information is set on the `module_`
+  // during the course of the loading process. Whereas this LoadModule instance
+  // will get destroyed at the end of `dlopen`, its `module_` will live as long
+  // as the file is loaded in the RuntimeDynamicLinker's `modules_` list.
+  ModuleHandle& module_;
   Relro loader_relro_;
 };
 
