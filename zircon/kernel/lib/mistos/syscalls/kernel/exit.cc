@@ -5,7 +5,9 @@
 #include <lib/syscalls/forward.h>
 #include <trace.h>
 
-#define LOCAL_TRACE 0
+#include "../priv.h"
+
+#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
 
 void __NO_RETURN do_exit(long code) {
   LTRACEF_LEVEL(2, "code=0x%lx\n", code);
