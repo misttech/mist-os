@@ -55,9 +55,8 @@ zx_library("kernel") {
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/mistos/elfldltl",
     "//zircon/kernel/lib/mistos/userloader",
+    "//zircon/kernel/lib/mistos/zx_syscalls",
   ]
-
-  public_configs = []
 }
 
 group("tests") {

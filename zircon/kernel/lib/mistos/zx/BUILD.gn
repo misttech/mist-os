@@ -18,12 +18,12 @@ zx_library("zx") {
 
   public_deps = [
     "//zircon/kernel/lib/mistos/util",
-    "//zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/vm:headers",
   ]
 
   deps = [
     "//zircon/kernel/lib/debuglog",
+    "//zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/vm",
   ]
 }

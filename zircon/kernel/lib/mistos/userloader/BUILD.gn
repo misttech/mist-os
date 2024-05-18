@@ -37,6 +37,7 @@ zx_library("userloader") {
     "//zircon/kernel/lib/mistos/linux_uapi",
     "//zircon/kernel/lib/mistos/util",
     "//zircon/kernel/lib/mistos/zbitl",
+    "//zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/lib/persistent-debuglog",
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/vm",

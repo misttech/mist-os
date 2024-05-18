@@ -41,11 +41,9 @@ source_set("impl") {
   ]
   deps = [
     "//zircon/kernel/lib/mistos/linux_uapi",
+    "//zircon/kernel/lib/mistos/starnix/kernel",
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/object",
   ]
-
-  # Force to be the last one
-  deps += [ "//zircon/kernel/lib/mistos/starnix/kernel" ]
 }
