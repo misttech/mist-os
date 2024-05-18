@@ -18,7 +18,7 @@ type LogInterestSelector = struct {
 
 /// This protocol allows clients to modify the logging behavior of components
 /// in the system.
-@discoverable
+@discoverable(client="platform", server="platform")
 closed protocol LogSettings {
     @available(deprecated=12, removed=18, legacy=true)
     strict RegisterInterest(struct {
