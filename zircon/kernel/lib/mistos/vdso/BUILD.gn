@@ -45,13 +45,6 @@ fidl("linux") {
   enable_rust = false
 
   zither = {
-    asm = {
-      # While "zx" headers are currently stratified across zircon/* and
-      # zircon/syscalls/*, at this time we only use the assembly backend to
-      # generate checked-in headers in the former include namespace (i.e.,
-      # <zircon/errors.h>).
-      output_namespace = "zircon"
-    }
   }
 }
 
