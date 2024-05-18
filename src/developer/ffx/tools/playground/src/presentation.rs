@@ -10,6 +10,31 @@ use playground::value::{PlaygroundValue, Value};
 use std::collections::HashMap;
 use std::io;
 
+/// Given a list of values, determine if all of them are Value::Objects and if
+/// they all have the same fields.
+fn all_objects_same_fields(values: &[Value]) -> bool {
+    if values.is_empty() {
+        true
+    } else if values.len() == 1 {
+        matches!(&values[0], Value::Object(_))
+    } else {
+        values.windows(2).all(|arr| {
+            let Value::Object(a) = &arr[0] else {
+                return false;
+            };
+            let Value::Object(b) = &arr[1] else {
+                return false;
+            };
+
+            if a.len() != b.len() {
+                return false;
+            }
+
+            a.iter().zip(b.iter()).all(|((a, _), (b, _))| a == b)
+        })
+    }
+}
+
 /// Display a list of values which came as the result of a command in a pretty way.
 async fn display_result_list<'a, W: AsyncWrite + Unpin + 'a>(
     writer: &'a mut W,
@@ -31,20 +56,7 @@ async fn display_result_list<'a, W: AsyncWrite + Unpin + 'a>(
         } else {
             writer.write_all(format!("{}\n", Value::List(values)).as_bytes()).await?
         }
-    } else if values.windows(2).all(|arr| {
-        let Value::Object(a) = &arr[0] else {
-            return false;
-        };
-        let Value::Object(b) = &arr[1] else {
-            return false;
-        };
-
-        if a.len() != b.len() {
-            return false;
-        }
-
-        a.iter().zip(b.iter()).all(|((a, _), (b, _))| a == b)
-    }) {
+    } else if all_objects_same_fields(&values) {
         let mut columns = HashMap::new();
         let mut column_order = Vec::new();
         let row_count = values.len();
@@ -65,7 +77,7 @@ async fn display_result_list<'a, W: AsyncWrite + Unpin + 'a>(
             }
         }
 
-        let column_lengths: HashMap<_, _> = column_order
+        let mut column_lengths: HashMap<_, _> = column_order
             .iter()
             .map(|column| {
                 let max =
@@ -74,6 +86,14 @@ async fn display_result_list<'a, W: AsyncWrite + Unpin + 'a>(
                 (column, max)
             })
             .collect();
+
+        if let Some(last_column) = column_order.last() {
+            let last_len =
+                column_lengths.get_mut(last_column).expect("Column should be in lengths table!");
+            if *last_len == last_column.len() {
+                *last_len += 1;
+            }
+        }
 
         let header = column_order
             .iter()
@@ -174,5 +194,54 @@ mod test {
         .await
         .unwrap();
         assert_eq!(b"\x1b[1;30;103m a     b           \x1b[0m\n 1u8 | Hi          \n 2u8 | Hello       \n 3u8 | Good Evening\n", got.as_slice());
+    }
+
+    #[fuchsia::test]
+    async fn test_short_list() {
+        let mut got = Vec::<u8>::new();
+        let ns = fidl_codec::library::Namespace::new();
+        let (fs_root, _server) = fidl::endpoints::create_endpoints();
+        let (interpreter, task) = playground::interpreter::Interpreter::new(ns, fs_root).await;
+        fuchsia_async::Task::spawn(task).detach();
+
+        display_result(&mut got, false, Ok(Value::List(vec![Value::U32(2)])), &interpreter)
+            .await
+            .unwrap();
+        assert_eq!(b"[ 2u32 ]\n", got.as_slice());
+    }
+
+    #[fuchsia::test]
+    async fn test_short_data() {
+        let mut got = Vec::<u8>::new();
+        let ns = fidl_codec::library::Namespace::new();
+        let (fs_root, _server) = fidl::endpoints::create_endpoints();
+        let (interpreter, task) = playground::interpreter::Interpreter::new(ns, fs_root).await;
+        fuchsia_async::Task::spawn(task).detach();
+
+        display_result(
+            &mut got,
+            false,
+            Ok(Value::List(vec![
+                Value::Object(vec![
+                    ("aa".to_owned(), Value::U8(1)),
+                    ("bb".to_owned(), Value::U8(2)),
+                ]),
+                Value::Object(vec![
+                    ("aa".to_owned(), Value::U8(2)),
+                    ("bb".to_owned(), Value::U8(3)),
+                ]),
+                Value::Object(vec![
+                    ("aa".to_owned(), Value::U8(3)),
+                    ("bb".to_owned(), Value::U8(4)),
+                ]),
+            ])),
+            &interpreter,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            b"\x1b[1;30;103m aa    bb \x1b[0m\n 1u8 | 2u8\n 2u8 | 3u8\n 3u8 | 4u8\n",
+            got.as_slice()
+        );
     }
 }
