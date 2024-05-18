@@ -26,7 +26,8 @@ FileBackedProvider::FileBackedProvider(std::string path) : path_(std::move(path)
   }
 
   if (!data.HasValue()) {
-    FX_LOGS(WARNING) << "Failed to build attachment ";
+    FX_LOGS(WARNING) << "Failed to build attachment '" << path_
+                     << "' due to error: " << ToString(data.Error());
   }
   return fpromise::make_ok_promise(std::move(data));
 }
