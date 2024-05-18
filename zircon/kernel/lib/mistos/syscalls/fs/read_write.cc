@@ -7,11 +7,13 @@
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 
+#include "../priv.h"
+
 // clang format off
 #include <lib/mistos/linux_uapi/typedefs.h>
 // clang format on
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
 
 long sys_read(unsigned int fd, user_out_ptr<char> buf, size_t count) {
   LTRACEF_LEVEL(2, "fd=%d count=%zu\n", fd, count);
