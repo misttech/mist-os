@@ -29,9 +29,9 @@ zx_library("syscalls") {
 source_set("impl") {
   visibility = [ ":*" ]
   sources = [
+    "drivers/char/random.cc",
     "fs/read_write.cc",
     "kernel/exit.cc",
-    "misc.cc",
     "not_implemented.cc",
     "test.cc",
     "static_assert.cc",

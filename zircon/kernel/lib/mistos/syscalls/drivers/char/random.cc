@@ -13,11 +13,13 @@
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 
+#include "../../priv.h"
+
 // clang format off
 #include <lib/mistos/linux_uapi/typedefs.h>
 // clang format on
 
-#define LOCAL_TRACE 0
+#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
 
 long sys_getrandom(user_out_ptr<char> buffer, size_t count, unsigned int flags) {
   LTRACEF_LEVEL(2, "buffer %p count %zu flags 0x%x\n", buffer.get(), count, flags);
@@ -27,7 +29,6 @@ long sys_getrandom(user_out_ptr<char> buffer, size_t count, unsigned int flags) 
       starnix_uapi::UserAddress::from_ptr(reinterpret_cast<zx_vaddr_t>(buffer.get())), count,
       flags);
   if (syscall_ret.is_error()) {
-    LTRACEF_LEVEL(2, "error code %d\n", syscall_ret.error_value().error_code());
     return syscall_ret.error_value().return_value();
   }
   return syscall_ret.value();
