@@ -114,35 +114,29 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     // Decode the main executable.
     zx::vmo vmo;
     ASSERT_NO_FATAL_FAILURE(vmo = GetExecutableVmo(executable_name));
-    std::array initial_modules = {Linker::InitModule{
-        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vmo), kPageSize),
+    Linker::InitModuleList initial_modules{{
+        Linker::Executable(RemoteModule::Decoded::Create(diag, std::move(vmo), kPageSize)),
     }};
     ASSERT_TRUE(initial_modules.front().decoded_module);
+    ASSERT_TRUE(initial_modules.front().decoded_module->HasModule());
 
     // Pre-decode the vDSO.
     zx::vmo vdso_vmo;
     zx_status_t status = GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
-    std::array predecoded_modules = {Linker::PredecodedModule{
-        .decoded_module = RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), kPageSize),
-    }};
+    initial_modules.push_back(
+        Linker::Implicit(RemoteModule::Decoded::Create(diag, std::move(vdso_vmo), kPageSize)));
+    ASSERT_TRUE(initial_modules.back().decoded_module);
+    ASSERT_TRUE(initial_modules.back().decoded_module->HasModule());
 
-    // Acquire the layout details from the stub.  The same values collected
-    // here can be reused along with the decoded RemoteLoadModule for the stub
-    // for creating and populating the RemoteLoadModule for the passive ABI of
-    // any number of separate dynamic linking domains in however many
-    // processes.
-    RemoteAbiStub<>::Ptr abi_stub = RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
-    EXPECT_TRUE(abi_stub);
-    linker.set_abi_stub(abi_stub);
+    linker.set_abi_stub(RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
+    ASSERT_TRUE(linker.abi_stub());
 
     // First just decode all the modules: the executable and dependencies.
-    auto init_result =
-        linker.Init(diag, initial_modules, GetDepFunction(diag), std::move(predecoded_modules));
+    auto init_result = linker.Init(diag, initial_modules, GetDepFunction(diag));
     ASSERT_TRUE(init_result);
-    auto& modules = linker.modules();
-    ASSERT_FALSE(modules.empty());
+    ASSERT_EQ(init_result->size(), initial_modules.size());
 
     // If not all modules could be decoded, don't bother with relocation to
     // diagnose symbol resolution errors since many are likely without all the
@@ -171,7 +165,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     set_stack_size(linker.main_stack_size());
 
     // Locate the loaded vDSO to pass its base pointer to the test process.
-    const RemoteModule& loaded_vdso = modules[init_result->front()];
+    const RemoteModule& loaded_vdso = *init_result->back();
     set_vdso_base(loaded_vdso.module().vaddr_start());
 
     // Apply relocations to segment VMOs.
@@ -194,6 +188,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       return;
     }
 
+    const auto& modules = linker.modules();
     for (size_t i = 0; i < modules.size(); ++i) {
       EXPECT_EQ(modules[i].module().symbolizer_modid, i);
     }
