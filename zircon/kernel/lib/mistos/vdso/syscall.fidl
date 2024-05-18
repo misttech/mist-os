@@ -109,8 +109,10 @@ closed protocol Syscall {
     strict Alarm() -> () error int64;
     ///STUB 38
     strict Setitimer() -> () error int64;
-    ///STUB 39
+
+    // #39, SYSCALL_DEFINE0(getpid)
     strict Getpid() -> () error int64;
+
     ///STUB 40
     strict Sendfile() -> () error int64;
     ///STUB 41

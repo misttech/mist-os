@@ -32,6 +32,7 @@ source_set("impl") {
     "drivers/char/random.cc",
     "fs/read_write.cc",
     "kernel/exit.cc",
+    "kernel/sys.cc",
     "mm/mmap.cc",
     "not_implemented.cc",
     "test.cc",
