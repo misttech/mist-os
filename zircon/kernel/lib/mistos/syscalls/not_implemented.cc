@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// clang format off
-#include <linux/errno.h>
-// clang format on
-
 #include <debug.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
@@ -13,6 +9,8 @@
 #include <zircon/types.h>
 
 #include "priv.h"
+
+#include <linux/errno.h>
 
 #define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
 
