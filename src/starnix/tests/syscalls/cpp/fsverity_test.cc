@@ -36,7 +36,7 @@ class FsverityTest : public ::testing::Test {
     const char *tmpdir = getenv("FSVERITY_TMPDIR");
     test_filename_ = std::string(tmpdir) + "/fsverity";
 
-    int fd = open(test_filename_.c_str(), O_CREAT | O_RDWR);
+    int fd = open(test_filename_.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
     ASSERT_GT(fd, 0) << fd << " errno:" << errno;
     write(fd, "foo", 3);
     close(fd);
@@ -167,12 +167,108 @@ TEST_F(FsverityTest, MeasureVerityWhenNotVerity) {
   ASSERT_GT(fd, 0);
   // We should get ENODATA if we ask for the digest.
   char buf[64];
-  memset(&buf[0], 0, sizeof(buf));
-  fsverity_digest arg = {.digest_algorithm = FS_VERITY_HASH_ALG_SHA256, .digest_size = 32};
-  memcpy(&buf[0], &arg, sizeof(arg));
-  ASSERT_EQ(ioctl(fd, FS_IOC_MEASURE_VERITY, &buf), -1);
+  struct fsverity_digest *arg = reinterpret_cast<struct fsverity_digest *>(&buf);
+  arg->digest_size = 32;
+  ASSERT_EQ(ioctl(fd, FS_IOC_MEASURE_VERITY, arg), -1);
   ASSERT_EQ(errno, ENODATA);
   close(fd);
+}
+
+TEST_F(FsverityTest, MeasureVerityOverflowDigestSize) {
+  int fd = open(fname(), O_RDONLY);
+  ASSERT_GT(fd, 0);
+  bool is_minfs;
+  {
+    struct statfs64 fs;
+    ASSERT_EQ(statfs64(fname(), &fs), 0);
+    is_minfs = fs.f_type == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs);
+  }
+
+  // Valid enable request, no salt, no sig.
+  {
+    fsverity_enable_arg arg = {
+        .version = 1, .hash_algorithm = FS_VERITY_HASH_ALG_SHA256, .block_size = 4096};
+    if (is_minfs) {
+      ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), -1) << errno;
+      ASSERT_EQ(errno, EOPNOTSUPP);
+      close(fd);
+      return;
+    }
+    ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), 0) << errno;
+  }
+
+  {
+    char buf[64];
+    struct fsverity_digest *arg = reinterpret_cast<struct fsverity_digest *>(&buf);
+    arg->digest_size = 31;
+    // Ugly polling wait for fsverity to build.
+    for (int i = 0; i < 10000; i++) {
+      if (ioctl(fd, FS_IOC_MEASURE_VERITY, arg) == -1 && errno == EOVERFLOW) {
+        return;
+      }
+      ASSERT_EQ(errno, ENODATA);
+      usleep(10000);
+    }
+    ASSERT_TRUE(false) << "fsverity did not finish building after 10000 loop iterations";
+  }
+}
+
+TEST_F(FsverityTest, MeasureVeritySetDigestAlgorithm) {
+  int fd = open(fname(), O_RDONLY);
+  ASSERT_GT(fd, 0);
+  bool is_minfs;
+  {
+    struct statfs64 fs;
+    ASSERT_EQ(statfs64(fname(), &fs), 0);
+    is_minfs = fs.f_type == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs);
+  }
+
+  // Valid enable request, no salt, no sig.
+  {
+    fsverity_enable_arg arg = {
+        .version = 1, .hash_algorithm = FS_VERITY_HASH_ALG_SHA256, .block_size = 4096};
+    if (is_minfs) {
+      ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), -1) << errno;
+      ASSERT_EQ(errno, EOPNOTSUPP);
+      close(fd);
+      return;
+    }
+    ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), 0) << errno;
+  }
+
+  // Now we should get back a digest for the data once fsverity has finished building.
+  {
+    char buf[64];
+    struct fsverity_digest *arg = reinterpret_cast<struct fsverity_digest *>(&buf);
+    arg->digest_size = 32;
+    // 3 is an invalid digest algorithm. Test that FS_IOC_MEASURE_VERITY ignores values set
+    // on an output field.
+    arg->digest_algorithm = 3;
+    // Ugly polling wait for fsverity to build.
+    for (int i = 0; i < 10000; i++) {
+      if (ioctl(fd, FS_IOC_MEASURE_VERITY, arg) == 0) {
+        break;
+      }
+      ASSERT_EQ(errno, ENODATA);
+      usleep(10000);
+    }
+    ASSERT_EQ(ioctl(fd, FS_IOC_MEASURE_VERITY, arg), 0) << errno;
+    ASSERT_EQ(arg->digest_algorithm, FS_VERITY_HASH_ALG_SHA256);
+    ASSERT_EQ(arg->digest_size, 32);
+
+    // Obtained via:
+    // ```
+    // $ echo -ne "foo" > /tmp/foo.txt
+    // $ fsverity digest /tmp/foo.txt
+    // sha256:84c7384b3239274691380d7042dc3d8c13f9e606ef546544fe9e348afb0e8af5 /tmp/foo.txt
+    // ```
+    uint8_t expected_digest[32] = {0x84, 0xc7, 0x38, 0x4b, 0x32, 0x39, 0x27, 0x46, 0x91, 0x38, 0x0d,
+                                   0x70, 0x42, 0xdc, 0x3d, 0x8c, 0x13, 0xf9, 0xe6, 0x06, 0xef, 0x54,
+                                   0x65, 0x44, 0xfe, 0x9e, 0x34, 0x8a, 0xfb, 0x0e, 0x8a, 0xf5
+
+    };
+    ASSERT_TRUE(memcmp(&expected_digest[0], arg->digest, 32) == 0);
+  }
 }
 
 TEST_F(FsverityTest, EnableVerity) {
@@ -221,17 +317,19 @@ TEST_F(FsverityTest, EnableVerity) {
   // Now we should get back a digest for the data once fsverity has finished building.
   {
     char buf[64];
-    fsverity_digest arg = {.digest_algorithm = FS_VERITY_HASH_ALG_SHA256, .digest_size = 32};
-    memcpy(&buf[0], &arg, sizeof(arg));
+    struct fsverity_digest *arg = reinterpret_cast<struct fsverity_digest *>(&buf);
+    arg->digest_size = 32;
     // Ugly polling wait for fsverity to build.
     for (int i = 0; i < 10000; i++) {
-      if (ioctl(fd, FS_IOC_MEASURE_VERITY, &buf) == 0) {
+      if (ioctl(fd, FS_IOC_MEASURE_VERITY, arg) == 0) {
         break;
       }
       ASSERT_EQ(errno, ENODATA);
       usleep(10000);
     }
-    ASSERT_EQ(ioctl(fd, FS_IOC_MEASURE_VERITY, &buf), 0) << errno;
+    ASSERT_EQ(ioctl(fd, FS_IOC_MEASURE_VERITY, arg), 0) << errno;
+    ASSERT_EQ(arg->digest_algorithm, FS_VERITY_HASH_ALG_SHA256);
+    ASSERT_EQ(arg->digest_size, 32);
 
     // Obtained via:
     // ```
@@ -244,7 +342,7 @@ TEST_F(FsverityTest, EnableVerity) {
                                    0x65, 0x44, 0xfe, 0x9e, 0x34, 0x8a, 0xfb, 0x0e, 0x8a, 0xf5
 
     };
-    ASSERT_TRUE(memcmp(&expected_digest[0], &buf[4], 32) == 0);
+    ASSERT_TRUE(memcmp(&expected_digest[0], arg->digest, 32) == 0);
   }
   // Enabling now should return EEXIST
   {
@@ -266,7 +364,8 @@ TEST_F(FsverityTest, EnableVerity) {
     ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), -1);
     ASSERT_EQ(errno, EEXIST);
   }
-  // TODO(https://fxbug.dev/300003181): Test FS_IOC_READ_VERITY_METADATA -- Merkle Tree (not supported)
+  // TODO(https://fxbug.dev/300003181): Test FS_IOC_READ_VERITY_METADATA -- Merkle Tree (not
+  // supported)
   {
     uint8_t buf[64];
     fsverity_read_metadata_arg arg = {

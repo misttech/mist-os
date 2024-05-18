@@ -11909,7 +11909,7 @@ pub struct fsverity_enable_arg {
     pub __reserved2: [__u64; 11usize],
 }
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, AsBytes, NoCell, FromBytes, FromZeros)]
 pub struct fsverity_digest {
     pub digest_algorithm: __u16,
     pub digest_size: __u16,

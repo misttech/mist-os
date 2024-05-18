@@ -108,6 +108,10 @@ AUTO_DERIVE_TRAITS = [
     (r"dm_name_list", ["AsBytes", "NoCell", "FromBytes", "FromZeros"]),
     (r"dm_target_versions", ["AsBytes", "NoCell", "FromBytes", "FromZeros"]),
     (
+        r"fsverity_digest",
+        ["Clone", "AsBytes", "NoCell", "FromBytes", "FromZeros"],
+    ),
+    (
         r"input_event",
         ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"],
     ),
