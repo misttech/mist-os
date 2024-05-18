@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library linux;
 
+type statx = struct {};
+
 @no_protocol_prefix
 @transport("Syscall")
 closed protocol Syscall {
@@ -708,8 +710,18 @@ closed protocol Syscall {
     strict PkeyAlloc() -> () error int64;
     ///STUB 331
     strict PkeyFree() -> () error int64;
-    ///STUB 332
-    strict Statx() -> () error int64;
+
+    // #332 SYSCALL_DEFINE5(statx, int, dfd, const char __user *, filename, unsigned, flags, unsigned int, mask, struct statx __user *, buffer)
+    strict Statx(resource struct {
+        dfd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        flags uint32;
+        mask uint32;
+        @out
+        buffer experimental_pointer<statx>;
+    }) -> () error int64;
+
     ///STUB 333
     strict IoPgetevents() -> () error int64;
     ///STUB 334
