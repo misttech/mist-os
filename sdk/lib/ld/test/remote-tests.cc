@@ -182,6 +182,58 @@ TEST_F(LdRemoteTests, RemoteDynamicLinker) {
   ExpectLog("");
 }
 
+// This demonstrates using ld::RemoteDynamicLinker::Preplaced in the initial
+// modules list.
+TEST_F(LdRemoteTests, Preplaced) {
+  constexpr uint64_t kLoadAddress = 0x12340000;
+
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  Linker linker;
+  linker.set_abi_stub(ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize));
+  ASSERT_TRUE(linker.abi_stub());
+
+  zx::vmo exec_vmo;
+  ASSERT_NO_FATAL_FAILURE(exec_vmo = GetExecutableVmo("fixed-load-address"));
+
+  Linker::Module::DecodedPtr decoded_executable =
+      Linker::Module::Decoded::Create(diag, std::move(exec_vmo), kPageSize);
+  EXPECT_TRUE(decoded_executable);
+
+  zx::vmo vdso_vmo;
+  zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+  EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  Linker::Module::DecodedPtr decoded_vdso =
+      Linker::Module::Decoded::Create(diag, std::move(vdso_vmo), kPageSize);
+  EXPECT_TRUE(decoded_vdso);
+
+  auto init_result = linker.Init(  //
+      diag,
+      {Linker::Preplaced(std::move(decoded_executable), kLoadAddress,
+                         ld::abi::Abi<>::kExecutableName),
+       Linker::Implicit(std::move(decoded_vdso))},
+      GetDepFunction(diag));
+  ASSERT_TRUE(init_result);
+
+  EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
+  set_entry(linker.main_entry());
+  set_stack_size(linker.main_stack_size());
+  set_vdso_base(init_result->back()->module().vaddr_start());
+
+  EXPECT_EQ(init_result->front()->module().vaddr_start, kLoadAddress);
+
+  EXPECT_TRUE(linker.Relocate(diag));
+  ASSERT_TRUE(linker.Load(diag));
+  linker.Commit();
+
+  EXPECT_EQ(Run(), static_cast<int64_t>(kLoadAddress));
+
+  ExpectLog("");
+}
+
 TEST_F(LdRemoteTests, RemoteAbiStub) {
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 

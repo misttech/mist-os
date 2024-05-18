@@ -12,7 +12,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "internal/filter-view.h"
 #include "remote-decoded-module.h"
 
 namespace ld {
@@ -174,17 +173,36 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   }
 
   // Initialize the loader and allocate the address region for the module,
-  // updating the module's runtime addr fields on success.
+  // updating the module's runtime address fields on success.  The optional
+  // vmar_offset argument can pick the load address used, in terms of the
+  // offset within the containing VMAR.  The kernel chooses by default.
   template <class Diagnostics>
-  bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
+  bool Allocate(Diagnostics& diag, const zx::vmar& vmar,
+                std::optional<size_t> vmar_offset = std::nullopt) {
     if (this->HasModule()) [[likely]] {
       loader_ = Loader{vmar};
-      if (!loader_.Allocate(diag, this->decoded().load_info())) {
+      if (!loader_.Allocate(diag, this->decoded().load_info(), vmar_offset)) {
         return false;
       }
       SetModuleVaddrBounds(module_, this->decoded().load_info(), loader_.load_bias());
     }
     return true;
+  }
+
+  // Before Allocate() is called, this can be used to store a chosen vaddr that
+  // RemoteDynamicLinker can fetch back to compute the vmar_offset to pass to
+  // Allocate().
+  void Preplaced(size_type load_bias) {
+    SetModuleVaddrBounds(module_, this->decoded().load_info(), load_bias);
+    assert(preplaced());
+  }
+
+  // Returns the absolute vaddr_start if Preplaced() or Preloaded() was called.
+  std::optional<size_type> preplaced() const {
+    if (module_.vaddr_end == 0) {
+      return std::nullopt;
+    }
+    return module_.vaddr_start;
   }
 
   // Before relocation can mutate any segments, load_info() needs to be set up

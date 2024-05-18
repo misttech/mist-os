@@ -91,7 +91,9 @@ namespace ld {
 //   the root VMAR of a process, or a smaller VMAR.  It must be large enough to
 //   fit all the module images (including their .bss space beyond the size of
 //   each ELF file image), and must permit the necessary mapping operations
-//   (read, write, and execute, usually).
+//   (read, write, and execute, usually).  The absolute addresses for any
+//   `Preplaced()` (`InitModule::WithLoadBias`) uses and their image sizes must
+//   lie within this VMAR.
 //
 // * `Relocate()` fills in all the segment data that will need to be mapped in.
 //   That is, it performs relocation on all modules and completes the passive
@@ -170,7 +172,30 @@ class RemoteDynamicLinker {
   // module goes onto the list.  If no DT_NEEDED entry required the module,
   // then it is still loaded, but appears last in the list, with false for its
   // ld::abi::Abi<>::Module::symbols_visible flag.
+  //
+  // The `.load` member may optionally be initialized to direct how to load
+  // that module.
   struct InitModule {
+    // This is the default type for the `.load` member.  It says that the
+    // module can go anywhere in the address space, leaving the choice up to
+    // the kernel's ASLR within the VMAR passed to the Allocate method.
+    struct LoadAnywhere {};
+
+    // This type requests loading at a specific load address, which is
+    // represented as the bias added to `.decoded_module->vaddr_start()`.
+    struct WithLoadBias {
+      WithLoadBias() = delete;
+      constexpr explicit WithLoadBias(size_type bias) : load_bias{bias} {}
+
+      size_type load_bias;
+    };
+    static_assert(!std::is_default_constructible_v<WithLoadBias>);
+    static_assert(std::is_trivially_copyable_v<WithLoadBias>);
+
+    // This is the type of the `.load` member: one of the above, with the
+    // default-constructed state being LoadAnywhere.
+    using Load = std::variant<LoadAnywhere, WithLoadBias>;
+
     // This is the module to load.  It must be a valid pointer whose
     // `->HasModule()` returns true, indicating it was decoded sufficiently
     // successfully to attempt relocation safely.
@@ -184,6 +209,10 @@ class RemoteDynamicLinker {
     // empty string, which is not the same as having no name!).  If left as
     // std::nullopt, this is instead an implicitly-loaded module.
     std::optional<Soname> visible_name;
+
+    // This can be set to one of the types defined above to direct the loading.
+    // When left to the default construction, this gets LoadAnywhere.
+    Load load;
   };
 
   // The Init method takes a vector of InitModule objects, whose
@@ -241,6 +270,17 @@ class RemoteDynamicLinker {
   // such as the vDSO.
   static InitModule Implicit(DecodedModulePtr decoded_module) {
     return InitModule{.decoded_module = std::move(decoded_module)};
+  }
+
+  // Shorthand to create an InitialModuleList element for a module whose load
+  // bias is chosen rather than left to ASLR.  If the optional visible_name is
+  // given, this is a root module; otherwise it's an implicit module.
+  static InitModule Preplaced(  //
+      DecodedModulePtr decoded_module, size_type load_bias,
+      std::optional<Soname> visible_name = std::nullopt) {
+    return InitModule{.decoded_module = std::move(decoded_module),
+                      .visible_name = visible_name,
+                      .load = WithLoadBias{load_bias}};
   }
 
   // Other accessors should be used only after a successful Init call (below).
@@ -405,6 +445,7 @@ class RemoteDynamicLinker {
         initial_modules_modid[i] = next_modid();
         EmplaceModule(*init_module.visible_name, std::nullopt,
                       std::move(init_module.decoded_module));
+        PlaceInitModule(modules_.back(), init_module.load);
       } else {
         ++implicit_module_count;
       }
@@ -442,6 +483,7 @@ class RemoteDynamicLinker {
           // Don't check this element again.
           init_module.visible_name = module.name();
           use_decoded(std::move(init_module.decoded_module));
+          PlaceInitModule(module, init_module.load);
           return true;
         }
       }
@@ -495,6 +537,7 @@ class RemoteDynamicLinker {
         if (!init_module.visible_name) {
           initial_modules_modid[i] = next_modid();
           EmplaceUnreferenced(std::move(init_module.decoded_module));
+          PlaceInitModule(modules_.back(), init_module.load);
           if (--implicit_module_count == (stub_modid_ == 0 ? 1 : 0)) {
             break;
           }
@@ -540,8 +583,26 @@ class RemoteDynamicLinker {
   // then this will just skip any modules that weren't substantially decoded.
   template <class Diagnostics>
   bool Allocate(Diagnostics& diag, zx::unowned_vmar vmar) {
-    auto allocate = [&vmar = *vmar, &diag](Module& module) -> bool {
-      return module.Allocate(diag, vmar);
+    auto allocate = [&vmar = *vmar, vmar_base = std::optional<uint64_t>{},
+                     &diag](Module& module) mutable -> bool {
+      std::optional<size_t> vmar_offset;
+      if (module.module().vaddr_end != 0) {
+        // Init did SetModuleVaddrBounds for an InitModule::WithLoadBias case.
+        // Turn the vaddr_start into an offset within this VMAR.
+        if (!vmar_base) {
+          zx_info_vmar_t info;
+          zx_status_t status = vmar.get_info(ZX_INFO_VMAR, &info, sizeof(info), nullptr, nullptr);
+          if (status != ZX_OK) [[unlikely]] {
+            return diag.SystemError("ZX_INFO_VMAR: ", elfldltl::ZirconError{status});
+          }
+          vmar_base = info.base;
+        }
+        if (module.module().vaddr_start < *vmar_base) [[unlikely]] {
+          return diag.SystemError("chosen load address below VMAR base");
+        }
+        vmar_offset = module.module().vaddr_start - *vmar_base;
+      }
+      return module.Allocate(diag, vmar, vmar_offset);
     };
     return OnModules(ValidModules(), allocate);
   }
@@ -636,6 +697,10 @@ class RemoteDynamicLinker {
   }
 
  private:
+  using InitModuleLoad = typename InitModule::Load;
+  using LoadAnywhere = typename InitModule::LoadAnywhere;
+  using WithLoadBias = typename InitModule::WithLoadBias;
+
   static constexpr Soname kStubSoname = abi::Abi<Elf>::kSoname;
 
   // Add a new module to the list.  If no decoded_module is supplied here,
@@ -675,6 +740,20 @@ class RemoteDynamicLinker {
   void EmplaceUnreferenced(DecodedModulePtr decoded) {
     assert(decoded);
     EmplaceModule(decoded->soname(), std::nullopt, std::move(decoded), false);
+  }
+
+  // Dispatch to another overload for the specific type.
+  static void PlaceInitModule(Module& mod, const InitModuleLoad& load) {
+    auto place = [&mod](const auto& load) { PlaceInitModule(mod, load); };
+    std::visit(place, load);
+  }
+
+  // Nothing special for a LoadAnywhere initial module.
+  static void PlaceInitModule(Module& mod, LoadAnywhere anywhere) {}
+
+  // For a WithLoadBias case, store the address for Allocate() to use.
+  static void PlaceInitModule(Module& mod, WithLoadBias preplaced) {
+    mod.Preplaced(preplaced.load_bias);
   }
 
   template <class Diagnostics>

@@ -45,6 +45,7 @@ executables = [
   ":missing-sym",
   ":missing-transitive-dep",
   ":relro",
+  ":fixed-load-address",
 ]
 
 shlibs = [
@@ -790,4 +791,9 @@ test_shared_library("has-missing-dep") {
 test_executable("relro") {
   sources = [ "relro.cc" ]
   deps = [ "//zircon/system/public" ]
+}
+
+test_executable("fixed-load-address") {
+  sources = [ "fixed-load-address.cc" ]
+  deps = [ "//src/lib/elfldltl" ]
 }
