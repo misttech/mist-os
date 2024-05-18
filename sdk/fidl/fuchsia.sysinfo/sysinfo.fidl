@@ -32,7 +32,7 @@ type InterruptControllerInfo = struct {
     type InterruptControllerType;
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol SysInfo {
     /// Return the board name for the platform we are running on.
     strict GetBoardName() -> (struct {
