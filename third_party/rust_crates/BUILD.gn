@@ -586,6 +586,10 @@ if (current_os == "fuchsia") {
   }
 }
 
+group("overload") {
+  public_deps = [ ":overload-v0_1_1" ]
+}
+
 group("p256") {
   public_deps = [ ":p256-v0_11_1" ]
 }
@@ -9425,6 +9429,33 @@ rust_library("output_vt100-v0_1_3") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+license("overload-v0_1_1.license") {
+  public_package_name = "overload"
+  license_files = [ "//third_party/rust_crates/vendor/overload-0.1.1/LICENSE" ]
+}
+
+rust_library("overload-v0_1_1") {
+  crate_name = "overload"
+  crate_root = "//third_party/rust_crates/vendor/overload-0.1.1/src/lib.rs"
+  output_name = "overload-eb3d37d1929098ee"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=eb3d37d1929098ee",
+    "-Cextra-filename=-eb3d37d1929098ee",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":overload-v0_1_1.license" ]
 }
 
 license("p256-v0_11_1.license") {
