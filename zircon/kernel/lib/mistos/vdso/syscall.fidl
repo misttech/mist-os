@@ -51,8 +51,12 @@ closed protocol Syscall {
     strict Mprotect() -> () error int64;
     ///STUB 11
     strict Munmap() -> () error int64;
-    ///STUB 12
-    strict Brk() -> () error int64;
+
+    // #12, SYSCALL_DEFINE1(brk, unsigned long, brk)
+    strict Brk(resource struct {
+        brk uint64;
+    }) -> () error int64;
+
     ///STUB 13
     strict RtSigaction() -> () error int64;
     ///STUB 14
