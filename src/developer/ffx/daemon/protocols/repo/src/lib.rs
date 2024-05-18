@@ -9,11 +9,9 @@ use ffx_daemon_events::{DaemonEvent, TargetEvent};
 use ffx_daemon_target::target::Target;
 use ffx_ssh::ssh::build_ssh_command;
 use ffx_target::Description;
-use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{
-    self as ffx_ext, PackageEntry, RepositoryPackage, RepositoryRegistrationAliasConflictMode,
-    RepositoryTarget, ServerStatus,
+    self as ffx_ext, RepositoryRegistrationAliasConflictMode, RepositoryTarget, ServerStatus,
 };
 use fidl_fuchsia_net_ext::SocketAddress;
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
@@ -578,153 +576,6 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
 
         Ok(())
     }
-
-    async fn list_packages(
-        &self,
-        repository_name: &str,
-        iterator: ServerEnd<ffx::RepositoryPackagesIteratorMarker>,
-        _include_fields: ffx::ListFields,
-    ) -> Result<(), ffx::RepositoryError> {
-        let mut stream = match iterator.into_stream() {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::warn!("error converting iterator to stream: {:#?}", e);
-                return Err(ffx::RepositoryError::InternalError);
-            }
-        };
-
-        let repo = if let Some(r) = self.inner.read().await.manager.get(&repository_name) {
-            r
-        } else {
-            return Err(ffx::RepositoryError::NoMatchingRepository);
-        };
-
-        // Make sure the repository is up to date.
-        update_repository(repository_name, &repo).await?;
-
-        let packages = repo.read().await.list_packages().await.map_err(|err| {
-            tracing::error!("Unable to list packages: {:#}", err);
-
-            match err {
-                repository::Error::Tuf(tuf::Error::ExpiredMetadata(_)) => {
-                    ffx::RepositoryError::ExpiredRepositoryMetadata
-                }
-                _ => ffx::RepositoryError::IoError,
-            }
-        })?;
-
-        let mut packages = packages
-            .into_iter()
-            .map(|package| RepositoryPackage::from(package).into())
-            .collect::<Vec<ffx::RepositoryPackage>>();
-
-        fasync::Task::spawn(async move {
-            let mut chunks = SliceChunker::new(&mut packages);
-
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(ffx::RepositoryPackagesIteratorRequest::Next { responder }) => {
-                        let chunk = chunks.next();
-
-                        if let Err(e) = responder.send(chunk) {
-                            tracing::warn!(
-                                "Error responding to RepositoryPackagesIterator request: {:?}",
-                                e
-                            );
-                            break;
-                        }
-
-                        if chunk.is_empty() {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Error in RepositoryPackagesIterator request stream: {:?}",
-                            e
-                        );
-                        break;
-                    }
-                }
-            }
-        })
-        .detach();
-
-        Ok(())
-    }
-
-    async fn show_package(
-        &self,
-        repository_name: &str,
-        package_name: &str,
-        iterator: ServerEnd<ffx::PackageEntryIteratorMarker>,
-    ) -> Result<(), ffx::RepositoryError> {
-        let mut stream = match iterator.into_stream() {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::warn!("error converting iterator to stream: {}", e);
-                return Err(ffx::RepositoryError::InternalError);
-            }
-        };
-
-        let repo = if let Some(r) = self.inner.read().await.manager.get(&repository_name) {
-            r
-        } else {
-            return Err(ffx::RepositoryError::NoMatchingRepository);
-        };
-
-        // Make sure the repository is up to date.
-        update_repository(repository_name, &repo).await?;
-
-        let entries =
-            repo.read().await.show_package(&package_name, false).await.map_err(|err| {
-                tracing::error!("Unable to list package contents {:?}: {:#}", package_name, err);
-                ffx::RepositoryError::IoError
-            })?;
-
-        let Some(entries) = entries else {
-            return Err(ffx::RepositoryError::NoMatchingPackage);
-        };
-
-        let mut entries = entries
-            .into_iter()
-            .map(|entry| ffx::PackageEntry::from(PackageEntry::from(entry)))
-            .collect::<Vec<_>>();
-
-        fasync::Task::spawn(async move {
-            let mut chunks = SliceChunker::new(&mut entries);
-
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(ffx::PackageEntryIteratorRequest::Next { responder }) => {
-                        let chunk = chunks.next();
-
-                        if let Err(e) = responder.send(chunk) {
-                            tracing::warn!(
-                                "Error responding to PackageEntryIteratorRequest request: {:?}",
-                                e
-                            );
-                            break;
-                        }
-
-                        if chunk.is_empty() {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Error in PackageEntryIteratorRequest request stream: {:?}",
-                            e
-                        );
-                        break;
-                    }
-                }
-            }
-        })
-        .detach();
-
-        Ok(())
-    }
 }
 
 impl<T: EventHandlerProvider<R> + Default, R: Registrar + Default> Default for Repo<T, R> {
@@ -896,25 +747,6 @@ impl<
 
                 metrics::deregister_repository_event().await;
 
-                Ok(())
-            }
-            ffx::RepositoryRegistryRequest::ListPackages {
-                name,
-                iterator,
-                include_fields,
-                responder,
-            } => {
-                responder.send(self.list_packages(&name, iterator, include_fields).await)?;
-                Ok(())
-            }
-            ffx::RepositoryRegistryRequest::ShowPackage {
-                repository_name,
-                package_name,
-                iterator,
-                responder,
-            } => {
-                responder
-                    .send(self.show_package(&repository_name, &package_name, iterator).await)?;
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::ListRepositories { iterator, .. } => {

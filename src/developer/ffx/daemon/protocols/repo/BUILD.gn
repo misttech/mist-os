@@ -10,9 +10,7 @@ if (is_host) {
   measure_tape("measure_fuchsia_developer_ffx") {
     fidls = [ "//src/developer/ffx/fidl:fuchsia.developer.ffx" ]
     target_types = [
-      "fuchsia.developer.ffx/PackageEntry",
       "fuchsia.developer.ffx/RepositoryConfig",
-      "fuchsia.developer.ffx/RepositoryPackage",
       "fuchsia.developer.ffx/RepositoryTarget",
     ]
     target_binding = "rust"
@@ -50,7 +48,6 @@ if (is_host) {
       "//src/developer/ffx/lib/protocols:lib",
       "//src/developer/ffx/lib/ssh:lib",
       "//src/developer/ffx/lib/target:lib",
-      "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//src/lib/network/fidl_fuchsia_net_ext",
       "//src/lib/zircon/rust:fuchsia-zircon-types",
@@ -72,6 +69,7 @@ if (is_host) {
       "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/addr:lib",
+      "//src/lib/fidl/rust/fidl",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:pretty_assertions",
