@@ -49,7 +49,7 @@ type Mmio = resource table {
     3: vmo zx.Handle:VMO;
 };
 
-@discoverable
+@discoverable(server="platform")
 open protocol Device {
     /// Returns a memory mapped IO (MMIO) resource for the given |index|.
     /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
