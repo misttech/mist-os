@@ -92,10 +92,8 @@ fuchsia_cc_test(
     deps = [
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//pkg/async",
-        "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
         "@internal_sdk//pkg/driver_compat",
-        "@internal_sdk//pkg/driver_testing_cpp",
+        "@internal_sdk//pkg/driver_testing_cpp_gtest_fixture",
     ] + _common_deps,
 )
 
