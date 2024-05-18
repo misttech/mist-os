@@ -58,6 +58,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name, false));
   }
 
+  void Start(zx::channel bootstrap_receiver);
+
   int64_t Run();
 
   template <class... Reports>

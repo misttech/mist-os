@@ -192,9 +192,26 @@ class RemoteDynamicLinker {
     static_assert(!std::is_default_constructible_v<WithLoadBias>);
     static_assert(std::is_trivially_copyable_v<WithLoadBias>);
 
+    // This type indicates that the module is already present in the process
+    // address space and does not need to be loaded at all.  This module is
+    // treated specially in that its DT_NEEDED dependencies won't be examined,
+    // and the module itself won't be loaded.  Instead, it will just go into
+    // the module list and provide symbol definitions as if it had been loaded.
+    // As in WithLoadBias, its load address is specified in terms of the bias
+    // added to its `.decoded_module->vaddr_start()`, as returned by the
+    // load_bias() method on An existing module from a previous session.
+    struct AlreadyLoaded {
+      AlreadyLoaded() = delete;
+      constexpr explicit AlreadyLoaded(size_type bias) : load_bias{bias} {}
+
+      size_type load_bias;
+    };
+    static_assert(!std::is_default_constructible_v<AlreadyLoaded>);
+    static_assert(std::is_trivially_copyable_v<AlreadyLoaded>);
+
     // This is the type of the `.load` member: one of the above, with the
     // default-constructed state being LoadAnywhere.
-    using Load = std::variant<LoadAnywhere, WithLoadBias>;
+    using Load = std::variant<LoadAnywhere, WithLoadBias, AlreadyLoaded>;
 
     // This is the module to load.  It must be a valid pointer whose
     // `->HasModule()` returns true, indicating it was decoded sufficiently
@@ -281,6 +298,30 @@ class RemoteDynamicLinker {
     return InitModule{.decoded_module = std::move(decoded_module),
                       .visible_name = visible_name,
                       .load = WithLoadBias{load_bias}};
+  }
+
+  // Shorthand to create an InitialModuleList element for a module already
+  // loaded in place.
+  static InitModule Preloaded(  //
+      DecodedModulePtr decoded_module, size_type load_bias,
+      std::optional<Soname> visible_name = std::nullopt) {
+    return InitModule{.decoded_module = std::move(decoded_module),
+                      .visible_name = visible_name,
+                      .load = AlreadyLoaded{load_bias}};
+  }
+
+  // Shorthand for turning a previous set of initial modules into a new one.
+  // This produces the list for a secondary dynamic linking session that takes
+  // the initial modules from this session as preloaded implicit modules.  This
+  // takes the (successful) return value from Init, but it should be used only
+  // after the Allocate phase when all the load addresses are known.
+  InitModuleList PreloadedImplicit(const InitResult& list) {
+    InitModuleList result;
+    result.reserve(list.size());
+    for (const auto& mod : list) {
+      result.emplace_back(Preloaded(mod->decoded_module(), mod->load_bias()));
+    }
+    return result;
   }
 
   // Other accessors should be used only after a successful Init call (below).
@@ -585,6 +626,13 @@ class RemoteDynamicLinker {
   bool Allocate(Diagnostics& diag, zx::unowned_vmar vmar) {
     auto allocate = [&vmar = *vmar, vmar_base = std::optional<uint64_t>{},
                      &diag](Module& module) mutable -> bool {
+      if (module.preloaded()) {
+        // This was an InitModule::AlreadyLoaded case where PlaceInitialModule
+        // called Module::Preloaded.  There's nothing to do here: this module
+        // is already in the address space.
+        return true;
+      }
+
       std::optional<size_t> vmar_offset;
       if (module.module().vaddr_end != 0) {
         // Init did SetModuleVaddrBounds for an InitModule::WithLoadBias case.
@@ -697,9 +745,12 @@ class RemoteDynamicLinker {
   }
 
  private:
+  using Loader = typename Module::Loader;
+
   using InitModuleLoad = typename InitModule::Load;
   using LoadAnywhere = typename InitModule::LoadAnywhere;
   using WithLoadBias = typename InitModule::WithLoadBias;
+  using AlreadyLoaded = typename InitModule::AlreadyLoaded;
 
   static constexpr Soname kStubSoname = abi::Abi<Elf>::kSoname;
 
@@ -754,6 +805,12 @@ class RemoteDynamicLinker {
   // For a WithLoadBias case, store the address for Allocate() to use.
   static void PlaceInitModule(Module& mod, WithLoadBias preplaced) {
     mod.Preplaced(preplaced.load_bias);
+  }
+
+  // For an AlreadyLoaded case, set up the addresses and make sure Allocate()
+  // skips the module.
+  static void PlaceInitModule(Module& mod, AlreadyLoaded preloaded) {
+    mod.Preloaded(preloaded.load_bias);
   }
 
   template <class Diagnostics>

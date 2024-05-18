@@ -234,6 +234,171 @@ TEST_F(LdRemoteTests, Preplaced) {
   ExpectLog("");
 }
 
+// This demonstrates performing two separate dynamic linking sessions to
+// establish two distinct dynamic linking namespaces inside one process address
+// space, where the second session uses the first session's initial modules
+// (but not their dependencies) as preloaded implicit modules that can satisfy
+// its symbols.
+TEST_F(LdRemoteTests, SecondSession) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  // The ld::RemoteAbiStub only needs to be set up once for all sessions.
+  ld::RemoteAbiStub<>::Ptr abi_stub = ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
+  ASSERT_TRUE(abi_stub);
+
+  // First do a complete dynamic linking session for the main executable.
+  ASSERT_NO_FATAL_FAILURE(Needed({
+      "libindirect-deps-a.so",
+      "libindirect-deps-b.so",
+      "libindirect-deps-c.so",
+  }));
+  constexpr std::string_view kMainSoname = "libsecond-session-test.so.1";
+  Linker::InitModuleList initial_modules;
+  std::string vdso_soname;
+  {
+    Linker linker;
+    linker.set_abi_stub(abi_stub);
+
+    zx::vmo exec_vmo;
+    ASSERT_NO_FATAL_FAILURE(exec_vmo = GetExecutableVmo("second-session"));
+
+    Linker::Module::DecodedPtr decoded_executable =
+        Linker::Module::Decoded::Create(diag, std::move(exec_vmo), kPageSize);
+    EXPECT_TRUE(decoded_executable);
+
+    zx::vmo vdso_vmo;
+    zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+    EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+    Linker::Module::DecodedPtr decoded_vdso =
+        Linker::Module::Decoded::Create(diag, std::move(vdso_vmo), kPageSize);
+    EXPECT_TRUE(decoded_vdso);
+    vdso_soname = decoded_vdso->soname().str();
+
+    auto init_result = linker.Init(  //
+        diag,
+        {Linker::Executable(std::move(decoded_executable)),
+         Linker::Implicit(std::move(decoded_vdso))},
+        GetDepFunction(diag));
+    ASSERT_TRUE(init_result);
+
+    // Check on expected get_dep callbacks made by Init,
+    // and wipe the test fixture mock clean for the later session.
+    ASSERT_NO_FATAL_FAILURE(VerifyAndClearNeeded());
+
+    EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
+    set_entry(linker.main_entry());
+    set_stack_size(linker.main_stack_size());
+    set_vdso_base(init_result->back()->module().vaddr_start());
+
+    EXPECT_TRUE(linker.Relocate(diag));
+    ASSERT_TRUE(linker.Load(diag));
+    linker.Commit();
+
+    // Extract both initial modules to be preloaded implicit modules.
+    initial_modules = linker.PreloadedImplicit(*init_result);
+    EXPECT_EQ(initial_modules.size(), 2u);
+
+    // The primary domain has more modules than just those.
+    EXPECT_GT(linker.modules().size(), 2u);
+  }
+
+  // Start the process running now with just the primary domain in place.
+  // It will block on reading from the bootstrap channel.
+  zx::channel bootstrap_sender, bootstrap_receiver;
+  zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
+  ASSERT_EQ(status, ZX_OK) << "zx_channel_create: " << zx_status_get_string(status);
+  ASSERT_NO_FATAL_FAILURE(Start(std::move(bootstrap_receiver)));
+
+  // Now do a second session using the InitModule::AlreadyLoaded main
+  // executable and vDSO from the first session as implicit modules.
+  Linker::size_type test_start_fnptr = 0;
+  {
+    Linker second_linker;
+    second_linker.set_abi_stub(abi_stub);
+
+    // Acquire the VMO for the root module.
+    constexpr Linker::Soname kRootModule{"second-session-module.so"};
+    zx::vmo module_vmo;
+    ASSERT_NO_FATAL_FAILURE(
+        module_vmo = ld::testing::MockLoaderServiceForTest::GetRootModuleVmo(kRootModule.str()));
+
+    // Decode the root module.
+    Linker::Module::DecodedPtr decoded_module =
+        Linker::Module::Decoded::Create(diag, std::move(module_vmo), kPageSize);
+    EXPECT_TRUE(decoded_module);
+
+    // Add in the root module with the implicit modules from the first session.
+    initial_modules.emplace_back(Linker::RootModule(decoded_module, kRootModule));
+
+    // Prime fresh expectations for get_dep callbacks from this session.
+    ASSERT_NO_FATAL_FAILURE(VerifyAndClearNeeded());
+    constexpr std::string_view kDepModule = "libsecond-session-module-deps-a.so";
+    ASSERT_NO_FATAL_FAILURE(Needed({kDepModule}));
+
+    // Now resolve dependencies, including the preloaded implicit modules as
+    // well as that Needed list, modules newly opened via the get_dep callback.
+    auto init_result = second_linker.Init(diag, std::move(initial_modules), GetDepFunction(diag));
+    ASSERT_TRUE(init_result);
+    ASSERT_EQ(init_result->size(), 3u);
+
+    EXPECT_EQ(init_result->front()->name().str(), kMainSoname);
+    EXPECT_EQ(init_result->at(1)->name().str(), vdso_soname);
+    EXPECT_EQ(init_result->back()->name().str(), kRootModule.str());
+
+    EXPECT_TRUE(init_result->front()->preloaded());
+    EXPECT_TRUE(init_result->at(1)->preloaded());
+    EXPECT_FALSE(init_result->back()->preloaded());
+
+    ASSERT_EQ(second_linker.modules().size(), 5u);
+    EXPECT_EQ(second_linker.modules().at(0).name().str(), kRootModule.str());
+    EXPECT_EQ(second_linker.modules().at(1).name().str(), kMainSoname);
+    EXPECT_TRUE(second_linker.modules().at(1).preloaded());
+    EXPECT_EQ(second_linker.modules().at(2).name().str(), kDepModule);
+    EXPECT_EQ(second_linker.modules().at(3).name().str(), vdso_soname);
+    EXPECT_TRUE(second_linker.modules().at(3).preloaded());
+    EXPECT_EQ(second_linker.modules().at(4).name().str(), ld::abi::Abi<>::kSoname.str());
+
+    ASSERT_NO_FATAL_FAILURE(VerifyAndClearNeeded());
+
+    // Allocate should place the root module and leave preloaded ones alone.
+    EXPECT_TRUE(second_linker.Allocate(diag, root_vmar().borrow()));
+    EXPECT_TRUE(init_result->front()->preloaded());
+    EXPECT_TRUE(init_result->at(1)->preloaded());
+    EXPECT_FALSE(init_result->back()->preloaded());
+
+    // Finish dynamic linking.
+    EXPECT_TRUE(second_linker.Relocate(diag));
+    ASSERT_TRUE(second_linker.Load(diag));
+    second_linker.Commit();
+
+    // Look up the module's entry-point symbol.
+    constexpr elfldltl::SymbolName kTestStart{"TestStart"};
+    auto* symbol = kTestStart.Lookup(second_linker.main_module().module().symbols);
+    ASSERT_TRUE(symbol);
+    test_start_fnptr = symbol->value + second_linker.main_module().load_bias();
+  }
+  EXPECT_NE(test_start_fnptr, 0u);
+
+  // The process is already running and it will block until it reads the
+  // function pointer from the bootstrap channel.
+  status = bootstrap_sender.write(0, &test_start_fnptr, sizeof(test_start_fnptr), nullptr, 0);
+  ASSERT_EQ(status, ZX_OK) << "zx_channel_write: " << zx_status_get_string(status);
+
+  // Close our end of the channel before waiting for the process, just in case
+  // that kicks it out of a block and into crashing rather than wedging.
+  bootstrap_sender.reset();
+
+  // The process should now call TestStart() and exit with its return value.
+  EXPECT_EQ(Wait(), kReturnValue);
+
+  ExpectLog("");
+}
+
 TEST_F(LdRemoteTests, RemoteAbiStub) {
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 

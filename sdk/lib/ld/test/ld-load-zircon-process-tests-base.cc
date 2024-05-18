@@ -38,67 +38,60 @@ int64_t LdLoadZirconProcessTestsBase::Wait() {
   return result;
 }
 
-int64_t LdLoadZirconProcessTestsBase::Run(TestProcessArgs* bootstrap,
-                                          std::optional<size_t> stack_size,
-                                          const zx::thread& thread, uintptr_t entry,
-                                          uintptr_t vdso_base, const zx::vmar& root_vmar) {
+void LdLoadZirconProcessTestsBase::Start(TestProcessArgs* bootstrap, zx::channel bootstrap_receiver,
+                                         std::optional<size_t> stack_size, const zx::thread& thread,
+                                         uintptr_t entry, uintptr_t vdso_base,
+                                         const zx::vmar& root_vmar) {
   // Allocate the stack.  This is delayed until here in case the test uses
   // bootstrap() methods after Init() that affect bootstrap().GetStackSize().
   zx::vmo stack_vmo;
   uintptr_t sp;
-  auto allocate_stack = [&]() {
-    std::optional<size_t> bootstrap_stack_size = stack_size;
-    if (!bootstrap_stack_size) {
-      // TODO(mcgrathr): stack use too big for procargs piddly default
-      // bootstrap_stack_size = bootstrap.GetStackSize();
-      bootstrap_stack_size = 64 << 10;
-    }
-
-    const size_t page_size = zx_system_get_page_size();
-    const size_t stack_vmo_size = (*bootstrap_stack_size + page_size - 1) & -page_size;
-    const size_t stack_vmar_size = stack_vmo_size + page_size;
-
-    ASSERT_EQ(zx::vmo::create(stack_vmo_size, 0, &stack_vmo), ZX_OK);
-
-    zx::vmar stack_vmar;
-    uintptr_t stack_vmar_base;
-    ASSERT_EQ(root_vmar.allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE,
-                                 0, stack_vmar_size, &stack_vmar, &stack_vmar_base),
-              ZX_OK);
-
-    zx_vaddr_t stack_base;
-    ASSERT_EQ(
-        stack_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC | ZX_VM_ALLOW_FAULTS,
-                       page_size, stack_vmo, 0, stack_vmo_size, &stack_base),
-        ZX_OK);
-
-    if (bootstrap) {
-      ASSERT_NO_FATAL_FAILURE(bootstrap->AddStackVmo(std::move(stack_vmo)));
-    }
-
-    sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_vmo_size);
-  };
-
-  allocate_stack();
-  if (::testing::Test::HasFailure()) {
-    return -1;
+  std::optional<size_t> bootstrap_stack_size = stack_size;
+  if (!bootstrap_stack_size) {
+    // TODO(mcgrathr): stack use too big for procargs piddly default
+    // bootstrap_stack_size = bootstrap.GetStackSize();
+    bootstrap_stack_size = 64 << 10;
   }
+
+  const size_t page_size = zx_system_get_page_size();
+  const size_t stack_vmo_size = (*bootstrap_stack_size + page_size - 1) & -page_size;
+  const size_t stack_vmar_size = stack_vmo_size + page_size;
+
+  ASSERT_EQ(zx::vmo::create(stack_vmo_size, 0, &stack_vmo), ZX_OK);
+
+  zx::vmar stack_vmar;
+  uintptr_t stack_vmar_base;
+  ASSERT_EQ(root_vmar.allocate(ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0,
+                               stack_vmar_size, &stack_vmar, &stack_vmar_base),
+            ZX_OK);
+
+  zx_vaddr_t stack_base;
+  ASSERT_EQ(stack_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC | ZX_VM_ALLOW_FAULTS,
+                           page_size, stack_vmo, 0, stack_vmo_size, &stack_base),
+            ZX_OK);
+
+  if (bootstrap) {
+    ASSERT_NO_FATAL_FAILURE(bootstrap->AddStackVmo(std::move(stack_vmo)));
+  }
+
+  sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_vmo_size);
 
   // Pack up the bootstrap message and start the process running.
-  auto start_process = [&]() {
-    zx::channel bootstrap_receiver =
-        bootstrap ? bootstrap->PackBootstrap() : zx::channel(ZX_HANDLE_INVALID);
-
-    ASSERT_EQ(this->process().start(thread, entry, sp, std::move(bootstrap_receiver), vdso_base),
-              ZX_OK);
-  };
-
-  start_process();
-  if (::testing::Test::HasFailure()) {
-    return -1;
+  if (bootstrap_receiver) {
+    ASSERT_FALSE(bootstrap);
+  } else if (bootstrap) {
+    bootstrap_receiver = bootstrap->PackBootstrap();
   }
 
-  return Wait();
+  ASSERT_EQ(this->process().start(thread, entry, sp, std::move(bootstrap_receiver), vdso_base),
+            ZX_OK);
+}
+
+int64_t LdLoadZirconProcessTestsBase::Run(  //
+    TestProcessArgs* bootstrap, std::optional<size_t> stack_size, const zx::thread& thread,
+    uintptr_t entry, uintptr_t vdso_base, const zx::vmar& root_vmar) {
+  Start(bootstrap, {}, stack_size, thread, entry, vdso_base, root_vmar);
+  return ::testing::Test::HasFailure() ? -1 : Wait();
 }
 
 LdLoadZirconProcessTestsBase::~LdLoadZirconProcessTestsBase() {

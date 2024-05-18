@@ -48,6 +48,10 @@ executables = [
   ":fixed-load-address",
 ]
 
+if (is_fuchsia) {
+  executables += [ ":second-session" ]
+}
+
 shlibs = [
   ":ld-dep-a",
   ":ld-dep-b",
@@ -62,9 +66,10 @@ shlibs = [
   ":tls-ie-dep",
   ":tls-desc-dep",
   ":has-missing-dep",
+  ":second-session-module-deps-a",
 ]
 
-modules = []
+modules = [ ":second-session-module" ]
 foreach(label, executables + in_process_executables) {
   modules += [ "$label.module" ]
 }
@@ -152,6 +157,12 @@ template("_test_non_executable") {
   }
 
   if (!is_fuchsia && current_toolchain == shlib_toolchain) {
+    prefixes = {
+      loadable_module = ""
+      shared_library = "lib"
+    }
+    prefix = prefixes[invoker.target_type]
+
     # host_test_data() generates this copy() target with this metadata, but it
     # adds extra deps that don't work here and are only in host_test_data() for
     # issues with non-shlib variant binaries that don't apply here.
@@ -160,7 +171,7 @@ template("_test_non_executable") {
       testonly = true
 
       deps = [ ":$shlib_target_name" ]
-      sources = [ "$root_out_dir/lib$shlib_target_name.so" ]
+      sources = [ "$root_out_dir/$prefix$shlib_target_name.so" ]
 
       # TODO(https://fxbug.dev/333947906): copy targets to a variant dedicated dir.
       outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
@@ -191,14 +202,48 @@ template("test_shared_library") {
 }
 
 template("test_loadable_module") {
-  _test_non_executable(target_name) {
+  module_target = target_name
+
+  _test_non_executable(module_target) {
     target_type = "loadable_module"
     configs = []
+    data_deps = []
     forward_variables_from(invoker, "*", [ "target_type" ])
 
     # Make sure a system dlopen loading the module will look for its
     # dependencies adjacent to it.
     configs += [ ":runpath-origin" ]
+
+    if (!is_fuchsia && defined(invoker.shlib_deps)) {
+      # On Fuchsia, the indirect deps are all reached as resource()
+      # equivalents implicitly.  On host, the shlib_deps binaries must both
+      # be copied into the right test-data directory and roll up as
+      # host_test_data() equivalents.  This is evaluated after variant
+      # selection so it reaches the right variant $shlib_toolchain where
+      # test_shared_library() defines the `.host-test-data` target.
+      foreach(shlib, invoker.shlib_deps) {
+        data_deps += [ "$shlib.host-test-data($shlib_toolchain)" ]
+      }
+    }
+  }
+
+  if (!is_fuchsia && current_toolchain != shlib_toolchain) {
+    # On Fuchsia, the test loadable_module is reached as a resource()
+    # equivalent implicitly.  On host, it must both be copied into the right
+    # test-data directory and roll up as an host_test_data() equivalent.  The
+    # variant selection is done by the loadable_module() target, but we are
+    # in the right environment that produces a copy() target into the base
+    # toolchain's $root_out_dir.  This host_test_data() will copy again from
+    # there.
+    if (is_linux) {
+      assert(toolchain_environment == "linux",
+             "$current_toolchain is $toolchain_environment")
+    }
+    host_test_data("$module_target.host-test-data") {
+      deps = [ ":$module_target" ]
+      sources = [ "$root_out_dir/$module_target.so" ]
+      outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+    }
   }
 }
 
@@ -796,4 +841,52 @@ test_executable("relro") {
 test_executable("fixed-load-address") {
   sources = [ "fixed-load-address.cc" ]
   deps = [ "//src/lib/elfldltl" ]
+}
+
+test_executable("second-session") {
+  sources = [ "second-session.cc" ]
+
+  # Though this is an executable, it has a DT_SONAME and the linker is told to
+  # export all its STV_DEFAULT symbols as a shared_library() would by default.
+  ldflags = [
+    "-Wl,-soname,libsecond-session-test.so.1",
+    "-rdynamic",
+  ]
+
+  deps = [
+    ":indirect-deps-a",
+    "//src/zircon/lib/zircon",
+    "//zircon/system/public",
+    "//zircon/system/ulib/zx",
+
+    # This isn't really necessary as a link-time dependency, though it doesn't
+    # hurt (a DT_NEEDED for its own DT_SONAME won't try to add any new module
+    # at runtime).  `gn check` requires it because second-session.lib owns the
+    # header file.
+    ":second-session.lib",
+  ]
+
+  data_deps = [ ":second-session-module" ]
+}
+
+# This is the link-time dependency necessary for the second-session test's
+# secondary dynamic linking domain.
+ifs_shared_library("second-session.lib") {
+  testonly = true
+  public = [ "second-session.h" ]
+  abi = "second-session.ifs"
+}
+
+test_loadable_module("second-session-module") {
+  sources = [ "second-session-module.cc" ]
+  deps = [
+    ":second-session-module-deps-a",
+    ":second-session.lib",
+    ":test-executable.module",
+  ]
+}
+
+test_shared_library("second-session-module-deps-a") {
+  sources = [ "second-session-module-deps-a.cc" ]
+  deps = [ "//zircon/system/public" ]
 }

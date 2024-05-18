@@ -39,6 +39,11 @@ void LdRemoteProcessTests::Init(std::initializer_list<std::string_view> args,
             ZX_OK);
 }
 
+void LdRemoteProcessTests::Start(zx::channel bootstrap_receiver) {
+  LdLoadZirconProcessTestsBase::Start(nullptr, std::move(bootstrap_receiver), stack_size_, thread_,
+                                      entry_, vdso_base_, root_vmar());
+}
+
 int64_t LdRemoteProcessTests::Run() {
   return LdLoadZirconProcessTestsBase::Run(nullptr, stack_size_, thread_, entry_, vdso_base_,
                                            root_vmar());

@@ -37,6 +37,10 @@ class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
 
   void set_process(zx::process process);
 
+  void Start(TestProcessArgs* bootstrap, zx::channel bootstrap_receiver,
+             std::optional<size_t> stack_size, const zx::thread& thread, uintptr_t entry,
+             uintptr_t vdso_base, const zx::vmar& root_vmar);
+
   int64_t Run(TestProcessArgs* bootstrap, std::optional<size_t> stack_size,
               const zx::thread& thread, uintptr_t entry, uintptr_t vdso_base,
               const zx::vmar& root_vmar);
