@@ -44,7 +44,10 @@ if (toolchain_environment == "user.basic") {
       "needs-writable-globals",
     ]
 
-    sources = [ "syscall-wrappers.cc" ]
+    # FIXME (Herrera) Temporary disable file compilation 
+    # (need to fix zither legacy_syscall_cdecl and c backends)
+    # to work as in the mistos backend (c.go).
+    #sources = [ "syscall-wrappers.cc" ]
 
     public_deps = [ "//zircon/kernel/lib/mistos/vdso:public" ]
     deps = [
