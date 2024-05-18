@@ -101,7 +101,6 @@ impl DotFile {
 
 /// Trait for dealing with flags and protocol lists in Open/Open2.
 trait OpenArgs: vfs::ProtocolsExt + Send + Sync {
-    fn send_error(self, object_request: vfs::ObjectRequestRef<'_>, e: Status);
     fn open_subdir(
         &self,
         proxy: &fio::DirectoryProxy,
@@ -111,14 +110,6 @@ trait OpenArgs: vfs::ProtocolsExt + Send + Sync {
 }
 
 impl OpenArgs for fio::OpenFlags {
-    fn send_error(self, object_request: vfs::ObjectRequestRef<'_>, e: Status) {
-        vfs::common::send_on_open_with_error(
-            self.contains(fio::OpenFlags::DESCRIBE),
-            object_request.take().into_server_end(),
-            e,
-        );
-    }
-
     fn open_subdir(
         &self,
         proxy: &fio::DirectoryProxy,
@@ -135,10 +126,6 @@ impl OpenArgs for fio::OpenFlags {
 }
 
 impl OpenArgs for fio::ConnectionProtocols {
-    fn send_error(self, object_request: vfs::ObjectRequestRef<'_>, e: Status) {
-        vfs::common::send_on_open_with_error(false, object_request.take().into_server_end(), e);
-    }
-
     fn open_subdir(
         &self,
         proxy: &fio::DirectoryProxy,
@@ -308,13 +295,16 @@ impl CFDirectory {
                     })
                     .await
                 else {
-                    protocols.send_error(&mut object_request, Status::INTERNAL);
+                    object_request.shutdown(Status::INTERNAL);
                     return;
                 };
 
                 match action {
                     Action::InfoFile(x) => {
                         let _ = object_request.handle(|object_request| {
+                            if !path.is_empty() {
+                                return Err(Status::NOT_DIR);
+                            }
                             vfs::file::serve(
                                 vfs::file::read_only(x),
                                 scope,
@@ -325,7 +315,7 @@ impl CFDirectory {
                     }
                     Action::EnvDir(ty) => {
                         let Ok(local_path) = self.path.as_str().try_into() else {
-                            protocols.send_error(&mut object_request, Status::INTERNAL);
+                            object_request.shutdown(Status::INTERNAL);
                             return;
                         };
                         let proxy = self.inner.lock().unwrap().proxy.clone();
@@ -336,7 +326,7 @@ impl CFDirectory {
                         )
                         .await
                         else {
-                            protocols.send_error(&mut object_request, Status::INTERNAL);
+                            object_request.shutdown(Status::INTERNAL);
                             return;
                         };
                         protocols.open_subdir(&dir, path.as_ref(), &mut object_request);
@@ -372,7 +362,7 @@ impl CFDirectory {
                     .and_then(|x| x)
                 {
                     Ok(x) => x.do_open(scope, protocols, path, &mut object_request),
-                    Err(e) => protocols.send_error(&mut object_request, e),
+                    Err(e) => object_request.shutdown(e),
                 }
             });
         }
@@ -838,6 +828,19 @@ mod test {
             assert_eq!(fuchsia_fs::directory::DirentKind::Directory, ns.kind);
 
             assert!(items.is_empty());
+
+            let fuchsia_fs::node::OpenError::OpenError(url_isnt_a_folder) =
+                fuchsia_fs::directory::open_file(
+                    &proxy,
+                    ".url/foo",
+                    fio::OpenFlags::RIGHT_READABLE,
+                )
+                .await
+                .unwrap_err()
+            else {
+                panic!();
+            };
+            assert_eq!(Status::NOT_DIR, url_isnt_a_folder);
 
             let url =
                 fuchsia_fs::directory::open_file(&proxy, ".url", fio::OpenFlags::RIGHT_READABLE)
