@@ -811,7 +811,7 @@ impl std::fmt::Display for PlaygroundValue {
                 Ok(())
             }
             PlaygroundValue::Iterator(_) => write!(f, "<iterator>"),
-            PlaygroundValue::InUseHandle(_) => write!(f, "<handle in use>"),
+            PlaygroundValue::InUseHandle(h) => std::fmt::Display::fmt(h, f),
             PlaygroundValue::TypeHinted(hint, v) => write!(f, "@{hint} {v}"),
         }
     }

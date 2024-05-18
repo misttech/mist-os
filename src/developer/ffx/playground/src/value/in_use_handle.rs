@@ -365,6 +365,23 @@ impl InUseHandle {
     }
 }
 
+impl std::fmt::Display for InUseHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut this = self.handle.lock().unwrap();
+        this.determine();
+        match &*this {
+            HandleObject::Endpoint(Endpoint::Client(_, proto)) => write!(f, "ClientEnd<{proto}>"),
+            HandleObject::Endpoint(Endpoint::Server(_, proto)) => write!(f, "ServerEnd<{proto}>"),
+            HandleObject::Undetermined(_) => write!(f, "<unknown>"),
+            HandleObject::Defunct => write!(f, "<invalid handle>"),
+            HandleObject::Handle(_, ty) => write!(f, "<{ty:?}>"),
+            HandleObject::Endpoint(Endpoint::Socket(_)) => {
+                write!(f, "<{:?}>", fidl::ObjectType::SOCKET)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use futures::{AsyncReadExt, AsyncWriteExt};
