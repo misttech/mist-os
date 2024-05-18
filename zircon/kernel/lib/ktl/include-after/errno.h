@@ -10,4 +10,10 @@
 // The kernel doesn't want this file but some libc++ headers we need
 // wind up including it.
 
+#if _KERNEL_MISTOS
+#if __has_include_next(<errno.h>)
+#include_next <errno.h>
+#endif
+#endif
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE_ERRNO_H_

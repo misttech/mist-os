@@ -8,7 +8,10 @@ import("uapi.gni")
 
 zx_library("linux_uapi") {
   sources = []
-  public_configs = [ ":uapi" ]
+  public_configs = [
+    ":uapi",
+    ":headers.after",
+  ]
 }
 
 config("uapi") {
@@ -17,6 +20,14 @@ config("uapi") {
     "stub",
   ]
   defines = [ "_STRUCT_TIMESPEC" ]
+}
+
+config("headers.after") {
+  visibility = [ ":*" ]
+  cflags = [
+    "-idirafter",
+    rebase_path("include-after", root_build_dir),
+  ]
 }
 
 # Run generate_uapi_headers.sh manually and commit the headers save some build time
