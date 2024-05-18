@@ -8,7 +8,12 @@ import("//build/zircon/hermetic_code_blob.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":usercopy-unittests" ]
+  deps = [
+    ":usercopy-unittests",
+
+    # Make sure that the hermetic copy/zero routines do not bitrot.
+    ":usercopy_cpp_reference_routines",
+  ]
 }
 
 config("leaf-frame-pointer") {
@@ -16,69 +21,20 @@ config("leaf-frame-pointer") {
   cflags = [ "-mno-omit-leaf-frame-pointer" ]
 }
 
-template("_hermetic_code_blob") {
-  forward_variables_from(invoker, "*")
+static_library("usercopy_cpp_reference_routines") {
+  sources = [
+    "hermetic_copy.cc",
+    "hermetic_copy_until_null_byte.cc",
+    "hermetic_zero.cc",
+  ]
 
-  _target_bin_name = target_name + "_bin"
-
-  user_basic_redirect("${_target_bin_name}.basic") {
-    visibility = [ ":*" ]
-
-    public_deps = [ ":${_target_bin_name}" ]
-  }
-
-  hermetic_code_blob(target_name) {
-    public = [ "${target_name}.h" ]
-    sources = [ "${target_name}.cc" ]
-    public_deps = [ "//zircon/system/public" ]
-
-    # TODO(https://fxbug.dev/333105602): Avoid the use of `allow_rodata`.
-    allow_rodata = true
-
-    add_configs = [
-      # hermetic_copy_error.S assumes it can "unwind" the hermetic code blob from a
-      # fault just by popping the frame pointer and returning.  So it needs to know
-      # for sure there will be a frame pointer and nothing else on the stack other
-      # than the return address from the original call.
-      #
-      # TODO(jamesr): This is not remotely safe to assume about compiled code. The
-      # only safe way to unwind is to rely on full DWARF CFI and use the full
-      # unwinder.  However, the hermetic code blob is detached from any metadata
-      # such as CFI, so there is no way to make it unwindable.  Without that, the
-      # only truly safe option is to implement the copy routine in assembly for
-      # each machine and have a manually-maintained contract with the error
-      # recovery code about how to correctly unwind it.  It's easy for that
-      # contract to be simple since such a copy routine is usually just a leaf
-      # routine that doesn't spill any call-saved registers such that nothing but
-      # the return instruction is required.  But writing it in assembly is the only
-      # way to ensure the code meets such a contract.
-      ":leaf-frame-pointer",
-
-      # The copy utilities are often used in the fast-path so make sure we
-      # optimize for speed.
-      "//build/config:optimize_speed",
-    ]
-
-    # TODO(https://fxbug.dev/42079915): LLD lets --no-pie trump the code generation
-    # switches, but this needs to be compiled as PIC though linked differently.
-    if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
-        toolchain_variant.tags || optimize == "size_lto") {
-      ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
-    }
-
-    # In this target, we always want frame pointers even on leaf functions to make unwinding on
-    # exceptions easier. The default_frame_pointers config may specify -momit-leaf-frame-pointer so
-    # we specify -mno-omit-leaf-frame-pointer to override it.
-    cflags_cc = [ "-mno-omit-leaf-frame-pointer" ]
-  }
-
-  _target_name = ":${target_name}"
-  _output = target_name + ".bin"
-  resource(_target_bin_name) {
-    deps = [ _target_name ]
-    sources = get_target_outputs(deps[0])
-    outputs = [ _output ]
-  }
+  configs += [ "//build/config:default_frame_pointers" ]
+  configs -= [ "//build/config:default_frame_pointers" ]
+  configs += [
+    "//build/config:optimize_speed",
+    "//build/config:frame_pointers",
+    ":leaf-frame-pointer",
+  ]
 }
 
 static_library("usercopy_assembly_routines") {
@@ -96,12 +52,6 @@ static_library("usercopy_assembly_routines") {
                         ".",
                         arch_dir)
 }
-_hermetic_code_blob("hermetic_copy") {
-}
-_hermetic_code_blob("hermetic_copy_until_null_byte") {
-}
-_hermetic_code_blob("hermetic_zero") {
-}
 
 rustc_library("usercopy") {
   edition = "2021"
@@ -111,12 +61,7 @@ rustc_library("usercopy") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:zerocopy",
   ]
-  non_rust_deps = [
-    ":hermetic_copy_bin.basic",
-    ":hermetic_copy_until_null_byte_bin.basic",
-    ":hermetic_zero_bin.basic",
-    ":usercopy_assembly_routines",
-  ]
+  non_rust_deps = [ ":usercopy_assembly_routines" ]
   with_unit_tests = true
   test_deps = [
     "//src/lib/fuchsia",
