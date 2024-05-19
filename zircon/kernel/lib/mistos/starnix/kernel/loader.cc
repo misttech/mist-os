@@ -36,7 +36,6 @@
 #include <zircon/rights.h>
 #include <zircon/types.h>
 
-#include <cerrno>
 #include <numeric>
 #include <optional>
 
@@ -484,13 +483,18 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
     )?;
   */
 
+  auto creds = current_task->creds();
   fbl::AllocChecker ac;
   fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
-  // auxv.push_back(ktl::make_pair(AT_UID, creds.uid));
-  // auxv.push_back(ktl::make_pair(AT_EUID, creds.euid));
-  // auxv.push_back(ktl::make_pair(AT_GID, creds.gid));
-  // auxv.push_back(ktl::make_pair(AT_EGID, creds.egid));
-  // auxv.push_back(ktl::make_pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0));
+  auxv.push_back(ktl::pair(AT_UID, creds.uid), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_EUID, creds.euid), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_GID, creds.gid), &ac);
+  ZX_ASSERT(ac.check());
+  auxv.push_back(ktl::pair(AT_EGID, creds.egid), &ac);
+  ZX_ASSERT(ac.check());
+  // auxv.push_back(ktl::pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0), &ac);
   auxv.push_back(ktl::pair(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE)), &ac);
   ZX_ASSERT(ac.check());
   // auxv.push_back(ktl::make_pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff));
