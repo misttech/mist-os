@@ -9,10 +9,10 @@ using fuchsia.hardware.gpio;
 using fuchsia.hardware.i2c;
 using fuchsia.focaltech.platform;
 using fuchsia.platform;
+using fuchsia.devicetree;
 
 primary node "i2c" {
   fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
-  fuchsia.BIND_I2C_ADDRESS == fuchsia.focaltech.platform.BIND_I2C_ADDRESS.TOUCH;
 }
 
 node "gpio-int" {
@@ -26,9 +26,17 @@ node "gpio-reset" {
 }
 
 node "pdev" {
-  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
-  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.FOCALTOUCH;
-  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+  if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.FOCALTOUCH {
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+    fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+  } else {
+    accept fuchsia.devicetree.FIRST_COMPATIBLE {
+      "focaltech,ft3x27",
+      "focaltech,ft6336",
+      "focaltech,ft5726",
+      "focaltech,ft5336",
+    }
+  }
 }

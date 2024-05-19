@@ -68,6 +68,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/register-controller-1000",
       "sys/platform/temperature-sensor-ff634800",
       "sys/platform/temperature-sensor-ff634c00",
+      "sys/platform/touchscreen-38",
       "sys/platform/usb-ff400000",
       "sys/platform/usb-ff500000",
       "sys/platform/video-decoder-ffd00000",

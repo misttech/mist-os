@@ -128,4 +128,12 @@
 
 &i2c3 {
 	pinctrl-0 = <&i2c3_pins>;
+
+	touchscreen@38 {
+		compatible = "focaltech,ft5336";
+		reg = <0x38>;
+		gpios = <&gpio A311D_GPIOA(5) 0>,
+				<&gpio_expander 6 0>;
+		gpio-names = "TOUCH_INTERRUPT", "TOUCH_RESET";
+	};
 };
