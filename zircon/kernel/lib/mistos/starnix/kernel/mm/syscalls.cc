@@ -30,10 +30,10 @@ uint32_t get_valid_platform_mmap_flags() { return MAP_32BIT; }
 uint32_t get_valid_platform_mmap_flags() { return 0; }
 #endif
 
-fit::result<Errno, UserAddress> sys_mmap(CurrentTask& current_task, UserAddress addr, size_t length,
-                                         uint32_t prot, uint32_t flags,
-                                         /*FdNumber fd,*/ uint64_t offset) {
-  auto user_address = do_mmap(current_task, addr, length, prot, flags, /*fd,*/ offset);
+fit::result<Errno, UserAddress> sys_mmap(const CurrentTask& current_task, UserAddress addr,
+                                         size_t length, uint32_t prot, uint32_t flags, FdNumber fd,
+                                         uint64_t offset) {
+  auto user_address = do_mmap(current_task, addr, length, prot, flags, fd, offset);
   if (user_address.is_error()) {
     return user_address.take_error();
   }
@@ -50,8 +50,8 @@ fit::result<Errno, UserAddress> sys_mmap(CurrentTask& current_task, UserAddress 
 }
 
 fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAddress addr,
-                                        size_t length, uint32_t prot, uint32_t flags,
-                                        /*FdNumber fd,*/ uint64_t offset) {
+                                        size_t length, uint32_t prot, uint32_t flags, FdNumber fd,
+                                        uint64_t offset) {
   auto prot_flags = ProtectionFlags::from_bits(prot);
   if (!prot_flags) {
     // track_stub!(TODO("https://fxbug.dev/322874211"), "mmap parse protection", prot);
@@ -145,7 +145,7 @@ fit::result<Errno> sys_munmap(const CurrentTask& current_task, UserAddress addr,
   return fit::ok();
 }
 
-fit::result<Errno> sys_mprotect(CurrentTask& current_task, UserAddress addr, size_t length,
+fit::result<Errno> sys_mprotect(const CurrentTask& current_task, UserAddress addr, size_t length,
                                 uint32_t prot) {
   auto prot_flags = ProtectionFlags::from_bits(prot);
   if (!prot_flags.has_value()) {
@@ -159,10 +159,10 @@ fit::result<Errno> sys_mprotect(CurrentTask& current_task, UserAddress addr, siz
   return fit::ok();
 }
 
-fit::result<Errno, UserAddress> sys_mremap(CurrentTask& current_task, UserAddress addr,
+fit::result<Errno, UserAddress> sys_mremap(const CurrentTask& current_task, UserAddress addr,
                                            size_t old_length, size_t new_length, uint32_t flags,
                                            UserAddress new_addr) {
-  return fit::ok(0);
+  return fit::error(errno(ENOSYS));
 }
 
 /*

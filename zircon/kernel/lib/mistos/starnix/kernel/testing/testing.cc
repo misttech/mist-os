@@ -69,10 +69,8 @@ UserAddress map_memory(CurrentTask& current_task, UserAddress address, uint64_t 
 
 UserAddress map_memory_with_flags(CurrentTask& current_task, UserAddress address, uint64_t length,
                                   uint32_t flags) {
-  auto result = do_mmap(current_task, address, length, PROT_READ | PROT_WRITE, flags /*,
-           FdNumber::from_raw(-1)*/
-                        ,
-                        0);
+  auto result = do_mmap(current_task, address, length, PROT_READ | PROT_WRITE, flags,
+                        FdNumber::from_raw(-1), 0);
   EXPECT_FALSE(result.is_error(), "Could not map memory");
   return result.value();
 }

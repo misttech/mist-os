@@ -47,12 +47,29 @@ closed protocol Syscall {
     strict Poll() -> () error int64;
     ///STUB 8
     strict Lseek() -> () error int64;
-    ///STUB 9
-    strict Mmap() -> () error int64;
-    ///STUB 10
-    strict Mprotect() -> () error int64;
-    ///STUB 11
-    strict Munmap() -> () error int64;
+
+    // #9, SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len, unsigned long, prot, unsigned long, flags, unsigned long, fd, unsigned long, off)
+    strict Mmap(resource struct {
+        addr uint64;
+        len uint64;
+        prot uint64;
+        flags uint64;
+        fd uint64;
+        off uint64;
+    }) -> () error int64;
+
+    // #10, SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len, unsigned long, prot)
+    strict Mprotect(resource struct {
+        start uint64;
+        len usize64;
+        prot uint64;
+    }) -> () error int64;
+
+    // #11, SYSCALL_DEFINE2(munmap, unsigned long, addr, size_t, len)
+    strict Munmap(resource struct {
+        addr uint64;
+        len usize64;
+    }) -> () error int64;
 
     // #12, SYSCALL_DEFINE1(brk, unsigned long, brk)
     strict Brk(resource struct {

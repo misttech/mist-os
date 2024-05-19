@@ -453,7 +453,7 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(
 
 fit::result<Errno> MemoryManagerState::protect(UserAddress addr, size_t length,
                                                ProtectionFlags prot_flags) {
-  return fit::error(errno(ENOTSUP));
+  return fit::error(errno(ENOSYS));
 }
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
