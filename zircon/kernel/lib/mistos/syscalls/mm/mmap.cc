@@ -8,6 +8,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/syscalls/forward.h>
 #include <trace.h>
 
@@ -23,5 +24,5 @@ long sys_brk(unsigned long brk) {
   if (syscall_ret.is_error()) {
     return syscall_ret.error_value().return_value();
   }
-  return syscall_ret.value().ptr();
+  return starnix_syscalls::SyscallResult::From(*syscall_ret).value();
 }

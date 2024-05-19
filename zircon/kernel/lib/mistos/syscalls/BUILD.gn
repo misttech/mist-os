@@ -36,12 +36,13 @@ source_set("impl") {
     "kernel/sys.cc",
     "mm/mmap.cc",
     "not_implemented.cc",
-    "test.cc",
     "static_assert.cc",
+    "test.cc",
   ]
   deps = [
     "//zircon/kernel/lib/mistos/linux_uapi",
     "//zircon/kernel/lib/mistos/starnix/kernel",
+    "//zircon/kernel/lib/mistos/starnix_syscalls",
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/object",
