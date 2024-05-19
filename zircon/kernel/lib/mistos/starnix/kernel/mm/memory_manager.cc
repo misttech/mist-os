@@ -7,6 +7,7 @@
 
 #include <align.h>
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/logging/logging.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -16,6 +17,7 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/range-map.h>
+#include <lib/mistos/zx/handle.h>
 #include <lib/mistos/zx/vmar.h>
 #include <lib/mistos/zx/vmo.h>
 #include <lib/user_copy/user_ptr.h>
@@ -325,7 +327,7 @@ fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
     case ZX_ERR_INVALID_ARGS:
       return fit::error(errno(EINVAL));
     default:
-      PANIC("encountered impossible error: %d", status);
+      return fit::error<Errno>(impossible_error(status));
   }
 
   return update_after_unmap(addr, length, released_mappings);
@@ -601,7 +603,7 @@ Errno MemoryManager::get_errno_for_map_err(zx_status_t status) {
     case ZX_ERR_BAD_STATE:
       return errno(EINVAL);
     default:
-      PANIC("encountered impossible error: %d", status);
+      return impossible_error(status);
   }
 }
 
@@ -668,8 +670,8 @@ MemoryManager::MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t u
 
 fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& current_task,
                                                        UserAddress addr) {
-  // TODO (Herrera) use rlimit from current process
-  uint64_t rlimit_data = ktl::min(kProgramBreakLimit, static_cast<uint64_t>(-1));
+  uint64_t rlimit_data =
+      ktl::min(kProgramBreakLimit, current_task->thread_group()->get_rlimit({ResourceEnum::DATA}));
 
   fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
   Guard<Mutex> lock(&mm_state_rw_lock_);
@@ -680,8 +682,9 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
     if (status != ZX_OK) {
       return fit::error(errno(ENOMEM));
     }
-    status = vmo.set_property(ZX_PROP_NAME, "starnix-brk", strlen("starnix-brk"));
-    DEBUG_ASSERT(status == ZX_OK);
+
+    set_zx_name(zx::unowned_handle(vmo.get()), {(uint8_t*)"starnix-brk", 11});
+
     size_t length = PAGE_SIZE;
     auto flags = MappingFlags(MappingFlagsEnum::READ) | MappingFlags(MappingFlagsEnum::WRITE);
 
@@ -735,7 +738,7 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
                                     mapping->backing().variant);
 
     if (status != ZX_OK) {
-      PANIC("encountered impossible error: %d", status);
+      return fit::error(impossible_error(status));
     }
     auto result = state_.unmap(new_end, delta, released_mappings);
     if (result.is_error())
@@ -921,15 +924,15 @@ fit::result<Errno, zx::ArcVmo> create_anonymous_mapping_vmo(uint64_t size) {
     case ZX_ERR_OUT_OF_RANGE:
       return fit::error<Errno>(errno(ENOMEM));
     default:
-      PANIC("encountered impossible error: %d", result);
+      return fit::error<Errno>(impossible_error(result));
   }
 
-  result = vmo.set_property(ZX_PROP_NAME, "starnix-anon", strlen("starnix-anon"));
-  DEBUG_ASSERT(result == ZX_OK);
+  set_zx_name(zx::unowned_handle(vmo.get()), {(uint8_t*)"starnix-anon", strlen("starnix-anon")});
+
   // TODO(https://fxbug.dev/42056890): Audit replace_as_executable usage
   result = vmo.replace_as_executable({}, &vmo);
   if (result != ZX_OK) {
-    PANIC("encountered impossible error: %d", result);
+    return fit::error<Errno>(impossible_error(result));
   }
 
   fbl::AllocChecker ac;
