@@ -276,10 +276,13 @@ closed protocol Syscall {
     strict Getegid() -> () error int64;
     ///STUB 109
     strict Setpgid() -> () error int64;
-    ///STUB 110
+
+    // #110, SYSCALL_DEFINE0(getppid)
     strict Getppid() -> () error int64;
-    ///STUB 111
+
+    // #111, SYSCALL_DEFINE0(getpgrp)
     strict Getpgrp() -> () error int64;
+
     ///STUB 112
     strict Setsid() -> () error int64;
     ///STUB 113
@@ -298,8 +301,12 @@ closed protocol Syscall {
     strict Setresgid() -> () error int64;
     ///STUB 120
     strict Getresgid() -> () error int64;
-    ///STUB 121
-    strict Getpgid() -> () error int64;
+
+    // #121, SYSCALL_DEFINE1(getpgid, pid_t, pid)
+    strict Getpgid(resource struct {
+        pid int32;
+    }) -> () error int64;
+
     ///STUB 122
     strict Setfsuid() -> () error int64;
     ///STUB 123
@@ -428,8 +435,10 @@ closed protocol Syscall {
     strict Tuxcall() -> () error int64;
     ///STUB 185
     strict Security() -> () error int64;
-    ///STUB 186
+
+    // #186, SYSCALL_DEFINE0(gettid)
     strict Gettid() -> () error int64;
+
     ///STUB 187
     strict Readahead() -> () error int64;
     ///STUB 188
