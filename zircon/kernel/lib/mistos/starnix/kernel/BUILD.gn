@@ -13,6 +13,7 @@ zx_library("kernel") {
     "fs/mistos/syslog.cc",
     "fs/tmpfs.cc",
     "loader.cc",
+    "logging/logging.cc",
     "mm/memory_accessor.cc",
     "mm/memory_manager.cc",
     "mm/syscalls.cc",
