@@ -8,7 +8,7 @@ using zx;
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
 /// `ZX_RSRC_SYSTEM_VMEX_BASE` to programs that should be able to mark VMOs as
 /// executable.
-@discoverable
+@discoverable(server="platform")
 closed protocol VmexResource {
     /// Get a VMEX resource handle.
     strict Get() -> (resource struct {

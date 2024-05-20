@@ -7,7 +7,7 @@ using zx;
 
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
 /// `ZX_RSRC_SYSTEM_MSI_BASE`.
-@discoverable
+@discoverable(server="platform")
 @available(added=HEAD)
 closed protocol MsiResource {
     /// Get an msi resource handle.

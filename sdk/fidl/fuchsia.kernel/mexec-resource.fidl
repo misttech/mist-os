@@ -8,7 +8,7 @@ using zx;
 
 /// Protocol for providing a `ZX_RSRC_KIND_SYSTEM` with base
 /// `ZX_RSRC_SYSTEM_MEXEC_BASE`.
-@discoverable
+@discoverable(server="platform")
 @available(added=HEAD)
 closed protocol MexecResource {
     /// Get an MEXEC resource handle as `resource`.

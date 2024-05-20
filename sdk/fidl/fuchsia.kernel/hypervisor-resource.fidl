@@ -6,7 +6,7 @@ library fuchsia.kernel;
 using zx;
 
 /// Protocol for providing the hypervisor resource.
-@discoverable
+@discoverable(server="platform")
 closed protocol HypervisorResource {
     /// Get a hypervisor resource handle.
     strict Get() -> (resource struct {
