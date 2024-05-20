@@ -185,7 +185,7 @@ function addNewRfcsToAppSheet() {
   }
 
   if (createRows.length != 0) {
-    appScriptApiCall({
+    callAppSheetAPI({
       "Action": "Add",
       "Properties": {},
       Rows: createRows,
