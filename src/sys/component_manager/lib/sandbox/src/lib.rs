@@ -21,7 +21,7 @@ pub use self::capability::{Capability, CapabilityTrait, ConversionError, RemoteE
 pub use self::component::{WeakComponentToken, WeakComponentTokenAny};
 pub use self::connector::{Connectable, Connector, Message};
 pub use self::data::Data;
-pub use self::dict::{Dict, Key as DictKey, WeakDict};
+pub use self::dict::{Dict, Key as DictKey};
 pub use self::directory::Directory;
 pub use self::handle::OneShotHandle;
 pub use self::open::Open;

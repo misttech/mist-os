@@ -487,7 +487,7 @@ impl ResolvedInstanceState {
             &state.component_input,
             &state.component_output_dict,
             &state.program_input_dict,
-            &state.program_output_dict,
+            &component.program_output(),
             &mut child_inputs,
             &mut state.collection_inputs,
             &mut state.bedrock_environments,
@@ -872,7 +872,7 @@ impl ResolvedInstanceState {
                 &self.children,
                 &self.component_input,
                 &dynamic_offers,
-                &self.program_output_dict,
+                &component.program_output(),
                 &mut child_input,
             );
         }

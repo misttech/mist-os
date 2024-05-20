@@ -973,9 +973,9 @@ impl ComponentInstance {
 
     /// Returns a router that delegates to the program output dict.
     ///
-    /// This will be helpful in breaking up reference cycles. For example, you can insert
-    /// an item into the program output dict that references another item in the same dict,
-    /// by indirecting through this router.
+    /// This is helpful in breaking up reference cycles. For example, you can insert an item into
+    /// the program output dict that references another item in the same dict, by indirecting
+    /// through this router.
     pub fn program_output(self: &Arc<Self>) -> Router {
         #[derive(Debug)]
         struct ProgramOutput {
