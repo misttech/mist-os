@@ -16,13 +16,12 @@ use crate::{
         HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError, TransportIpContext,
     },
     socket::{
-        address::SocketIpAddr,
         datagram::{
             self, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
             DatagramSocketSpec, DualStackDatagramBoundStateContext,
             NonDualStackDatagramBoundStateContext,
         },
-        MaybeDualStack,
+        MaybeDualStack, SocketIpAddr,
     },
     transport::tcp::{
         socket::{self as tcp_socket, TcpBindingsTypes},

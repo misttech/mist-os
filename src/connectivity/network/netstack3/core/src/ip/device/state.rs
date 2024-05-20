@@ -139,7 +139,7 @@ impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv6Addr> for StrongRc<Ipv6Addr
     }
 
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
-        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub.addr())
+        IpDeviceAddr::new_from_ipv6_non_mapped_unicast(self.addr_sub.addr())
     }
 
     fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
@@ -186,7 +186,7 @@ impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv4Addr> for Ipv4AddressEn
 
 impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
-        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
+        IpDeviceAddr::new_from_ipv6_non_mapped_unicast(self.addr_sub().addr())
     }
 }
 

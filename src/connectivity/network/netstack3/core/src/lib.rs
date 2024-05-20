@@ -54,9 +54,7 @@ pub(crate) mod data_structures {
         };
     }
     pub(crate) mod socketmap {
-        pub(crate) use netstack3_base::socketmap::{
-            Entry, IterShadows, OccupiedEntry, SocketMap, Tagged,
-        };
+        pub(crate) use netstack3_base::socketmap::{IterShadows, SocketMap, Tagged};
     }
     pub(crate) mod token_bucket {
         pub(crate) use netstack3_base::TokenBucket;
@@ -234,18 +232,28 @@ pub mod routes {
 
 /// Common types for dealing with sockets.
 pub mod socket {
-    pub(crate) mod address;
-    mod base;
     pub(crate) mod datagram;
 
-    pub(crate) use base::*;
+    pub(crate) use netstack3_base::socket::{
+        AddrEntry, AddrVec, AddrVecIter, Bound, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr,
+        DualStackConnIpAddr, DualStackIpExt, DualStackListenerIpAddr, DualStackLocalIp,
+        DualStackRemoteIp, EitherStack, FoundSockets, IncompatibleError, InsertError, Inserter,
+        Listener, ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, RemoveResult,
+        Shutdown, SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError,
+        SocketIpAddr, SocketIpAddrExt, SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
+    };
 
-    pub use address::{AddrIsMappedError, StrictlyZonedAddr};
-    pub use base::{NotDualStackCapableError, SetDualStackEnabledError, ShutdownType};
     pub use datagram::{
         ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError, ListenerInfo,
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, SendError, SendToError,
         SetMulticastMembershipError, SocketInfo,
+    };
+
+    pub use netstack3_base::socket::{
+        AddrIsMappedError, NotDualStackCapableError, SetDualStackEnabledError, ShutdownType,
+        StrictlyZonedAddr,
     };
 }
 

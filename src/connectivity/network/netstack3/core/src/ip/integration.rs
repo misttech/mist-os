@@ -41,7 +41,7 @@ use crate::{
         TransportReceiveError,
     },
     routes::ResolvedRoute,
-    socket::{address::SocketIpAddr, datagram},
+    socket::{datagram, SocketIpAddr},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
     uninstantiable::UninstantiableWrapper,
     BindingsContext, BindingsTypes, CoreCtx, StackState,

@@ -46,7 +46,7 @@ use crate::{
         AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
     },
     error::AddressResolutionFailed,
-    socket::{address::SocketIpAddr, SocketIpAddrExt as _},
+    socket::{SocketIpAddr, SocketIpAddrExt as _},
     time::LocalTimerHeap,
     Instant,
 };

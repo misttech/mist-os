@@ -76,8 +76,7 @@ use crate::{
         TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{
-        address::{AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, SocketIpAddr},
-        datagram, AddrVec,
+        datagram, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, SocketIpAddr,
     },
     sync::Mutex,
 };

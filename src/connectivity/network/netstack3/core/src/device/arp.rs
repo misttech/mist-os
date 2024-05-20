@@ -659,7 +659,7 @@ mod tests {
             },
             DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
         },
-        socket::address::SocketIpAddr,
+        socket::SocketIpAddr,
         testutil::assert_empty,
     };
 

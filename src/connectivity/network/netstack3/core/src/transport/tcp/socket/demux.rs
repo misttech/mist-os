@@ -33,11 +33,8 @@ use crate::{
         TransportIpContext, TransportReceiveError,
     },
     socket::{
-        address::{
-            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr,
-            SocketIpAddr,
-        },
-        AddrVec, InsertError, SocketIpAddrExt as _,
+        AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
+        ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
     },
     trace_duration,
     transport::tcp::{

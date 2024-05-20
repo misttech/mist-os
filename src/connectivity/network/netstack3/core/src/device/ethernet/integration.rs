@@ -56,7 +56,7 @@ use crate::{
         },
         icmp::NdpCounters,
     },
-    socket::address::SocketIpAddr,
+    socket::SocketIpAddr,
     BindingsContext, BindingsTypes, CoreCtx,
 };
 

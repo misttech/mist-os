@@ -61,6 +61,7 @@ use crate::{
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
+        self,
         icmp::IcmpErrorCode,
         socket::{
             DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
@@ -68,17 +69,14 @@ use crate::{
         IpExt, IpSockCreateAndSendError, TransportIpContext,
     },
     socket::{
-        self,
-        address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackListenerIpAddr, DualStackLocalIp,
-            DualStackRemoteIp, ListenerAddr, ListenerIpAddr, SocketIpAddr,
-        },
-        AddrVec, Bound, EitherStack, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
-        MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError,
-        ShutdownType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpExt,
-        SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        SocketZonedAddrExt as _, UpdateSharingError,
+        self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
+        DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
+        ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError,
+        RemoveResult, SetDualStackEnabledError, ShutdownType, SocketDeviceUpdate,
+        SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt, SocketMapAddrSpec,
+        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _,
+        UpdateSharingError,
     },
     sync::{RemoveResourceResult, RwLock},
     transport::tcp::{
@@ -109,7 +107,7 @@ impl<I> DualStackIpExt for I where
 }
 
 /// A dual stack IP extension trait for TCP.
-pub trait DualStackBaseIpExt: crate::socket::DualStackIpExt + SocketIpExt {
+pub trait DualStackBaseIpExt: crate::socket::DualStackIpExt + SocketIpExt + ip::IpExt {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>: SpecSocketId;
@@ -1548,8 +1546,12 @@ pub enum TcpSocketStateInner<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tcp
     Bound(BoundSocketState<I, D, BT>),
 }
 
+struct TcpPortAlloc<'a, I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
+    &'a BoundSocketMap<I, D, BT>,
+);
+
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAllocImpl
-    for BoundSocketMap<I, D, BT>
+    for TcpPortAlloc<'_, I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SocketIpAddr<I::Addr>>;
@@ -1561,6 +1563,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAlloc
     type PortAvailableArg = Option<NonZeroU16>;
 
     fn is_port_available(&self, addr: &Self::Id, port: u16, arg: &Option<NonZeroU16>) -> bool {
+        let Self(socketmap) = self;
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
@@ -1579,11 +1582,11 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortAlloc
         // there are no sockets that are shadowing it.
 
         root_addr.iter_shadows().chain(core::iter::once(root_addr.clone())).all(|a| match &a {
-            AddrVec::Listen(l) => self.listeners().get_by_addr(&l).is_none(),
+            AddrVec::Listen(l) => socketmap.listeners().get_by_addr(&l).is_none(),
             AddrVec::Conn(_c) => {
                 unreachable!("no connection shall be included in an iteration from a listener")
             }
-        }) && self.get_shadower_counts(&root_addr) == 0
+        }) && socketmap.get_shadower_counts(&root_addr) == 0
     }
 }
 
@@ -1598,13 +1601,14 @@ impl<'a, I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> PortA
     for TcpDualStackPortAlloc<'a, I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> =
-        <BoundSocketMap<I, D, BT> as PortAllocImpl>::EPHEMERAL_RANGE;
+        <TcpPortAlloc<'a, I, D, BT> as PortAllocImpl>::EPHEMERAL_RANGE;
     type Id = ();
     type PortAvailableArg = ();
 
     fn is_port_available(&self, (): &Self::Id, port: u16, (): &Self::PortAvailableArg) -> bool {
         let Self(this, other) = self;
-        this.is_port_available(&None, port, &None) && other.is_port_available(&None, port, &None)
+        TcpPortAlloc(this).is_port_available(&None, port, &None)
+            && TcpPortAlloc(other).is_port_available(&None, port, &None)
     }
 }
 
@@ -1918,7 +1922,7 @@ where
             match algorithm::simple_randomized_port_alloc(
                 &mut bindings_ctx.rng(),
                 &local_ip,
-                socketmap,
+                &TcpPortAlloc(socketmap),
                 &None,
             ) {
                 Some(port) => NonZeroU16::new(port).expect("ephemeral ports must be non-zero"),
@@ -4739,7 +4743,7 @@ where
         || match algorithm::simple_randomized_port_alloc(
             &mut bindings_ctx.rng(),
             &Some(*ip_sock.local_ip()),
-            socketmap,
+            &TcpPortAlloc(socketmap),
             &Some(remote_port),
         ) {
             Some(port) => Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero")),

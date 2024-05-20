@@ -84,7 +84,7 @@ use crate::{
         },
         types::IpTypesIpExt,
     },
-    socket::address::SocketIpAddr,
+    socket::SocketIpAddr,
     sync::RemoveResourceResultWithContext,
     Instant,
 };
@@ -1845,7 +1845,7 @@ pub(crate) mod testutil {
             A::Version::map_ip(
                 WrapIn(self.addr()),
                 |WrapIn(v4_addr)| IpDeviceAddr::new_ipv4_specified(v4_addr),
-                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_device_addr(v6_addr),
+                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_non_mapped_unicast(v6_addr),
             )
         }
 

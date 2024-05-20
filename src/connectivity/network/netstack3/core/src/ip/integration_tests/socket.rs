@@ -41,7 +41,7 @@ use crate::{
         types::{AddableEntryEither, AddableMetric, RawMetric},
         IpDeviceContext, ResolveRouteError,
     },
-    socket::address::SocketIpAddr,
+    socket::SocketIpAddr,
     testutil::{
         set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, TestAddrs,
         TestIpExt, DEFAULT_INTERFACE_METRIC,

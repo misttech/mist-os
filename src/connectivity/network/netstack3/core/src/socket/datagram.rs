@@ -42,6 +42,7 @@ use crate::{
     filter::TransportPacketSerializer,
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
+        self,
         socket::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
             IpSocketHandler, SendOneShotIpPacketError, SendOptions,
@@ -49,16 +50,12 @@ use crate::{
         HopLimits, MulticastMembershipHandler, ResolveRouteError, TransportIpContext,
     },
     socket::{
-        self,
-        address::{
-            AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
-            DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr,
-        },
-        AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
-        NotDualStackCapableError, Shutdown, ShutdownType, SocketDeviceUpdate,
-        SocketDeviceUpdateNotAllowedError, SocketIpExt, SocketMapAddrSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec, SocketZonedAddrExt as _, StrictlyZonedAddr,
+        self, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
+        DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, EitherStack, InsertError,
+        ListenerAddr, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError, Shutdown,
+        ShutdownType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddr,
+        SocketIpExt, SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketZonedAddrExt as _, StrictlyZonedAddr,
     },
     sync::{RemoveResourceResultWithContext, RwLock},
 };
@@ -234,85 +231,6 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> AsRef<IpOptions<I
             Self::Connected { state, sharing: _ } => state.as_ref(),
         }
     }
-}
-
-impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
-    BoundSockets<I, D, A, S>
-{
-    pub(crate) fn iter_receivers(
-        &self,
-        (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<A::RemoteIdentifier>),
-        (dst_ip, dst_port): (SocketIpAddr<I::Addr>, A::LocalIdentifier),
-        device: D,
-    ) -> Option<
-        FoundSockets<
-            AddrEntry<'_, I, D, A, S>,
-            impl Iterator<Item = AddrEntry<'_, I, D, A, S>> + '_,
-        >,
-    > {
-        self.lookup((src_ip, src_port), (dst_ip, dst_port), device)
-    }
-}
-
-pub(crate) enum FoundSockets<A, It> {
-    /// A single recipient was found for the address.
-    Single(A),
-    /// Indicates the looked-up address was multicast, and holds an iterator of
-    /// the found receivers.
-    Multicast(It),
-}
-
-impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
-    BoundSocketMap<I, D, A, S>
-{
-    /// Finds the socket(s) that should receive an incoming packet.
-    ///
-    /// Uses the provided addresses and receiving device to look up sockets that
-    /// should receive a matching incoming packet. Returns `None` if no sockets
-    /// were found, or the results of the lookup.
-    fn lookup(
-        &self,
-        (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<A::RemoteIdentifier>),
-        (dst_ip, dst_port): (SocketIpAddr<I::Addr>, A::LocalIdentifier),
-        device: D,
-    ) -> Option<
-        FoundSockets<
-            AddrEntry<'_, I, D, A, S>,
-            impl Iterator<Item = AddrEntry<'_, I, D, A, S>> + '_,
-        >,
-    > {
-        let mut matching_entries = AddrVecIter::with_device(
-            match (src_ip, src_port) {
-                (Some(specified_src_ip), Some(src_port)) => {
-                    ConnIpAddr { local: (dst_ip, dst_port), remote: (specified_src_ip, src_port) }
-                        .into()
-                }
-                _ => ListenerIpAddr { addr: Some(dst_ip), identifier: dst_port }.into(),
-            },
-            device,
-        )
-        .filter_map(move |addr: AddrVec<I, D, A>| match addr {
-            AddrVec::Listen(l) => {
-                self.listeners().get_by_addr(&l).map(|state| AddrEntry::Listen(state, l))
-            }
-            AddrVec::Conn(c) => self.conns().get_by_addr(&c).map(|state| AddrEntry::Conn(state, c)),
-        });
-
-        if dst_ip.addr().is_multicast() {
-            Some(FoundSockets::Multicast(matching_entries))
-        } else {
-            let single_entry: Option<_> = matching_entries.next();
-            single_entry.map(FoundSockets::Single)
-        }
-    }
-}
-
-pub(crate) enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
-    Listen(&'a S::ListenerAddrState, ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
-    Conn(
-        &'a S::ConnAddrState,
-        ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
-    ),
 }
 
 #[derive(Derivative)]
@@ -608,19 +526,6 @@ impl<A: Eq + Hash, D: Eq + Hash> IntoIterator for MulticastMemberships<A, D> {
     }
 }
 
-impl<A: IpAddress, D: DeviceIdentifier, LI, RI: Copy> ConnAddr<ConnIpAddr<A, LI, RI>, D> {
-    pub(crate) fn from_protocol_flow_and_local_port(
-        id: &DatagramFlowId<A, RI>,
-        local_port: LI,
-    ) -> Self {
-        let DatagramFlowId { local_ip, remote_ip, remote_id } = id;
-        Self {
-            ip: ConnIpAddr { local: (*local_ip, local_port), remote: (*remote_ip, *remote_id) },
-            device: None,
-        }
-    }
-}
-
 fn leave_all_joined_groups<A: IpAddress, BC, CC: MulticastMembershipHandler<A::Version, BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -787,30 +692,6 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: Dat
         cb: F,
     ) -> O;
 }
-
-// Implement `GenericOverIp` for a `MaybeDualStack` whose `DS` and `NDS` also
-// implement `GenericOverIp`.
-impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOverIp<I>
-    for MaybeDualStack<DS, NDS>
-{
-    type Type = MaybeDualStack<<DS as GenericOverIp<I>>::Type, <NDS as GenericOverIp<I>>::Type>;
-}
-
-impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
-    fn to_converter<I: IpExt, BC, S: DatagramSocketSpec>(
-        self,
-    ) -> MaybeDualStack<DS::Converter, NDS::Converter>
-    where
-        DS: DualStackDatagramBoundStateContext<I, BC, S>,
-        NDS: NonDualStackDatagramBoundStateContext<I, BC, S>,
-    {
-        match self {
-            MaybeDualStack::DualStack(ds) => MaybeDualStack::DualStack(ds.converter()),
-            MaybeDualStack::NotDualStack(nds) => MaybeDualStack::NotDualStack(nds.converter()),
-        }
-    }
-}
-
 /// Provides access to dual-stack socket state.
 pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
@@ -1001,12 +882,12 @@ pub trait DatagramSocketMapSpec<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec
 /// This trait acts as a marker for [`DualStackBaseIpExt`] for both `Self` and
 /// `Self::OtherVersion`.
 pub trait DualStackIpExt:
-    DualStackBaseIpExt + super::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+    DualStackBaseIpExt + socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
 {
 }
 
 impl<I> DualStackIpExt for I where
-    I: DualStackBaseIpExt + super::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+    I: DualStackBaseIpExt + socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
 {
 }
 
@@ -1016,7 +897,7 @@ impl<I> DualStackIpExt for I where
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-pub trait DualStackBaseIpExt: super::DualStackIpExt + SocketIpExt {
+pub trait DualStackBaseIpExt: socket::DualStackIpExt + SocketIpExt + ip::IpExt {
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
@@ -2448,7 +2329,10 @@ fn listen_inner<
 
     let bound_addr: ListenerAddr<S::ListenerIpAddr<I>, CC::WeakDeviceId> = match bound_operation {
         BoundOperation::OnlyCurrentStack(either_dual_stack, addr) => {
-            let converter = either_dual_stack.to_converter();
+            let converter = match either_dual_stack {
+                MaybeDualStack::DualStack(ds) => MaybeDualStack::DualStack(ds.converter()),
+                MaybeDualStack::NotDualStack(nds) => MaybeDualStack::NotDualStack(nds.converter()),
+            };
             core_ctx
                 .with_bound_sockets_mut(|core_ctx, bound| {
                     let id = S::make_bound_socket_map_id(id);
@@ -5102,7 +4986,8 @@ mod test {
             DEFAULT_HOP_LIMITS,
         },
         socket::{
-            Bound, IncompatibleError, ListenerAddrInfo, RemoveResult, SocketMapAddrStateSpec,
+            AddrVec, Bound, IncompatibleError, ListenerAddrInfo, RemoveResult,
+            SocketMapAddrStateSpec,
         },
         testutil::TestIpExt,
         uninstantiable::UninstantiableWrapper,
@@ -5185,7 +5070,9 @@ mod test {
     #[derive(Debug)]
     struct AddrState<T>(T);
 
-    impl<I: IpExt, D: WeakDeviceIdentifier> SocketMapStateSpec for (FakeStateSpec, I, D) {
+    struct FakeSocketMapStateSpec<I, D>(PhantomData<(I, D)>, Never);
+
+    impl<I: IpExt, D: WeakDeviceIdentifier> SocketMapStateSpec for FakeSocketMapStateSpec<I, D> {
         type AddrVecTag = Tag;
         type ConnAddrState = AddrState<Self::ConnId>;
         type ConnId = I::DualStackBoundSocketId<D, FakeStateSpec>;
@@ -5210,7 +5097,7 @@ mod test {
         type SocketId<I: IpExt, D: WeakDeviceIdentifier> = Id<I, D>;
         type OtherStackIpOptions<I: IpExt, D: WeakDeviceIdentifier> =
             DatagramSocketOptions<I::OtherVersion, D>;
-        type SocketMapSpec<I: IpExt, D: WeakDeviceIdentifier> = (Self, I, D);
+        type SocketMapSpec<I: IpExt, D: WeakDeviceIdentifier> = FakeSocketMapStateSpec<I, D>;
         type SharingState = Sharing;
         type ListenerIpAddr<I: IpExt> =
             I::DualStackListenerIpAddr<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
@@ -5263,7 +5150,7 @@ mod test {
         }
 
         fn try_alloc_local_id<I: IpExt, D: WeakDeviceIdentifier, BC: RngContext>(
-            bound: &BoundSocketMap<I, D, FakeAddrSpec, (FakeStateSpec, I, D)>,
+            bound: &BoundSocketMap<I, D, FakeAddrSpec, FakeSocketMapStateSpec<I, D>>,
             _bindings_ctx: &mut BC,
             _flow: DatagramFlowId<I::Addr, <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier>,
         ) -> Option<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
@@ -5285,7 +5172,7 @@ mod test {
     }
 
     impl<I: IpExt, D: WeakDeviceIdentifier> DatagramSocketMapSpec<I, D, FakeAddrSpec>
-        for (FakeStateSpec, I, D)
+        for FakeSocketMapStateSpec<I, D>
     {
         type BoundSocketId = I::DualStackBoundSocketId<D, FakeStateSpec>;
     }
@@ -5304,7 +5191,7 @@ mod test {
             I,
             D,
             FakeAddrSpec,
-        > for (FakeStateSpec, I, D)
+        > for FakeSocketMapStateSpec<I, D>
     {
         fn check_insert_conflicts(
             sharing: &Sharing,
@@ -5343,7 +5230,7 @@ mod test {
             I,
             D,
             FakeAddrSpec,
-        > for (FakeStateSpec, I, D)
+        > for FakeSocketMapStateSpec<I, D>
     {
         fn check_insert_conflicts(
             sharing: &Sharing,
@@ -5399,13 +5286,13 @@ mod test {
             Ipv4,
             FakeWeakDeviceId<D>,
             FakeAddrSpec,
-            (FakeStateSpec, Ipv4, FakeWeakDeviceId<D>),
+            FakeSocketMapStateSpec<Ipv4, FakeWeakDeviceId<D>>,
         >,
         v6: BoundSockets<
             Ipv6,
             FakeWeakDeviceId<D>,
             FakeAddrSpec,
-            (FakeStateSpec, Ipv6, FakeWeakDeviceId<D>),
+            FakeSocketMapStateSpec<Ipv6, FakeWeakDeviceId<D>>,
         >,
     }
 
@@ -5415,7 +5302,7 @@ mod test {
                 I,
                 FakeWeakDeviceId<D>,
                 FakeAddrSpec,
-                (FakeStateSpec, I, FakeWeakDeviceId<D>),
+                FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
             >,
         > for FakeBoundSockets<D>
     {
@@ -5425,7 +5312,7 @@ mod test {
             I,
             FakeWeakDeviceId<D>,
             FakeAddrSpec,
-            (FakeStateSpec, I, FakeWeakDeviceId<D>),
+            FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
         > {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
@@ -5434,7 +5321,7 @@ mod test {
                     I,
                     FakeWeakDeviceId<D>,
                     FakeAddrSpec,
-                    (FakeStateSpec, I, FakeWeakDeviceId<D>),
+                    FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
             );
             let Wrap(state) = I::map_ip(self, |state| Wrap(&state.v4), |state| Wrap(&state.v6));
@@ -5448,7 +5335,7 @@ mod test {
                 I,
                 FakeWeakDeviceId<D>,
                 FakeAddrSpec,
-                (FakeStateSpec, I, FakeWeakDeviceId<D>),
+                FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
             >,
         > for FakeBoundSockets<D>
     {
@@ -5458,7 +5345,7 @@ mod test {
             I,
             FakeWeakDeviceId<D>,
             FakeAddrSpec,
-            (FakeStateSpec, I, FakeWeakDeviceId<D>),
+            FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
         > {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
@@ -5467,7 +5354,7 @@ mod test {
                     I,
                     FakeWeakDeviceId<D>,
                     FakeAddrSpec,
-                    (FakeStateSpec, I, FakeWeakDeviceId<D>),
+                    FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
             );
             let Wrap(state) =
@@ -5665,7 +5552,7 @@ mod test {
                     I,
                     Self::WeakDeviceId,
                     FakeAddrSpec,
-                    (FakeStateSpec, I, Self::WeakDeviceId),
+                    FakeSocketMapStateSpec<I, Self::WeakDeviceId>,
                 >,
             ) -> O,
         >(
@@ -5683,7 +5570,7 @@ mod test {
                     I,
                     Self::WeakDeviceId,
                     FakeAddrSpec,
-                    (FakeStateSpec, I, Self::WeakDeviceId),
+                    FakeSocketMapStateSpec<I, Self::WeakDeviceId>,
                 >,
             ) -> O,
         >(
@@ -5767,13 +5654,13 @@ mod test {
                     Ipv6,
                     Self::WeakDeviceId,
                     FakeAddrSpec,
-                    (FakeStateSpec, Ipv6, Self::WeakDeviceId),
+                    FakeSocketMapStateSpec<Ipv6, Self::WeakDeviceId>,
                 >,
                 &mut BoundSockets<
                     Ipv4,
                     Self::WeakDeviceId,
                     FakeAddrSpec,
-                    (FakeStateSpec, Ipv4, Self::WeakDeviceId),
+                    FakeSocketMapStateSpec<Ipv4, Self::WeakDeviceId>,
                 >,
             ) -> O,
         >(
@@ -5792,7 +5679,7 @@ mod test {
                     Ipv4,
                     Self::WeakDeviceId,
                     FakeAddrSpec,
-                    (FakeStateSpec, Ipv4, Self::WeakDeviceId),
+                    FakeSocketMapStateSpec<Ipv4, Self::WeakDeviceId>,
                 >,
             ) -> O,
         >(

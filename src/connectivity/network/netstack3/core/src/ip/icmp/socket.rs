@@ -40,14 +40,14 @@ use crate::{
     },
     socket::{
         self,
-        address::{ConnAddr, ConnInfoAddr, ConnIpAddr},
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
             DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError,
             SocketHopLimits,
         },
-        AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType,
-        SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        AddrVec, ConnAddr, ConnInfoAddr, ConnIpAddr, IncompatibleError, InsertError,
+        ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::{RemoveResourceResultWithContext, RwLock, StrongRc},
 };
@@ -341,7 +341,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type SharingState = ();
 
     type SocketMapSpec<I: datagram::IpExt + datagram::DualStackIpExt, D: WeakDeviceIdentifier> =
-        (Self, I, D);
+        IcmpSocketMapStateSpec<I, D, BT>;
 
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
         I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
@@ -365,7 +365,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
 
     fn make_packet<I: datagram::IpExt, B: BufferMut>(
         mut body: B,
-        addr: &socket::address::ConnIpAddr<
+        addr: &socket::ConnIpAddr<
             I::Addr,
             <Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
             <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
@@ -392,8 +392,8 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
             <Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         ) -> Result<(), datagram::InUseError>,
     ) -> Option<<Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
-        let mut port = IcmpBoundSockets::<I, D, BT>::rand_ephemeral(&mut bindings_ctx.rng());
-        for _ in IcmpBoundSockets::<I, D, BT>::EPHEMERAL_RANGE {
+        let mut port = IcmpPortAlloc::<I, D, BT>::rand_ephemeral(&mut bindings_ctx.rng());
+        for _ in IcmpPortAlloc::<I, D, BT>::EPHEMERAL_RANGE {
             // We can unwrap here because we know that the EPHEMERAL_RANGE doesn't
             // include 0.
             let tryport = NonZeroU16::new(port.get()).unwrap();
@@ -405,7 +405,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         None
     }
 
-    type ListenerIpAddr<I: datagram::IpExt> = socket::address::ListenerIpAddr<I::Addr, NonZeroU16>;
+    type ListenerIpAddr<I: datagram::IpExt> = socket::ListenerIpAddr<I::Addr, NonZeroU16>;
 
     type ConnIpAddr<I: datagram::IpExt> = ConnIpAddr<
         I::Addr,
@@ -437,7 +437,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         flow: datagram::DatagramFlowId<I::Addr, ()>,
     ) -> Option<NonZeroU16> {
         let mut rng = bindings_ctx.rng();
-        algorithm::simple_randomized_port_alloc(&mut rng, &flow, bound, &())
+        algorithm::simple_randomized_port_alloc(&mut rng, &flow, &IcmpPortAlloc(bound), &())
             .map(|p| NonZeroU16::new(p).expect("ephemeral ports should be non-zero"))
     }
 }
@@ -450,16 +450,22 @@ impl SocketMapAddrSpec for IcmpAddrSpec {
     type LocalIdentifier = NonZeroU16;
 }
 
-type IcmpBoundSockets<I, D, BT> = datagram::BoundSockets<I, D, IcmpAddrSpec, (Icmp<BT>, I, D)>;
+type IcmpBoundSockets<I, D, BT> =
+    datagram::BoundSockets<I, D, IcmpAddrSpec, IcmpSocketMapStateSpec<I, D, BT>>;
+
+struct IcmpPortAlloc<'a, I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>(
+    &'a IcmpBoundSockets<I, D, BT>,
+);
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> PortAllocImpl
-    for IcmpBoundSockets<I, D, BT>
+    for IcmpPortAlloc<'_, I, D, BT>
 {
     const EPHEMERAL_RANGE: core::ops::RangeInclusive<u16> = 1..=u16::MAX;
     type Id = DatagramFlowId<I::Addr, ()>;
     type PortAvailableArg = ();
 
     fn is_port_available(&self, id: &Self::Id, port: u16, (): &()) -> bool {
+        let Self(socketmap) = self;
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
@@ -471,9 +477,9 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> PortAllocImpl
         // A port is free if there are no sockets currently using it, and if
         // there are no sockets that are shadowing it.
         AddrVec::from(conn).iter_shadows().all(|a| match &a {
-            AddrVec::Listen(l) => self.listeners().get_by_addr(&l).is_none(),
-            AddrVec::Conn(c) => self.conns().get_by_addr(&c).is_none(),
-        } && self.get_shadower_counts(&a) == 0)
+            AddrVec::Listen(l) => socketmap.listeners().get_by_addr(&l).is_none(),
+            AddrVec::Conn(c) => socketmap.conns().get_by_addr(&c).is_none(),
+        } && socketmap.get_shadower_counts(&a) == 0)
     }
 }
 
@@ -607,8 +613,12 @@ where
     }
 }
 
+/// An uninstantiable type providing a [`SocketMapStateSpec`] implementation for
+/// ICMP.
+pub struct IcmpSocketMapStateSpec<I, D, BT>(PhantomData<(I, D, BT)>, Never);
+
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> SocketMapStateSpec
-    for (Icmp<BT>, I, D)
+    for IcmpSocketMapStateSpec<I, D, BT>
 {
     type ListenerId = IcmpSocketId<I, D, BT>;
     type ConnId = IcmpSocketId<I, D, BT>;
@@ -671,13 +681,13 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> SocketMapAddr
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
-    DatagramSocketMapSpec<I, D, IcmpAddrSpec> for (Icmp<BT>, I, D)
+    DatagramSocketMapSpec<I, D, IcmpAddrSpec> for IcmpSocketMapStateSpec<I, D, BT>
 {
     type BoundSocketId = IcmpSocketId<I, D, BT>;
 }
 
 impl<AA, I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
-    SocketMapConflictPolicy<AA, (), I, D, IcmpAddrSpec> for (Icmp<BT>, I, D)
+    SocketMapConflictPolicy<AA, (), I, D, IcmpAddrSpec> for IcmpSocketMapStateSpec<I, D, BT>
 where
     AA: Into<AddrVec<I, D, IcmpAddrSpec>> + Clone,
 {

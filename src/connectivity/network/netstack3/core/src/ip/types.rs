@@ -15,7 +15,7 @@ use net_types::{
     SpecifiedAddr,
 };
 
-use crate::socket::address::SocketIpAddr;
+use crate::socket::SocketIpAddr;
 
 /// The priority of a forwarding entry. Lower metrics are preferred.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]

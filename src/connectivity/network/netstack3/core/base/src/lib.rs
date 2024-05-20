@@ -70,6 +70,27 @@ pub mod ref_counted_hash_map {
     };
 }
 
+/// Common types and utilities for sockets.
+pub mod socket {
+    mod address;
+    mod base;
+
+    pub use address::{
+        AddrIsMappedError, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
+        DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, ListenerAddr, ListenerIpAddr,
+        SocketIpAddr, StrictlyZonedAddr,
+    };
+    pub use base::{
+        AddrEntry, AddrVec, Bound, BoundSocketMap, DualStackIpExt, EitherStack, FoundSockets,
+        IncompatibleError, InsertError, Inserter, Listener, ListenerAddrInfo, MaybeDualStack,
+        NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, Shutdown, ShutdownType,
+        SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddrExt,
+        SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
+    };
+}
+
 /// Defines generic data structures used to implement common application socket
 /// functionality for multiple protocols.
 pub mod socketmap {

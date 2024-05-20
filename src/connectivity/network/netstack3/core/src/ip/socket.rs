@@ -30,7 +30,7 @@ use crate::{
         IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata, ResolveRouteError,
         SendIpPacketMeta,
     },
-    socket::{address::SocketIpAddr, SocketIpAddrExt as _},
+    socket::{SocketIpAddr, SocketIpAddrExt as _},
     trace_duration,
 };
 

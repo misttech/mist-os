@@ -12,7 +12,7 @@ use core::{
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    AddrAndZone, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
+    AddrAndZone, MulticastAddress, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 
 use crate::{
@@ -20,9 +20,7 @@ use crate::{
         Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
     },
     device::{DeviceIdentifier, EitherDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier},
-    error::ZonedAddressError,
-    error::{ExistsError, NotFoundError},
-    ip,
+    error::{ExistsError, NotFoundError, ZonedAddressError},
     socket::address::{
         AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
     },
@@ -44,7 +42,7 @@ impl DualStackIpExt for Ipv6 {
 }
 
 /// Extension trait for `Ip` providing socket-specific functionality.
-pub trait SocketIpExt: Ip + ip::IpExt {
+pub trait SocketIpExt: Ip {
     /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
     const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
         // SAFETY: The loopback address is a valid SocketIpAddr, as verified
@@ -53,7 +51,7 @@ pub trait SocketIpExt: Ip + ip::IpExt {
     };
 }
 
-impl<I: Ip + ip::IpExt> SocketIpExt for I {}
+impl<I: Ip> SocketIpExt for I {}
 
 #[cfg(test)]
 mod socket_ip_ext_test {
@@ -104,9 +102,18 @@ pub enum EitherStack<T, O> {
 /// the same)! That lets the compiler optimize it out completely, creating no
 /// actual runtime overhead.
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum MaybeDualStack<DS, NDS> {
     DualStack(DS),
     NotDualStack(NDS),
+}
+
+// Implement `GenericOverIp` for a `MaybeDualStack` whose `DS` and `NDS` also
+// implement `GenericOverIp`.
+impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOverIp<I>
+    for MaybeDualStack<DS, NDS>
+{
+    type Type = MaybeDualStack<<DS as GenericOverIp<I>>::Type, <NDS as GenericOverIp<I>>::Type>;
 }
 
 /// An error encountered while enabling or disabling dual-stack operation.
@@ -128,7 +135,7 @@ pub struct NotDualStackCapableError;
 
 /// Describes which direction(s) of the data path should be shut down.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Shutdown {
+pub struct Shutdown {
     /// True if the send path is shut down for the owning socket.
     ///
     /// If this is true, the socket should not be able to send packets.
@@ -152,7 +159,8 @@ pub enum ShutdownType {
 }
 
 impl ShutdownType {
-    pub(crate) fn to_send_receive(&self) -> (bool, bool) {
+    /// Returns a tuple of booleans for `(shutdown_send, shutdown_receive)`.
+    pub fn to_send_receive(&self) -> (bool, bool) {
         match self {
             Self::Send => (true, false),
             Self::Receive => (false, true),
@@ -249,9 +257,17 @@ where
     }
 }
 
+/// A helper type to verify if applying socket updates is allowed for a given
+/// current state.
+///
+/// The fields in `SocketDeviceUpdate` define the current state,
+/// [`SocketDeviceUpdate::try_update`] applies the verification logic.
 pub struct SocketDeviceUpdate<'a, A: IpAddress, D: WeakDeviceIdentifier> {
+    /// The current local IP address.
     pub local_ip: Option<&'a SpecifiedAddr<A>>,
+    /// The current remote IP address.
     pub remote_ip: Option<&'a SpecifiedAddr<A>>,
+    /// The currently bound device.
     pub old_device: Option<&'a D>,
 }
 
@@ -299,9 +315,13 @@ pub trait SocketMapAddrSpec {
     type RemoteIdentifier: Copy + Clone + Debug + Send + Sync + Hash + Eq;
 }
 
+/// Information about the address in a [`ListenerAddr`].
 pub struct ListenerAddrInfo {
-    pub(crate) has_device: bool,
-    pub(crate) specified_addr: bool,
+    /// Whether the address has a device bound.
+    pub has_device: bool,
+    /// Whether the listener is on a specified address (as opposed to a blanket
+    /// listener).
+    pub specified_addr: bool,
 }
 
 impl<A: IpAddress, D: DeviceIdentifier, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
@@ -319,8 +339,10 @@ pub trait SocketMapStateSpec {
     /// [`Self::ConnAddrState`].
     type AddrVecTag: Eq + Copy + Debug + 'static;
 
+    /// Returns a the tag for a listener in the socket map.
     fn listener_tag(info: ListenerAddrInfo, state: &Self::ListenerAddrState) -> Self::AddrVecTag;
 
+    /// Returns a the tag for a connected socket in the socket map.
     fn connected_tag(has_device: bool, state: &Self::ConnAddrState) -> Self::AddrVecTag;
 
     /// An identifier for a listening socket.
@@ -345,10 +367,13 @@ pub trait SocketMapStateSpec {
         + Debug;
 }
 
+/// Error returned by implementations of [`SocketMapAddrStateSpec`] to indicate
+/// incompatible changes to a socket map.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct IncompatibleError;
+pub struct IncompatibleError;
 
-pub(crate) trait Inserter<T> {
+/// An inserter into a [`SocketMap`].
+pub trait Inserter<T> {
     /// Inserts the provided item and consumes `self`.
     ///
     /// Inserts a single item and consumes the inserter (thus preventing
@@ -419,7 +444,10 @@ pub trait SocketMapAddrStateSpec {
     fn remove_by_id(&mut self, id: Self::Id) -> RemoveResult;
 }
 
-pub(crate) trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
+/// Provides behavior on updating the sharing state of a [`SocketMap`] entry.
+pub trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
+    /// Attempts to update the sharing state of the address state with id `id`
+    /// to `new_sharing_state`.
     fn try_update_sharing(
         &mut self,
         id: Self::Id,
@@ -427,6 +455,7 @@ pub(crate) trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
     ) -> Result<(), IncompatibleError>;
 }
 
+/// Provides conflict detection for a [`SocketMapStateSpec`].
 pub trait SocketMapConflictPolicy<
     Addr,
     SharingState,
@@ -450,21 +479,27 @@ pub trait SocketMapConflictPolicy<
     ) -> Result<(), InsertError>;
 }
 
-pub(crate) trait SocketMapUpdateSharingPolicy<Addr, SharingState, I: Ip, D: DeviceIdentifier, A>:
+/// Defines the policy for updating the sharing state of entries in the
+/// [`SocketMap`].
+pub trait SocketMapUpdateSharingPolicy<Addr, SharingState, I: Ip, D: DeviceIdentifier, A>:
     SocketMapConflictPolicy<Addr, SharingState, I, D, A>
 where
     A: SocketMapAddrSpec,
 {
+    /// Returns whether the entry `addr` in `socketmap` allows the sharing state
+    /// to transition from `old_sharing` to `new_sharing`.
     fn allows_sharing_update(
         socketmap: &SocketMap<AddrVec<I, D, A>, Bound<Self>>,
         addr: &Addr,
         old_sharing: &SharingState,
-        new_sharing_state: &SharingState,
+        new_sharing: &SharingState,
     ) -> Result<(), UpdateSharingError>;
 }
 
+/// A bound socket state that is either a listener or a connection.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "S::ListenerAddrState: Debug, S::ConnAddrState: Debug"))]
+#[allow(missing_docs)]
 pub enum Bound<S: SocketMapStateSpec + ?Sized> {
     Listen(S::ListenerAddrState),
     Conn(S::ConnAddrState),
@@ -492,6 +527,7 @@ pub enum Bound<S: SocketMapStateSpec + ?Sized> {
     PartialEq(bound = "D: PartialEq"),
     Hash(bound = "D: Hash")
 )]
+#[allow(missing_docs)]
 pub enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
     Listen(ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
     Conn(ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>),
@@ -535,11 +571,28 @@ impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec> IterShadows for AddrVec<I
     }
 }
 
+/// How a socket is bound on the system.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum SocketAddrType {
+#[allow(missing_docs)]
+pub enum SocketAddrType {
     AnyListener,
     SpecificListener,
     Connected,
+}
+
+impl<'a, A: IpAddress, LI> From<&'a ListenerIpAddr<A, LI>> for SocketAddrType {
+    fn from(ListenerIpAddr { addr, identifier: _ }: &'a ListenerIpAddr<A, LI>) -> Self {
+        match addr {
+            Some(_) => SocketAddrType::SpecificListener,
+            None => SocketAddrType::AnyListener,
+        }
+    }
+}
+
+impl<'a, A: IpAddress, LI, RI> From<&'a ConnIpAddr<A, LI, RI>> for SocketAddrType {
+    fn from(_: &'a ConnIpAddr<A, LI, RI>) -> Self {
+        SocketAddrType::Connected
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -578,7 +631,7 @@ impl<'a, A, D, S> From<(&'a ConnAddr<A, D>, S)> for SocketAddrTypeTag<S> {
 }
 
 /// The result of attempting to remove a socket from a collection of sockets.
-pub(crate) enum RemoveResult {
+pub enum RemoveResult {
     /// The value was removed successfully.
     Success,
     /// The value is the last value in the collection so the entire collection
@@ -588,7 +641,7 @@ pub(crate) enum RemoveResult {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "S::ListenerId: Clone, S::ConnId: Clone"), Debug(bound = ""))]
-pub(crate) enum SocketId<S: SocketMapStateSpec> {
+pub enum SocketId<S: SocketMapStateSpec> {
     Listener(S::ListenerId),
     Connection(S::ConnId),
 }
@@ -615,19 +668,19 @@ pub struct BoundSocketMap<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: S
 impl<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec, S: SocketMapStateSpec>
     BoundSocketMap<I, D, A, S>
 {
-    #[cfg(test)]
-    pub(crate) fn len(&self) -> usize {
+    /// Returns the number of entries in the map.
+    pub fn len(&self) -> usize {
         self.addr_to_state.len()
     }
 }
 
 /// Uninstantiable tag type for denoting listening sockets.
-pub(crate) enum Listener {}
+pub enum Listener {}
 /// Uninstantiable tag type for denoting connected sockets.
-pub(crate) enum Connection {}
+pub enum Connection {}
 
 /// View struct over one type of sockets in a [`BoundSocketMap`].
-pub(crate) struct Sockets<AddrToStateMap, SocketType>(AddrToStateMap, PhantomData<SocketType>);
+pub struct Sockets<AddrToStateMap, SocketType>(AddrToStateMap, PhantomData<SocketType>);
 
 impl<
         'a,
@@ -641,7 +694,7 @@ where
     S: SocketMapConflictPolicy<SocketType::Addr, SocketType::SharingState, I, D, A>,
 {
     /// Returns the state at an address, if there is any.
-    pub(crate) fn get_by_addr(self, addr: &SocketType::Addr) -> Option<&'a SocketType::AddrState> {
+    pub fn get_by_addr(self, addr: &SocketType::Addr) -> Option<&'a SocketType::AddrState> {
         let Self(addr_to_state, _marker) = self;
         addr_to_state.get(&SocketType::to_addr_vec(addr)).map(|state| {
             SocketType::from_bound_ref(state)
@@ -654,7 +707,7 @@ where
     /// Goes through a dry run of inserting a socket at the given address and
     /// with the given sharing state, returning `Ok(())` if the insertion would
     /// succeed, otherwise the error that would be returned.
-    pub(crate) fn could_insert(
+    pub fn could_insert(
         self,
         addr: &SocketType::Addr,
         sharing: &SocketType::SharingState,
@@ -669,9 +722,10 @@ where
     }
 }
 
+/// A borrowed state entry in a [`SocketMap`].
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
-pub(crate) struct SocketStateEntry<
+pub struct SocketStateEntry<
     'a,
     I: Ip,
     D: DeviceIdentifier,
@@ -697,7 +751,9 @@ where
     SocketType::SharingState: Clone,
     SocketType::Id: Clone,
 {
-    pub(crate) fn try_insert(
+    /// Attempts to insert a new entry into the [`SocketMap`] backing this
+    /// `Sockets`.
+    pub fn try_insert(
         self,
         socket_addr: SocketType::Addr,
         tag_state: SocketType::SharingState,
@@ -708,7 +764,11 @@ where
             .map(|(entry, ())| entry)
     }
 
-    pub(crate) fn try_insert_with<R>(
+    /// Like [`Sockets::try_insert`] but calls `make_id` to create a socket ID
+    /// before inserting into the map.
+    ///
+    /// `make_id` returns type `R` that is returned to the caller on success.
+    pub fn try_insert_with<R>(
         self,
         socket_addr: SocketType::Addr,
         tag_state: SocketType::SharingState,
@@ -757,7 +817,8 @@ where
         }
     }
 
-    pub(crate) fn entry(
+    /// Returns a borrowed entry at `id` and `addr`.
+    pub fn entry(
         self,
         id: &SocketType::Id,
         addr: &SocketType::Addr,
@@ -776,11 +837,8 @@ where
         })
     }
 
-    pub(crate) fn remove(
-        self,
-        id: &SocketType::Id,
-        addr: &SocketType::Addr,
-    ) -> Result<(), NotFoundError> {
+    /// Removes the entry with `id` and `addr`.
+    pub fn remove(self, id: &SocketType::Id, addr: &SocketType::Addr) -> Result<(), NotFoundError> {
         self.entry(id, addr)
             .map(|entry| {
                 entry.remove();
@@ -789,8 +847,10 @@ where
     }
 }
 
+/// The error returned when updating the sharing state for a [`SocketMap`] entry
+/// fails.
 #[derive(Debug)]
-pub(crate) struct UpdateSharingError;
+pub struct UpdateSharingError;
 
 impl<
         'a,
@@ -803,21 +863,20 @@ impl<
 where
     SocketType::Id: Clone,
 {
-    pub(crate) fn get_addr(&self) -> &SocketType::Addr {
+    /// Returns this entry's address.
+    pub fn get_addr(&self) -> &SocketType::Addr {
         let Self { id: _, addr_entry, _marker } = self;
         SocketType::from_addr_vec_ref(addr_entry.key())
     }
 
-    #[cfg(test)]
-    pub(crate) fn id(&self) -> &SocketType::Id {
+    /// Returns this entry's identifier.
+    pub fn id(&self) -> &SocketType::Id {
         let Self { id, addr_entry: _, _marker } = self;
         SocketType::from_socket_id_ref(id)
     }
 
-    pub(crate) fn try_update_addr(
-        self,
-        new_addr: SocketType::Addr,
-    ) -> Result<Self, (ExistsError, Self)> {
+    /// Attempts to update the address for this entry.
+    pub fn try_update_addr(self, new_addr: SocketType::Addr) -> Result<Self, (ExistsError, Self)> {
         let Self { id, addr_entry, _marker } = self;
 
         let new_addrvec = SocketType::to_addr_vec(&new_addr);
@@ -843,7 +902,8 @@ where
         return Err((ExistsError, SocketStateEntry { id, addr_entry, _marker }));
     }
 
-    pub(crate) fn remove(self) {
+    /// Removes this entry from the map.
+    pub fn remove(self) {
         let Self { id, mut addr_entry, _marker } = self;
         let addr = addr_entry.key().clone();
         match addr_entry.map_mut(|value| {
@@ -860,7 +920,8 @@ where
         }
     }
 
-    pub(crate) fn try_update_sharing(
+    /// Attempts to update the sharing state for this entry.
+    pub fn try_update_sharing(
         &mut self,
         old_sharing_state: &SocketType::SharingState,
         new_sharing_state: SocketType::SharingState,
@@ -903,7 +964,8 @@ where
     AddrVec<I, D, A>: IterShadows,
     S: SocketMapStateSpec,
 {
-    pub(crate) fn listeners(&self) -> Sockets<&SocketMap<AddrVec<I, D, A>, Bound<S>>, Listener>
+    /// Returns an iterator over the listeners on the socket map.
+    pub fn listeners(&self) -> Sockets<&SocketMap<AddrVec<I, D, A>, Bound<S>>, Listener>
     where
         S: SocketMapConflictPolicy<
             ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
@@ -919,9 +981,8 @@ where
         Sockets(addr_to_state, Default::default())
     }
 
-    pub(crate) fn listeners_mut(
-        &mut self,
-    ) -> Sockets<&mut SocketMap<AddrVec<I, D, A>, Bound<S>>, Listener>
+    /// Returns a mutable iterator over the listeners on the socket map.
+    pub fn listeners_mut(&mut self) -> Sockets<&mut SocketMap<AddrVec<I, D, A>, Bound<S>>, Listener>
     where
         S: SocketMapConflictPolicy<
             ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
@@ -937,7 +998,8 @@ where
         Sockets(addr_to_state, Default::default())
     }
 
-    pub(crate) fn conns(&self) -> Sockets<&SocketMap<AddrVec<I, D, A>, Bound<S>>, Connection>
+    /// Returns an iterator over the connections on the socket map.
+    pub fn conns(&self) -> Sockets<&SocketMap<AddrVec<I, D, A>, Bound<S>>, Connection>
     where
         S: SocketMapConflictPolicy<
             ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
@@ -953,9 +1015,8 @@ where
         Sockets(addr_to_state, Default::default())
     }
 
-    pub(crate) fn conns_mut(
-        &mut self,
-    ) -> Sockets<&mut SocketMap<AddrVec<I, D, A>, Bound<S>>, Connection>
+    /// Returns a mutable iterator over the connections on the socket map.
+    pub fn conns_mut(&mut self) -> Sockets<&mut SocketMap<AddrVec<I, D, A>, Bound<S>>, Connection>
     where
         S: SocketMapConflictPolicy<
             ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
@@ -977,23 +1038,110 @@ where
         addr_to_state.iter().map(|(a, _v): (_, &Bound<S>)| a)
     }
 
-    pub(crate) fn get_shadower_counts(&self, addr: &AddrVec<I, D, A>) -> usize {
+    /// Gets the number of shadower entries for `addr`.
+    pub fn get_shadower_counts(&self, addr: &AddrVec<I, D, A>) -> usize {
         let Self { addr_to_state } = self;
         addr_to_state.descendant_counts(&addr).map(|(_sharing, size)| size.get()).sum()
     }
 }
 
+/// The type returned by [`BoundSocketMap::iter_receivers`].
+pub enum FoundSockets<A, It> {
+    /// A single recipient was found for the address.
+    Single(A),
+    /// Indicates the looked-up address was multicast, and holds an iterator of
+    /// the found receivers.
+    Multicast(It),
+}
+
+/// A borrowed entry in a [`BoundSocketMap`].
+#[allow(missing_docs)]
+pub enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
+    Listen(&'a S::ListenerAddrState, ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
+    Conn(
+        &'a S::ConnAddrState,
+        ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
+    ),
+}
+
+impl<I, D, A, S> BoundSocketMap<I, D, A, S>
+where
+    I: Ip<Addr: MulticastAddress>,
+    D: DeviceIdentifier,
+    A: SocketMapAddrSpec,
+    S: SocketMapStateSpec
+        + SocketMapConflictPolicy<
+            ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
+            <S as SocketMapStateSpec>::ListenerSharingState,
+            I,
+            D,
+            A,
+        > + SocketMapConflictPolicy<
+            ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>,
+            <S as SocketMapStateSpec>::ConnSharingState,
+            I,
+            D,
+            A,
+        >,
+{
+    /// Finds the socket(s) that should receive an incoming packet.
+    ///
+    /// Uses the provided addresses and receiving device to look up sockets that
+    /// should receive a matching incoming packet. Returns `None` if no sockets
+    /// were found, or the results of the lookup.
+    pub fn iter_receivers(
+        &self,
+        (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<A::RemoteIdentifier>),
+        (dst_ip, dst_port): (SocketIpAddr<I::Addr>, A::LocalIdentifier),
+        device: D,
+    ) -> Option<
+        FoundSockets<
+            AddrEntry<'_, I, D, A, S>,
+            impl Iterator<Item = AddrEntry<'_, I, D, A, S>> + '_,
+        >,
+    > {
+        let mut matching_entries = AddrVecIter::with_device(
+            match (src_ip, src_port) {
+                (Some(specified_src_ip), Some(src_port)) => {
+                    ConnIpAddr { local: (dst_ip, dst_port), remote: (specified_src_ip, src_port) }
+                        .into()
+                }
+                _ => ListenerIpAddr { addr: Some(dst_ip), identifier: dst_port }.into(),
+            },
+            device,
+        )
+        .filter_map(move |addr: AddrVec<I, D, A>| match addr {
+            AddrVec::Listen(l) => {
+                self.listeners().get_by_addr(&l).map(|state| AddrEntry::Listen(state, l))
+            }
+            AddrVec::Conn(c) => self.conns().get_by_addr(&c).map(|state| AddrEntry::Conn(state, c)),
+        });
+
+        if dst_ip.addr().is_multicast() {
+            Some(FoundSockets::Multicast(matching_entries))
+        } else {
+            let single_entry: Option<_> = matching_entries.next();
+            single_entry.map(FoundSockets::Single)
+        }
+    }
+}
+
+/// Errors observed by [`SocketMapConflictPolicy`].
 #[derive(Debug, Eq, PartialEq)]
 pub enum InsertError {
+    /// A shadow address exists for the entry.
     ShadowAddrExists,
+    /// Entry already exists.
     Exists,
+    /// A shadower exists for the entry.
     ShadowerExists,
+    /// An indirect conflict was detected.
     IndirectConflict,
 }
 
 /// Helper trait for converting between [`AddrVec`] and [`Bound`] and their
 /// variants.
-pub(crate) trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
+pub trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
     type Id;
     type SharingState;
     type Addr: Debug;

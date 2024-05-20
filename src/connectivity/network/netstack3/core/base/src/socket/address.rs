@@ -17,11 +17,8 @@ use net_types::{
     MulticastAddr, NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
 };
 
-use crate::{
-    ip::device::Ipv6DeviceAddr,
-    socket::{
-        AddrVec, DualStackIpExt, EitherStack, SocketIpAddrExt as _, SocketIpExt, SocketMapAddrSpec,
-    },
+use crate::socket::base::{
+    AddrVec, DualStackIpExt, EitherStack, SocketIpAddrExt as _, SocketIpExt, SocketMapAddrSpec,
 };
 
 /// A [`ZonedAddr`] whose address is `Zoned` iff a zone is required.
@@ -80,9 +77,9 @@ impl<A: IpAddress, W: Witness<A> + ScopeableAddress + Copy, Z> StrictlyZonedAddr
         }
     }
 
-    #[cfg(test)]
+    #[cfg(feature = "testutils")]
     /// Creates the unzoned variant, or panics if the addr's scope needs a zone.
-    pub(crate) fn new_unzoned_or_panic(addr: W) -> Self {
+    pub fn new_unzoned_or_panic(addr: W) -> Self {
         Self::new_with_zone(addr, || panic!("addr unexpectedly required a zone."))
     }
 }
@@ -123,25 +120,27 @@ impl<A: IpAddress> Debug for SocketIpAddr<A> {
 
 impl<A: IpAddress> SocketIpAddr<A> {
     /// Constructs a [`SocketIpAddr`] if the address is compliant, else `None`.
-    pub(crate) fn new(addr: A) -> Option<SocketIpAddr<A>> {
+    pub fn new(addr: A) -> Option<SocketIpAddr<A>> {
         Some(SocketIpAddr(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?))
     }
 
     /// Constructs a [`SocketIpAddr`] without verify the address's properties.
     ///
+    ///
+    /// # Safety
+    ///
     /// Callers must ensure that the addr is both a [`SpecifiedAddr`] and
     /// a [`NonMappedAddr`].
-    #[cfg(test)]
-    pub(crate) const unsafe fn new_unchecked(addr: A) -> SocketIpAddr<A> {
+    pub const unsafe fn new_unchecked(addr: A) -> SocketIpAddr<A> {
         SocketIpAddr(NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)))
     }
 
     /// Like [`SocketIpAddr::new_unchecked`], but the address is specified.
     ///
+    /// # Safety
+    ///
     /// Callers must ensure that the addr is a [`NonMappedAddr`].
-    pub(crate) const unsafe fn new_from_specified_unchecked(
-        addr: SpecifiedAddr<A>,
-    ) -> SocketIpAddr<A> {
+    pub const unsafe fn new_from_specified_unchecked(addr: SpecifiedAddr<A>) -> SocketIpAddr<A> {
         SocketIpAddr(NonMappedAddr::new_unchecked(addr))
     }
 
@@ -152,7 +151,7 @@ impl<A: IpAddress> SocketIpAddr<A> {
     }
 
     /// Constructs a [`SocketIpAddr`] from the given multicast address.
-    pub(crate) fn new_from_multicast(addr: MulticastAddr<A>) -> SocketIpAddr<A> {
+    pub fn new_from_multicast(addr: MulticastAddr<A>) -> SocketIpAddr<A> {
         let addr: MulticastAddr<NonMappedAddr<_>> = addr.non_mapped().transpose();
         let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
         SocketIpAddr(addr)
@@ -160,7 +159,8 @@ impl<A: IpAddress> SocketIpAddr<A> {
 }
 
 impl SocketIpAddr<Ipv4Addr> {
-    pub(crate) fn new_ipv4_specified(addr: SpecifiedAddr<Ipv4Addr>) -> Self {
+    /// Constructs a [`SocketIpAddr`] from a given specified IPv4 address.
+    pub fn new_ipv4_specified(addr: SpecifiedAddr<Ipv4Addr>) -> Self {
         addr.try_into().unwrap_or_else(|AddrIsMappedError {}| {
             unreachable!("IPv4 addresses must be non-mapped")
         })
@@ -169,7 +169,7 @@ impl SocketIpAddr<Ipv4Addr> {
 
 impl SocketIpAddr<Ipv6Addr> {
     /// Constructs a [`SocketIpAddr`] from the given [`Ipv6DeviceAddr`].
-    pub(crate) fn new_from_ipv6_device_addr(addr: Ipv6DeviceAddr) -> Self {
+    pub fn new_from_ipv6_non_mapped_unicast(addr: NonMappedAddr<UnicastAddr<Ipv6Addr>>) -> Self {
         let addr: UnicastAddr<NonMappedAddr<_>> = addr.transpose();
         let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
         SocketIpAddr(addr)
@@ -177,10 +177,12 @@ impl SocketIpAddr<Ipv6Addr> {
 
     /// Optionally constructs a [`SocketIpAddr`] from the given
     /// [`Ipv6SourceAddr`], returning `None` if the given addr is `Unspecified`.
-    pub(crate) fn new_from_ipv6_source(addr: Ipv6SourceAddr) -> Option<Self> {
+    pub fn new_from_ipv6_source(addr: Ipv6SourceAddr) -> Option<Self> {
         match addr {
             Ipv6SourceAddr::Unspecified => None,
-            Ipv6SourceAddr::Unicast(addr) => Some(SocketIpAddr::new_from_ipv6_device_addr(addr)),
+            Ipv6SourceAddr::Unicast(addr) => {
+                Some(SocketIpAddr::new_from_ipv6_non_mapped_unicast(addr))
+            }
         }
     }
 }
@@ -226,9 +228,9 @@ impl<A: IpAddress> ScopeableAddress for SocketIpAddr<A> {
 #[generic_over_ip(A, IpAddress)]
 pub struct ListenerIpAddr<A: IpAddress, LI> {
     /// The specific address being listened on, or `None` for all addresses.
-    pub(crate) addr: Option<SocketIpAddr<A>>,
+    pub addr: Option<SocketIpAddr<A>>,
     /// The local identifier (i.e. port for TCP/UDP).
-    pub(crate) identifier: LI,
+    pub identifier: LI,
 }
 
 impl<A: IpAddress, LI: Into<NonZeroU16>> Into<(Option<SpecifiedAddr<A>>, NonZeroU16)>
@@ -243,8 +245,10 @@ impl<A: IpAddress, LI: Into<NonZeroU16>> Into<(Option<SpecifiedAddr<A>>, NonZero
 /// The address of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ListenerAddr<A, D> {
-    pub(crate) ip: A,
-    pub(crate) device: Option<D>,
+    /// The IP address of the listening socket.
+    pub ip: A,
+    /// The bound device of the listening socket.
+    pub device: Option<D>,
 }
 
 impl<A, D> AsRef<Option<D>> for ListenerAddr<A, D> {
@@ -266,8 +270,10 @@ impl<TA, OA, D> AsRef<Option<D>> for EitherStack<ListenerAddr<TA, D>, ListenerAd
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip(A, IpAddress)]
 pub struct ConnIpAddrInner<A, LI, RI> {
-    pub(crate) local: (A, LI),
-    pub(crate) remote: (A, RI),
+    /// The local address, port tuple.
+    pub local: (A, LI),
+    /// The remote address, port tuple.
+    pub remote: (A, RI),
 }
 
 /// The IP addresses and identifiers (ports) of a connected socket.
@@ -290,8 +296,10 @@ impl<A: IpAddress, LI: Into<NonZeroU16>, RI> From<ConnIpAddr<A, LI, RI>> for Con
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip()]
 pub struct ConnAddr<A, D> {
-    pub(crate) ip: A,
-    pub(crate) device: Option<D>,
+    /// The IP address for the connected socket.
+    pub ip: A,
+    /// The bound device for the connected socket.
+    pub device: Option<D>,
 }
 
 /// The IP address and identifier (port) of a dual-stack listening socket.
@@ -300,9 +308,11 @@ pub enum DualStackListenerIpAddr<A: IpAddress, LI: Into<NonZeroU16>>
 where
     A::Version: DualStackIpExt,
 {
+    /// The socket is bound to this stack.
     ThisStack(ListenerIpAddr<A, LI>),
+    /// The socket is bound to the other stack.
     OtherStack(ListenerIpAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr, LI>),
-    // The socket is dual-stack enabled and bound to the IPv6 any address.
+    /// The socket is dual-stack enabled and bound to the IPv6 any address.
     BothStacks(LI),
 }
 
@@ -331,6 +341,7 @@ impl<LI: Into<NonZeroU16>> Into<(Option<SpecifiedAddr<Ipv6Addr>>, NonZeroU16)>
 
 /// The IP address and identifiers (ports) of a dual-stack connected socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[allow(missing_docs)]
 pub enum DualStackConnIpAddr<A: IpAddress, LI, RI>
 where
     A::Version: DualStackIpExt,
@@ -409,7 +420,8 @@ impl<I: Ip, D, A: SocketMapAddrSpec>
     PartialEq(bound = ""),
     Hash(bound = "")
 )]
-pub(crate) enum IpAddrVec<I: Ip, A: SocketMapAddrSpec> {
+#[allow(missing_docs)]
+pub enum IpAddrVec<I: Ip, A: SocketMapAddrSpec> {
     Listener(ListenerIpAddr<I::Addr, A::LocalIdentifier>),
     Connected(ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>),
 }
@@ -504,11 +516,13 @@ impl<I: Ip, D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIterInner<I, D, 
 pub struct AddrVecIter<I: Ip, D, A: SocketMapAddrSpec>(AddrVecIterInner<I, D, A>);
 
 impl<I: Ip, D, A: SocketMapAddrSpec> AddrVecIter<I, D, A> {
-    pub(crate) fn with_device(addr: IpAddrVec<I, A>, device: D) -> Self {
+    /// Constructs an [`AddrVecIter`] with `addr` and a specified `device`.
+    pub fn with_device(addr: IpAddrVec<I, A>, device: D) -> Self {
         Self(AddrVecIterInner::WithDevice { device, emitted_device: false, addr })
     }
 
-    pub(crate) fn without_device(addr: IpAddrVec<I, A>) -> Self {
+    /// Constructs an [`AddrVecIter`] with `addr` without a specified device.
+    pub fn without_device(addr: IpAddrVec<I, A>) -> Self {
         Self(AddrVecIterInner::NoDevice { addr })
     }
 }
@@ -592,7 +606,8 @@ fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I::Addr>>, Z>
 }
 
 /// A remote IP address that's either in the current stack or the other stack.
-pub(crate) enum DualStackRemoteIp<I: DualStackIpExt, D> {
+#[allow(missing_docs)]
+pub enum DualStackRemoteIp<I: DualStackIpExt, D> {
     ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
     OtherStack(ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>),
 }
@@ -622,7 +637,8 @@ impl<I: SocketIpExt + DualStackIpExt<OtherVersion: SocketIpExt>, D> DualStackRem
 }
 
 /// A local IP address that's either in the current stack or the other stack.
-pub(crate) enum DualStackLocalIp<I: DualStackIpExt, D> {
+#[allow(missing_docs)]
+pub enum DualStackLocalIp<I: DualStackIpExt, D> {
     ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
     OtherStack(Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>>),
 }
