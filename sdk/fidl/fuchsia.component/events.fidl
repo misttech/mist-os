@@ -190,7 +190,8 @@ type Event = resource table {
 };
 
 /// Listener for events on the component hierarchy.
-@discoverable
+/// Can't be used outside of the platform.
+@discoverable(client="platform", server="platform")
 @available(added=11)
 closed protocol EventStream {
     strict GetNext() -> (resource struct {
