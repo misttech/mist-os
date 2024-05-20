@@ -18,6 +18,14 @@
 namespace internal {
 
 #if __aarch64__
+
+inline zx_ticks_t get_raw_ticks_arm_a73() {
+  zx_ticks_t ticks1, ticks2;
+  __asm__ volatile("mrs %0, cntvct_el0" : "=r"(ticks1));
+  __asm__ volatile("mrs %0, cntvct_el0" : "=r"(ticks2));
+  return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
+}
+
 inline zx_ticks_t get_raw_ticks(const TimeValues& tvalues) {
   if (tvalues.use_a73_errata_mitigation) {
     return get_raw_ticks_arm_a73();
@@ -26,13 +34,6 @@ inline zx_ticks_t get_raw_ticks(const TimeValues& tvalues) {
   zx_ticks_t ticks;
   __asm__ volatile("mrs %0, cntvct_el0" : "=r"(ticks));
   return ticks;
-}
-
-inline zx_ticks_t get_raw_ticks_arm_a73() {
-  zx_ticks_t ticks1, ticks2;
-  __asm__ volatile("mrs %0, cntvct_el0" : "=r"(ticks1));
-  __asm__ volatile("mrs %0, cntvct_el0" : "=r"(ticks2));
-  return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
 }
 
 #elif defined(__x86_64__)
