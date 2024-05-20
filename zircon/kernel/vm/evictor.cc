@@ -394,21 +394,27 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
           break;
         }
       }
-      if (backlink->cow->ReclaimPage(backlink->page, backlink->offset, hint_action,
-                                     compression_instance)) {
-        list_add_tail(&freed_list, &backlink->page->queue_node);
-        if (backlink->page->is_loaned()) {
-          counts.pager_backed_loaned++;
-        } else {
-          if (backlink->cow->can_evict()) {
-            counts.pager_backed++;
-          } else {
-            // If the cow wasn't evictable, then the reclamation must have succeeded due to
-            // compression.
-            counts.compressed++;
+      list_node_t reclaim_list;
+      list_initialize(&reclaim_list);
+      if (uint64_t count = backlink->cow->ReclaimPage(backlink->page, backlink->offset, hint_action,
+                                                      &reclaim_list, compression_instance);
+          count > 0) {
+        if (backlink->cow->can_evict()) {
+          vm_page_t* page;
+          list_for_every_entry (&reclaim_list, page, vm_page_t, queue_node) {
+            if (page->is_loaned()) {
+              counts.pager_backed_loaned++;
+            } else {
+              counts.pager_backed++;
+            }
           }
+        } else {
+          // If the cow wasn't evictable, then the reclamation must have succeeded due to
+          // compression.
+          counts.compressed += count;
         }
       }
+      list_splice_after(&reclaim_list, &freed_list);
     } else {
       break;
     }

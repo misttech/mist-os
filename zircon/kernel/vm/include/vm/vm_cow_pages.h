@@ -446,21 +446,27 @@ class VmCowPages final : public VmHierarchyBase,
     Ignore,
   };
 
-  // Asks the VMO to attempt to reclaim the specified page. This returns true if the page was both
-  // actually from this VMO, and was successfully reclaimed, at which point the caller now has
-  // ownership of the page. Although reclamation is allowed to fail for any reason there, are some
-  // guarantees provided
-  // 1. If the page was not from this VMO (or not at the specified offset) then nothing about the
-  //    page or this VMO will be modified.
-  // 2. If the page is from this VMO and offset (and was not reclaimed) then the page will have been
-  //    removed from any candidate reclamation lists (such as the DontNeed pager backed list).
+  // Asks the VMO to attempt to reclaim the specified page. There are a few possible outcomes:
+  // 1. Exactly this page is reclaimed.
+  // 2. This page and other pages are reclaimed.
+  // 3. Just other pages are reclaimed.
+  // 4. No pages are reclaimed.
+  // Pages other than the one requested may get reclaimed due to any internal relationships between
+  // pages that make it meaningless or difficult to reclaim just the single page in question.
+  // In the cases of (3) and (4) there are some guarantees provided:
+  // 1. If the |page| was not from this VMO (or not at the specified offset) then nothing about the
+  //    |page| or this VMO will be modified.
+  // 2. If the |page| is from this VMO and offset (and was not reclaimed) then the page will have
+  //    been removed from any candidate reclamation lists (such as the DontNeed pager backed list).
   // The effect of (2) is that the caller can assume in the case of reclamation failure it will not
   // keep finding this page as a reclamation candidate and infinitely retry it.
   // If the |compressor| is non-null then it must have just had |Arm| called on it.
-  //
   // |hint_action| indicates whether the |always_need| eviction hint should be respected or ignored.
-  bool ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
-                   VmCompressor* compressor);
+  //
+  // The actual number of pages reclaimed is returned and ownership of the pages is given by
+  // appending to the passed in |freed_list|.
+  uint64_t ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+                       list_node* freed_list, VmCompressor* compressor);
 
   // If any pages in the specified range are loaned pages, replaces them with non-loaned pages
   // (which requires providing a |page_request|). The specified range should be fully committed

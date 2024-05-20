@@ -130,14 +130,17 @@ class PageQueues::LruIsolate {
             continue;
           }
         }
-        if (backlink.cow->ReclaimPage(backlink.page, backlink.offset,
-                                      VmCowPages::EvictionHintAction::Follow, compressor)) {
+        list_node_t freed_list = LIST_INITIAL_VALUE(freed_list);
+        if (uint64_t count = backlink.cow->ReclaimPage(backlink.page, backlink.offset,
+                                                       VmCowPages::EvictionHintAction::Follow,
+                                                       &freed_list, compressor);
+            count > 0) {
           if (backlink.cow->can_evict()) {
-            pq_lru_pages_evicted.Add(1);
+            pq_lru_pages_evicted.Add(count);
           } else {
-            pq_lru_pages_compressed.Add(1);
+            pq_lru_pages_compressed.Add(count);
           }
-          pmm_free_page(backlink.page);
+          pmm_free(&freed_list);
         }
       }
     }

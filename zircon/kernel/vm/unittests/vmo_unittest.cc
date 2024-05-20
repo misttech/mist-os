@@ -12,6 +12,27 @@
 
 #include "test_helper.h"
 
+namespace {
+
+// Helper wrapper around reclaiming a page that returns the pages to the pmm.
+uint64_t reclaim_page(fbl::RefPtr<VmCowPages> vmo, vm_page_t* page, uint64_t offset,
+                      VmCowPages::EvictionHintAction hint_action, VmCompressor* compressor) {
+  list_node freed_list = LIST_INITIAL_VALUE(freed_list);
+  const uint64_t count = vmo->ReclaimPage(page, offset, hint_action, &freed_list, compressor);
+  ASSERT(list_length(&freed_list) == count);
+  if (count > 0) {
+    pmm_free(&freed_list);
+  }
+  return count;
+}
+
+uint64_t reclaim_page(fbl::RefPtr<VmObjectPaged> vmo, vm_page_t* page, uint64_t offset,
+                      VmCowPages::EvictionHintAction hint_action, VmCompressor* compressor) {
+  return reclaim_page(vmo->DebugGetCowPages(), page, offset, hint_action, compressor);
+}
+
+}  // namespace
+
 namespace vm_unittest {
 
 // Creates a vm object.
@@ -117,12 +138,9 @@ static bool vmo_commit_compressed_pages_test() {
     vm_page_t* page;
     status = vmo->GetPageBlocking(i * PAGE_SIZE, 0, nullptr, &page, nullptr);
     ASSERT_OK(status);
-    bool reclaimed = vmo->DebugGetCowPages()->ReclaimPage(
-        page, i * PAGE_SIZE, VmCowPages::EvictionHintAction::Follow, &compressor.get());
-    EXPECT_TRUE(reclaimed);
-    if (reclaimed) {
-      pmm_free_page(page);
-    }
+    uint64_t reclaimed = reclaim_page(vmo, page, i * PAGE_SIZE,
+                                      VmCowPages::EvictionHintAction::Follow, &compressor.get());
+    EXPECT_EQ(reclaimed, 1u);
   }
 
   // Should be no real pages, and one of the pages should have been deduped to zero and not even be
@@ -1447,13 +1465,10 @@ static bool vmo_clones_of_compressed_pages_test() {
   ASSERT_OK(status);
   ASSERT_NONNULL(page);
   ASSERT_OK(compressor.get().Arm());
-  bool reclaimed = vmo->DebugGetCowPages()->ReclaimPage(
-      page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
-  EXPECT_TRUE(reclaimed);
-  if (reclaimed) {
-    pmm_free_page(page);
-    page = nullptr;
-  }
+  uint64_t reclaimed =
+      reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
+  EXPECT_EQ(reclaimed, 1u);
+  page = nullptr;
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
 
@@ -1482,12 +1497,9 @@ static bool vmo_clones_of_compressed_pages_test() {
   ASSERT_NONNULL(page);
   ASSERT_OK(compressor.get().Arm());
   reclaimed =
-      hidden_root->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
-  EXPECT_TRUE(reclaimed);
-  if (reclaimed) {
-    pmm_free_page(page);
-    page = nullptr;
-  }
+      reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
+  EXPECT_EQ(reclaimed, 1u);
+  page = nullptr;
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
   EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
@@ -1591,8 +1603,7 @@ static bool vmo_eviction_hints_test() {
   EXPECT_EQ(0u, queue);
 
   // Evicting the page should fail.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Hint that the page is not needed again.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
@@ -1605,8 +1616,7 @@ static bool vmo_eviction_hints_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(page));
 
   // We should still not be able to evict the page, the AlwaysNeed hint is sticky.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Accessing the page should move it out of the DontNeed queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(page));
@@ -1625,14 +1635,10 @@ static bool vmo_eviction_hints_test() {
   EXPECT_EQ(0u, queue);
 
   // We should still not be able to evict the page, the AlwaysNeed hint is sticky.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // We should be able to evict the page when told to override the hint.
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Ignore,
-                                                   nullptr));
-
-  pmm_free_page(page);
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Ignore, nullptr), 1u);
 
   END_TEST;
 }
@@ -1745,8 +1751,7 @@ static bool vmo_eviction_hints_clone_test() {
   EXPECT_EQ(0u, queue);
 
   // Evicting the page should fail.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(
-      pages[0], 0, VmCowPages::EvictionHintAction::Follow, nullptr));
+  ASSERT_EQ(reclaim_page(vmo, pages[0], 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Hinting should also work via a clone of a clone.
   fbl::RefPtr<VmObject> clone2;
@@ -1773,8 +1778,7 @@ static bool vmo_eviction_hints_clone_test() {
   EXPECT_EQ(0u, queue);
 
   // Evicting the page should fail.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(
-      pages[0], 0, VmCowPages::EvictionHintAction::Follow, nullptr));
+  ASSERT_EQ(reclaim_page(vmo, pages[0], 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Verify that hinting still works via the parent VMO.
   // Hint that the page is not needed again.
@@ -1867,27 +1871,22 @@ static bool vmo_eviction_test() {
   ASSERT_EQ(ZX_OK, status);
 
   // Shouldn't be able to evict pages from the wrong VMO.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(
-      page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr));
-  ASSERT_FALSE(vmo2->DebugGetCowPages()->ReclaimPage(
-      page, 0, VmCowPages::EvictionHintAction::Follow, nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
+  ASSERT_EQ(reclaim_page(vmo2, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // We stack-own loaned pages from ReclaimPage() to pmm_free_page().
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   // Eviction should actually drop the number of committed pages.
   EXPECT_EQ((size_t)PAGE_SIZE, vmo2->GetAttributedMemory().uncompressed_bytes);
-  ASSERT_TRUE(vmo2->DebugGetCowPages()->ReclaimPage(
-      page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr));
+  ASSERT_EQ(reclaim_page(vmo2, page2, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 1u);
   EXPECT_EQ(0u, vmo2->GetAttributedMemory().uncompressed_bytes);
-  pmm_free_page(page2);
   EXPECT_GT(vmo2->ReclamationEventCount(), 0u);
 
   // Pinned pages should not be evictable.
   status = vmo->CommitRangePinned(0, PAGE_SIZE, false);
   EXPECT_EQ(ZX_OK, status);
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
   vmo->Unpin(0, PAGE_SIZE);
 
   END_TEST;
@@ -2454,9 +2453,7 @@ static bool vmo_attribution_evict_test() {
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   // Evicting the page should increment the generation count.
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                   nullptr));
-  pmm_free_page(page);
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 1u);
   ++expected_gen_count;
   EXPECT_EQ(true,
             verify_object_memory_attribution(vmo.get(), expected_gen_count, AttributionCounts{}));
@@ -2564,9 +2561,8 @@ static bool vmo_attribution_compression_test() {
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_OK(compressor.get().Arm());
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                   &compressor.get()));
-  pmm_free_page(page);
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+            1u);
   expected_gen_count += 2;
   EXPECT_EQ(true,
             verify_object_memory_attribution(
@@ -2581,9 +2577,9 @@ static bool vmo_attribution_compression_test() {
   status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
   EXPECT_OK(compressor.get().Arm());
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(
-      page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow, &compressor.get()));
-  pmm_free_page(page);
+  ASSERT_EQ(
+      reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+      1u);
   expected_gen_count += 2;
   EXPECT_EQ(true,
             verify_object_memory_attribution(vmo.get(), expected_gen_count,
@@ -3143,8 +3139,8 @@ static bool vmo_discardable_not_compressible_test() {
   vm_page_t* page;
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    &compressor.get()));
+  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+            0u);
   EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
 
@@ -3155,8 +3151,8 @@ static bool vmo_discardable_not_compressible_test() {
   EXPECT_OK(compressor.get().Arm());
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    &compressor.get()));
+  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+            0u);
   EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
 
@@ -3193,9 +3189,8 @@ static bool vmo_lookup_compressed_pages_test() {
   vm_page_t* page;
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                   &compressor.get()));
-  pmm_free_page(page);
+  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+            1u);
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory())
 
@@ -3215,9 +3210,8 @@ static bool vmo_lookup_compressed_pages_test() {
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
   EXPECT_OK(compressor.get().Arm());
-  EXPECT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                   &compressor.get()));
-  pmm_free_page(page);
+  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+            1u);
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory())
 
@@ -3505,8 +3499,7 @@ static bool vmo_dirty_pages_test() {
   EXPECT_GT(pmm_page_queues()->QueueCounts().pager_backed_dirty, 0u);
 
   // Should not be able to evict a dirty page.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Accessing the page again should not move the page out of the dirty queue.
   EXPECT_OK(vmo->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, nullptr, nullptr));
@@ -3536,8 +3529,7 @@ static bool vmo_dirty_pages_writeback_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Should not be able to evict a dirty page.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Begin writeback on the page. This should still keep the page in the dirty queue.
   ASSERT_OK(vmo->WritebackBegin(0, PAGE_SIZE, false));
@@ -3545,8 +3537,7 @@ static bool vmo_dirty_pages_writeback_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Should not be able to evict a dirty page.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Accessing the page should not move the page out of the dirty queue either.
   ASSERT_OK(vmo->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, nullptr, nullptr));
@@ -3554,8 +3545,7 @@ static bool vmo_dirty_pages_writeback_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Should not be able to evict a dirty page.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // End writeback on the page. This should finally move the page out of the dirty queue.
   ASSERT_OK(vmo->WritebackEnd(0, PAGE_SIZE));
@@ -3581,8 +3571,7 @@ static bool vmo_dirty_pages_writeback_test() {
   EXPECT_EQ(0u, queue);
 
   // We should now be able to evict the page.
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                   nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 1u);
 
   END_TEST;
 }
@@ -3613,8 +3602,7 @@ static bool vmo_dirty_pages_with_hints_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Should not be able to evict a dirty page.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   // Hint AlwaysNeed on the page. It should remain in the dirty queue.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
@@ -3630,15 +3618,13 @@ static bool vmo_dirty_pages_with_hints_test() {
   EXPECT_EQ(0u, queue);
 
   // Eviction should fail still because we hinted AlwaysNeed previously.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(page, &queue));
   EXPECT_EQ(0u, queue);
 
   // Eviction should succeed if we ignore the hint.
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Ignore,
-                                                   nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Ignore, nullptr), 1u);
 
   // Reset the vmo and retry some of the same actions as before, this time dirtying
   // the page *after* hinting.
@@ -3663,8 +3649,7 @@ static bool vmo_dirty_pages_with_hints_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Should not be able to evict a dirty page.
-  ASSERT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                    nullptr));
+  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, nullptr), 0u);
 
   END_TEST;
 }
@@ -3757,9 +3742,8 @@ static bool vmo_supply_compressed_pages_test() {
   vm_page_t* page;
   zx_status_t status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow,
-                                                   &compressor.get()));
-  pmm_free_page(page);
+  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+            1u);
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
 
@@ -3985,8 +3969,7 @@ static bool vmo_high_priority_reclaim_test() {
   EXPECT_GT(pmm_page_queues()->QueueCounts().high_priority, 0u);
 
   // Attempting to reclaim should fail.
-  EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Ignore,
-                                                    nullptr));
+  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Ignore, nullptr), 0u);
 
   // Page should still be in the queue.
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsHighPriority(page));
@@ -4015,8 +3998,8 @@ static bool vmo_high_priority_reclaim_test() {
   if (compression) {
     auto compressor = compression->AcquireCompressor();
     EXPECT_OK(compressor.get().Arm());
-    EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(
-        page, 0, VmCowPages::EvictionHintAction::Ignore, &compressor.get()));
+    EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Ignore, &compressor.get()),
+              0u);
     EXPECT_EQ(page, vmo->DebugGetPage(0));
   }
 
@@ -4332,9 +4315,8 @@ static bool vmo_prefetch_compressed_pages_test() {
   vm_page_t* page;
   status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  ASSERT_TRUE(vmo->DebugGetCowPages()->ReclaimPage(
-      page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow, &compressor.get()));
-  pmm_free_page(page);
+  ASSERT_TRUE(reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow,
+                           &compressor.get()));
   EXPECT_TRUE((VmObject::AttributionCounts{1 * PAGE_SIZE, 1 * PAGE_SIZE}) ==
               vmo->GetAttributedMemory())
 
