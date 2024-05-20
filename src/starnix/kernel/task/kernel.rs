@@ -16,9 +16,9 @@ use crate::{
     mm::{FutexTable, SharedFutexKey},
     power::SuspendResumeManagerHandle,
     task::{
-        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
-        HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
-        StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
+        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
+        KernelStats, KernelThreads, NetstackDevices, PidTable, StopState, Syslog, UtsNamespace,
+        UtsNamespaceHandle,
     },
     vdso::vdso_loader::Vdso,
     vfs::{
@@ -243,9 +243,6 @@ pub struct Kernel {
 
     /// All mounts.
     pub mounts: Mounts,
-
-    /// The manager for creating and managing high-resolution timers.
-    pub hrtimer_manager: HrTimerManagerHandle,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -369,7 +366,6 @@ impl Kernel {
             role_manager,
             syslog: Default::default(),
             mounts: Mounts::new(),
-            hrtimer_manager: HrTimerManager::new(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

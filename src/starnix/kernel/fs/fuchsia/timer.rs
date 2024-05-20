@@ -3,16 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    task::{
-        CurrentTask, EventHandler, HandleWaitCanceler, HrTimer, SignalHandler, SignalHandlerInner,
-        WaitCanceler, Waiter,
-    },
+    task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::{
@@ -30,68 +27,10 @@ use starnix_uapi::{
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
-pub trait TimerOps: Send + Sync + 'static {
-    /// Starts the timer with the specified `deadline`.
-    ///
-    /// This method should start the timer and schedule it to trigger at the specified `deadline`.
-    /// The timer should be cancelled if it is already running.
-    fn start(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno>;
-
-    /// Stops the timer.
-    ///
-    /// This method should stop the timer and prevent it from triggering.
-    fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno>;
-
-    /// Creates a `WaitCnaceler` that can be used to wait for the timer to be cancelled.
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler;
-
-    /// Returns a reference to the underlying Zircon handle.
-    fn as_handle_ref(&self) -> HandleRef<'_>;
-}
-
-struct ZxTimer {
-    timer: Arc<zx::Timer>,
-}
-
-impl ZxTimer {
-    fn new() -> Self {
-        Self { timer: Arc::new(zx::Timer::create()) }
-    }
-}
-
-impl TimerOps for ZxTimer {
-    fn start(&self, _currnet_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
-        self.timer
-            .set(deadline, zx::Duration::default())
-            .map_err(|status| from_status_like_fdio!(status))?;
-        Ok(())
-    }
-
-    fn stop(&self, _current_task: &CurrentTask) -> Result<(), Errno> {
-        self.timer.cancel().map_err(|status| from_status_like_fdio!(status))
-    }
-
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
-        WaitCanceler::new_timer(Arc::downgrade(&self.timer), canceler)
-    }
-
-    fn as_handle_ref(&self) -> HandleRef<'_> {
-        self.timer.as_handle_ref()
-    }
-}
-
-/// Clock types supported by a `TimerFile`.
+/// Clock types supported by TimerFiles.
 pub enum TimerFileClock {
     Monotonic,
     Realtime,
-}
-
-/// Wakeup types supported by a `TimerFile`.
-pub enum TimerWakeup {
-    /// A regular timer that does not wake the system if it is suspended.
-    Regular,
-    /// An alarm timer that will wake the system if it is suspended.
-    Alarm,
 }
 
 /// A `TimerFile` represents a file created by `timerfd_create`.
@@ -100,7 +39,7 @@ pub enum TimerWakeup {
 /// blocking reads, waiting for the timer to trigger.
 pub struct TimerFile {
     /// The timer that is used to wait for blocking reads.
-    timer: Arc<dyn TimerOps>,
+    timer: Arc<zx::Timer>,
 
     /// The type of clock this file was created with.
     clock: TimerFileClock,
@@ -119,14 +58,10 @@ impl TimerFile {
     /// Returns an error if the `zx::Timer` could not be created.
     pub fn new_file(
         current_task: &CurrentTask,
-        clock_type: TimerWakeup,
         clock: TimerFileClock,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let timer: Arc<dyn TimerOps> = match clock_type {
-            TimerWakeup::Regular => Arc::new(ZxTimer::new()),
-            TimerWakeup::Alarm => Arc::new(HrTimer::new()),
-        };
+        let timer = Arc::new(zx::Timer::create());
 
         Ok(Anon::new_file(
             current_task,
@@ -160,12 +95,7 @@ impl TimerFile {
     /// scheduled trigger or cancel the timer.
     ///
     /// Returns the previous `itimerspec` on success.
-    pub fn set_timer_spec(
-        &self,
-        current_task: &CurrentTask,
-        timer_spec: itimerspec,
-        flags: u32,
-    ) -> Result<itimerspec, Errno> {
+    pub fn set_timer_spec(&self, timer_spec: itimerspec, flags: u32) -> Result<itimerspec, Errno> {
         let mut deadline_interval = self.deadline_interval.lock();
         let (old_deadline, old_interval) = *deadline_interval;
         let old_itimerspec = itimerspec_from_deadline_interval(old_deadline, old_interval);
@@ -173,7 +103,7 @@ impl TimerFile {
         if timespec_is_zero(timer_spec.it_value) {
             // Sayeth timerfd_settime(2):
             // Setting both fields of new_value.it_value to zero disarms the timer.
-            self.timer.stop(current_task)?;
+            self.timer.cancel().map_err(|status| from_status_like_fdio!(status))?;
         } else {
             let now_monotonic = zx::Time::get_monotonic();
             let new_deadline = if flags & TFD_TIMER_ABSTIME != 0 {
@@ -202,14 +132,16 @@ impl TimerFile {
             };
             let new_interval = duration_from_timespec(timer_spec.it_interval)?;
 
-            self.timer.start(current_task, new_deadline)?;
+            self.timer
+                .set(new_deadline, zx::Duration::default())
+                .map_err(|status| from_status_like_fdio!(status))?;
             *deadline_interval = (new_deadline, new_interval);
         }
 
         Ok(old_itimerspec)
     }
 
-    /// Returns the `zx::Signals` to listen for given `events`. Used to wait on the `TimerOps`
+    /// Returns the `zx::Signals` to listen for given `events`. Used to wait on a `zx::Timer`
     /// associated with a `TimerFile`.
     fn get_signals_from_events(events: FdEvents) -> zx::Signals {
         if events.contains(FdEvents::POLLIN) {
@@ -279,9 +211,11 @@ impl FileOps for TimerFile {
                 let num_intervals = elapsed_nanos / interval.into_nanos() + 1;
                 let new_deadline = deadline + interval * num_intervals;
 
-                // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline
-                // is reached.
-                self.timer.start(current_task, new_deadline)?;
+                // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline is
+                // reached.
+                self.timer
+                    .set(new_deadline, zx::Duration::default())
+                    .map_err(|status| from_status_like_fdio!(status))?;
 
                 // Update the stored deadline.
                 *deadline_interval = (new_deadline, interval);
@@ -291,7 +225,7 @@ impl FileOps for TimerFile {
                 // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
                 // signal.
                 *deadline_interval = (zx::Time::default(), interval);
-                self.timer.stop(current_task)?;
+                self.timer.cancel().map_err(|status| from_status_like_fdio!(status))?;
                 1
             };
 
@@ -313,13 +247,12 @@ impl FileOps for TimerFile {
         };
         let canceler = waiter
             .wake_on_zircon_signals(
-                &self.timer.as_handle_ref(),
+                self.timer.as_ref(),
                 TimerFile::get_signals_from_events(events),
                 signal_handler,
             )
             .unwrap(); // TODO return error
-        let wait_canceler = self.timer.wait_canceler(canceler);
-        Some(wait_canceler)
+        Some(WaitCanceler::new_timer(Arc::downgrade(&self.timer), canceler))
     }
 
     fn query_events(
@@ -327,11 +260,10 @@ impl FileOps for TimerFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let observed =
-            match self.timer.as_handle_ref().wait(zx::Signals::TIMER_SIGNALED, zx::Time::ZERO) {
-                Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
-                res => res.unwrap(),
-            };
+        let observed = match self.timer.wait_handle(zx::Signals::TIMER_SIGNALED, zx::Time::ZERO) {
+            Err(zx::Status::TIMED_OUT) => zx::Signals::empty(),
+            res => res.unwrap(),
+        };
         Ok(TimerFile::get_events_from_signals(observed))
     }
 }

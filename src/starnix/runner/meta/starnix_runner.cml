@@ -103,11 +103,6 @@
             to: "#playground",
         },
         {
-            directory: "dev-hrtimer",
-            from: "parent",
-            to: [ "#kernels" ],
-        },
-        {
             directory: "dev-gpu",
             from: "parent",
             to: [ "#kernels" ],

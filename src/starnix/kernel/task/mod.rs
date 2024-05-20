@@ -4,7 +4,6 @@
 
 mod abstract_socket_namespace;
 mod current_task;
-mod hr_timer_manager;
 mod interval_timer;
 mod iptables;
 mod kernel;
@@ -27,7 +26,6 @@ mod waiter;
 
 pub use abstract_socket_namespace::*;
 pub use current_task::*;
-pub use hr_timer_manager::*;
 pub use interval_timer::*;
 pub use iptables::*;
 pub use kernel::*;

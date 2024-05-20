@@ -24,6 +24,8 @@ use starnix_uapi::{
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
 // timerfd's).
+//
+// This is currently unimplemented.
 #[derive(Debug, Default)]
 pub struct TimerTable {
     state: Mutex<TimerTableMutableState>,
