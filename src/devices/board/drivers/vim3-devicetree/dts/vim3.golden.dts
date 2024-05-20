@@ -12,6 +12,8 @@
 	};
 
 	backlight {
+		display-detect = <0x25>;
+		display-detect-names = "MIPI_DSI";
 		gpio-names = "LCD_BACKLIGHT_ENABLE";
 		gpios = <0x0f 0x01 0x00>;
 		pwm-names = "LCD_BRIGHTNESS";
@@ -22,7 +24,7 @@
 		boot-metadata = "CAMm\0\0\0";
 		compatible = "amlogic,bt-uart";
 		interrupts = <0x00 0x1a 0x01>;
-		pinctrl-0 = <0x25>;
+		pinctrl-0 = <0x26>;
 		pwm-init = <0x17>;
 		reg = <0x00 0xffd24000 0x00 0x18>;
 		serial-port = <0x02 0x06 0x03>;
@@ -35,7 +37,7 @@
 
 					handling-level {
 						level = <0x01>;
-						level-dependencies = <0x26 0x01>;
+						level-dependencies = <0x27 0x01>;
 
 						level-transition-table {
 
@@ -77,8 +79,10 @@
 	};
 
 	display-detect {
+		#display-detect-cells = <0x00>;
 		gpio-names = "LCD_RESET";
 		gpios = <0x0f 0x00 0x00>;
+		phandle = <0x25>;
 	};
 
 	iommu {
@@ -286,7 +290,7 @@
 
 			bt-uart-pins {
 				function = <0x00 0x01>;
-				phandle = <0x25>;
+				phandle = <0x26>;
 				pins = <0x44 0x45 0x46 0x47>;
 			};
 
@@ -603,7 +607,7 @@
 
 					active-level {
 						level = <0x01>;
-						phandle = <0x26>;
+						phandle = <0x27>;
 					};
 
 					inactive-level {

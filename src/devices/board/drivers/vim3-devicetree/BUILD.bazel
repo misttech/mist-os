@@ -34,6 +34,7 @@ fuchsia_package_resource_collection(
         "@internal_sdk//pkg/devicetree-amlogic-canvas-visitor",
         "@internal_sdk//pkg/devicetree-arm-gicv2",
         "@internal_sdk//pkg/devicetree-clockimpl-visitor",
+        "@internal_sdk//pkg/devicetree-display-detect-visitor",
         "@internal_sdk//pkg/devicetree-dwc2-visitor",
         "@internal_sdk//pkg/devicetree-ethernet-phy-visitor",
         "@internal_sdk//pkg/devicetree-focaltech-visitor",
