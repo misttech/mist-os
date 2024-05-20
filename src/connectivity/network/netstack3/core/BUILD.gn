@@ -128,6 +128,7 @@ rustc_library_with_features("netstack3-core") {
     "src/transport/tcp/socket/isn.rs",
     "src/transport/tcp/state.rs",
     "src/transport/udp.rs",
+    "src/transport/udp/integration_tests.rs",
     "src/uninstantiable.rs",
   ]
   deps = [
