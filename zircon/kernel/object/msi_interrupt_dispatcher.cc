@@ -121,7 +121,7 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
       return ZX_ERR_INVALID_ARGS;
     }
 
-    disp = fbl::AdoptRef<MsiInterruptDispatcher>(new (&ac) MsixDispatcherImpl(
+    disp = fbl::AdoptRef<MsiInterruptDispatcher>(new (&ac) MsixInterruptDispatcherImpl(
         ktl::move(alloc), base_irq_id, msi_id, ktl::move(mapping), vmo_offset, register_int_fn));
   } else {
     auto* cap = reinterpret_cast<MsiCapability*>(mapping_result->base + vmo_offset);
@@ -172,10 +172,9 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
   return ZX_OK;
 }
 
-MsiInterruptDispatcher::MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation>&& alloc,
-                                               fbl::RefPtr<VmMapping>&& mapping,
-                                               uint32_t base_irq_id, uint32_t msi_id,
-                                               RegisterIntFn register_int_fn)
+MsiInterruptDispatcher::MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation> alloc,
+                                               fbl::RefPtr<VmMapping> mapping, uint32_t base_irq_id,
+                                               uint32_t msi_id, RegisterIntFn register_int_fn)
     : alloc_(ktl::move(alloc)),
       mapping_(ktl::move(mapping)),
       register_int_fn_(register_int_fn),
@@ -250,9 +249,11 @@ void MsiInterruptDispatcherImpl::UnmaskInterrupt() {
   }
 }
 
-MsixDispatcherImpl::MsixDispatcherImpl(fbl::RefPtr<MsiAllocation>&& alloc, uint32_t base_irq_id,
-                                       uint32_t msi_id, fbl::RefPtr<VmMapping>&& mapping,
-                                       zx_off_t table_offset, RegisterIntFn register_int_fn)
+MsixInterruptDispatcherImpl::MsixInterruptDispatcherImpl(fbl::RefPtr<MsiAllocation> alloc,
+                                                         uint32_t base_irq_id, uint32_t msi_id,
+                                                         fbl::RefPtr<VmMapping> mapping,
+                                                         zx_off_t table_offset,
+                                                         RegisterIntFn register_int_fn)
     : MsiInterruptDispatcher(ktl::move(alloc), ktl::move(mapping), base_irq_id, msi_id,
                              register_int_fn),
       table_entries_(
@@ -274,19 +275,19 @@ MsixDispatcherImpl::MsixDispatcherImpl(fbl::RefPtr<MsiAllocation>&& alloc, uint3
   arch::DeviceMemoryBarrier();
 }
 
-void MsixDispatcherImpl::MaskInterrupt() {
+void MsixInterruptDispatcherImpl::MaskInterrupt() {
   kcounter_add(dispatcher_msi_mask_count, 1);
   RMWREG32(&table_entries_[msi_id()].vector_control, kMsixVectorControlMaskBit, 1, 1);
   arch::DeviceMemoryBarrier();
 }
 
-void MsixDispatcherImpl::UnmaskInterrupt() {
+void MsixInterruptDispatcherImpl::UnmaskInterrupt() {
   kcounter_add(dispatcher_msi_unmask_count, 1);
   RMWREG32(&table_entries_[msi_id()].vector_control, kMsixVectorControlMaskBit, 1, 0);
   arch::DeviceMemoryBarrier();
 }
 
-MsixDispatcherImpl::~MsixDispatcherImpl() {
+MsixInterruptDispatcherImpl::~MsixInterruptDispatcherImpl() {
   MaskInterrupt();
   writel(0, &table_entries_[msi_id()].msg_addr);
   writel(0, &table_entries_[msi_id()].msg_upper_addr);

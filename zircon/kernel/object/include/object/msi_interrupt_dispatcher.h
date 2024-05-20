@@ -43,18 +43,18 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
   void DeactivateInterrupt() final {}
 
  protected:
-  explicit MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation>&& alloc,
-                                  fbl::RefPtr<VmMapping>&& mapping, uint32_t base_irq_id,
-                                  uint32_t msi_id, RegisterIntFn = msi_register_handler);
-  fbl::RefPtr<VmMapping>& mapping() { return mapping_; }
-  fbl::RefPtr<MsiAllocation>& allocation() { return alloc_; }
+  MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation> alloc, fbl::RefPtr<VmMapping> mapping,
+                         uint32_t base_irq_id, uint32_t msi_id,
+                         RegisterIntFn = msi_register_handler);
+  const fbl::RefPtr<VmMapping>& mapping() const { return mapping_; }
+  const fbl::RefPtr<MsiAllocation>& allocation() const { return alloc_; }
   static void IrqHandler(void* ctx);
 
  private:
   // The MSI allocation block this dispatcher shares.
-  fbl::RefPtr<MsiAllocation> alloc_;
+  const fbl::RefPtr<MsiAllocation> alloc_;
   // The config space of the MSI capability controlling this MSI vector.
-  fbl::RefPtr<VmMapping> mapping_;
+  const fbl::RefPtr<VmMapping> mapping_;
   // A pointer to the function to register the msi interrupt handler. Allows
   // tests to override msi_register_handler.
   const RegisterIntFn register_int_fn_;
@@ -103,10 +103,9 @@ static_assert(sizeof(MsiCapability) == 24);
 
 class MsiInterruptDispatcherImpl : public MsiInterruptDispatcher {
  public:
-  explicit MsiInterruptDispatcherImpl(fbl::RefPtr<MsiAllocation>&& alloc, uint32_t base_irq_id,
-                                      uint32_t msi_id, fbl::RefPtr<VmMapping>&& mapping,
-                                      zx_off_t reg_offset, bool has_cap_pvm, bool has_64bit,
-                                      RegisterIntFn register_int_fn)
+  MsiInterruptDispatcherImpl(fbl::RefPtr<MsiAllocation> alloc, uint32_t base_irq_id,
+                             uint32_t msi_id, fbl::RefPtr<VmMapping> mapping, zx_off_t reg_offset,
+                             bool has_cap_pvm, bool has_64bit, RegisterIntFn register_int_fn)
       : MsiInterruptDispatcher(ktl::move(alloc), ktl::move(mapping), base_irq_id, msi_id,
                                register_int_fn),
         has_platform_pvm_(msi_supports_masking()),
@@ -148,12 +147,12 @@ struct MsixTableEntry {
 #define kMsixVectorControlMaskBit 0
 constexpr zx_off_t MsixTableOffset(uint32_t id) { return id * sizeof(MsixTableEntry); }
 
-class MsixDispatcherImpl : public MsiInterruptDispatcher {
+class MsixInterruptDispatcherImpl : public MsiInterruptDispatcher {
  public:
-  explicit MsixDispatcherImpl(fbl::RefPtr<MsiAllocation>&& alloc, uint32_t base_irq_id,
-                              uint32_t msi_id, fbl::RefPtr<VmMapping>&& mapping,
-                              zx_off_t table_offset, RegisterIntFn register_int_fn);
-  virtual ~MsixDispatcherImpl();
+  explicit MsixInterruptDispatcherImpl(fbl::RefPtr<MsiAllocation> alloc, uint32_t base_irq_id,
+                                       uint32_t msi_id, fbl::RefPtr<VmMapping> mapping,
+                                       zx_off_t table_offset, RegisterIntFn register_int_fn);
+  virtual ~MsixInterruptDispatcherImpl();
 
   void MaskInterrupt() final;
   void UnmaskInterrupt() final;
