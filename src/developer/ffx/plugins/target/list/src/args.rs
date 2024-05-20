@@ -24,7 +24,7 @@ To list targets with only their addresses:
     note = "List all targets that the daemon currently has in memory. This includes
 manually added targets. The daemon also proactively discovers targets as
 they come online. Use `ffx target list` to always get the latest list
-of targets.
+of targets. Targets are sorted by name.
 
 The default target is marked with a '*' next to the node name. The table
 has the following columns:
