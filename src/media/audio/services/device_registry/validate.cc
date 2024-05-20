@@ -894,13 +894,12 @@ bool ValidateDelayInfo(const fha::DelayInfo& delay_info) {
   ADR_LOG(kLogDeviceMethods);
   LogDelayInfo(delay_info);
 
-  if (!delay_info.internal_delay()) {
+  if (!delay_info.internal_delay().has_value()) {
     FX_LOGS(WARNING) << "DelayInfo.internal_delay is missing";
     return false;
   }
-  const auto internal_delay = *delay_info.internal_delay();
-  if (internal_delay < 0) {
-    FX_LOGS(WARNING) << "WatchDelayInfo: DelayInfo.internal_delay (" << internal_delay
+  if (*delay_info.internal_delay() < 0) {
+    FX_LOGS(WARNING) << "WatchDelayInfo: DelayInfo.internal_delay (" << *delay_info.internal_delay()
                      << " ns) cannot be negative";
     return false;
   }
@@ -1524,7 +1523,6 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
     FX_LOGS(WARNING) << "WatchElementState: ElementState.started is required but missing";
     return false;
   }
-
   if (!element.can_stop().value_or(false) && !*element_state.started()) {
     FX_LOGS(WARNING) << "WatchElementState: Element.can_stop is false, but ElementState is stopped";
     return false;

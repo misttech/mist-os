@@ -87,6 +87,7 @@ TEST_F(CodecTest, DeviceInfo) {
 
   ASSERT_TRUE(device->info().has_value());
   auto info = *device->info();
+
   EXPECT_TRUE(info.token_id().has_value());
 
   ASSERT_TRUE(info.device_type().has_value());
@@ -121,9 +122,13 @@ TEST_F(CodecTest, DeviceInfo) {
 
   EXPECT_FALSE(info.clock_domain().has_value());
 
-  EXPECT_FALSE(info.signal_processing_elements().has_value());
+  // signal_processing_elements is optional, but it can't be empty
+  EXPECT_FALSE(info.signal_processing_elements().has_value() &&
+               info.signal_processing_elements()->empty());
 
-  EXPECT_FALSE(info.signal_processing_topologies().has_value());
+  // signal_processing_topologies is optional, but it can't be empty
+  EXPECT_FALSE(info.signal_processing_topologies().has_value() &&
+               info.signal_processing_topologies()->empty());
 }
 
 TEST_F(CodecTest, DistinctTokenIds) {
@@ -755,8 +760,9 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_TRUE(info.clock_domain().has_value());
 
   ASSERT_TRUE(info.signal_processing_elements().has_value());
-  ASSERT_TRUE(info.signal_processing_topologies().has_value());
   EXPECT_FALSE(info.signal_processing_elements()->empty());
+
+  ASSERT_TRUE(info.signal_processing_topologies().has_value());
   EXPECT_FALSE(info.signal_processing_topologies()->empty());
 }
 
@@ -1641,7 +1647,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.bypassed().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
-  EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceDaiElementProcessingDelay.get());
   const auto& endpt_state1 = state.type_specific()->dai_interconnect();
   ASSERT_TRUE(endpt_state1.has_value());
   ASSERT_TRUE(endpt_state1->plug_state().has_value());
@@ -1653,6 +1658,7 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_EQ(state.vendor_specific_data()->at(7), 8u);
   EXPECT_FALSE(*state.started());
   EXPECT_FALSE(*state.bypassed());
+  EXPECT_EQ(*state.processing_delay(), FakeComposite::kSourceDaiElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kDestDaiElementId)->second;
   ASSERT_TRUE(state.type_specific().has_value());
@@ -1661,7 +1667,6 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   ASSERT_TRUE(state.bypassed().has_value());
   ASSERT_TRUE(state.processing_delay().has_value());
 
-  EXPECT_EQ(*state.processing_delay(), FakeComposite::kDestDaiElementProcessingDelay.get());
   const auto& endpt_state2 = state.type_specific()->dai_interconnect();
   ASSERT_TRUE(endpt_state2.has_value());
   ASSERT_TRUE(endpt_state2->plug_state().has_value());
@@ -1673,6 +1678,7 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
   EXPECT_EQ(state.vendor_specific_data()->at(8), 0u);
   EXPECT_FALSE(*state.started());
   EXPECT_FALSE(*state.bypassed());
+  EXPECT_EQ(*state.processing_delay(), FakeComposite::kDestDaiElementProcessingDelay.get());
 
   state = states.find(FakeComposite::kSourceRbElementId)->second;
   EXPECT_FALSE(state.type_specific().has_value());
@@ -1816,10 +1822,6 @@ TEST_F(CompositeTest, WatchElementStateUpdate) {
       EXPECT_EQ(
           *state_received.type_specific()->dai_interconnect()->plug_state()->plug_state_time(),
           plug_change_time_to_inject.get());
-      ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->external_delay().has_value());
-      EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
-                ZX_MSEC(element_id));
-
       ASSERT_TRUE(state_received.type_specific()->dai_interconnect()->external_delay().has_value());
       EXPECT_EQ(*state_received.type_specific()->dai_interconnect()->external_delay(),
                 ZX_MSEC(element_id));
@@ -1974,18 +1976,35 @@ TEST_F(StreamConfigTest, DeviceInfo) {
   auto info = GetDeviceInfo(device);
 
   EXPECT_TRUE(info.token_id());
-  EXPECT_TRUE(info.device_type());
-  EXPECT_EQ(*info.device_type(), fad::DeviceType::kOutput);
-  EXPECT_TRUE(info.device_name());
+
+  ASSERT_TRUE(info.device_type().has_value());
+  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kOutput);
+
+  ASSERT_TRUE(info.device_name().has_value());
+  EXPECT_FALSE(info.device_name()->empty());
+
   // manufacturer is optional, but it can't be an empty string
   EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
+
   // product is optional, but it can't be an empty string
   EXPECT_TRUE(!info.product().has_value() || !info.product()->empty());
+
   // unique_instance_id is optional
+
   EXPECT_TRUE(info.gain_caps());
+
   EXPECT_TRUE(info.plug_detect_caps());
+
   EXPECT_TRUE(info.clock_domain());
   EXPECT_EQ(*info.clock_domain(), fha::kClockDomainMonotonic);
+
+  // signal_processing_elements is optional, but it can't be empty
+  EXPECT_TRUE(!info.signal_processing_elements().has_value() ||
+              !info.signal_processing_elements()->empty());
+
+  // signal_processing_topologies is optional, but it can't be empty
+  EXPECT_TRUE(!info.signal_processing_topologies().has_value() ||
+              !info.signal_processing_topologies()->empty());
 }
 
 TEST_F(StreamConfigTest, DistinctTokenIds) {

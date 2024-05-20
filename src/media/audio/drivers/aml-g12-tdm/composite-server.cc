@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <string>
 
 #include <fbl/algorithm.h>
 
@@ -852,7 +853,10 @@ void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
     fuchsia_hardware_audio_signalprocessing::Element ring_buffer;
     ring_buffer.id(kRingBufferIds[i])
         .type(fuchsia_hardware_audio_signalprocessing::ElementType::kRingBuffer)
-        .can_stop(false);
+        .description(std::string(engines_[i].config.is_input ? "Incoming" : "Outgoing") +
+                     " ring buffer, id " + std::to_string(kRingBufferIds[i]))
+        .can_stop(false)
+        .can_bypass(false);
     elements.push_back(std::move(ring_buffer));
   }
   // One DAI per pipeline.
@@ -866,7 +870,9 @@ void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
         .type_specific(
             fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithDaiInterconnect(
                 std::move(dai_interconnect)))
-        .can_stop(false);
+        .description("DAI interconnect, id " + std::to_string(kDaiIds[i]))
+        .can_stop(false)
+        .can_bypass(false);
     elements.push_back(std::move(dai));
   }
 
@@ -885,24 +891,32 @@ void AudioCompositeServer::WatchElementState(WatchElementStateRequest& request,
   auto& element = element_completer->second;
   if (!element.first_response_sent) {
     element.first_response_sent = true;
-    // All elements are DAI, hardwired hence plugged at time 0.
-    fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
-    plug_state.plugged(true).plug_state_time(0);
-    fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
-    dai_state.plug_state(std::move(plug_state));
+
     fuchsia_hardware_audio_signalprocessing::ElementState element_state;
-    element_state.type_specific(
-        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
-            std::move(dai_state)));
+    // For the DAI elements, we need to return type-specific state as well.
+    if (std::find(kDaiIds.begin(), kDaiIds.end(), request.processing_element_id()) !=
+        kDaiIds.end()) {
+      // All DAI elements are hardwired hence plugged at time 0.
+      fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
+      plug_state.plugged(true).plug_state_time(0);
+      fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
+      dai_state.plug_state(std::move(plug_state));
+
+      // Would be nice to specify dai_state.external_delay as well, if we knew it.
+
+      element_state.type_specific(
+          fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
+              std::move(dai_state)));
+    }
     element_state.started(true);
     completer.Reply(std::move(element_state));
   } else if (element.completer) {
-    // The client called WatchElementState when another hanging get was pending.
+    // The client called WatchElementState when another hanging-get was pending.
     // This is an error condition and hence we unbind the channel.
     FDF_LOG(ERROR, "WatchElementState was re-called while the previous call was still pending");
     completer.Close(ZX_ERR_BAD_STATE);
   } else {
-    // This completer is kept but never used since we are not updating the state of the elements.
+    // This completer is kept but never used since all our ElementStates will never change.
     element.completer = completer.ToAsync();
   }
 }

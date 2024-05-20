@@ -41,6 +41,7 @@ fha::StreamProperties ValidStreamProperties() {
       .clock_domain = fha::kClockDomainMonotonic,
   }};
 }
+
 TEST(ValidateWarningTest, StreamPropertiesInvalid) {
   auto stream_properties = ValidStreamProperties();
   ASSERT_TRUE(ValidateStreamProperties(stream_properties)) << "Baseline setup unsuccessful";

@@ -801,7 +801,7 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
                         std::string_view addl_indent = "") {
   std::string first_indent{indent};
   if (index.has_value()) {
-    first_indent.append("[")
+    first_indent.append(" [")
         .append(std::to_string(*index))
         .append("]")
         .append(addl_indent.substr(3));
@@ -810,21 +810,21 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
   }
   indent.append(addl_indent);
 
-  FX_LOGS(INFO) << first_indent << "id                    "
+  FX_LOGS(INFO) << first_indent << "id              "
                 << (element.id().has_value() ? std::to_string(*element.id())
                                              : "<none> (non-compliant)");
 
-  FX_LOGS(INFO) << indent << "type                  " << element.type();
+  FX_LOGS(INFO) << indent << " type            " << element.type();
 
-  std::string ts_indent = indent + "                      ";
+  std::string ts_indent = indent + "                       ";
   if (element.type_specific().has_value()) {
     switch (element.type_specific()->Which()) {
       case fhasp::TypeSpecificElement::Tag::kDaiInterconnect:
-        FX_LOGS(INFO) << indent << "type_specific         "
+        FX_LOGS(INFO) << indent << " type_specific   "
                       << element.type_specific()->dai_interconnect().value();
         break;
       case fhasp::TypeSpecificElement::Tag::kDynamics:
-        FX_LOGS(INFO) << indent << "type_specific         DYNAMICS";
+        FX_LOGS(INFO) << indent << " type_specific   DYNAMICS";
         if (element.type_specific()->dynamics().has_value()) {
           if (element.type_specific()->dynamics()->bands().has_value()) {
             FX_LOGS(INFO) << ts_indent << "bands ["
@@ -883,7 +883,7 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
         //
         break;
       case fhasp::TypeSpecificElement::Tag::kEqualizer:
-        FX_LOGS(INFO) << indent << "type_specific         EQUALIZER";
+        FX_LOGS(INFO) << indent << " type_specific   EQUALIZER";
         if (element.type_specific()->equalizer().has_value()) {
           if (element.type_specific()->equalizer()->bands().has_value()) {
             FX_LOGS(INFO) << ts_indent << "bands ["
@@ -898,7 +898,7 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
             }
           } else {
             FX_LOGS(INFO) << indent
-                          << "                      bands               <none> (non-compliant)";
+                          << "                       bands               <none> (non-compliant)";
             break;
           }
         } else {
@@ -968,7 +968,7 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
                               : "<none>");
         break;
       case fhasp::TypeSpecificElement::Tag::kGain:
-        FX_LOGS(INFO) << indent << "type_specific         GAIN";
+        FX_LOGS(INFO) << indent << " type_specific   GAIN";
         FX_LOGS(INFO) << ts_indent << "type                "
                       << element.type_specific()->gain()->type();
         FX_LOGS(INFO) << ts_indent << "domain              "
@@ -988,26 +988,26 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
                               : "<none>");
         break;
       case fhasp::TypeSpecificElement::Tag::kVendorSpecific:
-        FX_LOGS(INFO) << indent << "type_specific         VENDOR_SPECIFIC";
+        FX_LOGS(INFO) << indent << " type_specific   VENDOR_SPECIFIC";
         break;
       default:
-        FX_LOGS(INFO) << indent << "type_specific         OTHER - unknown enum";
+        FX_LOGS(INFO) << indent << " type_specific   OTHER - unknown enum";
         break;
     }
   } else {
-    FX_LOGS(INFO) << indent << "type_specific         <none>";
+    FX_LOGS(INFO) << indent << " type_specific   <none>";
   }
 
-  FX_LOGS(INFO) << indent << "description           "
+  FX_LOGS(INFO) << indent << "description     "
                 << (element.description().has_value()
                         ? std::string("'") + *element.description() + "'"
                         : "<none>");
 
-  FX_LOGS(INFO) << indent << "can_stop              "
+  FX_LOGS(INFO) << indent << "can_stop        "
                 << (element.can_stop().has_value() ? (*element.can_stop() ? "TRUE" : "FALSE")
                                                    : "<none> (FALSE)");
 
-  FX_LOGS(INFO) << indent << "can_bypass            "
+  FX_LOGS(INFO) << indent << "can_bypass      "
                 << (element.can_bypass().has_value() ? (*element.can_bypass() ? "TRUE" : "FALSE")
                                                      : "<none> (FALSE)");
 }
@@ -1018,7 +1018,7 @@ void LogElement(const fhasp::Element& element) {
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Element";
-  LogElementInternal(element, "    ");
+  LogElementInternal(element, "   ");
 }
 
 void LogElements(const std::vector<fhasp::Element>& elements) {
@@ -1066,14 +1066,14 @@ void LogTopologyInternal(const fhasp::Topology& topology, std::string indent,
   }
   indent.append(addl_indent);
 
-  FX_LOGS(INFO) << first_indent << "id               "
+  FX_LOGS(INFO) << first_indent << "id              "
                 << (topology.id() ? std::to_string(*topology.id()) : "<none> (non-compliant)");
   if (topology.processing_elements_edge_pairs()) {
     FX_LOGS(INFO) << indent << "processing_elements_edge_pairs ["
                   << topology.processing_elements_edge_pairs()->size() << "]";
     for (auto idx = 0u; idx < topology.processing_elements_edge_pairs()->size(); ++idx) {
       FX_LOGS(INFO)
-          << indent << " [" << idx << "]             "
+          << indent << " [" << idx << "]            "
           << topology.processing_elements_edge_pairs()->at(idx).processing_element_id_from()
           << " -> "
           << topology.processing_elements_edge_pairs()->at(idx).processing_element_id_to();
@@ -1089,7 +1089,7 @@ void LogTopology(const fhasp::Topology& topology) {
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio_signalprocessing/Topology";
-  LogTopologyInternal(topology, "        ");
+  LogTopologyInternal(topology, "       ");
 }
 
 void LogTopologies(const std::vector<fhasp::Topology>& topologies) {
@@ -1135,7 +1135,7 @@ void LogDeviceRemoval(const std::optional<fad::Info>& device_info) {
                                                 : "<none> (non-compliant)")
                     << " has been removed";
     } else {
-      FX_LOGS(WARNING) << "UNKNOWN (uninitialized) device has encountered a fatal error";
+      FX_LOGS(WARNING) << "UNKNOWN device has been removed before initialization could complete";
     }
   }
 }
@@ -1155,7 +1155,7 @@ void LogDeviceError(const std::optional<fad::Info>& device_info) {
                                                    : "<none> (non-compliant)")
                        << " has encountered a fatal error";
     } else {
-      FX_LOGS(WARNING) << "UNKNOWN (uninitialized) device has encountered a fatal error";
+      FX_LOGS(WARNING) << "UNKNOWN device has encountered a fatal error during initialization";
     }
   }
 }
@@ -1317,7 +1317,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
           }
 
           const auto& bits_per_sample = dai_format_set.bits_per_sample();
-          FX_LOGS(INFO) << "              bits_per_sample [" << bits_per_sample.size() << "]";
+          FX_LOGS(INFO) << "             bits_per_sample [" << bits_per_sample.size() << "]";
           for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
             FX_LOGS(INFO) << "              [" << idx << "]              "
                           << static_cast<int16_t>(bits_per_sample[idx]);

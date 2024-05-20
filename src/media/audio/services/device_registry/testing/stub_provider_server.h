@@ -36,7 +36,7 @@ class StubProviderServer
                   << request.device_type() << " "
                   << (request.device_name().has_value()
                           ? std::string("'") + *request.device_name() + "'"
-                          : "");
+                          : "<none>");
 
     completer.Reply(fit::success(fuchsia_audio_device::ProviderAddDeviceResponse{}));
   }
