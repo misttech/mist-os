@@ -154,7 +154,13 @@ foreach(board_info, _boards) {
   test_env = board_info[1]
   test("device-enumeration-test-${board}-bin") {
     configs += [ ":include_packaged_drivers" ]
-    sources = [ "boards/${board}.cc" ]
+
+    # TODO(https://fxbug.dev/340607972): Update source file for vim3-devicetree. Once the migration is complete, this condition can be removed.
+    if (devicetree_board_driver) {
+      sources = [ "boards/${board}-devicetree.cc" ]
+    } else {
+      sources = [ "boards/${board}.cc" ]
+    }
     deps = [ ":common" ]
   }
 
