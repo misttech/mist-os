@@ -44,8 +44,10 @@ class WeakPtr final {
 
   fbl::RefPtr<T> Lock() const {
     fbl::AutoLock lock(&lock_);
-    DEBUG_ASSERT_MSG(ptr_, "WeakPtr::lock() on nullptr\n");
-    return fbl::MakeRefPtrUpgradeFromRaw(ptr_, lock_);
+    // DEBUG_ASSERT_MSG(ptr_, "WeakPtr::lock() on nullptr\n");
+    if (ptr_)
+      return fbl::MakeRefPtrUpgradeFromRaw(ptr_, lock_);
+    return fbl::RefPtr<T>();
   }
 
   ~WeakPtr() { ptr_ = nullptr; }
