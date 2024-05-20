@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Context, Error},
     fidl_fuchsia_bluetooth_host::{HostProxy, PeerWatcherGetNextResponse},
-    fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
+    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
     fuchsia_bluetooth::{
         expectation::{
             asynchronous::{
@@ -71,11 +71,11 @@ impl AsRef<EmulatorState> for HostState {
 /// Auxiliary data for the HostHarness
 pub struct Aux {
     pub host: HostProxy,
-    pub emulator: HciEmulatorProxy,
+    pub emulator: EmulatorProxy,
 }
 
-impl AsRef<HciEmulatorProxy> for Aux {
-    fn as_ref(&self) -> &HciEmulatorProxy {
+impl AsRef<EmulatorProxy> for Aux {
+    fn as_ref(&self) -> &EmulatorProxy {
         &self.emulator
     }
 }

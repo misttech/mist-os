@@ -5,7 +5,7 @@
 use {
     anyhow::{Context as _, Error},
     fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy},
-    fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
+    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
     fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable, ExpectableExt},
     futures::future::BoxFuture,
     futures::{FutureExt, StreamExt},
@@ -42,7 +42,7 @@ impl std::convert::AsRef<EmulatorState> for ProfileState {
 /// Auxilliary data for the ProfileHarness
 pub struct Aux {
     pub profile: ProfileProxy,
-    pub emulator: HciEmulatorProxy,
+    pub emulator: EmulatorProxy,
 }
 
 #[derive(Clone)]

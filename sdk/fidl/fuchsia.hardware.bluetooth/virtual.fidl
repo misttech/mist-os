@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.bluetooth;
 
-using fuchsia.bluetooth.test;
 using zx;
 
 const MAX_NAME_LENGTH uint32 = 32;
@@ -20,16 +19,5 @@ closed protocol VirtualController {
     /// The zircon channel is closed in the event of an error.
     strict CreateLoopbackDevice(resource struct {
         channel zx.Handle:CHANNEL;
-    });
-};
-
-/// Represents the bt-emulator device protocol. A bt-emulator device is used for configuring and
-/// publishing fake bt-hci devices.
-closed protocol Emulator {
-    /// Opens a fake controller management channel.
-    /// Only one channel to this protocol can be open on a given bt-hci-emulator
-    /// device.
-    strict Open(resource struct {
-        channel server_end:fuchsia.bluetooth.test.HciEmulator;
     });
 };

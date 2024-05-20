@@ -14,9 +14,9 @@
 
 namespace bt_hci_virtual {
 
-// The VirtualController class implements the fuchsia.bluetooth.test.VirtualController API. It is
-// used to created two devices: the EmulatorDevice and/or the LoopbackDevice. The EmulatorDevice is
-// used for Bluetooth integration tests, and the LoopbackDevice is used by RootCanal for PTS-bot.
+// The VirtualController class implements the fuchsia.hardware.bluetooth.VirtualController API. It
+// is used to created two devices: the EmulatorDevice and/or the LoopbackDevice. The EmulatorDevice
+// is used for Bluetooth integration tests, and the LoopbackDevice is used by RootCanal for PTS-bot.
 //
 // VirtualController publishes itself as a DFv2 driver and starts a device node to bind to said
 // driver. It can create a EmulatorDevice/LoopbackDevice which can then use the

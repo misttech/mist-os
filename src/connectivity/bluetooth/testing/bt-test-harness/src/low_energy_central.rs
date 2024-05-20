@@ -5,7 +5,7 @@
 use {
     anyhow::{Context as _, Error},
     fidl_fuchsia_bluetooth_le::{CentralEvent, CentralMarker, CentralProxy},
-    fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
+    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
     fuchsia_bluetooth::{
         expectation::asynchronous::{expectable, Expectable, ExpectableExt, ExpectableState},
         types::le::RemoteDevice,
@@ -43,11 +43,11 @@ pub struct CentralState {
 /// Auxilliary data for the CentralHarness
 pub struct Aux {
     pub central: CentralProxy,
-    emulator: HciEmulatorProxy,
+    emulator: EmulatorProxy,
 }
 
-impl AsRef<HciEmulatorProxy> for Aux {
-    fn as_ref(&self) -> &HciEmulatorProxy {
+impl AsRef<EmulatorProxy> for Aux {
+    fn as_ref(&self) -> &EmulatorProxy {
         &self.emulator
     }
 }

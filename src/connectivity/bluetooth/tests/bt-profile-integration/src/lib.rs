@@ -17,7 +17,7 @@ use {
         ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
     },
     fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_bluetooth_test::{BredrPeerParameters, HciEmulatorProxy, PeerProxy},
+    fidl_fuchsia_hardware_bluetooth::{BredrPeerParameters, EmulatorProxy, PeerProxy},
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_bluetooth::{
         constants::INTEGRATION_TIMEOUT,
@@ -75,7 +75,7 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
     Ok(connect_requests)
 }
 
-async fn create_bredr_peer(proxy: &HciEmulatorProxy, address: Address) -> Result<PeerProxy, Error> {
+async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<PeerProxy, Error> {
     let peer_params = BredrPeerParameters {
         address: Some(address.into()),
         connectable: Some(true),

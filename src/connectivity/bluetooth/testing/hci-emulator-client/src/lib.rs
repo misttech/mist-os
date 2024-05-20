@@ -4,12 +4,10 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_bluetooth_test::{
-    EmulatorError, EmulatorSettings, HciEmulatorMarker, HciEmulatorProxy,
-};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_bluetooth::{
-    EmulatorMarker, EmulatorProxy, HostMarker, HostProxy, VirtualControllerMarker,
+    EmulatorError, EmulatorMarker, EmulatorProxy, EmulatorSettings, HostMarker, HostProxy,
+    VirtualControllerMarker,
 };
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
@@ -34,7 +32,6 @@ pub struct Emulator {
     /// in `destroy_and_wait()`. This is so the destructor can assert that the TestDevice has been
     /// destroyed.
     dev: Option<TestDevice>,
-    hci_emulator: HciEmulatorProxy,
 }
 
 impl Emulator {
@@ -56,10 +53,10 @@ impl Emulator {
     /// `publish()`. If `realm` is present, the device will be created inside it, otherwise it will
     /// be created using the `/dev` directory in the component's namespace.
     pub async fn create(dev_directory: DirectoryProxy) -> Result<Emulator, Error> {
-        let (dev, hci_emulator) = TestDevice::create(dev_directory)
+        let dev = TestDevice::create(dev_directory)
             .await
             .context(format!("Error creating test device"))?;
-        Ok(Emulator { dev: Some(dev), hci_emulator })
+        Ok(Emulator { dev: Some(dev) })
     }
 
     /// Publish a bt-emulator and a bt-hci device using the default emulator settings. If `realm`
@@ -74,7 +71,8 @@ impl Emulator {
     /// Sends a publish message to the emulator. This is a convenience method that internally
     /// handles the FIDL binding error.
     pub async fn publish(&self, settings: EmulatorSettings) -> Result<(), Error> {
-        self.emulator()
+        let dev = self.dev.as_ref().expect("emulator device accessed after it was destroyed!");
+        dev.emulator
             .publish(&settings)
             .await
             .context("publish transport")?
@@ -153,9 +151,8 @@ impl Emulator {
         dev.get_topological_path().await
     }
 
-    /// Returns a reference to the fuchsia.bluetooth.test.HciEmulator protocol proxy.
-    pub fn emulator(&self) -> &HciEmulatorProxy {
-        &self.hci_emulator
+    pub fn emulator(&self) -> &EmulatorProxy {
+        &self.dev.as_ref().unwrap().emulator
     }
 }
 
@@ -167,10 +164,10 @@ impl Drop for Emulator {
     }
 }
 
-// Represents the test device. `destroy()` MUST be called explicitly to remove the device.
-// The device will be removed asynchronously so the caller cannot rely on synchronous
-// execution of destroy() to know about device removal. Instead, the caller should watch for the
-// device path to be removed.
+/// Represents the test device. `destroy()` MUST be called explicitly to remove the device.
+/// The device will be removed asynchronously so the caller cannot rely on synchronous
+/// execution of destroy() to know about device removal. Instead, the caller should watch for the
+/// device path to be removed.
 struct TestDevice {
     dev_directory: DirectoryProxy,
     controller: ControllerProxy,
@@ -178,11 +175,8 @@ struct TestDevice {
 }
 
 impl TestDevice {
-    // Creates a new device as a child of the emulator controller device and obtain the HciEmulator
-    // protocol channel.
-    async fn create(
-        dev_directory: DirectoryProxy,
-    ) -> Result<(TestDevice, HciEmulatorProxy), Error> {
+    /// Creates a new device as a child of the emulator controller device
+    async fn create(dev_directory: DirectoryProxy) -> Result<TestDevice, Error> {
         // 0x30 => fuchsia.platform.BIND_PLATFORM_DEV_DID.BT_HCI_EMULATOR
         let emulator_device_path: &str = "sys/platform/00:00:30";
         let virtual_controller_device_path: String =
@@ -240,10 +234,7 @@ impl TestDevice {
             EmulatorMarker,
         >(&directory, fidl_fuchsia_device_fs::DEVICE_PROTOCOL_NAME)?;
 
-        // Open a HciEmulator protocol channel.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<HciEmulatorMarker>()?;
-        let () = emulator.open(server_end)?;
-        Ok((Self { dev_directory, controller, emulator }, proxy))
+        Ok(Self { dev_directory, controller, emulator })
     }
 
     /// Sends the test device a destroy message which will unbind the driver.
@@ -277,8 +268,6 @@ mod tests {
         fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     };
 
-    const HCI_DEVICE_DIR: &str = "class/bt-hci";
-
     fn default_settings() -> EmulatorSettings {
         EmulatorSettings {
             address: None,
@@ -295,7 +284,6 @@ mod tests {
         // We use these watchers to verify the addition and removal of these devices as tied to the
         // lifetime of the Emulator instance we create below.
         let emul_dev: EmulatorProxy;
-        let hci_dev: HciEmulatorProxy;
 
         let realm = RealmBuilder::new().await.expect("realm builder");
         let _: &RealmBuilder =
@@ -309,8 +297,7 @@ mod tests {
 
         let dev_dir = realm.driver_test_realm_connect_to_dev().unwrap();
         let mut fake_dev = Emulator::create(dev_dir).await.expect("Failed to construct Emulator");
-        let Emulator { dev, hci_emulator: _ } = &fake_dev;
-        let dev = dev.as_ref().expect("emulator device exists");
+        let dev = fake_dev.dev.as_ref().expect("emulator device exists");
         let topo = dev
             .get_topological_path()
             .await
@@ -319,7 +306,7 @@ mod tests {
 
         // A bt-emulator device should already exist by now.
         let emulator_dir = fuchsia_fs::directory::open_directory_no_describe(
-            dev_directory,
+            &dev_directory,
             EMULATOR_DEVICE_DIR,
             fuchsia_fs::OpenFlags::empty(),
         )
@@ -346,31 +333,11 @@ mod tests {
             .await
             .expect("Failed to send Publish message to emulator device");
 
-        let hci_dir = fuchsia_fs::directory::open_directory_no_describe(
-            dev_directory,
-            HCI_DEVICE_DIR,
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .expect("open hci directory");
-        hci_dev = device_watcher::wait_for_device_with(
-            &hci_dir,
-            |device_watcher::DeviceInfo { filename, topological_path }| {
-                topological_path.starts_with(&topo).then(|| {
-                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-                        HciEmulatorMarker,
-                    >(&hci_dir, filename)
-                    .expect("failed to connect to device")
-                })
-            },
-        )
-        .on_timeout(WATCH_TIMEOUT, || panic!("timed out waiting for device to appear"))
-        .await
-        .expect("failed to watch for device");
-
         // Once a device is published, it should not be possible to publish again while the
-        // HciEmulator channel is open.
-        let result = fake_dev
-            .emulator()
+        // Emulator is open.
+        let dev = fake_dev.dev.as_ref().expect("emulator device exists");
+        let result = dev
+            .emulator
             .publish(&default_settings())
             .await
             .expect("Failed to send second Publish message to emulator device");
@@ -378,13 +345,12 @@ mod tests {
 
         fake_dev.destroy_and_wait().await.expect("Expected test device to be removed");
 
-        // Both devices should be destroyed when `fake_dev` gets dropped.
-        let _: (zx::Signals, zx::Signals) = futures::future::try_join(
-            emul_dev.as_channel().on_closed(),
-            hci_dev.as_channel().on_closed(),
-        )
-        .on_timeout(WATCH_TIMEOUT, || panic!("timed out waiting for device to close"))
-        .await
-        .expect("on closed");
+        // Emulator should be destroyed when `fake_dev` gets dropped
+        let _ = emul_dev
+            .as_channel()
+            .on_closed()
+            .on_timeout(WATCH_TIMEOUT, || panic!("timed out waiting for device to close"))
+            .await
+            .expect("on closed");
     }
 }

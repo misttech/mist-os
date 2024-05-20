@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_bluetooth_le::{
         ConnectionProxy, PeripheralEvent, PeripheralMarker, PeripheralProxy,
     },
-    fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
+    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
     fuchsia_bluetooth::{
         expectation::asynchronous::{expectable, Expectable, ExpectableExt, ExpectableState},
         types::le::Peer,
@@ -76,11 +76,11 @@ impl DerefMut for PeripheralHarness {
 /// Auxilliary data for the PeripheralHarness
 pub struct Aux {
     pub peripheral: PeripheralProxy,
-    emulator: HciEmulatorProxy,
+    emulator: EmulatorProxy,
 }
 
-impl AsRef<HciEmulatorProxy> for Aux {
-    fn as_ref(&self) -> &HciEmulatorProxy {
+impl AsRef<EmulatorProxy> for Aux {
+    fn as_ref(&self) -> &EmulatorProxy {
         &self.emulator
     }
 }

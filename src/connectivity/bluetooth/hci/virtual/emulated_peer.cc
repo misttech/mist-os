@@ -7,7 +7,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
 
 namespace fbt = fuchsia_bluetooth;
-namespace ftest = fuchsia_bluetooth_test;
 
 namespace bt_hci_virtual {
 namespace {
@@ -36,16 +35,16 @@ pw::bluetooth::emboss::ConnectionRole ConnectionRoleFromFidl(fbt::ConnectionRole
 }  // namespace
 
 // static
-EmulatedPeer::Result EmulatedPeer::NewLowEnergy(ftest::LowEnergyPeerParameters parameters,
-                                                fidl::ServerEnd<ftest::Peer> request,
-                                                bt::testing::FakeController* fake_controller,
-                                                async_dispatcher_t* dispatcher) {
+EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
+    fuchsia_hardware_bluetooth::LowEnergyPeerParameters parameters,
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+    bt::testing::FakeController* fake_controller, async_dispatcher_t* dispatcher) {
   ZX_DEBUG_ASSERT(request);
   ZX_DEBUG_ASSERT(fake_controller);
 
   if (!parameters.address().has_value()) {
     bt_log(ERROR, "virtual", "A fake peer address is mandatory!\n");
-    return fpromise::error(ftest::EmulatorPeerError::kParametersInvalid);
+    return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kParametersInvalid);
   }
 
   bt::BufferView adv, scan_response;
@@ -72,7 +71,7 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(ftest::LowEnergyPeerParameters p
   if (!fake_controller->AddPeer(std::move(peer))) {
     bt_log(ERROR, "virtual", "A fake LE peer with given address already exists: %s\n",
            address.ToString().c_str());
-    return fpromise::error(ftest::EmulatorPeerError::kAddressRepeated);
+    return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kAddressRepeated);
   }
 
   return fpromise::ok(std::unique_ptr<EmulatedPeer>(
@@ -80,16 +79,16 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(ftest::LowEnergyPeerParameters p
 }
 
 // static
-EmulatedPeer::Result EmulatedPeer::NewBredr(ftest::BredrPeerParameters parameters,
-                                            fidl::ServerEnd<ftest::Peer> request,
-                                            bt::testing::FakeController* fake_controller,
-                                            async_dispatcher_t* dispatcher) {
+EmulatedPeer::Result EmulatedPeer::NewBredr(
+    fuchsia_hardware_bluetooth::BredrPeerParameters parameters,
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+    bt::testing::FakeController* fake_controller, async_dispatcher_t* dispatcher) {
   ZX_DEBUG_ASSERT(request);
   ZX_DEBUG_ASSERT(fake_controller);
 
   if (!parameters.address().has_value()) {
     bt_log(ERROR, "virtual", "A fake peer address is mandatory!\n");
-    return fpromise::error(ftest::EmulatorPeerError::kParametersInvalid);
+    return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kParametersInvalid);
   }
 
   auto address = bt::DeviceAddress(bt::DeviceAddress::Type::kBREDR, parameters.address()->bytes());
@@ -118,14 +117,15 @@ EmulatedPeer::Result EmulatedPeer::NewBredr(ftest::BredrPeerParameters parameter
   if (!fake_controller->AddPeer(std::move(peer))) {
     bt_log(ERROR, "virtual", "A fake BR/EDR peer with given address already exists: %s\n",
            address.ToString().c_str());
-    return fpromise::error(ftest::EmulatorPeerError::kAddressRepeated);
+    return fpromise::error(fuchsia_hardware_bluetooth::EmulatorPeerError::kAddressRepeated);
   }
 
   return fpromise::ok(std::unique_ptr<EmulatedPeer>(
       new EmulatedPeer(address, std::move(request), fake_controller, dispatcher)));
 }
 
-EmulatedPeer::EmulatedPeer(bt::DeviceAddress address, fidl::ServerEnd<ftest::Peer> request,
+EmulatedPeer::EmulatedPeer(bt::DeviceAddress address,
+                           fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
                            bt::testing::FakeController* fake_controller,
                            async_dispatcher_t* dispatcher)
     : address_(address),
@@ -172,8 +172,9 @@ void EmulatedPeer::WatchConnectionStates(WatchConnectionStatesCompleter::Sync& c
 }
 
 void EmulatedPeer::UpdateConnectionState(bool connected) {
-  ftest::ConnectionState state =
-      connected ? ftest::ConnectionState::kConnected : ftest::ConnectionState::kDisconnected;
+  fuchsia_hardware_bluetooth::ConnectionState state =
+      connected ? fuchsia_hardware_bluetooth::ConnectionState::kConnected
+                : fuchsia_hardware_bluetooth::ConnectionState::kDisconnected;
 
   connection_states_.emplace_back(state);
   MaybeUpdateConnectionStates();

@@ -4,7 +4,6 @@
 
 #include "emulator.h"
 
-#include <fidl/fuchsia.bluetooth.test/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -16,7 +15,7 @@
 #include "src/connectivity/bluetooth/hci/vendor/broadcom/packets.h"
 #include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
 
-namespace ftest = fuchsia_bluetooth_test;
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 using bt::DeviceAddress;
 using bt::testing::FakeController;
@@ -39,9 +38,9 @@ const char* ChannelTypeToString(ChannelType chan_type) {
   }
 }
 
-FakeController::Settings SettingsFromFidl(const ftest::EmulatorSettings& input) {
+FakeController::Settings SettingsFromFidl(const fhbt::EmulatorSettings& input) {
   FakeController::Settings settings;
-  if (input.hci_config().has_value() && input.hci_config().value() == ftest::HciConfig::kLeOnly) {
+  if (input.hci_config().has_value() && input.hci_config().value() == fhbt::HciConfig::kLeOnly) {
     settings.ApplyLEOnlyDefaults();
   } else {
     settings.ApplyDualModeDefaults();
@@ -143,9 +142,6 @@ zx_status_t EmulatorDevice::Initialize(std::string_view name, AddChildCallback c
 }
 
 void EmulatorDevice::Shutdown() {
-  // Closing |bindings_| stops servicing HciEmulator FIDL messages and unpublishes the bt-hci-device
-  bindings_.CloseAll(ZX_OK);
-
   fake_device_.Stop();
   peers_.clear();
 
@@ -159,10 +155,7 @@ zx_status_t EmulatorDevice::OpenChannel(ChannelType chan_type, zx_handle_t chan)
 
   zx::channel in(chan);
 
-  if (chan_type == ChannelType::EMULATOR) {
-    fidl::ServerEnd<ftest::HciEmulator> server_end(std::move(in));
-    StartEmulatorInterface(std::move(server_end));
-  } else if (chan_type == ChannelType::COMMAND) {
+  if (chan_type == ChannelType::COMMAND) {
     StartCmdChannel(std::move(in));
   } else if (chan_type == ChannelType::ACL) {
     StartAclChannel(std::move(in));
@@ -174,20 +167,10 @@ zx_status_t EmulatorDevice::OpenChannel(ChannelType chan_type, zx_handle_t chan)
   return ZX_OK;
 }
 
-void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
-  if (zx_status_t status =
-          OpenChannel(ChannelType::EMULATOR, request->channel.TakeChannel().release());
-      status != ZX_OK) {
-    completer.Close(status);
-  }
-}
-
 void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "HciEmulator.Publish\n");
-
   if (hci_node_controller_.is_valid()) {
     FDF_LOG(INFO, "bt-hci-device is already published");
-    completer.Reply(fit::error(ftest::EmulatorError::kHciAlreadyPublished));
+    completer.Reply(fit::error(fhbt::EmulatorError::kHciAlreadyPublished));
     return;
   }
 
@@ -197,7 +180,7 @@ void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& co
   zx_status_t status = AddHciDeviceChildNode();
   if (status != ZX_OK) {
     FDF_LOG(WARNING, "Failed to publish bt-hci-device node");
-    completer.Reply(fit::error(ftest::EmulatorError::kFailed));
+    completer.Reply(fit::error(fhbt::EmulatorError::kFailed));
   } else {
     FDF_LOG(INFO, "Successfully published bt-hci-device node");
     completer.Reply(fit::success());
@@ -206,8 +189,6 @@ void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& co
 
 void EmulatorDevice::AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
                                       AddLowEnergyPeerCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "HciEmulator.AddLowEnergyPeer\n");
-
   auto result =
       EmulatedPeer::NewLowEnergy(request.parameters(), std::move(request.peer()), &fake_device_,
                                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
@@ -222,8 +203,6 @@ void EmulatorDevice::AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
 
 void EmulatorDevice::AddBredrPeer(AddBredrPeerRequest& request,
                                   AddBredrPeerCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "HciEmulator.AddBredrPeer\n");
-
   auto result =
       EmulatedPeer::NewBredr(request.parameters(), std::move(request.peer()), &fake_device_,
                              fdf::Dispatcher::GetCurrent()->async_dispatcher());
@@ -238,8 +217,6 @@ void EmulatorDevice::AddBredrPeer(AddBredrPeerRequest& request,
 
 void EmulatorDevice::WatchControllerParameters(
     WatchControllerParametersCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "HciEmulator.WatchControllerParameters\n");
-
   controller_parameters_completer_.emplace(completer.ToAsync());
   MaybeUpdateControllerParametersChanged();
 }
@@ -250,8 +227,6 @@ void EmulatorDevice::WatchLeScanStates(WatchLeScanStatesCompleter::Sync& complet
 
 void EmulatorDevice::WatchLegacyAdvertisingStates(
     WatchLegacyAdvertisingStatesCompleter::Sync& completer) {
-  FDF_LOG(TRACE, "HciEmulator.WatchLegacyAdvertisingState\n");
-
   legacy_adv_states_completers_.emplace(completer.ToAsync());
   MaybeUpdateLegacyAdvertisingStates();
 }
@@ -260,7 +235,7 @@ void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
                                    EncodeCommandCompleter::Sync& completer) {
   uint8_t data_buffer[bt_hci_broadcom::kBcmSetAclPriorityCmdSize];
   switch (request->Which()) {
-    case fuchsia_hardware_bluetooth::wire::VendorCommand::Tag::kSetAclPriority: {
+    case fhbt::wire::VendorCommand::Tag::kSetAclPriority: {
       EncodeSetAclPriorityCommand(request->set_acl_priority(), data_buffer);
       auto encoded_cmd = fidl::VectorView<uint8_t>::FromExternal(
           data_buffer, bt_hci_broadcom::kBcmSetAclPriorityCmdSize);
@@ -275,7 +250,7 @@ void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
 }
 
 void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  auto endpoints = fidl::CreateEndpoints<fhbt::Hci>();
   if (endpoints.is_error()) {
     FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
     completer.ReplyError(endpoints.error_value());
@@ -286,9 +261,8 @@ void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
   completer.ReplySuccess(std::move(endpoints->client));
 }
 
-void EmulatorDevice::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+void EmulatorDevice::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vendor> metadata,
+                                           fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
@@ -350,53 +324,31 @@ void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
   completer.ReplySuccess();
 }
 
-void EmulatorDevice::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+void EmulatorDevice::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
+                                           fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void EmulatorDevice::ConnectEmulator(
-    fidl::ServerEnd<fuchsia_hardware_bluetooth::Emulator> request) {
+void EmulatorDevice::ConnectEmulator(fidl::ServerEnd<fhbt::Emulator> request) {
   emulator_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                      std::move(request), this, fidl::kIgnoreBindingClosure);
 }
 
-void EmulatorDevice::ConnectVendor(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+void EmulatorDevice::ConnectVendor(fidl::ServerEnd<fhbt::Vendor> request) {
   vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    std::move(request), this, fidl::kIgnoreBindingClosure);
 
-  vendor_binding_group_.ForEachBinding(
-      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
-        fidl::Arena arena;
-        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
-        builder.acl_priority_command(true);
-        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
+  vendor_binding_group_.ForEachBinding([](const fidl::ServerBinding<fhbt::Vendor>& binding) {
+    fidl::Arena arena;
+    auto builder = fhbt::wire::VendorFeatures::Builder(arena);
+    builder.acl_priority_command(true);
+    fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
 
-        if (status.status() != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
-        }
-      });
-}
-
-void EmulatorDevice::StartEmulatorInterface(fidl::ServerEnd<ftest::HciEmulator> request) {
-  FDF_LOG(TRACE, "start HciEmulator interface\n");
-
-  if (bindings_.size() > 0) {
-    FDF_LOG(TRACE, "HciEmulator channel already bound\n");
-    return;
-  }
-
-  // Process HciEmulator messages on a thread that can safely access the FakeController, which is
-  // thread-hostile.
-  auto cb = [this](auto impl, fidl::UnbindInfo info) {
-    FDF_LOG(TRACE, "emulator channel closed (status: %s); unpublish device\n",
-            zx_status_get_string(info.status()));
-    UnpublishHci();
-  };
-  bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request), this,
-                       std::move(cb));
+    if (status.status() != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
+    }
+  });
 }
 
 zx_status_t EmulatorDevice::AddHciDeviceChildNode() {
@@ -463,8 +415,8 @@ zx_status_t EmulatorDevice::AddHciDeviceChildNode() {
   return ZX_OK;
 }
 
-void EmulatorDevice::EncodeSetAclPriorityCommand(
-    fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer) {
+void EmulatorDevice::EncodeSetAclPriorityCommand(fhbt::wire::VendorSetAclPriorityParams params,
+                                                 void* out_buffer) {
   if (!params.has_connection_handle() || !params.has_priority() || !params.has_direction()) {
     FDF_LOG(ERROR,
             "The command cannot be encoded because the following fields are missing: %s %s %s",
@@ -480,10 +432,10 @@ void EmulatorDevice::EncodeSetAclPriorityCommand(
                                       sizeof(bt_hci_broadcom::HciCommandHeader),
           },
       .connection_handle = htole16(params.connection_handle()),
-      .priority = (params.priority() == fuchsia_hardware_bluetooth::VendorAclPriority::kNormal)
+      .priority = (params.priority() == fhbt::VendorAclPriority::kNormal)
                       ? bt_hci_broadcom::kBcmAclPriorityNormal
                       : bt_hci_broadcom::kBcmAclPriorityHigh,
-      .direction = (params.direction() == fuchsia_hardware_bluetooth::VendorAclDirection::kSource)
+      .direction = (params.direction() == fhbt::VendorAclDirection::kSource)
                        ? bt_hci_broadcom::kBcmAclDirectionSource
                        : bt_hci_broadcom::kBcmAclDirectionSink,
   };
@@ -498,9 +450,7 @@ void EmulatorDevice::AddPeer(std::unique_ptr<EmulatedPeer> peer) {
 }
 
 void EmulatorDevice::OnControllerParametersChanged() {
-  FDF_LOG(TRACE, "HciEmulator.OnControllerParametersChanged\n");
-
-  ftest::ControllerParameters fidl_value;
+  fhbt::ControllerParameters fidl_value;
   fidl_value.local_name(fake_device_.local_name());
 
   const auto& device_class_bytes = fake_device_.device_class().bytes();
@@ -527,15 +477,13 @@ void EmulatorDevice::MaybeUpdateControllerParametersChanged() {
 }
 
 void EmulatorDevice::OnLegacyAdvertisingStateChanged() {
-  FDF_LOG(TRACE, "HciEmulator.OnLegacyAdvertisingStateChanged\n");
-
   // We have requests to resolve. Construct the FIDL table for the current state.
-  ftest::LegacyAdvertisingState fidl_state;
+  fhbt::LegacyAdvertisingState fidl_state;
   const FakeController::LEAdvertisingState& adv_state = fake_device_.legacy_advertising_state();
   fidl_state.enabled(adv_state.enabled);
 
   // Populate the rest only if advertising is enabled.
-  fidl_state.type(static_cast<ftest::LegacyAdvertisingType>(
+  fidl_state.type(static_cast<fhbt::LegacyAdvertisingType>(
       bt::hci::LowEnergyAdvertiser::AdvertisingEventPropertiesToLEAdvertisingType(
           adv_state.properties)));
   fidl_state.address_type(LeOwnAddressTypeToFidl(adv_state.own_address_type));

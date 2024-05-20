@@ -12,7 +12,6 @@ rustc_library("hci-emulator-client") {
 
   deps = [
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
-    "//sdk/fidl/fuchsia.bluetooth.test:fuchsia.bluetooth.test_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_rust",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_rust",
