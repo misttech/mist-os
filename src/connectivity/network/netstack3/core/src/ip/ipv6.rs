@@ -207,37 +207,27 @@ mod tests {
     use packet_formats::{ip::IpProto, ipv6::Ipv6PacketBuilder};
 
     use super::*;
-    use crate::{
-        device::DeviceId,
-        testutil::{Ctx, FakeCtxBuilder, TEST_ADDRS_V6},
-    };
+    use crate::{device::testutil::FakeDeviceId, testutil::TEST_ADDRS_V6};
+
+    type FakeCoreCtx = crate::context::testutil::FakeCoreCtx<(), (), FakeDeviceId>;
 
     #[test]
     fn test_no_extension_headers() {
-        // Test that if we have no extension headers, we continue
-
-        let (Ctx { core_ctx, bindings_ctx: _ }, device_ids) =
-            FakeCtxBuilder::with_addrs(TEST_ADDRS_V6).build();
+        // Test that if we have no extension headers, we continue.
+        let mut core_ctx = FakeCoreCtx::default();
         let builder = Ipv6PacketBuilder::new(
             TEST_ADDRS_V6.remote_ip,
             TEST_ADDRS_V6.local_ip,
             10,
             IpProto::Tcp.into(),
         );
-        let device_id: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
         let mut buffer =
             Buf::new(vec![1, 2, 3, 4, 5], ..).encapsulate(builder).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
 
         assert_eq!(
-            handle_extension_headers(
-                &mut core_ctx.context(),
-                &device_id,
-                Some(frame_dst),
-                &packet,
-                false
-            ),
+            handle_extension_headers(&mut core_ctx, &FakeDeviceId, Some(frame_dst), &packet, false),
             Ipv6PacketAction::Continue
         );
     }

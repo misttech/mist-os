@@ -397,26 +397,25 @@ where
         }
     }
 
+    /// Enables or disables the device for IP version `I` and returns whether it
+    /// was enabled before.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn set_ip_device_enabled<I: crate::IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) -> bool {
+        let update =
+            IpDeviceConfigurationUpdate { ip_enabled: Some(enabled), ..Default::default() };
+        let prev =
+            self.core_api().device_ip::<I>().update_configuration(device, update.into()).unwrap();
+        prev.as_ref().ip_enabled.unwrap()
+    }
+
     /// Enables `device`.
     pub fn enable_device(&mut self, device: &DeviceId<BC>) {
-        let ip_config =
-            IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() };
-        let _: Ipv4DeviceConfigurationUpdate = self
-            .core_api()
-            .device_ip::<Ipv4>()
-            .update_configuration(
-                device,
-                Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
-            )
-            .unwrap();
-        let _: Ipv6DeviceConfigurationUpdate = self
-            .core_api()
-            .device_ip::<Ipv6>()
-            .update_configuration(
-                device,
-                Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
-            )
-            .unwrap();
+        let _was_enabled: bool = self.set_ip_device_enabled::<Ipv4>(device, true);
+        let _was_enabled: bool = self.set_ip_device_enabled::<Ipv6>(device, true);
     }
 
     /// Enables or disables IP packet routing on `device`.

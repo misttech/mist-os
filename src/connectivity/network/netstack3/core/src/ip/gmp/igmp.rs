@@ -447,7 +447,7 @@ pub struct Igmpv2HostConfig {
 /// 8.10].
 ///
 /// [RFC 2236 Section 8.10]: https://tools.ietf.org/html/rfc2236#section-8.10
-const DEFAULT_UNSOLICITED_REPORT_INTERVAL: Duration = Duration::from_secs(10);
+pub const DEFAULT_UNSOLICITED_REPORT_INTERVAL: Duration = Duration::from_secs(10);
 /// The default value for `v1_router_present_timeout` as per [RFC 2236 Section
 /// 8.11].
 ///
@@ -552,17 +552,10 @@ mod tests {
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
 
-    use net_types::{
-        ethernet::Mac,
-        ip::{Ip, IpVersionMarker},
-    };
+    use net_types::ip::{Ip, IpVersionMarker};
     use netstack3_base::IntoCoreTimerCtx;
     use packet::{serialize::Buf, ParsablePacket as _};
-    use packet_formats::{
-        ethernet::EthernetFrameLengthCheck,
-        igmp::messages::IgmpMembershipQueryV2,
-        testutil::{parse_ip_packet, parse_ip_packet_in_ethernet_frame},
-    };
+    use packet_formats::{igmp::messages::IgmpMembershipQueryV2, testutil::parse_ip_packet};
     use test_case::test_case;
 
     use super::*;
@@ -571,17 +564,9 @@ mod tests {
             testutil::{FakeInstant, FakeTimerCtxExt},
             CtxPair, InstantContext as _, SendFrameContext as _,
         },
-        device::{
-            ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-            DeviceId,
-        },
+        device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         filter::{MaybeTransportPacket, ProofOfEgressCheck},
         ip::{
-            device::{
-                config::{IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate},
-                Ipv4DeviceTimerId,
-            },
             gmp::{
                 GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
@@ -590,13 +575,7 @@ mod tests {
             types::IpTypesIpExt,
             IpLayerPacketMetadata,
         },
-        state::StackStateBuilder,
-        testutil::{
-            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, TestAddrs, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC,
-        },
-        time::TimerIdInner,
-        TimerId,
+        testutil::{assert_empty, new_rng, run_with_many_seeds},
     };
 
     /// Metadata for sending an IGMP packet.
@@ -1398,155 +1377,5 @@ mod tests {
                 );
             }
         });
-    }
-
-    #[test]
-    fn test_igmp_enable_disable_integration() {
-        let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
-            Ipv4::TEST_ADDRS;
-
-        let mut ctx = crate::testutil::FakeCtx::new_with_builder(StackStateBuilder::default());
-
-        let eth_device_id =
-            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
-                EthernetCreationProperties {
-                    mac: local_mac,
-                    max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
-                },
-                DEFAULT_INTERFACE_METRIC,
-            );
-        let device_id: DeviceId<_> = eth_device_id.clone().into();
-        ctx.core_api()
-            .device_ip::<Ipv4>()
-            .add_ip_addr_subnet(&device_id, AddrSubnet::new(MY_ADDR.get(), 24).unwrap())
-            .unwrap();
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-
-        let now = ctx.bindings_ctx.now();
-        // NB: The assertions made on this timer_id are valid because we only
-        // ever join a single group for the duration of the test. Given that,
-        // the timer ID in bindings matches the state of the single timer id in
-        // the local timer heap in GMP.
-        let timer_id = TimerId(TimerIdInner::Ipv4Device(
-            Ipv4DeviceTimerId::from(IgmpTimerId::Gmp(GmpDelayedReportTimerId {
-                device: device_id.downgrade(),
-                _marker: Default::default(),
-            }))
-            .into(),
-        ));
-        let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-        struct TestConfig {
-            ip_enabled: bool,
-            gmp_enabled: bool,
-        }
-
-        let set_config = |ctx: &mut crate::testutil::FakeCtx,
-                          TestConfig { ip_enabled, gmp_enabled }| {
-            let _: Ipv4DeviceConfigurationUpdate = ctx
-                .core_api()
-                .device_ip::<Ipv4>()
-                .update_configuration(
-                    &device_id,
-                    Ipv4DeviceConfigurationUpdate {
-                        ip_config: IpDeviceConfigurationUpdate {
-                            ip_enabled: Some(ip_enabled),
-                            gmp_enabled: Some(gmp_enabled),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
-        };
-        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
-            let frames = bindings_ctx.take_ethernet_frames();
-            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
-            assert_eq!(egress_device, &eth_device_id);
-            let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame, EthernetFrameLengthCheck::NoCheck)
-                    .unwrap();
-            assert_eq!(src_mac, local_mac.get());
-            assert_eq!(dst_mac, Mac::from(&GROUP_ADDR));
-            assert_eq!(src_ip, MY_ADDR.get());
-            assert_eq!(dst_ip, GROUP_ADDR.get());
-            assert_eq!(proto, Ipv4Proto::Igmp);
-            assert_eq!(ttl, 1);
-            let mut bv = &body[..];
-            assert_matches!(
-                IgmpPacket::parse(&mut bv, ()).unwrap(),
-                IgmpPacket::MembershipReportV2(msg) => {
-                    assert_eq!(msg.group_addr(), GROUP_ADDR.get());
-                }
-            );
-        };
-        let check_sent_leave = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
-            let frames = bindings_ctx.take_ethernet_frames();
-            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
-
-            assert_eq!(egress_device, &eth_device_id);
-            let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame, EthernetFrameLengthCheck::NoCheck)
-                    .unwrap();
-            assert_eq!(src_mac, local_mac.get());
-            assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS));
-            assert_eq!(src_ip, MY_ADDR.get());
-            assert_eq!(dst_ip, Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.get());
-            assert_eq!(proto, Ipv4Proto::Igmp);
-            assert_eq!(ttl, 1);
-            let mut bv = &body[..];
-            assert_matches!(
-                IgmpPacket::parse(&mut bv, ()).unwrap(),
-                IgmpPacket::LeaveGroup(msg) => {
-                    assert_eq!(msg.group_addr(), GROUP_ADDR.get());
-                }
-            );
-        };
-
-        // Enable IPv4 and IGMP, then join `GROUP_ADDR`.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.test_api().join_ip_multicast(&device_id, GROUP_ADDR);
-        ctx.bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed_range([(timer_id.clone(), range.clone())]);
-        check_sent_report(&mut ctx.bindings_ctx);
-
-        // Disable IGMP.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_leave(&mut ctx.bindings_ctx);
-
-        // Enable IGMP but disable IPv4.
-        //
-        // Should do nothing.
-        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-
-        // Disable IGMP but enable IPv4.
-        //
-        // Should do nothing.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-
-        // Enable IGMP.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed_range([(timer_id.clone(), range.clone())]);
-        check_sent_report(&mut ctx.bindings_ctx);
-
-        // Disable IPv4.
-        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_leave(&mut ctx.bindings_ctx);
-
-        // Enable IPv4.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id, range)]);
-        check_sent_report(&mut ctx.bindings_ctx);
-
-        core::mem::drop(device_id);
-        ctx.core_api().device().remove_device(eth_device_id).into_removed();
     }
 }

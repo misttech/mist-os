@@ -179,6 +179,13 @@ pub mod ip {
     mod integration;
     mod ipv6;
 
+    #[cfg(test)]
+    mod integration_tests {
+        mod base;
+        mod forwarding;
+        mod socket;
+    }
+
     pub(crate) use base::*;
 
     // Re-exported types.
@@ -297,7 +304,7 @@ pub use context::{
 };
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
-pub use state::StackState;
+pub use state::{StackState, StackStateBuilder};
 pub use time::{Instant, TimerId};
 
 // Re-export useful macros.

@@ -35,6 +35,8 @@ macro_rules! assert_gmp_state {
 }
 
 pub(crate) mod igmp;
+#[cfg(test)]
+mod integration_tests;
 pub(crate) mod mld;
 
 use alloc::vec::Vec;

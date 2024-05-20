@@ -278,7 +278,7 @@ pub struct MldConfig {
 /// The default value for `unsolicited_report_interval` [RFC 2710 Section 7.10]
 ///
 /// [RFC 2710 Section 7.10]: https://tools.ietf.org/html/rfc2710#section-7.10
-const DEFAULT_UNSOLICITED_REPORT_INTERVAL: Duration = Duration::from_secs(10);
+pub const DEFAULT_UNSOLICITED_REPORT_INTERVAL: Duration = Duration::from_secs(10);
 
 impl Default for MldConfig {
     fn default() -> Self {
@@ -426,10 +426,8 @@ mod tests {
     };
     use netstack3_base::IntoCoreTimerCtx;
     use packet::{BufferMut, ParseBuffer};
-    use packet_formats::{
-        ethernet::EthernetFrameLengthCheck,
-        icmp::{mld::MulticastListenerQuery, IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet},
-        testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+    use packet_formats::icmp::{
+        mld::MulticastListenerQuery, IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet,
     };
 
     use super::*;
@@ -438,18 +436,9 @@ mod tests {
             testutil::{FakeInstant, FakeTimerCtxExt},
             CtxPair, InstantContext as _, SendFrameContext,
         },
-        device::{
-            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-            DeviceId,
-        },
+        device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         filter::ProofOfEgressCheck,
         ip::{
-            device::{
-                config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
-                slaac::SlaacConfiguration,
-                Ipv6DeviceTimerId,
-            },
             gmp::{
                 GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
                 QueryReceivedActions, QueryReceivedGenericAction,
@@ -458,13 +447,7 @@ mod tests {
             types::IpTypesIpExt,
             IpLayerPacketMetadata,
         },
-        state::StackStateBuilder,
-        testutil::{
-            assert_empty, new_rng, run_with_many_seeds, CtxPairExt as _, TestAddrs, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        },
-        time::TimerIdInner,
-        TimerId,
+        testutil::{assert_empty, new_rng, run_with_many_seeds},
     };
 
     /// Metadata for sending an MLD packet in an IP packet.
@@ -1262,174 +1245,5 @@ mod tests {
             );
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
         });
-    }
-
-    #[test]
-    fn test_mld_enable_disable_integration() {
-        let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
-            Ipv6::TEST_ADDRS;
-
-        let mut ctx = crate::testutil::FakeCtx::new_with_builder(StackStateBuilder::default());
-
-        let eth_device_id =
-            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
-                EthernetCreationProperties {
-                    mac: local_mac,
-                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                },
-                DEFAULT_INTERFACE_METRIC,
-            );
-        let device_id: DeviceId<_> = eth_device_id.clone().into();
-
-        let now = ctx.bindings_ctx.now();
-        let ll_addr = local_mac.to_ipv6_link_local().addr();
-        let snmc_addr = ll_addr.to_solicited_node_address();
-
-        // NB: The assertions made on this timer_id are valid because we only
-        // ever join a single group for the duration of the test. Given that,
-        // the timer ID in bindings matches the state of the single timer id in
-        // the local timer heap in GMP.
-        let snmc_timer_id = TimerId(TimerIdInner::Ipv6Device(
-            Ipv6DeviceTimerId::Mld(MldTimerId(GmpDelayedReportTimerId {
-                device: device_id.downgrade(),
-                _marker: IpVersionMarker::new(),
-            }))
-            .into(),
-        ));
-        let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-        struct TestConfig {
-            ip_enabled: bool,
-            gmp_enabled: bool,
-        }
-        let set_config = |ctx: &mut crate::testutil::FakeCtx,
-                          TestConfig { ip_enabled, gmp_enabled }| {
-            let _: Ipv6DeviceConfigurationUpdate = ctx
-                .core_api()
-                .device_ip::<Ipv6>()
-                .update_configuration(
-                    &device_id,
-                    Ipv6DeviceConfigurationUpdate {
-                        // TODO(https://fxbug.dev/42180878): Make sure that DAD resolving
-                        // for a link-local address results in reports sent with a
-                        // specified source address.
-                        dad_transmits: Some(None),
-                        max_router_solicitations: Some(None),
-                        // Auto-generate a link-local address.
-                        slaac_config: Some(SlaacConfiguration {
-                            enable_stable_addresses: true,
-                            ..Default::default()
-                        }),
-                        ip_config: IpDeviceConfigurationUpdate {
-                            ip_enabled: Some(ip_enabled),
-                            gmp_enabled: Some(gmp_enabled),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                )
-                .unwrap();
-        };
-        let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
-                                 specified_source: bool| {
-            let frames = bindings_ctx.take_ethernet_frames();
-            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
-            assert_eq!(egress_device, &eth_device_id);
-            let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
-                parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-                    Ipv6,
-                    _,
-                    MulticastListenerReport,
-                    _,
-                >(frame, EthernetFrameLengthCheck::NoCheck, |icmp| {
-                    assert_eq!(icmp.body().group_addr, snmc_addr.get());
-                })
-                .unwrap();
-            assert_eq!(src_mac, local_mac.get());
-            assert_eq!(dst_mac, Mac::from(&snmc_addr));
-            assert_eq!(
-                src_ip,
-                if specified_source { ll_addr.get() } else { Ipv6::UNSPECIFIED_ADDRESS }
-            );
-            assert_eq!(dst_ip, snmc_addr.get());
-            assert_eq!(ttl, 1);
-            assert_eq!(code, IcmpUnusedCode);
-            assert_eq!(dst_ip, snmc_addr.get());
-            assert_eq!(ttl, 1);
-            assert_eq!(code, IcmpUnusedCode);
-        };
-        let check_sent_done = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
-                               specified_source: bool| {
-            let frames = bindings_ctx.take_ethernet_frames();
-            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
-            assert_eq!(egress_device, &eth_device_id);
-            let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
-                        parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-                            Ipv6,
-                            _,
-                            MulticastListenerDone,
-                            _,
-                        >(frame, EthernetFrameLengthCheck::NoCheck, |icmp| {
-                            assert_eq!(icmp.body().group_addr, snmc_addr.get());
-                        }).unwrap();
-            assert_eq!(src_mac, local_mac.get());
-            assert_eq!(dst_mac, Mac::from(&Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS));
-            assert_eq!(
-                src_ip,
-                if specified_source { ll_addr.get() } else { Ipv6::UNSPECIFIED_ADDRESS }
-            );
-            assert_eq!(dst_ip, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.get());
-            assert_eq!(ttl, 1);
-            assert_eq!(code, IcmpUnusedCode);
-        };
-
-        // Enable IPv6 and MLD.
-        //
-        // MLD should be performed for the auto-generated link-local address's
-        // solicited-node multicast address.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed_range([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(&mut ctx.bindings_ctx, false);
-
-        // Disable MLD.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(&mut ctx.bindings_ctx, true);
-
-        // Enable MLD but disable IPv6.
-        //
-        // Should do nothing.
-        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-
-        // Disable MLD but enable IPv6.
-        //
-        // Should do nothing.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-
-        // Enable MLD.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx
-            .timer_ctx()
-            .assert_timers_installed_range([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(&mut ctx.bindings_ctx, true);
-
-        // Disable IPv6.
-        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(&mut ctx.bindings_ctx, false);
-
-        // Enable IPv6.
-        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(snmc_timer_id, range)]);
-        check_sent_report(&mut ctx.bindings_ctx, false);
-
-        // Remove the device to cleanup all dangling references.
-        core::mem::drop(device_id);
-        ctx.core_api().device().remove_device(eth_device_id).into_removed();
     }
 }

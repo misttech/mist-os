@@ -480,26 +480,19 @@ mod testutil_testonly {
 
 #[cfg(test)]
 mod tests {
-    use fakealloc::collections::HashSet;
+    use alloc::collections::HashSet;
     use ip_test_macro::ip_test;
     use itertools::Itertools;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::ip::{IpAddress as _, Ipv6, Ipv6Addr};
+    use net_types::ip::{Ipv6, Ipv6Addr};
     use test_case::test_case;
     use tracing::trace;
 
     use super::*;
     use crate::{
-        device::{
-            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-            testutil::MultipleDevicesId,
-            DeviceId,
-        },
-        ip::{
-            forwarding::testutil::FakeIpForwardingCtx,
-            types::{AddableEntryEither, AddableMetric, Metric},
-        },
-        testutil::{CtxPairExt as _, TestAddrs},
+        device::testutil::MultipleDevicesId,
+        ip::{forwarding::testutil::FakeIpForwardingCtx, types::Metric},
+        testutil::TestAddrs,
     };
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
@@ -1410,213 +1403,5 @@ mod tests {
             }
             assert_eq!(table.iter_table().cloned().collect::<Vec<_>>(), expected_table);
         }
-    }
-
-    #[ip_test]
-    #[test_case(true; "when there is an on-link route to the gateway")]
-    #[test_case(false; "when there is no on-link route to the gateway")]
-    fn select_device_for_gateway<I: Ip + TestIpExt>(on_link_route: bool) {
-        let mut ctx = crate::testutil::Ctx::<crate::testutil::FakeBindingsCtx>::new_with_builder(
-            crate::state::StackStateBuilder::default(),
-        );
-
-        let device_id: DeviceId<_> = ctx
-            .core_api()
-            .device::<EthernetLinkDevice>()
-            .add_device_with_default_state(
-                EthernetCreationProperties {
-                    mac: I::TEST_ADDRS.local_mac,
-                    max_frame_size: crate::device::ethernet::MaxEthernetFrameSize::from_mtu(
-                        I::MINIMUM_LINK_MTU,
-                    )
-                    .unwrap(),
-                },
-                crate::testutil::DEFAULT_INTERFACE_METRIC,
-            )
-            .into();
-
-        let gateway = SpecifiedAddr::new(
-            // Set the last bit to make it an address inside the fake config's
-            // subnet.
-            I::map_ip::<_, I::Addr>(
-                I::TEST_ADDRS.subnet.network(),
-                |addr| {
-                    let mut bytes = addr.ipv4_bytes();
-                    bytes[bytes.len() - 1] = 1;
-                    Ipv4Addr::from(bytes)
-                },
-                |addr| {
-                    let mut bytes = addr.ipv6_bytes();
-                    bytes[bytes.len() - 1] = 1;
-                    Ipv6Addr::from(bytes)
-                },
-            )
-            .to_ip_addr(),
-        )
-        .expect("should be specified");
-
-        // Try to resolve a device for a gateway that we have no route to.
-        assert_eq!(ctx.core_api().routes_any().select_device_for_gateway(gateway), None);
-
-        // Add a route to the gateway.
-        let route_to_add = if on_link_route {
-            AddableEntryEither::from(AddableEntry::without_gateway(
-                I::TEST_ADDRS.subnet,
-                device_id.clone(),
-                AddableMetric::ExplicitMetric(RawMetric(0)),
-            ))
-        } else {
-            AddableEntryEither::from(AddableEntry::with_gateway(
-                I::TEST_ADDRS.subnet,
-                device_id.clone(),
-                I::TEST_ADDRS.remote_ip,
-                AddableMetric::ExplicitMetric(RawMetric(0)),
-            ))
-        };
-
-        assert_eq!(ctx.test_api().add_route(route_to_add), Ok(()));
-
-        // It still won't resolve successfully because the device is not enabled yet.
-        assert_eq!(ctx.core_api().routes_any().select_device_for_gateway(gateway), None);
-
-        ctx.test_api().enable_device(&device_id);
-
-        // Now, try to resolve a device for the gateway.
-        assert_eq!(
-            ctx.core_api().routes_any().select_device_for_gateway(gateway),
-            if on_link_route { Some(device_id) } else { None }
-        );
-    }
-
-    struct AddGatewayRouteTestCase {
-        enable_before_final_route_add: bool,
-        expected_first_result: Result<(), AddRouteError>,
-        expected_second_result: Result<(), AddRouteError>,
-    }
-
-    #[ip_test]
-    #[test_case(AddGatewayRouteTestCase {
-        enable_before_final_route_add: false,
-        expected_first_result: Ok(()),
-        expected_second_result: Ok(()),
-    }; "with_specified_device_no_enable")]
-    #[test_case(AddGatewayRouteTestCase {
-        enable_before_final_route_add: true,
-        expected_first_result: Ok(()),
-        expected_second_result: Ok(()),
-    }; "with_specified_device_enabled")]
-    fn add_gateway_route<I: Ip + TestIpExt>(test_case: AddGatewayRouteTestCase) {
-        let AddGatewayRouteTestCase {
-            enable_before_final_route_add,
-            expected_first_result,
-            expected_second_result,
-        } = test_case;
-        let mut ctx =
-            crate::testutil::FakeCtx::new_with_builder(crate::state::StackStateBuilder::default());
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-
-        let gateway_subnet = I::map_ip(
-            (),
-            |()| net_subnet_v4!("10.0.0.0/16"),
-            |()| net_subnet_v6!("::0a00:0000/112"),
-        );
-
-        let device_id: DeviceId<_> = ctx
-            .core_api()
-            .device::<EthernetLinkDevice>()
-            .add_device_with_default_state(
-                EthernetCreationProperties {
-                    mac: I::TEST_ADDRS.local_mac,
-                    max_frame_size: crate::device::ethernet::MaxEthernetFrameSize::from_mtu(
-                        I::MINIMUM_LINK_MTU,
-                    )
-                    .unwrap(),
-                },
-                crate::testutil::DEFAULT_INTERFACE_METRIC,
-            )
-            .into();
-        let gateway_device = device_id.clone();
-
-        // Attempt to add the gateway route when there is no known route to the
-        // gateway.
-        assert_eq!(
-            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(
-                gateway_subnet,
-                gateway_device.clone(),
-                I::TEST_ADDRS.remote_ip,
-                AddableMetric::ExplicitMetric(RawMetric(0))
-            ))),
-            expected_first_result,
-        );
-
-        assert_eq!(
-            ctx.test_api().del_routes_to_subnet(gateway_subnet.into()),
-            expected_first_result.map_err(|_: AddRouteError| crate::error::NotFoundError),
-        );
-
-        // Then, add a route to the gateway, and try again, expecting success.
-        assert_eq!(
-            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::without_gateway(
-                I::TEST_ADDRS.subnet,
-                device_id.clone(),
-                AddableMetric::ExplicitMetric(RawMetric(0))
-            ))),
-            Ok(())
-        );
-
-        if enable_before_final_route_add {
-            ctx.test_api().enable_device(&device_id);
-        }
-        assert_eq!(
-            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(
-                gateway_subnet,
-                gateway_device,
-                I::TEST_ADDRS.remote_ip,
-                AddableMetric::ExplicitMetric(RawMetric(0))
-            ))),
-            expected_second_result,
-        );
-    }
-
-    #[ip_test]
-    fn test_route_tracks_interface_metric<I: Ip + TestIpExt>() {
-        let mut ctx = crate::testutil::Ctx::<crate::testutil::FakeBindingsCtx>::new_with_builder(
-            crate::state::StackStateBuilder::default(),
-        );
-        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-
-        let metric = RawMetric(9999);
-        let device_id =
-            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
-                EthernetCreationProperties {
-                    mac: I::TEST_ADDRS.local_mac,
-                    max_frame_size: crate::device::ethernet::MaxEthernetFrameSize::from_mtu(
-                        I::MINIMUM_LINK_MTU,
-                    )
-                    .unwrap(),
-                },
-                metric,
-            );
-        assert_eq!(
-            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::without_gateway(
-                I::TEST_ADDRS.subnet,
-                device_id.clone().into(),
-                AddableMetric::MetricTracksInterface
-            ))),
-            Ok(())
-        );
-        assert_eq!(
-            ctx.core_api().routes_any().get_all_routes(),
-            &[Entry {
-                subnet: I::TEST_ADDRS.subnet,
-                device: device_id.clone().into(),
-                gateway: None,
-                metric: Metric::MetricTracksInterface(metric)
-            }
-            .into()]
-        );
-
-        // Remove the device and routes to clear all dangling references.
-        ctx.test_api().clear_routes_and_remove_ethernet_device(device_id);
     }
 }

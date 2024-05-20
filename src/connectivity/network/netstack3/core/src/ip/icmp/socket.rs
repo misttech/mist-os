@@ -971,158 +971,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{Ipv4, Ipv6, Mtu},
+        ip::{Ipv4, Ipv6},
         Witness,
     };
     use packet::Buf;
     use packet_formats::icmp::IcmpUnusedCode;
-    use test_case::test_case;
 
     use super::*;
-    use crate::{
-        device::loopback::{LoopbackCreationProperties, LoopbackDevice},
-        ip::icmp::tests::FakeIcmpCtx,
-        socket::StrictlyZonedAddr,
-        testutil::{CtxPairExt as _, FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC},
-    };
+    use crate::{ip::icmp::tests::FakeIcmpCtx, socket::StrictlyZonedAddr, testutil::TestIpExt};
 
     const REMOTE_ID: u16 = 1;
-
-    enum IcmpConnectionType {
-        Local,
-        Remote,
-    }
-
-    enum IcmpSendType {
-        Send,
-        SendTo,
-    }
-
-    // TODO(https://fxbug.dev/42084713): Add test cases with local delivery and a
-    // bound device once delivery of looped-back packets is corrected in the
-    // socket map.
-    #[ip_test]
-    #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, true)]
-    #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, true)]
-    #[test_case(IcmpConnectionType::Local, IcmpSendType::Send, false)]
-    #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo, false)]
-    #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
-    #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
-    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
-    fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + crate::marker::IpExt>(
-        conn_type: IcmpConnectionType,
-        send_type: IcmpSendType,
-        bind_to_device: bool,
-    ) {
-        crate::testutil::set_logger_for_test();
-
-        let config = I::TEST_ADDRS;
-
-        const LOCAL_CTX_NAME: &str = "alice";
-        const REMOTE_CTX_NAME: &str = "bob";
-        let (local, local_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
-        let (remote, remote_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS.swap()).build();
-        let mut net = crate::testutil::new_simple_fake_network(
-            LOCAL_CTX_NAME,
-            local,
-            local_device_ids[0].downgrade(),
-            REMOTE_CTX_NAME,
-            remote,
-            remote_device_ids[0].downgrade(),
-        );
-
-        let icmp_id = 13;
-
-        let (remote_addr, ctx_name_receiving_req) = match conn_type {
-            IcmpConnectionType::Local => (config.local_ip, LOCAL_CTX_NAME),
-            IcmpConnectionType::Remote => (config.remote_ip, REMOTE_CTX_NAME),
-        };
-
-        let loopback_device_id = net.with_context(LOCAL_CTX_NAME, |ctx| {
-            ctx.core_api()
-                .device::<LoopbackDevice>()
-                .add_device_with_default_state(
-                    LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
-                    DEFAULT_INTERFACE_METRIC,
-                )
-                .into()
-        });
-
-        let echo_body = vec![1, 2, 3, 4];
-        let buf = Buf::new(echo_body.clone(), ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                *config.local_ip,
-                *remote_addr,
-                IcmpUnusedCode,
-                IcmpEchoRequest::new(0, 1),
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .into_inner();
-        let conn = net.with_context(LOCAL_CTX_NAME, |ctx| {
-            ctx.test_api().enable_device(&loopback_device_id);
-            let mut socket_api = ctx.core_api().icmp_echo::<I>();
-            let conn = socket_api.create();
-            if bind_to_device {
-                let device = local_device_ids[0].clone().into();
-                socket_api.set_device(&conn, Some(&device)).expect("failed to set SO_BINDTODEVICE");
-            }
-            core::mem::drop((local_device_ids, remote_device_ids));
-            socket_api.bind(&conn, None, NonZeroU16::new(icmp_id)).unwrap();
-            match send_type {
-                IcmpSendType::Send => {
-                    socket_api
-                        .connect(&conn, Some(ZonedAddr::Unzoned(remote_addr)), REMOTE_ID)
-                        .unwrap();
-                    socket_api.send(&conn, buf).unwrap();
-                }
-                IcmpSendType::SendTo => {
-                    socket_api.send_to(&conn, Some(ZonedAddr::Unzoned(remote_addr)), buf).unwrap();
-                }
-            }
-            conn
-        });
-
-        net.run_until_idle();
-
-        assert_eq!(
-            net.context(LOCAL_CTX_NAME)
-                .core_ctx
-                .inner_icmp_state::<I>()
-                .rx_counters
-                .echo_reply
-                .get(),
-            1
-        );
-        assert_eq!(
-            net.context(ctx_name_receiving_req)
-                .core_ctx
-                .inner_icmp_state::<I>()
-                .rx_counters
-                .echo_request
-                .get(),
-            1
-        );
-        let replies = net.context(LOCAL_CTX_NAME).bindings_ctx.take_icmp_replies(&conn);
-        let expected = Buf::new(echo_body, ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                *config.local_ip,
-                *remote_addr,
-                IcmpUnusedCode,
-                packet_formats::icmp::IcmpEchoReply::new(icmp_id, 1),
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .into_inner()
-            .into_inner();
-        assert_matches!(&replies[..], [body] if *body == expected);
-    }
 
     #[test]
     fn test_connect_dual_stack_fails() {
