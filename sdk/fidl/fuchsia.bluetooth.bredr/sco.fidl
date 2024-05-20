@@ -101,37 +101,33 @@ type RxPacketStatus = strict enum : uint8 {
     DATA_PARTIALLY_LOST = 0x3;
 };
 
-closed protocol ScoConnection {
-    // Read the next inbound SCO payload.
-    // Hangs until new data is received.
-    // Only one Read request may be pending at a time. Additional requests will result in protocol
-    // closure.
-    strict Read() -> (struct {
-        status_flag RxPacketStatus;
-        data vector<uint8>:MAX;
+/// A SCO connection. The connection is pending until the `OnConnectionComplete` event is sent,
+/// which will always arrive first. If the connection fails, the protocol will be closed after the
+/// error is delivered. If methods are called before the `OnConnectionComplete` event, they will
+/// and the protocol will be closed.
+open protocol ScoConnection {
+    /// Read the next inbound SCO payload.
+    /// Hangs until new data is received.
+    /// Only one Read request may be pending at a time. Additional requests will result in protocol
+    /// closure.
+    flexible Read() -> (table {
+        1: status_flag RxPacketStatus;
+        2: data vector<uint8>:MAX;
     });
 
-    // Write `data` to the SCO connection.
-    // If Write tries to send more data than `max_tx_data_size`, the protocol will be closed.
-    // Only one Write request may be pending at a time. Additional requests will result in protocol
-    // closure.
-    strict Write(struct {
-        data vector<uint8>:MAX;
+    /// Write `data` to the SCO connection.
+    /// If Write tries to send more data than `max_tx_data_size`, the protocol will be closed.
+    /// Only one Write request may be pending at a time. Additional requests will result in protocol
+    /// closure.
+    flexible Write(table {
+        1: data vector<uint8>:MAX;
     }) -> ();
-};
 
-/// Represents an active synchronous connection request by a profile.
-/// Either `Connected()` or `Error()` will be called and then server will close the protocol.
-closed protocol ScoConnectionReceiver {
-    /// Called upon successful connection establishment.
-    /// `params` contains the parameters that were used to establish the connection.
-    strict Connected(resource struct {
-        connection client_end:ScoConnection;
-        params ScoConnectionParameters;
-    });
-
-    /// Called when connection establishment fails or is cancelled by the host.
-    strict Error(struct {
-        error ScoErrorCode;
+    /// Called upon successful connection establishment or failure.
+    flexible -> OnConnectionComplete(flexible union {
+        /// On success, contains the parameters that were used to establish the connection.
+        1: connected_params ScoConnectionParameters;
+        /// On failure, specifies the reason connection establishment failed.
+        2: error ScoErrorCode;
     });
 };

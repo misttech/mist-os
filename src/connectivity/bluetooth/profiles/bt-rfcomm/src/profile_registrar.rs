@@ -640,7 +640,7 @@ mod tests {
         expect_stream_item, expect_stream_pending, expect_stream_terminated, run_while,
     };
     use async_utils::PollExt;
-    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use futures::{Future, FutureExt, SinkExt};
     use std::pin::pin;
 
@@ -685,24 +685,24 @@ mod tests {
     /// Creates a Profile::ConnectSco request.
     fn generate_connect_sco_request(
         exec: &mut fasync::TestExecutor,
-    ) -> (bredr::ProfileRequest, bredr::ScoConnectionReceiverRequestStream) {
+    ) -> (bredr::ProfileRequest, bredr::ScoConnectionProxy) {
         let (profile_proxy, mut profile_request_stream) =
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
-        let (receiver_client, receiver_server) =
-            create_request_stream::<bredr::ScoConnectionReceiverMarker>().unwrap();
+        let (connection_proxy, connection_server) =
+            create_proxy::<bredr::ScoConnectionMarker>().unwrap();
 
         assert!(profile_proxy
             .connect_sco(bredr::ProfileConnectScoRequest {
                 peer_id: Some(PeerId(1).into()),
                 initiator: Some(true),
                 params: Some(vec![bredr::ScoConnectionParameters::default()]),
-                receiver: Some(receiver_client),
+                connection: Some(connection_server),
                 ..Default::default()
             })
             .is_ok());
 
         match expect_stream_item(exec, &mut profile_request_stream) {
-            Ok(request) => (request, receiver_server),
+            Ok(request) => (request, connection_proxy),
             x => panic!("Expected ProfileRequest but got: {:?}", x),
         }
     }
@@ -1362,7 +1362,7 @@ mod tests {
     fn handle_connect_sco_request() {
         let (mut exec, mut server, mut profile_requests) = setup_server();
 
-        let (connect_sco_request, _receiver_server) = generate_connect_sco_request(&mut exec);
+        let (connect_sco_request, _connection_proxy) = generate_connect_sco_request(&mut exec);
         let handle_fut = server.handle_profile_request(connect_sco_request);
         let mut handle_fut = pin!(handle_fut);
         let handle_result = exec.run_until_stalled(&mut handle_fut).expect("processed request");

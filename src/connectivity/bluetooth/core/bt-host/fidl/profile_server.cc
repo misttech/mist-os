@@ -220,6 +220,8 @@ ProfileServer::ProfileServer(bt::gap::Adapter::WeakPtr adapter,
       weak_self_(this) {}
 
 ProfileServer::~ProfileServer() {
+  sco_connection_servers_.clear();
+
   if (adapter().is_alive()) {
     // Unregister anything that we have registered.
     for (const auto& it : current_advertised_) {
@@ -428,8 +430,8 @@ void ProfileServer::AudioOffloadController::handle_unknown_method(uint64_t ordin
 
 ProfileServer::ScoConnectionServer::ScoConnectionServer(
     fidl::InterfaceRequest<fuchsia::bluetooth::bredr::ScoConnection> request,
-    bt::sco::ScoConnection::WeakPtr connection)
-    : ServerBase(this, std::move(request)), connection_(std::move(connection)) {
+    ProfileServer* profile_server)
+    : ServerBase(this, std::move(request)), profile_server_(profile_server), weak_self_(this) {
   binding()->set_error_handler([this](zx_status_t) { Close(ZX_ERR_CANCELED); });
 }
 
@@ -439,15 +441,28 @@ ProfileServer::ScoConnectionServer::~ScoConnectionServer() {
   }
 }
 
-void ProfileServer::ScoConnectionServer::Activate(fit::callback<void()> on_closed) {
-  on_closed_ = std::move(on_closed);
-
+void ProfileServer::ScoConnectionServer::Activate() {
   auto rx_callback = [this] { TryRead(); };
   auto closed_cb = [this] { Close(ZX_ERR_PEER_CLOSED); };
-  connection_->Activate(std::move(rx_callback), std::move(closed_cb));
+  bool activated = connection_->Activate(std::move(rx_callback), std::move(closed_cb));
+  if (!activated) {
+    OnError(fidlbredr::ScoErrorCode::FAILURE);
+  }
+}
+
+void ProfileServer::ScoConnectionServer::OnError(::fuchsia::bluetooth::bredr::ScoErrorCode error) {
+  OnConnectionComplete(
+      ::fuchsia::bluetooth::bredr::ScoConnectionOnConnectionCompleteRequest::WithError(
+          std::move(error)));  // NOLINT(performance-move-const-arg)
+  Close(ZX_ERR_PEER_CLOSED);
 }
 
 void ProfileServer::ScoConnectionServer::Read(ReadCallback callback) {
+  if (!connection_.is_alive()) {
+    Close(ZX_ERR_IO_REFUSED);
+    return;
+  }
+
   if (connection_->parameters().view().input_data_path().Read() !=
       pw::bluetooth::emboss::ScoDataPath::HCI) {
     bt_log(WARN, "fidl", "%s called for an offloaded SCO connection", __func__);
@@ -464,13 +479,25 @@ void ProfileServer::ScoConnectionServer::Read(ReadCallback callback) {
   TryRead();
 }
 
-void ProfileServer::ScoConnectionServer::Write(std::vector<uint8_t> data, WriteCallback callback) {
+void ProfileServer::ScoConnectionServer::Write(fidlbredr::ScoConnectionWriteRequest request,
+                                               WriteCallback callback) {
+  if (!connection_.is_alive()) {
+    Close(ZX_ERR_IO_REFUSED);
+    return;
+  }
+
   if (connection_->parameters().view().output_data_path().Read() !=
       pw::bluetooth::emboss::ScoDataPath::HCI) {
     bt_log(WARN, "fidl", "%s called for a non-HCI SCO connection", __func__);
     Close(ZX_ERR_IO_NOT_PRESENT);
     return;
   }
+
+  if (!request.has_data()) {
+    Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  std::vector<uint8_t> data = std::move(*request.mutable_data());
 
   auto buffer = std::make_unique<bt::DynamicByteBuffer>(data.size());
   buffer->Write(data.data(), data.size());
@@ -479,7 +506,13 @@ void ProfileServer::ScoConnectionServer::Write(std::vector<uint8_t> data, WriteC
     Close(ZX_ERR_IO);
     return;
   }
-  callback();
+  callback(fidlbredr::ScoConnection_Write_Result::WithResponse(
+      fidlbredr::ScoConnection_Write_Response()));
+}
+
+void ProfileServer::ScoConnectionServer::handle_unknown_method(uint64_t ordinal,
+                                                               bool method_has_response) {
+  bt_log(WARN, "fidl", "ScoConnectionServer received unknown method with ordinal %lu", ordinal);
 }
 
 void ProfileServer::ScoConnectionServer::TryRead() {
@@ -491,22 +524,24 @@ void ProfileServer::ScoConnectionServer::TryRead() {
     return;
   }
   std::vector<uint8_t> payload;
-  fuchsia::bluetooth::bredr::RxPacketStatus status =
+  fidlbredr::RxPacketStatus status =
       fidl_helpers::ScoPacketStatusToFidl(packet->packet_status_flag());
   if (packet->packet_status_flag() !=
       bt::hci_spec::SynchronousDataPacketStatusFlag::kNoDataReceived) {
     payload = packet->view().payload_data().ToVector();
   }
-  read_cb_(status, std::move(payload));
+  fidlbredr::ScoConnection_Read_Response response;
+  response.set_data(std::move(payload));
+  response.set_status_flag(status);
+  read_cb_(fidlbredr::ScoConnection_Read_Result::WithResponse(std::move(response)));
 }
 
 void ProfileServer::ScoConnectionServer::Close(zx_status_t epitaph) {
-  connection_->Deactivate();
-  connection_.reset();
-  binding()->Close(epitaph);
-  if (on_closed_) {
-    on_closed_();
+  if (connection_.is_alive()) {
+    connection_->Deactivate();
   }
+  binding()->Close(epitaph);
+  profile_server_->sco_connection_servers_.erase(this);
 }
 
 void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest request,
@@ -657,15 +692,18 @@ void ProfileServer::Connect(fuchsia::bluetooth::PeerId peer_id,
 }
 
 void ProfileServer::ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoRequest request) {
-  if (!request.has_receiver()) {
-    bt_log(WARN, "fidl", "%s missing receiver", __FUNCTION__);
+  if (!request.has_connection()) {
+    bt_log(WARN, "fidl", "%s missing connection", __FUNCTION__);
     return;
   }
-  auto client = request.mutable_receiver()->Bind();
+  std::unique_ptr<ScoConnectionServer> connection =
+      std::make_unique<ScoConnectionServer>(std::move(*request.mutable_connection()), this);
+  ScoConnectionServer* connection_raw = connection.get();
+  WeakPtr<ScoConnectionServer> connection_weak = connection->GetWeakPtr();
 
   if (!request.has_peer_id() || !request.has_initiator() || !request.has_params() ||
       request.params().empty()) {
-    client->Error(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+    connection->OnError(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
     return;
   }
   bt::PeerId peer_id(request.peer_id().value);
@@ -673,26 +711,23 @@ void ProfileServer::ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoReq
   if (request.initiator() && request.params().size() != 1u) {
     bt_log(WARN, "fidl", "%s: too many parameters in initiator request (peer: %s)", __FUNCTION__,
            bt_str(peer_id));
-    client->Error(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+    connection->OnError(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
     return;
   }
 
   auto params_result = fidl_helpers::FidlToScoParametersVector(request.params());
   if (params_result.is_error()) {
     bt_log(WARN, "fidl", "%s: invalid parameters (peer: %s)", __FUNCTION__, bt_str(peer_id));
-    client->Error(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
+    connection->OnError(fidlbredr::ScoErrorCode::INVALID_ARGUMENTS);
     return;
   }
+  connection->set_parameters(std::move(*request.mutable_params()));
   auto params = params_result.value();
 
-  pw::IntrusivePtr<ScoRequest> sco_request = pw::MakeRefCounted<ScoRequest>();
-  client.set_error_handler(
-      [sco_request](zx_status_t status) { sco_request->request_handle.reset(); });
-  sco_request->receiver = std::move(client);
-  sco_request->parameters = std::move(*request.mutable_params());
+  sco_connection_servers_.emplace(connection_raw, std::move(connection));
 
   if (request.initiator()) {
-    auto callback = [self = weak_self_.GetWeakPtr(), sco_request](
+    auto callback = [self = weak_self_.GetWeakPtr(), connection_weak](
                         bt::sco::ScoConnectionManager::OpenConnectionResult result) mutable {
       // The connection may complete after this server is destroyed.
       if (!self.is_alive()) {
@@ -702,22 +737,24 @@ void ProfileServer::ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoReq
         }
         return;
       }
-
-      // Convert result type.
       if (result.is_error()) {
-        self->OnScoConnectionResult(std::move(sco_request), result.take_error());
+        self->OnScoConnectionResult(connection_weak, result.take_error());
         return;
       }
-      self->OnScoConnectionResult(
-          std::move(sco_request),
-          fit::ok(std::make_pair(std::move(result.value()), /*parameter index=*/0u)));
+      self->OnScoConnectionResult(connection_weak, fit::ok(std::make_pair(std::move(result.value()),
+                                                                          /*parameter index=*/0u)));
     };
-
-    sco_request->request_handle =
+    // If the BR/EDR connection doesn't exist, no handle will be returned and the callback will be
+    // synchronously called with an error.
+    std::optional<bt::gap::Adapter::BrEdr::ScoRequestHandle> handle =
         adapter()->bredr()->OpenScoConnection(peer_id, params.front(), std::move(callback));
+    if (handle && connection_weak.is_alive()) {
+      connection_weak->set_request_handle(std::move(*handle));
+    }
     return;
   }
-  auto callback = [self = weak_self_.GetWeakPtr(), sco_request](
+
+  auto callback = [self = weak_self_.GetWeakPtr(), connection_weak](
                       bt::sco::ScoConnectionManager::AcceptConnectionResult result) mutable {
     // The connection may complete after this server is destroyed.
     if (!self.is_alive()) {
@@ -728,10 +765,15 @@ void ProfileServer::ConnectSco(::fuchsia::bluetooth::bredr::ProfileConnectScoReq
       return;
     }
 
-    self->OnScoConnectionResult(std::move(sco_request), std::move(result));
+    self->OnScoConnectionResult(connection_weak, std::move(result));
   };
-  sco_request->request_handle =
+  // If the BR/EDR connection doesn't exist, no handle will be returned and the callback will be
+  // synchronously called with an error.
+  std::optional<bt::gap::Adapter::BrEdr::ScoRequestHandle> handle =
       adapter()->bredr()->AcceptScoConnection(peer_id, params, std::move(callback));
+  if (handle && connection_weak.is_alive()) {
+    connection_weak->set_request_handle(std::move(*handle));
+  }
 }
 
 void ProfileServer::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
@@ -840,12 +882,10 @@ void ProfileServer::OnServiceFound(
 }
 
 void ProfileServer::OnScoConnectionResult(
-    pw::IntrusivePtr<ScoRequest> request,  // NOLINT(performance-unnecessary-value-param)
+    WeakPtr<ScoConnectionServer>& server,
     bt::sco::ScoConnectionManager::AcceptConnectionResult result) {
-  auto receiver = std::move(request->receiver);
-
   if (result.is_error()) {
-    if (!receiver.is_bound()) {
+    if (!server.is_alive()) {
       return;
     }
 
@@ -859,38 +899,32 @@ void ProfileServer::OnScoConnectionResult(
     if (result.error_value() == bt::HostError::kParametersRejected) {
       fidl_error = fidlbredr::ScoErrorCode::PARAMETERS_REJECTED;
     }
-    receiver->Error(fidl_error);
+    server->OnError(fidl_error);
     return;
   }
 
   bt::sco::ScoConnection::WeakPtr connection = std::move(result.value().first);
   const uint16_t max_tx_data_size = connection->max_tx_sdu_size();
 
-  fidl::InterfaceHandle<fidlbredr::ScoConnection> sco_handle;
+  if (!server.is_alive()) {
+    connection->Deactivate();
+    return;
+  }
+  server->set_connection(std::move(connection));
 
-  std::unique_ptr<ScoConnectionServer> sco_server =
-      std::make_unique<ScoConnectionServer>(sco_handle.NewRequest(), connection);
-  auto [server_iter, _] = sco_connection_servers_.emplace(&connection.get(), std::move(sco_server));
-
-  // Activate after adding the connection to the map in case on_closed is called synchronously.
-  auto on_closed = [this, conn = &connection.get()] {
-    auto iter = sco_connection_servers_.find(conn);
-    BT_ASSERT(iter != sco_connection_servers_.end());
-    sco_connection_servers_.erase(iter);
-  };
-  server_iter->second->Activate(std::move(on_closed));
-
-  if (!receiver.is_bound()) {
+  server->Activate();
+  if (!server.is_alive()) {
     return;
   }
 
   size_t parameter_index = result.value().second;
-  BT_ASSERT_MSG(parameter_index < request->parameters.size(),
+  BT_ASSERT_MSG(parameter_index < server->parameters().size(),
                 "parameter_index (%zu)  >= request->parameters.size() (%zu)", parameter_index,
-                request->parameters.size());
-  fidlbredr::ScoConnectionParameters parameters = std::move(request->parameters[parameter_index]);
+                server->parameters().size());
+  fidlbredr::ScoConnectionParameters parameters =
+      fidl::Clone(server->parameters()[parameter_index]);
   parameters.set_max_tx_data_size(max_tx_data_size);
-  receiver->Connected(std::move(sco_handle), std::move(parameters));
+  server->OnConnectedParams(std::move(parameters));
 }
 
 void ProfileServer::OnAudioDirectionExtError(AudioDirectionExt* ext_server, zx_status_t status) {

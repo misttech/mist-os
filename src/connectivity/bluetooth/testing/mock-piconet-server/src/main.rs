@@ -162,12 +162,16 @@ impl MockPiconetServer {
                 self.new_search(id, service_uuid, attr_ids, proxy);
             }
             bredr::ProfileRequest::ConnectSco { payload, .. } => {
-                let proxy = payload
-                    .receiver
+                let (_stream, control) = payload
+                    .connection
                     .unwrap()
-                    .into_proxy()
-                    .expect("couldn't get sco connection receiver");
-                let _ = proxy.error(bredr::ScoErrorCode::Failure);
+                    .into_stream_and_control_handle()
+                    .expect("couldn't get sco connection");
+                let _ = control.send_on_connection_complete(
+                    &bredr::ScoConnectionOnConnectionCompleteRequest::Error(
+                        bredr::ScoErrorCode::Failure,
+                    ),
+                );
                 error!("ConnectSco not implemented");
             }
             bredr::ProfileRequest::_UnknownMethod { .. } => {

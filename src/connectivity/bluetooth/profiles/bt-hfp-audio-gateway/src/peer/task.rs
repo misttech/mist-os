@@ -1838,12 +1838,17 @@ mod tests {
         // which has the expected direction.
         loop {
             tracing::info!("Waiting for a SCO connection");
-            let (proxy, params) = match profile_requests.next().await.expect("request").unwrap() {
+            let (connection, params) = match profile_requests
+                .next()
+                .await
+                .expect("request")
+                .unwrap()
+            {
                 bredr::ProfileRequest::ConnectSco { payload, .. } => {
                     let bredr::ProfileConnectScoRequest {
                         initiator: Some(initiator),
                         params: Some(params),
-                        receiver: Some(receiver),
+                        connection: Some(connection),
                         ..
                     } = payload
                     else {
@@ -1854,31 +1859,29 @@ mod tests {
                         continue;
                     };
                     assert!(params.len() >= 1);
-                    (receiver.into_proxy().unwrap(), params)
+                    (connection, params)
                 }
                 x => panic!("Unexpected request to profile stream: {:?}", x),
             };
             tracing::info!("Got a SCO connection: {params:?}");
+            let (request_stream, control) = connection.into_stream_and_control_handle().unwrap();
             match result {
                 Ok(()) => {
-                    let (client, request_stream) =
-                        fidl::endpoints::create_request_stream::<bredr::ScoConnectionMarker>()
-                            .expect("request stream");
                     let accepted_params = params.into_iter().find(|p| {
                         p.parameter_set
                             .map(|set| accept_parameter_sets.contains(&set))
                             .unwrap_or(false)
                     });
                     if let Some(connect_params) = accepted_params {
-                        proxy.connected(client, &connect_params).unwrap();
+                        control.send_on_connection_complete(&fidl_fuchsia_bluetooth_bredr::ScoConnectionOnConnectionCompleteRequest::ConnectedParams(connect_params)).unwrap();
                         return Some(request_stream);
                     } else {
-                        proxy.error(bredr::ScoErrorCode::ParametersRejected).unwrap();
+                        control.send_on_connection_complete(&fidl_fuchsia_bluetooth_bredr::ScoConnectionOnConnectionCompleteRequest::Error(bredr::ScoErrorCode::ParametersRejected)).unwrap();
                         return None;
                     }
                 }
                 Err(code) => {
-                    proxy.error(code).unwrap();
+                    control.send_on_connection_complete(&fidl_fuchsia_bluetooth_bredr::ScoConnectionOnConnectionCompleteRequest::Error(code)).unwrap();
                     return None;
                 }
             }

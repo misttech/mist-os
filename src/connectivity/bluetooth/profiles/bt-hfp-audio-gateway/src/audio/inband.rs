@@ -63,9 +63,15 @@ impl AudioSession {
         proxy: bredr::ScoConnectionProxy,
         codec: CodecId,
     ) -> AudioError {
-        let packet: &mut [u8] = &mut [0; 60]; // SCO has 60 byte packets
+        // Pre-allocate the packet vector and reuse to avoid allocating for every packet.
+        let mut packet: Vec<u8> = Vec::with_capacity(60); // SCO has 60 byte packets
+        packet.resize(60, 0);
+        let mut request =
+            bredr::ScoConnectionWriteRequest { data: Some(packet), ..Default::default() };
+
         const MSBC_ENCODED_LEN: usize = 57; // Length of a MSBC packet after encoding.
         if codec == CodecId::MSBC {
+            let packet: &mut [u8] = request.data.as_mut().unwrap().as_mut_slice();
             packet[0] = 0x01; // H2 header has a constant part (0b1000_0000_0001_AABB) with AABB
                               // cycling 0000, 0011, 1100, 1111
         }
@@ -79,17 +85,20 @@ impl AudioSession {
                             warn!("Got {} bytes, uneven number of packets", encoded.len());
                         }
                         for sbc_packet in encoded.as_slice().chunks_exact(MSBC_ENCODED_LEN) {
+                            let packet: &mut [u8] = request.data.as_mut().unwrap().as_mut_slice();
                             packet[1] = *h2_marker.next().unwrap();
                             packet[2..59].copy_from_slice(sbc_packet);
-                            if let Err(e) = proxy.write(&packet).await {
+                            if let Err(e) = proxy.write(&request).await {
                                 return e.into();
                             }
                         }
                     } else {
                         // CVSD has no padding or header. Encoder sends us multiples of 60 bytes as
                         // long as we provide a multiple of 7.5ms audio packets.
-                        for packet in encoded.as_slice().chunks_exact(60) {
-                            if let Err(e) = proxy.write(&packet).await {
+                        for cvsd_packet in encoded.as_slice().chunks_exact(60) {
+                            let packet: &mut [u8] = request.data.as_mut().unwrap().as_mut_slice();
+                            packet.copy_from_slice(cvsd_packet);
+                            if let Err(e) = proxy.write(&request).await {
                                 return e.into();
                             }
                         }
@@ -172,8 +181,9 @@ impl AudioSession {
         codec: CodecId,
     ) -> AudioError {
         loop {
-            let (_packet_status, data) = match proxy.read().await {
-                Ok(x) => x,
+            let data = match proxy.read().await {
+                Ok(bredr::ScoConnectionReadResponse { data: Some(data), .. }) => data,
+                Ok(_) => return AudioError::audio_core(format_err!("Invalid Read response")),
                 Err(e) => return e.into(),
             };
             let packet = match codec {
@@ -358,18 +368,21 @@ mod tests {
     // Processes one sco request.  Returns true if the stream was ended.
     async fn process_sco_request(
         sco_request_stream: &mut ScoConnectionRequestStream,
-        read_data: &[u8],
+        read_data: Vec<u8>,
     ) -> Option<ProcessedRequest> {
         match sco_request_stream.next().await {
             Some(Ok(bredr::ScoConnectionRequest::Read { responder })) => {
-                responder
-                    .send(bredr::RxPacketStatus::CorrectlyReceivedData, read_data)
-                    .expect("sends okay");
+                let response = bredr::ScoConnectionReadResponse {
+                    status_flag: Some(bredr::RxPacketStatus::CorrectlyReceivedData),
+                    data: Some(read_data),
+                    ..Default::default()
+                };
+                responder.send(&response).expect("sends okay");
                 Some(ProcessedRequest::ScoRead)
             }
-            Some(Ok(bredr::ScoConnectionRequest::Write { responder, data })) => {
+            Some(Ok(bredr::ScoConnectionRequest::Write { payload, responder })) => {
                 responder.send().expect("response to write");
-                Some(ProcessedRequest::ScoWrite(data))
+                Some(ProcessedRequest::ScoWrite(payload.data.unwrap()))
             }
             None => None,
             x => panic!("Expected read or write requests, got {x:?}"),
@@ -397,7 +410,7 @@ mod tests {
         for _ in 1..10 {
             assert_eq!(
                 Some(ProcessedRequest::ScoRead),
-                process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET).await
+                process_sco_request(&mut sco_request_stream, ZERO_INPUT_SBC_PACKET.to_vec()).await
             );
         }
 
@@ -407,7 +420,7 @@ mod tests {
         // Should be able to drain the requests.
         let mut extra_requests = 0;
         while let Some(r) =
-            process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET).await
+            process_sco_request(&mut sco_request_stream, ZERO_INPUT_SBC_PACKET.to_vec()).await
         {
             assert_eq!(ProcessedRequest::ScoRead, r);
             extra_requests += 1;
@@ -469,7 +482,7 @@ mod tests {
         // We need to write to the stream at least once to start it up.
         assert_eq!(
             Some(ProcessedRequest::ScoRead),
-            process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET).await
+            process_sco_request(&mut sco_request_stream, ZERO_INPUT_SBC_PACKET.to_vec()).await
         );
 
         let notifications_per_ring = 20;
@@ -505,7 +518,7 @@ mod tests {
         for _ in 1..100 {
             assert_eq!(
                 Some(ProcessedRequest::ScoRead),
-                process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET).await
+                process_sco_request(&mut sco_request_stream, ZERO_INPUT_SBC_PACKET.to_vec()).await
             );
             // We are the only ones polling position_info, so we can ignore wakeups (noop waker).
             if position_info
@@ -579,7 +592,9 @@ mod tests {
         let next_header = &mut [0x01, 0x08];
         for _sco_frame in 1..100 {
             'sco: loop {
-                match process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET).await {
+                match process_sco_request(&mut sco_request_stream, ZERO_INPUT_SBC_PACKET.to_vec())
+                    .await
+                {
                     Some(ProcessedRequest::ScoRead) => continue 'sco,
                     Some(ProcessedRequest::ScoWrite(data)) => {
                         assert_eq!(60, data.len());
@@ -656,7 +671,9 @@ mod tests {
         // Expect 100 CVSD Audio frames, which should take ~ 750 milliseconds.
         for _sco_frame in 1..100 {
             'sco: loop {
-                match process_sco_request(&mut sco_request_stream, &ZERO_INPUT_CVSD_PACKET).await {
+                match process_sco_request(&mut sco_request_stream, ZERO_INPUT_CVSD_PACKET.to_vec())
+                    .await
+                {
                     Some(ProcessedRequest::ScoRead) => continue 'sco,
                     Some(ProcessedRequest::ScoWrite(data)) => {
                         // Confirm the data is right
@@ -723,8 +740,10 @@ mod tests {
         'position_notifications: for i in 1..20 {
             let mut position_info = ring_buffer.watch_clock_recovery_position_info();
             loop {
-                let sco_activity =
-                    Box::pin(process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET));
+                let sco_activity = Box::pin(process_sco_request(
+                    &mut sco_request_stream,
+                    ZERO_INPUT_SBC_PACKET.to_vec(),
+                ));
                 use futures::future::Either;
                 match futures::future::select(position_info, sco_activity).await {
                     Either::Left((result, _sco_fut)) => {

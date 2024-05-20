@@ -109,26 +109,69 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
   class ScoConnectionServer final : public ServerBase<fuchsia::bluetooth::bredr::ScoConnection> {
    public:
-    ScoConnectionServer(fidl::InterfaceRequest<fuchsia::bluetooth::bredr::ScoConnection> request,
-                        bt::sco::ScoConnection::WeakPtr connection);
+    explicit ScoConnectionServer(
+        fidl::InterfaceRequest<fuchsia::bluetooth::bredr::ScoConnection> request,
+        ProfileServer* profile_server);
     ~ScoConnectionServer() override;
-    void Activate(fit::callback<void()> on_closed);
-    void Read(ReadCallback callback) override;
-    void Write(std::vector<uint8_t> data, WriteCallback callback) override;
+    // Call bt::gap::ScoConnection::Activate with the appropriate callbacks. On error, destroys this
+    // server.
+    void Activate();
+
+    void OnConnectedParams(::fuchsia::bluetooth::bredr::ScoConnectionParameters params) {
+      OnConnectionComplete(::fuchsia::bluetooth::bredr::ScoConnectionOnConnectionCompleteRequest::
+                               WithConnectedParams(std::move(params)));
+    }
+
+    // Sends the OnConnectionComplete event with `error` and shuts down the server.
+    void OnError(::fuchsia::bluetooth::bredr::ScoErrorCode error);
+
+    const std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters>& parameters() const {
+      return parameters_;
+    }
+
+    void set_parameters(std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters> params) {
+      parameters_ = std::move(params);
+    }
+
+    void set_request_handle(bt::gap::Adapter::BrEdr::ScoRequestHandle handle) {
+      request_handle_ = std::move(handle);
+    };
+
+    void set_connection(bt::sco::ScoConnection::WeakPtr connection) {
+      connection_ = std::move(connection);
+    }
+
+    WeakPtr<ScoConnectionServer> GetWeakPtr() { return weak_self_.GetWeakPtr(); }
 
    private:
-    void TryRead();
-    void Close(zx_status_t epitaph);
-    bt::sco::ScoConnection::WeakPtr connection_;
-    fit::callback<void()> on_closed_;
-    // Non-null when a read request is waiting for an inbound packet.
-    fit::callback<void(fuchsia::bluetooth::bredr::RxPacketStatus, std::vector<uint8_t>)> read_cb_;
-  };
+    // ScoConnection overrides:
+    void Read(ReadCallback callback) override;
+    void Write(::fuchsia::bluetooth::bredr::ScoConnectionWriteRequest request,
+               WriteCallback callback) override;
+    void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
-  struct ScoRequest : public pw::RefCounted<ScoRequest> {
-    std::optional<bt::gap::BrEdrConnectionManager::ScoRequestHandle> request_handle;
-    fuchsia::bluetooth::bredr::ScoConnectionReceiverPtr receiver;
-    std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters> parameters;
+    void TryRead();
+
+    // Closes the server with `epitaph` and destroys the server.
+    void Close(zx_status_t epitaph);
+
+    void OnConnectionComplete(
+        ::fuchsia::bluetooth::bredr::ScoConnectionOnConnectionCompleteRequest request) {
+      binding()->events().OnConnectionComplete(std::move(request));
+    }
+
+    std::optional<bt::gap::Adapter::BrEdr::ScoRequestHandle> request_handle_;
+    std::vector<fuchsia::bluetooth::bredr::ScoConnectionParameters> parameters_;
+
+    bt::sco::ScoConnection::WeakPtr connection_;
+    // Non-null when a read request is waiting for an inbound packet.
+    fit::callback<void(::fuchsia::bluetooth::bredr::ScoConnection_Read_Result)> read_cb_;
+
+    ProfileServer* profile_server_;
+
+    // Keep this as the last member to make sure that all weak pointers are
+    // invalidated before other members get destroyed.
+    WeakSelf<ScoConnectionServer> weak_self_;
   };
 
   // fuchsia::bluetooth::bredr::Profile overrides:
@@ -156,8 +199,8 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
                       const std::map<bt::sdp::AttributeId, bt::sdp::DataElement>& attributes);
 
   // Callback for SCO connections requests.
-  void OnScoConnectionResult(pw::IntrusivePtr<ScoRequest> request,
-                             bt::sco::ScoConnectionManager::AcceptConnectionResult);
+  static void OnScoConnectionResult(WeakPtr<ScoConnectionServer>& server,
+                                    bt::sco::ScoConnectionManager::AcceptConnectionResult result);
 
   // Callback when clients close their audio direction extension.
   void OnAudioDirectionExtError(AudioDirectionExt* ext_server, zx_status_t status);
@@ -250,7 +293,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   // Creates sockets that bridge L2CAP channels to profile processes.
   bt::socket::SocketFactory<bt::l2cap::Channel> l2cap_socket_factory_;
 
-  std::unordered_map<bt::sco::ScoConnection*, std::unique_ptr<ScoConnectionServer>>
+  std::unordered_map<ScoConnectionServer*, std::unique_ptr<ScoConnectionServer>>
       sco_connection_servers_;
 
   // Keep this as the last member to make sure that all weak pointers are

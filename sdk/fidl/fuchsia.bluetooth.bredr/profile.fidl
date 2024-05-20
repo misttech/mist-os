@@ -341,7 +341,7 @@ open protocol Profile {
     /// the procedure is canceled.
     ///
     /// The result of the connection attempt and the parameters used for the
-    /// connection will be returned with `receiver`.  Dropping `receiver` will
+    /// connection will be returned with `connection`.  Dropping `connection` will
     /// cancel the request.
     flexible ConnectSco(resource table {
         /// Required.
@@ -351,6 +351,6 @@ open protocol Profile {
         /// Required.
         3: params vector<ScoConnectionParameters>:MAX;
         /// Required.
-        4: receiver client_end:ScoConnectionReceiver;
+        4: connection server_end:ScoConnection;
     });
 };
