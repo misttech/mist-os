@@ -280,9 +280,22 @@ template("board_configuration") {
   }
 
   if (defined(invoker.devicetree)) {
-    _dtb_file = get_label_info(invoker.devicetree, "target_out_dir") + "/" +
-                get_label_info(invoker.devicetree, "name") + ".dtb"
-    creation_deps += [ invoker.devicetree ]
+    devicetree = invoker.devicetree
+    _dtb_filename = get_label_info(devicetree, "name") + ".dtb"
+    _dtb_path =
+        get_label_info(devicetree, "target_out_dir") + "/${_dtb_filename}"
+
+    _dtb_rebased_path = "devicetree/${_dtb_filename}"
+
+    copy("${target_name}.devicetree") {
+      visibility = [ ":${labels.main_target}" ]
+      sources = [ _dtb_path ]
+      outputs = [ "${files.board_configuration_dir}/${_dtb_rebased_path}" ]
+
+      deps = [ devicetree + ".dtb" ]
+    }
+
+    creation_deps += [ ":${target_name}.devicetree" ]
   }
 
   base_info_contents = {
@@ -312,7 +325,8 @@ template("board_configuration") {
     }
 
     if (defined(invoker.devicetree)) {
-      devicetree = rebase_path(_dtb_file, files.board_configuration_dir)
+      devicetree =
+          "devicetree/" + get_label_info(invoker.devicetree, "name") + ".dtb"
     }
 
     forward_variables_from(invoker,
