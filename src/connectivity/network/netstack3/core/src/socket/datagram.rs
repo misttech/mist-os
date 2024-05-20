@@ -35,14 +35,16 @@ use crate::{
         AnyDevice, DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier as _,
         WeakDeviceIdentifier,
     },
-    error::ExistsError,
-    error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
+    error::{
+        ExistsError, LocalAddressError, NotFoundError, RemoteAddressError, SocketError,
+        ZonedAddressError,
+    },
     filter::TransportPacketSerializer,
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
         socket::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
-            IpSocketHandler, SendOneShotIpPacketError, SendOptions,
+            IpSocketHandler, SendOneShotIpPacketError, SendOptions, SocketIpExt,
         },
         EitherDeviceId, HopLimits, MulticastMembershipHandler, ResolveRouteError,
         TransportIpContext,
@@ -994,13 +996,27 @@ pub trait DatagramSocketMapSpec<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec
     type BoundSocketId: Clone + Debug;
 }
 
+/// A marker trait for dual-stack socket features.
+///
+/// This trait acts as a marker for [`DualStackBaseIpExt`] for both `Self` and
+/// `Self::OtherVersion`.
+pub trait DualStackIpExt:
+    DualStackBaseIpExt + super::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+{
+}
+
+impl<I> DualStackIpExt for I where
+    I: DualStackBaseIpExt + super::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+{
+}
+
 /// Common features of dual-stack sockets that vary by IP version.
 ///
 /// This trait exists to provide per-IP-version associated types that are
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-pub trait DualStackIpExt: super::DualStackIpExt {
+pub trait DualStackBaseIpExt: super::DualStackIpExt + SocketIpExt {
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
@@ -1038,7 +1054,9 @@ pub trait DualStackIpExt: super::DualStackIpExt {
         + AsRef<IpOptions<Self, D, S>>
         + AsMut<IpOptions<Self, D, S>>
         + Send
-        + Sync;
+        + Sync
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     /// Convert a socket ID into a `Self::DualStackBoundSocketId`.
     ///
@@ -1054,7 +1072,9 @@ pub trait DualStackIpExt: super::DualStackIpExt {
     /// Retrieves the associated connection address from the connection state.
     fn conn_addr_from_state<D: WeakDeviceIdentifier, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
-    ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D>;
+    ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 }
 
 /// An IP Socket ID that is either `Ipv4` or `Ipv6`.
@@ -1070,7 +1090,7 @@ pub enum EitherIpSocket<D: WeakDeviceIdentifier, S: DatagramSocketSpec> {
     V6(S::SocketId<Ipv6, D>),
 }
 
-impl DualStackIpExt for Ipv4 {
+impl DualStackBaseIpExt for Ipv4 {
     /// Incoming IPv4 packets may be received by either IPv4 or IPv6 sockets.
     type DualStackBoundSocketId<D: WeakDeviceIdentifier, S: DatagramSocketSpec> =
         EitherIpSocket<D, S>;
@@ -1109,7 +1129,7 @@ impl DualStackIpExt for Ipv4 {
     }
 }
 
-impl DualStackIpExt for Ipv6 {
+impl DualStackBaseIpExt for Ipv6 {
     /// Incoming IPv6 packets may only be received by IPv6 sockets.
     type DualStackBoundSocketId<D: WeakDeviceIdentifier, S: DatagramSocketSpec> =
         S::SocketId<Self, D>;
@@ -5073,7 +5093,7 @@ mod test {
             device::state::IpDeviceStateIpExt,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
-            IpLayerIpExt, DEFAULT_HOP_LIMITS,
+            DEFAULT_HOP_LIMITS,
         },
         socket::{
             Bound, IncompatibleError, ListenerAddrInfo, RemoveResult, SocketMapAddrStateSpec,
@@ -5507,7 +5527,7 @@ mod test {
         type WeakDeviceId = FakeWeakDeviceId<D>;
     }
 
-    impl<D: FakeStrongDeviceId, I: DatagramIpExt<D> + IpLayerIpExt>
+    impl<D: FakeStrongDeviceId, I: DatagramIpExt<D>>
         DatagramStateContext<I, FakeBindingsCtx, FakeStateSpec> for FakeCoreCtx<I, D>
     {
         type SocketsStateCtx<'a> = FakeDualStackCoreCtx<D>;
@@ -5584,7 +5604,7 @@ mod test {
     /// This allows us to implement `DatagramBoundStateContext` for all `I`
     /// while also assigning its associated types different values for `Ipv4`
     /// and `Ipv6`.
-    trait DualStackContextsIpExt<D: FakeStrongDeviceId>: Ip + DualStackIpExt {
+    trait DualStackContextsIpExt<D: FakeStrongDeviceId>: IpExt {
         type DualStackContext: DualStackDatagramBoundStateContext<
             Self,
             FakeBindingsCtx,
@@ -5624,7 +5644,7 @@ mod test {
         }
     }
 
-    impl<D: FakeStrongDeviceId, I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>>
+    impl<D: FakeStrongDeviceId, I: Ip + DualStackContextsIpExt<D>>
         DatagramBoundStateContext<I, FakeBindingsCtx, FakeStateSpec> for FakeDualStackCoreCtx<D>
     {
         type IpSocketsCtx<'a> = InnerIpSocketCtx<D>;
@@ -5786,7 +5806,7 @@ mod test {
     }
 
     #[ip_test]
-    fn set_get_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn set_get_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId>>() {
         let mut core_ctx = FakeCoreCtx::<I, FakeDeviceId>::new_with_sockets(
             Default::default(),
             Default::default(),
@@ -5811,7 +5831,7 @@ mod test {
     }
 
     #[ip_test]
-    fn set_get_device_hop_limits<I: Ip + DatagramIpExt<FakeReferencyDeviceId> + IpLayerIpExt>() {
+    fn set_get_device_hop_limits<I: Ip + DatagramIpExt<FakeReferencyDeviceId>>() {
         let device = FakeReferencyDeviceId::default();
         let mut core_ctx =
             FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
@@ -5845,7 +5865,7 @@ mod test {
     }
 
     #[ip_test]
-    fn default_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn default_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId>>() {
         let mut core_ctx = FakeCoreCtx::<I, FakeDeviceId>::new_with_sockets(
             Default::default(),
             Default::default(),
@@ -5876,7 +5896,7 @@ mod test {
     }
 
     #[ip_test]
-    fn bind_device_unbound<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn bind_device_unbound<I: Ip + DatagramIpExt<FakeDeviceId>>() {
         let mut core_ctx =
             FakeCoreCtx::<I, _>::new_with_sockets(Default::default(), Default::default());
         let mut bindings_ctx = FakeBindingsCtx::default();
@@ -5894,7 +5914,7 @@ mod test {
     }
 
     #[ip_test]
-    fn send_to_binds_unbound<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn send_to_binds_unbound<I: Ip + DatagramIpExt<FakeDeviceId>>() {
         let mut core_ctx = FakeCoreCtx::<I, FakeDeviceId>::new_with_ip_socket_ctx(
             FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
                 device: FakeDeviceId,
@@ -5923,7 +5943,7 @@ mod test {
     }
 
     #[ip_test]
-    fn send_to_no_route_still_binds<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn send_to_no_route_still_binds<I: Ip + DatagramIpExt<FakeDeviceId>>() {
         let mut core_ctx =
             FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
                 FakeDeviceConfig {
@@ -6035,7 +6055,7 @@ mod test {
     }
 
     #[ip_test]
-    fn set_get_transparent<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>() {
+    fn set_get_transparent<I: Ip + DatagramIpExt<FakeDeviceId>>() {
         let mut core_ctx =
             FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(FakeDualStackIpSocketCtx::new([
                 FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
@@ -6069,9 +6089,7 @@ mod test {
     #[test_case(OriginalSocketState::Unbound; "reinsert_unbound")]
     #[test_case(OriginalSocketState::Listener; "reinsert_listener")]
     #[test_case(OriginalSocketState::Connected; "reinsert_connected")]
-    fn connect_reinserts_on_failure_single_stack<
-        I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt,
-    >(
+    fn connect_reinserts_on_failure_single_stack<I: Ip + DatagramIpExt<FakeDeviceId>>(
         original: OriginalSocketState,
     ) {
         connect_reinserts_on_failure_inner::<I>(
@@ -6096,7 +6114,7 @@ mod test {
         connect_reinserts_on_failure_inner::<Ipv6>(original, local_ip, remote_ip);
     }
 
-    fn connect_reinserts_on_failure_inner<I: Ip + DatagramIpExt<FakeDeviceId> + IpLayerIpExt>(
+    fn connect_reinserts_on_failure_inner<I: Ip + DatagramIpExt<FakeDeviceId>>(
         original: OriginalSocketState,
         local_ip: I::Addr,
         remote_ip: SpecifiedAddr<I::Addr>,
@@ -6240,7 +6258,7 @@ mod test {
     #[test_case(OriginalSocketState::Unbound; "unbound")]
     #[test_case(OriginalSocketState::Listener; "listener")]
     #[test_case(OriginalSocketState::Connected; "connected")]
-    fn set_get_device_single_stack<I: Ip + DatagramIpExt<MultipleDevicesId> + IpLayerIpExt>(
+    fn set_get_device_single_stack<I: Ip + DatagramIpExt<MultipleDevicesId>>(
         original: OriginalSocketState,
     ) {
         set_get_device_inner::<I>(original, I::TEST_ADDRS.local_ip.get(), I::TEST_ADDRS.remote_ip);
@@ -6261,7 +6279,7 @@ mod test {
         set_get_device_inner::<Ipv6>(original, local_ip, remote_ip);
     }
 
-    fn set_get_device_inner<I: Ip + DatagramIpExt<MultipleDevicesId> + IpLayerIpExt>(
+    fn set_get_device_inner<I: Ip + DatagramIpExt<MultipleDevicesId>>(
         original: OriginalSocketState,
         local_ip: I::Addr,
         remote_ip: SpecifiedAddr<I::Addr>,

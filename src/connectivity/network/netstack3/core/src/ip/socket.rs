@@ -206,7 +206,7 @@ pub enum SendOneShotIpPacketError<E> {
 }
 
 /// Extension trait for `Ip` providing socket-specific functionality.
-pub(crate) trait SocketIpExt: Ip + IpExt {
+pub trait SocketIpExt: Ip + IpExt {
     /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
     const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
         // SAFETY: The loopback address is a valid SocketIpAddr, as verified
@@ -266,10 +266,7 @@ pub(crate) enum MmsError {
 }
 
 /// Gets device related information of an IP socket.
-pub trait DeviceIpSocketHandler<I, BC>: DeviceIdContext<AnyDevice>
-where
-    I: IpLayerIpExt,
-{
+pub trait DeviceIpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Gets the maximum message size for the transport layer, it equals the
     /// device MTU minus the IP header size.
     ///
@@ -475,7 +472,7 @@ fn new_ip_socket<I, D>(
     proto: I::Proto,
 ) -> IpSock<I, D::Weak>
 where
-    I: IpLayerIpExt,
+    I: IpExt,
     D: StrongDeviceIdentifier,
 {
     // TODO(https://fxbug.dev/323389672): Cache a reference to the route to
@@ -953,27 +950,25 @@ pub(crate) mod testutil {
     #[derive(Derivative, GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpSocketCtx<I: IpLayerIpExt, D> {
+    pub(crate) struct FakeIpSocketCtx<I: Ip, D> {
         pub(crate) table: ForwardingTable<I, D>,
         forwarding: FakeIpForwardingCtx<D>,
         devices: HashMap<D, FakeDeviceState<I>>,
     }
 
-    impl<I: IpLayerIpExt, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
+    impl<I: Ip, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
         fn as_ref(&self) -> &Self {
             self
         }
     }
 
-    impl<I: IpLayerIpExt, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
+    impl<I: Ip, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
         fn as_mut(&mut self) -> &mut Self {
             self
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId, BC> TransportIpContext<I, BC>
-        for FakeIpSocketCtx<I, D>
-    {
+    impl<I: IpExt, D: FakeStrongDeviceId, BC> TransportIpContext<I, BC> for FakeIpSocketCtx<I, D> {
         fn get_default_hop_limits(&mut self, device: Option<&D>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
                 let hop_limit = self.get_device_state(device).default_hop_limit;
@@ -1001,14 +996,14 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpSocketCtx<I, D> {
+    impl<I: IpExt, D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpSocketCtx<I, D> {
         type DeviceId = <FakeIpDeviceIdCtx<D> as DeviceIdContext<AnyDevice>>::DeviceId;
         type WeakDeviceId = <FakeIpDeviceIdCtx<D> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
     }
 
     impl<I, D, BC> IpSocketHandler<I, BC> for FakeIpSocketCtx<I, D>
     where
-        I: IpLayerIpExt,
+        I: IpExt,
         D: FakeStrongDeviceId,
     {
         fn new_ip_socket(
@@ -1046,7 +1041,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpLayerIpExt + IpDeviceStateIpExt,
+            I: IpExt,
             State: AsRef<FakeIpSocketCtx<I, DeviceId>>
                 + AsMut<FakeIpSocketCtx<I, DeviceId>>
                 + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
@@ -1092,7 +1087,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId, BC> MulticastMembershipHandler<I, BC>
+    impl<I: IpExt, D: FakeStrongDeviceId, BC> MulticastMembershipHandler<I, BC>
         for FakeIpSocketCtx<I, D>
     {
         fn join_multicast_group(
@@ -1130,7 +1125,7 @@ pub(crate) mod testutil {
 
     impl<I, BC, D, State, Meta> TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
-        I: IpLayerIpExt,
+        I: IpExt,
         BC: InstantContext + TracingContext + FilterBindingsTypes,
         D: FakeStrongDeviceId,
         State: TransportIpContext<I, BC, DeviceId = D>,
@@ -1205,11 +1200,11 @@ pub(crate) mod testutil {
             Self { v4: FakeIpSocketCtx::new(v4), v6: FakeIpSocketCtx::new(v6) }
         }
 
-        fn inner_mut<I: IpLayerIpExt>(&mut self) -> &mut FakeIpSocketCtx<I, D> {
+        fn inner_mut<I: Ip>(&mut self) -> &mut FakeIpSocketCtx<I, D> {
             I::map_ip(IpInvariant(self), |IpInvariant(s)| &mut s.v4, |IpInvariant(s)| &mut s.v6)
         }
 
-        fn inner<I: IpLayerIpExt>(&self) -> &FakeIpSocketCtx<I, D> {
+        fn inner<I: Ip>(&self) -> &FakeIpSocketCtx<I, D> {
             I::map_ip(IpInvariant(self), |IpInvariant(s)| &s.v4, |IpInvariant(s)| &s.v6)
         }
 
@@ -1250,14 +1245,14 @@ pub(crate) mod testutil {
             );
         }
 
-        pub(crate) fn get_device_state_mut<I: IpLayerIpExt>(
+        pub(crate) fn get_device_state_mut<I: IpExt>(
             &mut self,
             device: &D,
         ) -> &mut FakeDeviceState<I> {
             self.inner_mut::<I>().get_device_state_mut(device)
         }
 
-        pub(crate) fn multicast_memberships<I: IpLayerIpExt>(
+        pub(crate) fn multicast_memberships<I: IpExt>(
             &self,
         ) -> HashMap<(D, MulticastAddr<I::Addr>), NonZeroUsize> {
             self.inner::<I>().multicast_memberships()
@@ -1275,9 +1270,7 @@ pub(crate) mod testutil {
         type WeakDeviceId = D::Weak;
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId, BC> IpSocketHandler<I, BC>
-        for FakeDualStackIpSocketCtx<D>
-    {
+    impl<I: IpExt, D: FakeStrongDeviceId, BC> IpSocketHandler<I, BC> for FakeDualStackIpSocketCtx<D> {
         fn new_ip_socket(
             &mut self,
             bindings_ctx: &mut BC,
@@ -1320,7 +1313,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, Meta, DeviceId: FakeStrongDeviceId, BC> IpSocketHandler<I, BC>
+    impl<I: IpExt, Meta, DeviceId: FakeStrongDeviceId, BC> IpSocketHandler<I, BC>
         for FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
     where
         FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>:
@@ -1360,7 +1353,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId, BC> MulticastMembershipHandler<I, BC>
+    impl<I: IpExt, D: FakeStrongDeviceId, BC> MulticastMembershipHandler<I, BC>
         for FakeDualStackIpSocketCtx<D>
     {
         fn join_multicast_group(
@@ -1402,7 +1395,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId, BC> TransportIpContext<I, BC>
+    impl<I: IpExt, D: FakeStrongDeviceId, BC> TransportIpContext<I, BC>
         for FakeDualStackIpSocketCtx<D>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
@@ -1453,7 +1446,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         /// Creates a new `FakeIpSocketCtx` with the given device
         /// configs.
         pub(crate) fn new(

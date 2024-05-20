@@ -21,7 +21,7 @@ use crate::{
     },
     device::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier},
     error::{ExistsError, NotFoundError},
-    ip::{device::state::IpDeviceStateIpExt, socket::SocketIpExt, IpLayerIpExt},
+    ip::socket::SocketIpExt,
     socket::address::{
         AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
     },
@@ -29,12 +29,9 @@ use crate::{
 
 /// A dual stack IP extention trait that provides the `OtherVersion` associated
 /// type.
-pub trait DualStackIpExt: IpLayerIpExt + IpDeviceStateIpExt {
+pub trait DualStackIpExt: Ip {
     /// The "other" IP version, e.g. [`Ipv4`] for [`Ipv6`] and vice-versa.
-    type OtherVersion: IpLayerIpExt
-        + IpDeviceStateIpExt
-        + crate::socket::datagram::DualStackIpExt<OtherVersion = Self>
-        + crate::transport::tcp::socket::DualStackIpExt<OtherVersion = Self>;
+    type OtherVersion: DualStackIpExt<OtherVersion = Self>;
 }
 
 impl DualStackIpExt for Ipv4 {

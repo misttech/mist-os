@@ -283,7 +283,7 @@ impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for
     fn convert<D: WeakDeviceIdentifier, BT: tcp_socket::TcpBindingsTypes>(
         &self,
         _id: tcp_socket::TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as tcp_socket::DualStackIpExt>::DemuxSocketId<D, BT> {
+    ) -> <I::OtherVersion as tcp_socket::DualStackBaseIpExt>::DemuxSocketId<D, BT> {
         self.uninstantiable_unreachable()
     }
 }

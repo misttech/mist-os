@@ -3112,7 +3112,6 @@ mod tests {
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         ip::{
-            device::state::IpDeviceStateIpExt,
             icmp::socket::{
                 IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet, IcmpSocketState, StateContext,
             },
@@ -3215,9 +3214,7 @@ mod tests {
         }
     }
 
-    impl<I: datagram::IpExt + IpDeviceStateIpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>>
-        for FakeIcmpCoreCtx<I>
-    {
+    impl<I: datagram::IpExt> InnerIcmpContext<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
         type DualStackContext = UninstantiableWrapper<Self>;
         type IpSocketsCtx<'a> = InnerIpSocketCtx;
         fn receive_icmp_error(

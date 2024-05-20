@@ -60,7 +60,8 @@ use crate::{
     ip::{
         icmp::IcmpErrorCode,
         socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
+            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError,
+            IpSocketHandler, SocketIpExt,
         },
         EitherDeviceId, IpExt, IpSockCreateAndSendError, TransportIpContext,
     },
@@ -90,8 +91,22 @@ use crate::{
 
 pub use accept_queue::ListenerNotifier;
 
+/// A marker trait for dual-stack socket features.
+///
+/// This trait acts as a marker for [`DualStackBaseIpExt`] for both `Self` and
+/// `Self::OtherVersion`.
+pub trait DualStackIpExt:
+    DualStackBaseIpExt + crate::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+{
+}
+
+impl<I> DualStackIpExt for I where
+    I: DualStackBaseIpExt + crate::socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+{
+}
+
 /// A dual stack IP extension trait for TCP.
-pub trait DualStackIpExt: crate::socket::DualStackIpExt {
+pub trait DualStackBaseIpExt: crate::socket::DualStackIpExt + SocketIpExt {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>: SpecSocketId;
@@ -113,18 +128,24 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     /// (by reference) to a dual stack TCP socket ID.
     fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
-    ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>>;
+    ) -> EitherStack<&TcpSocketId<Self, D, BT>, &TcpSocketId<Self::OtherVersion, D, BT>>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     /// Determines which stack the demux socket ID belongs to and converts
     /// (by value) to a dual stack TCP socket ID.
     fn into_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: Self::DemuxSocketId<D, BT>,
-    ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>>;
+    ) -> EitherStack<TcpSocketId<Self, D, BT>, TcpSocketId<Self::OtherVersion, D, BT>>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     /// Turns a [`TcpSocketId`] of the current stack into the demuxer ID.
     fn into_demux_socket_id<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
-    ) -> Self::DemuxSocketId<D, BT>;
+    ) -> Self::DemuxSocketId<D, BT>
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
 
     fn get_conn_info<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
@@ -137,7 +158,9 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
             BT::ReturnedBuffers,
             BT::ListenerNotifierOrProvidedBuffers,
         >,
-    >;
+    >
+    where
+        Self::OtherVersion: DualStackBaseIpExt;
     fn get_defunct<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> bool;
@@ -155,10 +178,11 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
-    );
+    ) where
+        Self::OtherVersion: DualStackBaseIpExt;
 }
 
-impl DualStackIpExt for Ipv4 {
+impl DualStackBaseIpExt for Ipv4 {
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
         EitherStack<TcpSocketId<Ipv4, D, BT>, TcpSocketId<Ipv6, D, BT>>;
     type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
@@ -240,7 +264,7 @@ pub struct Ipv6Options {
     pub(crate) dual_stack_enabled: bool,
 }
 
-impl DualStackIpExt for Ipv6 {
+impl DualStackBaseIpExt for Ipv6 {
     type DemuxSocketId<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> = TcpSocketId<Ipv6, D, BT>;
     type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> = EitherStack<
         (Connection<Ipv6, Ipv6, D, BT>, ConnAddr<ConnIpAddr<Ipv6Addr, NonZeroU16, NonZeroU16>, D>),
@@ -729,14 +753,14 @@ pub trait DualStackDemuxIdConverter<I: DualStackIpExt> {
     fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
+    ) -> <I::OtherVersion as DualStackBaseIpExt>::DemuxSocketId<D, BT>;
 }
 
 impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
     fn convert<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<Ipv6, D, BT>,
-    ) -> <Ipv4 as DualStackIpExt>::DemuxSocketId<D, BT> {
+    ) -> <Ipv4 as DualStackBaseIpExt>::DemuxSocketId<D, BT> {
         EitherStack::OtherStack(id)
     }
 }
@@ -759,7 +783,7 @@ pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tc
     fn into_other_demux_socket_id(
         &self,
         id: TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT> {
+    ) -> <I::OtherVersion as DualStackBaseIpExt>::DemuxSocketId<D, BT> {
         self.other_demux_id_converter().convert(id)
     }
 

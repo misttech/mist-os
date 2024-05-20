@@ -18,7 +18,7 @@ use net_types::{
 };
 
 use crate::{
-    ip::device::Ipv6DeviceAddr,
+    ip::{device::Ipv6DeviceAddr, socket::SocketIpExt},
     socket::{AddrVec, DualStackIpExt, EitherStack, SocketMapAddrSpec},
 };
 
@@ -590,7 +590,10 @@ pub(crate) enum DualStackRemoteIp<I: DualStackIpExt, D> {
 /// An IPv4-mapped-IPv6 address will be unmapped to the inner IPv4 address, and
 /// an unspecified address will be populated with
 /// [`crate::socket::specify_unspecified_remote()`].
-pub(crate) fn dual_stack_remote_ip<I: DualStackIpExt, D>(
+pub(crate) fn dual_stack_remote_ip<
+    I: DualStackIpExt<OtherVersion: SocketIpExt> + SocketIpExt,
+    D,
+>(
     remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, D>>,
 ) -> DualStackRemoteIp<I, D> {
     let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(remote_ip);
