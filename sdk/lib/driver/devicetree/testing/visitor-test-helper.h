@@ -33,6 +33,45 @@ class VisitorTestHelper : public VisitorImpl, public ManagerTestHelper {
     return manager_.get();
   }
 
+  std::vector<std::shared_ptr<fuchsia_driver_framework::NodeAddChildRequest>> GetNodes(
+      const std::string& name_filter) {
+    std::vector<std::shared_ptr<fuchsia_driver_framework::NodeAddChildRequest>> output_nodes;
+    auto node_count = env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_node_size);
+    for (size_t i = 0; i < node_count; i++) {
+      auto node = env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::non_pbus_nodes_at, i);
+      if (node->args().name()->find(name_filter) != std::string::npos) {
+        output_nodes.push_back(node);
+      }
+    }
+    return output_nodes;
+  }
+
+  std::vector<fuchsia_hardware_platform_bus::Node> GetPbusNodes(const std::string& name_filter) {
+    std::vector<fuchsia_hardware_platform_bus::Node> output_nodes;
+    auto node_count = env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_node_size);
+    for (size_t i = 0; i < node_count; i++) {
+      auto node = env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
+      if (node.name()->find(name_filter) != std::string::npos) {
+        output_nodes.push_back(node);
+      }
+    }
+    return output_nodes;
+  }
+
+  std::vector<fuchsia_driver_framework::CompositeNodeSpec> GetCompositeNodeSpecs(
+      const std::string& name_filter) {
+    std::vector<fuchsia_driver_framework::CompositeNodeSpec> output_specs;
+    auto request_count =
+        env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_size);
+    for (size_t i = 0; i < request_count; i++) {
+      auto request = env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, i);
+      if (request.name()->find(name_filter) != std::string::npos) {
+        output_specs.push_back(request);
+      }
+    }
+    return output_specs;
+  }
+
  private:
   bool visit_called_ = false;
   std::unique_ptr<Manager> manager_;

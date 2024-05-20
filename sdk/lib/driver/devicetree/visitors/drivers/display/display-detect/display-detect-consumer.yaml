@@ -1,0 +1,42 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display-detect-consumer.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Fuchsia display detector consumer
+
+maintainers:
+  - Puneetha Ramachandra <puneetha@google.com>
+  - Victor Coston <coston@google.com>
+
+properties:
+  display-detect:
+    description: Phandle array of display detect nodes.
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+
+  display-detect-names:
+    description:
+      Names of the output display type corresponding to OUTPUT enum of the `fuchsia.display.bind`
+      file.
+
+additionalProperties: true
+
+dependentRequired:
+  display-detect-names: [display-detect]
+
+examples:
+  - |
+    display_detect: display-detect {
+      gpios = <&gpio 8 0>;
+      #display-detect-cells = <0>;
+    };
+
+    hdmi-display {
+      compatible = "fuchsia,hdmi-display";
+      display-detect = <&display_detect>;
+      display-detect-names = "HDMI";
+    };
