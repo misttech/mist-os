@@ -285,7 +285,7 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
   if (is_sync) {
     // Wait for completion.
     TRACE_DURATION("ufs", "SendRequestUsingSlot::sync_completion_wait", "slot", slot);
-    zx_status_t status = sync_completion_wait(&request_slot.complete, ZX_MSEC(GetTimeoutMsec()));
+    zx_status_t status = sync_completion_wait(&request_slot.complete, GetTimeout().get());
     zx_status_t request_result = request_slot.result;
     if (zx::result<> result = ClearSlot(request_slot); result.is_error()) {
       return result.take_error();

@@ -15,7 +15,7 @@
 
 namespace ufs {
 
-constexpr uint32_t kCommandTimeoutMs = 10000;
+constexpr zx::duration kCommandTimeout = zx::sec(10);
 
 class Ufs;
 
@@ -44,8 +44,8 @@ class RequestProcessor {
   zx::unowned_bti &GetBti() { return bti_; }
 
   // For testing
-  void SetTimeoutMsec(uint32_t time) { timeout_msec_ = time; }
-  uint32_t GetTimeoutMsec() const { return timeout_msec_; }
+  void SetTimeout(zx::duration timeout) { timeout_ = timeout; }
+  zx::duration GetTimeout() const { return timeout_; }
 
  protected:
   // |request_list| is not thread safe.
@@ -61,7 +61,7 @@ class RequestProcessor {
   Ufs &controller_;
   fdf::MmioBuffer &register_;
 
-  uint32_t timeout_msec_ = kCommandTimeoutMs;
+  zx::duration timeout_ = kCommandTimeout;
 
  private:
   zx::unowned_bti bti_;

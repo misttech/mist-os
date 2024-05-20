@@ -147,7 +147,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
       .WriteTo(mock_device_->GetRegisters());
 
   ReadAttributeUpiu request(Attributes::bBootLunEn);
-  ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
+  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
   auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_TIMED_OUT);
   ufs_->ProcessCompletions();
@@ -179,6 +179,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
                                                                          *response_upiu);
       });
 
+  ufs_->GetTransferRequestProcessor().SetTimeout(kCommandTimeout);
   response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
 }
@@ -216,7 +217,7 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
       .WriteTo(mock_device_->GetRegisters());
 
   NopOutUpiu nop_out_upiu;
-  ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
+  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
   auto nop_in =
       ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_TIMED_OUT);
@@ -240,6 +241,7 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
         return ZX_OK;
       });
 
+  ufs_->GetTransferRequestProcessor().SetTimeout(kCommandTimeout);
   nop_in = ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_BAD_STATE);
 }
@@ -297,7 +299,7 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlotTimeout) {
       .set_utp_transfer_request_completion_enable(false)
       .WriteTo(mock_device_->GetRegisters());
 
-  ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
+  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
 
   auto slot = ufs_->GetTransferRequestProcessor().ReserveSlot();
   ASSERT_OK(slot);
@@ -349,7 +351,7 @@ TEST_F(RequestProcessorTest, SendScsiUpiuTimeout) {
       .set_utp_transfer_request_completion_enable(false)
       .WriteTo(mock_device_->GetRegisters());
 
-  ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
+  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
 
   // Send scsi command with SendScsiUpiu()
   uint8_t cdb_buffer[6] = {};
