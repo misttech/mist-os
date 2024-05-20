@@ -4,8 +4,6 @@
 
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 
-#if __Fuchsia_API_level__ >= 15
-
 namespace fdf_testing {
 
 DriverUnderTestBase::DriverUnderTestBase(DriverRegistration driver_registration_symbol)
@@ -78,5 +76,3 @@ zx::result<> DriverUnderTestBase::Stop() {
 }
 
 }  // namespace fdf_testing
-
-#endif

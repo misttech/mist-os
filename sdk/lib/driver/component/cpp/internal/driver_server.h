@@ -5,10 +5,6 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_DRIVER_SERVER_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_DRIVER_SERVER_H_
 
-#include <zircon/availability.h>
-
-#if __Fuchsia_API_level__ >= 15
-
 #include <fidl/fuchsia.driver.framework/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/type_conversions.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -123,8 +119,7 @@ class DriverServer final : public fdf::WireServer<fuchsia_driver_framework::Driv
   std::optional<fdf::ServerBinding<fuchsia_driver_framework::Driver>> binding_;
   std::unique_ptr<fdf::DriverBase> driver_;
 };
-}  // namespace fdf_internal
 
-#endif
+}  // namespace fdf_internal
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_INTERNAL_DRIVER_SERVER_H_

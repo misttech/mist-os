@@ -5,9 +5,6 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_PREPARE_STOP_COMPLETER_H_
 #define LIB_DRIVER_COMPONENT_CPP_PREPARE_STOP_COMPLETER_H_
 
-#include <zircon/availability.h>
-
-#if __Fuchsia_API_level__ >= 15
 #include <lib/driver/component/cpp/start_completer.h>
 
 namespace fdf {
@@ -20,7 +17,5 @@ class PrepareStopCompleter final : public Completer {
 };
 
 }  // namespace fdf
-
-#endif
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_PREPARE_STOP_COMPLETER_H_

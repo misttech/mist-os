@@ -5,10 +5,6 @@
 #ifndef LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_
 #define LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_
 
-#include <zircon/availability.h>
-
-#if __Fuchsia_API_level__ >= 15
-
 #include <fidl/fuchsia.driver.framework/cpp/driver/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/internal/driver_server.h>
@@ -116,7 +112,5 @@ class DriverUnderTest final : public DriverUnderTestBase {
 };
 
 }  // namespace fdf_testing
-
-#endif
 
 #endif  // LIB_DRIVER_TESTING_CPP_DRIVER_LIFECYCLE_H_
