@@ -6,7 +6,7 @@
 
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
 load("//common:transition_utils.bzl", "set_command_line_option_value")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level", "get_fuchsia_api_levels")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
@@ -93,16 +93,18 @@ def _fuchsia_transition_impl(settings, attr):
     # Note: we do not need to validate here since the validation logic will
     # run in the config setting rule
     fuchsia_api_level = _update_fuchsia_api_level(settings, attr)
-    if fuchsia_api_level != "":
-        # Clang only accepts API levels as integers, so convert any special API
-        # levels to their numeric form.
-        #
-        # TODO(https://fxbug.dev/335442302): Get the numeric values for these
-        # special API levels from a better source of truth.
-        FUCHSIA_HEAD_VALUE = 4292870144
+    fuchsia_api_level_infos = [
+        info
+        for info in get_fuchsia_api_levels()
+        if info.api_level == fuchsia_api_level
+    ]
+    if len(fuchsia_api_level_infos) == 0:
+        fail("No metadata found for API level: ", fuchsia_api_level)
+    if 1 < len(fuchsia_api_level_infos):
+        fail("Assertion failure: more than one API level matched: ", fuchsia_api_level_infos)
+    fuchsia_api_level_info = fuchsia_api_level_infos[0]
 
-        api_level = FUCHSIA_HEAD_VALUE if fuchsia_api_level == "HEAD" else int(fuchsia_api_level)
-        copt = set_command_line_option_value(copt, "-ffuchsia-api-level=", str(api_level))
+    copt = set_command_line_option_value(copt, "-ffuchsia-api-level=", str(fuchsia_api_level_info.as_u32))
 
     return {
         "//command_line_option:cpu": output_cpu,

@@ -341,22 +341,27 @@ def _generate_companion_host_tool_build_rules(ctx, meta, relative_dir, build_fil
 def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     versions = []
     max_api = -1
-    if "data" in meta and "api_levels" in meta["data"]:
-        for api_level, value in meta["data"]["api_levels"].items():
-            versions.append(struct(
-                abi_revision = value["abi_revision"],
-                api_level = api_level,
-                status = value["status"],
-            ))
-            max_api = max(max_api, int(api_level))
+    for api_level, value in meta["data"]["api_levels"].items():
+        versions.append(struct(
+            abi_revision = value["abi_revision"],
+            api_level = api_level,
+            as_u32 = int(api_level),
+            status = value["status"],
+        ))
+        max_api = max(max_api, int(api_level))
+
+    for api_level, value in meta["data"]["special_api_levels"].items():
+        versions.append(struct(
+            abi_revision = value["abi_revision"],
+            api_level = api_level,
+            as_u32 = value["as_u32"],
+            status = value["status"],
+        ))
 
     # unlike other template rules that affect the corresponding BUILD.bazel file,
     # the api_version template creates a api_version.bzl file that is loaded in
     # the top-level BUILD.bazel created by fuchsia_sdk_repository_template.BUILD.
     bzl_file = ctx.path(build_file).dirname.get_child("api_version.bzl")
-
-    fidl_api_level_override = ctx.attr.fuchsia_api_level_override
-    clang_api_level_override = ctx.attr.fuchsia_api_level_override
 
     _merge_template(
         ctx,
@@ -529,7 +534,7 @@ def _get_api_level(variant):
     return "HEAD" if _is_undefined_api_level(api_level) else api_level
 
 def _is_undefined_api_level(api_level):
-    return api_level in (-1, "unversioned", "HEAD")
+    return api_level in (-1, "unversioned")
 
 def _api_level_deprecation_message(api_level):
     if _is_undefined_api_level(api_level):
