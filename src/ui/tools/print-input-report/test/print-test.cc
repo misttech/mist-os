@@ -660,12 +660,12 @@ TEST_F(PrintInputReport, PrintFeatureReport) {
 
 TEST_F(PrintInputReport, PrintDeviceInfo) {
   auto descriptor = std::make_unique<fuchsia::input::report::DeviceDescriptor>();
-  auto device_info = descriptor->mutable_device_info();
+  auto device_info = descriptor->mutable_device_information();
 
-  device_info->vendor_id = 0x1234;
-  device_info->product_id = 0x4321;
-  device_info->version = 0x1111;
-  device_info->polling_rate = 1000;
+  device_info->set_vendor_id(0x1234);
+  device_info->set_product_id(0x4321);
+  device_info->set_version(0x1111);
+  device_info->set_polling_rate(1000);
 
   fake_device_->SetDescriptor(std::move(descriptor));
 

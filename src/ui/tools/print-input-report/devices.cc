@@ -112,8 +112,8 @@ zx_status_t PrintInputDescriptor(std::string filename, Printer* printer,
         auto* result = call_result.Unwrap();
         printer->SetIndent(0);
         printer->Print("Descriptor from file: %s\n", filename.c_str());
-        if (result->descriptor.has_device_info()) {
-          PrintDeviceInfo(printer, result->descriptor.device_info());
+        if (result->descriptor.has_device_information()) {
+          PrintDeviceInfo(printer, result->descriptor.device_information());
         }
         if (result->descriptor.has_mouse()) {
           if (result->descriptor.mouse().has_input()) {
@@ -141,28 +141,29 @@ zx_status_t PrintInputDescriptor(std::string filename, Printer* printer,
   return ZX_OK;
 }
 
-void PrintDeviceInfo(Printer* printer, const fuchsia_input_report::wire::DeviceInfo& device_info) {
+void PrintDeviceInfo(Printer* printer,
+                     const fuchsia_input_report::wire::DeviceInformation& device_info) {
   printer->Print("Device Info:\n");
   printer->IncreaseIndent();
 
   printer->Print("Vendor ID:\n");
   printer->IncreaseIndent();
-  printer->Print("0x%x\n", device_info.vendor_id);
+  printer->Print("0x%x\n", device_info.vendor_id());
   printer->DecreaseIndent();
 
   printer->Print("Product ID:\n");
   printer->IncreaseIndent();
-  printer->Print("0x%x\n", device_info.product_id);
+  printer->Print("0x%x\n", device_info.product_id());
   printer->DecreaseIndent();
 
   printer->Print("Version:\n");
   printer->IncreaseIndent();
-  printer->Print("0x%x\n", device_info.version);
+  printer->Print("0x%x\n", device_info.version());
   printer->DecreaseIndent();
 
   printer->Print("Polling Rate:\n");
   printer->IncreaseIndent();
-  printer->Print("%lu usec\n", device_info.polling_rate);
+  printer->Print("%lu usec\n", device_info.polling_rate());
   printer->DecreaseIndent();
 
   printer->DecreaseIndent();

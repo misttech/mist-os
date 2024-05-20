@@ -180,9 +180,9 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.input.report/DeviceDescriptor.device_info",
-        "ordinal": "1",
-        "type": "fuchsia.input.report/DeviceInfo"
+        "name": "fuchsia.input.report/DeviceDescriptor.device_information",
+        "ordinal": "7",
+        "type": "fuchsia.input.report/DeviceInformation"
     },
     {
         "kind": "table/member",
@@ -213,26 +213,32 @@
         "name": "fuchsia.input.report/DeviceDescriptor"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.input.report/DeviceInfo.product_id",
+        "kind": "table/member",
+        "name": "fuchsia.input.report/DeviceInformation.polling_rate",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.input.report/DeviceInformation.product_id",
         "ordinal": "2",
         "type": "uint32"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.input.report/DeviceInfo.vendor_id",
+        "kind": "table/member",
+        "name": "fuchsia.input.report/DeviceInformation.vendor_id",
         "ordinal": "1",
         "type": "uint32"
     },
     {
-        "kind": "struct/member",
-        "name": "fuchsia.input.report/DeviceInfo.version",
+        "kind": "table/member",
+        "name": "fuchsia.input.report/DeviceInformation.version",
         "ordinal": "3",
         "type": "uint32"
     },
     {
-        "kind": "struct",
-        "name": "fuchsia.input.report/DeviceInfo"
+        "kind": "table",
+        "name": "fuchsia.input.report/DeviceInformation"
     },
     {
         "kind": "enum/member",

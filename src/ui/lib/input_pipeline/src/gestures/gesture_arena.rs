@@ -1389,11 +1389,12 @@ mod tests {
             input_device::InputDeviceDescriptor::Keyboard(
                 keyboard_binding::KeyboardDeviceDescriptor {
                     device_id: 3,
-                    device_info: fidl_fuchsia_input_report::DeviceInfo {
-                        product_id: 0,
-                        vendor_id: 0,
-                        version: 0,
-                        polling_rate: 0,
+                    device_information: fidl_fuchsia_input_report::DeviceInformation {
+                        vendor_id: Some(0),
+                        product_id: Some(0),
+                        version: Some(0),
+                        polling_rate: Some(0),
+                        ..Default::default()
                     },
                     keys: vec![fidl_fuchsia_input::Key::A],
                 },
@@ -3702,11 +3703,12 @@ mod tests {
             let keyboard_descriptor = input_device::InputDeviceDescriptor::Keyboard(
                 keyboard_binding::KeyboardDeviceDescriptor {
                     device_id: 2,
-                    device_info: fidl_fuchsia_input_report::DeviceInfo {
-                        product_id: 0,
-                        vendor_id: 0,
-                        version: 0,
-                        polling_rate: 0,
+                    device_information: fidl_fuchsia_input_report::DeviceInformation {
+                        vendor_id: Some(0),
+                        product_id: Some(0),
+                        version: Some(0),
+                        polling_rate: Some(0),
+                        ..Default::default()
                     },
                     keys: vec![fidl_fuchsia_input::Key::A, fidl_fuchsia_input::Key::B],
                 },

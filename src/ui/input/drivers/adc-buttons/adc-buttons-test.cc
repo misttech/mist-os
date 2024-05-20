@@ -147,12 +147,12 @@ TEST_F(AdcButtonsDeviceTest, GetDescriptorTest) {
   EXPECT_FALSE(result->descriptor.has_sensor());
   EXPECT_FALSE(result->descriptor.has_touch());
 
-  ASSERT_TRUE(result->descriptor.has_device_info());
-  EXPECT_EQ(result->descriptor.device_info().vendor_id,
+  ASSERT_TRUE(result->descriptor.has_device_information());
+  EXPECT_EQ(result->descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
-  EXPECT_EQ(result->descriptor.device_info().product_id,
+  EXPECT_EQ(result->descriptor.device_information().product_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAdcButtons));
-  EXPECT_EQ(result->descriptor.device_info().polling_rate, kPollingRateUsec);
+  EXPECT_EQ(result->descriptor.device_information().polling_rate(), kPollingRateUsec);
 
   ASSERT_TRUE(result->descriptor.has_consumer_control());
   ASSERT_TRUE(result->descriptor.consumer_control().has_input());

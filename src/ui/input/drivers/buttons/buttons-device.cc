@@ -211,12 +211,12 @@ void ButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView reque
 void ButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   fidl::Arena<kFeatureAndDescriptorBufferSize> arena;
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::VendorId::kGoogle);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(arena);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::VendorId::kGoogle));
   // Product id is "HID" buttons only for backward compatibility with users of this driver.
   // There is no HID support in this driver anymore.
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::VendorGoogleProductId::kHidButtons);
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::VendorGoogleProductId::kHidButtons));
 
   const std::vector<fuchsia_input_report::ConsumerControlButton> buttons = {
       fuchsia_input_report::ConsumerControlButton::kVolumeUp,
@@ -234,7 +234,7 @@ void ButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
       fuchsia_input_report::wire::ConsumerControlDescriptor::Builder(arena).input(input).Build();
 
   completer.Reply(fuchsia_input_report::wire::DeviceDescriptor::Builder(arena)
-                      .device_info(device_info)
+                      .device_information(device_info.Build())
                       .consumer_control(consumer_control)
                       .Build());
 }

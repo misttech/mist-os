@@ -208,7 +208,7 @@ pub enum InputDeviceEvent {
 /// The descriptor is sent alongside [`InputDeviceEvent`]s so clients can, for example, convert a
 /// touch coordinate to a display coordinate. The descriptor is not expected to change for the
 /// lifetime of a device binding.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InputDeviceDescriptor {
     Keyboard(keyboard_binding::KeyboardDeviceDescriptor),
     LightSensor(light_sensor_binding::LightSensorDeviceDescriptor),
@@ -660,7 +660,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: None,
                             sensor: None,
                             touch: None,
@@ -703,7 +703,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: Some(fidl_input_report::MouseDescriptor {
                                 input: Some(fidl_input_report::MouseInputDescriptor {
                                     movement_x: None,
@@ -750,7 +750,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: None,
                             sensor: None,
                             touch: None,
@@ -785,7 +785,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: None,
                             sensor: None,
                             touch: Some(fidl_input_report::TouchDescriptor {
@@ -829,7 +829,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: None,
                             sensor: None,
                             touch: None,
@@ -864,7 +864,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: None,
                             sensor: None,
                             touch: None,
@@ -906,7 +906,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: None,
                             sensor: None,
                             touch: None,
@@ -940,7 +940,7 @@ mod tests {
                 match input_device_request {
                     fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
                         let _ = responder.send(&fidl_input_report::DeviceDescriptor {
-                            device_info: None,
+                            device_information: None,
                             mouse: Some(fidl_input_report::MouseDescriptor {
                                 input: Some(fidl_input_report::MouseInputDescriptor {
                                     movement_x: None,

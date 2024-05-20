@@ -397,10 +397,10 @@ void Tcs3400Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
 
   fidl::Arena<kFeatureAndDescriptorBufferSize> allocator;
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAmsLightSensor);
+  auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
+  device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  device_info.product_id(
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kAmsLightSensor));
 
   auto sensor_axes = SensorAxisVector(allocator, 4);
   sensor_axes[0] = MakeLightSensorAxis(fuchsia_input_report::wire::SensorType::kLightIlluminance);
@@ -445,7 +445,7 @@ void Tcs3400Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
                                      .Build();
 
   const auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
-                              .device_info(device_info)
+                              .device_information(device_info.Build())
                               .sensor(sensor_descriptor)
                               .Build();
 

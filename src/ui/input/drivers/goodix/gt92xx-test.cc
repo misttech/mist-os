@@ -161,11 +161,11 @@ TEST_F(Gt92xxTest, TestGetDescriptor) {
   EXPECT_TRUE(result.ok());
   auto descriptor = result->descriptor;
 
-  EXPECT_TRUE(descriptor.has_device_info());
-  EXPECT_EQ(descriptor.device_info().vendor_id,
+  EXPECT_TRUE(descriptor.has_device_information());
+  EXPECT_EQ(descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
   EXPECT_EQ(
-      descriptor.device_info().product_id,
+      descriptor.device_information().product_id(),
       static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen));
 
   EXPECT_TRUE(descriptor.has_touch());

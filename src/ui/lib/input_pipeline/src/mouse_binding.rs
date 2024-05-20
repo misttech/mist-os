@@ -351,7 +351,7 @@ impl MouseBinding {
             format_err!("MouseDescriptor does not have a MouseInputDescriptor")
         })?;
 
-        let model = mouse_model_database::db::get_mouse_model(device_descriptor.device_info);
+        let model = mouse_model_database::db::get_mouse_model(device_descriptor.device_information);
 
         let device_descriptor: MouseDeviceDescriptor = MouseDeviceDescriptor {
             device_id,

@@ -25,11 +25,12 @@ impl input_device::InputDeviceBinding for FakeInputDeviceBinding {
     fn get_device_descriptor(&self) -> input_device::InputDeviceDescriptor {
         input_device::InputDeviceDescriptor::Keyboard(keyboard_binding::KeyboardDeviceDescriptor {
             keys: vec![],
-            device_info: fidl_fuchsia_input_report::DeviceInfo {
-                vendor_id: 42,
-                product_id: 43,
-                version: 44,
-                polling_rate: 1000,
+            device_information: fidl_fuchsia_input_report::DeviceInformation {
+                vendor_id: Some(42),
+                product_id: Some(43),
+                version: Some(44),
+                polling_rate: Some(1000),
+                ..Default::default()
             },
             // Random fake identifier.
             device_id: 442,

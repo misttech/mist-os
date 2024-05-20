@@ -128,13 +128,15 @@ const DEFAULT_MODEL: MouseModel = MouseModel {
     counts_per_mm: DEFAULT_COUNTS_PER_MM,
 };
 
-pub(crate) fn get_mouse_model(device_info: Option<fidl_input_report::DeviceInfo>) -> MouseModel {
+pub(crate) fn get_mouse_model(
+    device_info: Option<fidl_input_report::DeviceInformation>,
+) -> MouseModel {
     match device_info {
         None => DEFAULT_MODEL.clone(),
         Some(device_info) => {
-            let vid = to_hex(device_info.vendor_id);
+            let vid = to_hex(device_info.vendor_id.unwrap_or_default());
             match DB.get(&vid) {
-                Some(v) => match v.get(device_info.product_id) {
+                Some(v) => match v.get(device_info.product_id.unwrap_or_default()) {
                     Some(m) => m.clone(),
                     None => DEFAULT_MODEL.clone(),
                 },
@@ -211,11 +213,12 @@ mod test {
       ; "Unknown device: this is a microphone")]
     #[fuchsia::test]
     fn test_get_mouse_model(vendor_id: u32, product_id: u32) -> MouseModel {
-        get_mouse_model(Some(fidl_input_report::DeviceInfo {
-            vendor_id: vendor_id,
-            product_id: product_id,
-            version: 0,
-            polling_rate: 0,
+        get_mouse_model(Some(fidl_input_report::DeviceInformation {
+            vendor_id: Some(vendor_id),
+            product_id: Some(product_id),
+            version: Some(0),
+            polling_rate: Some(0),
+            ..Default::default()
         }))
     }
 

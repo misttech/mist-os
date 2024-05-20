@@ -484,7 +484,7 @@ TEST_F(Gt6853Test, GetDescriptor) {
   auto response = client->GetDescriptor();
 
   ASSERT_TRUE(response.ok());
-  ASSERT_TRUE(response.value().descriptor.has_device_info());
+  ASSERT_TRUE(response.value().descriptor.has_device_information());
   ASSERT_TRUE(response.value().descriptor.has_touch());
   ASSERT_TRUE(response.value().descriptor.touch().has_input());
   ASSERT_TRUE(response.value().descriptor.touch().input().has_contacts());
@@ -492,10 +492,10 @@ TEST_F(Gt6853Test, GetDescriptor) {
   ASSERT_TRUE(response.value().descriptor.touch().input().has_touch_type());
   ASSERT_EQ(response.value().descriptor.touch().input().contacts().count(), 10);
 
-  EXPECT_EQ(response.value().descriptor.device_info().vendor_id,
+  EXPECT_EQ(response.value().descriptor.device_information().vendor_id(),
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
   EXPECT_EQ(
-      response.value().descriptor.device_info().product_id,
+      response.value().descriptor.device_information().product_id(),
       static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen));
 
   for (size_t i = 0; i < 10; i++) {

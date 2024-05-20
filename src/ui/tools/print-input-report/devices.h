@@ -33,7 +33,8 @@ void GetAndPrintInputReport(
     fidl::WireSharedClient<fuchsia_input_report::InputDevice> client,
     fit::closure callback = [] {});
 
-void PrintDeviceInfo(Printer* printer, const fuchsia_input_report::wire::DeviceInfo& device_info);
+void PrintDeviceInfo(Printer* printer,
+                     const fuchsia_input_report::wire::DeviceInformation& device_info);
 
 void PrintMouseDesc(Printer* printer,
                     const fuchsia_input_report::wire::MouseInputDescriptor& mouse_desc);

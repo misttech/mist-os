@@ -214,11 +214,12 @@ mod tests {
             match request {
                 fir::InputDeviceRequest::GetDescriptor { responder } => {
                     let descriptor = fir::DeviceDescriptor {
-                        device_info: Some(fir::DeviceInfo {
-                            vendor_id: 123,
-                            product_id: 987,
-                            version: 555,
-                            polling_rate: 1000,
+                        device_information: Some(fir::DeviceInformation {
+                            vendor_id: Some(123),
+                            product_id: Some(987),
+                            version: Some(555),
+                            polling_rate: Some(1000),
+                            ..Default::default()
                         }),
                         mouse: Some(fir::MouseDescriptor {
                             input: Some(fir::MouseInputDescriptor {

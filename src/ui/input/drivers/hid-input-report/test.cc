@@ -235,10 +235,10 @@ TEST_F(HidDevTest, ReportDescInfoTest) {
   fake_hid_.HidDeviceGetHidDeviceInfo(&info);
 
   auto& desc = result.value().descriptor;
-  ASSERT_TRUE(desc.has_device_info());
-  ASSERT_EQ(desc.device_info().vendor_id, info.vendor_id);
-  ASSERT_EQ(desc.device_info().product_id, info.product_id);
-  ASSERT_EQ(desc.device_info().version, info.version);
+  ASSERT_TRUE(desc.has_device_information());
+  ASSERT_EQ(desc.device_information().vendor_id(), info.vendor_id);
+  ASSERT_EQ(desc.device_information().product_id(), info.product_id);
+  ASSERT_EQ(desc.device_information().version(), info.version);
 }
 
 TEST_F(HidDevTest, ReadInputReportsTest) {

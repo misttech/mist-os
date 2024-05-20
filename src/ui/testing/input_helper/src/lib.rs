@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_input::Key,
     fidl_fuchsia_input_injection::InputDeviceRegistryMarker,
     fidl_fuchsia_input_report::{
-        ConsumerControlInputReport, ContactInputReport, DeviceInfo, InputReport,
+        ConsumerControlInputReport, ContactInputReport, DeviceInformation, InputReport,
         KeyboardInputReport, MouseInputReport, TouchInputReport,
     },
     fidl_fuchsia_math as math, fidl_fuchsia_ui_display_singleton as display_info,
@@ -32,9 +32,15 @@ mod input_device;
 mod input_device_registry;
 mod input_reports_reader;
 
-/// Use this to place required DeviceInfo into DeviceDescriptor.
-fn new_fake_device_info() -> DeviceInfo {
-    DeviceInfo { product_id: 42, vendor_id: 43, version: u32::MAX, polling_rate: 1000 }
+/// Use this to place required DeviceInformation into DeviceDescriptor.
+fn new_fake_device_info() -> DeviceInformation {
+    DeviceInformation {
+        product_id: Some(42),
+        vendor_id: Some(43),
+        version: Some(u32::MAX),
+        polling_rate: Some(1000),
+        ..Default::default()
+    }
 }
 
 /// Converts the `input` string into a key sequence under the `InverseKeymap` derived from `keymap`.
