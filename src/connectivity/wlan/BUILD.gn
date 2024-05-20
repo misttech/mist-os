@@ -47,6 +47,7 @@ group("tests") {
 
   deps = [
     "drivers/lib/components/cpp/test:tests",
+    "drivers/lib/fidl-bridge/cpp/test:fidl_bridge_test",
     "drivers/lib/fuzzing:tests",
     "drivers/lib/log:tests",
     "drivers/lib/timer/cpp/test:tests",
