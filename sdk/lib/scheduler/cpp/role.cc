@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/scheduler/role.h>
 #include <lib/zx/result.h>
+#include <zircon/availability.h>
 
 #include <shared_mutex>
 
@@ -70,9 +71,9 @@ static RoleClient role_client{};
 zx::result<fidl::VectorView<Parameter>> SetRoleCommon(RoleTarget target, std::string_view role,
                                                       std::vector<Parameter> input_parameters) {
 // TODO(https://fxbug.dev/323262398): Remove this check once the necessary API is in the SDK.
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_LESS_THAN(HEAD)
   return ZX_ERR_NOT_SUPPORTED;
-#endif  // #if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#endif  // #if FUCHSIA_API_LEVEL_LESS_THAN(HEAD)
   zx::result client = role_client.Connect();
   if (!client.is_ok()) {
     return client.take_error();

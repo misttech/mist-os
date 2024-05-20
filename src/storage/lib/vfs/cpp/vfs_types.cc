@@ -170,7 +170,7 @@ zx::result<VnodeProtocol> NegotiateProtocol(fio::NodeProtocolKinds supported,
   if (supported & NodeProtocolKinds::kFile) {
     return zx::ok(VnodeProtocol::kFile);
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (supported & NodeProtocolKinds::kSymlink) {
     return zx::ok(VnodeProtocol::kSymlink);
   }

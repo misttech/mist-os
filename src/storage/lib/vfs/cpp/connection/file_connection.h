@@ -10,6 +10,7 @@
 #endif
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <zircon/availability.h>
 
 #include <cstdint>
 
@@ -102,13 +103,11 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void Resize(ResizeRequestView request, ResizeCompleter::Sync& completer) final;
   void GetBackingMemory(GetBackingMemoryRequestView request,
                         GetBackingMemoryCompleter::Sync& completer) final;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   void Allocate(AllocateRequestView request, AllocateCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-#endif
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   void EnableVerity(EnableVerityRequestView request, EnableVerityCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }

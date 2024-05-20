@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/fdio/vfs.h>
 #include <lib/zx/result.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -74,7 +75,7 @@ enum class VnodeProtocol : uint8_t {
   kService = uint64_t{fuchsia_io::NodeProtocolKinds::kConnector},
   kDirectory = uint64_t{fuchsia_io::NodeProtocolKinds::kDirectory},
   kFile = uint64_t{fuchsia_io::NodeProtocolKinds::kFile},
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   kSymlink = uint64_t{fuchsia_io::NodeProtocolKinds::kSymlink},
 #endif
 };
@@ -138,7 +139,7 @@ struct VnodeConnectionOptions {
   // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
   constexpr fuchsia_io::NodeProtocolKinds protocols() const {
     constexpr fuchsia_io::NodeProtocolKinds kSupportedIo1Protocols =
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
         // Symlinks are not supported via io1.
         fuchsia_io::NodeProtocolKinds::kMask ^ fuchsia_io::NodeProtocolKinds::kSymlink;
 #else

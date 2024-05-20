@@ -13,6 +13,7 @@
 #include <lib/zxio/types.h>
 #include <lib/zxio/zxio.h>
 #include <stdarg.h>
+#include <zircon/availability.h>
 #include <zircon/errors.h>
 
 #include "private.h"
@@ -445,7 +446,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
                                             fio::wire::Representation& representation,
                                             zxio_node_attributes_t* attr, zxio_storage_t* storage) {
   switch (representation.Which()) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     case fio::wire::Representation::Tag::kConnector: {
       fio::wire::ConnectorInfo& connector = representation.connector();
       if (attr) {

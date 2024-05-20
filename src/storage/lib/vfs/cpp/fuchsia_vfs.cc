@@ -12,6 +12,7 @@
 #include <threads.h>
 #include <unistd.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 
 #include <memory>
 #include <string_view>
@@ -374,7 +375,7 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
     case VnodeProtocol::kService: {
       return ConnectService(vnode, options, std::move(node));
     }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     case VnodeProtocol::kSymlink: {
       return ZX_ERR_NOT_SUPPORTED;
     }
