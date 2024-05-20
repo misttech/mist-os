@@ -48,11 +48,6 @@ const CONNECTION_EXPIRY_OTHER: Duration = Duration::from_secs(30);
 /// The maximum number of connections in the conntrack table.
 const MAXIMUM_CONNECTIONS: usize = 50_000;
 
-/// The maximum size of the conntrack table. We double the table size limit
-/// because each connection is inserted into the table twice, once for the
-/// original tuple and again for the reply tuple.
-const TABLE_SIZE_LIMIT: usize = MAXIMUM_CONNECTIONS * 2;
-
 /// Implements a connection tracking subsystem.
 ///
 /// The `E` parameter is for external data that is stored in the [`Connection`]
@@ -66,6 +61,12 @@ struct TableInner<I: IpExt, BT: FilterBindingsTypes, E> {
     /// A connection is inserted into the map twice: once for the original
     /// tuple, and once for the reply tuple.
     table: HashMap<Tuple<I>, Arc<ConnectionShared<I, BT, E>>>,
+    /// The number of connections in the table.
+    ///
+    /// We can't use the size of the HashMap because connections that have
+    /// identical original and reply tuples (e.g. self-connected sockets) can
+    /// only be inserted into the table once.
+    num_connections: usize,
     /// A timer for triggering garbage collection events.
     gc_timer: BT::Timer,
     /// The number of times the table size limit was hit.
@@ -104,6 +105,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                     bindings_ctx,
                     FilterTimerId::ConntrackGc(IpVersionMarker::<I>::new()),
                 ),
+                num_connections: 0,
                 table_limit_hits: 0,
                 table_limit_drops: 0,
             }),
@@ -137,7 +139,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         // We multiply the table size limit because each connection is inserted
         // into the table twice, once for the original tuple and again for the
         // reply tuple.
-        if guard.table.len() >= TABLE_SIZE_LIMIT {
+        if guard.num_connections >= MAXIMUM_CONNECTIONS {
             guard.table_limit_hits = guard.table_limit_hits.saturating_add(1);
             if let Some((original_tuple, reply_tuple)) = guard
                 .table
@@ -152,7 +154,11 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                 .next()
             {
                 assert!(guard.table.remove(&original_tuple).is_some());
-                assert!(guard.table.remove(&reply_tuple).is_some());
+                if original_tuple != reply_tuple {
+                    assert!(guard.table.remove(&reply_tuple).is_some());
+                }
+
+                guard.num_connections -= 1;
             } else {
                 guard.table_limit_drops = guard.table_limit_drops.saturating_add(1);
                 return Err(FinalizeConnectionError::TableFull);
@@ -183,8 +189,12 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             let res = guard.table.insert(shared.inner.original_tuple.clone(), shared.clone());
             debug_assert!(res.is_none());
 
-            let res = guard.table.insert(shared.inner.reply_tuple.clone(), shared);
-            debug_assert!(res.is_none());
+            if shared.inner.reply_tuple != shared.inner.original_tuple {
+                let res = guard.table.insert(shared.inner.reply_tuple.clone(), shared);
+                debug_assert!(res.is_none());
+            }
+
+            guard.num_connections += 1;
 
             // For the most part, this will only schedule the timer once, when
             // the first packet hits the netstack. However, since the GC timer
@@ -262,9 +272,12 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             })
             .collect();
 
+        guard.num_connections -= to_remove.len();
         for (original_tuple, reply_tuple) in to_remove {
             assert!(guard.table.remove(&original_tuple).is_some());
-            assert!(guard.table.remove(&reply_tuple).is_some());
+            if reply_tuple != original_tuple {
+                assert!(guard.table.remove(&reply_tuple).is_some());
+            }
         }
 
         // The table is only expected to be empty in exceptional cases, or
@@ -272,7 +285,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         // will wait for core to quiesce by waiting for timers to stop firing.
         // By only rescheduling when there are still entries in the table, we
         // ensure that we won't enter an infinite timer firing/scheduling loop.
-        if !guard.table.is_empty() {
+        if guard.num_connections > 0 {
             schedule_gc(bindings_ctx, &mut guard.gc_timer);
         }
     }
@@ -282,7 +295,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I,
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let guard = self.inner.lock();
 
-        inspector.record_usize("num_connections", guard.table.len() / 2);
+        inspector.record_usize("num_connections", guard.num_connections);
         inspector.record_uint("table_limit_hits", guard.table_limit_hits);
         inspector.record_uint("table_limit_drops", guard.table_limit_drops);
 
@@ -449,10 +462,17 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
             Connection::Shared(c) => (&c.inner.original_tuple, &c.inner.reply_tuple),
         };
 
-        if tuple == original {
-            Some(ConnectionDirection::Original)
-        } else if tuple == reply {
+        // The ordering here is sadly mildly load-bearing. For self-connected
+        // sockets, the first comparison will be true, so having the original
+        // tuple first would mean that the connection is never marked
+        // established.
+        //
+        // This ordering means that all self-connected connections will be
+        // marked as established immediately upon receiving the first packet.
+        if tuple == reply {
             Some(ConnectionDirection::Reply)
+        } else if tuple == original {
+            Some(ConnectionDirection::Original)
         } else {
             None
         }
@@ -1152,6 +1172,7 @@ mod tests {
             .expect("connection finalize should succeed"));
         assert!(core_ctx.conntrack().contains_tuple(&first_tuple));
         assert!(core_ctx.conntrack().contains_tuple(&second_tuple));
+        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // T=GC_INTERVAL: Triggering a GC does not clean up any connections,
         // because no connections are stale yet.
@@ -1161,6 +1182,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
+        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // T=GC_INTERVAL a packet for just the second connection comes in in the
         // reply direction, which causes the connection to be marked
@@ -1178,6 +1200,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
+        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // The state in the table at this point is:
         // Connection 1
@@ -1196,6 +1219,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
+        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // Time advances to expiry for the first packet
         // (T=CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED + GC_INTERVAL) trigger gc and
@@ -1206,6 +1230,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
+        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 1);
 
         // Advance time past the expiry time for the second connection and see
         // that it is cleaned up.
@@ -1217,6 +1242,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), false);
+        assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 0);
     }
 
     fn make_packets<I: IpExt + TestIpExt>(
@@ -1276,7 +1302,7 @@ mod tests {
         // The table should be full whether or not the connections are
         // established since finalize_connection always inserts the connection
         // under the original and reply tuples.
-        assert_eq!(table.inner.lock().table.len(), TABLE_SIZE_LIMIT);
+        assert_eq!(table.inner.lock().num_connections, MAXIMUM_CONNECTIONS);
 
         let (packet, _) = make_packets(MAXIMUM_CONNECTIONS);
         let conn = table
@@ -1395,7 +1421,7 @@ mod tests {
                 .expect("connection finalize should succeed"));
         }
 
-        assert_eq!(table.inner.lock().table.len(), TABLE_SIZE_LIMIT);
+        assert_eq!(table.inner.lock().num_connections, MAXIMUM_CONNECTIONS);
 
         // This first one should succeed because it can evict the
         // non-established connection.
@@ -1435,5 +1461,48 @@ mod tests {
                 "num_connections": MAXIMUM_CONNECTIONS as u64,
             });
         }
+    }
+
+    #[ip_test]
+    fn self_connected_socket<I: Ip + IpExt + TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        let packet = FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::SRC_ADDR,
+            body: FakeTcpSegment { src_port: I::SRC_PORT, dst_port: I::SRC_PORT },
+        };
+
+        let tuple = Tuple::from_packet(&packet).expect("packet should be valid");
+        let reply_tuple = tuple.clone().invert();
+
+        assert_eq!(tuple, reply_tuple);
+
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
+        let state = conn.state();
+        // Since we can't differentiate between the original and reply tuple,
+        // the connection ends up being marked established immediately.
+        assert!(state.established);
+
+        assert_matches!(conn, Connection::Exclusive(_));
+        assert!(!table.contains_tuple(&tuple));
+
+        // Once we finalize the connection, it should be present in the map.
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(true));
+        assert!(table.contains_tuple(&tuple));
+
+        // There should be a single connection in the table, despite there only
+        // being a single tuple.
+        assert_eq!(table.inner.lock().table.len(), 1);
+        assert_eq!(table.inner.lock().num_connections, 1);
+
+        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED);
+        table.perform_gc(&mut bindings_ctx);
+
+        assert_eq!(table.inner.lock().table.len(), 0);
+        assert_eq!(table.inner.lock().num_connections, 0);
     }
 }
