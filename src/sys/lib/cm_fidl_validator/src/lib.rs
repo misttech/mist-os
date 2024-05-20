@@ -287,13 +287,31 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
     all_dictionaries: HashMap<&'a str, Option<&'a fdecl::Ref>>,
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     all_configs: HashSet<&'a str>,
     all_environment_names: HashSet<&'a str>,
     dynamic_children: Vec<(&'a str, &'a str)>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
     target_ids: IdMap<'a>,
     errors: Vec<Error>,
+}
+
+/// [Container] provides a capability type agnostic trait to check for the existence of a
+/// capability definition of a particular type. This is useful for writing common validation
+/// functions.
+trait Container {
+    fn contains(&self, key: &str) -> bool;
+}
+
+impl<'a> Container for HashSet<&'a str> {
+    fn contains(&self, key: &str) -> bool {
+        self.contains(key)
+    }
+}
+
+impl<'a, T> Container for HashMap<&'a str, T> {
+    fn contains(&self, key: &str) -> bool {
+        self.contains_key(key)
+    }
 }
 
 /// A node in the DependencyGraph. The first string describes the type of node and the second
@@ -378,14 +396,14 @@ impl<'a> ValidationContext<'a> {
         // Validate "offers".
         if let Some(offers) = decl.offers.as_ref() {
             for offer in offers.iter() {
-                self.validate_offers_decl(&offer, OfferType::Static);
+                self.validate_offer_decl(&offer, OfferType::Static);
             }
             self.validate_offer_group(&offers, OfferType::Static);
         }
 
         if let Some(dynamic_offers) = dynamic_offers.as_ref() {
             for dynamic_offer in dynamic_offers.iter() {
-                self.validate_offers_decl(&dynamic_offer, OfferType::Dynamic);
+                self.validate_offer_decl(&dynamic_offer, OfferType::Dynamic);
             }
             self.validate_offer_group(&dynamic_offers, OfferType::Dynamic);
         }
@@ -1650,14 +1668,6 @@ impl<'a> ValidationContext<'a> {
         num_errors == self.errors.len()
     }
 
-    fn validate_storage_source(&mut self, source_name: &String, decl_type: DeclType) {
-        if check_name(Some(source_name), decl_type, "source.storage.name", &mut self.errors) {
-            if !self.all_storages.contains_key(source_name.as_str()) {
-                self.errors.push(Error::invalid_storage(decl_type, "source", source_name));
-            }
-        }
-    }
-
     /// Return a key that can be used in `HashMap` to group aggregate declarations.
     ///
     /// Returns `None` if the input resembles an invalid declaration.
@@ -1739,79 +1749,51 @@ impl<'a> ValidationContext<'a> {
         match expose {
             fdecl::Expose::Service(e) => {
                 let decl = DeclType::ExposeService;
-                let source_dictionary = get_source_dictionary!(e);
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::Many,
                     CollectionSource::Allow,
+                    Self::service_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Service.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_services.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::Expose::Protocol(e) => {
                 let decl = DeclType::ExposeProtocol;
-                let source_dictionary = get_source_dictionary!(e);
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::protocol_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Protocol.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_protocols.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::Expose::Directory(e) => {
                 let decl = DeclType::ExposeDirectory;
-                let source_dictionary = get_source_dictionary!(e);
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::directory_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Directory.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_directories.contains(&name as &str) && source_dictionary.is_none()
-                    {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                    if name.starts_with('/') && e.rights.is_none() {
-                        self.errors.push(Error::missing_field(decl, "rights"));
-                    }
-                }
 
                 // Subdir makes sense when routing, but when exposing to framework the subdirectory
                 // can be exposed directly.
@@ -1830,78 +1812,52 @@ impl<'a> ValidationContext<'a> {
             }
             fdecl::Expose::Runner(e) => {
                 let decl = DeclType::ExposeRunner;
-                let source_dictionary = get_source_dictionary!(e);
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::runner_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Runner.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_runners.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::Expose::Resolver(e) => {
                 let decl = DeclType::ExposeResolver;
-                let source_dictionary = get_source_dictionary!(e);
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::resolver_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Resolver.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_resolvers.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Expose::Dictionary(e) => {
                 let decl = DeclType::ExposeDictionary;
-                let source_dictionary = get_source_dictionary!(e);
                 self.validate_expose_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::dictionary_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(e),
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Dictionary.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_dictionaries.contains_key(&name as &str)
-                        && source_dictionary.is_none()
-                    {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Expose::Config(e) => {
@@ -1910,6 +1866,7 @@ impl<'a> ValidationContext<'a> {
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::config_checker,
                     e.source.as_ref(),
                     e.source_name.as_ref(),
                     None,
@@ -1918,14 +1875,6 @@ impl<'a> ValidationContext<'a> {
                     e.availability.as_ref(),
                     prev_target_ids,
                 );
-                // If the expose source is `self`, ensure we have a corresponding Config capability.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_expose_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
-                    if !self.all_configs.contains(&name as &str) {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             _ => {
                 self.errors.push(Error::invalid_field(DeclType::Component, "expose"));
@@ -1938,6 +1887,10 @@ impl<'a> ValidationContext<'a> {
         decl: DeclType,
         allowable_ids: AllowableIds,
         collection_source: CollectionSource,
+        // This takes a callback that returns a [Container], instead of the &[Container] directly,
+        // to avoid a borrow checker error that would occur from a simultaneous borrow on
+        // &mut self.
+        capability_checker: impl Fn(&Self) -> &dyn Container,
         source: Option<&fdecl::Ref>,
         source_name: Option<&String>,
         source_dictionary: Option<&String>,
@@ -1976,6 +1929,12 @@ impl<'a> ValidationContext<'a> {
                 if prev_state == AllowableIds::One || prev_state != allowable_ids {
                     self.errors.push(Error::duplicate_field(decl, "target_name", target_name));
                 }
+            }
+        }
+
+        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
+            if !(capability_checker)(self).contains(name) && source_dictionary.is_none() {
+                self.errors.push(Error::invalid_capability(decl, "source", name));
             }
         }
     }
@@ -2105,18 +2064,18 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    fn validate_offers_decl(&mut self, offer: &'a fdecl::Offer, offer_type: OfferType) {
+    fn validate_offer_decl(&mut self, offer: &'a fdecl::Offer, offer_type: OfferType) {
         match offer {
             fdecl::Offer::Service(o) => {
                 let decl = DeclType::OfferService;
-                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::Many,
                     CollectionSource::Allow,
+                    Self::service_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::DependencyType::Strong),
@@ -2128,67 +2087,40 @@ impl<'a> ValidationContext<'a> {
                     o.source_instance_filter.as_ref(),
                     o.renamed_instances.as_ref(),
                 );
-                // If the offer source is `self`, ensure we have a corresponding Service.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_services.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_field(decl, "source"));
-                    }
-                }
             }
             fdecl::Offer::Protocol(o) => {
                 let decl = DeclType::OfferProtocol;
-                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::protocol_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.dependency_type.as_ref(),
                     o.availability.as_ref(),
                     offer_type,
                 );
-                // If the offer source is `self`, ensure we have a
-                // corresponding Protocol.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_protocols.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::Offer::Directory(o) => {
                 let decl = DeclType::OfferDirectory;
-                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::directory_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.dependency_type.as_ref(),
                     o.availability.as_ref(),
                     offer_type,
                 );
-                // If the offer source is `self`, ensure we have a corresponding
-                // Directory.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_directories.contains(&name as &str) && source_dictionary.is_none()
-                    {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
                 if let Some(subdir) = o.subdir.as_ref() {
                     check_relative_path(
                         Some(subdir),
@@ -2199,8 +2131,10 @@ impl<'a> ValidationContext<'a> {
                 }
             }
             fdecl::Offer::Storage(o) => {
+                let decl = DeclType::OfferStorage;
                 self.validate_storage_offer_fields(
-                    DeclType::OfferStorage,
+                    decl,
+                    Self::storage_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
                     o.target.as_ref(),
@@ -2219,55 +2153,37 @@ impl<'a> ValidationContext<'a> {
             }
             fdecl::Offer::Runner(o) => {
                 let decl = DeclType::OfferRunner;
-                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::runner_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::DependencyType::Strong),
                     Some(&fdecl::Availability::Required),
                     offer_type,
                 );
-                // If the offer source is `self`, ensure we have a corresponding Runner.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_runners.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::Offer::Resolver(o) => {
                 let decl = DeclType::OfferResolver;
-                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::resolver_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     Some(&fdecl::DependencyType::Strong),
                     Some(&fdecl::Availability::Required),
                     offer_type,
                 );
-
-                // If the offer source is `self`, ensure we have a
-                // corresponding Resolver.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_resolvers.contains(&name as &str) && source_dictionary.is_none() {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::Offer::EventStream(e) => {
                 self.validate_event_stream_offer_fields(e, offer_type);
@@ -2275,31 +2191,20 @@ impl<'a> ValidationContext<'a> {
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Offer::Dictionary(o) => {
                 let decl = DeclType::OfferDictionary;
-                let source_dictionary = get_source_dictionary!(o);
                 self.validate_offer_fields(
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::dictionary_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
-                    source_dictionary,
+                    get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
                     o.dependency_type.as_ref(),
                     o.availability.as_ref(),
                     offer_type,
                 );
-
-                // If the offer source is `self`, ensure we have a corresponding Dictionary.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_dictionaries.contains_key(&name as &str)
-                        && source_dictionary.is_none()
-                    {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fdecl::Offer::Config(o) => {
@@ -2308,6 +2213,7 @@ impl<'a> ValidationContext<'a> {
                     decl,
                     AllowableIds::One,
                     CollectionSource::Deny,
+                    Self::config_checker,
                     o.source.as_ref(),
                     o.source_name.as_ref(),
                     None,
@@ -2317,14 +2223,6 @@ impl<'a> ValidationContext<'a> {
                     o.availability.as_ref(),
                     offer_type,
                 );
-                // If the offer source is `self`, ensure we have a corresponding capability.
-                //
-                // TODO(https://fxbug.dev/340632445): Bring this bit into validate_offer_fields.
-                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
-                    if !self.all_configs.contains(&name as &str) {
-                        self.errors.push(Error::invalid_capability(decl, "source", name));
-                    }
-                }
             }
             fdecl::OfferUnknown!() => {
                 self.errors.push(Error::invalid_field(DeclType::Component, "offer"));
@@ -2337,6 +2235,10 @@ impl<'a> ValidationContext<'a> {
         decl: DeclType,
         allowable_names: AllowableIds,
         collection_source: CollectionSource,
+        // This takes a callback that returns a [Container], instead of the &[Container] directly,
+        // to avoid a borrow checker error that would occur from a simultaneous borrow on
+        // &mut self.
+        capability_checker: impl Fn(&Self) -> &dyn Container,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
         source_dictionary: Option<&'a String>,
@@ -2387,6 +2289,12 @@ impl<'a> ValidationContext<'a> {
                 );
             }
         }
+
+        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
+            if !(capability_checker)(self).contains(name) && source_dictionary.is_none() {
+                self.errors.push(Error::invalid_capability(decl, "source", name));
+            }
+        }
     }
 
     fn validate_offer_source(
@@ -2425,6 +2333,10 @@ impl<'a> ValidationContext<'a> {
     fn validate_storage_offer_fields(
         &mut self,
         decl: DeclType,
+        // This takes a callback that returns a [Container], instead of the &[Container] directly,
+        // to avoid a borrow checker error that would occur from a simultaneous borrow on
+        // &mut self.
+        capability_checker: impl Fn(&Self) -> &dyn Container,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
         target: Option<&'a fdecl::Ref>,
@@ -2433,10 +2345,7 @@ impl<'a> ValidationContext<'a> {
         offer_type: OfferType,
     ) {
         match source {
-            Some(fdecl::Ref::Parent(_) | fdecl::Ref::VoidType(_)) => (),
-            Some(fdecl::Ref::Self_(_)) => {
-                self.validate_storage_source(source_name.unwrap(), decl);
-            }
+            Some(fdecl::Ref::Parent(_) | fdecl::Ref::VoidType(_) | fdecl::Ref::Self_(_)) => {}
             Some(_) => {
                 self.errors.push(Error::invalid_field(decl, "source"));
             }
@@ -2448,6 +2357,12 @@ impl<'a> ValidationContext<'a> {
         check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
         self.validate_offer_target(decl, AllowableIds::One, target, target_name, offer_type);
         check_offer_name(target_name, decl, "target_name", offer_type, &mut self.errors);
+
+        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
+            if !(capability_checker)(self).contains(name) {
+                self.errors.push(Error::invalid_capability(decl, "source", name));
+            }
+        }
     }
 
     fn validate_event_stream_offer_fields(
@@ -2802,6 +2717,33 @@ impl<'a> ValidationContext<'a> {
             .iter()
             .filter_map(|(n, c)| if *c == collection { Some(*n) } else { None })
             .collect()
+    }
+
+    // The following functions can be used to convert a type-specific collection of capabilities
+    // into [Container].
+    fn service_checker(&self) -> &dyn Container {
+        &self.all_services
+    }
+    fn protocol_checker(&self) -> &dyn Container {
+        &self.all_protocols
+    }
+    fn directory_checker(&self) -> &dyn Container {
+        &self.all_directories
+    }
+    fn runner_checker(&self) -> &dyn Container {
+        &self.all_runners
+    }
+    fn resolver_checker(&self) -> &dyn Container {
+        &self.all_resolvers
+    }
+    fn dictionary_checker(&self) -> &dyn Container {
+        &self.all_dictionaries
+    }
+    fn config_checker(&self) -> &dyn Container {
+        &self.all_configs
+    }
+    fn storage_checker(&self) -> &dyn Container {
+        &self.all_storages
     }
 }
 
@@ -5972,7 +5914,6 @@ mod tests {
                 Error::duplicate_field(DeclType::ExposeDictionary, "target_name", "dict"),
             ])),
         },
-        // TODO: Add analogous test for offer
         test_validate_exposes_invalid_capability_from_self => {
             input = {
                 let mut decl = new_component_decl();
@@ -6021,6 +5962,13 @@ mod tests {
                         target_name: Some("dict".to_string()),
                         ..Default::default()
                     }),
+                    fdecl::Expose::Config(fdecl::ExposeConfiguration {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_config".to_string()),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("config".to_string()),
+                        ..Default::default()
+                    }),
                 ]);
                 decl
             },
@@ -6037,6 +5985,7 @@ mod tests {
                 Error::invalid_capability(DeclType::ExposeRunner, "source", "source_elf"),
                 Error::invalid_capability(DeclType::ExposeResolver, "source", "source_pkg"),
                 Error::invalid_capability(DeclType::ExposeDictionary, "source", "source_dict"),
+                Error::invalid_capability(DeclType::ExposeConfig, "source", "source_config"),
             ])),
         },
 
@@ -7568,6 +7517,121 @@ mod tests {
                 decl
             },
             result = Ok(()),
+        },
+        test_validate_offers_invalid_capability_from_self => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.children = Some(vec![
+                    fdecl::Child {
+                        name: Some("child".to_string()),
+                        url: Some("fuchsia-pkg://fuchsia.com/foo".to_string()),
+                        startup: Some(fdecl::StartupMode::Lazy),
+                        ..Default::default()
+                    }
+                ]);
+                decl.offers = Some(vec![
+                    fdecl::Offer::Service(fdecl::OfferService {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("foo".into()),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("bar".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Directory(fdecl::OfferDirectory {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("dir".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("assets".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Runner(fdecl::OfferRunner {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_elf".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("elf".into()),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Resolver(fdecl::OfferResolver {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_pkg".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("pkg".into()),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Dictionary(fdecl::OfferDictionary {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_dict".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("dict".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Storage(fdecl::OfferStorage {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_storage".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("storage".into()),
+                        ..Default::default()
+                    }),
+                    fdecl::Offer::Config(fdecl::OfferConfiguration {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_config".into()),
+                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "child".into(),
+                            collection: None
+                        })),
+                        target_name: Some("config".into()),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::invalid_capability(
+                    DeclType::OfferService,
+                    "source",
+                    "fuchsia.some.library.SomeProtocol"),
+                Error::invalid_capability(
+                    DeclType::OfferProtocol,
+                    "source",
+                    "fuchsia.some.library.SomeProtocol"),
+                Error::invalid_capability(DeclType::OfferDirectory, "source", "dir"),
+                Error::invalid_capability(DeclType::OfferRunner, "source", "source_elf"),
+                Error::invalid_capability(DeclType::OfferResolver, "source", "source_pkg"),
+                Error::invalid_capability(DeclType::OfferDictionary, "source", "source_dict"),
+                Error::invalid_capability(DeclType::OfferStorage, "source", "source_storage"),
+                Error::invalid_capability(DeclType::OfferConfig, "source", "source_config"),
+            ])),
         },
         test_validate_offers_long_dependency_cycle => {
             input = {
