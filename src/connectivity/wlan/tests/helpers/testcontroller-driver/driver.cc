@@ -65,12 +65,20 @@ class WlanFullmacImplIfcToDriverBridge
   void DisassocInd(DisassocIndRequest& request, DisassocIndCompleter::Sync& completer) override {}
   void StartConf(StartConfRequest& request, StartConfCompleter::Sync& completer) override {}
   void StopConf(StopConfRequest& request, StopConfCompleter::Sync& completer) override {}
-  void EapolConf(EapolConfRequest& request, EapolConfCompleter::Sync& completer) override {}
+  void EapolConf(EapolConfRequest& request, EapolConfCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->EapolConf(request).Then(
+        ForwardResult<WlanFullmacImplIfc::EapolConf>(completer.ToAsync()));
+  }
   void OnChannelSwitch(OnChannelSwitchRequest& request,
                        OnChannelSwitchCompleter::Sync& completer) override {}
   void SignalReport(SignalReportRequest& request, SignalReportCompleter::Sync& completer) override {
   }
-  void EapolInd(EapolIndRequest& request, EapolIndCompleter::Sync& completer) override {}
+  void EapolInd(EapolIndRequest& request, EapolIndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->EapolInd(request).Then(
+        ForwardResult<WlanFullmacImplIfc::EapolInd>(completer.ToAsync()));
+  }
   void OnPmkAvailable(OnPmkAvailableRequest& request,
                       OnPmkAvailableCompleter::Sync& completer) override {}
   void SaeHandshakeInd(SaeHandshakeIndRequest& request,
@@ -180,9 +188,17 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
   void Reset(ResetRequest& request, ResetCompleter::Sync& completer) override {}
   void StartBss(StartBssRequest& request, StartBssCompleter::Sync& completer) override {}
   void StopBss(StopBssRequest& request, StopBssCompleter ::Sync& completer) override {}
-  void SetKeysReq(SetKeysReqRequest& request, SetKeysReqCompleter::Sync& completer) override {}
+  void SetKeysReq(SetKeysReqRequest& request, SetKeysReqCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->SetKeysReq(request).Then(
+        ForwardResult<WlanFullmacImplBridge::SetKeysReq>(completer.ToAsync()));
+  }
   void DelKeysReq(DelKeysReqRequest& request, DelKeysReqCompleter::Sync& completer) override {}
-  void EapolTx(EapolTxRequest& request, EapolTxCompleter::Sync& completer) override {}
+  void EapolTx(EapolTxRequest& request, EapolTxCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->EapolTx(request).Then(
+        ForwardResult<WlanFullmacImplBridge::EapolTx>(completer.ToAsync()));
+  }
   void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override {}
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override {}
   void SetMulticastPromisc(SetMulticastPromiscRequest& request,

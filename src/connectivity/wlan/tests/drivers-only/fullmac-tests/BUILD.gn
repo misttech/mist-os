@@ -14,6 +14,7 @@ rust_wlan_integration_test("fullmac-tests") {
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
+    "//src/connectivity/wlan/lib/rsn:wlan-rsn",
     "//src/connectivity/wlan/tests/drivers-only/common",
     "//src/connectivity/wlan/tests/helpers/fullmac-helpers",
     "//src/lib/fidl/rust/fidl",

@@ -10,18 +10,25 @@ rustc_library("fullmac-helpers") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
+    "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_rust",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
+    "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",
+    "//src/connectivity/wlan/lib/eapol",
+    "//src/connectivity/wlan/lib/ieee80211",
+    "//src/connectivity/wlan/lib/rsn:wlan-rsn",
     "//src/connectivity/wlan/tests/helpers/test-realm-helpers",
     "//src/connectivity/wlan/tests/helpers/testcontroller-driver/fidl:test.wlan.testcontroller_rust",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:zerocopy",
   ]
   sources = [
     "src/config.rs",
+    "src/fake_ap.rs",
     "src/lib.rs",
   ]
 }

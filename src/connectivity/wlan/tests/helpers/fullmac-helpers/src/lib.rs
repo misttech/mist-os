@@ -7,10 +7,34 @@ use {
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_test_wlan_testcontroller as fidl_testcontroller,
     futures::StreamExt,
-    wlan_common::assert_variant,
+    lazy_static::lazy_static,
+    wlan_common::{
+        assert_variant, bss, fake_fidl_bss_description, test_utils::fake_stas::FakeProtectionCfg,
+    },
 };
 
 pub mod config;
+pub mod fake_ap;
+
+// Compatible BSS descriptions are defined here.
+// "Compatible" here means that that an SME  with default configuration
+// will accept a connect request to a BSS with the returned BssDescription.
+lazy_static! {
+    pub static ref COMPATIBLE_OPEN_BSS: bss::BssDescription = fake_fidl_bss_description!(
+        protection => FakeProtectionCfg::Open,
+        channel: wlan_common::channel::Channel::new(1, wlan_common::channel::Cbw::Cbw20),
+        rates: vec![2, 4, 11],
+    )
+    .try_into()
+    .expect("Could not convert BSS description from FIDL");
+    pub static ref COMPATIBLE_WPA2_BSS: bss::BssDescription = fake_fidl_bss_description!(
+        protection => FakeProtectionCfg::Wpa2,
+        channel: wlan_common::channel::Channel::new(1, wlan_common::channel::Cbw::Cbw20),
+        rates: vec![2, 4, 11],
+    )
+    .try_into()
+    .expect("Could not convert BSS description from FIDL");
+}
 
 /// Creates and starts fullmac driver using |testcontroller_proxy|.
 /// This handles the request to start SME through the UsmeBootstrap protocol,
