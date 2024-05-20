@@ -15,7 +15,8 @@
 //!   by bindings types.
 //! * Modularity.
 
-use core::{fmt::Debug, hash::Hash};
+use alloc::borrow::Cow;
+use core::{borrow::Borrow, fmt::Debug, hash::Hash};
 
 /// An identifier for a device.
 pub trait DeviceIdentifier: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static {
@@ -102,6 +103,75 @@ where
 {
     type DeviceId_ = <CC as DeviceIdContext<AnyDevice>>::DeviceId;
     type WeakDeviceId_ = <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId;
+}
+
+/// A device id that might be either in its strong or weak form.
+#[derive(Copy, Clone)]
+#[allow(missing_docs)]
+pub enum EitherDeviceId<S, W> {
+    Strong(S),
+    Weak(W),
+}
+
+impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, W> {
+    fn eq(&self, other: &EitherDeviceId<S, W>) -> bool {
+        match (self, other) {
+            (EitherDeviceId::Strong(this), EitherDeviceId::Strong(other)) => this == other,
+            (EitherDeviceId::Strong(this), EitherDeviceId::Weak(other)) => other == this,
+            (EitherDeviceId::Weak(this), EitherDeviceId::Strong(other)) => this == other,
+            (EitherDeviceId::Weak(this), EitherDeviceId::Weak(other)) => this == other,
+        }
+    }
+}
+
+impl<S: StrongDeviceIdentifier, W: WeakDeviceIdentifier<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
+    /// Returns a [`Cow`] reference for the strong variant.
+    ///
+    /// Attempts to upgrade if this is a `Weak` variant.
+    pub fn as_strong_ref<'a>(&'a self) -> Option<Cow<'a, S>> {
+        match self {
+            EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
+            EitherDeviceId::Weak(w) => w.upgrade().map(Cow::Owned),
+        }
+    }
+}
+
+impl<S, W> EitherDeviceId<S, W> {
+    /// Returns a borrowed version of this `EitherDeviceId`.
+    pub fn as_ref<'a, S2, W2>(&'a self) -> EitherDeviceId<&'a S2, &'a W2>
+    where
+        S: Borrow<S2>,
+        W: Borrow<W2>,
+    {
+        match self {
+            EitherDeviceId::Strong(s) => EitherDeviceId::Strong(s.borrow()),
+            EitherDeviceId::Weak(w) => EitherDeviceId::Weak(w.borrow()),
+        }
+    }
+}
+
+impl<S: StrongDeviceIdentifier<Weak = W>, W: WeakDeviceIdentifier<Strong = S>>
+    EitherDeviceId<S, W>
+{
+    /// Returns a [`Cow`] reference for the `Strong` variant.
+    ///
+    /// Attempts to upgrade if this is a `Weak` variant.
+    pub fn as_strong<'a>(&'a self) -> Option<Cow<'a, S>> {
+        match self {
+            EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
+            EitherDeviceId::Weak(w) => w.upgrade().map(Cow::Owned),
+        }
+    }
+
+    /// Returns a [`Cow`] reference for the `Weak` variant.
+    ///
+    /// Downgrades if this is a `Strong` variant.
+    pub fn as_weak<'a>(&'a self) -> Cow<'a, W> {
+        match self {
+            EitherDeviceId::Strong(s) => Cow::Owned(s.downgrade()),
+            EitherDeviceId::Weak(w) => Cow::Borrowed(w),
+        }
+    }
 }
 
 #[cfg(any(test, feature = "testutils"))]

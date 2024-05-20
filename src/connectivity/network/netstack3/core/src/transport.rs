@@ -60,17 +60,12 @@ pub(crate) mod tcp;
 pub(crate) mod udp;
 
 use derivative::Derivative;
-use net_types::{
-    ip::{Ip, IpAddress, Ipv4, Ipv6},
-    ScopeableAddress, SpecifiedAddr, ZonedAddr,
-};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 
 use crate::{
     context::{HandleableTimer, TimerHandler},
     device::WeakDeviceId,
-    error::ZonedAddressError,
-    ip::EitherDeviceId,
-    socket::{datagram, SocketIpAddrExt as _},
+    socket::datagram,
     transport::{
         tcp::{TcpCounters, TcpState},
         udp::{UdpCounters, UdpState, UdpStateBuilder},
@@ -163,41 +158,4 @@ impl<BT: BindingsTypes> From<tcp::socket::TimerId<WeakDeviceId<BT>, BT>>
     fn from(id: tcp::socket::TimerId<WeakDeviceId<BT>, BT>) -> Self {
         TransportLayerTimerId::Tcp(id)
     }
-}
-
-/// Returns the address and device that should be used for a socket.
-///
-/// Given an address for a socket and an optional device that the socket is
-/// already bound on, returns the address and device that should be used
-/// for the socket. If `addr` and `device` require inconsistent devices,
-/// or if `addr` requires a zone but there is none specified (by `addr` or
-/// `device`), an error is returned.
-pub(crate) fn resolve_addr_with_device<
-    IA: IpAddress,
-    A: ScopeableAddress + AsRef<SpecifiedAddr<IA>>,
-    S: PartialEq,
-    W: PartialEq + PartialEq<S>,
->(
-    addr: ZonedAddr<A, S>,
-    device: Option<W>,
-) -> Result<(A, Option<EitherDeviceId<S, W>>), ZonedAddressError> {
-    let (addr, zone) = addr.into_addr_zone();
-    let device = match (zone, device) {
-        (Some(zone), Some(device)) => {
-            if device != zone {
-                return Err(ZonedAddressError::DeviceZoneMismatch);
-            }
-            Some(EitherDeviceId::Strong(zone))
-        }
-        (Some(zone), None) => Some(EitherDeviceId::Strong(zone)),
-        (None, Some(device)) => Some(EitherDeviceId::Weak(device)),
-        (None, None) => {
-            if addr.as_ref().must_have_zone() {
-                return Err(ZonedAddressError::RequiredZoneNotProvided);
-            } else {
-                None
-            }
-        }
-    };
-    Ok((addr, device))
 }

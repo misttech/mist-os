@@ -42,7 +42,8 @@ use crate::{
 };
 
 pub(crate) use netstack3_base::{
-    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, FrameDestination, RecvIpFrameMeta,
+    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, EitherDeviceId, FrameDestination,
+    RecvIpFrameMeta,
 };
 
 /// Iterator over devices.

@@ -55,7 +55,8 @@ use crate::{
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{
-        AnyDevice, DeviceIdContext, FrameDestination, StrongDeviceIdentifier, WeakDeviceIdentifier,
+        AnyDevice, DeviceIdContext, EitherDeviceId, FrameDestination, StrongDeviceIdentifier,
+        WeakDeviceIdentifier,
     },
     filter::{MaybeTransportPacket, TransportPacketSerializer},
     ip::{
@@ -70,9 +71,9 @@ use crate::{
         },
         path_mtu::PmtuHandler,
         socket::{DefaultSendOptions, IpSocketHandler},
-        AddressStatus, EitherDeviceId, IpDeviceStateContext, IpExt, IpLayerHandler,
-        IpTransportContext, Ipv6PresentAddressStatus, MulticastMembershipHandler, SendIpPacketMeta,
-        TransportIpContext, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+        AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpTransportContext,
+        Ipv6PresentAddressStatus, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
+        TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{
         address::{AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, SocketIpAddr},

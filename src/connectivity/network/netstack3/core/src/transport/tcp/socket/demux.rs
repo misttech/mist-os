@@ -25,12 +25,12 @@ use tracing::{debug, error, warn};
 use crate::{
     context::{CounterContext, CtxPair},
     convert::BidirectionalConverter as _,
-    device::{StrongDeviceIdentifier as _, WeakDeviceIdentifier},
+    device::{EitherDeviceId, StrongDeviceIdentifier as _, WeakDeviceIdentifier},
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
-        base::TransparentLocalDelivery, socket::MmsError, EitherDeviceId, IpSockCreationError,
-        IpTransportContext, TransportIpContext, TransportReceiveError,
+        base::TransparentLocalDelivery, socket::MmsError, IpSockCreationError, IpTransportContext,
+        TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{

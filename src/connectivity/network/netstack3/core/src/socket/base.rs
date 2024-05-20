@@ -12,14 +12,15 @@ use core::{
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    AddrAndZone, ScopeableAddress, SpecifiedAddr, Witness,
+    AddrAndZone, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 
 use crate::{
     data_structures::socketmap::{
         Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
     },
-    device::{DeviceIdentifier, WeakDeviceIdentifier},
+    device::{DeviceIdentifier, EitherDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier},
+    error::ZonedAddressError,
     error::{ExistsError, NotFoundError},
     ip,
     socket::address::{
@@ -196,6 +197,57 @@ pub trait SocketIpAddrExt<A: IpAddress>: Witness<A> + ScopeableAddress {
 }
 
 impl<A: IpAddress, W: Witness<A> + ScopeableAddress> SocketIpAddrExt<A> for W {}
+
+/// An extention trait for [`ZonedAddr`].
+pub trait SocketZonedAddrExt<W, A, D> {
+    /// Returns the address and device that should be used for a socket.
+    ///
+    /// Given an address for a socket and an optional device that the socket is
+    /// already bound on, returns the address and device that should be used
+    /// for the socket. If `addr` and `device` require inconsistent devices,
+    /// or if `addr` requires a zone but there is none specified (by `addr` or
+    /// `device`), an error is returned.
+    fn resolve_addr_with_device(
+        self,
+        device: Option<D::Weak>,
+    ) -> Result<(W, Option<EitherDeviceId<D, D::Weak>>), ZonedAddressError>
+    where
+        D: StrongDeviceIdentifier;
+}
+
+impl<W, A, D> SocketZonedAddrExt<W, A, D> for ZonedAddr<W, D>
+where
+    W: ScopeableAddress + AsRef<SpecifiedAddr<A>>,
+    A: IpAddress,
+{
+    fn resolve_addr_with_device(
+        self,
+        device: Option<D::Weak>,
+    ) -> Result<(W, Option<EitherDeviceId<D, D::Weak>>), ZonedAddressError>
+    where
+        D: StrongDeviceIdentifier,
+    {
+        let (addr, zone) = self.into_addr_zone();
+        let device = match (zone, device) {
+            (Some(zone), Some(device)) => {
+                if device != zone {
+                    return Err(ZonedAddressError::DeviceZoneMismatch);
+                }
+                Some(EitherDeviceId::Strong(zone))
+            }
+            (Some(zone), None) => Some(EitherDeviceId::Strong(zone)),
+            (None, Some(device)) => Some(EitherDeviceId::Weak(device)),
+            (None, None) => {
+                if addr.as_ref().must_have_zone() {
+                    return Err(ZonedAddressError::RequiredZoneNotProvided);
+                } else {
+                    None
+                }
+            }
+        };
+        Ok((addr, device))
+    }
+}
 
 pub struct SocketDeviceUpdate<'a, A: IpAddress, D: WeakDeviceIdentifier> {
     pub local_ip: Option<&'a SpecifiedAddr<A>>,

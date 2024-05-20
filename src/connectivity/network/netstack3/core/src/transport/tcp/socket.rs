@@ -54,7 +54,10 @@ use crate::{
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier as _, WeakDeviceIdentifier},
+    device::{
+        AnyDevice, DeviceIdContext, EitherDeviceId, StrongDeviceIdentifier as _,
+        WeakDeviceIdentifier,
+    },
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
@@ -62,7 +65,7 @@ use crate::{
         socket::{
             DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
         },
-        EitherDeviceId, IpExt, IpSockCreateAndSendError, TransportIpContext,
+        IpExt, IpSockCreateAndSendError, TransportIpContext,
     },
     socket::{
         self,
@@ -75,7 +78,7 @@ use crate::{
         ShutdownType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpExt,
         SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
         SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        UpdateSharingError,
+        SocketZonedAddrExt as _, UpdateSharingError,
     },
     sync::{RemoveResourceResult, RwLock},
     transport::tcp::{
@@ -1892,11 +1895,8 @@ where
             // Extract the specified address and the device. The
             // device is either the one from the address or the one
             // to which the socket was previously bound.
-            let (addr, required_device) =
-                crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-                    addr,
-                    bound_device.clone(),
-                )
+            let (addr, required_device) = addr
+                .resolve_addr_with_device(bound_device.clone())
                 .map_err(LocalAddressError::Zone)?;
 
             let mut assigned_to = core_ctx.get_devices_with_assigned_addr(addr.clone().into());
@@ -4709,10 +4709,7 @@ where
     let local_ip = listener_addr.as_ref().and_then(|la| la.ip.addr);
     let bound_device = listener_addr.as_ref().and_then(|la| la.device.clone());
     let local_port = listener_addr.as_ref().map(|la| la.ip.identifier);
-    let (remote_ip, device) = crate::transport::resolve_addr_with_device::<WireI::Addr, _, _, _>(
-        remote_ip,
-        bound_device,
-    )?;
+    let (remote_ip, device) = remote_ip.resolve_addr_with_device(bound_device)?;
 
     let ip_sock = core_ctx
         .new_ip_socket(

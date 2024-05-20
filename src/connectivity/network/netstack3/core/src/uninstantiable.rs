@@ -10,11 +10,10 @@ use packet::{BufferMut, Serializer};
 
 use crate::{
     context::CounterContext,
-    device::WeakDeviceIdentifier,
+    device::{EitherDeviceId, WeakDeviceIdentifier},
     ip::{
         socket::{DeviceIpSocketHandler, IpSock, IpSocketHandler, Mms, MmsError, SendOptions},
-        EitherDeviceId, HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError,
-        TransportIpContext,
+        HopLimits, IpExt, IpLayerIpExt, IpSockCreationError, IpSockSendError, TransportIpContext,
     },
     socket::{
         address::SocketIpAddr,

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::vec::Vec;
 use core::{
-    borrow::Borrow,
     cmp::Ordering,
     fmt::Debug,
     hash::Hash,
@@ -39,8 +38,7 @@ use crate::{
     },
     counters::Counter,
     device::{
-        AnyDevice, DeviceIdContext, DeviceIdentifier as _, FrameDestination,
-        StrongDeviceIdentifier, WeakDeviceIdentifier,
+        AnyDevice, DeviceIdContext, DeviceIdentifier as _, FrameDestination, StrongDeviceIdentifier,
     },
     filter::{
         ConntrackConnection, FilterBindingsContext, FilterBindingsTypes, FilterHandler as _,
@@ -423,63 +421,6 @@ impl<
             None => {
                 tracing::debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
             }
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub enum EitherDeviceId<S, W> {
-    Strong(S),
-    Weak(W),
-}
-
-impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, W> {
-    fn eq(&self, other: &EitherDeviceId<S, W>) -> bool {
-        match (self, other) {
-            (EitherDeviceId::Strong(this), EitherDeviceId::Strong(other)) => this == other,
-            (EitherDeviceId::Strong(this), EitherDeviceId::Weak(other)) => other == this,
-            (EitherDeviceId::Weak(this), EitherDeviceId::Strong(other)) => this == other,
-            (EitherDeviceId::Weak(this), EitherDeviceId::Weak(other)) => this == other,
-        }
-    }
-}
-
-impl<S: StrongDeviceIdentifier, W: WeakDeviceIdentifier<Strong = S>> EitherDeviceId<&'_ S, &'_ W> {
-    pub(crate) fn as_strong_ref<'a>(&'a self) -> Option<Cow<'a, S>> {
-        match self {
-            EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
-            EitherDeviceId::Weak(w) => w.upgrade().map(Cow::Owned),
-        }
-    }
-}
-
-impl<S, W> EitherDeviceId<S, W> {
-    pub(crate) fn as_ref<'a, S2, W2>(&'a self) -> EitherDeviceId<&'a S2, &'a W2>
-    where
-        S: Borrow<S2>,
-        W: Borrow<W2>,
-    {
-        match self {
-            EitherDeviceId::Strong(s) => EitherDeviceId::Strong(s.borrow()),
-            EitherDeviceId::Weak(w) => EitherDeviceId::Weak(w.borrow()),
-        }
-    }
-}
-
-impl<S: StrongDeviceIdentifier<Weak = W>, W: WeakDeviceIdentifier<Strong = S>>
-    EitherDeviceId<S, W>
-{
-    pub(crate) fn as_strong<'a>(&'a self) -> Option<Cow<'a, S>> {
-        match self {
-            EitherDeviceId::Strong(s) => Some(Cow::Borrowed(s)),
-            EitherDeviceId::Weak(w) => w.upgrade().map(Cow::Owned),
-        }
-    }
-
-    pub(crate) fn as_weak<'a>(&'a self) -> Cow<'a, W> {
-        match self {
-            EitherDeviceId::Strong(s) => Cow::Owned(s.downgrade()),
-            EitherDeviceId::Weak(w) => Cow::Borrowed(w),
         }
     }
 }

@@ -29,7 +29,7 @@ use test_case::test_case;
 use crate::{
     device::{
         loopback::{LoopbackCreationProperties, LoopbackDevice},
-        DeviceId, EthernetLinkDevice,
+        DeviceId, EitherDeviceId, EthernetLinkDevice,
     },
     ip::{
         self,
@@ -39,7 +39,7 @@ use crate::{
             IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
         },
         types::{AddableEntryEither, AddableMetric, RawMetric},
-        EitherDeviceId, IpDeviceContext, ResolveRouteError,
+        IpDeviceContext, ResolveRouteError,
     },
     socket::address::SocketIpAddr,
     testutil::{

@@ -17,15 +17,18 @@ use thiserror::Error;
 
 use crate::{
     context::{CounterContext, InstantContext, TracingContext},
-    device::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier as _},
+    device::{
+        AnyDevice, DeviceIdContext, EitherDeviceId, StrongDeviceIdentifier,
+        WeakDeviceIdentifier as _,
+    },
     filter::{
         FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
     },
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
         types::{ResolvedRoute, RoutableIpAddr},
-        EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
-        ResolveRouteError, SendIpPacketMeta,
+        IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata, ResolveRouteError,
+        SendIpPacketMeta,
     },
     socket::{address::SocketIpAddr, SocketIpAddrExt as _},
     trace_duration,

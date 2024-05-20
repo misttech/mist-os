@@ -32,7 +32,7 @@ use crate::{
     context::{ReferenceNotifiers, ReferenceNotifiersExt as _, RngContext},
     convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter},
     device::{
-        AnyDevice, DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier as _,
+        AnyDevice, DeviceIdContext, DeviceIdentifier, EitherDeviceId, StrongDeviceIdentifier as _,
         WeakDeviceIdentifier,
     },
     error::{
@@ -46,8 +46,7 @@ use crate::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
             IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
-        EitherDeviceId, HopLimits, MulticastMembershipHandler, ResolveRouteError,
-        TransportIpContext,
+        HopLimits, MulticastMembershipHandler, ResolveRouteError, TransportIpContext,
     },
     socket::{
         self,
@@ -59,7 +58,7 @@ use crate::{
         AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
         NotDualStackCapableError, Shutdown, ShutdownType, SocketDeviceUpdate,
         SocketDeviceUpdateNotAllowedError, SocketIpExt, SocketMapAddrSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec, StrictlyZonedAddr,
+        SocketMapStateSpec, SocketZonedAddrExt as _, StrictlyZonedAddr,
     },
     sync::{RemoveResourceResultWithContext, RwLock},
 };
@@ -2275,7 +2274,7 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
             // Extract the specified address and the device. The device
             // is either the one from the address or the one to which
             // the socket was previously bound.
-            let (addr, device) = crate::transport::resolve_addr_with_device(addr, device.clone())?;
+            let (addr, device) = addr.resolve_addr_with_device(device.clone())?;
 
             // Binding to multicast addresses is allowed regardless.
             // Other addresses can only be bound to if they are assigned
@@ -2665,11 +2664,7 @@ fn connect_inner<
             .flatten()
     });
 
-    let (remote_ip, socket_device) =
-        crate::transport::resolve_addr_with_device::<WireI::Addr, _, _, _>(
-            remote_ip,
-            device.clone(),
-        )?;
+    let (remote_ip, socket_device) = remote_ip.resolve_addr_with_device(device.clone())?;
 
     let clear_device_on_disconnect = device.is_none() && socket_device.is_some();
 
@@ -4045,11 +4040,10 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
             .then(|| socket_options.multicast_interface.clone())
             .flatten()
     });
-    let (remote_ip, device) =
-        match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(remote_ip, device) {
-            Ok(addr) => addr,
-            Err(e) => return Err(SendToError::Zone(e)),
-        };
+    let (remote_ip, device) = match remote_ip.resolve_addr_with_device(device) {
+        Ok(addr) => addr,
+        Err(e) => return Err(SendToError::Zone(e)),
+    };
 
     core_ctx
         .send_oneshot_ip_packet_with_fallible_serializer(
