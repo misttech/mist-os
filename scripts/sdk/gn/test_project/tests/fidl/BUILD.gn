@@ -15,7 +15,6 @@ executable("hello_fidl") {
   deps = [
     ":fuchsia.examples.rot13",
     ":fuchsia.examples.rot13_cpp",
-    ":fuchsia.examples.rot13_cpp",
     ":fuchsia.examples.rot13_cpp_hlcpp_conversion",
   ]
   sources = [ "//tests/package/hello.cc" ]
