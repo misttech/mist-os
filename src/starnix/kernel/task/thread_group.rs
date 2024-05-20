@@ -615,11 +615,10 @@ impl ThreadGroup {
 
         // Send signals
         if let Some(exit_signal) = zombie.exit_info.exit_signal {
-            // get targets and notify all
-            for target in state.tasks() {
+            if let Some(signal_target) = state.get_signal_target(exit_signal.into()) {
                 let mut signal_info = zombie.to_wait_result().as_signal_info();
                 signal_info.signal = exit_signal;
-                send_signal(&target, signal_info).unwrap_or_else(|e| {
+                send_signal(&signal_target, signal_info).unwrap_or_else(|e| {
                     log_warn!("Failed to send exit signal: {}", e);
                 });
             }

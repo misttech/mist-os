@@ -692,51 +692,6 @@ TEST(Task, ChildCantModifyParent) {
   delete heap_variable;
 }
 
-void worker_func() {
-  // Block SIGCHLD
-  sigset_t child_mask, old_mask;
-  sigemptyset(&child_mask);
-  sigaddset(&child_mask, SIGCHLD);
-
-  ASSERT_NE(sigprocmask(SIG_BLOCK, &child_mask, &old_mask), -1);
-
-  pid_t pid = fork();
-  if (pid == 0) {
-    _exit(0);
-  }
-  int status;
-
-  // Due to sigprocmask we should not receive a SIGCHLD here.
-  pid_t waited_pid = waitpid(pid, &status, WNOHANG);
-  ASSERT_NE(waited_pid, pid);
-
-  int timeout_ms = 10000;
-
-  timespec spec = {};
-  spec.tv_sec = timeout_ms / 1000;
-  spec.tv_nsec = (timeout_ms % 1000) * 1000000;
-
-  int res;
-  do {
-    res = sigtimedwait(&child_mask, nullptr, &spec);
-    if (res == -1 && errno == EINTR) {
-      continue;
-    }
-
-    break;
-  } while (true);
-  ASSERT_NE(res, -1);
-  sigprocmask(SIG_SETMASK, &old_mask, nullptr);
-
-  waited_pid = waitpid(pid, &status, WNOHANG);
-  ASSERT_EQ(waited_pid, pid);
-}
-
-TEST(Task, MultithreadedSignals) {
-  std::thread t(worker_func);
-  t.join();
-}
-
 TEST(Task, ForkDoesntDropWrites) {
   // This tests creates a thread that keeps reading
   // and writing to a pager-backed memory region (the data section of this
