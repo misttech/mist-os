@@ -27,12 +27,12 @@ fidl("linux") {
   # NOSORT
   sources = [
     "syscall.fidl",
-    "syscall.test.fidl",
+    #"syscall.test.fidl",
   ]
 
-  if (exclude_testonly_syscalls) {
-    sources -= [ "syscall.test.fidl" ]
-  }
+  #if (exclude_testonly_syscalls) {
+    #sources -= [ "syscall.test.fidl" ]
+  #}
 
   # TODO(https://fxbug.dev/42061412): Burn these down.
   experimental_flags = [

@@ -556,11 +556,11 @@ static_assert(ZX_SYS_compat_io_submit == 544);
 static_assert(ZX_SYS_compat_execveat == 545);
 static_assert(ZX_SYS_compat_preadv2 == 546);
 static_assert(ZX_SYS_compat_pwritev2 == 547);
-static_assert(ZX_SYS_test_0 == 548);
+/*static_assert(ZX_SYS_test_0 == 548);
 static_assert(ZX_SYS_test_1 == 549);
 static_assert(ZX_SYS_test_2 == 550);
 static_assert(ZX_SYS_test_3 == 551);
 static_assert(ZX_SYS_test_4 == 552);
 static_assert(ZX_SYS_test_5 == 553);
 static_assert(ZX_SYS_test_6 == 554);
-static_assert(ZX_SYS_COUNT == 555);
+static_assert(ZX_SYS_COUNT == 555);*/
