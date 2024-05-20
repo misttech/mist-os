@@ -16,7 +16,9 @@ import trace_processing.metrics.cpu as cpu_metrics
 import trace_processing.metrics.fps as fps_metrics
 import trace_processing.metrics.input_latency as input_latency_metrics
 import trace_processing.metrics.scenic as scenic_metrics
-from trace_processing import trace_importing, trace_metrics, trace_model
+import trace_processing.trace_importing as trace_importing
+import trace_processing.trace_metrics as trace_metrics
+import trace_processing.trace_model as trace_model
 
 # Boilerplate-busting constants:
 U = trace_metrics.Unit
@@ -74,7 +76,7 @@ class TestCaseResultTest(unittest.TestCase):
 class MetricProcessorsTest(unittest.TestCase):
     """Tests for the various MetricProcessors."""
 
-    def _load_model(self, model_file_name: str) -> trace_model.Model:
+    def _load_model(self, model_file_name) -> trace_model.Model:
         # A second dirname is required to account for the .pyz archive which
         # contains the test and a third one since data is a sibling of the test.
         runtime_deps_path = os.path.join(
@@ -544,4 +546,4 @@ class MetricProcessorsTest(unittest.TestCase):
 
         # Improves assertEqual output when comparing lists.
         self.maxDiff = 10000
-        self.assertEqual(actual_results, expected_results)
+        self.assertEquals(actual_results, expected_results)

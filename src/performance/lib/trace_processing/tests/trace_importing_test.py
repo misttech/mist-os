@@ -496,18 +496,12 @@ class TraceImportingTest(unittest.TestCase):
         self.assertIsInstance(
             model.scheduling_records[0][1], trace_model.ContextSwitch
         )
-        assert isinstance(
-            model.scheduling_records[0][1], trace_model.ContextSwitch
-        )
         self.assertEqual(model.scheduling_records[0][1].start, TimePoint(5000))
         self.assertEqual(model.scheduling_records[0][1].tid, 2)
         self.assertEqual(model.scheduling_records[0][1].prio, 3122)
         self.assertEqual(model.scheduling_records[0][1].outgoing_tid, 1)
         self.assertEqual(model.scheduling_records[0][1].outgoing_prio, 3122)
-        self.assertEqual(
-            model.scheduling_records[0][1].outgoing_state,
-            trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
-        )
+        self.assertEqual(model.scheduling_records[0][1].outgoing_state, 3)
 
         self.assertIsInstance(
             model.scheduling_records[0][2], trace_model.ContextSwitch
@@ -516,15 +510,9 @@ class TraceImportingTest(unittest.TestCase):
             model.scheduling_records[0][2].start,
             TimePoint(10000),
         )
-        assert isinstance(
-            model.scheduling_records[0][2], trace_model.ContextSwitch
-        )
         self.assertEqual(model.scheduling_records[0][2].tid, 1036)
         self.assertEqual(model.scheduling_records[0][2].prio, -0x80000000)
         self.assertEqual(model.scheduling_records[0][2].outgoing_tid, 2)
         self.assertEqual(model.scheduling_records[0][2].outgoing_prio, 3122)
-        self.assertEqual(
-            model.scheduling_records[0][2].outgoing_state,
-            trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
-        )
+        self.assertEqual(model.scheduling_records[0][2].outgoing_state, 3)
         self.assertTrue(model.scheduling_records[0][2].is_idle())

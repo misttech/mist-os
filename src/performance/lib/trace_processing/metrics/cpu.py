@@ -5,10 +5,13 @@
 """CPU trace metrics."""
 
 import logging
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Iterable, Iterator
 
 import statistics
-from trace_processing import trace_metrics, trace_model, trace_utils
+import trace_processing.trace_metrics as trace_metrics
+import trace_processing.trace_model as trace_model
+import trace_processing.trace_time as trace_time
+import trace_processing.trace_utils as trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CPU_USAGE_EVENT_NAME: str = "cpu_usage"
@@ -19,7 +22,7 @@ _AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
 # TODO(b/320778225): Remove once downstream callers are migrated.
 def metrics_processor(
     model: trace_model.Model, extra_args: dict[str, Any]
-) -> Sequence[trace_metrics.TestCaseResult]:
+) -> list[trace_metrics.TestCaseResult]:
     """Computes the CPU utilization for the given trace.
 
     Args:
@@ -41,14 +44,14 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
         """Constructor.
 
         Args:
-            aggregates_only: When True, generates CpuMin, CpuMax, CpuAverage and CpuP* (%iles).
+            aggregates_only: When True, generates CpuMin, CpuMax, CpuAverage and CpuP* (percentiles).
                 Otherwise generates CpuLoad metric with all cpu values.
         """
         self.aggregates_only: bool = aggregates_only
 
     def process_metrics(
         self, model: trace_model.Model
-    ) -> Sequence[trace_metrics.TestCaseResult]:
+    ) -> list[trace_metrics.TestCaseResult]:
         all_events: Iterator[trace_model.Event] = model.all_events()
         cpu_usage_events: Iterable[
             trace_model.Event
@@ -86,8 +89,8 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
 
         if len(cpu_percentages) == 0:
             _LOGGER.info(
-                "No cpu usage measurements are present. Perhaps the trace duration "
-                "is too short to provide cpu usage information"
+                f"No cpu usage measurements are present. Perhaps the trace duration "
+                f"is too short to provide cpu usage information"
             )
             return []
 
@@ -100,8 +103,9 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
                 label_prefix="Cpu",
                 unit=trace_metrics.Unit.percent,
             )
-        return [
-            trace_metrics.TestCaseResult(
-                "CpuLoad", trace_metrics.Unit.percent, cpu_percentages
-            )
-        ]
+        else:
+            return [
+                trace_metrics.TestCaseResult(
+                    "CpuLoad", trace_metrics.Unit.percent, cpu_percentages
+                )
+            ]

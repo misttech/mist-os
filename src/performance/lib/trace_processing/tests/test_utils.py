@@ -227,7 +227,7 @@ def get_test_model() -> trace_model.Model:
             outgoing_tid=7021,
             incoming_prio=3122,
             outgoing_prio=3122,
-            outgoing_state=trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+            outgoing_state=3,
             args={},
         ),
         trace_model.ContextSwitch(
@@ -238,7 +238,7 @@ def get_test_model() -> trace_model.Model:
             outgoing_tid=7022,
             incoming_prio=-2147483648,
             outgoing_prio=3122,
-            outgoing_state=trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+            outgoing_state=3,
             args={},
         ),
         trace_model.ContextSwitch(
@@ -249,7 +249,7 @@ def get_test_model() -> trace_model.Model:
             outgoing_tid=1036,
             incoming_prio=3122,
             outgoing_prio=3122,
-            outgoing_state=trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+            outgoing_state=3,
             args={},
         ),
         trace_model.ContextSwitch(
@@ -260,7 +260,7 @@ def get_test_model() -> trace_model.Model:
             outgoing_tid=1037,
             incoming_prio=3122,
             outgoing_prio=3122,
-            outgoing_state=trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+            outgoing_state=3,
             args={},
         ),
     ]
@@ -281,7 +281,7 @@ def get_test_model() -> trace_model.Model:
             outgoing_tid=7021,
             incoming_prio=3122,
             outgoing_prio=3122,
-            outgoing_state=trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+            outgoing_state=3,
             args={},
         ),
         trace_model.ContextSwitch(
@@ -292,7 +292,7 @@ def get_test_model() -> trace_model.Model:
             outgoing_tid=7022,
             incoming_prio=-2147483648,
             outgoing_prio=3122,
-            outgoing_state=trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+            outgoing_state=3,
             args={},
         ),
     ]
@@ -334,7 +334,6 @@ def assertEventsEqual(
     elif isinstance(a, trace_model.DurationEvent) and isinstance(
         b, trace_model.DurationEvent
     ):
-        assert a.duration is not None and b.duration is not None
         test.assertAlmostEqual(
             a.duration.to_microseconds(), b.duration.to_microseconds()
         )
@@ -345,7 +344,6 @@ def assertEventsEqual(
         b, trace_model.AsyncEvent
     ):
         test.assertEqual(a.id, b.id)
-        assert a.duration is not None and b.duration is not None
         test.assertAlmostEqual(
             a.duration.to_microseconds(), b.duration.to_microseconds()
         )
@@ -451,7 +449,7 @@ def assertModelsEqual(
         f"vs {len(b.scheduling_records)}",
     )
 
-    for cpu in a.scheduling_records:
+    for cpu, records in a.scheduling_records.items():
         for a_record, b_record in zip(
             a.scheduling_records[cpu], b.scheduling_records[cpu]
         ):

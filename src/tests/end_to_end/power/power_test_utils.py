@@ -25,7 +25,6 @@ import time
 from collections import deque
 from collections.abc import Iterable, Mapping
 from trace_processing import trace_metrics, trace_model, trace_time
-from trace_processing.metrics import power as power_metrics
 from typing import Sequence
 
 # keep-sorted end
@@ -41,6 +40,10 @@ _LOGGER = logging.getLogger(__name__)
 # The measurepower tool's path. The tool is expected to periodically output
 # power measurements into a csv file, with _PowerCsvHeaders.all() columns.
 _MEASUREPOWER_PATH_ENV_VARIABLE = "MEASUREPOWER_PATH"
+
+
+def _avg(avg: float, value: float, count: int) -> float:
+    return avg + (value - avg) / count
 
 
 def weighted_average(arr: Iterable[float], weights: Iterable[int]) -> float:
@@ -101,6 +104,88 @@ def cross_correlate_arg_max(
     )
 
 
+@dataclasses.dataclass
+class PowerMetricSample:
+    """A sample of collected power metrics.
+
+    Args:
+      timestamp: timestamp of sample in nanoseconds since epoch.
+      voltage: voltage in Volts.
+      current: current in milliAmpere.
+      raw_aux: (optional) The raw 16 bit fine aux channel reading from a Monsoon power monitor.  Can
+               optionally be used for log synchronization and alignment
+    """
+
+    timestamp: int
+    voltage: float
+    current: float
+    raw_aux: int | None
+
+    def compute_power(self) -> float:
+        """Compute the power in Watts from sample.
+
+        Returns:
+          Power in Watts.
+        """
+        return self.voltage * self.current * 1e-3
+
+
+@dataclasses.dataclass
+class AggregatePowerMetrics:
+    """Aggregate power metrics representation.
+
+    Represents aggregated metrics over a number of power metrics samples.
+
+    Args:
+      sample_count: number of power metric samples.
+      max_power: maximum power in Watts over all samples.
+      mean_power: average power in Watts over all samples.
+      min_power: minimum power in Watts over all samples.
+    """
+
+    sample_count: int = 0
+    max_power: float = float("-inf")
+    mean_power: float = 0
+    min_power: float = float("inf")
+
+    def process_sample(self, sample: PowerMetricSample) -> None:
+        """Process a sample of power metrics.
+
+        Args:
+            sample: A sample of power metrics.
+        """
+        power = sample.compute_power()
+        self.sample_count += 1
+        self.max_power = max(self.max_power, power)
+        self.mean_power = _avg(self.mean_power, power, self.sample_count)
+        self.min_power = min(self.min_power, power)
+
+    def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
+        """Converts Power metrics to fuchsiaperf JSON object.
+
+        Returns:
+          List of JSON object.
+        """
+        results: list[trace_metrics.TestCaseResult] = [
+            trace_metrics.TestCaseResult(
+                label="MinPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.min_power],
+            ),
+            trace_metrics.TestCaseResult(
+                label="MeanPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.mean_power],
+            ),
+            trace_metrics.TestCaseResult(
+                label="MaxPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.max_power],
+            ),
+        ]
+        return results
+
+
 # Constants class
 #
 # One of two formats for the CSV data is expected.  If the first column is named
@@ -144,11 +229,10 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def __init__(self, power_samples_path: str) -> None:
         self._power_samples_path: str = power_samples_path
-        self._power_metrics: power_metrics.AggregatePowerMetrics = (
-            power_metrics.AggregatePowerMetrics()
-        )
+        self._power_metrics: AggregatePowerMetrics = AggregatePowerMetrics()
 
-    # Implements MetricsProcessor.process_metrics. Model is None to support legacy users.
+    # Implements MetricsProcessor.process_metrics. Model is unused and is None
+    # to support legacy users.
     def process_metrics(
         self, model: trace_model.Model | None = None
     ) -> list[trace_metrics.TestCaseResult]:
@@ -158,7 +242,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             header = next(reader)
             _PowerCsvHeaders.assert_header(header)
             for row in reader:
-                sample = power_metrics.PowerMetricSample(
+                sample = PowerMetricSample(
                     timestamp=int(row[0]),
                     voltage=float(row[1]),
                     current=float(row[2]),
@@ -276,7 +360,7 @@ class PowerSampler:
 
     # DEPRECATED: Use .metric_processor().process_metrics() instead.
     # TODO(b/320778225): Remove once downstream users are refactored.
-    def to_fuchsiaperf_results(self) -> Sequence[trace_metrics.TestCaseResult]:
+    def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
         """Returns power metrics TestCaseResults"""
         assert self._state == _PowerSamplerState.STOPPED
         return self.metrics_processor().process_metrics(
@@ -357,12 +441,7 @@ class _RealPowerSampler(PowerSampler):
         _LOGGER.info("Power sampling stopped")
 
     def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
-        return trace_metrics.MetricsProcessorsSet(
-            (
-                PowerMetricsProcessor(power_samples_path=self._csv_output_path),
-                power_metrics.PowerMetricsProcessor(),
-            )
-        )
+        return PowerMetricsProcessor(power_samples_path=self._csv_output_path)
 
     def _start_power_measurement(self) -> None:
         assert self._config.measurepower_path
@@ -444,8 +523,7 @@ def create_power_sampler(
             )
 
         _LOGGER.warning(
-            f"{_MEASUREPOWER_PATH_ENV_VARIABLE} env variable not set. "
-            "Using a no-op power sampler instead."
+            f"{_MEASUREPOWER_PATH_ENV_VARIABLE} env variable not set. Using a no-op power sampler instead."
         )
         return _NoopPowerSampler(config)
     else:
