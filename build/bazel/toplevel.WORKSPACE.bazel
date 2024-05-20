@@ -8,7 +8,9 @@ the Bazel workspace used by the Fuchsia platform build. Keep its content in
 sync with toplevel.MODULE.bazel whenever possible!!
 """
 
+# LINT.IfChange
 workspace(name = "main")
+# LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 
 local_repository(
     name = "platforms",

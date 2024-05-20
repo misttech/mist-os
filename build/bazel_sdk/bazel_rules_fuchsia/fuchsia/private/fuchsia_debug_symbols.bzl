@@ -72,7 +72,7 @@ def strip_resources(ctx, resources, build_id_path = None, source_dir = None):
     # will try to declare the same file twice. We only need to strip the resource
     # once so there is no need to attempt to stip duplicates.
     for r in depset(resources).to_list():
-        ids_txt = ctx.actions.declare_file(r.src.path + "ids_txt")
+        ids_txt = ctx.actions.declare_file(r.src.path + ".ids_txt")
         all_ids_txt.append(ids_txt)
         all_maybe_elf_files.append(r.src)
         stripped_resources.append(_maybe_process_elf(ctx, r, ids_txt))
@@ -350,8 +350,13 @@ def _find_and_process_unstripped_binaries_impl(ctx):
         generated_resources.extend(stripped_resources)
         debug_infos.append(debug_info)
 
+    outputs = depset(
+        direct = [r.src for r in generated_resources],
+        transitive = [debug_info.build_id_dirs.values()[0] for debug_info in debug_infos],
+    )
+
     result = [
-        DefaultInfo(files = depset([r.src for r in generated_resources])),
+        DefaultInfo(files = outputs),
         FuchsiaPackageResourcesInfo(resources = prebuilt_resources + generated_resources),
         collect_debug_symbols(debug_infos),
     ]
