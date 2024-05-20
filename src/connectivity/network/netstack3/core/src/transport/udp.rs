@@ -7093,7 +7093,7 @@ mod tests {
                 crate::testutil::DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&mut ctx, &loopback_device_id);
+        ctx.test_api().enable_device(&loopback_device_id);
         let mut api = ctx.core_api().udp::<I>();
         let socket = api.create();
         api.listen(&socket, None, Some(LOCAL_PORT)).unwrap();

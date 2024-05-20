@@ -34,6 +34,8 @@ use crate::{
 };
 
 mod integration;
+#[cfg(test)]
+mod integration_tests;
 
 /// A weak device ID identifying a pure IP device.
 ///

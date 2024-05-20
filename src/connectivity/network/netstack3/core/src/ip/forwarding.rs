@@ -1479,7 +1479,7 @@ mod tests {
         // It still won't resolve successfully because the device is not enabled yet.
         assert_eq!(ctx.core_api().routes_any().select_device_for_gateway(gateway), None);
 
-        crate::device::testutil::enable_device(&mut ctx, &device_id);
+        ctx.test_api().enable_device(&device_id);
 
         // Now, try to resolve a device for the gateway.
         assert_eq!(
@@ -1565,7 +1565,7 @@ mod tests {
         );
 
         if enable_before_final_route_add {
-            crate::device::testutil::enable_device(&mut ctx, &device_id);
+            ctx.test_api().enable_device(&device_id);
         }
         assert_eq!(
             ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(

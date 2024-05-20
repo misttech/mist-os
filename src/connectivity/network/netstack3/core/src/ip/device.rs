@@ -15,6 +15,9 @@ pub(crate) mod router_solicitation;
 pub(crate) mod slaac;
 pub(crate) mod state;
 
+#[cfg(test)]
+mod ndp_integration_tests;
+
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     fmt::{Debug, Display},

@@ -62,14 +62,17 @@ use crate::{
     filter::FilterBindingsTypes,
     ip::{
         device::{
-            config::{Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
+            config::{
+                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+                Ipv6DeviceConfigurationUpdate,
+            },
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent,
         },
         icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
         raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         types::{AddableEntry, AddableMetric, RawMetric},
-        IpLayerEvent,
+        IpDeviceConfiguration, IpLayerEvent,
     },
     state::{StackState, StackStateBuilder},
     sync::{DynDebugReferences, Mutex},
@@ -96,16 +99,13 @@ pub use netstack3_base::testutil::{
 
 /// NDP test utilities.
 pub mod ndp {
-    pub use crate::device::ndp::testutil::*;
+    pub use crate::ip::icmp::testutil::{
+        neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet,
+    };
 }
 /// Context test utilities.
 pub mod context {
     pub use crate::context::testutil::*;
-}
-
-/// Device test utilities.
-pub mod device {
-    pub use crate::device::testutil::*;
 }
 
 /// The default interface routing metric for test interfaces.
@@ -395,6 +395,57 @@ where
                 panic!("failed to remove ethernet device")
             }
         }
+    }
+
+    /// Enables `device`.
+    pub fn enable_device(&mut self, device: &DeviceId<BC>) {
+        let ip_config =
+            IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() };
+        let _: Ipv4DeviceConfigurationUpdate = self
+            .core_api()
+            .device_ip::<Ipv4>()
+            .update_configuration(
+                device,
+                Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
+            )
+            .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = self
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                device,
+                Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
+            )
+            .unwrap();
+    }
+
+    /// Enables or disables IP packet routing on `device`.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn set_forwarding_enabled<I: crate::IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) {
+        let _config = self
+            .core_api()
+            .device_ip::<I>()
+            .update_configuration(
+                device,
+                IpDeviceConfigurationUpdate {
+                    forwarding_enabled: Some(enabled),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .unwrap();
+    }
+
+    /// Returns whether IP packet routing is enabled on `device`.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn is_forwarding_enabled<I: crate::IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
+        let configuration = self.core_api().device_ip::<I>().get_configuration(device);
+        let IpDeviceConfiguration { forwarding_enabled, .. } = configuration.as_ref();
+        *forwarding_enabled
     }
 }
 
@@ -946,8 +997,7 @@ impl FakeCtxBuilder {
     }
 
     /// Add an ARP table entry for a device's ARP table.
-    #[cfg(test)]
-    pub(crate) fn add_arp_table_entry(
+    pub fn add_arp_table_entry(
         &mut self,
         device: usize,
         // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
@@ -958,8 +1008,7 @@ impl FakeCtxBuilder {
     }
 
     /// Add an NDP table entry for a device's NDP table.
-    #[cfg(test)]
-    pub(crate) fn add_ndp_table_entry(
+    pub fn add_ndp_table_entry(
         &mut self,
         device: usize,
         // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
@@ -969,8 +1018,24 @@ impl FakeCtxBuilder {
         self.ndp_table_entries.push((device, ip, mac));
     }
 
+    /// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
+    /// `FakeCtxBuilder`.
+    pub fn add_arp_or_ndp_table_entry<A: IpAddress>(
+        &mut self,
+        device: usize,
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
+        ip: SpecifiedAddr<A>,
+        mac: UnicastAddr<Mac>,
+    ) {
+        match ip.into() {
+            IpAddr::V4(ip) => self.add_arp_table_entry(device, ip, mac),
+            IpAddr::V6(ip) => {
+                self.add_ndp_table_entry(device, UnicastAddr::new(ip.get()).unwrap(), mac)
+            }
+        }
+    }
+
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
-    #[cfg(any(test, feature = "testutils"))]
     pub fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         self.build_with_modifications(|_| {})
     }
@@ -978,7 +1043,6 @@ impl FakeCtxBuilder {
     /// `build_with_modifications` is equivalent to `build`, except that after
     /// the `StackStateBuilder` is initialized, it is passed to `f` for further
     /// modification before the `Ctx` is constructed.
-    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
@@ -990,7 +1054,6 @@ impl FakeCtxBuilder {
 
     /// Build a `Ctx` from the present configuration with a caller-provided
     /// dispatcher and `StackStateBuilder`.
-    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn build_with(
         self,
         state_builder: StackStateBuilder,
@@ -1024,7 +1087,7 @@ impl FakeCtxBuilder {
                         .update_configuration(&id, ipv6_config)
                         .unwrap();
                 }
-                crate::device::testutil::enable_device(&mut ctx, &id);
+                ctx.test_api().enable_device(&id);
                 match ip_and_subnet {
                     Some(addr_sub) => {
                         ctx.core_api().device_ip_any().add_ip_addr_subnet(&id, addr_sub).unwrap();
@@ -1061,24 +1124,6 @@ impl FakeCtxBuilder {
         }
 
         (ctx, idx_to_device_id)
-    }
-}
-
-/// Add either an NDP entry (if IPv6) or ARP entry (if IPv4) to a
-/// `FakeCtxBuilder`.
-#[cfg(test)]
-pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
-    builder: &mut FakeCtxBuilder,
-    device: usize,
-    // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
-    ip: SpecifiedAddr<A>,
-    mac: UnicastAddr<Mac>,
-) {
-    match ip.into() {
-        IpAddr::V4(ip) => builder.add_arp_table_entry(device, ip, mac),
-        IpAddr::V6(ip) => {
-            builder.add_ndp_table_entry(device, UnicastAddr::new(ip.get()).unwrap(), mac)
-        }
     }
 }
 

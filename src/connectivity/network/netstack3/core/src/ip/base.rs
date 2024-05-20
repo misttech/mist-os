@@ -3162,7 +3162,6 @@ mod tests {
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
-            testutil::set_forwarding_enabled,
             DeviceId,
         },
         ip::{
@@ -3733,7 +3732,7 @@ mod tests {
         let fake_config = I::TEST_ADDRS;
         let (mut alice, alice_device_ids) = FakeCtxBuilder::with_addrs(fake_config.swap()).build();
         {
-            set_forwarding_enabled::<_, I>(&mut alice, &alice_device_ids[0].clone().into(), true);
+            alice.test_api().set_forwarding_enabled::<I>(&alice_device_ids[0].clone().into(), true);
         }
         let (bob, bob_device_ids) = FakeCtxBuilder::with_addrs(fake_config).build();
         let mut net = crate::testutil::new_simple_fake_network(
@@ -3820,7 +3819,7 @@ mod tests {
         let (mut ctx, device_ids) = dispatcher_builder.build();
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
+        ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, true);
         let frame_dst = FrameDestination::Individual { local: true };
 
         // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
@@ -4219,7 +4218,7 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
 
-        crate::device::testutil::enable_device(&mut ctx, &device);
+        ctx.test_api().enable_device(&device);
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
 
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
@@ -4487,7 +4486,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&mut ctx, &device);
+        ctx.test_api().enable_device(&device);
 
         let ip: Ipv6Addr = cfg.local_mac.to_ipv6_link_local().addr().get();
         let buf = Buf::new(vec![0; 10], ..)
@@ -4697,8 +4696,8 @@ mod tests {
 
         // Receive packet destined to a remote address when forwarding is
         // enabled both globally and on the inbound device.
-        set_forwarding_enabled::<_, Ipv4>(&mut ctx, &v4_dev, true);
-        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &v6_dev, true);
+        ctx.test_api().set_forwarding_enabled::<Ipv4>(&v4_dev, true);
+        ctx.test_api().set_forwarding_enabled::<Ipv6>(&v6_dev, true);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             receive_ipv4_packet_action(
@@ -4854,7 +4853,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&mut ctx, &loopback_id);
+        ctx.test_api().enable_device(&loopback_id);
         ctx.core_api()
             .device_ip::<I>()
             .add_ip_addr_subnet(

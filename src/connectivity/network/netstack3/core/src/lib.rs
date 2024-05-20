@@ -74,11 +74,13 @@ pub mod device {
     pub(crate) mod integration;
     pub(crate) mod link;
     pub(crate) mod loopback;
-    pub(crate) mod ndp;
     pub(crate) mod pure_ip;
     pub(crate) mod queue;
     pub(crate) mod socket;
     mod state;
+
+    #[cfg(test)]
+    mod integration_tests;
 
     pub(crate) use base::*;
     pub(crate) use id::*;

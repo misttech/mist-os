@@ -3009,6 +3009,86 @@ fn receive_icmp_echo_reply<
     })
 }
 
+/// Test utilities for ICMP.
+#[cfg(any(test, feature = "testutils"))]
+pub(crate) mod testutil {
+    use alloc::vec::Vec;
+    use net_types::{
+        ethernet::Mac,
+        ip::{Ipv6, Ipv6Addr},
+    };
+    use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
+    use packet_formats::{
+        icmp::{
+            ndp::{
+                options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
+                OptionSequenceBuilder,
+            },
+            IcmpPacketBuilder, IcmpUnusedCode,
+        },
+        ip::Ipv6Proto,
+        ipv6::Ipv6PacketBuilder,
+    };
+
+    use super::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
+
+    /// Serialize an IP packet containing a neighbor advertisement with the
+    /// provided parameters.
+    pub fn neighbor_advertisement_ip_packet(
+        src_ip: Ipv6Addr,
+        dst_ip: Ipv6Addr,
+        router_flag: bool,
+        solicited_flag: bool,
+        override_flag: bool,
+        mac: Mac,
+    ) -> Buf<Vec<u8>> {
+        OptionSequenceBuilder::new([NdpOptionBuilder::TargetLinkLayerAddress(&mac.bytes())].iter())
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+                src_ip,
+                dst_ip,
+                IcmpUnusedCode,
+                NeighborAdvertisement::new(router_flag, solicited_flag, override_flag, src_ip),
+            ))
+            .encapsulate(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b()
+    }
+
+    /// Serialize an IP packet containing a neighbor solicitation with the
+    /// provided parameters.
+    pub fn neighbor_solicitation_ip_packet(
+        src_ip: Ipv6Addr,
+        dst_ip: Ipv6Addr,
+        target_addr: Ipv6Addr,
+        mac: Mac,
+    ) -> Buf<Vec<u8>> {
+        OptionSequenceBuilder::new([NdpOptionBuilder::SourceLinkLayerAddress(&mac.bytes())].iter())
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+                src_ip,
+                dst_ip,
+                IcmpUnusedCode,
+                NeighborSolicitation::new(target_addr),
+            ))
+            .encapsulate(Ipv6PacketBuilder::new(
+                src_ip,
+                dst_ip,
+                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+                Ipv6Proto::Icmpv6,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
@@ -3036,7 +3116,7 @@ mod tests {
             CtxPair,
         },
         device::{
-            testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
         ip::{
@@ -3360,7 +3440,7 @@ mod tests {
             .build_with_modifications(modify_stack_state_builder);
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
+        ctx.test_api().set_forwarding_enabled::<I>(&device, true);
         ctx.test_api().receive_ip_packet::<I, _>(
             &device,
             Some(FrameDestination::Individual { local: true }),

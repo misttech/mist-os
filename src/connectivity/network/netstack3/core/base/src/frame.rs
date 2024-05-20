@@ -266,3 +266,39 @@ pub(crate) mod testutil {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use net_declare::net_mac;
+    use net_types::{UnicastAddr, Witness as _};
+
+    #[test]
+    fn frame_destination_from_dest() {
+        const LOCAL_ADDR: Mac = net_mac!("88:88:88:88:88:88");
+
+        assert_eq!(
+            FrameDestination::from_dest(
+                UnicastAddr::new(net_mac!("00:11:22:33:44:55")).unwrap().get(),
+                LOCAL_ADDR
+            ),
+            FrameDestination::Individual { local: false }
+        );
+        assert_eq!(
+            FrameDestination::from_dest(LOCAL_ADDR, LOCAL_ADDR),
+            FrameDestination::Individual { local: true }
+        );
+        assert_eq!(
+            FrameDestination::from_dest(Mac::BROADCAST, LOCAL_ADDR),
+            FrameDestination::Broadcast,
+        );
+        assert_eq!(
+            FrameDestination::from_dest(
+                MulticastAddr::new(net_mac!("11:11:11:11:11:11")).unwrap().get(),
+                LOCAL_ADDR
+            ),
+            FrameDestination::Multicast
+        );
+    }
+}

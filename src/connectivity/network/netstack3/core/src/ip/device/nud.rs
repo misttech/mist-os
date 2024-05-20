@@ -2618,7 +2618,6 @@ mod tests {
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
-            ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::FakeWeakDeviceId,
             EthernetDeviceId, FrameDestination, WeakDeviceId,
         },
@@ -2627,7 +2626,7 @@ mod tests {
                 nud::api::NeighborApi, slaac::SlaacConfiguration, testutil::set_ip_device_enabled,
                 Ipv6DeviceConfigurationUpdate, Mtu,
             },
-            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+            icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT},
         },
         routes::{AddableEntry, AddableMetric},
         testutil::{
@@ -5146,7 +5145,12 @@ mod tests {
         ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
-            neighbor_solicitation_ip_packet(**src_ip, dst_ip, target_addr, *remote_mac),
+            icmp::testutil::neighbor_solicitation_ip_packet(
+                **src_ip,
+                dst_ip,
+                target_addr,
+                *remote_mac,
+            ),
         );
 
         // Check if a neighbor advertisement was sent as a response and the
@@ -5233,7 +5237,7 @@ mod tests {
         let neighbor_ip: UnicastAddr<_> = neighbor_ip.into_addr();
         let dst_ip = Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get();
         let na_packet_buf = |solicited_flag, override_flag| {
-            neighbor_advertisement_ip_packet(
+            icmp::testutil::neighbor_advertisement_ip_packet(
                 *neighbor_ip,
                 dst_ip,
                 false, /* router_flag */
@@ -5597,7 +5601,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&mut ctx, &device);
+        ctx.test_api().enable_device(&device);
 
         let mut tcp_api = ctx.core_api().tcp::<I>();
         let socket = tcp_api.create(tcp::buffer::testutil::ProvidedBuffers::default());
@@ -5654,11 +5658,7 @@ mod tests {
         }
 
         net.with_context("remote", |ctx| {
-            crate::device::testutil::set_forwarding_enabled::<_, I>(
-                ctx,
-                &remote_device.into(),
-                true,
-            );
+            ctx.test_api().set_forwarding_enabled::<I>(&remote_device.into(), true);
         });
 
         let socket = net.with_context("local", |ctx| {
@@ -5707,11 +5707,7 @@ mod tests {
             .insert_static_entry(&device_id, FROM_ADDR.get(), Ipv4::TEST_ADDRS.remote_mac.get())
             .expect("add static NUD entry for FROM_ADDR");
 
-        crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(
-            &mut ctx,
-            &device_id.clone().into(),
-            true,
-        );
+        ctx.test_api().set_forwarding_enabled::<Ipv4>(&device_id.clone().into(), true);
 
         // Receive an IPv4 packet with the per test-case fragment offset value.
         let to = Ipv4::get_other_ip_address(254);

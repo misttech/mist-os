@@ -1066,7 +1066,7 @@ mod tests {
             .unwrap()
             .into_inner();
         let conn = net.with_context(LOCAL_CTX_NAME, |ctx| {
-            crate::device::testutil::enable_device(ctx, &loopback_device_id);
+            ctx.test_api().enable_device(&loopback_device_id);
             let mut socket_api = ctx.core_api().icmp_echo::<I>();
             let conn = socket_api.create();
             if bind_to_device {
