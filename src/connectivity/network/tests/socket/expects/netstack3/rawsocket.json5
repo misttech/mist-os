@@ -6,14 +6,7 @@
         {
             type: "expect_pass",
             matchers: [
-                "RawSocketTest.ProtocolZeroNotSupported",
-                "RawSocketTest.UnsupportedOps",
-                "AllRawSocketTests/RawSocketTest.SockOptSoType/0",
-                "AllRawSocketTests/RawSocketTest.SockOptSoType/1",
-                "AllRawSocketTests/RawSocketTest.SockOptSoType/2",
-                "AllRawSocketTests/RawSocketTest.SockOptSoType/3",
-                "AllRawSocketTests/RawSocketTest.SockOptSoType/4",
-                "AllRawSocketTests/RawSocketTest.SockOptSoType/5",
+                "*",
             ],
         },
         {
