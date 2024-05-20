@@ -24,6 +24,7 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 #include <zircon/errors.h>
 
 #include <cstddef>
@@ -67,7 +68,7 @@ Realm& Realm::AddChild(const std::string& child_name, const std::string& url,
 
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 // The newer definition of LocalComponentKind is incompatible with LocalComponent*.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                             const ChildOptions& options) {
   return AddLocalChildImpl(child_name, LocalComponentKind(local_impl), options);
@@ -82,7 +83,7 @@ Realm& Realm::AddLocalChild(const std::string& child_name, LocalComponentFactory
 Realm& Realm::AddLocalChildImpl(const std::string& child_name, LocalComponentKind local_impl,
                                 const ChildOptions& options) {
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 // Ignore warnings caused by the use of the deprecated `LocalComponent` type as it is part of the
 // implementation that supports the deprecated type.
 #pragma clang diagnostic push
@@ -168,7 +169,7 @@ Realm& Realm::SetConfigValue(const std::string& name, const std::string& key, Co
   return *this;
 }
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
 Realm& Realm::AddConfiguration(std::vector<ConfigCapability> configurations) {
   for (ConfigCapability& c : configurations) {
     fuchsia::component::decl::Configuration config;
@@ -304,7 +305,7 @@ RealmBuilder& RealmBuilder::AddChild(const std::string& child_name, const std::s
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
 // The newer definition of LocalComponentKind, which is a parameter to AddLocalChildImpl(), is
 // incompatible with LocalComponent*.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 RealmBuilder& RealmBuilder::AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                                           const ChildOptions& options) {
   ZX_ASSERT_MSG(!child_name.empty(), "child_name can't be empty");
@@ -351,7 +352,7 @@ RealmBuilder& RealmBuilder::InitMutableConfigToEmpty(const std::string& name) {
   return *this;
 }
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
 RealmBuilder& RealmBuilder::AddConfiguration(std::vector<ConfigCapability> configurations) {
   root_.AddConfiguration(std::move(configurations));
   return *this;

@@ -247,7 +247,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromDictionary) {
 }
 
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 class LocalEchoServerByPtr : public test::placeholders::Echo, public LocalComponent {
  public:
   explicit LocalEchoServerByPtr(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -314,7 +314,7 @@ class LocalEchoServer : public test::placeholders::Echo, public LocalComponentIm
 };
 
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 // Tests and demonstrates that the deprecated AddLocalChild(LocalComponent*)
 // still works.
 //
@@ -1223,7 +1223,7 @@ TEST(RealmBuilderUnittest, PanicsWhenArgsAreNullptr) {
       },
       "");
 
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   ASSERT_DEATH(

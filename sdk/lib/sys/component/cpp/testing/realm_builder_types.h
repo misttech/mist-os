@@ -45,7 +45,7 @@ struct Protocol final {
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<DependencyType> type = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
 };
@@ -57,7 +57,7 @@ struct Service final {
   std::string_view name;
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
 };
@@ -71,7 +71,7 @@ struct Directory final {
   cpp17::optional<std::string_view> subdir = cpp17::nullopt;
   cpp17::optional<fuchsia::io::Operations> rights = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
 };
@@ -222,7 +222,7 @@ using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImpl>(
 
 // Type for either variation of implementation passed to AddLocalChild(): the
 // deprecated raw pointer, or one of the valid callback functions.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 // TODO(https://fxbug.dev/296292544): Remove variant when build support for API level 16 is removed.
 // Ignore warnings caused by the use of the deprecated `LocalComponent` type as it is part of the
 // implementation that supports the deprecated type.

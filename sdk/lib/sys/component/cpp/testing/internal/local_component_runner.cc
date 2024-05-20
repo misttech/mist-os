@@ -170,7 +170,7 @@ void LocalComponentRunner::Start(
   ZX_ASSERT_MSG(ready_components_.erase(name) == 1, "ready component not erased");
 
 // TODO(https://fxbug.dev/296292544): Remove when build support for API level 16 is removed.
-#if __Fuchsia_API_level__ < 17
+#if FUCHSIA_API_LEVEL_LESS_THAN(17)
 // Ignore warnings caused by the use of the deprecated `LocalComponent` type as it is part of the
 // implementation that supports the deprecated type.
 #pragma clang diagnostic push

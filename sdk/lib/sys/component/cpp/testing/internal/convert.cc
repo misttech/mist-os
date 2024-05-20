@@ -6,6 +6,7 @@
 #include <lib/sys/component/cpp/testing/internal/convert.h>
 #include <lib/sys/component/cpp/testing/internal/errors.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
+#include <zircon/availability.h>
 
 namespace component_testing {
 namespace internal {
@@ -104,7 +105,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, path, fidl_capability);
     ZX_COMPONENT_ADD_IF_PRESENT(protocol, type, fidl_capability);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, from_dictionary, fidl_capability);
 #endif
 
@@ -116,7 +117,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     fidl_capability.set_name(std::string(service->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, path, fidl_capability);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, from_dictionary, fidl_capability);
 #endif
 
@@ -131,7 +132,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, subdir, fidl_capability);
     ZX_COMPONENT_ADD_IF_PRESENT(directory, rights, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, path, fidl_capability);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, from_dictionary, fidl_capability);
 #endif
 
@@ -147,7 +148,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
   }
   if ([[maybe_unused]] auto dictionary = cpp17_get_if<Dictionary>(&capability)) {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     fuchsia::component::test::Dictionary fidl_capability;
 
     fidl_capability.set_name(std::string(dictionary->name));
@@ -160,7 +161,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #endif
   }
   if ([[maybe_unused]] auto config = cpp17_get_if<Config>(&capability)) {
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
     fuchsia::component::test::Config fidl_capability;
 
     fidl_capability.set_name(std::string(config->name));
