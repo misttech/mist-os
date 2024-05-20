@@ -10,6 +10,7 @@
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
+#include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
@@ -18,11 +19,13 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/userloader/start.h>
 #include <lib/mistos/userloader/userloader.h>
 #include <lib/mistos/util/strings/split_string.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/mistos/zbi_parser/bootfs.h>
 #include <lib/mistos/zbi_parser/option.h>
 #include <lib/mistos/zbi_parser/zbi.h>
@@ -45,14 +48,11 @@ using namespace util;
 
 namespace starnix {
 
-CurrentTask::CurrentTask(fbl::RefPtr<Task> task) : task_(std::move(task)) {}
-
-const fbl::RefPtr<Task>& CurrentTask::task() const { return task_; }
-fbl::RefPtr<Task> CurrentTask::task() { return task_; }
+CurrentTask::CurrentTask(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
 
 Task* CurrentTask::operator->() const {
-  ASSERT_MSG(task_, "called `operator->()` empty Task");
-  return task_.get();
+  ASSERT_MSG(task, "called `operator->()` empty Task");
+  return task.get();
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(const fbl::RefPtr<Kernel>& kernel,
@@ -60,30 +60,23 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(const fbl::RefP
                                                                  const fbl::String& initial_name,
                                                                  fbl::RefPtr<FsContext> fs) {
   LTRACE;
-  Guard<Mutex> guard{kernel->pidtable_rw_lock()};
+  auto pids = kernel->pids.Write();
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
                                                   fbl::RefPtr<ProcessGroup> process_group) {
     return create_zircon_process(kernel, {}, pid, process_group, initial_name);
   };
 
-  return create_task_with_pid(kernel, kernel->pids(), pid, initial_name, fs, task_info_factory);
+  return create_task_with_pid(kernel, pids, pid, initial_name, fs, task_info_factory);
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
     const fbl::RefPtr<Kernel>& kernel, const fbl::String& initial_name) {
   LTRACE;
-  fbl::RefPtr<Task> init_task;
-  {
-    fbl::RefPtr<Task> weak_init;
-    {
-      Guard<Mutex> lock(kernel->pidtable_rw_lock());
-      weak_init = kernel->pids().get_task(1);
-    }
-    if (!weak_init) {
-      return fit::error(errno(EINVAL));
-    }
-    init_task = weak_init;
+  util::WeakPtr<Task> weak_init = kernel->pids.Read()->get_task(1);
+  fbl::RefPtr<Task> init_task = weak_init.Lock();
+  if (!init_task) {
+    return fit::error(errno(EINVAL));
   }
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
@@ -100,52 +93,51 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task(const fbl::RefPtr<Kerne
                                                          fbl::RefPtr<FsContext> root_fs,
                                                          TaskInfoFactory&& task_info_factory) {
   LTRACE;
-  pid_t pid;
-  {
-    Guard<Mutex> guard{kernel->pidtable_rw_lock()};
-    pid = kernel->pids().allocate_pid();
-  }
-  return create_task_with_pid(kernel, kernel->pids(), pid, initial_name, root_fs,
-                              task_info_factory);
+  auto pids = kernel->pids.Write();
+  auto pid = pids->allocate_pid();
+  return create_task_with_pid(kernel, pids, pid, initial_name, root_fs, task_info_factory);
 }
 
 template <typename TaskInfoFactory>
 fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
-    const fbl::RefPtr<Kernel>& kernel, PidTable& pids, pid_t pid, const fbl::String& initial_name,
-    fbl::RefPtr<FsContext> root_fs, TaskInfoFactory&& task_info_factory) {
+    const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
+    const fbl::String& initial_name, fbl::RefPtr<FsContext> root_fs,
+    TaskInfoFactory&& task_info_factory) {
   LTRACE;
-  DEBUG_ASSERT(pids.get_task(pid) == nullptr);
+  DEBUG_ASSERT(pids->get_task(pid).Lock() == nullptr);
 
-  fbl::RefPtr<ProcessGroup> process_group;
-  zx_status_t status = ProcessGroup::New(pid, {}, &process_group);
-  if (status != ZX_OK) {
-    return fit::error(errno(from_status_like_fdio(status)));
-  }
-
-  pids.add_process_group(process_group);
+  fbl::RefPtr<ProcessGroup> process_group = ProcessGroup::New(pid, {});
+  pids->add_process_group(process_group);
 
   auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
 
   process_group->insert(task_info.thread_group);
 
-  fbl::RefPtr<Task> task;
-  status = Task::New(pid, initial_name, task_info.thread_group, std::move(task_info.thread),
-                     FdTable::Create(), task_info.memory_manager, root_fs, &task);
-  if (status != ZX_OK) {
-    return fit::error(errno(from_status_like_fdio(status)));
-  }
+  fbl::RefPtr<Task> task =
+      Task::New(pid, initial_name, task_info.thread_group, ktl::move(task_info.thread),
+                FdTable::Create(), task_info.memory_manager, root_fs, Credentials::root());
 
   auto builder = TaskBuilder{task};
+
   // TODO (Herrera) Add fit::defer
   {
-    auto temp_task = builder.task();
-    auto result = builder->thread_group()->add(temp_task);
+    auto temp_task = builder.task;
+    auto result = builder->thread_group->add(temp_task);
     if (result.is_error()) {
       return result.take_error();
     }
+    /*
+    for (resource, limit) in rlimits {
+                builder
+                    .thread_group
+                    .limits
+                    .lock()
+                    .set(*resource, rlimit { rlim_cur: *limit, rlim_max: *limit });
+            }
+    */
 
-    pids.add_task(temp_task);
-    pids.add_thread_group(builder->thread_group());
+    pids->add_task(temp_task);
+    pids->add_thread_group(builder->thread_group);
   }
 
   return fit::ok(builder);
@@ -177,12 +169,9 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const fbl::St
     return resolved_elf.take_error();
   }
 
-  {
-    Guard<Mutex> lock((*this)->thread_group()->tg_rw_lock());
-    if ((*this)->thread_group()->tasks_count() > 1) {
-      // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
-      return fit::error(errno(EINVAL));
-    }
+  if ((*this)->thread_group->read().tasks_count() > 1) {
+    // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
+    return fit::error(errno(EINVAL));
   }
 
   auto err = finish_exec(path, resolved_elf.value());
@@ -230,7 +219,7 @@ fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
     return start_info.take_error();
   }
   auto regs = zx_thread_state_general_regs_t::From(start_info.value());
-  thread_state_.registers = RegisterState::From(regs);
+  thread_state.registers = RegisterState::From(regs);
 
   {
     // Guard<Mutex> lock(task_->task_mutable_state_rw_lock());
@@ -271,11 +260,7 @@ fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
     // TODO: POSIX timers are not preserved.
   */
 
-  {
-    auto tg = task_->thread_group();
-    Guard<Mutex> lock(tg->tg_rw_lock());
-    tg->did_exec() = true;
-  }
+  task->thread_group->write().did_exec = true;
 
   // `prctl(PR_GET_NAME)` and `/proc/self/stat`
   /*
@@ -357,7 +342,7 @@ fit::result<Errno, std::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
       //   directory.
       //
       // See https://man7.org/linux/man-pages/man2/open.2.html
-      auto result = (*this)->files().get_allowing_opath(dir_fd);
+      auto result = (*this)->files.get_allowing_opath(dir_fd);
       if (result.is_error()) {
         return result.take_error();
       }
@@ -679,12 +664,12 @@ fit::result<Errno, NamespaceNode> CurrentTask::lookup_path_from_root(const FsStr
 
 fit::result<Errno, ktl::span<uint8_t>> CurrentTask::read_memory(UserAddress addr,
                                                                 ktl::span<uint8_t>& bytes) const {
-  return task_->mm()->unified_read_memory(*this, addr, bytes);
+  return task->mm()->unified_read_memory(*this, addr, bytes);
 }
 
 fit::result<Errno, size_t> CurrentTask::write_memory(UserAddress addr,
                                                      const ktl::span<const uint8_t>& bytes) const {
-  return task_->mm()->unified_write_memory(*this, addr, bytes);
+  return task->mm()->unified_write_memory(*this, addr, bytes);
 }
 
 }  // namespace starnix

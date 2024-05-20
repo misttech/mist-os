@@ -13,10 +13,7 @@
 namespace starnix {
 
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
-  auto tg = current_task->thread_group();
-
-  Guard<Mutex> lock(tg->tg_rw_lock());
-  return fit::ok(tg->process_group()->leader());
+  return fit::ok(current_task->thread_group->read().process_group->leader);
 }
 
 }  // namespace starnix

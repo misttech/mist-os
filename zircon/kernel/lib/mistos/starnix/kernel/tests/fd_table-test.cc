@@ -22,7 +22,7 @@ using namespace starnix::testing;
 
 fit::result<Errno, FdNumber> add(const CurrentTask& current_task, const FdTable& files,
                                  FileHandle file) {
-  return files.add_with_flags(*current_task.task(), file, FdFlags::empty());
+  return files.add_with_flags(*current_task.task, file, FdFlags::empty());
 }
 
 TEST(FdTable, test_fd_table_install) {

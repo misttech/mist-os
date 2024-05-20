@@ -10,53 +10,32 @@
 #include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix/kernel/task/thread_group_decl.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/zx/process.h>
-
-#include <optional>
 
 #include <fbl/canary.h>
 #include <fbl/recycler.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <ktl/optional.h>
 
 namespace starnix {
 
 /// The mutable state of the ThreadGroup.
 class ThreadGroupMutableState {
  public:
-  using BTreeMapTaskContainer = fbl::WAVLTree<pid_t, fbl::RefPtr<TaskContainer>>;
+  using BTreeMapTaskContainer = fbl::WAVLTree<pid_t, ktl::unique_ptr<TaskContainer>>;
   using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, fbl::RefPtr<ThreadGroup>>;
-
-  ThreadGroupMutableState(const ThreadGroupMutableState&) = delete;
-  ThreadGroupMutableState& operator=(const ThreadGroupMutableState&) = delete;
-
-  ThreadGroupMutableState();
-
-  bool Initialize(std::optional<fbl::RefPtr<ThreadGroup>> parent,
-                  fbl::RefPtr<ProcessGroup> process_group);
-
-  bool terminating() { return terminating_; }
-
-  BTreeMapTaskContainer& tasks() { return tasks_; }
-
-  BTreeMapThreadGroup& children() { return children_; }
-
-  const bool& did_exec() const { return did_exec_; }
-  bool& did_exec() { return did_exec_; }
-
-  pid_t get_ppid();
-
- private:
-  friend class ThreadGroup;
 
   // The parent thread group.
   //
   // The value needs to be writable so that it can be re-parent to the correct subreaper if the
   // parent ends before the child.
-  std::optional<fbl::RefPtr<ThreadGroup>> parent_;
+  ktl::optional<fbl::RefPtr<ThreadGroup>> parent;
 
+ private:
   // The tasks in the thread group.
   //
   // The references to Task is weak to prevent cycles as Task have a Arc reference to their
@@ -65,13 +44,14 @@ class ThreadGroupMutableState {
   // themselves before they are deleted.
   BTreeMapTaskContainer tasks_;
 
+ public:
   // The children of this thread group.
   //
   // The references to ThreadGroup is weak to prevent cycles as ThreadGroup have a Arc reference
   // to their parent.
   // It is still expected that these weak references are always valid, as thread groups must
   // unregister themselves before they are deleted.
-  BTreeMapThreadGroup children_;
+  BTreeMapThreadGroup children;
 
   /// Child tasks that have exited, but not yet been waited for.
   // pub zombie_children: Vec<OwnedRef<ZombieProcess>>,
@@ -93,12 +73,12 @@ class ThreadGroupMutableState {
   // pub is_child_subreaper: bool,
 
   /// The IDs used to perform shell job control.
-  fbl::RefPtr<ProcessGroup> process_group_;
+  fbl::RefPtr<ProcessGroup> process_group;
 
   /// The timers for this thread group (from timer_create(), etc.).
   // pub timers: TimerTable,
 
-  bool did_exec_ = false;
+  bool did_exec = false;
 
   /// Wait queue for updates to `stopped`.
   // pub stopped_waiters: WaitQueue,
@@ -110,7 +90,7 @@ class ThreadGroupMutableState {
 
   // pub leader_exit_info: Option<ProcessExitInfo>,
 
-  bool terminating_ = false;
+  bool terminating = false;
 
   /// The SELinux operations for this thread group.
   // pub selinux_state: Option<SeLinuxThreadGroupState>,
@@ -123,6 +103,23 @@ class ThreadGroupMutableState {
 
   /// Thread groups allowed to trace tasks in this this thread group.
   // pub allowed_ptracers: PtraceAllowedPtracers,
+
+ public:
+  /// impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>>
+  pid_t leader() const;
+
+  pid_t get_ppid() const;
+
+  size_t tasks_count() const { return tasks_.size(); }
+
+ public:
+  ThreadGroupMutableState() = default;
+  ThreadGroupMutableState(ThreadGroup* base, ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                          fbl::RefPtr<ProcessGroup> process_group);
+
+ private:
+  friend class ThreadGroup;
+  ThreadGroup* base_ = nullptr;
 };
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -151,42 +148,8 @@ class ThreadGroupMutableState {
 class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
                     public fbl::WAVLTreeContainable<fbl::RefPtr<ThreadGroup>> {
  public:
-  static zx_status_t New(fbl::RefPtr<Kernel> kernel, zx::process process,
-                         std::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t leader,
-                         fbl::RefPtr<ProcessGroup> process_group, fbl::RefPtr<ThreadGroup>* out);
-
-  fbl::RefPtr<Kernel>& kernel() { return kernel_; }
-
-  pid_t leader() const { return leader_; }
-
-  uint64_t get_rlimit(starnix_uapi::Resource resource) const;
-
-  pid_t get_ppid() TA_REQ(tg_rw_lock_);
-
-  // WAVL-tree Index
-  uint GetKey() const { return leader_; }
-
-  fit::result<Errno> add(fbl::RefPtr<Task> task);
-
-  size_t tasks_count() TA_REQ_SHARED(tg_rw_lock_) { return mutable_state_.tasks().size(); }
-
-  Lock<Mutex>* tg_rw_lock() const TA_RET_CAP(tg_rw_lock_) { return &tg_rw_lock_; }
-
-  bool& did_exec() TA_REQ(tg_rw_lock_) { return mutable_state_.did_exec_; }
-
-  zx::process& process() { return process_; }
-
-  fbl::RefPtr<ProcessGroup> process_group() TA_REQ_SHARED(tg_rw_lock_) {
-    return mutable_state_.process_group_;
-  }
-
- private:
-  ThreadGroup(fbl::RefPtr<Kernel> kernel, zx::process process, pid_t leader);
-
-  fbl::Canary<fbl::magic("TGRP")> canary_;
-
   // The kernel to which this thread group belongs.
-  fbl::RefPtr<Kernel> kernel_;
+  fbl::RefPtr<Kernel> kernel;
 
   /// A handle to the underlying Zircon process object.
   ///
@@ -196,12 +159,12 @@ class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
   /// groups share an address space. To implement that situation, we might
   /// need to break the 1-to-1 mapping between thread groups and zx::process
   /// or teach zx::process to share address spaces.
-  zx::process process_;
+  zx::process process;
 
   /// The lead task of this thread group.
   ///
   /// The lead task is typically the initial thread created in the thread group.
-  pid_t leader_;
+  pid_t leader;
 
   /// The signal actions that are registered for this process.
   // pub signal_actions: Arc<SignalActions>,
@@ -214,15 +177,16 @@ class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
   /// Must only be set when the `mutable_state` write lock is held.
   // stop_state: AtomicStopState,
 
-  mutable DECLARE_MUTEX(ThreadGroup) tg_rw_lock_;
+ private:
   /// The mutable state of the ThreadGroup.
-  ThreadGroupMutableState mutable_state_ TA_GUARDED(tg_rw_lock_);
+  mutable RwLock<ThreadGroupMutableState> mutable_state_;
 
+ public:
   /// The resource limits for this thread group.  This is outside mutable_state
   /// to avoid deadlocks where the thread_group lock is held when acquiring
   /// the task lock, and vice versa.
   // pub limits: Mutex<ResourceLimits>,
-  mutable StarnixMutex<starnix_uapi::ResourceLimits> limits_;
+  mutable StarnixMutex<starnix_uapi::ResourceLimits> limits;
 
   /// The next unique identifier for a seccomp filter.  These are required to be
   /// able to distinguish identical seccomp filters, which are treated differently
@@ -230,11 +194,37 @@ class ThreadGroup : public fbl::RefCounted<ThreadGroup>,
   /// seccomp filters are also inherited across clone.
   // pub next_seccomp_filter_id: AtomicU64Counter,
 
+ private:
   /// Timer id of ITIMER_REAL.
   // itimer_real_id: TimerId,
 
+ public:
   /// Tasks ptraced by this process
   // pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
+
+  /// impl ThreadGroup
+ public:
+  static fbl::RefPtr<ThreadGroup> New(fbl::RefPtr<Kernel> kernel, zx::process process,
+                                      ktl::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t leader,
+                                      fbl::RefPtr<ProcessGroup> process_group);
+
+  uint64_t get_rlimit(starnix_uapi::Resource resource) const;
+
+  fit::result<Errno> add(fbl::RefPtr<Task> task);
+
+  /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
+  const ThreadGroupMutableState& read() const { return *mutable_state_.Read(); }
+  ThreadGroupMutableState& write() { return *mutable_state_.Write(); }
+
+  // C++
+ public:
+  // WAVL-tree Index
+  uint GetKey() const { return leader; }
+
+ private:
+  ThreadGroup(fbl::RefPtr<Kernel> kernel, zx::process process, pid_t leader,
+              ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+              fbl::RefPtr<ProcessGroup> process_group);
 };
 
 }  // namespace starnix

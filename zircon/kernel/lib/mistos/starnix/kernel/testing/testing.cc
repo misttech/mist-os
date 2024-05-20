@@ -16,9 +16,9 @@
 #include <fbl/ref_ptr.h>
 #include <zxtest/zxtest.h>
 
-namespace {
-
 using namespace starnix;
+
+namespace {
 
 // Creates a `Kernel`, `Task`, and `Locked<Unlocked>` for testing purposes.
 //
@@ -27,14 +27,10 @@ std::tuple<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_fs_and_selinux(
     std::function<FileSystemHandle(const fbl::RefPtr<Kernel>&)> create_fs/*,
     security_server: Option<Arc<SecurityServer>>*/) {
-  fbl::RefPtr<Kernel> kernel;
-  ASSERT(Kernel::New("", &kernel) == ZX_OK);
+  fbl::RefPtr<Kernel> kernel = Kernel::New("").value_or(fbl::RefPtr<Kernel>());
+  ASSERT_MSG(kernel, "failed to create kernel");
 
-  pid_t init_pid;
-  {
-    Guard<Mutex> guard{kernel->pidtable_rw_lock()};
-    init_pid = kernel->pids().allocate_pid();
-  }
+  auto init_pid = kernel->pids.Write()->allocate_pid();
   ASSERT(init_pid == 1);
   auto fs = FsContext::New(create_fs(kernel));
   auto init_task = CurrentTask::create_init_process(kernel, init_pid, "test-task", fs);
@@ -51,8 +47,6 @@ create_kernel_task_and_unlocked() {
 }  // namespace
 
 namespace starnix::testing {
-
-using namespace starnix;
 
 std::tuple<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
   return create_kernel_task_and_unlocked();

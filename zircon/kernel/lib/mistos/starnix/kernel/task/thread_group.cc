@@ -1,4 +1,5 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -20,65 +21,53 @@
 
 namespace starnix {
 
-ThreadGroupMutableState::ThreadGroupMutableState() = default;
+ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
+                                                 ktl::optional<fbl::RefPtr<ThreadGroup>> _parent,
+                                                 fbl::RefPtr<ProcessGroup> _process_group)
+    : parent(ktl::move(_parent)), process_group(ktl::move(_process_group)), base_(base) {}
 
-bool ThreadGroupMutableState::Initialize(std::optional<fbl::RefPtr<ThreadGroup>> parent,
-                                         fbl::RefPtr<ProcessGroup> process_group) {
-  parent_ = parent;
-  process_group_ = process_group;
-  return true;
-}
+pid_t ThreadGroupMutableState::leader() const { return base_->leader; }
 
-uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {
-  return limits_.Lock()->get(resource).rlim_cur;
-}
-
-pid_t ThreadGroup::get_ppid() {
-  if (mutable_state_.parent_.has_value()) {
-    return mutable_state_.parent_.value()->leader();
+pid_t ThreadGroupMutableState::get_ppid() const {
+  if (parent.has_value()) {
+    return parent.value()->leader;
   }
   return leader();
 }
 
-zx_status_t ThreadGroup::New(fbl::RefPtr<Kernel> kernel, zx::process process,
-                             std::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t leader,
-                             fbl::RefPtr<ProcessGroup> process_group,
-                             fbl::RefPtr<ThreadGroup>* out) {
+fbl::RefPtr<ThreadGroup> ThreadGroup::New(fbl::RefPtr<Kernel> kernel, zx::process process,
+                                          ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                                          pid_t leader, fbl::RefPtr<ProcessGroup> process_group) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<ThreadGroup> thread_group =
-      fbl::AdoptRef(new (&ac) ThreadGroup(kernel, std::move(process), leader));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  {
-    Guard<Mutex> lock(thread_group->tg_rw_lock());
-    thread_group->mutable_state_.Initialize(parent, process_group);
-  }
+  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(
+      new (&ac) ThreadGroup(kernel, std::move(process), leader, parent, process_group));
+  ASSERT(ac.check());
 
   if (parent.has_value()) {
     //  parent.value()->mutable_state_->children().insert()
   }
 
-  *out = std::move(thread_group);
-  return ZX_OK;
+  return ktl::move(thread_group);
 }
 
-ThreadGroup::ThreadGroup(fbl::RefPtr<Kernel> kernel, zx::process process, pid_t leader)
-    : kernel_(std::move(kernel)), process_(std::move(process)), leader_(leader) {}
+uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {
+  return limits.Lock()->get(resource).rlim_cur;
+}
+
+ThreadGroup::ThreadGroup(fbl::RefPtr<Kernel> _kernel, zx::process _process, pid_t _leader,
+                         ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                         fbl::RefPtr<ProcessGroup> process_group)
+    : kernel(ktl::move(_kernel)), process(ktl::move(_process)), leader(_leader) {
+  *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, parent, process_group));
+}
 
 fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) {
-  Guard<Mutex> lock(&tg_rw_lock_);
-  if (mutable_state_.terminating()) {
+  auto& state = this->write();
+  if (state.terminating) {
     return fit::error(errno(EINVAL));
   }
 
-  fbl::AllocChecker ac;
-  mutable_state_.tasks().insert(
-      fbl::MakeRefCountedChecked<TaskContainer>(&ac, task->persistent_info()));
-  if (!ac.check()) {
-    return fit::error(errno(ENOMEM));
-  }
+  state.tasks_.insert(TaskContainer::From(task));
   return fit::ok();
 }
 

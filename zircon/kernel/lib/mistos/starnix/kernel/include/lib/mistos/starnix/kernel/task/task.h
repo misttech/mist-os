@@ -5,17 +5,21 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
 
+#include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
 #include <lib/mistos/starnix_uapi/auth.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/mistos/zx/thread.h>
 
 #include <utility>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/canary.h>
 #include <fbl/ref_counted.h>
+#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 #include <kernel/mutex.h>
@@ -54,14 +58,6 @@ class ExitStatus {
 
 class TaskMutableState {
  public:
-  TaskMutableState(const TaskMutableState&) = delete;
-  TaskMutableState& operator=(const TaskMutableState&) = delete;
-
-  TaskMutableState() = default;
-
-  bool Initialize();
-
- private:
   // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
   // pub clear_child_tid: UserRef<pid_t>,
 
@@ -69,9 +65,11 @@ class TaskMutableState {
   /// signal sending and delivery.
   // pub signals: SignalState,
 
+ private:
   // The exit status that this task exited with.
   ktl::optional<ExitStatus> exit_status_;
 
+ public:
   /// Desired scheduler policy for the task.
   // pub scheduler_policy: SchedulerPolicy,
 
@@ -122,6 +120,9 @@ class TaskMutableState {
   /// Information that a tracer needs to communicate with this process, if it
   /// is being traced.
   // pub ptrace: Option<PtraceState>,
+
+ public:
+  // TaskMutableState(const TaskMutableState&) = delete;
 };
 
 enum class TaskStateCode {
@@ -138,7 +139,11 @@ enum class TaskStateCode {
   Zombie
 };
 
-struct TaskPersistentInfoState {
+class TaskPersistentInfoState;
+using TaskPersistentInfo = StarnixMutex<fbl::RefPtr<TaskPersistentInfoState>>;
+
+class TaskPersistentInfoState : public fbl::RefCounted<TaskPersistentInfoState> {
+ private:
   /// Immutable information about the task
   pid_t tid_;
   pid_t pid_;
@@ -147,27 +152,37 @@ struct TaskPersistentInfoState {
   fbl::String command_;
 
   /// The security credentials for this task.
-  Credentials creds;
+  Credentials creds_;
 
   /// The signal this task generates on exit.
   // exit_signal: Option<Signal>,
-};
 
-class TaskPersistentInfoLock : public fbl::RefCounted<TaskPersistentInfoLock> {
  public:
-  TaskPersistentInfoLock(TaskPersistentInfoState state) : state_(std::move(state)) {}
+  /// impl TaskPersistentInfoState
+  static TaskPersistentInfo New(pid_t tid, pid_t pid, fbl::String command,
+                                Credentials creds /*, exit_signal: Option<Signal>*/);
 
-  const TaskPersistentInfoState& state() const { return state_; }
-  TaskPersistentInfoState& state() { return state_; }
+  pid_t tid() const { return tid_; }
 
-  Lock<Mutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  pid_t pid() const { return pid_; }
+
+  fbl::String command() const { return command_; }
+
+  Credentials creds() const { return creds_; }
+
+  Credentials& creds_mut() { return creds_; }
+
+  /*
+  pub fn exit_signal(&self) -> &Option<Signal> {
+        &self.exit_signal
+    }
+  */
 
  private:
-  mutable DECLARE_MUTEX(TaskPersistentInfoLock) lock_;
-  TaskPersistentInfoState state_ TA_GUARDED(lock_);
+  TaskPersistentInfoState(pid_t tid, pid_t pid, fbl::String command, Credentials creds
+                          /*, exit_signal: Option<Signal>*/)
+      : tid_(tid), pid_(pid), command_(ktl::move(command)), creds_(std::move(creds)) {}
 };
-
-using TaskPersistentInfo = fbl::RefPtr<TaskPersistentInfoLock>;
 
 class MemoryManager;
 
@@ -195,109 +210,47 @@ class MemoryManager;
 /// See also `CurrentTask`, which represents the task corresponding to the thread that is currently
 /// executing.
 
-class Task : public fbl::RefCounted<Task> {
+class Task : public fbl::RefCountedUpgradeable<Task> {
  public:
-  const fbl::RefPtr<Kernel>& kernel() const;
-
-  /// Internal function for creating a Task object. Useful when you need to specify the value of
-  /// every field. create_process and create_thread are more likely to be what you want.
-  ///
-  /// Any fields that should be initialized fresh for every task, even if the task was created
-  /// with fork, are initialized to their defaults inside this function. All other fields are
-  /// passed as parameters.
-  static zx_status_t New(pid_t pid, const fbl::String& command,
-                         fbl::RefPtr<ThreadGroup> thread_group, ktl::optional<zx::thread> thread,
-                         FdTable files, fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
-                         fbl::RefPtr<Task>* out);
-
-  const fbl::RefPtr<FsContext>& fs() const;
-  const fbl::RefPtr<MemoryManager>& mm() const;
-
-  Credentials creds() const {
-    Guard<Mutex> lock(persistent_info_->lock());
-    return persistent_info_->state().creds;
-  }
-
-  /*
-    pub fn exit_signal(&self) -> Option<Signal> {
-        self.persistent_info.lock().exit_signal
-    }
-  */
-
-  void set_creds(Credentials creds) const {
-    Guard<Mutex> lock(persistent_info_->lock());
-    persistent_info_->state().creds = creds;
-  }
-
-  fbl::RefPtr<Task> get_task(pid_t pid);
-  pid_t get_pid() const;
-  pid_t get_tid() const;
-  bool is_leader() const { return get_pid() == get_tid(); }
-
-  // ucred as_ucred() const;
-  FsCred as_fscred() const { return creds().as_fscred(); }
-
-  // Acessors
-  TaskPersistentInfo persistent_info() { return persistent_info_; }
-  const fbl::RefPtr<ThreadGroup>& thread_group() const;
-  FdTable& files() { return files_; }
-
-  Lock<Mutex>* task_mutable_state_rw_lock() const TA_RET_CAP(task_mutable_state_rw_lock_) {
-    return &task_mutable_state_rw_lock_;
-  }
-
-  Lock<Mutex>* thread_rw_lock() const TA_RET_CAP(thread_rw_lock_) { return &thread_rw_lock_; }
-
-  // TaskMutableState& mutable_state() { return &mutable_state_; }
-
-  ktl::optional<zx::thread>& thread() { return thread_; }
-
-  ~Task();
-
- private:
-  Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group, ktl::optional<zx::thread> thread,
-       FdTable files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
-       ktl::optional<fbl::RefPtr<FsContext>> fs, TaskPersistentInfoState persistent_info);
-
-  fbl::Canary<fbl::magic("TASK")> canary_;
-
   // A unique identifier for this task.
   //
   // This value can be read in userspace using `gettid(2)`. In general, this value
   // is different from the value return by `getpid(2)`, which returns the `id` of the leader
   // of the `thread_group`.
-  pid_t id_;
+  pid_t id;
 
   // The thread group to which this task belongs.
   //
   // The group of tasks in a thread group roughly corresponds to the userspace notion of a
   // process.
-  fbl::RefPtr<ThreadGroup> thread_group_;
+  fbl::RefPtr<ThreadGroup> thread_group;
 
   // A handle to the underlying Zircon thread object.
   //
   // Some tasks lack an underlying Zircon thread. These tasks are used internally by the
   // Starnix kernel to track background work, typically on a `kthread`.
-  mutable DECLARE_MUTEX(Task) thread_rw_lock_;
-  ktl::optional<zx::thread> thread_ TA_GUARDED(thread_rw_lock_);
+  mutable RwLock<ktl::optional<zx::thread>> thread;
 
   // The file descriptor table for this task.
   //
   // This table can be share by many tasks.
-  FdTable files_;
+  FdTable files;
 
+ private:
   // The memory manager for this task.
   ktl::optional<fbl::RefPtr<MemoryManager>> mm_;
 
   // The file system for this task.
   ktl::optional<fbl::RefPtr<FsContext>> fs_;
 
+ public:
   /// The namespace for abstract AF_UNIX sockets for this task.
   // pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
 
   /// The namespace for AF_VSOCK for this task.
   // pub abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
+ private:
   /// The stop state of the task, distinct from the stop state of the thread group.
   ///
   /// Must only be set when the `mutable_state` write lock is held.
@@ -309,14 +262,14 @@ class Task : public fbl::RefCounted<Task> {
   // flags: AtomicTaskFlags,
 
   // The mutable state of the Task.
-  mutable DECLARE_MUTEX(Task) task_mutable_state_rw_lock_;
-  TaskMutableState mutable_state_ TA_GUARDED(task_mutable_state_rw_lock_);
+  mutable RwLock<TaskMutableState> mutable_state_;
 
+ public:
   // The information of the task that needs to be available to the `ThreadGroup` while computing
   // which process a wait can target.
   // Contains the command line, the task credentials and the exit signal.
   // See `TaskPersistentInfo` for more information.
-  TaskPersistentInfo persistent_info_;
+  mutable TaskPersistentInfo persistent_info;
 
   /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
   /// It allows the calling task to block until the fork has been completed. Only populated
@@ -332,6 +285,64 @@ class Task : public fbl::RefCounted<Task> {
 
   /// Tell you whether you are tracing syscall entry / exit without a lock.
   // pub trace_syscalls: AtomicBool,
+
+ public:
+  /// impl Task
+  const fbl::RefPtr<Kernel>& kernel() const;
+
+  /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
+  static fit::result<Errno, fbl::RefPtr<Task>> from_weak(util::WeakPtr<Task> weak) {
+    fbl::RefPtr<Task> task = weak.Lock();
+    if (!task) {
+      return fit::error(errno(ESRCH));
+    }
+    return fit::ok(task);
+  }
+
+  /// Internal function for creating a Task object. Useful when you need to specify the value of
+  /// every field. create_process and create_thread are more likely to be what you want.
+  ///
+  /// Any fields that should be initialized fresh for every task, even if the task was created
+  /// with fork, are initialized to their defaults inside this function. All other fields are
+  /// passed as parameters.
+  static fbl::RefPtr<Task> New(pid_t pid, const fbl::String& command,
+                               fbl::RefPtr<ThreadGroup> thread_group,
+                               ktl::optional<zx::thread> thread, FdTable files,
+                               fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
+                               Credentials creds);
+
+  Credentials creds() const { return (*persistent_info.Lock())->creds(); }
+
+  /*
+    pub fn exit_signal(&self) -> Option<Signal> {
+        self.persistent_info.lock().exit_signal
+    }
+  */
+
+  const fbl::RefPtr<FsContext>& fs() const;
+
+  const fbl::RefPtr<MemoryManager>& mm() const;
+
+  util::WeakPtr<Task> get_task(pid_t pid);
+
+  pid_t get_pid() const;
+
+  pid_t get_tid() const;
+
+  bool is_leader() const { return get_pid() == get_tid(); }
+
+  // ucred as_ucred() const;
+
+  FsCred as_fscred() const { return creds().as_fscred(); }
+
+  // C++
+ public:
+  ~Task();
+
+ private:
+  Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group, ktl::optional<zx::thread> thread,
+       FdTable files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
+       ktl::optional<fbl::RefPtr<FsContext>> fs);
 };
 
 // NOTE: This class originaly was in thread_group.rs
@@ -340,18 +351,26 @@ class Task : public fbl::RefCounted<Task> {
 /// moment where the task is not yet released, yet the weak pointer is not upgradeable anymore.
 /// During this time, it is still necessary to access the persistent info to compute the state of
 /// the thread for the different wait syscalls.
-class TaskContainer : public fbl::RefCounted<TaskContainer>,
-                      public fbl::WAVLTreeContainable<fbl::RefPtr<TaskContainer>> {
+class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContainer>> {
  public:
-  TaskContainer(TaskPersistentInfo info) : info_(std::move(info)) {}
+  static ktl::unique_ptr<TaskContainer> From(fbl::RefPtr<Task> task) {
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<TaskContainer> ptr = ktl::unique_ptr<TaskContainer>(
+        new (&ac) TaskContainer(util::WeakPtr<Task>(task.get()), task->persistent_info));
+    ASSERT(ac.check());
+    return ptr;
+  }
 
   // WAVL-tree Index
-  uint GetKey() const { return info_->state().tid_; }
+  uint GetKey() const { return (*info_.Lock())->tid(); }
 
  private:
-  // TODO WEAK_REF
-  // fbl::RefPtr<Task> task;
-  TaskPersistentInfo info_;
+  TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info) : weak_(ktl::move(weak)) {
+    *info_.Lock() = fbl::RefPtr<TaskPersistentInfoState>(info.Lock()->get());
+  }
+
+  util::WeakPtr<Task> weak_;
+  mutable TaskPersistentInfo info_;
 };
 
 }  // namespace starnix

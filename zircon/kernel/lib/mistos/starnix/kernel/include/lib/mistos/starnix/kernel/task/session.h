@@ -6,7 +6,9 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
+#include <lib/mistos/starnix/kernel/task/process_group.h>
 
 #include <fbl/canary.h>
 #include <fbl/intrusive_wavl_tree.h>
@@ -17,15 +19,7 @@
 
 namespace starnix {
 
-class SessionMutableState {
- public:
-  SessionMutableState(const SessionMutableState&) = delete;
-  SessionMutableState& operator=(const SessionMutableState&) = delete;
-
-  SessionMutableState();
-
-  bool Initialize();
-
+struct SessionMutableState {
  private:
   /// The process groups in the session
   ///
@@ -35,6 +29,7 @@ class SessionMutableState {
   // process_groups: BTreeMap<pid_t, Weak<ProcessGroup>>,
   fbl::WAVLTree<pid_t, fbl::RefPtr<ProcessGroup>> process_groups_;
 
+ public:
   /// The controlling terminal of the session.
   // pub controlling_terminal: Option<ControllingTerminal>,
 };
@@ -53,21 +48,20 @@ class SessionMutableState {
 /// session are destroyed.
 class Session : public fbl::RefCounted<Session> {
  public:
-  pid_t leader() const { return leader_; }
-
-  static zx_status_t Create(pid_t leader, fbl::RefPtr<Session>* out);
+  /// The leader of the session
+  pid_t leader;
 
  private:
-  Session(pid_t leader) : leader_(leader) {}
-
-  fbl::Canary<fbl::magic("SESS")> canary_;
-
-  // The leader of the session
-  pid_t leader_;
-
-  DECLARE_MUTEX(SessionMutableState) session_mutable_state_rw_lock_;
   // The mutable state of the Session.
-  SessionMutableState mutable_state_ TA_GUARDED(session_mutable_state_rw_lock_);
+  mutable RwLock<SessionMutableState> mutable_state_;
+
+ public:
+  /// impl Session
+  static fbl::RefPtr<Session> New(pid_t _leader);
+
+  // C++
+ private:
+  Session(pid_t _leader) : leader(_leader) {}
 };
 
 }  // namespace starnix

@@ -32,8 +32,8 @@ TEST(MemoryManager, test_brk) {
   auto mm = current_task->mm();
 
   auto get_range = [&mm](const UserAddress& addr) -> util::Range<UserAddress> {
-    Guard<Mutex> lock(mm->mm_state_rw_lock());
-    if (auto opt = mm->state().mappings().get(addr); opt) {
+    auto state = mm->state.Read();
+    if (auto opt = state->mappings.get(addr); opt) {
       return opt->first;
     }
     EXPECT_TRUE(true, "failed to find mapping");
@@ -98,8 +98,8 @@ TEST(MemoryManager, test_mm_exec) {
   auto mm = current_task->mm();
 
   auto has = [&mm](UserAddress addr) -> bool {
-    Guard<Mutex> lock(mm->mm_state_rw_lock());
-    return mm->state().mappings().get(addr).has_value();
+    auto state = mm->state.Read();
+    return state->mappings.get(addr).has_value();
   };
 
   auto brk_addr = mm->set_brk(*current_task, 0);
@@ -142,21 +142,21 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
   ASSERT_EQ(map_memory(*current_task, addr_d, PAGE_SIZE).ptr(), addr_d);
 
   {
-    Guard<Mutex> lock(mm->mm_state_rw_lock());
+    auto mm_state = mm->state.Read();
+
     // Verify that requesting an unmapped address returns an empty iterator.
-    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a - 100, 50)->is_empty());
-    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a - 100, 200)->is_empty());
+    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100, 50)->is_empty());
+    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a - 100, 200)->is_empty());
 
     // Verify that requesting zero bytes returns an empty iterator.
-    ASSERT_TRUE(mm->state().get_contiguous_mappings_at(addr_a, 0)->is_empty());
+    ASSERT_TRUE(mm_state->get_contiguous_mappings_at(addr_a, 0)->is_empty());
 
     // Verify errors
     ASSERT_EQ(errno(EFAULT),
-              mm->state().get_contiguous_mappings_at(UserAddress(100), SIZE_MAX).error_value());
+              mm_state->get_contiguous_mappings_at(UserAddress(100), SIZE_MAX).error_value());
 
-    ASSERT_EQ(
-        errno(EFAULT),
-        mm->state().get_contiguous_mappings_at(mm->state().max_address() + 1ul, 0).error_value());
+    ASSERT_EQ(errno(EFAULT),
+              mm_state->get_contiguous_mappings_at(mm_state->max_address() + 1ul, 0).error_value());
   }
 
 #if STARNIX_ANON_ALLOCS
@@ -166,13 +166,12 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
   {
     ASSERT_EQ(mm->get_mapping_count(), 4);
 
-    Guard<Mutex> lock(mm->mm_state_rw_lock());
+    auto mm_state = mm->state.Read();
 
-    auto [map_a, map_b, map_c, map_d] =
-        [&mm]() TA_REQ(
-            mm->mm_state_rw_lock_) -> std::tuple<fbl::RefPtr<Mapping>, fbl::RefPtr<Mapping>,
-                                                 fbl::RefPtr<Mapping>, fbl::RefPtr<Mapping>> {
-      auto map = mm->state().mappings_.iter();
+    auto [map_a, map_b, map_c,
+          map_d] = [&mm_state]() -> std::tuple<fbl::RefPtr<Mapping>, fbl::RefPtr<Mapping>,
+                                               fbl::RefPtr<Mapping>, fbl::RefPtr<Mapping>> {
+      auto map = mm_state->mappings.iter();
       auto it = map.begin();
       return std::make_tuple((*it).second, (*++it).second, (*++it).second, (*++it).second);
     }();
@@ -184,24 +183,23 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     expected.push_back({map_a, page_size}, &ac);
     ASSERT(ac.check());
 
-    ASSERT_EQ(expected[0], mm->state().get_contiguous_mappings_at(addr_a, page_size).value()[0]);
+    ASSERT_EQ(expected[0], mm_state->get_contiguous_mappings_at(addr_a, page_size).value()[0]);
 
     expected.reset();
     expected.push_back({map_a, page_size / 2}, &ac);
     ASSERT(ac.check());
-    ASSERT_EQ(expected[0],
-              mm->state().get_contiguous_mappings_at(addr_a, page_size / 2).value()[0]);
+    ASSERT_EQ(expected[0], mm_state->get_contiguous_mappings_at(addr_a, page_size / 2).value()[0]);
 
     ASSERT_EQ(
         expected[0],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size / 2).value()[0]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size / 2).value()[0]);
 
     expected.reset();
     expected.push_back({map_a, page_size / 8}, &ac);
     ASSERT(ac.check());
     ASSERT_EQ(
         expected[0],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 4, page_size / 8).value()[0]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 4, page_size / 8).value()[0]);
 
     // Verify result when requesting a range spanning more than one mapping.
     expected.reset();
@@ -211,9 +209,9 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     ASSERT(ac.check());
 
     ASSERT_EQ(expected[0],
-              mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[0]);
+              mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[0]);
     ASSERT_EQ(expected[1],
-              mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[1]);
+              mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size).value()[1]);
 
     expected.reset();
     expected.push_back({map_a, page_size / 2}, &ac);
@@ -221,14 +219,12 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     expected.push_back({map_b, page_size}, &ac);
     ASSERT(ac.check());
 
-    ASSERT_EQ(expected[0],
-              mm->state()
-                  .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2)
-                  .value()[0]);
-    ASSERT_EQ(expected[1],
-              mm->state()
-                  .get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2)
-                  .value()[1]);
+    ASSERT_EQ(
+        expected[0],
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2).value()[0]);
+    ASSERT_EQ(
+        expected[1],
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 3 / 2).value()[1]);
 
     expected.reset();
     expected.push_back({map_a, page_size}, &ac);
@@ -237,9 +233,9 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     ASSERT(ac.check());
 
     ASSERT_EQ(expected[0],
-              mm->state().get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value()[0]);
+              mm_state->get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value()[0]);
     ASSERT_EQ(expected[1],
-              mm->state().get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value()[1]);
+              mm_state->get_contiguous_mappings_at(addr_a, page_size * 3 / 2).value()[1]);
 
     expected.reset();
     expected.push_back({map_a, page_size / 2}, &ac);
@@ -251,13 +247,13 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
 
     ASSERT_EQ(
         expected[0],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[0]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[0]);
     ASSERT_EQ(
         expected[1],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[1]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[1]);
     ASSERT_EQ(
         expected[2],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[2]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 2).value()[2]);
 
     expected.reset();
     expected.push_back({map_b, page_size / 2}, &ac);
@@ -265,14 +261,12 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     expected.push_back({map_c, page_size}, &ac);
     ASSERT(ac.check());
 
-    ASSERT_EQ(expected[0],
-              mm->state()
-                  .get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2)
-                  .value()[0]);
-    ASSERT_EQ(expected[1],
-              mm->state()
-                  .get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2)
-                  .value()[1]);
+    ASSERT_EQ(
+        expected[0],
+        mm_state->get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2).value()[0]);
+    ASSERT_EQ(
+        expected[1],
+        mm_state->get_contiguous_mappings_at(addr_b + page_size / 2, page_size * 3 / 2).value()[1]);
 
     // Verify that results stop if there is a hole.
     expected.reset();
@@ -285,21 +279,20 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
 
     ASSERT_EQ(
         expected[0],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[0]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[0]);
     ASSERT_EQ(
         expected[1],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[1]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[1]);
     ASSERT_EQ(
         expected[2],
-        mm->state().get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[2]);
+        mm_state->get_contiguous_mappings_at(addr_a + page_size / 2, page_size * 10).value()[2]);
 
     // Verify that results stop at the last mapped page.
     expected.reset();
     expected.push_back({map_d, page_size}, &ac);
     ASSERT(ac.check());
 
-    ASSERT_EQ(expected[0],
-              mm->state().get_contiguous_mappings_at(addr_d, page_size * 10).value()[0]);
+    ASSERT_EQ(expected[0], mm_state->get_contiguous_mappings_at(addr_d, page_size * 10).value()[0]);
   }
 #endif
 }
@@ -377,8 +370,7 @@ TEST(MemoryManager, test_unmap_returned_mappings) {
   auto addr = map_memory(*current_task, 0, PAGE_SIZE * 2);
 
   fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
-  Guard<Mutex> lock(mm->mm_state_rw_lock());
-  auto unmap_result = mm->state().unmap(addr, PAGE_SIZE, released_mappings);
+  auto unmap_result = mm->state.Write()->unmap(addr, PAGE_SIZE, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(released_mappings.size(), 1);
 }
@@ -391,8 +383,7 @@ TEST(MemoryManager, test_unmap_returns_multiple_mappings) {
   map_memory(*current_task, addr.ptr() + 2 * PAGE_SIZE, PAGE_SIZE);
 
   fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
-  Guard<Mutex> lock(mm->mm_state_rw_lock());
-  auto unmap_result = mm->state().unmap(addr, PAGE_SIZE * 3, released_mappings);
+  auto unmap_result = mm->state.Write()->unmap(addr, PAGE_SIZE * 3, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(released_mappings.size(), 2);
 }

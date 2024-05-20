@@ -13,6 +13,8 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
+#include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/mistos/zx/job.h>
 #include <lib/mistos/zx/process.h>
 #include <lib/mistos/zx/thread.h>
@@ -46,18 +48,13 @@ fit::result<zx_status_t, TaskInfo> create_zircon_process(
   }
   auto [process, root_vmar] = std::move(result.value());
 
-  fbl::RefPtr<MemoryManager> memory_manager;
-  zx_status_t status = MemoryManager::New(std::move(root_vmar), &memory_manager);
-  if (status != ZX_OK) {
-    return fit::error(status);
+  auto new_result = MemoryManager::New(ktl::move(root_vmar));
+  if (new_result.is_error()) {
+    return fit::error(from_status_like_fdio(result.error_value()));
   }
+  fbl::RefPtr<MemoryManager> memory_manager = new_result.value();
 
-  fbl::RefPtr<ThreadGroup> thread_group;
-  status = ThreadGroup::New(kernel, std::move(process), parent, pid, process_group, &thread_group);
-  if (status != ZX_OK) {
-    return fit::error(status);
-  }
-
+  auto thread_group = ThreadGroup::New(kernel, ktl::move(process), parent, pid, process_group);
   return fit::ok(TaskInfo{{}, thread_group, memory_manager});
 }
 
@@ -94,9 +91,9 @@ fit::result<zx_status_t, zx::thread> create_thread(const zx::process& parent,
 fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
   LTRACE;
   // Start the process going.
-  auto& thread = current_task->thread();
+  auto& thread = *current_task->thread.Read();
   if (thread.has_value()) {
-    auto& process = current_task->thread_group()->process();
+    auto& process = current_task->thread_group->process;
 
     ProcessDispatcher* up = nullptr;
     bool is_kernel_space = ThreadDispatcher::GetCurrent() == nullptr;
@@ -118,7 +115,7 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
     // Make task handle
     KernelHandle<TaskDispatcher> task_handle;
     zx_rights_t task_rights;
-    status = TaskDispatcher::Create(current_task.task(), &task_handle, &task_rights);
+    status = TaskDispatcher::Create(current_task.task, &task_handle, &task_rights);
     if (status != ZX_OK) {
       TRACEF("failed to create task dispatcher %d\n", status);
       return fit::error(status);
@@ -128,17 +125,16 @@ fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
     // When running from kernel (bootstrapping) we need to transfer handles
     if (is_kernel_space) {
       // Transfer handles to child process
-      Guard<Mutex> lock(current_task->mm()->mm_state_rw_lock());
+      auto state = current_task->mm()->state.Write();
 
       zx_handle_t new_handle;
-      TransferHandle<VmAddressRegionDispatcher>(
-          process.get(), current_task->mm()->state().user_vmar().get(), &new_handle);
+      TransferHandle<VmAddressRegionDispatcher>(process.get(), state->user_vmar.get(), &new_handle);
 
-      current_task->mm()->state().user_vmar().reset(new_handle);
+      state->user_vmar.reset(new_handle);
     }
 
-    status = process.start(thread.value(), current_task.thread_state().registers.real_registers.rip,
-                           current_task.thread_state().registers.real_registers.rsp, {}, 0);
+    status = process.start(thread.value(), current_task.thread_state.registers.real_registers.rip,
+                           current_task.thread_state.registers.real_registers.rsp, {}, 0);
     if (status != ZX_OK) {
       TRACEF("failed to start process %d\n", status);
       return fit::error(status);
@@ -167,7 +163,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRun pre_run,
   LTRACE;
   execute_task(
       task_builder,
-      [pre_run = std::move(pre_run)](CurrentTask& init_task) -> fit::result<Errno> {
+      [pre_run = ktl::move(pre_run)](CurrentTask& init_task) -> fit::result<Errno> {
         if (auto pre_run_result = pre_run(init_task); pre_run_result.is_error()) {
           return pre_run_result.take_error();
         }
@@ -183,9 +179,11 @@ void execute_task(TaskBuilder task_builder, PreRun pre_run,
   // Set the process handle to the new task's process, so the new thread is spawned in that
   // process.
 
+  auto weak_task = util::WeakPtr<Task>(task_builder.task.get());
+  auto ref_task = weak_task.Lock();
+
   // Hold a lock on the task's thread slot until we have a chance to initialize it.
-  auto ref_task = task_builder.task();
-  Guard<Mutex> lock(ref_task->thread_rw_lock());
+  // auto task_thread_guard = ref_task->thread.Write();
 
 #if 0
   // create a thread to complete task initialization
@@ -222,10 +220,10 @@ void execute_task(TaskBuilder task_builder, PreRun pre_run,
     TRACEF("Pre run failed from %d. The task will not be run.",
            pre_run_result.error_value().error_code());
   } else {
-    auto init_thread = create_thread(current_task->thread_group()->process(), "user-thread");
+    auto init_thread = create_thread(current_task->thread_group->process, "user-thread");
     if (!init_thread.is_error()) {
       // Spawn the process' thread.
-      current_task->thread() = std::move(init_thread.value());
+      *ref_task->thread.Write() = ktl::move(init_thread.value());
       auto exit_code = run_task(current_task);
       if (exit_code.is_error()) {
         TRACEF("Failed to run task %d\n", exit_code.error_value());

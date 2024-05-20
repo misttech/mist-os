@@ -4,6 +4,7 @@
 
 #include "lib/mistos/starnix/kernel/task/kernel.h"
 
+#include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
@@ -13,16 +14,15 @@
 
 namespace starnix {
 
-zx_status_t Kernel::New(fbl::String cmdline, fbl::RefPtr<Kernel>* out) {
+fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(fbl::String cmdline) {
   fbl::AllocChecker ac;
 
   fbl::RefPtr<Kernel> kernel = fbl::AdoptRef(new (&ac) Kernel(cmdline));
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return fit::error(ZX_ERR_NO_MEMORY);
   }
 
-  *out = std::move(kernel);
-  return ZX_OK;
+  return fit::ok(ktl::move(kernel));
 }
 
 }  // namespace starnix

@@ -538,20 +538,17 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
     return stack_result.take_error();
   }
 
-  {
-    Guard<Mutex> lock(current_task->mm()->mm_state_rw_lock());
-    auto& state = current_task->mm()->state();
-    state->stack_base = stack_base.value();
-    state->stack_size = stack_size_result.value();
-    state->stack_start = stack_result->stack_pointer;
-    state->auxv_start = stack_result->auxv_start;
-    state->auxv_end = stack_result->auxv_end;
-    state->argv_start = stack_result->argv_start;
-    state->argv_end = stack_result->argv_end;
-    state->environ_start = stack_result->environ_start;
-    state->environ_end = stack_result->environ_end;
-    // mm_state.vdso_base = vdso_base;
-  }
+  auto mm_state = current_task->mm()->state.Write();
+  (*mm_state)->stack_base = stack_base.value();
+  (*mm_state)->stack_size = stack_size_result.value();
+  (*mm_state)->stack_start = stack_result->stack_pointer;
+  (*mm_state)->auxv_start = stack_result->auxv_start;
+  (*mm_state)->auxv_end = stack_result->auxv_end;
+  (*mm_state)->argv_start = stack_result->argv_start;
+  (*mm_state)->argv_end = stack_result->argv_end;
+  (*mm_state)->environ_start = stack_result->environ_start;
+  (*mm_state)->environ_end = stack_result->environ_end;
+  // mm_state.vdso_base = vdso_base;
 
   return fit::ok(ThreadStartInfo{entry, stack_result->stack_pointer});
 }

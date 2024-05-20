@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
@@ -209,17 +210,34 @@ class Mapping : public fbl::RefCounted<Mapping> {
   // file_write_guard: FileWriteGuardRef,
 };
 
-class MemoryManagerState {
+struct MemoryManagerState {
  public:
-  MemoryManagerState(const MemoryManagerState&) = delete;
-  MemoryManagerState& operator=(const MemoryManagerState&) = delete;
+  // The VMAR in which userspace mappings occur.
+  //
+  // We map userspace memory in this child VMAR so that we can destroy the
+  // entire VMAR during exec.
+  zx::vmar user_vmar;
 
-  MemoryManagerState() = default;
+  // Cached VmarInfo for user_vmar.
+  zx_info_vmar_t user_vmar_info;
 
-  bool Initialize(zx::vmar vmar, zx_info_vmar_t info, MemoryManagerForkableState state);
+  /// The memory mappings currently used by this address space.
+  ///
+  /// The mappings record which VMO backs each address.
+  util::RangeMap<UserAddress, fbl::RefPtr<Mapping>> mappings;
 
-  MemoryManagerForkableState* operator->() { return &forkable_state_; }
+  /// VMO backing private, anonymous memory allocations in this address space.
+  // #[cfg(feature = "alternate_anon_allocs")]
+  // private_anonymous: PrivateAnonymousMemoryManager,
 
+ private:
+  MemoryManagerForkableState forkable_state_;
+
+ public:
+  /// Asynchronous I/O contexts.
+  // pub aio_contexts: AioContexts,
+
+  /// impl MemoryManagerState
   fit::result<Errno, UserAddress> map_anonymous(
       DesiredAddress addr, size_t length, ProtectionFlags prot_flags, MappingOptionsFlags options,
       MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
@@ -237,10 +255,8 @@ class MemoryManagerState {
   fit::result<Errno> unmap(UserAddress, size_t length,
                            fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
 
-  zx::vmar& user_vmar() { return user_vmar_; }
-  const zx::vmar& user_vmar() const { return user_vmar_; }
-
-  const util::RangeMap<UserAddress, fbl::RefPtr<Mapping>>& mappings() const { return mappings_; }
+ public:
+  MemoryManagerForkableState* operator->() { return &forkable_state_; }
 
  private:
   ZXTEST_FRIEND_TEST(MemoryManager, test_get_contiguous_mappings_at);
@@ -293,26 +309,6 @@ class MemoryManagerState {
   /// - `bytes`: The bytes to write to the VMO.
   fit::result<Errno> write_mapping_memory(UserAddress addr, fbl::RefPtr<Mapping>& mapping,
                                           const ktl::span<const uint8_t>& bytes) const;
-
-  // The VMAR in which userspace mappings occur.
-  //
-  // We map userspace memory in this child VMAR so that we can destroy the
-  // entire VMAR during exec.
-  zx::vmar user_vmar_;
-
-  // Cached VmarInfo for user_vmar.
-  zx_info_vmar_t user_vmar_info_;
-
-  /// The memory mappings currently used by this address space.
-  ///
-  /// The mappings record which VMO backs each address.
-  util::RangeMap<UserAddress, fbl::RefPtr<Mapping>> mappings_;
-
-  /// VMO backing private, anonymous memory allocations in this address space.
-  // #[cfg(feature = "alternate_anon_allocs")]
-  // private_anonymous: PrivateAnonymousMemoryManager,
-
-  MemoryManagerForkableState forkable_state_;
 };
 
 class CurrentTask;
@@ -328,8 +324,20 @@ class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccess
   // The base address of the root_vmar.
   UserAddress base_addr;
 
+  /// The futexes in this address space.
+  // pub futex: FutexTable<PrivateFutexKey>,
+
+  // Mutable state for the memory manager.
+  mutable RwLock<MemoryManagerState> state;
+
+  /// Whether this address space is dumpable.
+  // pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,
+
+  /// Maximum valid user address for this vmar.
+  // pub maximum_valid_user_address: UserAddress,
+
  public:
-  static zx_status_t New(zx::vmar root_vmar, fbl::RefPtr<MemoryManager>* out);
+  static fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> New(zx::vmar root_vmar);
 
   // pub fn new_empty() -> Self;
 
@@ -390,31 +398,12 @@ class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccess
   fit::result<Errno, size_t> vmo_write_memory(UserAddress addr,
                                               const ktl::span<const uint8_t>& bytes) const;
 
- public:
-  Lock<Mutex>* mm_state_rw_lock() const TA_RET_CAP(mm_state_rw_lock_) { return &mm_state_rw_lock_; }
-
-  MemoryManagerState& state() TA_REQ(mm_state_rw_lock_) { return state_; }
-  const MemoryManagerState& state() const TA_REQ_SHARED(mm_state_rw_lock_) { return state_; }
-
  private:
   ZXTEST_FRIEND_TEST(MemoryManager, test_get_contiguous_mappings_at);
   ZXTEST_FRIEND_TEST(MemoryManager, test_read_write_crossing_mappings);
   ZXTEST_FRIEND_TEST(MemoryManager, test_read_write_errors);
 
   MemoryManager(zx::vmar root, zx::vmar user_vmar, zx_info_vmar_t user_vmar_info);
-
-  /// The futexes in this address space.
-  // pub futex: FutexTable<PrivateFutexKey>,
-
-  // Mutable state for the memory manager.
-  mutable DECLARE_MUTEX(MemoryManager) mm_state_rw_lock_;
-  mutable MemoryManagerState state_ TA_GUARDED(mm_state_rw_lock_);
-
-  /// Whether this address space is dumpable.
-  // pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,
-
-  /// Maximum valid user address for this vmar.
-  // pub maximum_valid_user_address: UserAddress,
 };
 
 /// Holds the number of _elements_ read by the callback to [`read_to_vec`].

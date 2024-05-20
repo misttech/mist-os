@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -22,44 +23,44 @@
 
 namespace starnix {
 
-bool TaskMutableState::Initialize() { return true; }
-
-zx_status_t Task::New(pid_t id, const fbl::String& command, fbl::RefPtr<ThreadGroup> thread_group,
-                      std::optional<zx::thread> thread, FdTable files,
-                      fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
-                      fbl::RefPtr<Task>* out) {
+TaskPersistentInfo TaskPersistentInfoState::New(
+    pid_t tid, pid_t pid, fbl::String command,
+    Credentials creds /*, exit_signal: Option<Signal>*/) {
   fbl::AllocChecker ac;
-  pid_t pid = thread_group->leader();
-  fbl::RefPtr<Task> task =
-      fbl::AdoptRef(new (&ac) Task(id, thread_group, std::move(thread), files, mm, fs,
-                                   TaskPersistentInfoState{id, pid, command}));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  *out = std::move(task);
-  return ZX_OK;
-}  // namespace starnix
-
-Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group, std::optional<zx::thread> thread,
-           FdTable files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
-           ktl::optional<fbl::RefPtr<FsContext>> fs, TaskPersistentInfoState persistent_info)
-    : id_(id),
-      thread_group_(std::move(thread_group)),
-      thread_(std::move(thread)),
-      files_(files),
-      mm_(std::move(mm)),
-      fs_(std::move(fs)) {
-  mutable_state_.Initialize();
-
-  fbl::AllocChecker ac;
-  persistent_info_ = fbl::MakeRefCountedChecked<TaskPersistentInfoLock>(&ac, persistent_info);
+  auto state = fbl::AdoptRef(new (&ac) TaskPersistentInfoState(tid, pid, command, creds));
   ASSERT(ac.check());
+
+  return TaskPersistentInfo(ktl::move(state));
 }
 
-Task::~Task() {}
+fbl::RefPtr<Task> Task::New(pid_t id, const fbl::String& command,
+                            fbl::RefPtr<ThreadGroup> thread_group, std::optional<zx::thread> thread,
+                            FdTable files, fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
+                            Credentials creds) {
+  fbl::AllocChecker ac;
+  fbl::RefPtr<Task> task =
+      fbl::AdoptRef(new (&ac) Task(id, thread_group, std::move(thread), files, mm, fs));
+  ASSERT(ac.check());
 
-const fbl::RefPtr<ThreadGroup>& Task::thread_group() const { return thread_group_; }
+  pid_t pid = thread_group->leader;
+  task->persistent_info.Lock()->reset(
+      TaskPersistentInfoState::New(id, pid, command, creds).Lock()->get());
+
+  return ktl::move(task);
+}  // namespace starnix
+
+Task::Task(pid_t _id, fbl::RefPtr<ThreadGroup> _thread_group, ktl::optional<zx::thread> _thread,
+           FdTable _files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
+           ktl::optional<fbl::RefPtr<FsContext>> fs)
+    : id(_id),
+      thread_group(ktl::move(_thread_group)),
+      files(_files),
+      mm_(std::move(mm)),
+      fs_(std::move(fs)) {
+  *thread.Write() = ktl::move(_thread);
+}
+
+Task::~Task() = default;
 
 const fbl::RefPtr<FsContext>& Task::fs() const {
   ASSERT_MSG(fs_.has_value(), "fs must be set");
@@ -71,15 +72,12 @@ const fbl::RefPtr<MemoryManager>& Task::mm() const {
   return mm_.value();
 }
 
-const fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group_->kernel(); }
+const fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel; }
 
-fbl::RefPtr<Task> Task::get_task(pid_t pid) {
-  Guard<Mutex> lock(kernel()->pidtable_rw_lock());
-  return kernel()->pids().get_task(pid);
-}
+util::WeakPtr<Task> Task::get_task(pid_t pid) { return kernel()->pids.Read()->get_task(pid); }
 
-pid_t Task::get_pid() const { return thread_group_->leader(); }
+pid_t Task::get_pid() const { return thread_group->leader; }
 
-pid_t Task::get_tid() const { return id_; }
+pid_t Task::get_tid() const { return id; }
 
 }  // namespace starnix

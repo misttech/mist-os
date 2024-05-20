@@ -8,17 +8,19 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
+#include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/util/weak_wrapper.h>
 
 #include <linux/errno.h>
 
 namespace {
 
-fbl::RefPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
-                                               pid_t pid) {
+util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
+                                                 pid_t pid) {
   if (pid == 0) {
-    return current_task.task();
+    return current_task.weak_task();
   } else {
     // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
     return current_task->get_task(pid);
@@ -39,22 +41,40 @@ fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task) {
   return fit::ok(current_task->get_tid());
 }
 fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task) {
-  auto tg = current_task->thread_group();
+  return fit::ok(current_task->thread_group->read().get_ppid());
+}
 
-  Guard<Mutex> lock(tg->tg_rw_lock());
-  return fit::ok(tg->get_ppid());
+/*
+fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> {
+    if pid == 0 {
+        current_task.weak_task()
+    } else {
+        // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
+        current_task.get_task(pid)
+    }
+}
+*/
+
+fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid) {
+  util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
+  auto result = Task::from_weak(weak);
+  if (result.is_error())
+    return result.take_error();
+  auto target_task = result.value();
+  // security::check_task_getsid(current_task, &target_task)?;
+  auto sid = target_task->thread_group->read().process_group->session->leader;
+  return fit::ok(sid);
 }
 
 fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid) {
-  fbl::RefPtr<starnix::Task> task = get_task_or_current(current_task, pid);
-  if (!task) {
-    return fit::error(errno(ESRCH));
-  }
+  util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
+  auto result = Task::from_weak(weak);
+  if (result.is_error())
+    return result.take_error();
 
-  auto tg = task->thread_group();
-  Guard<Mutex> lock(tg->tg_rw_lock());
+  auto task = result.value();
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
-  auto pgid = tg->process_group()->leader();
+  auto pgid = task->thread_group->read().process_group->leader;
   return fit::ok(pgid);
 }
 

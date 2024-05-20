@@ -107,7 +107,7 @@ class FdTable {
   fit::result<Errno> close(FdNumber fd) const;
 
   // Drop the fd table, closing any files opened exclusively by this table.
-  void release() const { inner_.Lock() = fbl::RefPtr<FdTableInner>(); }
+  void release() const { inner_.Lock()->reset(); }
 
  private:
   FdTable(fbl::RefPtr<FdTableInner> table);

@@ -15,7 +15,13 @@ namespace starnix {
 fit::result<Errno, pid_t> sys_getpid(const CurrentTask& current_task);
 fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task);
 fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task);
+fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid);
 fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid);
+
+fit::result<Errno, uid_t> sys_getuid(const CurrentTask& current_task);
+fit::result<Errno, uid_t> sys_getgid(const CurrentTask& current_task);
+fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task);
+fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task);
 
 }  // namespace starnix
 

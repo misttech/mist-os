@@ -70,6 +70,9 @@ class RwLockGuard;
 template <typename Data>
 class RwLock {
  public:
+  using RwLockWriteGuard = RwLockGuard<Data, BrwLockPi::Writer>;
+  using RwLockReadGuard = RwLockGuard<Data, BrwLockPi::Reader>;
+
   RwLock() = default;
   RwLock(Data&& data) : data_(data) {}
 
@@ -77,18 +80,12 @@ class RwLock {
   DISALLOW_COPY_ASSIGN_AND_MOVE(RwLock);
 
   // Copy elision - Return value optimization (RVO)
-  RwLockGuard<Data, BrwLockPi::Reader> Read() { return RwLockGuard<Data, BrwLockPi::Reader>(this); }
-  const RwLockGuard<Data, BrwLockPi::Reader> Read() const {
-    return RwLockGuard<Data, BrwLockPi::Reader>(this);
-  }
+  RwLockReadGuard Read() { return RwLockReadGuard(this); }
+  const RwLockReadGuard Read() const { return RwLockReadGuard(this); }
 
   // Copy elision - Return value optimization (RVO)
-  RwLockGuard<Data, BrwLockPi::Writer> Write() {
-    return RwLockGuard<Data, BrwLockPi::Writer>(this);
-  }
-  const RwLockGuard<Data, BrwLockPi::Writer> Write() const {
-    return RwLockGuard<Data, BrwLockPi::Writer>(this);
-  }
+  RwLockWriteGuard Write() { return RwLockWriteGuard(this); }
+  const RwLockWriteGuard Write() const { return RwLockWriteGuard(this); }
 
  private:
   friend class RwLockGuard<Data, BrwLockPi::Reader>;

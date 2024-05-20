@@ -171,7 +171,7 @@ fit::result<Errno, size_t> VmoFileObject::write(const zx::vmo& vmo, const FileOb
         }
 
         // Check against the FSIZE limt
-        auto fsize_limit = current_task->thread_group()->get_rlimit({ResourceEnum::FSIZE});
+        auto fsize_limit = current_task->thread_group->get_rlimit({ResourceEnum::FSIZE});
         if (write_end > fsize_limit) {
           if (offset >= fsize_limit) {
             // Write starts beyond the FSIZE limt.

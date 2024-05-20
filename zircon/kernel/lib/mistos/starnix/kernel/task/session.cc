@@ -13,18 +13,13 @@
 
 namespace starnix {
 
-SessionMutableState::SessionMutableState() = default;
-
-zx_status_t Session::Create(pid_t leader, fbl::RefPtr<Session>* out) {
+fbl::RefPtr<Session> Session::New(pid_t _leader) {
   fbl::AllocChecker ac;
 
-  fbl::RefPtr<Session> session = fbl::AdoptRef(new (&ac) Session(leader));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  fbl::RefPtr<Session> session = fbl::AdoptRef(new (&ac) Session(_leader));
+  ASSERT(ac.check());
 
-  *out = std::move(session);
-  return ZX_OK;
+  return ktl::move(session);
 }
 
 }  // namespace starnix

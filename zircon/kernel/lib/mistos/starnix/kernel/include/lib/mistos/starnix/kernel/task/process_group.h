@@ -8,7 +8,6 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
-#include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/zx/process.h>
 
 #include <optional>
@@ -18,6 +17,7 @@
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <ktl/optional.h>
 
 namespace starnix {
 
@@ -46,13 +46,25 @@ class ProcessGroupMutableState {
   // bool orphaned_ = false;
 };
 
+class Session;
 class ProcessGroup : public fbl::RefCounted<ProcessGroup>,
                      public fbl::WAVLTreeContainable<fbl::RefPtr<ProcessGroup>> {
  public:
-  ~ProcessGroup();
-  static zx_status_t New(pid_t pid, fbl::RefPtr<Session>, fbl::RefPtr<ProcessGroup>* out);
+  // The session of the process group.
+  fbl::RefPtr<Session> session;
 
-  pid_t leader() const { return leader_; }
+  // The leader of the process group.
+  pid_t leader;
+
+ private:
+  /// The mutable state of the ProcessGroup.
+  // mutable_state : OrderedRwLock<ProcessGroupMutableState, ProcessGroupState>,
+  mutable DECLARE_MUTEX(ProcessGroup) pg_mutable_state_rw_lock_;
+  ProcessGroupMutableState mutable_state_ TA_GUARDED(pg_mutable_state_rw_lock_);
+
+  /// impl ProcessGroup
+ public:
+  static fbl::RefPtr<ProcessGroup> New(pid_t pid, ktl::optional<fbl::RefPtr<Session>>);
 
   Lock<Mutex>* pg_mutable_state_rw_lock() const TA_RET_CAP(pg_mutable_state_rw_lock_) {
     return &pg_mutable_state_rw_lock_;
@@ -60,21 +72,12 @@ class ProcessGroup : public fbl::RefCounted<ProcessGroup>,
 
   void insert(fbl::RefPtr<ThreadGroup> thread_group);
 
+  // C++
+ public:
+  ~ProcessGroup();
+
  private:
   ProcessGroup(fbl::RefPtr<Session> session, pid_t leader);
-
-  fbl::Canary<fbl::magic("PGRP")> canary_;
-
-  // The session of the process group.
-  fbl::RefPtr<Session> session_;
-
-  // The leader of the process group.
-  pid_t leader_;
-
-  /// The mutable state of the ProcessGroup.
-  // mutable_state : OrderedRwLock<ProcessGroupMutableState, ProcessGroupState>,
-  mutable DECLARE_MUTEX(ProcessGroup) pg_mutable_state_rw_lock_;
-  ProcessGroupMutableState mutable_state_ TA_GUARDED(pg_mutable_state_rw_lock_);
 };
 
 }  // namespace starnix

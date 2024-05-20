@@ -5,9 +5,13 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_H_
 
+#include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
 #include <lib/mistos/util/onecell.h>
+#include <zircon/types.h>
 
 #include <utility>
 
@@ -31,44 +35,15 @@ namespace starnix {
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
  public:
-  using fbl::RefCountedUpgradeable<Kernel>::AddRef;
-  using fbl::RefCountedUpgradeable<Kernel>::Release;
-  using fbl::RefCountedUpgradeable<Kernel>::Adopt;
-  using fbl::RefCountedUpgradeable<Kernel>::AddRefMaybeInDestructor;
-
-  ~Kernel() = default;
-
-  static zx_status_t New(fbl::String cmdline, fbl::RefPtr<Kernel>* handle);
-
-  PidTable& pids() { return pids_; }
-
-  Lock<Mutex>* pidtable_rw_lock() const TA_RET_CAP(pidtable_rw_lock_) { return &pidtable_rw_lock_; }
-
-  uint64_t get_next_mount_id() { return next_mount_id_.fetch_add(1, std::memory_order_relaxed); }
-  uint64_t get_next_namespace_id() {
-    return next_namespace_id_.fetch_add(1, std::memory_order_relaxed);
-  }
-
-  uint64_t next_file_object_id() {
-    return next_file_object_id_.fetch_add(1, std::memory_order_relaxed);
-  }
-
- private:
-  fbl::Canary<fbl::magic("KERN")> canary_;
-
-  Kernel(fbl::String cmdline) : cmdline_{std::move(cmdline)} {}
-
   /// The kernel threads running on behalf of this kernel.
   // pub kthreads: KernelThreads,
 
   /// The feaures enabled for this kernel.
   // pub features: KernelFeatures,
 
-  mutable DECLARE_MUTEX(Kernel) pidtable_rw_lock_;
   // The processes and threads running in this kernel, organized by pid_t.
-  PidTable pids_ TA_GUARDED(pidtable_rw_lock_);
+  RwLock<PidTable> pids;
 
- public:
   /// The default namespace for abstract AF_UNIX sockets in this kernel.
   ///
   /// Rather than use this default namespace, abstract socket addresses
@@ -80,7 +55,7 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
   // pub default_abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
   // The kernel command line. Shows up in /proc/cmdline.
-  fbl::String cmdline_;
+  fbl::String cmdline;
 
   // Owned by anon_node.rs
   // pub anon_fs: OnceCell<FileSystemHandle>,
@@ -188,12 +163,14 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
   // pub power_manager: PowerManager,
 
   /// Unique IDs for new mounts and mount namespaces.
-  ktl::atomic<uint64_t> next_mount_id_ = 0;
+  AtomicCounter<uint64_t> next_mount_id;
+
   // pub next_peer_group_id: AtomicU64Counter,
-  ktl::atomic<uint64_t> next_namespace_id_ = 0;
+
+  AtomicCounter<uint64_t> next_namespace_id;
 
   /// Unique IDs for file objects.
-  ktl::atomic<uint64_t> next_file_object_id_ = 0;
+  AtomicCounter<uint64_t> next_file_object_id;
 
   /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
   // pub next_inotify_cookie: AtomicU32Counter,
@@ -219,6 +196,25 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
 
   /// The syslog manager.
   // pub syslog: Syslog,
+
+ public:
+  /// impl Kernel
+  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(fbl::String cmdline);
+
+  uint64_t get_next_mount_id() { return next_mount_id.next(); }
+
+  uint64_t get_next_namespace_id() { return next_namespace_id.next(); }
+
+ public:
+  using fbl::RefCountedUpgradeable<Kernel>::AddRef;
+  using fbl::RefCountedUpgradeable<Kernel>::Release;
+  using fbl::RefCountedUpgradeable<Kernel>::Adopt;
+  using fbl::RefCountedUpgradeable<Kernel>::AddRefMaybeInDestructor;
+
+  ~Kernel() = default;
+
+ private:
+  Kernel(fbl::String _cmdline) : cmdline{std::move(_cmdline)} {}
 };
 
 }  // namespace starnix

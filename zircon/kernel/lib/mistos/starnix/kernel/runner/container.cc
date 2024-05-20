@@ -40,9 +40,8 @@ namespace starnix {
 fit::result<Errno, Container> create_container(const ConfigWrapper& config) {
   const fbl::String DEFAULT_INIT("/container/init");
 
-  fbl::RefPtr<starnix::Kernel> kernel;
-  ASSERT(starnix::Kernel::New(config->kernel_cmdline, &kernel) == ZX_OK);
-  LTRACEF("creating Kernel: %s\n", config->name.data());
+  fbl::RefPtr<Kernel> kernel = Kernel::New(config->kernel_cmdline).value_or(fbl::RefPtr<Kernel>());
+  ASSERT_MSG(kernel, "creating Kernel: %s\n", config->name.data());
 
   fbl::RefPtr<FsContext> fs_context;
   if (auto result = create_fs_context(kernel, config); result.is_error()) {
@@ -52,11 +51,7 @@ fit::result<Errno, Container> create_container(const ConfigWrapper& config) {
     fs_context = result.value();
   }
 
-  pid_t init_pid;
-  {
-    Guard<Mutex> guard{kernel->pidtable_rw_lock()};
-    init_pid = kernel->pids().allocate_pid();
-  }
+  auto init_pid = kernel->pids.Write()->allocate_pid();
   ASSERT(init_pid == 1);
 
   /*

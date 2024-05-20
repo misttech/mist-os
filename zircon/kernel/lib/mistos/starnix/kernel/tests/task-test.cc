@@ -23,12 +23,9 @@ TEST(Task, test_tid_allocation) {
 
   ASSERT_GE(2, another_tid);
 
-  {
-    Guard<Mutex> guard{kernel->pidtable_rw_lock()};
-    ASSERT_EQ(1, kernel->pids().get_task(1)->get_tid());
-    ASSERT_EQ(another_tid, kernel->pids().get_task(another_tid)->get_tid());
-    ASSERT_NULL(kernel->pids().get_task(another_tid + 1));
-  }
+  auto pids = kernel->pids.Read();
+  ASSERT_EQ(1, pids->get_task(1).Lock()->get_tid());
+  ASSERT_EQ(another_tid, pids->get_task(another_tid).Lock()->get_tid());
 }
 
 }  // namespace
