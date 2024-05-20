@@ -79,7 +79,7 @@ type LightError = strict enum {
     INVALID_VALUE = 4;
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol Light {
     /// Fetches information on the controllable light groups on the device.
     /// Returns immediately on first call; subsequent calls return when the

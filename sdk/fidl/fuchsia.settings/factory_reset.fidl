@@ -4,7 +4,7 @@
 library fuchsia.settings;
 
 /// Settings related to factory reset.
-@discoverable
+@discoverable(server="platform")
 closed protocol FactoryReset {
     /// Notifies of a change in information about the factory reset settings.
     ///

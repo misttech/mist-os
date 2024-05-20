@@ -11,7 +11,7 @@ library fuchsia.settings;
 ///
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
-@discoverable
+@discoverable(server="platform")
 closed protocol DoNotDisturb {
     /// Gets the current [`DoNotDisturbSettings`]. Returns immediately on first
     /// call; subsequent calls return when the values change.
