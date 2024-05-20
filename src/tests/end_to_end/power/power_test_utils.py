@@ -376,6 +376,9 @@ class PowerSampler:
     def should_generate_load(self) -> bool:
         return False
 
+    def has_samples(self) -> bool:
+        return False
+
     def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
         pass
 
@@ -429,11 +432,13 @@ class _RealPowerSampler(PowerSampler):
             self._config.output_dir,
             f"{self._config.metric_name}_power_samples.csv",
         )
+        self._sampled_data = False
 
     def _start_impl(self) -> None:
         _LOGGER.info("Starting power sampling")
         self._start_power_measurement()
         self._await_first_sample()
+        self._sampled_data = True
 
     def _stop_impl(self) -> None:
         _LOGGER.info("Stopping power sampling...")
@@ -500,6 +505,9 @@ class _RealPowerSampler(PowerSampler):
 
     def should_generate_load(self) -> bool:
         return True
+
+    def has_samples(self) -> bool:
+        return self._sampled_data
 
     def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
         merge_power_data(model, self._csv_output_path, fxt_path)
