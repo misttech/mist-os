@@ -43,7 +43,7 @@ closed protocol ProcedureToken {};
 ///
 /// The procedures initiated by an Access protocol instance are terminated when the underlying
 /// channel is closed.
-@discoverable
+@discoverable(server="platform")
 closed protocol Access {
     /// Assign a PairingDelegate to respond to drive pairing procedures. The delegate will be
     /// configured to use the provided I/O capabilities to determine the pairing method.

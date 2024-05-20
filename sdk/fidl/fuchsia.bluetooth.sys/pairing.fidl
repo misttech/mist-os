@@ -7,7 +7,7 @@ using fuchsia.bluetooth as bt;
 
 /// Allows system clients to enable Bluetooth pairing.
 @available(added=HEAD)
-@discoverable
+@discoverable(server="platform")
 closed protocol Pairing {
     /// Assign a PairingDelegate to respond to pairing procedures. The provided I/O capabilities
     /// will be used to determine the pairing methods used.

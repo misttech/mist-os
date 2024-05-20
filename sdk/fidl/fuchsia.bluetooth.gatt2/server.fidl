@@ -167,7 +167,7 @@ closed protocol LocalService {
     });
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol Server {
     /// Publishes the given `service` so that it is available to all remote peers. Upon publication,
     /// the service is defined to have INITIAL_VALUE_CHANGED_CREDITS credits available for sending

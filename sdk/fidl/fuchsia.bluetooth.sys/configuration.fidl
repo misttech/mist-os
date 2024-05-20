@@ -46,7 +46,7 @@ type Settings = table {
 ///
 /// This protocol should only be exposed to highly privileged components (e.g. Bluetooth developer
 /// tools in a testing/qualification environment).
-@discoverable
+@discoverable(server="platform")
 closed protocol Configuration {
     /// Applies the fields present in `settings` to all bt-host drivers known to the system. Any
     /// fields not present in `settings` will remain unchanged.
