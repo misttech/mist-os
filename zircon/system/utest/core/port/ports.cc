@@ -388,6 +388,43 @@ TEST(PortTest, CancelEventKeyAfter) {
   EXPECT_EQ(key_sum, keys[0]);
 }
 
+TEST(PortTest, CancelKeyInvalidOptions) {
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+  // Currently, no options are supported.
+  EXPECT_EQ(port.cancel_key(1, 0), ZX_ERR_INVALID_ARGS);
+}
+
+TEST(PortTest, CancelKey) {
+  zx::event event;
+  zx::port port;
+
+  ASSERT_OK(zx::port::create(0, &port));
+  ASSERT_OK(zx::event::create(0, &event));
+
+  ASSERT_OK(event.wait_async(port, 1, ZX_EVENT_SIGNALED, 0));
+  ASSERT_OK(event.wait_async(port, 2, ZX_EVENT_SIGNALED, 0));
+  ASSERT_OK(event.wait_async(port, 2, ZX_USER_SIGNAL_0, 0));
+
+  EXPECT_EQ(port.cancel_key(0, 1), ZX_OK);
+
+  ASSERT_OK(event.signal(0u, ZX_EVENT_SIGNALED));
+
+  // This should remove the packet for the ZX_EVENT_SIGNALED wait and cancel the pending
+  // wait for ZX_USER_SIGNAL_0.
+  EXPECT_EQ(port.cancel_key(0, 2), ZX_OK);
+  // Now that the wait is canceled subsequent calls should return NOT_FOUND.
+  EXPECT_EQ(port.cancel_key(0, 2), ZX_ERR_NOT_FOUND);
+
+  zx_port_packet_t packet = {};
+  EXPECT_EQ(port.wait(zx::time::infinite_past(), &packet), ZX_ERR_TIMED_OUT);
+
+  ASSERT_OK(event.signal(0u, ZX_USER_SIGNAL_0));
+  EXPECT_EQ(port.wait(zx::time::infinite_past(), &packet), ZX_ERR_TIMED_OUT);
+
+  EXPECT_EQ(port.cancel_key(0, 3), ZX_ERR_NOT_FOUND);
+}
+
 TEST(PortTest, ThreadEvents) {
   zx::port port;
   zx::event event;

@@ -459,4 +459,68 @@ closed protocol Port {
         source Handle;
         key uint64;
     }) -> () error Status;
+
+    /// ## Summary
+    ///
+    /// Cancels all async port notifications matching a key.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_status_t zx_port_cancel_key(zx_handle_t handle,
+    ///                                uint32_t options,
+    ///                                uint64_t key);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// `zx_port_cancel_key()` is a non-blocking syscall that cancels all
+    /// pending [`zx_object_wait_async()`] operations on this port registered
+    /// with *key*.
+    ///
+    /// When this call succeeds no new packets from operations registered with
+    /// *key* will be delivered to *handle*, and pending queued packets that
+    /// *key* are removed from the port.
+    ///
+    /// ## Rights
+    ///
+    /// *handle* must be of type `ZX_OBJ_TYPE_PORT` and have `ZX_RIGHT_WRITE`.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_port_cancel_key()` returns `ZX_OK` if cancellation succeeded and
+    /// either queued packets were removed or pending [`zx_object_wait_async()`] were
+    /// canceled.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle.
+    ///
+    /// `ZX_ERR_WRONG_TYPE`  *handle* is not a port handle.
+    ///
+    /// `ZX_ERR_INVALID_ARGS` *options* has an invalid value.
+    ///
+    /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have `ZX_RIGHT_WRITE`.
+    ///
+    /// `ZX_ERR_NOT_FOUND` if either no pending packets or pending
+    /// [`zx_object_wait_async()`] calls matching *key* were found.
+    ///
+    /// ## See also
+    ///
+    ///  - [`zx_port_wait()`]
+    ///
+    /// [`zx_object_wait_async()`]: object_wait_async.md
+    /// [`zx_port_wait()`]: port_wait.md
+    // TODO(https://fxbug.dev/339884866): This API was introduced in API level
+    // 20 but our versioning tooling does not yet support availability
+    // annotations for vDSO entry points. Enable this annotation once it's
+    // supported.
+    // @available(added=20)
+    strict CancelKey(resource struct {
+        handle Handle:PORT;
+        options uint32;
+        key uint64;
+    }) -> () error Status;
 };

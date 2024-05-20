@@ -30,6 +30,7 @@ typedef uint32_t zx_packet_type_t;
 #define ZX_PKT_TYPE_GUEST_VCPU        ((zx_packet_type_t)0x06u)
 #define ZX_PKT_TYPE_INTERRUPT         ((zx_packet_type_t)0x07u)
 #define ZX_PKT_TYPE_PAGE_REQUEST      ((zx_packet_type_t)0x09u)
+// 0xffffffff is reserved for internal use.
 
 // For options passed to port_create
 #define ZX_PORT_BIND_TO_INTERRUPT     ((uint32_t)(0x1u << 0))

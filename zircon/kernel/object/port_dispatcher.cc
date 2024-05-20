@@ -280,6 +280,11 @@ zx_status_t PortDispatcher::Queue(PortPacket* port_packet, zx_signals_t observed
       return ZX_ERR_BAD_HANDLE;
     }
 
+    // We have to acquire get_lock() before we can check the canceled flag.
+    if (port_packet->is_canceled()) {
+      return ZX_OK;
+    }
+
     if (IsDefaultAllocatedEphemeral(*port_packet) &&
         num_ephemeral_packets_ > kMaxAllocatedPacketCountPerPort) {
       kcounter_add(port_full_count, 1);
@@ -343,6 +348,7 @@ zx_status_t PortDispatcher::Dequeue(const Deadline& deadline, zx_port_packet_t* 
         if (IsDefaultAllocatedEphemeral(*port_packet)) {
           --num_ephemeral_packets_;
         }
+        DEBUG_ASSERT(port_packet->packet.type != kPortPacketTypeCanceled);
         *out_packet = port_packet->packet;
 
         bool is_ephemeral = port_packet->is_ephemeral();
@@ -438,10 +444,8 @@ zx_status_t PortDispatcher::MakeObserver(uint32_t options, Handle* handle, uint6
   return dispatcher->AddObserver(observer_result.value().release(), handle, signals, trigger_mode);
 }
 
-bool PortDispatcher::CancelQueued(const void* handle, uint64_t key) {
-  canary_.Assert();
-
-  Guard<CriticalMutex> guard{get_lock()};
+bool PortDispatcher::CancelQueuedPacketsLocked(const void* const handle, uint64_t key) {
+  bool packet_removed = false;
 
   // This loop can take a while if there are many items.
   // In practice, the number of pending signal packets is
@@ -463,10 +467,8 @@ bool PortDispatcher::CancelQueued(const void* handle, uint64_t key) {
   //    and deliver them in order via timestamps or
   //    a side structure.
 
-  bool packet_removed = false;
-
   for (auto it = packets_.begin(); it != packets_.end();) {
-    if ((it->handle == handle) && (it->key() == key)) {
+    if ((handle == nullptr || it->handle == handle) && (it->key() == key)) {
       auto to_remove = it++;
       if (IsDefaultAllocatedEphemeral(*to_remove)) {
         --num_ephemeral_packets_;
@@ -483,6 +485,14 @@ bool PortDispatcher::CancelQueued(const void* handle, uint64_t key) {
   return packet_removed;
 }
 
+bool PortDispatcher::CancelQueued(const void* handle, uint64_t key) {
+  canary_.Assert();
+
+  Guard<CriticalMutex> guard{get_lock()};
+
+  return CancelQueuedPacketsLocked(handle, key);
+}
+
 bool PortDispatcher::CancelQueued(PortPacket* port_packet) {
   canary_.Assert();
 
@@ -497,6 +507,37 @@ bool PortDispatcher::CancelQueued(PortPacket* port_packet) {
   }
 
   return false;
+}
+
+zx_status_t PortDispatcher::CancelKey(uint64_t key) {
+  canary_.Assert();
+
+  PortObserver::List canceled_observers;
+
+  Guard<CriticalMutex> guard{get_lock()};
+
+  for (auto it = observers_.begin(); it != observers_.end();) {
+    if (static_cast<SignalObserver*>(&*it)->MatchesKey(this, key)) {
+      it->Cancel();
+      canceled_observers.push_front(observers_.erase(it++));
+    } else {
+      ++it;
+    }
+  }
+  const bool observer_canceled = !canceled_observers.is_empty();
+  const bool packet_removed = CancelQueuedPacketsLocked(nullptr, key);
+
+  while (!canceled_observers.is_empty()) {
+    PortObserver* canceled_observer = canceled_observers.pop_front();
+    // Acquire a reference to dispatcher before releasing get_lock().
+    fbl::RefPtr<Dispatcher> dispatcher(canceled_observer->UnlinkDispatcherLocked());
+    guard.CallUnlocked([canceled_observer, dispatcher = ktl::move(dispatcher)] {
+      dispatcher->RemoveObserver(canceled_observer);
+    });
+    object_cache::UniquePtr<PortObserver> destroyer(canceled_observer);
+  }
+
+  return (observer_canceled || packet_removed) ? ZX_OK : ZX_ERR_NOT_FOUND;
 }
 
 void PortDispatcher::InitializeCacheAllocators(uint32_t /*level*/) {

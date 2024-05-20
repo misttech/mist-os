@@ -122,3 +122,20 @@ zx_status_t sys_port_cancel(zx_handle_t handle, zx_handle_t source, uint64_t key
     return (had_observer || packet_removed) ? ZX_OK : ZX_ERR_NOT_FOUND;
   }
 }
+
+// zx_status_t zx_port_cancel_key
+zx_status_t sys_port_cancel_key(zx_handle_t handle, uint32_t options, uint64_t key) {
+  if (options != 0u) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  auto up = ProcessDispatcher::GetCurrent();
+
+  fbl::RefPtr<PortDispatcher> port;
+  zx_status_t status =
+      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &port);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  return port->CancelKey(key);
+}
