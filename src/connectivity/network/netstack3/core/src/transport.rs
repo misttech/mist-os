@@ -70,7 +70,7 @@ use crate::{
     device::WeakDeviceId,
     error::ZonedAddressError,
     ip::EitherDeviceId,
-    socket::datagram,
+    socket::{datagram, SocketIpAddrExt as _},
     transport::{
         tcp::{TcpCounters, TcpState},
         udp::{UdpCounters, UdpState, UdpStateBuilder},
@@ -192,7 +192,7 @@ pub(crate) fn resolve_addr_with_device<
         (Some(zone), None) => Some(EitherDeviceId::Strong(zone)),
         (None, Some(device)) => Some(EitherDeviceId::Weak(device)),
         (None, None) => {
-            if crate::socket::must_have_zone(addr.as_ref()) {
+            if addr.as_ref().must_have_zone() {
                 return Err(ZonedAddressError::RequiredZoneNotProvided);
             } else {
                 None

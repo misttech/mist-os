@@ -46,7 +46,7 @@ use crate::{
         AnyDevice, DeviceIdContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
     },
     error::AddressResolutionFailed,
-    socket::address::SocketIpAddr,
+    socket::{address::SocketIpAddr, SocketIpAddrExt as _},
     time::LocalTimerHeap,
     Instant,
 };
@@ -2185,7 +2185,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                     // Even if the link-local subnet is off-link, passing the device ID is never
                     // incorrect because link-local traffic will never be forwarded, and
                     // there is only ever one link and thus interface involved.
-                    crate::socket::must_have_zone(original_src_ip.as_ref()).then_some(&device_id),
+                    original_src_ip.as_ref().must_have_zone().then_some(&device_id),
                     original_src_ip,
                     original_dst_ip,
                     header_metadata,

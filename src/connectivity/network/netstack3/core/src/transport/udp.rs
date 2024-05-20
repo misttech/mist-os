@@ -2620,7 +2620,7 @@ mod tests {
             testutil::DualStackSendIpPacketMeta,
             ResolveRouteError, SendIpPacketMeta,
         },
-        socket::{self, datagram::MulticastInterfaceSelector, StrictlyZonedAddr},
+        socket::{datagram::MulticastInterfaceSelector, SocketIpAddrExt as _, StrictlyZonedAddr},
         testutil::{set_logger_for_test, TestIpExt as _},
         uninstantiable::UninstantiableWrapper,
     };
@@ -3157,7 +3157,7 @@ mod tests {
             DualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp<FakeUdpBindingsCtx<D>>, DeviceId=D, WeakDeviceId=D::Weak>;
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
             NonDualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp<FakeUdpBindingsCtx<D>>, DeviceId=D, WeakDeviceId=D::Weak>;
-        fn try_into_recv_src_addr(addr: Self::Addr) -> Option<Self::RecvSrcAddr>;
+        fn into_recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
     }
 
     impl TestIpExt for Ipv4 {
@@ -3167,8 +3167,8 @@ mod tests {
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             FakeUdpBoundSocketsCtx<D>;
 
-        fn try_into_recv_src_addr(addr: Ipv4Addr) -> Option<Ipv4Addr> {
-            Some(addr)
+        fn into_recv_src_addr(addr: Ipv4Addr) -> Ipv4Addr {
+            addr
         }
     }
 
@@ -3178,8 +3178,8 @@ mod tests {
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             UninstantiableWrapper<FakeUdpBoundSocketsCtx<D>>;
 
-        fn try_into_recv_src_addr(addr: Ipv6Addr) -> Option<Ipv6SourceAddr> {
-            Ipv6SourceAddr::new(addr)
+        fn into_recv_src_addr(addr: Ipv6Addr) -> Ipv6SourceAddr {
+            Ipv6SourceAddr::new(addr).unwrap_or_else(|| panic!("{addr} is not a valid source addr"))
         }
     }
 
@@ -3212,7 +3212,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            <A::Version as TestIpExt>::try_into_recv_src_addr(src_ip).unwrap(),
+            <A::Version as TestIpExt>::into_recv_src_addr(src_ip),
             SpecifiedAddr::new(dst_ip).unwrap(),
             buffer,
             None,
@@ -5768,7 +5768,7 @@ mod tests {
     #[test]
     fn test_udp_ipv6_connect_zoned_get_info() {
         let ll_addr = LinkLocalAddr::new(net_ip_v6!("fe80::1234")).unwrap().into_specified();
-        assert!(socket::must_have_zone(&ll_addr));
+        assert!(ll_addr.must_have_zone());
 
         let remote_ips = vec![remote_ip::<Ipv6>()];
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
@@ -5902,7 +5902,7 @@ mod tests {
         expected: Result<(), SendToError>,
     ) {
         let ll_addr = LinkLocalAddr::new(net_ip_v6!("fe80::1234")).unwrap().into_specified();
-        assert!(socket::must_have_zone(&ll_addr));
+        assert!(ll_addr.must_have_zone());
         let conn_remote_ip = Ipv6::get_other_remote_ip_address(1);
 
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
@@ -6021,7 +6021,7 @@ mod tests {
         // If a socket is bound to an unzoned address, whether or not it has a
         // bound device should be restored after `connect` then `disconnect`.
         let ll_addr = LinkLocalAddr::new(net_ip_v6!("fe80::1234")).unwrap().into_specified();
-        assert!(socket::must_have_zone(&ll_addr));
+        assert!(ll_addr.must_have_zone());
 
         let local_ip = local_ip::<Ipv6>();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(
@@ -6052,7 +6052,7 @@ mod tests {
         // If a socket is bound to a zoned address, the address's device should
         // be retained after `connect` then `disconnect`.
         let ll_addr = LinkLocalAddr::new(net_ip_v6!("fe80::1234")).unwrap().into_specified();
-        assert!(socket::must_have_zone(&ll_addr));
+        assert!(ll_addr.must_have_zone());
 
         let remote_ip = remote_ip::<Ipv6>();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(
@@ -6082,7 +6082,7 @@ mod tests {
         // If a socket is bound to an unzoned address, connected to a zoned address, and then has
         // its device set, the device should be *retained* after `disconnect`.
         let ll_addr = LinkLocalAddr::new(net_ip_v6!("fe80::1234")).unwrap().into_specified();
-        assert!(socket::must_have_zone(&ll_addr));
+        assert!(ll_addr.must_have_zone());
 
         let local_ip = local_ip::<Ipv6>();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(

@@ -25,7 +25,7 @@ use net_types::{
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::{
     error::IpParseError,
-    ip::{IpPacket as _, IpPacketBuilder as _},
+    ip::{IpPacket as _, IpPacketBuilder as _, IpProtoExt},
     ipv4::{Ipv4FragmentType, Ipv4Packet},
     ipv6::Ipv6Packet,
 };
@@ -62,7 +62,7 @@ use crate::{
         ipv6,
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
-        raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes, RawIpSocketsIpExt},
+        raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes},
         reassembly::{
             FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
             IpPacketFragmentCache,
@@ -73,6 +73,7 @@ use crate::{
             WrapBroadcastMarker,
         },
     },
+    socket::SocketIpAddrExt as _,
     sync::{Mutex, RwLock},
 };
 
@@ -163,7 +164,7 @@ impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, 
 }
 
 /// An [`Ip`] extension trait adding functionality specific to the IP layer.
-pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt + RawIpSocketsIpExt {
+pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt + IpProtoExt {
     /// The type used to specify an IP packet's source address in a call to
     /// [`IpTransportContext::receive_ip_packet`].
     ///
@@ -843,9 +844,8 @@ pub(crate) fn resolve_route_to_destination<
                             })
                         })
                         .map(|device| {
-                            if local_ip.is_some_and(|local_ip| {
-                                crate::socket::must_have_zone(local_ip.as_ref())
-                            }) || crate::socket::must_have_zone(addr.as_ref())
+                            if local_ip.is_some_and(|local_ip| local_ip.as_ref().must_have_zone())
+                                || addr.as_ref().must_have_zone()
                             {
                                 LocalDelivery::StrongForDevice(device)
                             } else {

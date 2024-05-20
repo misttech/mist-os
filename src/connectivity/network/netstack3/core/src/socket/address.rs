@@ -18,8 +18,10 @@ use net_types::{
 };
 
 use crate::{
-    ip::{device::Ipv6DeviceAddr, socket::SocketIpExt},
-    socket::{AddrVec, DualStackIpExt, EitherStack, SocketMapAddrSpec},
+    ip::device::Ipv6DeviceAddr,
+    socket::{
+        AddrVec, DualStackIpExt, EitherStack, SocketIpAddrExt as _, SocketIpExt, SocketMapAddrSpec,
+    },
 };
 
 /// A [`ZonedAddr`] whose address is `Zoned` iff a zone is required.
@@ -68,7 +70,7 @@ impl<A: IpAddress, W: Witness<A> + ScopeableAddress + Copy, Z> StrictlyZonedAddr
     /// This method panics if the `addr` wants a zone and `get_zone` will panic
     /// when called.
     pub fn new_with_zone(addr: W, get_zone: impl FnOnce() -> Z) -> Self {
-        if let Some(addr_and_zone) = crate::socket::try_into_null_zoned::<A, W>(&addr) {
+        if let Some(addr_and_zone) = addr.try_into_null_zoned() {
             StrictlyZonedAddr {
                 addr: ZonedAddr::Zoned(addr_and_zone.map_zone(move |()| get_zone())),
                 marker: PhantomData,
@@ -522,7 +524,7 @@ impl<I: Ip, D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIter<I, D, A> {
 
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub(crate) enum TryUnmapResult<I: DualStackIpExt, D> {
+enum TryUnmapResult<I: DualStackIpExt, D> {
     /// The address does not have an un-mapped representation.
     ///
     /// This spits back the input address unmodified.
@@ -546,9 +548,7 @@ pub(crate) enum TryUnmapResult<I: DualStackIpExt, D> {
 /// The only inputs that will produce [`TryUnmapResult::Mapped`] are
 /// IPv4-mapped IPv6 addresses. All other inputs will produce
 /// [`TryUnmapResult::CannotBeUnmapped`].
-pub(crate) fn try_unmap<A: IpAddress, D>(
-    addr: ZonedAddr<SpecifiedAddr<A>, D>,
-) -> TryUnmapResult<A::Version, D>
+fn try_unmap<A: IpAddress, D>(addr: ZonedAddr<SpecifiedAddr<A>, D>) -> TryUnmapResult<A::Version, D>
 where
     A::Version: DualStackIpExt,
 {
@@ -579,38 +579,63 @@ where
     )
 }
 
+/// Provides a specified IP address to use in-place of an unspecified
+/// remote.
+///
+/// Concretely, this method is called during `connect()` and `send_to()`
+/// socket operations to transform an unspecified remote IP address to the
+/// loopback address. This ensures conformance with Linux and BSD.
+fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I::Addr>>, Z>(
+    addr: Option<ZonedAddr<A, Z>>,
+) -> ZonedAddr<A, Z> {
+    addr.unwrap_or_else(|| ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.into()))
+}
+
 /// A remote IP address that's either in the current stack or the other stack.
 pub(crate) enum DualStackRemoteIp<I: DualStackIpExt, D> {
     ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
     OtherStack(ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>),
 }
 
-/// Returns the [`DualStackRemoteIp`] for the given remote_ip.
-///
-/// An IPv4-mapped-IPv6 address will be unmapped to the inner IPv4 address, and
-/// an unspecified address will be populated with
-/// [`crate::socket::specify_unspecified_remote()`].
-pub(crate) fn dual_stack_remote_ip<
-    I: DualStackIpExt<OtherVersion: SocketIpExt> + SocketIpExt,
-    D,
->(
-    remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, D>>,
-) -> DualStackRemoteIp<I, D> {
-    let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(remote_ip);
-    match try_unmap(remote_ip) {
-        TryUnmapResult::CannotBeUnmapped(remote_ip) => {
-            DualStackRemoteIp::<I, _>::ThisStack(remote_ip)
+impl<I: SocketIpExt + DualStackIpExt<OtherVersion: SocketIpExt>, D> DualStackRemoteIp<I, D> {
+    /// Returns the [`DualStackRemoteIp`] for the given `remote_ip``.
+    ///
+    /// An IPv4-mapped-IPv6 address will be unmapped to the inner IPv4 address,
+    /// and an unspecified address will be populated with
+    /// [`specify_unspecified_remote`].
+    pub fn new(remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, D>>) -> Self {
+        let remote_ip = specify_unspecified_remote::<I, _, _>(remote_ip);
+        match try_unmap(remote_ip) {
+            TryUnmapResult::CannotBeUnmapped(remote_ip) => Self::ThisStack(remote_ip),
+            TryUnmapResult::Mapped(remote_ip) => {
+                // NB: Even though we ensured the address was specified above by
+                // calling `specify_unspecified_remote`, it's possible that
+                // unmapping the address made it unspecified (e.g. `::FFFF:0.0.0.0`
+                // is a specified IPv6 addr but an unspecified IPv4 addr). Call
+                // `specify_unspecified_remote` again to ensure the unmapped address
+                // is specified.
+                let remote_ip = specify_unspecified_remote::<I::OtherVersion, _, _>(remote_ip);
+                Self::OtherStack(remote_ip)
+            }
         }
-        TryUnmapResult::Mapped(remote_ip) => {
-            // NB: Even though we ensured the address was specified above by
-            // calling `specify_unspecified_remote`, it's possible that
-            // unmapping the address made it unspecified (e.g. `::FFFF:0.0.0.0`
-            // is a specified IPv6 addr but an unspecified IPv4 addr). Call
-            // `specify_unspecified_remote` again to ensure the unmapped address
-            // is specified.
-            let remote_ip =
-                crate::socket::specify_unspecified_remote::<I::OtherVersion, _, _>(remote_ip);
-            DualStackRemoteIp::OtherStack(remote_ip)
+    }
+}
+
+/// A local IP address that's either in the current stack or the other stack.
+pub(crate) enum DualStackLocalIp<I: DualStackIpExt, D> {
+    ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
+    OtherStack(Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>>),
+}
+
+impl<I: SocketIpExt + DualStackIpExt<OtherVersion: SocketIpExt>, D> DualStackLocalIp<I, D> {
+    /// Returns the [`DualStackLocalIp`] for the given `local_ip``.
+    ///
+    /// If `local_ip` is the unspecified address for the other stack, returns
+    /// `Self::OtherStack(None)`.
+    pub fn new(local_ip: ZonedAddr<SpecifiedAddr<I::Addr>, D>) -> Self {
+        match try_unmap(local_ip) {
+            TryUnmapResult::CannotBeUnmapped(local_ip) => Self::ThisStack(local_ip),
+            TryUnmapResult::Mapped(local_ip) => Self::OtherStack(local_ip),
         }
     }
 }

@@ -12,16 +12,16 @@ use core::{
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    AddrAndZone, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
+    AddrAndZone, ScopeableAddress, SpecifiedAddr, Witness,
 };
 
 use crate::{
     data_structures::socketmap::{
         Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
     },
-    device::{DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier},
+    device::{DeviceIdentifier, WeakDeviceIdentifier},
     error::{ExistsError, NotFoundError},
-    ip::socket::SocketIpExt,
+    ip,
     socket::address::{
         AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
     },
@@ -40,6 +40,34 @@ impl DualStackIpExt for Ipv4 {
 
 impl DualStackIpExt for Ipv6 {
     type OtherVersion = Ipv4;
+}
+
+/// Extension trait for `Ip` providing socket-specific functionality.
+pub trait SocketIpExt: Ip + ip::IpExt {
+    /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
+    const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
+        // SAFETY: The loopback address is a valid SocketIpAddr, as verified
+        // in the `loopback_addr_is_valid_socket_addr` test.
+        SocketIpAddr::new_from_specified_unchecked(Self::LOOPBACK_ADDRESS)
+    };
+}
+
+impl<I: Ip + ip::IpExt> SocketIpExt for I {}
+
+#[cfg(test)]
+mod socket_ip_ext_test {
+    use super::*;
+    use ip_test_macro::ip_test;
+
+    #[ip_test]
+    fn loopback_addr_is_valid_socket_addr<I: Ip + SocketIpExt>() {
+        // `LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR is defined with the "unchecked"
+        // constructor (which supports const construction). Verify here that the
+        // addr actually satisfies all the requirements (protecting against far
+        // away changes)
+        let _addr = SocketIpAddr::new(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.addr())
+            .expect("loopback address should be a valid SocketIpAddr");
+    }
 }
 
 /// State belonging to either IP stack.
@@ -142,63 +170,71 @@ impl ShutdownType {
     }
 }
 
-/// Determines whether the provided address is underspecified by itself.
-///
-/// Some addresses are ambiguous and so must have a zone identifier in order
-/// to be used in a socket address. This function returns true for IPv6
-/// link-local addresses and false for all others.
-pub(crate) fn must_have_zone<A: IpAddress>(addr: &SpecifiedAddr<A>) -> bool {
-    try_into_null_zoned(addr).is_some()
-}
-
-/// Determines where a change in device is allowed given the local and remote
-/// addresses.
-pub(crate) fn can_device_change<
-    A: IpAddress,
-    W: WeakDeviceIdentifier<Strong = S>,
-    S: StrongDeviceIdentifier,
->(
-    local_ip: Option<&SpecifiedAddr<A>>,
-    remote_ip: Option<&SpecifiedAddr<A>>,
-    old_device: Option<&W>,
-    new_device: Option<&S>,
-) -> bool {
-    let must_have_zone =
-        local_ip.is_some_and(must_have_zone) || remote_ip.is_some_and(must_have_zone);
-
-    if !must_have_zone {
-        return true;
+/// Extensions to IP Address witnesses useful in the context of sockets.
+pub trait SocketIpAddrExt<A: IpAddress>: Witness<A> + ScopeableAddress {
+    /// Determines whether the provided address is underspecified by itself.
+    ///
+    /// Some addresses are ambiguous and so must have a zone identifier in order
+    /// to be used in a socket address. This function returns true for IPv6
+    /// link-local addresses and false for all others.
+    fn must_have_zone(&self) -> bool
+    where
+        Self: Copy,
+    {
+        self.try_into_null_zoned().is_some()
     }
 
-    let old_device = old_device.as_ref().unwrap_or_else(|| {
-        panic!("local_ip={:?} or remote_ip={:?} must have zone", local_ip, remote_ip)
-    });
-
-    new_device.as_ref().is_some_and(|new_device| old_device == new_device)
-}
-
-/// Converts into a [`AddrAndZone<A, ()>`] if the address requires a zone.
-///
-/// Otherwise returns `None`.
-pub(crate) fn try_into_null_zoned<A: IpAddress, W: Witness<A> + ScopeableAddress + Copy>(
-    addr: &W,
-) -> Option<AddrAndZone<W, ()>> {
-    if addr.get().is_loopback() {
-        return None;
+    /// Converts into a [`AddrAndZone<A, ()>`] if the address requires a zone.
+    ///
+    /// Otherwise returns `None`.
+    fn try_into_null_zoned(self) -> Option<AddrAndZone<Self, ()>> {
+        if self.get().is_loopback() {
+            return None;
+        }
+        AddrAndZone::new(self, ())
     }
-    AddrAndZone::new(*addr, ())
 }
 
-/// Provides a specified IP address to use in-place of an unspecified remote.
-///
-/// Concretely, this method is called during `connect()` and `send_to()` socket
-/// operations to transform an unspecified remote IP address to the loopback
-/// address. This ensures conformance with Linux and BSD.
-pub(crate) fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I::Addr>>, Z>(
-    addr: Option<ZonedAddr<A, Z>>,
-) -> ZonedAddr<A, Z> {
-    addr.unwrap_or_else(|| ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.into()))
+impl<A: IpAddress, W: Witness<A> + ScopeableAddress> SocketIpAddrExt<A> for W {}
+
+pub struct SocketDeviceUpdate<'a, A: IpAddress, D: WeakDeviceIdentifier> {
+    pub local_ip: Option<&'a SpecifiedAddr<A>>,
+    pub remote_ip: Option<&'a SpecifiedAddr<A>>,
+    pub old_device: Option<&'a D>,
 }
+
+impl<'a, A: IpAddress, D: WeakDeviceIdentifier> SocketDeviceUpdate<'a, A, D> {
+    /// Checks if an update from `old_device` to `new_device` is allowed,
+    /// returning an error if not.
+    pub fn check_update<N>(
+        self,
+        new_device: Option<&N>,
+    ) -> Result<(), SocketDeviceUpdateNotAllowedError>
+    where
+        D: PartialEq<N>,
+    {
+        let Self { local_ip, remote_ip, old_device } = self;
+        let must_have_zone = local_ip.is_some_and(|a| a.must_have_zone())
+            || remote_ip.is_some_and(|a| a.must_have_zone());
+
+        if !must_have_zone {
+            return Ok(());
+        }
+
+        let old_device = old_device.unwrap_or_else(|| {
+            panic!("local_ip={:?} or remote_ip={:?} must have zone", local_ip, remote_ip)
+        });
+
+        if new_device.is_some_and(|new_device| old_device == new_device) {
+            Ok(())
+        } else {
+            Err(SocketDeviceUpdateNotAllowedError)
+        }
+    }
+}
+
+/// The device can't be updated on a socket.
+pub struct SocketDeviceUpdateNotAllowedError;
 
 /// Specification for the identifiers in an [`AddrVec`].
 ///
@@ -1037,7 +1073,7 @@ mod tests {
     fn must_never_have_zone_ipv4(addr: Ipv4Addr) {
         // No IPv4 addresses are allowed to have a zone.
         let addr = SpecifiedAddr::new(addr).unwrap();
-        assert_eq!(must_have_zone(&addr), false);
+        assert_eq!(addr.must_have_zone(), false);
     }
 
     #[test_case(net_ip_v6!("1::2:3"), false)]
@@ -1051,16 +1087,16 @@ mod tests {
         // Only link-local unicast and multicast addresses are allowed to have
         // zones.
         let addr = SpecifiedAddr::new(addr).unwrap();
-        assert_eq!(must_have_zone(&addr), must_have);
+        assert_eq!(addr.must_have_zone(), must_have);
     }
 
     #[test]
     fn try_into_null_zoned_ipv6() {
-        assert_eq!(try_into_null_zoned(&Ipv6::LOOPBACK_ADDRESS), None);
+        assert_eq!(Ipv6::LOOPBACK_ADDRESS.try_into_null_zoned(), None);
         let zoned = Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
         const ZONE: u32 = 5;
         assert_eq!(
-            try_into_null_zoned(&zoned).map(|a| a.map_zone(|()| ZONE)),
+            zoned.try_into_null_zoned().map(|a| a.map_zone(|()| ZONE)),
             Some(AddrAndZone::new(zoned, ZONE).unwrap())
         );
     }

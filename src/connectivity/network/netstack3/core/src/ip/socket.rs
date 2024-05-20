@@ -27,7 +27,7 @@ use crate::{
         EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
         ResolveRouteError, SendIpPacketMeta,
     },
-    socket::address::SocketIpAddr,
+    socket::{address::SocketIpAddr, SocketIpAddrExt as _},
     trace_duration,
 };
 
@@ -203,35 +203,6 @@ pub enum IpSockCreateAndSendError {
 pub enum SendOneShotIpPacketError<E> {
     CreateAndSendError { err: IpSockCreateAndSendError },
     SerializeError(E),
-}
-
-/// Extension trait for `Ip` providing socket-specific functionality.
-pub trait SocketIpExt: Ip + IpExt {
-    /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
-    const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
-        // SAFETY: The loopback address is a valid SocketIpAddr, as verified
-        // in the `loopback_addr_is_valid_socket_addr` test.
-        SocketIpAddr::new_from_specified_unchecked(Self::LOOPBACK_ADDRESS)
-    };
-}
-
-impl<I: Ip + IpExt> SocketIpExt for I {}
-
-#[cfg(test)]
-mod socket_ip_ext_test {
-    use super::*;
-    use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
-
-    #[ip_test]
-    fn loopback_addr_is_valid_socket_addr<I: Ip + SocketIpExt>() {
-        // `LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR is defined with the "unchecked"
-        // constructor (which supports const construction). Verify here that the
-        // addr actually satisfies all the requirements (protecting against far
-        // away changes)
-        let _addr = SocketIpAddr::new(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.addr())
-            .expect("loopback address should be a valid SocketIpAddr");
-    }
 }
 
 /// Maximum packet size, that is the maximum IP payload one packet can carry.
@@ -483,17 +454,16 @@ where
 
     // If the source or destination address require a device, make sure to
     // set that in the socket definition. Otherwise defer to what was provided.
-    let socket_device = (crate::socket::must_have_zone(src_addr.as_ref())
-        || crate::socket::must_have_zone(remote_ip.as_ref()))
-    .then(|| {
-        // NB: The route device might be loopback, and in such cases
-        // we want to bind the socket to the device the source IP is
-        // assigned to instead.
-        local_delivery_device.unwrap_or(route_device)
-    })
-    .as_ref()
-    .or(requested_device)
-    .map(|d| d.downgrade());
+    let socket_device = (src_addr.as_ref().must_have_zone() || remote_ip.as_ref().must_have_zone())
+        .then(|| {
+            // NB: The route device might be loopback, and in such cases
+            // we want to bind the socket to the device the source IP is
+            // assigned to instead.
+            local_delivery_device.unwrap_or(route_device)
+        })
+        .as_ref()
+        .or(requested_device)
+        .map(|d| d.downgrade());
 
     let definition =
         IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };

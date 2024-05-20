@@ -44,7 +44,7 @@ use crate::{
     ip::{
         socket::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
-            IpSocketHandler, SendOneShotIpPacketError, SendOptions, SocketIpExt,
+            IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
         EitherDeviceId, HopLimits, MulticastMembershipHandler, ResolveRouteError,
         TransportIpContext,
@@ -52,13 +52,14 @@ use crate::{
     socket::{
         self,
         address::{
-            dual_stack_remote_ip, try_unmap, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
-            DualStackConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr, TryUnmapResult,
+            AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
+            DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, ListenerAddr,
+            ListenerIpAddr, SocketIpAddr,
         },
         AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
-        NotDualStackCapableError, Shutdown, ShutdownType, SocketMapAddrSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, StrictlyZonedAddr,
+        NotDualStackCapableError, Shutdown, ShutdownType, SocketDeviceUpdate,
+        SocketDeviceUpdateNotAllowedError, SocketIpExt, SocketMapAddrSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec, StrictlyZonedAddr,
     },
     sync::{RemoveResourceResultWithContext, RwLock},
 };
@@ -2355,36 +2356,44 @@ fn listen_inner<
         }
         // There is dual-stack support and the address is not unspecified so how
         // to proceed is going to depend on the value of `addr`.
-        (MaybeDualStack::DualStack(dual_stack), Some(addr)) => match try_unmap(addr) {
-            // `addr` can't be represented in the other stack.
-            TryUnmapResult::CannotBeUnmapped(addr) => {
-                BoundOperation::OnlyCurrentStack(MaybeDualStack::DualStack(dual_stack), Some(addr))
+        (MaybeDualStack::DualStack(dual_stack), Some(addr)) => {
+            match DualStackLocalIp::<I, _>::new(addr) {
+                // `addr` can't be represented in the other stack.
+                DualStackLocalIp::ThisStack(addr) => BoundOperation::OnlyCurrentStack(
+                    MaybeDualStack::DualStack(dual_stack),
+                    Some(addr),
+                ),
+                // There's a representation in the other stack, so use that if possible.
+                DualStackLocalIp::OtherStack(addr) => {
+                    match dual_stack.dual_stack_enabled(ip_options) {
+                        true => BoundOperation::OnlyOtherStack(dual_stack, addr),
+                        false => return Err(Either::Right(LocalAddressError::CannotBindToAddress)),
+                    }
+                }
             }
-            // There's a representation in the other stack, so use that if possible.
-            TryUnmapResult::Mapped(addr) => match dual_stack.dual_stack_enabled(ip_options) {
-                true => BoundOperation::OnlyOtherStack(dual_stack, addr),
-                false => return Err(Either::Right(LocalAddressError::CannotBindToAddress)),
-            },
-        },
+        }
         // No dual-stack support, so only bind on the current stack.
         (MaybeDualStack::NotDualStack(single_stack), None) => {
             BoundOperation::OnlyCurrentStack(MaybeDualStack::NotDualStack(single_stack), None)
         }
         // No dual-stack support, so check the address is allowed in the current
         // stack.
-        (MaybeDualStack::NotDualStack(single_stack), Some(addr)) => match try_unmap(addr) {
-            // The address is only representable in the current stack.
-            TryUnmapResult::CannotBeUnmapped(addr) => BoundOperation::OnlyCurrentStack(
-                MaybeDualStack::NotDualStack(single_stack),
-                Some(addr),
-            ),
-            // The address has a representation in the other stack but there's
-            // no dual-stack support!
-            TryUnmapResult::Mapped(_addr) => {
-                let _: Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, _>> = _addr;
-                return Err(Either::Right(LocalAddressError::CannotBindToAddress));
+        (MaybeDualStack::NotDualStack(single_stack), Some(addr)) => {
+            match DualStackLocalIp::<I, _>::new(addr) {
+                // The address is only representable in the current stack.
+                DualStackLocalIp::ThisStack(addr) => BoundOperation::OnlyCurrentStack(
+                    MaybeDualStack::NotDualStack(single_stack),
+                    Some(addr),
+                ),
+                // The address has a representation in the other stack but there's
+                // no dual-stack support!
+                DualStackLocalIp::OtherStack(_addr) => {
+                    let _: Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, _>> =
+                        _addr;
+                    return Err(Either::Right(LocalAddressError::CannotBindToAddress));
+                }
             }
-        },
+        }
     };
 
     fn try_bind_single_stack<
@@ -3250,7 +3259,7 @@ pub(crate) fn connect<
     core_ctx.with_socket_state_mut(id, |core_ctx, state| {
         let (conn_state, sharing) = match (
             core_ctx.dual_stack_context(),
-            dual_stack_remote_ip::<I, _>(remote_ip.clone()),
+            DualStackRemoteIp::<I, _>::new(remote_ip.clone()),
         ) {
             (MaybeDualStack::DualStack(ds), remote_ip) => {
                 let connect_op = DualStackConnectOperation::new_from_state(
@@ -3775,7 +3784,7 @@ pub(crate) fn send_to<
 
         let (operation, shutdown) = match (
             core_ctx.dual_stack_context(),
-            dual_stack_remote_ip::<I, _>(remote_ip.clone()),
+            DualStackRemoteIp::<I, _>::new(remote_ip.clone()),
         ) {
             (MaybeDualStack::NotDualStack(_), DualStackRemoteIp::OtherStack(_)) => {
                 return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
@@ -4127,16 +4136,19 @@ fn set_bound_device_single_stack<
     };
     // Don't allow changing the device if one of the IP addresses in the
     // socket address vector requires a zone (scope ID).
-    if !socket::can_device_change(
-        local_ip.map(AsRef::<SpecifiedAddr<WireI::Addr>>::as_ref),
-        remote_ip.map(AsRef::<SpecifiedAddr<WireI::Addr>>::as_ref),
+    let device_update = SocketDeviceUpdate {
+        local_ip: local_ip.map(AsRef::<SpecifiedAddr<WireI::Addr>>::as_ref),
+        remote_ip: remote_ip.map(AsRef::<SpecifiedAddr<WireI::Addr>>::as_ref),
         old_device,
-        new_device,
-    ) {
-        return Err(SocketError::Local(LocalAddressError::Zone(
-            ZonedAddressError::DeviceZoneMismatch,
-        )));
-    }
+    };
+    match device_update.check_update(new_device) {
+        Ok(()) => (),
+        Err(SocketDeviceUpdateNotAllowedError) => {
+            return Err(SocketError::Local(LocalAddressError::Zone(
+                ZonedAddressError::DeviceZoneMismatch,
+            )));
+        }
+    };
 
     match params {
         SetBoundDeviceParameters::Listener { ip, device } => {

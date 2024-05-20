@@ -37,7 +37,7 @@ use crate::{
             AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr,
             SocketIpAddr,
         },
-        AddrVec, InsertError,
+        AddrVec, InsertError, SocketIpAddrExt as _,
     },
     trace_duration,
     transport::tcp::{
@@ -879,7 +879,7 @@ where
     // Ensure that if the remote address requires a zone, we propagate that to
     // the address for the connected socket.
     let bound_device = listener_addr.as_ref().clone();
-    let bound_device = if crate::socket::must_have_zone(remote_ip.as_ref()) {
+    let bound_device = if remote_ip.as_ref().must_have_zone() {
         Some(bound_device.map_or(EitherDeviceId::Strong(incoming_device), EitherDeviceId::Weak))
     } else {
         bound_device.map(EitherDeviceId::Weak)
