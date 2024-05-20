@@ -52,7 +52,10 @@ class NetDeviceDriverTest : public fdf_testing::DriverTestFixture<TestFixtureCon
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;
 
-  void TearDown() override { ShutdownDriver(); }
+  void TearDown() override {
+    ShutdownDriver();
+    port_impl_.WaitPortRemoved();
+  }
 
   void ShutdownDriver() {
     if (shutdown_) {
