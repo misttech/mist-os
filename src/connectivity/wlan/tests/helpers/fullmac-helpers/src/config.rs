@@ -13,7 +13,7 @@ use {
 /// These are primarily used to respond to SME query requests.
 /// By default, the configuration is a client with DEFAULT_CLIENT_STA_ADDR that
 /// supports 2.4 GHz bands and HT capabilities.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FullmacDriverConfig {
     pub query_info: fidl_fullmac::WlanFullmacQueryInfo,
     pub mac_sublayer_support: fidl_common::MacSublayerSupport,
