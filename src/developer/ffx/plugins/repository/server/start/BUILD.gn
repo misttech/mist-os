@@ -14,16 +14,15 @@ ffx_plugin("ffx_repository_server_start") {
 
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
-    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/network/fidl_fuchsia_net_ext",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
-    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/config:lib",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
