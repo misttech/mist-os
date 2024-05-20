@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::cmp::max;
+
 use crate::{
     client::types, config_management::FailureReason::CredentialRejected, util::pseudo_energy::*,
 };
@@ -12,7 +14,7 @@ const SNR_SCORE_WEIGHT: f32 = 0.4;
 /// Above or at this RSSI, we'll give 5G networks a preference
 const RSSI_CUTOFF_5G_PREFERENCE: i16 = -64;
 /// The score boost for 5G networks that we are giving preference to.
-const RSSI_5G_PREFERENCE_BOOST: i16 = 20;
+const MAX_5G_PREFERENCE_BOOST: i16 = 20;
 /// The amount to decrease the score by for each failed connection attempt.
 const SCORE_PENALTY_FOR_RECENT_CONNECT_FAILURE: i16 = 5;
 /// Excessive recent connect failures warrant a higher penalty.
@@ -30,9 +32,9 @@ pub fn score_bss_scanned_candidate(bss_candidate: types::ScannedCandidate) -> i1
     let mut score = bss_candidate.bss.signal.rssi_dbm as i16;
     let channel = bss_candidate.bss.channel;
 
-    // If the network is 5G and has a strong enough RSSI, give it a bonus
-    if channel.is_5ghz() && score >= RSSI_CUTOFF_5G_PREFERENCE {
-        score = score.saturating_add(RSSI_5G_PREFERENCE_BOOST);
+    // If the network is 5G and has a strong enough RSSI, give it a bonus.
+    if channel.is_5ghz() {
+        score = score.saturating_add(calculate_5g_bonus(score));
     }
 
     // Penalize APs with recent failures to connect
@@ -65,6 +67,13 @@ pub fn score_bss_scanned_candidate(bss_candidate: types::ScannedCandidate) -> i1
         .saturating_mul(SCORE_PENALTY_FOR_SHORT_CONNECTION);
 
     return score.saturating_sub(short_connection_score);
+}
+
+// Calculate a score bonus for 5GHz BSSs, based on the RSSI.
+fn calculate_5g_bonus(rssi: i16) -> i16 {
+    // Cap bonus at the maximum for RSSI >= RSSI_CUTOFF_5G_PREFERENCE. Reduce bonus by 2 for each
+    // dB/m below RSSI_CUTOFF_5G_PREFERENCE.
+    max(MAX_5G_PREFERENCE_BOOST - max(RSSI_CUTOFF_5G_PREFERENCE - rssi, 0) * 2, 0)
 }
 
 pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
@@ -438,5 +447,19 @@ mod test {
             score_current_connection_signal_data(weak_improving_signal),
             score_current_connection_signal_data(weak_stable_signal)
         );
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_5g_bonus_max_bonus_above_cutoff() {
+        assert_eq!(calculate_5g_bonus(RSSI_CUTOFF_5G_PREFERENCE), MAX_5G_PREFERENCE_BOOST);
+        assert_eq!(calculate_5g_bonus(RSSI_CUTOFF_5G_PREFERENCE + 1), MAX_5G_PREFERENCE_BOOST);
+    }
+
+    #[fuchsia::test]
+    fn test_calculate_5g_bonus_linear_decrease_below_cutoff() {
+        assert_eq!(calculate_5g_bonus(RSSI_CUTOFF_5G_PREFERENCE - 1), MAX_5G_PREFERENCE_BOOST - 2);
+        assert_eq!(calculate_5g_bonus(RSSI_CUTOFF_5G_PREFERENCE - 2), MAX_5G_PREFERENCE_BOOST - 4);
+        assert_eq!(calculate_5g_bonus(RSSI_CUTOFF_5G_PREFERENCE - 10), 0);
+        assert_eq!(calculate_5g_bonus(RSSI_CUTOFF_5G_PREFERENCE - 20), 0);
     }
 }
