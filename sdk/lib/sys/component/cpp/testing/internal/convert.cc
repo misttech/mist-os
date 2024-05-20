@@ -31,7 +31,6 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
     result.set_environment(std::string(options.environment));
   }
 
-#if __Fuchsia_API_level__ >= 13
   if (!options.config_overrides.empty()) {
     result.mutable_config_overrides()->reserve(options.config_overrides.size());
 
@@ -43,7 +42,6 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
       result.mutable_config_overrides()->push_back(std::move(override_clone));
     }
   }
-#endif
 
   return result;
 }
