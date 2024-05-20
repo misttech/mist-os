@@ -49,9 +49,9 @@ pub trait FidlRouteAdminIpExt: Ip {
     /// The "route table provider" protocol to use for this IP version.
     type RouteTableProviderMarker: DiscoverableProtocolMarker;
     /// The request stream for the route set protocol.
-    type RouteSetRequestStream: fidl::endpoints::RequestStream;
+    type RouteSetRequestStream: fidl::endpoints::RequestStream<Ok: Send, ControlHandle: Send>;
     /// The request stream for the route table protocol.
-    type RouteTableRequestStream: fidl::endpoints::RequestStream;
+    type RouteTableRequestStream: fidl::endpoints::RequestStream<Ok: Send, ControlHandle: Send>;
     /// The responder for AddRoute requests.
     type AddRouteResponder: Responder<Payload = Result<bool, fnet_routes_admin::RouteSetError>>;
     /// The responder for RemoveRoute requests.

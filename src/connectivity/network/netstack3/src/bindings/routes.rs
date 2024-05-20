@@ -70,6 +70,7 @@ pub(crate) enum Change<A: IpAddress> {
     RouteOp(RouteOp<A>, WeakSetMembership<A::Version>),
     RemoveSet(WeakUserRouteSet<A::Version>),
     RemoveMatchingDevice(WeakDeviceId),
+    RemoveTable(TableId<A::Version>),
 }
 
 pub(crate) enum ChangeEither {
@@ -422,12 +423,32 @@ where
         loop {
             futures::select_biased!(
                 route_work_item = route_work_receivers.next() => {
-                    let Some((Some(route_work_item), rest)) = route_work_item else {
+                    let Some((Some(route_work_item), mut rest)) = route_work_item else {
                         continue;
                     };
+                    let removing =  matches!(route_work_item, RouteWorkItem {
+                        change: Change::RemoveTable(_),
+                        responder: _,
+                    });
+                    // No new requests will be accepted.
+                    if removing {
+                        rest.close();
+                    }
                     Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item)
                         .await;
-                    route_work_receivers.push(rest.into_future());
+                    if removing {
+                        rest.filter_map(|RouteWorkItem {
+                            change: _,
+                            responder,
+                        }| futures::future::ready(responder))
+                        .for_each(|responder| futures::future::ready(
+                            responder.send(Err(ChangeError::TableRemoved)).unwrap_or_else(|err| {
+                                tracing::error!("failed to respond to the change request: {err:?}");
+                            })
+                        )).await;
+                    } else {
+                        route_work_receivers.push(rest.into_future());
+                    }
                 },
                 table_work_item = table_work_receiver.next() => {
                     let Some(table_work_item) = table_work_item else {
@@ -535,6 +556,7 @@ where
         | Change::RouteOp(_, SetMembership::CoreNdp)
         | Change::RouteOp(_, SetMembership::InitialDeviceRoutes)
         | Change::RouteOp(_, SetMembership::Loopback) => main_table_id::<I>(),
+        Change::RemoveTable(table_id) => *table_id,
     };
 
     let table = tables.get_mut(&table_id).expect("missing table {table_id:?}");
@@ -612,20 +634,31 @@ where
                 return Ok(ChangeOutcome::NoChange);
             }
             TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
-                itertools::Either::Right(entries.into_iter()),
+                itertools::Either::Right(itertools::Either::Left(entries.into_iter())),
+            )))
+        }
+        Change::RemoveTable(_table_id) => {
+            let removed = std::mem::take(&mut table.inner)
+                .into_iter()
+                .map(|(entry, EntryData { generation, set_membership: _ })| (entry, generation));
+            TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
+                itertools::Either::Right(itertools::Either::Right(removed)),
             )))
         }
     };
 
-    let new_routes = table
-        .inner
-        .iter()
-        .map(|(entry, data)| {
-            let device_metric = ctx.api().device_ip::<I>().get_routing_metric(&entry.device);
-            entry.clone().resolve_metric(device_metric).with_generation(data.generation)
-        })
-        .collect::<Vec<_>>();
-    ctx.api().routes::<I>().set_routes(new_routes);
+    // TODO(https://fxbug.dev/341194323): Store all route tables in Core.
+    if table_id.is_main() {
+        let new_routes = table
+            .inner
+            .iter()
+            .map(|(entry, data)| {
+                let device_metric = ctx.api().device_ip::<I>().get_routing_metric(&entry.device);
+                entry.clone().resolve_metric(device_metric).with_generation(data.generation)
+            })
+            .collect::<Vec<_>>();
+        ctx.api().routes::<I>().set_routes(new_routes);
+    }
 
     match table_change {
         TableChange::Add(entry) => {

@@ -4,7 +4,11 @@
 
 use std::{borrow::BorrowMut, collections::HashSet, pin::pin};
 
-use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
+use assert_matches::assert_matches;
+use async_utils::event::Event;
+use fidl::endpoints::{
+    ControlHandle as _, ProtocolMarker as _, RequestStream as _, Responder as _,
+};
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
@@ -15,7 +19,7 @@ use fnet_routes_ext::{
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
 use futures::{
     channel::{mpsc, oneshot},
-    TryStream, TryStreamExt as _,
+    Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _,
 };
 use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
@@ -29,54 +33,61 @@ use crate::bindings::{
 
 use super::{RouteWorkItem, WeakDeviceId};
 
-async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
-    stream: I::RouteSetRequestStream,
-    mut route_set: UserRouteSet<I>,
-) {
-    serve_route_set::<I, UserRouteSet<I>, _>(stream, &mut route_set).await;
-
-    route_set.close().await;
-}
-
 pub(crate) async fn serve_route_set<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     R: RouteSet<I>,
     B: BorrowMut<R>,
+    C: Future<Output = ()>,
 >(
     stream: I::RouteSetRequestStream,
     mut route_set: B,
+    cancel_token: C,
 ) {
     let debug_name = match I::VERSION {
         IpVersion::V4 => "RouteSetV4",
         IpVersion::V6 => "RouteSetV6",
     };
 
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct In<I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
-        <I::RouteSetRequestStream as TryStream>::Ok,
-    );
-
-    stream
-        .try_fold(route_set.borrow_mut(), |route_set, request| async {
-            let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
+    let mut cancel_token = pin!(cancel_token.fuse());
+    let control_handle = stream.control_handle();
+    let mut stream = stream
+        .map_ok(|request| {
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct In<I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
+                <I::RouteSetRequestStream as TryStream>::Ok,
+            );
+            net_types::map_ip_twice!(I, In(request), |In(request)| {
                 fnet_routes_ext::admin::RouteSetRequest::<I>::from(request)
-            });
-
-            route_set.handle_request(request).await.unwrap_or_else(|e| {
-                if !e.is_closed() {
-                    tracing::error!("error handling {debug_name} request: {e:?}");
-                }
-            });
-            Ok(route_set)
+            })
         })
-        .await
-        .map(|_| ())
-        .unwrap_or_else(|e| {
-            if !e.is_closed() {
-                tracing::error!("error serving {debug_name}: {e:?}");
-            }
-        });
+        .into_stream()
+        .fuse();
+
+    loop {
+        futures::select_biased! {
+            () = cancel_token => {
+                control_handle.shutdown_with_epitaph(zx::Status::UNAVAILABLE);
+                break;
+            },
+            request = stream.try_next() => match request {
+                Ok(Some(request)) => {
+                    route_set.borrow_mut().handle_request(request).await.unwrap_or_else(|e| {
+                        if !e.is_closed() {
+                            tracing::error!("error handling {debug_name} request: {e:?}");
+                        }
+                    });
+                },
+                Err(err) => {
+                    if !err.is_closed() {
+                        tracing::error!("error handling {debug_name} request: {err:?}");
+                    }
+                    break;
+                }
+                Ok(None) => break,
+            },
+        }
+    }
 }
 
 pub(crate) async fn serve_route_table_provider_v4(
@@ -164,38 +175,71 @@ pub(crate) async fn serve_route_table<
 >(
     stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
     spawner: TaskWaitGroupSpawner,
-    mut route_table: B,
-) where
-    <I::RouteSetRequestStream as TryStream>::Ok: Send,
-{
-    let debug_name = I::RouteTableMarker::DEBUG_NAME;
+    route_table: B,
+) {
+    serve_route_table_inner(stream, spawner, route_table).await.unwrap_or_else(|err| {
+        if !err.is_closed() {
+            tracing::error!("error while serving {}: {err:?}", I::RouteTableMarker::DEBUG_NAME);
+        }
+    });
+}
 
+async fn serve_route_table_inner<
+    I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    R: RouteTable<I>,
+    B: BorrowMut<R>,
+>(
+    mut stream: <I as FidlRouteAdminIpExt>::RouteTableRequestStream,
+    spawner: TaskWaitGroupSpawner,
+    mut route_table: B,
+) -> Result<(), fidl::Error> {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     struct In<I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
         <I::RouteTableRequestStream as TryStream>::Ok,
     );
 
-    stream
-        .try_fold(route_table.borrow_mut(), |route_table, request| async {
-            let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
-                fnet_routes_ext::admin::RouteTableRequest::<I>::from(request)
-            });
-
-            route_table.handle_request(request, spawner.clone()).unwrap_or_else(|e| {
-                if !e.is_closed() {
-                    tracing::error!("error handling {debug_name} request: {e:?}");
-                }
-            });
-            Ok(route_table)
-        })
-        .await
-        .map(|_| ())
-        .unwrap_or_else(|e| {
-            if !e.is_closed() {
-                tracing::error!("error serving {debug_name}: {e:?}");
+    while let Some(request) = stream.try_next().await? {
+        let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
+            fnet_routes_ext::admin::RouteTableRequest::<I>::from(request)
+        });
+        match request {
+            RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
+                let set_request_stream = route_set.into_stream()?;
+                route_table.borrow().serve_user_route_set(spawner.clone(), set_request_stream);
             }
-        })
+            RouteTableRequest::GetTableId { responder } => {
+                responder.send(route_table.borrow().id().into())?;
+            }
+            RouteTableRequest::Detach { control_handle: _ } => {}
+            RouteTableRequest::Remove { responder } => {
+                let fidl_result = match route_table.borrow_mut().remove().await {
+                    Ok(()) | Err(TableRemoveError::Removed) => Ok(()),
+                    Err(TableRemoveError::InvalidOp) => {
+                        Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable)
+                    }
+                };
+                responder.send(fidl_result)?;
+                break;
+            }
+            RouteTableRequest::GetAuthorizationForRouteTable { responder } => {
+                responder.send(fnet_routes_admin::GrantForRouteTableAuthorization {
+                    table_id: route_table.borrow().id().into(),
+                    token: route_table.borrow().token(),
+                })?;
+            }
+        }
+    }
+
+    // TODO(https://fxbug.dev/337868190): match on the result when detach is
+    // implemented.
+    let _: Result<(), _> = route_table.borrow_mut().remove().await;
+    Ok(())
+}
+
+pub(crate) enum TableRemoveError {
+    Removed,
+    InvalidOp,
 }
 
 /// The common trait for operations on route table.
@@ -207,43 +251,9 @@ pub(crate) trait RouteTable<I: FidlRouteAdminIpExt + FidlRouteIpExt>: Send + Syn
     /// Gets the token for authorization.
     fn token(&self) -> zx::Event;
     /// Removes this route table from the system.
-    fn remove(&mut self) -> Result<(), fnet_routes_admin::BaseRouteTableRemoveError>;
-    /// Returns a new [`UserRouteSet`] to modify this route table.
-    fn new_user_route_set(&self) -> UserRouteSet<I>;
-
-    /// Handles an incoming FIDL request.
-    fn handle_request(
-        &mut self,
-        request: RouteTableRequest<I>,
-        spawner: TaskWaitGroupSpawner,
-    ) -> Result<(), fidl::Error>
-    where
-        <I::RouteSetRequestStream as TryStream>::Ok: Send,
-    {
-        match request {
-            RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
-                let set_request_stream = route_set.into_stream()?;
-                spawner.spawn(serve_user_route_set::<I>(
-                    set_request_stream,
-                    self.new_user_route_set(),
-                ));
-            }
-            RouteTableRequest::GetTableId { responder } => {
-                responder.send(self.id().into())?;
-            }
-            RouteTableRequest::Detach { control_handle: _ } => {}
-            RouteTableRequest::Remove { responder } => {
-                responder.send(self.remove())?;
-            }
-            RouteTableRequest::GetAuthorizationForRouteTable { responder } => {
-                responder.send(fnet_routes_admin::GrantForRouteTableAuthorization {
-                    table_id: self.id().into(),
-                    token: self.token(),
-                })?;
-            }
-        };
-        Ok(())
-    }
+    async fn remove(&mut self) -> Result<(), TableRemoveError>;
+    /// Serves the user route set.
+    fn serve_user_route_set(&self, spawner: TaskWaitGroupSpawner, stream: I::RouteSetRequestStream);
 }
 
 pub(crate) struct MainRouteTable {
@@ -267,11 +277,24 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
             .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
             .expect("failed to duplicate")
     }
-    fn remove(&mut self) -> Result<(), fnet_routes_admin::BaseRouteTableRemoveError> {
-        Err(fnet_routes_admin::BaseRouteTableRemoveError::InvalidOpOnMainTable)
+    async fn remove(&mut self) -> Result<(), TableRemoveError> {
+        Err(TableRemoveError::InvalidOp)
     }
-    fn new_user_route_set(&self) -> UserRouteSet<I> {
-        UserRouteSet::from_main_table(self.ctx.clone())
+    fn serve_user_route_set(
+        &self,
+        spawner: TaskWaitGroupSpawner,
+        stream: I::RouteSetRequestStream,
+    ) {
+        let mut user_route_set = UserRouteSet::from_main_table(self.ctx.clone());
+        spawner.spawn(async move {
+            serve_route_set::<I, UserRouteSet<I>, _, _>(
+                stream,
+                &mut user_route_set,
+                std::future::pending(), /* never cancelled */
+            )
+            .await;
+            user_route_set.close().await
+        })
     }
 }
 
@@ -283,6 +306,7 @@ pub(crate) struct UserRouteTable<I: Ip> {
     table_id: TableId<I>,
     token: zx::Event,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
+    cancel_event: Event,
 }
 
 impl<I: Ip> UserRouteTable<I> {
@@ -293,7 +317,7 @@ impl<I: Ip> UserRouteTable<I> {
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
     ) -> Self {
         let token = zx::Event::create();
-        Self { ctx, _name: name, table_id, token, route_work_sink }
+        Self { ctx, _name: name, table_id, token, route_work_sink, cancel_event: Event::new() }
     }
 }
 
@@ -306,11 +330,47 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
             .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
             .expect("failed to duplicate")
     }
-    fn remove(&mut self) -> Result<(), fnet_routes_admin::BaseRouteTableRemoveError> {
-        todo!("https://fxbug.dev/337065118: Support table removal")
+    async fn remove(&mut self) -> Result<(), TableRemoveError> {
+        let (responder, receiver) = oneshot::channel();
+        let work_item = RouteWorkItem {
+            change: routes::Change::RemoveTable(self.table_id),
+            responder: Some(responder),
+        };
+        match self.route_work_sink.unbounded_send(work_item) {
+            Ok(()) => {
+                self.route_work_sink.close_channel();
+                let result = receiver.await.expect("responder should not be dropped");
+                assert_matches!(
+                    result,
+                    Ok(routes::ChangeOutcome::Changed | routes::ChangeOutcome::NoChange)
+                );
+                Ok(())
+            }
+            Err(e) => {
+                let _: mpsc::TrySendError<_> = e;
+                Err(TableRemoveError::Removed)
+            }
+        }
     }
-    fn new_user_route_set(&self) -> UserRouteSet<I> {
-        UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone())
+    fn serve_user_route_set(
+        &self,
+        spawner: TaskWaitGroupSpawner,
+        stream: I::RouteSetRequestStream,
+    ) {
+        let mut user_route_set =
+            UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone());
+        // We never signal the event, only wait for the signaler to be dropped.
+        let cancel_token = {
+            let wait_or_dropped = self.cancel_event.wait_or_dropped();
+            async move {
+                assert_matches!(wait_or_dropped.await, Err(async_utils::event::Dropped));
+            }
+        };
+        spawner.spawn(async move {
+            serve_route_set::<I, UserRouteSet<I>, _, _>(stream, &mut user_route_set, cancel_token)
+                .await;
+            user_route_set.close().await;
+        })
     }
 }
 
@@ -463,6 +523,16 @@ impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum ModifyTableError {
+    #[error("backing route table is removed")]
+    TableRemoved,
+    #[error("route set error: {0:?}")]
+    RouteSetError(fnet_routes_admin::RouteSetError),
+    #[error("fidl error: {0:?}")]
+    Fidl(#[from] fidl::Error),
+}
+
 pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId<I>>>;
     fn ctx(&self) -> &Ctx;
@@ -482,8 +552,15 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
                     }
                 };
 
-                let result = self.add_fidl_route(route).await;
-                responder.send(result)
+                match self.add_fidl_route(route).await {
+                    Ok(modified) => responder.send(Ok(modified)),
+                    Err(ModifyTableError::Fidl(err)) => Err(err),
+                    Err(ModifyTableError::RouteSetError(err)) => responder.send(Err(err)),
+                    Err(ModifyTableError::TableRemoved) => {
+                        responder.control_handle().shutdown_with_epitaph(zx::Status::UNAVAILABLE);
+                        Ok(())
+                    }
+                }
             }
             RouteSetRequest::RemoveRoute { route, responder } => {
                 let route = match route {
@@ -493,8 +570,15 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
                     }
                 };
 
-                let result = self.remove_fidl_route(route).await;
-                responder.send(result)
+                match self.remove_fidl_route(route).await {
+                    Ok(modified) => responder.send(Ok(modified)),
+                    Err(ModifyTableError::Fidl(err)) => Err(err),
+                    Err(ModifyTableError::RouteSetError(err)) => responder.send(Err(err)),
+                    Err(ModifyTableError::TableRemoved) => {
+                        responder.control_handle().shutdown_with_epitaph(zx::Status::UNAVAILABLE);
+                        Ok(())
+                    }
+                }
             }
             RouteSetRequest::AuthenticateForInterface { credential, responder } => {
                 responder.send(self.authenticate_for_interface(credential))
@@ -528,12 +612,15 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     async fn add_fidl_route(
         &self,
         route: fnet_routes_ext::Route<I>,
-    ) -> Result<bool, fnet_routes_admin::RouteSetError> {
-        let addable_entry = try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)?
+    ) -> Result<bool, ModifyTableError> {
+        let addable_entry = try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)
+            .map_err(ModifyTableError::RouteSetError)?
             .map_device_id(|d| d.downgrade());
 
         if !self.authorization_set().contains(&addable_entry.device) {
-            return Err(fnet_routes_admin::RouteSetError::Unauthenticated);
+            return Err(ModifyTableError::RouteSetError(
+                fnet_routes_admin::RouteSetError::Unauthenticated,
+            ));
         }
 
         let result = self.apply_route_op(routes::RouteOp::Add(addable_entry)).await;
@@ -545,9 +632,11 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
             },
             Err(err) => match err {
                 routes::ChangeError::DeviceRemoved => Err(
-                    fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists,
+                    ModifyTableError::RouteSetError(fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists),
                 ),
-                routes::ChangeError::TableRemoved => panic!("the route table has been removed"),
+                routes::ChangeError::TableRemoved => Err(
+                    ModifyTableError::TableRemoved
+                ),
                 routes::ChangeError::SetRemoved => unreachable!(
                     "SetRemoved should not be observable while holding a route set, \
                     as `RouteSet::close()` takes ownership of `self`"
@@ -559,13 +648,16 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     async fn remove_fidl_route(
         &self,
         route: fnet_routes_ext::Route<I>,
-    ) -> Result<bool, fnet_routes_admin::RouteSetError> {
+    ) -> Result<bool, ModifyTableError> {
         let AddableEntry { subnet, device, gateway, metric } =
-            try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)?
+            try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)
+                .map_err(ModifyTableError::RouteSetError)?
                 .map_device_id(|d| d.downgrade());
 
         if !self.authorization_set().contains(&device) {
-            return Err(fnet_routes_admin::RouteSetError::Unauthenticated);
+            return Err(ModifyTableError::RouteSetError(
+                fnet_routes_admin::RouteSetError::Unauthenticated,
+            ));
         }
 
         let result = self
@@ -584,9 +676,11 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
             },
             Err(err) => match err {
                 routes::ChangeError::DeviceRemoved => Err(
-                    fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists,
+                    ModifyTableError::RouteSetError(fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists),
                 ),
-                routes::ChangeError::TableRemoved => panic!("the route table has been removed"),
+                routes::ChangeError::TableRemoved => Err(
+                    ModifyTableError::TableRemoved
+                ),
                 routes::ChangeError::SetRemoved => unreachable!(
                     "SetRemoved should not be observable while holding a route set, \
                     as `RouteSet::close()` takes ownership of `self`"

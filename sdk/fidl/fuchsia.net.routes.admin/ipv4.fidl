@@ -62,6 +62,9 @@ closed protocol RouteTableProviderV4 {
 /// Note that the system reserves the right to remove routes out from underneath
 /// this route set. This will always manifest as a `removed` event on the
 /// [`fuchsia.net.routes/WatcherV4`] protocol.
+///
+/// If the route table backing this route set is removed, then this protocol
+/// will be closed with a `ZX_ERR_UNAVAILABLE` epitaph.
 closed protocol RouteSetV4 {
     /// Authenticate this route set to manage routes on the provided interface.
     /// Authentication is valid for the lifetime of the route set.

@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 
 use assert_matches::assert_matches;
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::{ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -198,6 +198,10 @@ async fn add_remove_route<
     };
 
     let proxy = add_route_and_assert_added(proxy).await;
+
+    // Dropping the channel to the main route table should not remove the table
+    // nor any routes in it.
+    std::mem::drop(route_table);
 
     fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
         routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
@@ -1569,4 +1573,52 @@ async fn add_route_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteI
     let user_table_id =
         fnet_routes_ext::admin::get_table_id::<I>(&user_route_table).await.expect("get table id");
     assert_ne!(main_table_id, user_table_id);
+}
+
+#[netstack_test]
+#[test_case(true; "explicitly remove")]
+#[test_case(false; "dropping the proxy")]
+async fn route_set_closed_when_table_removed<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+>(
+    name: &str,
+    explicit_remove: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let realm = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let user_route_table =
+        fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+            .expect("create new user table");
+    let user_route_set = fnet_routes_ext::admin::new_route_set::<I>(&user_route_table)
+        .expect("failed to create new route set");
+
+    if explicit_remove {
+        fnet_routes_ext::admin::remove_route_table::<I>(&user_route_table)
+            .await
+            .expect("fidl should succeed")
+            .expect("removal should succeed");
+        assert!(user_route_table.is_closed());
+    } else {
+        std::mem::drop(user_route_table);
+    }
+
+    let channel = user_route_set
+        .into_channel()
+        .unwrap_or_else(|_err| panic!("failed to turn a proxy into a channel"));
+    let client = fidl::client::Client::new(channel, I::RouteSetMarker::DEBUG_NAME);
+    let mut event_receiver = client.take_event_receiver();
+    assert_matches!(
+        event_receiver.next().await,
+        Some(Err(fidl::Error::ClientChannelClosed {
+            status: zx::Status::UNAVAILABLE,
+            protocol_name: _,
+        }))
+    );
+    assert_matches!(event_receiver.next().await, None);
 }
