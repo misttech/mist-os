@@ -48,7 +48,7 @@ fuchsia::component::test::ChildOptions ConvertToFidl(const ChildOptions& options
 }
 
 namespace {
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 std::string NameFromDictionaryRef(const DictionaryRef& ref) {
   size_t delim = ref.path.find('/');
   if (delim == std::string_view::npos || ref.path.substr(0, delim) != "self") {
@@ -86,7 +86,7 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto _ = cpp17_get_if<SelfRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithSelf(fuchsia::component::decl::SelfRef());
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (auto dictionary_ref = cpp17_get_if<DictionaryRef>(&ref)) {
     fuchsia::component::decl::CapabilityRef result;
     result.name = NameFromDictionaryRef(*dictionary_ref);
