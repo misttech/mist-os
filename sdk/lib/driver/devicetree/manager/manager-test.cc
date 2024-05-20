@@ -19,10 +19,10 @@
 #include <utility>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/devicetree/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 
 #include "manager-test-helper.h"
 #include "test-data/basic-properties.h"
@@ -468,12 +468,13 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
 
   EXPECT_TRUE(testing::CheckHasProperties(
       {{
-          fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       }},
       (*mgr_request.parents())[0].properties(), true));
   EXPECT_TRUE(testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                  bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       },
       (*mgr_request.parents())[0].bind_rules(), true));
 
