@@ -978,7 +978,7 @@ pub(crate) trait IpLayerEgressContext<I, BC>:
     IpDeviceSendContext<I, BC, DeviceId = Self::DeviceId_> + FilterHandlerProvider<I, BC>
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsTypes,
+    BC: FilterBindingsContext,
 {
     // This is working around the fact that currently, where clauses are only
     // elaborated for supertraits, and not, for example, bounds on associated types
@@ -994,7 +994,7 @@ where
 impl<I, BC, CC> IpLayerEgressContext<I, BC> for CC
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsTypes,
+    BC: FilterBindingsContext,
     CC: IpDeviceSendContext<I, BC> + FilterHandlerProvider<I, BC>,
     Self::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
@@ -1507,7 +1507,12 @@ fn dispatch_receive_ipv4_packet<
 
     let proto = packet.proto();
 
-    match core_ctx.filter_handler().local_ingress_hook(&mut packet, device, &mut packet_metadata) {
+    match core_ctx.filter_handler().local_ingress_hook(
+        bindings_ctx,
+        &mut packet,
+        device,
+        &mut packet_metadata,
+    ) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
             return Ok(());
@@ -1589,7 +1594,12 @@ fn dispatch_receive_ipv6_packet<
 
     let proto = packet.proto();
 
-    match core_ctx.filter_handler().local_ingress_hook(&mut packet, device, &mut packet_metadata) {
+    match core_ctx.filter_handler().local_ingress_hook(
+        bindings_ctx,
+        &mut packet,
+        device,
+        &mut packet_metadata,
+    ) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
             return Ok(());
@@ -1655,13 +1665,17 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
 ) -> Result<(), S>
 where
     I: IpLayerIpExt,
-    BC: FilterBindingsTypes,
+    BC: FilterBindingsContext,
     CC: IpLayerEgressContext<I, BC>,
     S: Serializer + IpPacket<I>,
     S::Buffer: BufferMut,
 {
-    let (verdict, proof) =
-        core_ctx.filter_handler().egress_hook(&mut body, device, &mut packet_metadata);
+    let (verdict, proof) = core_ctx.filter_handler().egress_hook(
+        bindings_ctx,
+        &mut body,
+        device,
+        &mut packet_metadata,
+    );
     match verdict {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
@@ -1937,7 +1951,7 @@ pub(crate) fn receive_ipv4_packet<
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     let mut filter = core_ctx.filter_handler();
-    match filter.ingress_hook(&mut packet, device, &mut packet_metadata) {
+    match filter.ingress_hook(bindings_ctx, &mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(crate::filter::Verdict::Accept) => {}
         IngressVerdict::Verdict(crate::filter::Verdict::Drop) => {
             packet_metadata.acknowledge_drop();
@@ -2227,7 +2241,7 @@ pub(crate) fn receive_ipv6_packet<
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
     let mut filter = core_ctx.filter_handler();
-    match filter.ingress_hook(&mut packet, device, &mut packet_metadata) {
+    match filter.ingress_hook(bindings_ctx, &mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(crate::filter::Verdict::Accept) => {}
         IngressVerdict::Verdict(crate::filter::Verdict::Drop) => {
             packet_metadata.acknowledge_drop();

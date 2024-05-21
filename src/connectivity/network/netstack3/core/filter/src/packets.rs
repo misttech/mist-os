@@ -1025,8 +1025,6 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
 
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
-    use alloc::vec::Vec;
-
     use super::*;
 
     // Note that we could choose to implement `MaybeTransportPacket` for these
@@ -1056,7 +1054,7 @@ pub mod testutil {
         type TransportPacket = Never;
 
         fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-            unimplemented!()
+            None
         }
     }
 
@@ -1064,23 +1062,7 @@ pub mod testutil {
         type TransportPacketMut<'a> = Never where Self: 'a;
 
         fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
-            unimplemented!()
-        }
-    }
-
-    impl MaybeTransportPacket for Buf<Vec<u8>> {
-        type TransportPacket = Never;
-
-        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-            unimplemented!()
-        }
-    }
-
-    impl<I: IpExt> MaybeTransportPacketMut<I> for Buf<Vec<u8>> {
-        type TransportPacketMut<'a> = Never;
-
-        fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
-            unimplemented!()
+            None
         }
     }
 

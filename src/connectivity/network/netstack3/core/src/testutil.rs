@@ -59,7 +59,7 @@ use crate::{
         EthernetWeakDeviceId, PureIpDeviceId, PureIpWeakDeviceId, ReceiveQueueBindingsContext,
         TransmitQueueBindingsContext, WeakDeviceId,
     },
-    filter::FilterBindingsTypes,
+    filter::{FilterBindingsTypes, FilterTimerId},
     ip::{
         device::{
             config::{
@@ -72,11 +72,11 @@ use crate::{
         icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
         raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         types::{AddableEntry, AddableMetric, RawMetric},
-        IpDeviceConfiguration, IpLayerEvent,
+        IpDeviceConfiguration, IpLayerEvent, IpLayerTimerId,
     },
     state::{StackState, StackStateBuilder},
     sync::{DynDebugReferences, Mutex},
-    time::TimerId,
+    time::{TimerId, TimerIdInner},
     transport::{
         tcp::{
             buffer::{
@@ -750,6 +750,16 @@ impl TimerContext for FakeBindingsCtx {
         time: Self::Instant,
         timer: &mut Self::Timer,
     ) -> Option<Self::Instant> {
+        // Filter out conntrack GC timers. We don't need conntrack GC in most
+        // tests, and this causes issues with tests that are expecting the
+        // netstack to quiesce.
+        match timer.dispatch_id.0 {
+            TimerIdInner::IpLayer(IpLayerTimerId::FilterTimerv4(FilterTimerId::ConntrackGc(_)))
+            | TimerIdInner::IpLayer(IpLayerTimerId::FilterTimerv6(FilterTimerId::ConntrackGc(_))) => {
+                return None
+            }
+            _ => {}
+        }
         self.with_inner_mut(|ctx| ctx.schedule_timer_instant(time, timer))
     }
 

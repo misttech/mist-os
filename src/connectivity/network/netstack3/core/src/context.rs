@@ -185,7 +185,7 @@ pub(crate) mod testutil {
     use core::fmt::Debug;
 
     #[cfg(test)]
-    use crate::filter::{FilterBindingsTypes, FilterHandlerProvider};
+    use crate::filter::{FilterBindingsContext, FilterHandlerProvider};
     use crate::{
         device::link::LinkDevice,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
@@ -229,7 +229,7 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<I: packet_formats::ip::IpExt, BC: FilterBindingsTypes, S, Meta, DeviceId>
+    impl<I: packet_formats::ip::IpExt, BC: FilterBindingsContext, S, Meta, DeviceId>
         FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
     {
         type Handler<'a> = crate::filter::NoopImpl where Self: 'a;

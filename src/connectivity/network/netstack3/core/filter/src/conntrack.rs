@@ -120,7 +120,6 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
     ///
     /// This is on [`Table`] instead of [`Connection`] because conntrack needs
     /// to be able to manipulate its internal map.
-    #[allow(dead_code)]
     pub(crate) fn finalize_connection(
         &self,
         bindings_ctx: &mut BC,
@@ -218,7 +217,6 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
     /// After processing is complete, you must call
     /// [`finalize_connection`](Table::finalize_connection) with this
     /// connection.
-    #[allow(dead_code)]
     pub(crate) fn get_connection_for_packet_and_update<P: IpPacket<I>>(
         &self,
         bindings_ctx: &BC,

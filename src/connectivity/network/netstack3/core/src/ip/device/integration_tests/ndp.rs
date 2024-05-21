@@ -1033,7 +1033,7 @@ fn test_sending_ipv6_packet_after_hop_limit_change() {
                 ttl: None,
                 mtu: None,
             },
-            Buf::new(vec![0; 10], ..),
+            [].into_serializer(),
         )
         .unwrap();
         let frames = bindings_ctx.take_ethernet_frames();

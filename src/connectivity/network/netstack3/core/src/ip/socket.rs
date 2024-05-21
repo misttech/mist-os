@@ -22,7 +22,7 @@ use crate::{
         WeakDeviceIdentifier as _,
     },
     filter::{
-        FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
+        FilterBindingsContext, FilterHandler as _, FilterHandlerProvider, TransportPacketSerializer,
     },
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
@@ -321,8 +321,8 @@ impl<I: IpExt, D> IpSock<I, D> {
 // raw IP sockets once we support those.
 
 /// The bindings execution context for IP sockets.
-pub trait IpSocketBindingsContext: InstantContext + TracingContext + FilterBindingsTypes {}
-impl<BC: InstantContext + TracingContext + FilterBindingsTypes> IpSocketBindingsContext for BC {}
+pub trait IpSocketBindingsContext: InstantContext + TracingContext + FilterBindingsContext {}
+impl<BC: InstantContext + TracingContext + FilterBindingsContext> IpSocketBindingsContext for BC {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
@@ -512,7 +512,12 @@ where
         crate::filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
-    match core_ctx.filter_handler().local_egress_hook(&mut packet, &device, &mut packet_metadata) {
+    match core_ctx.filter_handler().local_egress_hook(
+        bindings_ctx,
+        &mut packet,
+        &device,
+        &mut packet_metadata,
+    ) {
         crate::filter::Verdict::Drop => {
             packet_metadata.acknowledge_drop();
             return Ok(());
@@ -1099,7 +1104,7 @@ pub(crate) mod testutil {
     impl<I, BC, D, State, Meta> TransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
         I: IpExt,
-        BC: InstantContext + TracingContext + FilterBindingsTypes,
+        BC: InstantContext + TracingContext + FilterBindingsContext,
         D: FakeStrongDeviceId,
         State: TransportIpContext<I, BC, DeviceId = D>,
         Self: IpSocketHandler<I, BC, DeviceId = D, WeakDeviceId = FakeWeakDeviceId<D>>,

@@ -8,12 +8,12 @@ use packet_formats::ip::IpExt;
 
 use crate::{
     filter::{
-        FilterBindingsTypes, FilterContext, FilterHandler, FilterImpl, FilterIpContext, State,
+        FilterBindingsContext, FilterContext, FilterHandler, FilterImpl, FilterIpContext, State,
     },
     BindingsContext, CoreCtx, StackState,
 };
 
-pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsTypes> {
+pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsContext> {
     type Handler<'a>: FilterHandler<I, BC>
     where
         Self: 'a;
