@@ -28,9 +28,9 @@ below are correlated with the numbers in the diagram.
    graph inside `/dev/sys/platform/00:00:30`
 5. RootCanal detects bt-hci-virtual in `/dev/sys/platform/00:00:30` and calls
    [`create_loopback_device()`](https://source.corp.google.com/h/turquoise-internal/turquoise/+/main:src/connectivity/bluetooth/tools/bt-rootcanal/src/main.rs;l=91)
-6. bt-hci-virtual uses the LoopbackDevice class to add a device node
-   (bt-loopback-device) to the node graph inside `/dev/class/bt-hci`
-7. bt-init detects bt-loopback-device in `/dev/class/bt-hci` and creates a new
+6. bt-hci-virtual uses the LoopbackDevice class to add a device node (loopback)
+   to the node graph inside `/dev/class/bt-hci`
+7. bt-init detects the LoopbackDevice in `/dev/class/bt-hci` and creates a new
    bt-host component
 
 ```
@@ -64,13 +64,11 @@ below are correlated with the numbers in the diagram.
 ## EmulatorDevice
 
 EmulatorDevice is used for Bluetooth integration tests. The
-[fuchsia.bluetooth.test.HciEmulator](//sdk/fidl/fuchsia.bluetooth.test/hci_emulator.fidl)
-and
 [fuchsia.hardware.bluetooth.Emulator](//sdk/fidl/fuchsia.hardware.bluetooth/virtual.fidl)
-APIs are used to establish and interact with the EmulatorDevice. The step
-numbers below are correlated with the numbers in the diagram. Please note that
-the term “emulator” is heavily overloaded, so it’s important to be precise when
-using the term.
+API is used to establish and interact with the EmulatorDevice. The step numbers
+below are correlated with the numbers in the diagram. Please note that the term
+“emulator” is heavily overloaded, so it’s important to be precise when using the
+term.
 
 ### Steps
 
@@ -83,17 +81,15 @@ using the term.
 5. The hci-emulator-client detects bt-hci-virtual in
    `/dev/sys/platform/00:00:30` and calls
    [`create_emulator()`](https://source.corp.google.com/h/turquoise-internal/turquoise/+/main:src/connectivity/bluetooth/testing/hci-emulator-client/src/lib.rs;l=199)
-6. bt-hci-virtual uses the EmulatorDevice class to add a device node
-   (bt-emulator-device) to the node graph inside `/dev/class/bt-emulator`
-7. Use the Emulator.Open protocol to start connecting the HciEmulator protocol
-   to EmulatorDevice
-8. The HciEmulator protocol is connected to the bt-emulator-device
-9. Publish a bt-hci device as a child of bt-emulator-device
-10. bt-emulator-device uses the EmulatorDevice class to add a device node
-    (bt-hci-device) to the node graph inside `/dev/class/bt-hci`
-11. Other HciEmulator calls can be made
-12. bt-init detects bt-hci-device in `/dev/class/bt-hci` and creates a new
-    bt-host component using a FakeController to mimic the BT controller
+6. bt-hci-virtual uses the EmulatorDevice class to add a device node (emulator)
+   to the node graph inside `/dev/class/bt-emulator`
+7. Use the Emulator.Publish method publishes a bt-hci device as a child of the
+   EmulatorDevice
+8. The EmulatorDevice adds a device node (bt-hci-device) to the node graph
+   inside `/dev/class/bt-hci`
+9. Other Emulator API calls can be made
+10. bt-init detects bt-hci-device in `/dev/class/bt-hci` and creates a new
+   bt-host component using a FakeController to mimic the BT controller
 
 ```
                                   2. bt-hci-virtual.bind dictates
@@ -108,24 +104,24 @@ using the term.
 │             bt-hci-virtual              │
 │ 4. Added to /dev/sys/platform/00:00:30/ │      5. create_emulator()
 └───────────────────┬─────────────────────┘◄────────────────────────────────┐
-                    │                            7. Emulator::open()        │
+                    │                                                       │
                     │                                                       |
 ┌───────────────────────────────────────────┐                               |
 | EmulatorDevice class                      |                               |
 |                   |                       |                               |
 |                   ▼                       |                    ┌─────────────────────┐
 |   ┌────────────────────────────────────┐  |                    │ hci-emulator-client │
-|   │            emulator                │  |                    └─────────────────────┘
-|   │ 6. Added to /dev/class/bt-emulator │  |  9. HciEmulator::Publish()    |
-|   │ 8. Serves HciEmulator protocol     │◄─|───────────────────────────────┘
+|   │            emulator                │  |                    └──────────┬──────────┘
+|   │ 6. Added to /dev/class/bt-emulator │  |     7. Emulator::Publish()    |
+|   │                                 │◄─|───────────────────────────────┘
 |   └───────────────┬────────────────────┘◄─|───────────────────────────────┐
-|                   │                       11. Other HciEmulator API calls |
+|                   │                       |  9 . Other Emulator API calls |
 |                   │                       |                               |
 |                   ▼                       |                    ┌──────────────────────┐
-|   ┌────────────────────────────────┐      |                    | BT Integration Tests |
-|   │          bt-hci-device         │      |                    └──────────────────────┘
-|   │ 10. Added to /dev/class/bt-hci |      |
-|   └───────────────┬────────────────┘      |
+|   ┌───────────────────────────────┐       |                    | BT Integration Tests |
+|   │          bt-hci-device        │       |                    └──────────────────────┘
+|   │ 8. Added to /dev/class/bt-hci |       |
+|   └───────────────┬───────────────┘       |
 |                   │                       |
 |                   │                       |
 |                   ▼                       |
