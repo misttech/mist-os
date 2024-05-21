@@ -58,7 +58,8 @@ fuchsia_component("starnix_runner_component") {
 
 fuchsia_package("starnix_package") {
   package_name = "starnix"
-  validate_structured_config = false
+
+  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 
   deps = [
     ":starnix_runner_bin",

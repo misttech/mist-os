@@ -42,6 +42,12 @@
             protocol: "fuchsia.settings.Privacy",
             availability: "optional",
         },
+        {
+            // Sets the platform's data collection bit.
+            config: "fuchsia.starnix.runner.EnableDataCollection",
+            key: "enable_data_collection",
+            type: "bool",
+        },
     ],
     offer: [
         {
@@ -135,8 +141,4 @@
             ],
         },
     ],
-    config: {
-        // Sets the platform's data collection bit.
-        enable_data_collection: { type: "bool" },
-    },
 }

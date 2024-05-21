@@ -22,7 +22,7 @@ use tracing::{info, warn};
 use zx::AsHandleRef;
 
 /// The component URL of the Starnix kernel.
-const KERNEL_URL: &str = "fuchsia-pkg://fuchsia.com/starnix_kernel#meta/starnix_kernel.cm";
+const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
 
 enum Services {
     ComponentRunner(frunner::ComponentRunnerRequestStream),

@@ -2198,11 +2198,18 @@ assembly_input_bundle("full_package_drivers") {
 # valid build-types: all
 #
 assembly_input_bundle("starnix_support") {
-  flexible_packages = [
-    "//src/starnix/runner:starnix_package",
-    "//src/starnix/kernel:starnix_kernel_package",
-  ]
+  flexible_packages = [ "//src/starnix/runner:starnix_package" ]
   compiled_packages = [
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/starnix/runner/meta/starnix_runner.root_shard.cml" ]
+        },
+      ]
+    },
     {
       name = "core"
       components = [
