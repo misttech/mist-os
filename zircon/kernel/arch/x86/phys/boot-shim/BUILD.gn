@@ -13,25 +13,39 @@ import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/shim_executable.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 
-# All these 32-bit legacy shims can be booted directly by QEMU.
+# The 32-bit legacy shims can be booted directly by QEMU and other things.
 legacy_shims = [
-  {
-    name = "linux-x86-boot-shim"
-    format = "linuxboot"
-  },
   {
     name = "multiboot-shim"
     format = "multiboot"
   },
+
+  # This boot shim is not meant to be used with qemu, but it works with it.
+  # So we test it via qemu just to get some automated testing of it at all.
+  # Its logic that differs from multiboot-shim won't really be exercised
+  # this way, so it needs direct testing on Chromebook devices too.
   {
-    # This boot shim is not meant to be used with qemu, but it works with it.
-    # So we test it via qemu just to get some automated testing of it at all.
-    # Its logic that differs from multiboot-shim won't really be exercised this
-    # way, so it needs direct testing on Chromebook devices too.
     name = "depthcharge-multiboot-shim"
     format = "multiboot"
   },
 ]
+
+linux_thin_shims = [
+  # The 32-bit Linux/x896 shim can be booted directly by QEMU and others.
+  {
+    # TODO(https://fxbug.dev/335547883): Rename this to .32 or something
+    # when the biboot is ready to be the default.
+    name = "linux-x86-boot-shim"
+    format = "linuxboot"
+  },
+
+  # The 64-bit Linux/x86 shim can be booted directly by crosvm and others.
+  {
+    name = "linux-x86-64-boot-shim"
+    format = "linuxboot64"
+  },
+]
+legacy_shims += linux_thin_shims
 
 group("boot-shim") {
   deps = []
@@ -71,7 +85,8 @@ source_set("legacy-mem-config") {
   }
 }
 
-if (toolchain_environment == "kernel.phys32") {
+if (toolchain_environment == "kernel.phys32" ||
+    toolchain_environment == "kernel.phys") {
   source_set("legacy-boot-shim") {
     public = [ "legacy-boot-shim.h" ]
     sources = [ "legacy-boot-shim.cc" ]
@@ -106,47 +121,59 @@ if (toolchain_environment == "kernel.phys32") {
     ]
   }
 
-  shim_executable("linux-x86-boot-shim") {
-    sources = [ "linux-x86-boot-shim.cc" ]
-    deps = [
-      ":legacy-boot-shim",
-      "..:linuxboot",
-      "//zircon/kernel/phys:symbolize",
-    ]
+  foreach(shim, linux_thin_shims) {
+    foreach(qemu, qemu_boot_formats) {
+      if (qemu.name == shim.format &&
+          toolchain_variant.base == qemu.environment) {
+        shim_executable(shim.name) {
+          sources = [ "linux-x86-boot-shim.cc" ]
+          deps = [
+            ":legacy-boot-shim",
+            "..:${shim.format}",
+            "//zircon/kernel/phys:symbolize",
+          ]
+        }
+      }
+    }
   }
 
-  shim_executable("multiboot-shim") {
-    sources = [ "multiboot-shim.cc" ]
-    deps = [
-      ":legacy-boot-shim",
-      "..:multiboot",
-      "//zircon/kernel/phys:symbolize",
-    ]
+  if (toolchain_environment == "kernel.phys32") {
+    shim_executable("multiboot-shim") {
+      sources = [ "multiboot-shim.cc" ]
+      deps = [
+        ":legacy-boot-shim",
+        "..:multiboot",
+        "//zircon/kernel/phys:symbolize",
+      ]
 
-    # Everything should find this via the //:images build API.
-    # But some things might still look for "out/.../multiboot.bin" directly.
-    output_dir = root_build_dir
-    output_name = "multiboot"
-  }
+      # Everything should find this via the //:images build API.
+      # But some things might still look for "out/.../multiboot.bin" directly.
+      output_dir = root_build_dir
+      output_name = "multiboot"
+    }
 
-  phys_executable("depthcharge-multiboot-shim") {
-    sources = [ "depthcharge-multiboot-shim.cc" ]
-    deps = [
-      ":legacy-boot-shim",
-      "..:multiboot",
-      "//sdk/lib/fit",
-      "//sdk/lib/zbi-format",
-      "//zircon/kernel/phys:stdio",
-      "//zircon/kernel/phys:symbolize",
-      "//zircon/kernel/phys:uart",
-      "//zircon/system/ulib/uart",
-    ]
+    phys_executable("depthcharge-multiboot-shim") {
+      sources = [ "depthcharge-multiboot-shim.cc" ]
+      deps = [
+        ":legacy-boot-shim",
+        "..:multiboot",
+        "//sdk/lib/fit",
+        "//sdk/lib/zbi-format",
+        "//zircon/kernel/phys:stdio",
+        "//zircon/kernel/phys:symbolize",
+        "//zircon/kernel/phys:uart",
+        "//zircon/system/ulib/uart",
+      ]
+    }
   }
 } else {
   foreach(shim, legacy_shims) {
-    group(shim.name) {
-      public_deps =
-          [ ":${shim.name}(//zircon/kernel/arch/x86/phys:kernel.phys32)" ]
+    foreach(qemu, qemu_boot_formats) {
+      if (qemu.name == shim.format) {
+        group(shim.name) {
+          public_deps = [ ":${shim.name}(${qemu.environment})" ]
+        }
+      }
     }
   }
 }
@@ -193,12 +220,19 @@ if (current_toolchain != host_toolchain) {
         foreach(qemu, qemu_boot_formats) {
           if (qemu.name == shim.format) {
             qemu_kernel = ":${shim.name}(${qemu.environment})"
-            forward_variables_from(qemu, [ "timeout" ])
+            forward_variables_from(qemu,
+                                   [
+                                     "device_types",
+                                     "disabled",
+                                     "timeout",
+                                   ])
           }
         }
         assert(defined(qemu_kernel), "$shim not in $qemu_boot_formats")
 
-        device_types = [ "QEMU" ]
+        if (!defined(device_types)) {
+          device_types = [ "QEMU" ]
+        }
 
         forward_variables_from(invoker, "*")
       }

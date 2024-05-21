@@ -85,6 +85,7 @@ if (current_cpu == "x64") {
       disabled = true  # Only for experimentation.
       environment = phys_toolchain
       deps = [ "//zircon/kernel/arch/x86/phys:linuxboot64" ]
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-64-boot-shim($environment)" ]
       timeout = qemu_short_timeout
     },
     {

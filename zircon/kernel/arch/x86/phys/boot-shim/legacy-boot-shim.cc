@@ -71,7 +71,7 @@ bool LegacyBootShim::Load(TrampolineBoot& boot) {
 
 bool LegacyBootShim::StandardLoad(TrampolineBoot& boot) {
   return Check("Not a bootable ZBI", boot.Init(input_zbi())) &&
-         Check("Failed to load ZBI", boot.Load(size_bytes())) &&
+         Check("Failed to load ZBI", boot.Load(static_cast<uint32_t>(size_bytes()))) &&
          Check("Failed to append boot loader items to data ZBI", AppendItems(boot.DataZbi()));
 }
 
