@@ -225,7 +225,7 @@ test("driver_host_runner_test") {
   sources = [ "driver_host_runner_test.cc" ]
   deps = [
     ":driver_runner_test_fixture",
-    "//src/devices/bin/driver_manager:driver_runner",
+    "//src/devices/bin/driver_manager:driver_host_runner",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

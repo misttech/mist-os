@@ -74,8 +74,6 @@ source_set("driver_runner") {
     "controller_allowlist_passthrough.h",
     "driver_host.cc",
     "driver_host.h",
-    "driver_host_runner.cc",
-    "driver_host_runner.h",
     "driver_runner.cc",
     "driver_runner.h",
     "node.cc",
@@ -126,6 +124,28 @@ source_set("driver_runner") {
     "//src/lib/ddk",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+source_set("driver_host_runner") {
+  sources = [
+    "driver_host_runner.cc",
+    "driver_host_runner.h",
+  ]
+  deps = [
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/lib/log",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
+    "//sdk/lib/vfs/cpp",
+    "//zircon/system/ulib/fbl",
   ]
 }
 
