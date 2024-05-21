@@ -391,7 +391,7 @@
 			#size-cells = <2>;
 			ranges = <0x0 0x0 0x0 0xffe40000 0x0 0x40000>;
 
-			arm-mali@0 {
+			arm_mali: arm-mali@0 {
 				compatible = "arm,mali-gpu";
 				reg = <0x0 0x0 0x0 0x40000>;
 				interrupts = <GIC_SPI 162 GIC_IRQ_MODE_LEVEL_HIGH>,

@@ -12,20 +12,20 @@
 	};
 
 	backlight {
-		display-detect = <0x26>;
+		display-detect = <0x28>;
 		display-detect-names = "MIPI_DSI";
 		gpio-names = "LCD_BACKLIGHT_ENABLE";
-		gpios = <0x10 0x01 0x00>;
+		gpios = <0x11 0x01 0x00>;
 		pwm-names = "LCD_BRIGHTNESS";
-		pwms = <0x11 0x08 0x00 0x00>;
+		pwms = <0x12 0x08 0x00 0x00>;
 	};
 
 	bt-uart@ffd24000 {
 		boot-metadata = "CAMm\0\0\0";
 		compatible = "amlogic,bt-uart";
 		interrupts = <0x00 0x1a 0x01>;
-		pinctrl-0 = <0x27>;
-		pwm-init = <0x18>;
+		pinctrl-0 = <0x29>;
+		pwm-init = <0x19>;
 		reg = <0x00 0xffd24000 0x00 0x18>;
 		serial-port = <0x02 0x06 0x03>;
 
@@ -37,7 +37,7 @@
 
 					handling-level {
 						level = <0x01>;
-						level-dependencies = <0x0e 0x01>;
+						level-dependencies = <0x0f 0x01>;
 
 						level-transition-table {
 
@@ -81,8 +81,8 @@
 	display-detect {
 		#display-detect-cells = <0x00>;
 		gpio-names = "LCD_RESET";
-		gpios = <0x10 0x00 0x00>;
-		phandle = <0x26>;
+		gpios = <0x11 0x00 0x00>;
+		phandle = <0x28>;
 	};
 
 	iommu {
@@ -95,14 +95,14 @@
 		interrupts = <0x00 0x93 0x04>;
 		iommus = <0x03 0x03>;
 		reg = <0x00 0xff100000 0x00 0x30000 0x00 0xff63c000 0x00 0x2000 0x00 0xff800000 0x00 0x1000 0x00 0xff63c000 0x00 0x1000 0x00 0xff000000 0x00 0x100000>;
-		registers = <0x13 0x88 0x04 0x00 0x1000>;
+		registers = <0x14 0x88 0x04 0x00 0x1000>;
 	};
 
 	pwm_a-regulator {
 		#regulator-cells = <0x00>;
 		compatible = "amlogic,pwm-regulator";
-		pinctrl-0 = <0x25>;
-		pwms = <0x11 0x00 0x4e2 0x00>;
+		pinctrl-0 = <0x27>;
+		pwms = <0x12 0x00 0x4e2 0x00>;
 		regulator-max-microvolt = <0x100590>;
 		regulator-min-microvolt = <0xa8750>;
 		regulator-name = "pwm_vreg_big";
@@ -112,8 +112,8 @@
 	pwm_a0_d-regulator {
 		#regulator-cells = <0x00>;
 		compatible = "amlogic,pwm-regulator";
-		pinctrl-0 = <0x24>;
-		pwms = <0x11 0x09 0x4e2 0x00>;
+		pinctrl-0 = <0x26>;
+		pwms = <0x12 0x09 0x4e2 0x00>;
 		regulator-max-microvolt = <0x100590>;
 		regulator-min-microvolt = <0xa8750>;
 		regulator-name = "pwm_vreg_little";
@@ -152,6 +152,24 @@
 			iommus = <0x03 0x04>;
 			pinctrl-0 = <0x09 0x0a 0x0b 0x0c>;
 			reg = <0x00 0xff642000 0x00 0x2000>;
+
+			power-elements {
+
+				audio-hw-element {
+
+					power-levels {
+
+						off-level {
+							level = <0x00>;
+						};
+
+						on-level {
+							level = <0x01>;
+							level-dependencies = <0x0d 0x02>;
+						};
+					};
+				};
+			};
 		};
 
 		bus@ff800000 {
@@ -171,7 +189,7 @@
 				#size-cells = <0x00>;
 				compatible = "amlogic,meson-axg-i2c";
 				interrupts = <0x00 0xc3 0x01>;
-				pinctrl-0 = <0x0d>;
+				pinctrl-0 = <0x0e>;
 				reg = <0x00 0x5000 0x00 0x20>;
 
 				fusb302@22 {
@@ -184,7 +202,7 @@
 					#gpio-cells = <0x02>;
 					compatible = "ti,tca6408a";
 					gpio-controller;
-					phandle = <0x10>;
+					phandle = <0x11>;
 					reg = <0x20>;
 				};
 
@@ -228,7 +246,7 @@
 
 							on-level {
 								level = <0x01>;
-								level-dependencies = <0x0e 0x01>;
+								level-dependencies = <0x0f 0x01>;
 							};
 						};
 					};
@@ -240,13 +258,13 @@
 				#size-cells = <0x00>;
 				compatible = "amlogic,meson-axg-i2c";
 				interrupts = <0x00 0x27 0x01>;
-				pinctrl-0 = <0x0f>;
+				pinctrl-0 = <0x10>;
 				reg = <0x00 0x1c000 0x00 0x20>;
 
 				touchscreen@38 {
 					compatible = "focaltech,ft5336";
 					gpio-names = "TOUCH_INTERRUPT\0TOUCH_RESET";
-					gpios = <0x07 0x15 0x00 0x10 0x06 0x00>;
+					gpios = <0x07 0x15 0x00 0x11 0x06 0x00>;
 					reg = <0x38>;
 				};
 			};
@@ -254,7 +272,7 @@
 			register-controller@1000 {
 				#register-cells = <0x04>;
 				compatible = "fuchsia,registers";
-				phandle = <0x13>;
+				phandle = <0x14>;
 				reg = <0x00 0x1000 0x00 0x100>;
 			};
 		};
@@ -314,37 +332,37 @@
 
 			bt-uart-pins {
 				function = <0x00 0x01>;
-				phandle = <0x27>;
+				phandle = <0x29>;
 				pins = <0x44 0x45 0x46 0x47>;
 			};
 
 			emmc-clk-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1d>;
+				phandle = <0x1e>;
 				pins = <0x28>;
 			};
 
 			emmc-cmd-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1e>;
+				phandle = <0x1f>;
 				pins = <0x2a>;
 			};
 
 			emmc-cs-cfg {
 				output-high;
-				phandle = <0x20>;
+				phandle = <0x21>;
 				pins = <0x2e>;
 			};
 
 			emmc-d0-d7-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1c>;
+				phandle = <0x1d>;
 				pins = <0x20 0x21 0x22 0x23 0x24 0x25 0x26 0x27>;
 			};
 
 			emmc-ds-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1f>;
+				phandle = <0x20>;
 				pins = <0x2d>;
 			};
 
@@ -357,43 +375,43 @@
 
 			i2c-AO-pins {
 				function = <0x00 0x01>;
-				phandle = <0x0d>;
+				phandle = <0x0e>;
 				pins = <0x57 0x57>;
 			};
 
 			i2c3-pins {
 				function = <0x00 0x02>;
-				phandle = <0x0f>;
+				phandle = <0x10>;
 				pins = <0x1f 0x1e>;
 			};
 
 			pwm-a-regulator-pins {
 				function = <0x00 0x03>;
-				phandle = <0x25>;
+				phandle = <0x27>;
 				pins = <0x63>;
 			};
 
 			pwm-a0-d-regulator-pins {
 				function = <0x00 0x03>;
-				phandle = <0x24>;
+				phandle = <0x26>;
 				pins = <0x62>;
 			};
 
 			sdcard-clk-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1a>;
+				phandle = <0x1b>;
 				pins = <0x34>;
 			};
 
 			sdcard-cmd-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1b>;
+				phandle = <0x1c>;
 				pins = <0x35>;
 			};
 
 			sdcard-d0-d3-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x19>;
+				phandle = <0x1a>;
 				pins = <0x30 0x31 0x32 0x33>;
 			};
 
@@ -402,7 +420,7 @@
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
 				input-enable;
-				phandle = <0x16>;
+				phandle = <0x17>;
 				pins = <0x3c>;
 			};
 
@@ -411,7 +429,7 @@
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
 				input-enable;
-				phandle = <0x17>;
+				phandle = <0x18>;
 				pins = <0x3d>;
 			};
 
@@ -420,13 +438,13 @@
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
 				input-enable;
-				phandle = <0x15>;
+				phandle = <0x16>;
 				pins = <0x38 0x39 0x3a 0x3b>;
 			};
 
 			usb-power {
 				output-high;
-				phandle = <0x12>;
+				phandle = <0x13>;
 				pins = <0x16>;
 			};
 		};
@@ -435,17 +453,51 @@
 			#address-cells = <0x02>;
 			#size-cells = <0x02>;
 			compatible = "amlogic,gpu";
-			phandle = <0x21>;
+			phandle = <0x23>;
 			ranges = <0x00 0x00 0x00 0xffe40000 0x00 0x40000>;
 			reg = <0x00 0xffe40000 0x00 0x40000 0x00 0xff63c000 0x00 0x2000>;
-			registers = <0x13 0x40 0x04 0x00 0x100000 0x13 0x80 0x04 0x00 0x100000 0x13 0x48 0x04 0x00 0x4000 0x13 0x88 0x04 0x00 0x4000>;
+			registers = <0x14 0x40 0x04 0x00 0x100000 0x14 0x80 0x04 0x00 0x100000 0x14 0x48 0x04 0x00 0x4000 0x14 0x88 0x04 0x00 0x4000>;
 
 			arm-mali@0 {
 				compatible = "arm,mali-gpu";
 				interrupts = <0x00 0xa2 0x04 0x00 0xa1 0x04 0x00 0xa0 0x04>;
 				iommus = <0x03 0x05>;
-				mali-gpu-parent = <0x21>;
+				mali-gpu-parent = <0x23>;
 				reg = <0x00 0x00 0x00 0x40000>;
+
+				power-elements {
+
+					mali-gpu-hardware-element {
+
+						power-levels {
+
+							off-level {
+								level = <0x00>;
+
+								level-transition-table {
+
+									transition-to-on {
+										latency-us = <0x1f4>;
+										target-level = <0x01>;
+									};
+								};
+							};
+
+							on-level {
+								level = <0x01>;
+								level-dependencies = <0x22 0x02>;
+
+								level-transition-table {
+
+									transition-to-off {
+										latency-us = <0x7d0>;
+										target-level = <0x00>;
+									};
+								};
+							};
+						};
+					};
+				};
 			};
 		};
 
@@ -466,8 +518,8 @@
 			interrupts = <0x00 0xbd 0x01>;
 			iommus = <0x03 0x0a>;
 			max-frequency = <0x5f5e100>;
-			pinctrl-0 = <0x15 0x16 0x17>;
-			pwm-init = <0x18>;
+			pinctrl-0 = <0x16 0x17 0x18>;
+			pwm-init = <0x19>;
 			reg = <0x00 0xffe03000 0x00 0x2000>;
 		};
 
@@ -476,7 +528,7 @@
 			interrupts = <0x00 0xbe 0x01>;
 			iommus = <0x03 0x07>;
 			max-frequency = <0x2faf080>;
-			pinctrl-0 = <0x19 0x1a 0x1b>;
+			pinctrl-0 = <0x1a 0x1b 0x1c>;
 			reg = <0x00 0xffe05000 0x00 0x2000>;
 		};
 
@@ -491,9 +543,74 @@
 			max-frequency = <0x7270e00>;
 			no-mmc-hs400;
 			non-removable;
-			pinctrl-0 = <0x1c 0x1d 0x1e 0x1f 0x20>;
+			pinctrl-0 = <0x1d 0x1e 0x1f 0x20 0x21>;
 			reg = <0x00 0xffe07000 0x00 0x2000>;
 			use-fidl;
+
+			power-elements {
+
+				aml-sdmmc-hardware-element {
+
+					power-levels {
+
+						off-level {
+							level = <0x00>;
+
+							level-transition-table {
+
+								transition-to-on {
+									latency-us = <0x64>;
+									target-level = <0x01>;
+								};
+							};
+						};
+
+						on-level {
+							level = <0x01>;
+							level-dependencies = <0x22 0x02>;
+
+							level-transition-table {
+
+								transition-to-off {
+									latency-us = <0xc8>;
+									target-level = <0x00>;
+								};
+							};
+						};
+					};
+				};
+
+				aml-sdmmc-system-wake-on-request-element {
+
+					power-levels {
+
+						off-level {
+							level = <0x00>;
+
+							level-transition-table {
+
+								transition-to-on {
+									latency-us = <0x00>;
+									target-level = <0x01>;
+								};
+							};
+						};
+
+						on-level {
+							level = <0x01>;
+							level-dependencies = <0x0f 0x01>;
+
+							level-transition-table {
+
+								transition-to-off {
+									latency-us = <0x00>;
+									target-level = <0x00>;
+								};
+							};
+						};
+					};
+				};
+			};
 		};
 
 		phy@ffe09000 {
@@ -504,24 +621,24 @@
 			dr_modes = "host\0peripheral\0host";
 			interrupts = <0x00 0x10 0x01>;
 			iommus = <0x03 0x06>;
-			phandle = <0x14>;
-			pinctrl-0 = <0x12>;
+			phandle = <0x15>;
+			pinctrl-0 = <0x13>;
 			reg = <0x00 0xffe09000 0x00 0x2000 0x00 0xff636000 0x00 0x2000 0x00 0xff63a000 0x00 0x2000 0x00 0xff646000 0x00 0x2000>;
 			reg-names = "usb-ctrl\0usb2-phy\0usb2-otg-phy\0usb3-phy";
-			registers = <0x13 0x08 0x04 0x00 0x10004 0x13 0x84 0x04 0x00 0x30000>;
+			registers = <0x14 0x08 0x04 0x00 0x10004 0x14 0x84 0x04 0x00 0x30000>;
 		};
 
 		pwm-init {
 			gpio-names = "WIFI_LPO\0BT_REG_ON";
 			gpios = <0x07 0x48 0x00 0x07 0x49 0x00>;
-			phandle = <0x18>;
-			pwms = <0x11 0x04 0x00 0x00>;
+			phandle = <0x19>;
+			pwms = <0x12 0x04 0x00 0x00>;
 		};
 
 		pwm@ffd1b000 {
 			#pwm-cells = <0x03>;
 			compatible = "amlogic,meson-g12a-ee-pwm";
-			phandle = <0x11>;
+			phandle = <0x12>;
 			reg = <0x00 0xffd1b000 0x00 0x1000 0x00 0xffd1a000 0x00 0x1000 0x00 0xffd19000 0x00 0x1000 0x00 0xff807000 0x00 0x1000 0x00 0xff802000 0x00 0x1000>;
 		};
 
@@ -530,7 +647,7 @@
 			assigned-clocks = <0x06 0x1000d>;
 			compatible = "amlogic,g12a-thermal";
 			interrupts = <0x00 0x23 0x01>;
-			phandle = <0x22>;
+			phandle = <0x24>;
 			reg = <0x00 0xff634800 0x00 0x80 0x00 0xff800268 0x00 0x04>;
 		};
 
@@ -539,7 +656,7 @@
 			assigned-clocks = <0x06 0x1000d>;
 			compatible = "amlogic,g12a-thermal";
 			interrupts = <0x00 0x24 0x01>;
-			phandle = <0x23>;
+			phandle = <0x25>;
 			reg = <0x00 0xff634c00 0x00 0x80 0x00 0xff800230 0x00 0x04>;
 		};
 
@@ -554,7 +671,7 @@
 			interrupts = <0x00 0x1f 0x01>;
 			iommus = <0x03 0x06>;
 			phy-names = "dwc2-phy";
-			phys = <0x14>;
+			phys = <0x15>;
 			reg = <0x00 0xff400000 0x00 0x100000>;
 		};
 
@@ -563,7 +680,7 @@
 			interrupts = <0x00 0x1e 0x01>;
 			iommus = <0x03 0x06>;
 			phy-names = "xhci-phy";
-			phys = <0x14>;
+			phys = <0x15>;
 			reg = <0x00 0xff500000 0x00 0x100000>;
 		};
 
@@ -613,6 +730,7 @@
 
 					active-level {
 						level = <0x02>;
+						phandle = <0x0d>;
 					};
 
 					inactive-level {
@@ -621,6 +739,7 @@
 
 					wake-handling-level {
 						level = <0x01>;
+						phandle = <0x22>;
 					};
 				};
 			};
@@ -631,7 +750,7 @@
 
 					active-level {
 						level = <0x01>;
-						phandle = <0x0e>;
+						phandle = <0x0f>;
 					};
 
 					inactive-level {
@@ -645,7 +764,7 @@
 	thermal-zones {
 
 		cpu-thermal {
-			thermal-sensors = <0x22>;
+			thermal-sensors = <0x24>;
 
 			trips {
 
@@ -657,7 +776,7 @@
 		};
 
 		ddr-thermal {
-			thermal-sensors = <0x23>;
+			thermal-sensors = <0x25>;
 
 			trips {
 

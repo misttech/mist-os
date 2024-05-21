@@ -97,3 +97,99 @@
 		};
 	};
 };
+
+&audio {
+	power-elements {
+		audio-hw-element {
+			power-levels {
+				off-level {
+					level = <0>;
+				};
+				on-level {
+					level = <1>;
+					level-dependencies = <&sag_execution_active 2>;
+				};
+			};
+		};
+	};
+};
+
+
+&sd_emmc_c {
+	power-elements {
+		aml-sdmmc-hardware-element {
+			power-levels {
+				off-level {
+					level = <0>;
+					level-transition-table {
+						transition-to-on {
+							target-level = <1>;
+							latency-us = <100>;
+						};
+					};
+				};
+				on-level {
+					level = <1>;
+					level-dependencies = <&sag_execution_handling 2>;
+					level-transition-table {
+						transition-to-off {
+							target-level = <0>;
+							latency-us = <200>;
+						};
+					};
+				};
+			};
+		};
+		aml-sdmmc-system-wake-on-request-element {
+			power-levels {
+				off-level {
+					level = <0>;
+					level-transition-table {
+						transition-to-on {
+							target-level = <1>;
+							latency-us = <0>;
+						};
+					};
+				};
+				on-level {
+					level = <1>;
+					level-dependencies = <&sag_wake_active 1>;
+					level-transition-table {
+						transition-to-off {
+							target-level = <0>;
+							latency-us = <0>;
+						};
+					};
+				};
+			};
+		};
+	};
+};
+
+&arm_mali {
+	power-elements {
+		mali-gpu-hardware-element {
+			power-levels {
+				off-level {
+					level = <0>;
+					level-transition-table {
+						transition-to-on {
+							target-level = <1>;
+							latency-us = <500>;
+						};
+					};
+				};
+				on-level {
+					level = <1>;
+					level-dependencies = <&sag_execution_handling 2>;
+					level-transition-table {
+						transition-to-off {
+							target-level = <0>;
+							latency-us = <2000>;
+						};
+					};
+				};
+			};
+		};
+	};
+};
