@@ -111,6 +111,8 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/graphics/display/lib/designware-dsi:dsi-host-controller",
@@ -229,7 +231,7 @@ test("amlogic-display-test") {
   ]
   deps = [
     ":common_srcs",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/testing/fake-mmio-reg",
