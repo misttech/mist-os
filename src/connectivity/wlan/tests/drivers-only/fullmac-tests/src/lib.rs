@@ -667,3 +667,113 @@ async fn test_sme_disconnect() {
                 fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest));
     });
 }
+
+#[fuchsia::test]
+async fn test_remote_deauth() {
+    let (_client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+        setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
+
+    fullmac_driver
+        .ifc_proxy
+        .deauth_ind(&fidl_fullmac::WlanFullmacDeauthIndication {
+            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
+            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            locally_initiated: false,
+        })
+        .await
+        .expect("Could not send deauth ind");
+
+    assert_variant!(fullmac_driver.request_stream.next().await,
+    Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: false, responder })) => {
+        responder
+            .send()
+            .expect("Failed to respond to OnLinkStateChanged");
+    });
+
+    assert_variant!(
+        connect_txn_event_stream.next().await,
+        Some(Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect {
+            info: fidl_sme::DisconnectInfo {
+                is_sme_reconnecting: false,
+                disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                    mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+                    reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason
+                }),
+            }
+        }))
+    );
+}
+
+#[fuchsia::test]
+async fn test_remote_disassoc_then_reconnect() {
+    let (_client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+        setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
+
+    fullmac_driver
+        .ifc_proxy
+        .disassoc_ind(&fidl_fullmac::WlanFullmacDisassocIndication {
+            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
+            reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
+            locally_initiated: false,
+        })
+        .await
+        .expect("Could not send DissasocInd");
+
+    assert_variant!(fullmac_driver.request_stream.next().await,
+    Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: false, responder })) => {
+        responder
+            .send()
+            .expect("Failed to respond to OnLinkStateChanged");
+    });
+
+    assert_variant!(fullmac_driver.request_stream.next().await,
+    Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Reconnect { payload, responder })) => {
+        responder
+            .send()
+            .expect("Failed to respond to Reconnect");
+
+        assert_eq!(payload.peer_sta_address.unwrap(), COMPATIBLE_OPEN_BSS.bssid.to_array());
+    });
+
+    assert_variant!(
+        connect_txn_event_stream.next().await,
+        Some(Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect {
+            info: fidl_sme::DisconnectInfo {
+                is_sme_reconnecting: true,
+                disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                    mlme_event_name: fidl_sme::DisconnectMlmeEventName::DisassociateIndication,
+                    reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
+                }),
+            }
+        }))
+    );
+
+    fullmac_driver
+        .ifc_proxy
+        .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
+            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
+            result_code: fidl_ieee80211::StatusCode::Success,
+            association_id: 0,
+            association_ies: vec![],
+        })
+        .await
+        .expect("Failed to send ConnectConf");
+
+    assert_variant!(fullmac_driver.request_stream.next().await,
+    Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: true, responder })) => {
+        responder
+            .send()
+            .expect("Failed to respond to OnLinkStateChanged");
+    });
+
+    assert_variant!(
+        connect_txn_event_stream.next().await,
+        Some(Ok(fidl_sme::ConnectTransactionEvent::OnConnectResult {
+            result: fidl_sme::ConnectResult {
+                code: fidl_ieee80211::StatusCode::Success,
+                is_credential_rejected: false,
+                is_reconnect: true,
+            }
+        }))
+    );
+}

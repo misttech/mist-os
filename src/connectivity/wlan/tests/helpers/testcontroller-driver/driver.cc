@@ -62,11 +62,19 @@ class WlanFullmacImplIfcToDriverBridge
     bridge_client_->DeauthConf(request).Then(
         ForwardResult<WlanFullmacImplIfc::DeauthConf>(completer.ToAsync()));
   }
-  void DeauthInd(DeauthIndRequest& request, DeauthIndCompleter::Sync& completer) override {}
+  void DeauthInd(DeauthIndRequest& request, DeauthIndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->DeauthInd(request).Then(
+        ForwardResult<WlanFullmacImplIfc::DeauthInd>(completer.ToAsync()));
+  }
   void AssocInd(AssocIndRequest& request, AssocIndCompleter::Sync& completer) override {}
   void DisassocConf(DisassocConfRequest& request, DisassocConfCompleter::Sync& completer) override {
   }
-  void DisassocInd(DisassocIndRequest& request, DisassocIndCompleter::Sync& completer) override {}
+  void DisassocInd(DisassocIndRequest& request, DisassocIndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->DisassocInd(request).Then(
+        ForwardResult<WlanFullmacImplIfc::DisassocInd>(completer.ToAsync()));
+  }
   void StartConf(StartConfRequest& request, StartConfCompleter::Sync& completer) override {}
   void StopConf(StopConfRequest& request, StopConfCompleter::Sync& completer) override {}
   void EapolConf(EapolConfRequest& request, EapolConfCompleter::Sync& completer) override {
@@ -180,7 +188,11 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
     bridge_client_->Connect(request).Then(
         ForwardResult<WlanFullmacImplBridge::Connect>(completer.ToAsync()));
   }
-  void Reconnect(ReconnectRequest& request, ReconnectCompleter::Sync& completer) override {}
+  void Reconnect(ReconnectRequest& request, ReconnectCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->Reconnect(request).Then(
+        ForwardResult<WlanFullmacImplBridge::Reconnect>(completer.ToAsync()));
+  }
   void AuthResp(AuthRespRequest& request, AuthRespCompleter::Sync& completer) override {}
   void Deauth(DeauthRequest& request, DeauthCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
