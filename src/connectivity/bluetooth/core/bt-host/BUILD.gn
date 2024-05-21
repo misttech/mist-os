@@ -327,6 +327,7 @@ group("bazel_tests") {
   deps = [
     "att:test_pkg",
     "common:test_pkg",
+    "fidl:test_pkg",
     "gap:test_pkg",
     "gatt:test_pkg",
     "hci:test_pkg",

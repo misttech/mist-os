@@ -263,7 +263,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
                       bt::l2cap::Channel::WeakPtr channel)
         : ServerBase(this, std::move(request)),
           unique_id_(channel->unique_id()),
-          channel_(std::move(channel)) {};
+          channel_(std::move(channel)) {}
 
     bt::l2cap::Channel::UniqueId unique_id() const { return unique_id_; }
 
