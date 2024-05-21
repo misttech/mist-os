@@ -7,7 +7,8 @@ use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_wlan_security,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_zircon as zx,
     fullmac_helpers::{
         config::{default_fullmac_query_info, FullmacDriverConfig},
         COMPATIBLE_OPEN_BSS, COMPATIBLE_WPA2_BSS,
@@ -774,6 +775,25 @@ async fn test_remote_disassoc_then_reconnect() {
                 is_credential_rejected: false,
                 is_reconnect: true,
             }
+        }))
+    );
+}
+
+#[fuchsia::test]
+async fn test_channel_switch() {
+    let (_client_sme_proxy, mut connect_txn_event_stream, fullmac_driver, _generic_sme_proxy) =
+        setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
+
+    fullmac_driver
+        .ifc_proxy
+        .on_channel_switch(&fidl_fullmac::WlanFullmacChannelSwitchInfo { new_channel: 11 })
+        .await
+        .expect("Could not send OnChannelSwitch");
+
+    assert_variant!(
+        connect_txn_event_stream.next().await,
+        Some(Ok(fidl_sme::ConnectTransactionEvent::OnChannelSwitched {
+            info: fidl_internal::ChannelSwitchInfo { new_channel: 11 }
         }))
     );
 }

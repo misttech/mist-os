@@ -11,6 +11,7 @@ rust_wlan_integration_test("fullmac-tests") {
     "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_rust",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
+    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
