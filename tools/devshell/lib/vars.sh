@@ -625,7 +625,7 @@ function get-ssh-privkey {
     fx-error "$init"
     return 1
   fi
-  val="$(fx-command-run ffx config get ssh.priv)"
+  val="$(fx-command-run ffx config get --process file ssh.priv)"
   temp="${val%\"}"
   authkeys="${temp#\"}"
   echo "${authkeys}"
@@ -639,7 +639,7 @@ function get-ssh-authkeys {
     fx-error "$init"
     return 1
   fi
-  val="$(fx-command-run ffx config get ssh.pub)"
+  val="$(fx-command-run ffx config get --process file ssh.pub)"
   temp="${val%\"}"
   authkeys="${temp#\"}"
   echo "${authkeys}"

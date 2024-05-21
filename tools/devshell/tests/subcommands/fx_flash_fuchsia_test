@@ -73,7 +73,7 @@ if [[ "\$1" == "devices" ]]; then
 fi
 INPUT
   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -90,7 +90,7 @@ if [[ "\$1" == "devices" ]]; then
 fi
 INPUT
   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -107,7 +107,7 @@ if [[ "\$1" == "devices" ]]; then
 fi
 INPUT
   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -123,7 +123,7 @@ INPUT
 
 TEST_fx_flash_with_serial() {
   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -136,7 +136,7 @@ INPUT
 
 TEST_fx_flash_with_serial_with_ffx() {
   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -148,7 +148,7 @@ TEST_fx_flash_with_discoverable_default_device_with_ffx() {
   cat >"${ffx}.mock_side_effects" <<INPUT
 if [[ "\$2" == "list" ]]; then
   echo "default-device 1:2:3:4::8"
-elif [[ "\$3" == "ssh.pub" ]]; then
+elif [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -160,7 +160,7 @@ TEST_fx_flash_with_undiscoverable_default_device_with_ffx() {
   cat >"${ffx}.mock_side_effects" <<INPUT
 if [[ "\$2" == "list" ]]; then
   echo "some-other-device 4:3:2:1::2"
-elif [[ "\$3" == "ssh.pub" ]]; then
+elif [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -170,7 +170,7 @@ INPUT
 
 TEST_fx_flash_skip_verify_with_ffx() {
    cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT
@@ -180,7 +180,7 @@ INPUT
 
 TEST_fx_flash_no_bootloader_reboot_with_ffx() {
    cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$3" == "ssh.pub" ]]; then
+if [[ "\$5" == "ssh.pub" ]]; then
   echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
 fi
 INPUT

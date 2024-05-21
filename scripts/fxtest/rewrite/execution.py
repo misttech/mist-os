@@ -477,7 +477,14 @@ async def get_device_environment_from_exec_env(
     # get the configured private key. Ideally, the private key usage
     # should be an implementation detail internal to ffx commands.
     ssh_key_output = await run_command(
-        "fx", "ffx", "config", "get", "ssh.priv", recorder=recorder
+        "fx",
+        "ffx",
+        "config",
+        "get",
+        "--process",
+        "file",
+        "ssh.priv",
+        recorder=recorder,
     )
     if not ssh_key_output or ssh_key_output.return_code != 0:
         msg = "No return information"
