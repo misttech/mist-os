@@ -361,12 +361,11 @@ TEST(VmoFile, Getattr) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file =
         fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), zx_system_get_page_size() * 3u + 117u);
-    fs::VnodeAttributes attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr.mode);
-    EXPECT_EQ(zx_system_get_page_size() * 3u + 117u, attr.content_size);
-    EXPECT_EQ(4u * zx_system_get_page_size(), attr.storage_size);
-    EXPECT_EQ(1u, attr.link_count);
+    zx::result attr = file->GetAttributes();
+    ASSERT_TRUE(attr.is_ok());
+    EXPECT_EQ(V_TYPE_FILE | V_IRUSR, attr->mode);
+    EXPECT_EQ(zx_system_get_page_size() * 3u + 117u, attr->content_size);
+    EXPECT_EQ(4u * zx_system_get_page_size(), attr->storage_size);
   }
 
   // writable
@@ -375,12 +374,11 @@ TEST(VmoFile, Getattr) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup),
                                                  zx_system_get_page_size() * 3u + 117u, true);
-    fs::VnodeAttributes attr;
-    EXPECT_EQ(ZX_OK, file->GetAttributes(&attr));
-    EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr.mode);
-    EXPECT_EQ(zx_system_get_page_size() * 3u + 117u, attr.content_size);
-    EXPECT_EQ(4u * zx_system_get_page_size(), attr.storage_size);
-    EXPECT_EQ(1u, attr.link_count);
+    zx::result attr = file->GetAttributes();
+    ASSERT_TRUE(attr.is_ok());
+    EXPECT_EQ(V_TYPE_FILE | V_IRUSR | V_IWUSR, attr->mode);
+    EXPECT_EQ(zx_system_get_page_size() * 3u + 117u, attr->content_size);
+    EXPECT_EQ(4u * zx_system_get_page_size(), attr->storage_size);
   }
 }
 

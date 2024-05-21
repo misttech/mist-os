@@ -56,16 +56,14 @@ zx_status_t VnodeDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out)
   return r;
 }
 
-zx_status_t VnodeDir::GetAttributes(fs::VnodeAttributes* attr) {
-  *attr = fs::VnodeAttributes();
-  attr->inode = ino_;
-  attr->mode = V_TYPE_DIR | V_IRUSR;
-  attr->content_size = 0;
-  attr->storage_size = 0;
-  attr->link_count = link_count_;
-  attr->creation_time = create_time_;
-  attr->modification_time = modify_time_;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .id = ino_,
+      .link_count = link_count_,
+      .creation_time = create_time_,
+      .modification_time = modify_time_,
+      .mode = V_TYPE_DIR | V_IRUSR,
+  });
 }
 
 zx_status_t VnodeDir::Readdir(fs::VdirCookie* cookie, void* data, size_t len, size_t* out_actual) {

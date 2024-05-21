@@ -69,7 +69,7 @@ void NodeConnection::Sync(SyncCompleter::Sync& completer) {
 }
 
 void NodeConnection::GetAttr(GetAttrCompleter::Sync& completer) {
-  zx::result result = Connection::NodeGetAttr();
+  zx::result result = vnode()->GetAttributes();
   completer.Reply(result.status_value(), result.is_ok() ? result.value().ToIoV1NodeAttributes()
                                                         : fio::wire::NodeAttributes());
 }

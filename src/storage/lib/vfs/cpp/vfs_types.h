@@ -168,66 +168,53 @@ struct VnodeConnectionOptions {
 
 fuchsia_io::OpenFlags RightsToOpenFlags(fuchsia_io::Rights rights);
 
-// Objective information about a filesystem node, used to implement |Vnode::GetAttributes|.
-struct VnodeAttributes {
-  uint32_t mode = {};
-  uint64_t inode = {};
-  uint64_t content_size = {};
-  uint64_t storage_size = {};
-  uint64_t link_count = {};
-  uint64_t creation_time = {};
-  uint64_t modification_time = {};
+using VnodeAttributesQuery = fuchsia_io::NodeAttributesQuery;
 
+// Objective information about a filesystem node, used to implement |Vnode::GetAttributes|. Not
+// all attributes are supported by all filesystems, so certain attributes may be unreported.
+struct VnodeAttributes {
+  std::optional<uint64_t> id;
+  std::optional<uint64_t> content_size;
+  std::optional<uint64_t> storage_size;
+  std::optional<uint64_t> link_count;
+
+  std::optional<uint64_t> creation_time;
+  std::optional<uint64_t> modification_time;
+
+  // POSIX Compatibility Attributes
+  // TODO(https://fxbug.dev/340626555): Add support for uid/gid.
+  std::optional<uint32_t> mode;
+
+  // Compare two |VnodeAttributes| instances for equality.
   bool operator==(const VnodeAttributes& other) const {
-    return mode == other.mode && inode == other.inode && content_size == other.content_size &&
+    return id == other.id && content_size == other.content_size &&
            storage_size == other.storage_size && link_count == other.link_count &&
-           creation_time == other.creation_time && modification_time == other.modification_time;
+           creation_time == other.creation_time && modification_time == other.modification_time &&
+           mode == other.mode;
   }
 
   // Converts from |VnodeAttributes| to fuchsia.io v1 |NodeAttributes|.
   fuchsia_io::wire::NodeAttributes ToIoV1NodeAttributes() const;
 };
 
-// A request to update pieces of the |VnodeAttributes|. The fuchsia.io protocol only allows mutating
-// the creation time and modification time. When a field is present, it indicates that the
-// corresponding field should be updated.
-class VnodeAttributesUpdate {
- public:
-  VnodeAttributesUpdate& set_creation_time(std::optional<uint64_t> v) {
-    creation_time_ = v;
-    return *this;
+// A request to update pieces of the |VnodeAttributes| via |Vnode::SetAttributes|. Not all
+// attributes are supported by all filesystems, which may ignore unsupported attributes.
+// TODO(https://fxbug.dev/340626555): Add support for setting POSIX mode/uid/gid.
+struct VnodeAttributesUpdate {
+  std::optional<uint64_t> creation_time;
+  std::optional<uint64_t> modification_time;
+
+  // Return a set of flags representing those attributes which we want to update.
+  constexpr VnodeAttributesQuery AttributesQuery() const {
+    VnodeAttributesQuery query;
+    if (creation_time) {
+      query |= VnodeAttributesQuery::kCreationTime;
+    }
+    if (modification_time) {
+      query |= VnodeAttributesQuery::kModificationTime;
+    }
+    return query;
   }
-
-  VnodeAttributesUpdate& set_modification_time(std::optional<uint64_t> v) {
-    modification_time_ = v;
-    return *this;
-  }
-
-  bool any() const { return creation_time_.has_value() || modification_time_.has_value(); }
-
-  bool has_creation_time() const { return creation_time_.has_value(); }
-
-  // Moves out the creation time. Requires |creation_time_| to be present. After this method
-  // returns, |creation_time_| is absent.
-  uint64_t take_creation_time() {
-    uint64_t v = creation_time_.value();
-    creation_time_ = std::nullopt;
-    return v;
-  }
-
-  bool has_modification_time() const { return modification_time_.has_value(); }
-
-  // Moves out the modification time. Requires |modification_time_| to be present. After this method
-  // returns, |modification_time_| is absent.
-  uint64_t take_modification_time() {
-    uint64_t v = modification_time_.value();
-    modification_time_ = std::nullopt;
-    return v;
-  }
-
- private:
-  std::optional<uint64_t> creation_time_ = {};
-  std::optional<uint64_t> modification_time_ = {};
 };
 
 // Indicates if and when a new object should be created when opening a node.

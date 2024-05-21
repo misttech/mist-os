@@ -116,8 +116,8 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   return (*target_->device_connect.get())(std::move(channel));
 }
 
-zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
-  return children().GetAttributes(a);
+zx::result<fs::VnodeAttributes> Devnode::VnodeImpl::GetAttributes() const {
+  return children().GetAttributes();
 }
 
 zx_status_t Devnode::VnodeImpl::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) {

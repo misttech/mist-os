@@ -27,7 +27,7 @@ class BuiltinDevVnode : public fs::Vnode {
 
   zx_status_t Truncate(size_t len) override;
 
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) override;
+  zx::result<fs::VnodeAttributes> GetAttributes() const override;
 
   fuchsia_io::NodeProtocolKinds GetProtocols() const override;
 

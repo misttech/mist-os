@@ -95,30 +95,26 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
   }
 }
 
-zx::result<VnodeAttributes> Connection::NodeGetAttr() const {
-  FS_PRETTY_TRACE_DEBUG("[NodeGetAttr] rights: ", rights());
-  // TODO(https://fxbug.dev/324080764): This io1 operation should require the GET_ATTRIBUTES right.
-  fs::VnodeAttributes attr;
-  if (zx_status_t status = vnode_->GetAttributes(&attr); status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(attr);
-}
-
-zx::result<> Connection::NodeSetAttr(fio::NodeAttributeFlags flags,
-                                     const fio::wire::NodeAttributes& attributes) {
+zx::result<> Connection::NodeUpdateAttributes(fio::NodeAttributeFlags flags,
+                                              const fio::wire::NodeAttributes& attributes) {
   FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our rights: ", rights(), ", incoming flags: ", flags);
   if (!(rights_ & fio::Rights::kUpdateAttributes)) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
   fs::VnodeAttributesUpdate update;
   if (flags & fio::NodeAttributeFlags::kCreationTime) {
-    update.set_creation_time(attributes.creation_time);
+    update.creation_time = attributes.creation_time;
   }
   if (flags & fio::NodeAttributeFlags::kModificationTime) {
-    update.set_modification_time(attributes.modification_time);
+    update.modification_time = attributes.modification_time;
   }
-  return zx::make_result(vnode_->SetAttributes(update));
+  FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] Setting attributes: ", update.AttributesQuery(),
+                        ", supported attributes: ", vnode_->SupportedMutableAttributes());
+  // Check that the Vnode allows setting the attributes we are updating.
+  if (update.AttributesQuery() - vnode_->SupportedMutableAttributes()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return vnode_->UpdateAttributes(update);
 }
 
 zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() const {

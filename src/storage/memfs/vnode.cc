@@ -22,15 +22,14 @@ Vnode::Vnode(Memfs& memfs)
 
 Vnode::~Vnode() { deleted_ino_ctr_.fetch_add(1, std::memory_order_relaxed); }
 
-zx_status_t Vnode::SetAttributes(fs::VnodeAttributesUpdate attr) {
-  if (attr.has_modification_time()) {
-    modify_time_ = attr.take_modification_time();
-  }
-  if (attr.any()) {
-    // any unhandled field update is unsupported
-    return ZX_ERR_INVALID_ARGS;
-  }
-  return ZX_OK;
+fs::VnodeAttributesQuery Vnode::SupportedMutableAttributes() const {
+  return fs::VnodeAttributesQuery::kModificationTime;
+}
+
+zx::result<> Vnode::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) {
+  // TODO(https://fxbug.dev/340626555): Add support for creation time and POSIX mode/uid/gid.
+  modify_time_ = attributes.modification_time.value_or(modify_time_);
+  return zx::ok();
 }
 
 void Vnode::Sync(SyncCallback closure) {
@@ -39,7 +38,7 @@ void Vnode::Sync(SyncCallback closure) {
   closure(ZX_OK);
 }
 
-void Vnode::UpdateModified() {
+void Vnode::UpdateModified() const {
   std::timespec ts;
   if (std::timespec_get(&ts, TIME_UTC)) {
     modify_time_ = zx_time_from_timespec(ts);

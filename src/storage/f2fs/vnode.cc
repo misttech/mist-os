@@ -322,46 +322,45 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 }
 
-zx_status_t VnodeF2fs::GetAttributes(fs::VnodeAttributes *a) {
-  *a = fs::VnodeAttributes();
-
+zx::result<fs::VnodeAttributes> VnodeF2fs::GetAttributes() const {
+  fs::VnodeAttributes a;
   fs::SharedLock rlock(mutex_);
-  a->mode = mode_;
-  a->inode = ino_;
-  a->content_size = GetSize();
-  a->storage_size = GetBlockCount() * kBlockSize;
-  a->link_count = nlink_;
+  a.mode = mode_;
+  a.id = ino_;
+  a.content_size = GetSize();
+  a.storage_size = GetBlockCount() * kBlockSize;
+  a.link_count = nlink_;
   const auto &btime = GetTime<Timestamps::BirthTime>();
   const auto &mtime = GetTime<Timestamps::ModificationTime>();
-  a->creation_time = zx_time_add_duration(ZX_SEC(btime.tv_sec), btime.tv_nsec);
-  a->modification_time = zx_time_add_duration(ZX_SEC(mtime.tv_sec), mtime.tv_nsec);
+  a.creation_time = zx_time_add_duration(ZX_SEC(btime.tv_sec), btime.tv_nsec);
+  a.modification_time = zx_time_add_duration(ZX_SEC(mtime.tv_sec), mtime.tv_nsec);
 
-  return ZX_OK;
+  return zx::ok(a);
 }
 
-zx_status_t VnodeF2fs::SetAttributes(fs::VnodeAttributesUpdate attr) {
+fs::VnodeAttributesQuery VnodeF2fs::SupportedMutableAttributes() const {
+  return fs::VnodeAttributesQuery::kCreationTime | fs::VnodeAttributesQuery::kModificationTime;
+}
+
+zx::result<> VnodeF2fs::UpdateAttributes(const fs::VnodeAttributesUpdate &attr) {
   bool need_inode_sync = false;
 
-  if (attr.has_creation_time()) {
-    SetTime<Timestamps::BirthTime>(zx_timespec_from_duration(
-        safemath::checked_cast<zx_duration_t>(attr.take_creation_time())));
+  if (attr.creation_time) {
+    SetTime<Timestamps::BirthTime>(
+        zx_timespec_from_duration(safemath::checked_cast<zx_duration_t>(*attr.creation_time)));
     need_inode_sync = true;
   }
-  if (attr.has_modification_time()) {
-    SetTime<Timestamps::ModificationTime>(zx_timespec_from_duration(
-        safemath::checked_cast<zx_duration_t>(attr.take_modification_time())));
+  if (attr.modification_time) {
+    SetTime<Timestamps::ModificationTime>(
+        zx_timespec_from_duration(safemath::checked_cast<zx_duration_t>(*attr.modification_time)));
     need_inode_sync = true;
-  }
-
-  if (attr.any()) {
-    return ZX_ERR_INVALID_ARGS;
   }
 
   if (need_inode_sync) {
     SetDirty();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 struct f2fs_iget_args {

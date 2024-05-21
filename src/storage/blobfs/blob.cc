@@ -440,23 +440,20 @@ zx_status_t Blob::Append(const void* data, size_t len, size_t* out_end, size_t* 
   });
 }
 
-zx_status_t Blob::GetAttributes(fs::VnodeAttributes* a) {
+zx::result<fs::VnodeAttributes> Blob::GetAttributes() const {
   TRACE_DURATION("blobfs", "Blob::GetAttributes");
-  return blobfs_.node_operations().get_attr.Track([&] {
+  return blobfs_.node_operations().get_attr.Track([&]() -> zx::result<fs::VnodeAttributes> {
     // FileSize() expects to be called outside the lock.
     auto content_size = FileSize();
 
     std::lock_guard lock(mutex_);
 
-    *a = fs::VnodeAttributes();
-    a->mode = V_TYPE_FILE | V_IRUSR | V_IXUSR;
-    a->inode = map_index_;
-    a->content_size = content_size;
-    a->storage_size = block_count_ * GetBlockSize();
-    a->link_count = 1;
-    a->creation_time = 0;
-    a->modification_time = 0;
-    return ZX_OK;
+    return zx::ok(fs::VnodeAttributes{
+        .id = map_index_,
+        .content_size = content_size,
+        .storage_size = block_count_ * GetBlockSize(),
+        .mode = V_TYPE_FILE | V_IRUSR | V_IXUSR,
+    });
   });
 }
 
@@ -521,8 +518,8 @@ zx_status_t Blob::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
 }
 
 void Blob::Sync(SyncCallback on_complete) {
-  // This function will issue its callbacks on either the current thread or the journal thread. The
-  // vnode interface says this is OK.
+  // This function will issue its callbacks on either the current thread or the journal thread.
+  // The vnode interface says this is OK.
   TRACE_DURATION("blobfs", "Blob::Sync");
   auto event = blobfs_.node_operations().sync.NewEvent();
   // Wraps `on_complete` to record the result into `event` as well.
@@ -567,14 +564,14 @@ void Blob::VmoRead(uint64_t offset, uint64_t length) {
   TRACE_DURATION("blobfs", "Blob::VmoRead", "offset", offset, "length", length);
 
   // It's important that this function use only a shared read lock. This is for performance (to
-  // allow multiple page requests to be run in parallel) and to prevent deadlock with the non-paged
-  // Read() path. The non-paged path is implemented by reading from the vmo which will recursively
-  // call into this code and taking an exclusive lock would deadlock.
+  // allow multiple page requests to be run in parallel) and to prevent deadlock with the
+  // non-paged Read() path. The non-paged path is implemented by reading from the vmo which will
+  // recursively call into this code and taking an exclusive lock would deadlock.
   fs::SharedLock lock(mutex_);
 
   if (!paged_vmo()) {
-    // Races with calling FreePagedVmo() on another thread can result in stale read requests. Ignore
-    // them if the VMO is gone.
+    // Races with calling FreePagedVmo() on another thread can result in stale read requests.
+    // Ignore them if the VMO is gone.
     return;
   }
 
@@ -610,16 +607,16 @@ void Blob::VmoRead(uint64_t offset, uint64_t length) {
       FX_LOGS(ERROR) << "Failed to report pager error to kernel: " << error_result.status_string();
     }
 
-    // We've signaled a failure and unblocked outstanding page requests for this range. If the pager
-    // error was a verification error, fail future requests as well - we should not service further
-    // page requests on a corrupt blob.
+    // We've signaled a failure and unblocked outstanding page requests for this range. If the
+    // pager error was a verification error, fail future requests as well - we should not service
+    // further page requests on a corrupt blob.
     //
     // Note that we cannot simply detach the VMO from the pager here. There might be outstanding
     // page requests which have been queued but are yet to be serviced. These need to be handled
     // correctly - if the VMO is detached, there will be no way for us to communicate failure to
     // the kernel, since zx_pager_op_range() requires a valid pager VMO handle. Without being able
-    // to make a call to zx_pager_op_range() to indicate a failed page request, the faulting thread
-    // would hang indefinitely.
+    // to make a call to zx_pager_op_range() to indicate a failed page request, the faulting
+    // thread would hang indefinitely.
     if (pager_error_status == PagerErrorStatus::kErrDataIntegrity)
       is_corrupt_ = true;
   }
@@ -652,13 +649,14 @@ zx_status_t Blob::OpenNode(fbl::RefPtr<Vnode>* out_redirect) {
     // reflects the new state).
     //
     // This normally means that the node was closed but cached, and we're not re-opening it. This
-    // means we have to mark things as being open and register for the corresponding notifications.
+    // means we have to mark things as being open and register for the corresponding
+    // notifications.
     //
     // It's also possible to get in this state if there was a memory mapping for a file that
     // was otherwise closed. In that case we don't need to do anything but the operations here
-    // can be performed multiple times with no bad effects. Avoiding these calls in the "mapped but
-    // opened" state would mean checking for no mappings which bundles this code more tightly to
-    // the HasReferences() implementation that is better avoided.
+    // can be performed multiple times with no bad effects. Avoiding these calls in the "mapped
+    // but opened" state would mean checking for no mappings which bundles this code more tightly
+    // to the HasReferences() implementation that is better avoided.
     SetPagedVmoName(true);
   }
   return ZX_OK;

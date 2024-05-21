@@ -292,11 +292,11 @@ TEST_F(CompressorBlobfsTests, CompressSmallCompressibleBlobs) {
     printf("Test case: data size %zu\n", test_case.data_size);
     fbl::RefPtr<fs::Vnode> file = AddBlobToBlobfs(test_case.data_size, DataType::Compressible);
 
-    fs::VnodeAttributes attributes;
-    ASSERT_EQ(file->GetAttributes(&attributes), ZX_OK);
+    zx::result attributes = file->GetAttributes();
+    ASSERT_TRUE(attributes.is_ok()) << attributes.status_string();
 
-    EXPECT_EQ(attributes.content_size, test_case.data_size);
-    EXPECT_LE(attributes.storage_size, test_case.expected_max_storage_size);
+    EXPECT_EQ(attributes->content_size, test_case.data_size);
+    EXPECT_LE(attributes->storage_size, test_case.expected_max_storage_size);
 
     ASSERT_EQ(file->Close(), ZX_OK);
   }
@@ -316,15 +316,15 @@ TEST_F(CompressorBlobfsTests, DoNotInflateIncompressibleBlobs) {
     printf("Test case: data size %zu\n", data_size);
     fbl::RefPtr<fs::Vnode> file = AddBlobToBlobfs(data_size, DataType::Random);
 
-    fs::VnodeAttributes attributes;
-    ASSERT_EQ(file->GetAttributes(&attributes), ZX_OK);
+    zx::result attributes = file->GetAttributes();
+    ASSERT_TRUE(attributes.is_ok()) << attributes.status_string();
 
-    EXPECT_EQ(attributes.content_size, data_size);
+    EXPECT_EQ(attributes->content_size, data_size);
     // Beyond 1 block, we need 1 block for the Merkle tree.
     size_t expected_max_storage_size = fbl::round_up(data_size, kBlobfsBlockSize) +
                                        (data_size > kBlobfsBlockSize ? kBlobfsBlockSize : 0);
 
-    EXPECT_LE(attributes.storage_size, expected_max_storage_size);
+    EXPECT_LE(attributes->storage_size, expected_max_storage_size);
 
     ASSERT_EQ(file->Close(), ZX_OK);
   }

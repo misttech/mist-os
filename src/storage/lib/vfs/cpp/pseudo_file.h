@@ -56,7 +56,7 @@ class PseudoFile : public Vnode {
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   bool ValidateRights(fuchsia_io::Rights rights) const override;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
 
  protected:
   PseudoFile(ReadHandler read_handler, WriteHandler write_handler);
@@ -97,7 +97,7 @@ class BufferedPseudoFile : public PseudoFile {
    public:
     // |Vnode| implementation:
     fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-    zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+    zx::result<fs::VnodeAttributes> GetAttributes() const final;
     zx_status_t Read(void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Write(const void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Append(const void* data, size_t length, size_t* out_end, size_t* out_actual) final;
@@ -186,7 +186,7 @@ class UnbufferedPseudoFile : public PseudoFile {
    public:
     // |Vnode| implementation:
     fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-    zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+    zx::result<fs::VnodeAttributes> GetAttributes() const final;
     zx_status_t Read(void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Write(const void* data, size_t length, size_t offset, size_t* out_actual) final;
     zx_status_t Append(const void* data, size_t length, size_t* out_end, size_t* out_actual) final;

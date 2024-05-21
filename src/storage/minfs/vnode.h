@@ -213,8 +213,9 @@ class VnodeMinfs : public fs::Vnode,
  private:
   // fs::Vnode private interface.
   zx_status_t CloseNode() final;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
-  zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) final;
+  fs::VnodeAttributesQuery SupportedMutableAttributes() const final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
+  zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) final;
 #ifdef __Fuchsia__
   zx::result<std::string> GetDevicePath() const final;
 #endif

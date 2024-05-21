@@ -17,10 +17,9 @@ TEST(RemoteDir, ApiTest) {
   auto dir = fbl::MakeRefCounted<fs::RemoteDir>(std::move(endpoints.client));
 
   // get attributes
-  fs::VnodeAttributes attr;
-  EXPECT_EQ(ZX_OK, dir->GetAttributes(&attr));
-  EXPECT_EQ(V_TYPE_DIR | V_IRUSR, attr.mode);
-  EXPECT_EQ(1, attr.link_count);
+  zx::result<fs::VnodeAttributes> attr = dir->GetAttributes();
+  ASSERT_TRUE(attr.is_ok());
+  EXPECT_EQ(V_TYPE_DIR | V_IRUSR, attr->mode);
 
   // get remote properties
   ASSERT_TRUE(dir->IsRemote());

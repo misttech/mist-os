@@ -46,7 +46,7 @@ class VnodeDir final : public Vnode {
   zx_status_t Rename(fbl::RefPtr<fs::Vnode> newdir, std::string_view oldname,
                      std::string_view newname, bool src_must_be_dir, bool dst_must_be_dir) final;
   zx_status_t Link(std::string_view name, fbl::RefPtr<fs::Vnode> target) final;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;
 
   Memfs& memfs_;

@@ -309,6 +309,8 @@ closed protocol Node2 {
     /// + `attributes` the presence of a table field in `attributes` indicates
     /// the intent to update the corresponding attribute.
     ///
+    /// Returns `ZX_ERR_NOT_SUPPORTED` if the node does not support any of the specified attributes.
+    ///
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
     @selector("fuchsia.io/Node.UpdateAttributes")
     strict UpdateAttributes(MutableNodeAttributes) -> () error zx.Status;

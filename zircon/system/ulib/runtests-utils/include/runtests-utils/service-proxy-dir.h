@@ -29,7 +29,7 @@ class ServiceProxyDir : public fs::Vnode {
 
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
 
  private:
   const fidl::ClientEnd<fuchsia_io::Directory> proxy_dir_;

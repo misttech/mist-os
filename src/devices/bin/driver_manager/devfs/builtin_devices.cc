@@ -30,11 +30,10 @@ zx_status_t BuiltinDevVnode::Write(const void* data, size_t len, size_t off, siz
 
 zx_status_t BuiltinDevVnode::Truncate(size_t len) { return ZX_OK; }
 
-zx_status_t BuiltinDevVnode::GetAttributes(fs::VnodeAttributes* a) {
-  a->mode = V_TYPE_CDEV | V_IRUSR | V_IWUSR;
-  a->content_size = 0;
-  a->link_count = 1;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> BuiltinDevVnode::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .mode = V_TYPE_CDEV | V_IRUSR | V_IWUSR,
+  });
 }
 
 fuchsia_io::NodeProtocolKinds BuiltinDevVnode::GetProtocols() const {

@@ -75,16 +75,16 @@ zx_status_t VnodeVmo::Read(void* data, size_t len, size_t off, size_t* out_actua
   return status;
 }
 
-zx_status_t VnodeVmo::GetAttributes(fs::VnodeAttributes* attr) {
-  *attr = fs::VnodeAttributes();
-  attr->inode = ino_;
-  attr->mode = V_TYPE_FILE | V_IRUSR;
-  attr->content_size = length_;
-  attr->storage_size = fbl::round_up(attr->content_size, GetPageSize());
-  attr->link_count = link_count_;
-  attr->creation_time = create_time_;
-  attr->modification_time = modify_time_;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> VnodeVmo::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .id = ino_,
+      .content_size = length_,
+      .storage_size = fbl::round_up(length_, GetPageSize()),
+      .link_count = link_count_,
+      .creation_time = create_time_,
+      .modification_time = modify_time_,
+      .mode = V_TYPE_FILE | V_IRUSR,
+  });
 }
 
 zx_status_t VnodeVmo::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {

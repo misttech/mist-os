@@ -154,7 +154,7 @@ void FileConnection::Sync(SyncCompleter::Sync& completer) {
 }
 
 void FileConnection::GetAttr(GetAttrCompleter::Sync& completer) {
-  zx::result result = Connection::NodeGetAttr();
+  zx::result result = vnode()->GetAttributes();
   if (result.is_error()) {
     completer.Reply(result.status_value(), fio::wire::NodeAttributes());
   } else {
@@ -163,12 +163,8 @@ void FileConnection::GetAttr(GetAttrCompleter::Sync& completer) {
 }
 
 void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
-  zx::result result = Connection::NodeSetAttr(request->flags, request->attributes);
-  if (result.is_error()) {
-    completer.Reply(result.status_value());
-  } else {
-    completer.Reply(ZX_OK);
-  }
+  zx::result result = Connection::NodeUpdateAttributes(request->flags, request->attributes);
+  completer.Reply(result.status_value());
 }
 
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {

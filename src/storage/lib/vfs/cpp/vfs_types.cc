@@ -121,13 +121,23 @@ fio::OpenFlags RightsToOpenFlags(fio::Rights rights) {
 }
 
 fio::wire::NodeAttributes VnodeAttributes::ToIoV1NodeAttributes() const {
-  return fio::wire::NodeAttributes{.mode = mode,
-                                   .id = inode,
-                                   .content_size = content_size,
-                                   .storage_size = storage_size,
-                                   .link_count = link_count,
-                                   .creation_time = creation_time,
-                                   .modification_time = modification_time};
+  // Filesystems that don't support hard links typically report a value of 1 for the link count.
+  constexpr uint64_t kDefaultLinkCount = 1;
+  // TODO(https://fxbug.dev/324112857): Most filesystems don't support POSIX attributes and have
+  // a hard-coded value for the mode bits. We should consider centralizing how they are calculated
+  // here based off of a node's protocols/abilities, or determine them from the connection which
+  // invokes this function.
+  //
+  // This isn't an issue for the ongoing io2 migration as filesystems which do support the POSIX
+  // mode attributes will correctly handle them, but should be considered for the long term as the
+  // way permissions work on Fuchsia is fundamentally different than POSIX.
+  return fio::wire::NodeAttributes{.mode = mode.value_or(0),
+                                   .id = id.value_or(fio::wire::kInoUnknown),
+                                   .content_size = content_size.value_or(0),
+                                   .storage_size = storage_size.value_or(0),
+                                   .link_count = link_count.value_or(kDefaultLinkCount),
+                                   .creation_time = creation_time.value_or(0),
+                                   .modification_time = modification_time.value_or(0)};
 }
 
 namespace internal {

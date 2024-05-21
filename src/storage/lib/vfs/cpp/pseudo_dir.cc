@@ -25,12 +25,10 @@ PseudoDir::~PseudoDir() {
   entries_by_id_.clear();
 }
 
-zx_status_t PseudoDir::GetAttributes(VnodeAttributes* attr) {
-  *attr = VnodeAttributes();
-  attr->mode = V_TYPE_DIR | V_IRUSR;
-  attr->inode = fio::wire::kInoUnknown;
-  attr->link_count = 1;
-  return ZX_OK;
+zx::result<VnodeAttributes> PseudoDir::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .mode = V_TYPE_DIR | V_IRUSR,
+  });
 }
 
 zx_status_t PseudoDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) {
@@ -72,11 +70,11 @@ zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_
     if (cookie->n >= it->id()) {
       continue;
     }
-    VnodeAttributes attr;
-    if ((r = it->node()->GetAttributes(&attr)) != ZX_OK) {
+    zx::result attr = it->node()->GetAttributes();
+    if (!attr.is_ok()) {
       continue;
     }
-    if (df.Next(it->name(), VTYPE_TO_DTYPE(attr.mode), attr.inode) != ZX_OK) {
+    if (df.Next(it->name(), VTYPE_TO_DTYPE(*attr->mode), *attr->id) != ZX_OK) {
       *out_actual = df.BytesFilled();
       return ZX_OK;
     }

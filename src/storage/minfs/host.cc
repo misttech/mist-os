@@ -34,17 +34,16 @@
 namespace {
 
 zx_status_t do_stat(const fbl::RefPtr<fs::Vnode>& vn, struct stat* s) {
-  fs::VnodeAttributes a;
-  zx_status_t status = vn->GetAttributes(&a);
-  if (status == ZX_OK) {
+  zx::result a = vn->GetAttributes();
+  if (a.is_ok()) {
     memset(s, 0, sizeof(struct stat));
-    s->st_mode = static_cast<mode_t>(a.mode);
-    s->st_size = static_cast<off_t>(a.content_size);
-    s->st_ino = a.inode;
-    s->st_ctime = static_cast<time_t>(a.creation_time);
-    s->st_mtime = static_cast<time_t>(a.modification_time);
+    s->st_mode = static_cast<mode_t>(*a->mode);
+    s->st_size = static_cast<off_t>(*a->content_size);
+    s->st_ino = *a->id;
+    s->st_ctime = static_cast<time_t>(*a->creation_time);
+    s->st_mtime = static_cast<time_t>(*a->modification_time);
   }
-  return status;
+  return a.status_value();
 }
 
 struct HostFile {
@@ -373,11 +372,11 @@ off_t emu_lseek(int fd, off_t offset, int whence) {
       break;
     }
     case SEEK_END: {
-      fs::VnodeAttributes a;
-      if (f->vn->GetAttributes(&a)) {
+      zx::result attributes = f->vn->GetAttributes();
+      if (attributes.is_error()) {
         FAIL(EINVAL);
       }
-      old = a.content_size;
+      old = *attributes->content_size;
       __FALLTHROUGH;
     }
     case SEEK_CUR: {

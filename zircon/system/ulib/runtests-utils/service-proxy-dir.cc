@@ -27,12 +27,10 @@ void ServiceProxyDir::AddEntry(std::string name, fbl::RefPtr<fs::Vnode> node) {
   entries_[std::move(name)] = std::move(node);
 }
 
-zx_status_t ServiceProxyDir::GetAttributes(fs::VnodeAttributes* attr) {
-  *attr = fs::VnodeAttributes();
-  attr->mode = V_TYPE_DIR | V_IRUSR;
-  attr->inode = fio::wire::kInoUnknown;
-  attr->link_count = 1;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> ServiceProxyDir::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .mode = V_TYPE_DIR | V_IRUSR,
+  });
 }
 
 fuchsia_io::NodeProtocolKinds ServiceProxyDir::GetProtocols() const {

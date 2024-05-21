@@ -110,9 +110,8 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
 
   void NodeClone(fuchsia_io::OpenFlags flags, VnodeProtocol protocol,
                  fidl::ServerEnd<fuchsia_io::Node> server_end);
-  zx::result<VnodeAttributes> NodeGetAttr() const;
-  zx::result<> NodeSetAttr(fuchsia_io::wire::NodeAttributeFlags flags,
-                           const fuchsia_io::wire::NodeAttributes& attributes);
+  zx::result<> NodeUpdateAttributes(fuchsia_io::wire::NodeAttributeFlags flags,
+                                    const fuchsia_io::wire::NodeAttributes& attributes);
   zx::result<fuchsia_io::wire::FilesystemInfo> NodeQueryFilesystem() const;
 
  private:

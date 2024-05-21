@@ -179,13 +179,14 @@ type NodeOptions = table {
 
     /// If the [`NodeFlags.GET_REPRESENTATION`] flag is set, attributes to be returned in
     /// [`Node.OnRepresentation`]. This requires the [`Rights.GET_ATTRIBUTES`] right on the parent
-    /// connection, but this is not required on the resulting connection.
+    /// connection, but not the resulting connection.
     @available(added=18)
     5: attributes NodeAttributesQuery;
 
     /// If an object is to be created, this specifies attributes that should be stored with the
-    /// object at creation time. Servers might not support setting any or all attributes in which
-    /// case they will return `ZX_ERR_NOT_SUPPORTED`.
+    /// object at creation time. This requires the [`Rights.UPDATE_ATTRIBUTES`] right on the parent
+    /// connection, but not the resulting connection. Requests will fail with `ZX_ERR_NOT_SUPPORTED`
+    /// if any specified attributes are not supported.
     @available(added=18)
     6: create_attributes MutableNodeAttributes;
 };

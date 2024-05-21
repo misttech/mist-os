@@ -33,7 +33,7 @@ class Service : public Vnode {
   template <typename, typename = void>
   struct has_protocol_type : public std::false_type {};
   template <typename T>
-  struct has_protocol_type<T, std::void_t<typename T::ProtocolType>> : public std::true_type {};
+  struct has_protocol_type<T, std::void_t<typename T::ProtocolType>> : public std::true_type{};
   template <typename T>
   static constexpr inline auto has_protocol_type_v = has_protocol_type<T>::value;
 
@@ -56,7 +56,7 @@ class Service : public Vnode {
 
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-  zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+  zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t ConnectService(zx::channel channel) final;
 
  protected:

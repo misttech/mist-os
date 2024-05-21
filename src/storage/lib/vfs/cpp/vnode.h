@@ -274,11 +274,16 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // include a null terminator.
   virtual zx_status_t Lookup(std::string_view name, fbl::RefPtr<Vnode>* out);
 
-  // Read attributes of the vnode.
-  virtual zx_status_t GetAttributes(fs::VnodeAttributes* a);
+  // Get attributes of the vnode.
+  virtual zx::result<fs::VnodeAttributes> GetAttributes() const;
 
-  // Set attributes of the vnode.
-  virtual zx_status_t SetAttributes(VnodeAttributesUpdate a);
+  // Returns the set of attributes this vnode supports. Requests to update attributes which the
+  // vnode does not support will be rejected.
+  virtual VnodeAttributesQuery SupportedMutableAttributes() const { return {}; }
+
+  // Update attributes of the vnode. Only those attributes specified by
+  // |SupportedMutableAttributes()| will be specified in |attributes|.
+  virtual zx::result<> UpdateAttributes(const VnodeAttributesUpdate& attributes);
 
   // Create a new object with specified |name| and |type| under this Vnode. On success, the newly
   // created Vnode must already be opened (i.e. |Open()| will not be called on the result).

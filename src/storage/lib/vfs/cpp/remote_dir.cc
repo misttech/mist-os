@@ -26,12 +26,10 @@ fuchsia_io::NodeProtocolKinds RemoteDir::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kDirectory;
 }
 
-zx_status_t RemoteDir::GetAttributes(VnodeAttributes* attr) {
-  *attr = VnodeAttributes();
-  attr->mode = V_TYPE_DIR | V_IRUSR;
-  attr->inode = fio::wire::kInoUnknown;
-  attr->link_count = 1;
-  return ZX_OK;
+zx::result<fs::VnodeAttributes> RemoteDir::GetAttributes() const {
+  return zx::ok(fs::VnodeAttributes{
+      .mode = V_TYPE_DIR | V_IRUSR,
+  });
 }
 
 bool RemoteDir::IsRemote() const { return true; }
