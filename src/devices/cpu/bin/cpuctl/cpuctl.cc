@@ -140,11 +140,21 @@ void describe(const char* domain_name) {
   }
 
   CpuPerformanceDomain& client = domain.value();
-  const auto [core_count_status, core_count] = client.GetNumLogicalCores();
-
   std::cout << "Domain " << domain_name << std::endl;
+
+  const auto [core_count_status, core_count] = client.GetNumLogicalCores();
   if (core_count_status == ZX_OK) {
-    std::cout << core_count << " logical cores" << std::endl;
+    std::cout << "logical core count: " << core_count << std::endl;
+  }
+
+  const auto [relative_perf_status, relative_perf] = client.GetRelativePerformance();
+  if (relative_perf_status == ZX_OK) {
+    std::cout << "relative performance: " << relative_perf << std::endl;
+  }
+
+  const auto [domain_id_status, domain_id] = client.GetDomainId();
+  if (domain_id_status == ZX_OK) {
+    std::cout << "domain_id: " << domain_id << std::endl;
   }
 
   const auto [status, opps] = client.GetOperatingPoints();
