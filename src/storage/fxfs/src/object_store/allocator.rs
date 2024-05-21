@@ -55,18 +55,17 @@
 //!
 //! These regions are currently tracked in RAM in the allocator.
 //!
+//! ## Allocated but uncommitted regions
+//!
+//! These are allocated regions that are not (yet) persisted to disk. They are regular
+//! file allocations, but are not stored on persistent storage until their transaction is committed
+//! and safely flushed to disk.
+//!
 //! ## TRIMed unusable regions
 //!
-//! TRIM notifies the SSD controller of regions of the disk that are not used. This helps with SSD
-//! performance and longevity because wear leveling and ECC need not be performed on logical blocks
-//! that don't contain useful data. Fxfs performs batch TRIM passes periodically in the background
-//! by walking over unallocated regions of the disk and performing trim() operations on unused
-//! regions. These operations are asynchronous and therefore these regions are unusable until
-//! the operation completes.
-//!
-//! We allocate these free ranges using a monotonically increasing
-//! `allocate_next_available(offset, length)`. When the trim completes, we free the
-//! range, returning it to the pool of available storage.
+//! We periodically TRIM unallocated regions to give the SSD controller insight into which
+//! parts of the device contain data. We must avoid using temporary TRIM allocations that are held
+//! while we perform these operations.
 //!
 //! ## Volume deletion
 //!
@@ -85,8 +84,8 @@
 //! fxblob-based boards, this is an Fxfs filesystem containing a volume with the base set of
 //! blobs required to bootstrap the system. When we build such an image, we want it to be as compact
 //! as possible as we're potentially packaging it up for distribution. To that end, our allocation
-//! strategy should differ between image generation and "live" use cases.
-
+//! strategy (or at least the strategy used for image generation) should prefer to allocate from the
+//! start of the device wherever possible.
 pub mod merge;
 pub mod strategy;
 
@@ -99,9 +98,10 @@ use {
         lsm_tree::{
             cache::NullCache,
             layers_from_handles,
+            skip_list_layer::SkipListLayer,
             types::{
-                Item, ItemRef, LayerIterator, LayerKey, MergeType, OrdLowerBound, OrdUpperBound,
-                RangeKey, SortByU64,
+                Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
+                OrdUpperBound, RangeKey, SortByU64,
             },
             LSMTree,
         },
@@ -431,6 +431,13 @@ pub struct Allocator {
     object_id: u64,
     max_extent_size_bytes: u64,
     tree: LSMTree<AllocatorKey, AllocatorValue>,
+    // A list of allocations which are temporary; i.e. they are not actually stored in the LSM tree,
+    // but we still don't want to be able to allocate over them.  This layer is merged into the
+    // allocator's LSM tree whilst reading it, so the allocations appear to exist in the LSM tree.
+    // This is used in a few places, for example to hold back allocations that have been added to a
+    // transaction but are not yet committed yet, or to prevent the allocation of a deleted extent
+    // until the device is flushed.
+    temporary_allocations: Arc<SkipListLayer<AllocatorKey, AllocatorValue>>,
     inner: Mutex<Inner>,
     allocation_mutex: futures::lock::Mutex<()>,
     counters: Mutex<AllocatorCounters>,
@@ -445,6 +452,7 @@ struct ByteTracking {
     /// This is i64 because it can be negative during replay.
     allocated_bytes: i64,
     /// This value is the number of bytes allocated to uncommitted allocations.
+    /// (Bytes allocated, but not yet persisted to disk)
     uncommitted_allocated_bytes: u64,
     /// This value is the number of bytes allocated to reservations.
     reserved_bytes: u64,
@@ -493,6 +501,34 @@ struct Inner {
     /// The allocator can only be opened if there have been no allocations and it has not already
     /// been opened or initialized.
     opened: bool,
+    /// When we allocate a range from RAM, we add it to Allocator::temporary_allocations.
+    /// This layer is added to layer_set in rebuild_strategy and take_for trim so we don't assume
+    /// the range is available.
+    /// If we apply the mutation, we move it from `temporary_allocations` to the LSMTree.
+    /// If we drop the mutation, we just delete it from `temporary_allocations` and call `free`.
+    ///
+    /// We need to be very careful about races when we move the allocation into the LSMTree.
+    /// A layer_set is a snapshot in time of a set of layers. Say:
+    ///  1. `rebuild_strategy` takes a layer_set that includes the mutable layer.
+    ///  2. A compaction operation seals that mutable layer and creates a new mutable layer.
+    ///     Note that the layer_set in rebuild_strategy doesn't have this new mutable layer.
+    ///  3. An apply_mutation operation adds the allocation to the new mutable layer.
+    ///     It then removes the allocation from `temporary_allocations`.
+    ///  4. `rebuild_strategy` iterates the layer_set, missing both the temporary mutation AND
+    ///     the record in the new mutable layer, making the allocated range available for double
+    ///     allocation and future filesystem corruption.
+    ///
+    /// We don't have (or want) a means to lock compctions during rebuild_strategy operations so
+    /// to avoid this scenario, we can't remove from temporary_allocations when we apply a mutation.
+    /// Instead we add them to dropped_temporary_allocations and make the actual removals from
+    /// `temporary_allocations` while holding the allocator lock. Because rebuild_strategy only
+    /// runs with this lock held, this guarantees that we don't remove entries from temporary
+    /// mutations while also iterating over it.
+    ///
+    /// A related issue happens when we deallocate a range. We use temporary_allocations this time
+    /// to prevent reuse until after the deallocation has been successfully flushed.
+    /// In this scenario we don't want to call 'free()' until the range is ready to use again.
+    dropped_temporary_allocations: Vec<Range<u64>>,
     /// The per-owner counters for bytes at various stages of the data life-cycle. From initial
     /// reservation through until the bytes are unallocated and eventually uncommitted.
     owner_bytes: BTreeMap<u64, ByteTracking>,
@@ -517,6 +553,8 @@ struct Inner {
     strategy: Box<strategy::BestFit>,
     /// Tracks the number of allocations of size 1,2,...63,>=64.
     histogram: [u64; 64],
+    /// Tracks which size bucket triggers rebuild_strategy.
+    rebuild_strategy_trigger_histogram: [u64; 64],
 }
 
 impl Inner {
@@ -647,7 +685,10 @@ impl<'a> Drop for TrimmableExtents<'a> {
     fn drop(&mut self) {
         let mut inner = self.allocator.inner.lock().unwrap();
         for device_range in std::mem::take(&mut self.extents) {
-            inner.strategy.free(device_range).expect("drop trim extent");
+            inner.strategy.free(device_range.clone()).expect("drop trim extent");
+            self.allocator
+                .temporary_allocations
+                .erase(&AllocatorKey { device_range: device_range.clone() });
         }
         inner.trim_reserved_bytes = 0;
     }
@@ -665,7 +706,7 @@ impl Allocator {
         // Note that we use BestFit strategy for new filesystems to favour dense packing of
         // data and 'FirstFit' for existing filesystems for better fragmentation.
         let mut strategy = Box::new(strategy::BestFit::default());
-        strategy.free(0..filesystem.device().size()).expect("new fs");
+        strategy.free(0..device_size).expect("new fs");
         Allocator {
             filesystem: Arc::downgrade(&filesystem),
             block_size,
@@ -673,9 +714,11 @@ impl Allocator {
             object_id,
             max_extent_size_bytes,
             tree: LSMTree::new(merge, Box::new(NullCache {})),
+            temporary_allocations: SkipListLayer::new(1024),
             inner: Mutex::new(Inner {
                 info: AllocatorInfo::default(),
                 opened: false,
+                dropped_temporary_allocations: Vec::new(),
                 owner_bytes: BTreeMap::new(),
                 unattributed_reserved_bytes: 0,
                 committed_deallocated: VecDeque::new(),
@@ -684,6 +727,7 @@ impl Allocator {
                 trim_listener: None,
                 strategy,
                 histogram: [0; 64],
+                rebuild_strategy_trigger_histogram: [0; 64],
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
             counters: Mutex::new(AllocatorCounters::default()),
@@ -748,10 +792,11 @@ impl Allocator {
     // otherwise load and initialise the LSM tree.  This is not thread-safe; this should be called
     // after the journal has been replayed. Any entries in the LSMTree mutable layer
     // that were written during replay will be preserved.
-    pub async fn open(&self) -> Result<(), Error> {
+    pub async fn open(self: &Arc<Self>) -> Result<(), Error> {
         let filesystem = self.filesystem.upgrade().unwrap();
         let root_store = filesystem.root_store();
-        let mut strategy = Box::new(strategy::BestFit::default());
+
+        self.inner.lock().unwrap().strategy = Box::new(strategy::BestFit::default());
 
         let handle =
             ObjectStore::open_object(&root_store, self.object_id, HandleOptions::default(), None)
@@ -829,35 +874,67 @@ impl Allocator {
                 tree::reservation_amount_from_layer_size(total_size),
             );
         }
-        // Walk all allocations to generate the set of free regions between allocations.
-        // This may take some time and consume a potentially large chunk of RAM on on very large,
-        // fragmented filesystems. We may circle back here to support caching of free space maps
-        // and/or tracking only partial free-space (if the chosen allocation strategy allows it).
-        {
-            let layer_set = self.tree.layer_set();
-            let mut merger = layer_set.merger();
-            let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
-            let mut last_offset = 0;
-            loop {
-                match iter.get() {
-                    None => {
-                        ensure!(last_offset <= self.device_size, FxfsError::Inconsistent);
-                        strategy.free(last_offset..self.device_size).expect("open fs");
-                        break;
-                    }
-                    Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
-                        if device_range.start > last_offset {
-                            strategy.free(last_offset..device_range.start).expect("open fs");
-                        }
-                        last_offset = device_range.end;
-                    }
-                }
-                iter.advance().await?;
-            }
-            self.inner.lock().unwrap().strategy = strategy;
-        }
+        // Build free extent structure from disk.
+        self.rebuild_strategy().await.context("Build free extents")?;
 
         assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);
+        Ok(())
+    }
+
+    /// Walk all allocations to generate the set of free regions between allocations.
+    /// It is safe to re-run this on live filesystems but it should not be called concurrently
+    /// with allocations, trims or other rebuild_strategy invocations -- use allocation_mutex.
+    async fn rebuild_strategy(self: &Arc<Self>) -> Result<(), Error> {
+        let mut layer_set = self.tree.empty_layer_set();
+        layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
+        self.tree.add_all_layers_to_layer_set(&mut layer_set);
+
+        self.inner.lock().unwrap().strategy.reset_overflow_markers();
+
+        let mut to_add = Vec::new();
+        let mut merger = layer_set.merger();
+        let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
+        let mut last_offset = 0;
+        while last_offset < self.device_size {
+            let next_range = match iter.get() {
+                None => {
+                    assert!(last_offset <= self.device_size);
+                    let range = last_offset..self.device_size;
+                    last_offset = self.device_size;
+                    iter.advance().await?;
+                    range
+                }
+                Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
+                    if device_range.end < last_offset {
+                        iter.advance().await?;
+                        continue;
+                    }
+                    if device_range.start <= last_offset {
+                        last_offset = device_range.end;
+                        iter.advance().await?;
+                        continue;
+                    }
+                    let range = last_offset..device_range.start;
+                    last_offset = device_range.end;
+                    iter.advance().await?;
+                    range
+                }
+            };
+            to_add.push(next_range);
+            // Avoid taking a lock on inner for every free range.
+            if to_add.len() > 100 {
+                let mut inner = self.inner.lock().unwrap();
+                for range in to_add.drain(..) {
+                    inner.strategy.remove(range.clone());
+                    inner.strategy.free(range)?;
+                }
+            }
+        }
+        let mut inner = self.inner.lock().unwrap();
+        for range in to_add {
+            inner.strategy.remove(range.clone());
+            inner.strategy.free(range)?;
+        }
         Ok(())
     }
 
@@ -874,18 +951,74 @@ impl Allocator {
 
         let (mut result, listener) = TrimmableExtents::new(self);
         let mut bytes = 0;
-        {
+
+        // We can't just use self.strategy here because it doesn't necessarily hold all
+        // free extent metadata in RAM.
+        let mut layer_set = self.tree.empty_layer_set();
+        layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
+        self.tree.add_all_layers_to_layer_set(&mut layer_set);
+        let mut merger = layer_set.merger();
+        let mut iter = self
+            .filter(merger.seek(Bound::Included(&AllocatorKey { device_range: offset..0 })).await?)
+            .await?;
+        let mut last_offset = offset;
+        'outer: while last_offset < self.device_size {
+            let mut range = match iter.get() {
+                None => {
+                    assert!(last_offset <= self.device_size);
+                    let range = last_offset..self.device_size;
+                    last_offset = self.device_size;
+                    iter.advance().await?;
+                    range
+                }
+                Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
+                    if device_range.end <= last_offset {
+                        iter.advance().await?;
+                        continue;
+                    }
+                    if device_range.start <= last_offset {
+                        last_offset = device_range.end;
+                        iter.advance().await?;
+                        continue;
+                    }
+                    let range = last_offset..device_range.start;
+                    last_offset = device_range.end;
+                    iter.advance().await?;
+                    range
+                }
+            };
+            if range.start < offset {
+                continue;
+            }
+
+            // 'range' is based on the on-disk LSM tree. We need to check against any uncommitted
+            // allocations and remove temporarily allocate the range for ourselves.
             let mut inner = self.inner.lock().unwrap();
-            for _ in 0..extents_per_batch {
-                if let Some(range) =
-                    inner.strategy.allocate_next_available(offset, max_extent_size as u64)
-                {
-                    result.add_extent(range.clone());
-                    bytes += range.length()?;
-                } else {
-                    break;
+
+            while range.start < range.end {
+                let prefix =
+                    range.start..std::cmp::min(range.start + max_extent_size as u64, range.end);
+                range = prefix.end..range.end;
+                bytes += prefix.length()?;
+                // We can assume the following are safe because we've checked both LSM tree and
+                // temporary_allocations while holding the lock.
+                inner.strategy.remove(prefix.clone());
+                self.temporary_allocations.insert(AllocatorItem {
+                    key: AllocatorKey { device_range: prefix.clone() },
+                    value: AllocatorValue::Abs { owner_object_id: INVALID_OBJECT_ID, count: 1 },
+                    sequence: 0,
+                })?;
+                result.add_extent(prefix);
+                if result.extents.len() == extents_per_batch {
+                    break 'outer;
                 }
             }
+            if result.extents.len() == extents_per_batch {
+                break 'outer;
+            }
+        }
+        {
+            let mut inner = self.inner.lock().unwrap();
 
             assert!(inner.trim_reserved_bytes == 0, "Multiple trims ongoing");
             inner.trim_listener = Some(listener);
@@ -923,7 +1056,8 @@ impl Allocator {
         // committed deallocated bytes, but we might want to trigger a sync if we're low and there
         // happens to be a lot of deallocated bytes as that might mean we can fully satisfy
         // allocation requests.
-        self.inner.lock().unwrap().unavailable_bytes() >= self.device_size
+        let inner = self.inner.lock().unwrap();
+        inner.unavailable_bytes() >= self.device_size
     }
 
     fn is_system_store(&self, owner_object_id: u64) -> bool {
@@ -1015,6 +1149,13 @@ impl Allocator {
                         alloc_sizes.set(i, *count);
                     }
                     root.record(alloc_sizes);
+
+                    let data = this.inner.lock().unwrap().rebuild_strategy_trigger_histogram;
+                    let triggers = root.create_uint_array("rebuild_strategy_triggers", data.len());
+                    for (i, count) in data.iter().enumerate() {
+                        triggers.set(i, *count);
+                    }
+                    root.record(triggers);
                 }
                 Ok(inspector)
             }
@@ -1062,7 +1203,7 @@ impl Allocator {
     /// that we have a means to delete encrypted stores without needing the encryption key.
     #[trace]
     pub async fn allocate(
-        &self,
+        self: &Arc<Self>,
         transaction: &mut Transaction<'_>,
         owner_object_id: u64,
         mut len: u64,
@@ -1093,7 +1234,7 @@ impl Allocator {
             len = round_down(std::cmp::min(len, limit), self.block_size);
             let owner_entry = inner.owner_bytes.entry(owner_object_id).or_default();
             owner_entry.reserved_bytes += len;
-            Right(ReservationImpl::<_, Self>::new(self, Some(owner_object_id), len))
+            Right(ReservationImpl::<_, Self>::new(&**self, Some(owner_object_id), len))
         };
 
         ensure!(len > 0, FxfsError::NoSpace);
@@ -1157,13 +1298,36 @@ impl Allocator {
             listener.await;
         }
 
-        let result = match self.inner.lock().unwrap().strategy.allocate(len) {
-            Err(err) => {
-                tracing::error!(%err, "Likely filesystem corruption.");
-                Err(err)
+        let result = loop {
+            {
+                let mut inner = self.inner.lock().unwrap();
+
+                // While we know rebuild_strategy and take_for_trim are not running (we hold guard),
+                // apply temporary_allocation removals.
+                for device_range in inner.dropped_temporary_allocations.drain(..) {
+                    self.temporary_allocations.erase(&AllocatorKey { device_range });
+                }
+
+                match inner.strategy.allocate(len) {
+                    Err(FxfsError::NotFound) => {
+                        // Overflow. Fall through and rebuild
+                        inner.rebuild_strategy_trigger_histogram
+                            [std::cmp::min(63, (len / self.block_size) as usize)] += 1;
+                    }
+                    Err(err) => {
+                        tracing::error!(%err, "Likely filesystem corruption.");
+                        return Err(err.into());
+                    }
+                    Ok(x) => {
+                        break x;
+                    }
+                }
             }
-            x => x,
-        }?;
+            // We've run out of extents of the requested length in RAM but there
+            // exists more of this size on device. Rescan device and circle back.
+            // We already hold the allocation_mutex, so exclusive access is guaranteed.
+            self.rebuild_strategy().await?;
+        };
 
         debug!(device_range = ?result, "allocate");
 
@@ -1187,6 +1351,11 @@ impl Allocator {
             // If the reservation has an owner, ensure they are the same.
             assert_eq!(owner_object_id, reservation_owner.unwrap_or(owner_object_id));
             inner.remove_reservation(reservation_owner, len);
+            self.temporary_allocations.insert(AllocatorItem {
+                key: AllocatorKey { device_range: result.clone() },
+                value: AllocatorValue::Abs { owner_object_id, count: 1 },
+                sequence: 0,
+            })?;
         }
 
         let mutation =
@@ -1224,12 +1393,12 @@ impl Allocator {
                 reservation.reserve(len).ok_or(FxfsError::NoSpace)?.forget();
             }
             owner_entry.uncommitted_allocated_bytes += len;
-            // Done last to avoid leaking free list entries if we error out.
-            let range = inner
-                .strategy
-                .allocate_fixed_offset(device_range.start, device_range.end - device_range.start)
-                .context("mark_allocated)")?;
-            ensure!(range == device_range, FxfsError::Inconsistent);
+            inner.strategy.remove(device_range.clone());
+            self.temporary_allocations.insert(AllocatorItem {
+                key: AllocatorKey { device_range: device_range.clone() },
+                value: AllocatorValue::Abs { owner_object_id, count: 1 },
+                sequence: 0,
+            })?;
         }
         let mutation =
             AllocatorMutation::Allocate { device_range: device_range.into(), owner_object_id };
@@ -1272,9 +1441,42 @@ impl Allocator {
         // long as we can assume the deallocated range is actually allocated, we can avoid device
         // access.
         let deallocated = dealloc_range.end - dealloc_range.start;
-        let mutation =
-            AllocatorMutation::Deallocate { device_range: dealloc_range.into(), owner_object_id };
+        let mutation = AllocatorMutation::Deallocate {
+            device_range: dealloc_range.clone().into(),
+            owner_object_id,
+        };
         transaction.add(self.object_id(), Mutation::Allocator(mutation));
+
+        let _guard = self.allocation_mutex.lock().await;
+
+        // We use `dropped_temporary_allocations` to defer removals from `temporary_allocations` in
+        // places where we can't execute async code or take locks.
+        //
+        // It's important we don't ever remove entries from `temporary_allocations` without
+        // holding the `allocation_mutex` lock or else we may end up with an inconsistent view of
+        // available disk space when we combine temporary_allocations with the LSMTree.
+        // This is normally done in `allocate()` but we also need to apply these here because
+        // `temporary_allocations` is also used to track deallocated space until it has been
+        // flushed (see comment below). A user may allocate and then deallocate space before calling
+        // allocate() a second time, so if we do not clean up here, we may end up with the same
+        // range in temporary_allocations twice (once for allocate, once for deallocate).
+        let mut inner = self.inner.lock().unwrap();
+        for device_range in inner.dropped_temporary_allocations.drain(..) {
+            self.temporary_allocations.erase(&AllocatorKey { device_range });
+        }
+
+        // We can't reuse deallocated space immediately because failure to successfully flush will
+        // mean that on next mount, we may find this space is still assigned to the deallocated
+        // region. To avoid immediate reuse, we hold these regions in 'temporary_allocations' until
+        // after a successful flush so we know the region is safe to reuse.
+        self.temporary_allocations
+            .insert(AllocatorItem {
+                key: AllocatorKey { device_range: dealloc_range.clone() },
+                value: AllocatorValue::Abs { owner_object_id, count: 1 },
+                sequence: 0,
+            })
+            .context("tracking deallocated")?;
+
         Ok(deallocated)
     }
 
@@ -1378,7 +1580,8 @@ impl Allocator {
         for dealloc in deallocs {
             *(totals.entry(dealloc.owner_object_id).or_default()) +=
                 dealloc.range.length().unwrap();
-            inner.strategy.free(dealloc.range).expect("dealloced ranges");
+            inner.strategy.free(dealloc.range.clone()).expect("dealloced ranges");
+            self.temporary_allocations.erase(&AllocatorKey { device_range: dealloc.range.clone() });
         }
 
         // This *must* come after we've removed the records from reserved reservations because the
@@ -1528,6 +1731,11 @@ impl JournalingObject for Allocator {
                 entry.allocated_bytes = entry.allocated_bytes.saturating_add(len as i64);
                 if let ApplyMode::Live(transaction) = context.mode {
                     entry.uncommitted_allocated_bytes -= len;
+                    // Note that we cannot drop entries from temporary_allocations without holding
+                    // the allocation_mutex as it may introduce races. We instead add the range to
+                    // a Vec that can be applied later when we hold the lock (See comment on
+                    // `dropped_temporary_allocations` above).
+                    inner.dropped_temporary_allocations.push(device_range.into());
                     if let Some(reservation) = transaction.allocator_reservation {
                         reservation.commit(len);
                     }
@@ -1625,7 +1833,13 @@ impl JournalingObject for Allocator {
                     inner.add_reservation(res_owner, len);
                     reservation.release_reservation(res_owner, len);
                 }
-                inner.strategy.free(device_range.clone().into()).expect("drop_mutation");
+                inner.strategy.free(device_range.clone().into()).expect("drop mutaton");
+                self.temporary_allocations
+                    .erase(&AllocatorKey { device_range: device_range.into() });
+            }
+            Mutation::Allocator(AllocatorMutation::Deallocate { device_range, .. }) => {
+                self.temporary_allocations
+                    .erase(&AllocatorKey { device_range: device_range.into() });
             }
             _ => {}
         }
@@ -2625,9 +2839,8 @@ mod tests {
             );
             offset = free.extents().last().expect("Unexpectedly hit the end of free extents").end;
         }
-        // Coalesce adjacent free ranges because the buddy allocator will
-        // return smaller aligned chunks but the overall range will be
-        // equivalent.
+        // Coalesce adjacent free ranges because the allocator may return smaller aligned chunks
+        // but the overall range should always be equivalent.
         let coalesced_free_ranges = coalesce_ranges(free_ranges);
         let coalesced_expected_free_ranges = coalesce_ranges(expected_free_ranges);
 
