@@ -295,7 +295,6 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
       return zx::error(status);
     }
     if (request_result != ZX_OK) {
-      zxlogf(ERROR, "Failed to SendRequestUsingSlot: %s", zx_status_get_string(request_result));
       return zx::error(request_result);
     }
 
@@ -447,34 +446,44 @@ zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
 
 zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescriptor *descriptor,
                                                          AbstractResponseUpiu &response,
-                                                         uint8_t transaction_type) {
+                                                         UpiuTransactionCodes transaction_code) {
   uint8_t status = response.GetHeader().status;
   uint8_t header_response = response.GetHeader().response;
 
-  // TODO(https://fxbug.dev/42075643): Needs refactoring.
-  if (transaction_type == UpiuTransactionCodes::kCommand &&
-      (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
-       status != static_cast<uint8_t>(scsi::StatusCode::GOOD) ||
-       header_response != UpiuHeaderResponse::kTargetSuccess)) {
-    zxlogf(ERROR, "SCSI failure: ocs=0x%x, status=0x%x, header_response=0x%x",
-           descriptor->overall_command_status(), status, header_response);
-    auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
-        static_cast<ResponseUpiu &>(response).GetSenseData());
-    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x",
-           static_cast<uint8_t>(sense_data->sense_key()), sense_data->additional_sense_code,
-           sense_data->additional_sense_code_qualifier);
-  } else if (transaction_type == UpiuTransactionCodes::kQueryRequest &&
-             (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
-              header_response != UpiuHeaderResponse::kTargetSuccess)) {
-    zxlogf(ERROR, "Query failure: ocs=0x%x, status=0x%x, header_response=0x%x",
-           descriptor->overall_command_status(), status, header_response);
-  } else if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess) {
-    zxlogf(ERROR, "Generic failure: ocs=0x%x", descriptor->overall_command_status());
-  } else {
-    return zx::ok();
+  switch (transaction_code) {
+    case UpiuTransactionCodes::kCommand:
+      if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
+          status != static_cast<uint8_t>(scsi::StatusCode::GOOD) ||
+          header_response != UpiuHeaderResponse::kTargetSuccess) {
+        auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
+            static_cast<ResponseUpiu &>(response).GetSenseData());
+
+        zxlogf(ERROR,
+               "SCSI failure: ocs=0x%x, status=0x%x, header_response=0x%x, "
+               "sense_key=0x%x, asc=0x%x, ascq=0x%x",
+               descriptor->overall_command_status(), status, header_response,
+               static_cast<uint8_t>(sense_data->sense_key()), sense_data->additional_sense_code,
+               sense_data->additional_sense_code_qualifier);
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+      break;
+    case UpiuTransactionCodes::kQueryRequest:
+      if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
+          header_response != UpiuHeaderResponse::kTargetSuccess) {
+        zxlogf(ERROR, "Query failure: ocs=0x%x, status=0x%x, header_response=0x%x",
+               descriptor->overall_command_status(), status, header_response);
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+      break;
+    default:
+      if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess) {
+        zxlogf(ERROR, "Generic failure: ocs=0x%x", descriptor->overall_command_status());
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+      break;
   }
 
-  return zx::error(ZX_ERR_BAD_STATE);
+  return zx::ok();
 }
 
 }  // namespace ufs
