@@ -5,7 +5,7 @@
 #ifndef SRC_UI_INPUT_DRIVERS_USB_HID_FUNCTION_ONE_ENDPOINT_HID_FUNCTION_H_
 #define SRC_UI_INPUT_DRIVERS_USB_HID_FUNCTION_ONE_ENDPOINT_HID_FUNCTION_H_
 
-#include <fuchsia/hardware/hidbus/c/banjo.h>
+#include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/ddk/device.h>
 
@@ -68,7 +68,8 @@ class FakeUsbHidFunction : public DeviceType {
   std::unique_ptr<fake_usb_hid_descriptor_t, DescriptorDeleter> descriptor_;
   size_t descriptor_size_;
 
-  uint8_t hid_protocol_ = HID_PROTOCOL_REPORT;
+  fuchsia_hardware_hidbus::wire::HidProtocol hid_protocol_ =
+      fuchsia_hardware_hidbus::wire::HidProtocol::kReport;
 };
 
 }  // namespace one_endpoint_hid_function

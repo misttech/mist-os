@@ -5,14 +5,16 @@
 #ifndef SRC_UI_INPUT_DRIVERS_USB_HID_USB_HID_H_
 #define SRC_UI_INPUT_DRIVERS_USB_HID_USB_HID_H_
 
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/sync/completion.h>
 
 #include <memory>
 #include <thread>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 #include <usb/hid.h>
@@ -23,30 +25,42 @@ namespace usb_hid {
 class UsbHidbus;
 using DeviceType = ddk::Device<UsbHidbus, ddk::Unbindable>;
 
-class UsbHidbus : public DeviceType, public ddk::HidbusProtocol<UsbHidbus, ddk::base_protocol> {
+class UsbHidbus : public DeviceType,
+                  public ddk::EmptyProtocol<ZX_PROTOCOL_HIDBUS>,
+                  public fidl::WireServer<fuchsia_hardware_hidbus::Hidbus> {
  public:
-  explicit UsbHidbus(zx_device_t* device) : DeviceType(device) {}
+  explicit UsbHidbus(zx_device_t* device)
+      : DeviceType(device), outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
 
   // Methods required by the ddk mixins.
   void UsbInterruptCallback(usb_request_t* req);
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info);
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc);
-  void HidbusStop();
+  // fuchsia_hardware_hidbus methods.
+  void Query(QueryCompleter::Sync& completer) override;
+  void Start(StartCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
+  void GetDescriptor(fuchsia_hardware_hidbus::wire::HidbusGetDescriptorRequest* request,
+                     GetDescriptorCompleter::Sync& completer) override;
+  void SetDescriptor(fuchsia_hardware_hidbus::wire::HidbusSetDescriptorRequest* request,
+                     SetDescriptorCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetReport(fuchsia_hardware_hidbus::wire::HidbusGetReportRequest* request,
+                 GetReportCompleter::Sync& completer) override;
+  void SetReport(fuchsia_hardware_hidbus::wire::HidbusSetReportRequest* request,
+                 SetReportCompleter::Sync& completer) override;
+  void GetIdle(fuchsia_hardware_hidbus::wire::HidbusGetIdleRequest* request,
+               GetIdleCompleter::Sync& completer) override;
+  void SetIdle(fuchsia_hardware_hidbus::wire::HidbusSetIdleRequest* request,
+               SetIdleCompleter::Sync& completer) override;
+  void GetProtocol(GetProtocolCompleter::Sync& completer) override;
+  void SetProtocol(fuchsia_hardware_hidbus::wire::HidbusSetProtocolRequest* request,
+                   SetProtocolCompleter::Sync& completer) override;
   zx_status_t UsbHidControl(uint8_t req_type, uint8_t request, uint16_t value, uint16_t index,
                             void* data, size_t length, size_t* out_length);
   zx_status_t UsbHidControlIn(uint8_t req_type, uint8_t request, uint16_t value, uint16_t index,
                               void* data, size_t length, size_t* out_length);
   zx_status_t UsbHidControlOut(uint8_t req_type, uint8_t request, uint16_t value, uint16_t index,
                                const void* data, size_t length, size_t* out_length);
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual);
-  zx_status_t HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                              size_t* out_len);
-  zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len);
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration);
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration);
-  zx_status_t HidbusGetProtocol(uint8_t* protocol);
-  zx_status_t HidbusSetProtocol(uint8_t protocol);
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void UsbHidRelease();
@@ -57,6 +71,10 @@ class UsbHidbus : public DeviceType, public ddk::HidbusProtocol<UsbHidbus, ddk::
   zx_status_t Bind(ddk::UsbProtocolClient usbhid);
 
  private:
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_hidbus::Hidbus> binding_;
+  std::atomic_uint32_t start_ = 0;
+
   std::optional<usb::InterfaceList> usb_interface_list_;
 
   // These pointers are valid as long as usb_interface_list_ is valid.
@@ -69,15 +87,13 @@ class UsbHidbus : public DeviceType, public ddk::HidbusProtocol<UsbHidbus, ddk::
   bool has_endptout_ = false;
   size_t endptout_max_size_ = 0;
 
-  hid_info_t info_ = {};
+  fidl::Arena<> arena_;
+  fuchsia_hardware_hidbus::wire::HidInfo info_;
   usb_request_t* req_ = nullptr;
   usb_request_t* request_out_ = nullptr;
   bool req_queued_ = false;
 
   ddk::UsbProtocolClient usb_ = {};
-
-  fbl::Mutex hidbus_ifc_lock_;
-  ddk::HidbusIfcProtocolClient ifc_ __TA_GUARDED(hidbus_ifc_lock_) = {};
 
   uint8_t interface_ = 0;
   usb_desc_iter_t desc_iter_ = {};

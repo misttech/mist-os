@@ -28,6 +28,8 @@ constexpr int BULK_MAX_PACKET = 512;
 
 namespace two_endpoint_hid_function {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+
 static const uint8_t boot_mouse_r_desc[50] = {
     0x05, 0x01,  // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,  // Usage (Mouse)
@@ -104,7 +106,7 @@ zx_status_t FakeUsbHidFunction::UsbFunctionInterfaceControl(
       return ZX_OK;
     }
     if (setup->b_request == USB_HID_SET_PROTOCOL) {
-      func->hid_protocol_ = static_cast<uint8_t>(setup->w_value);
+      func->hid_protocol_ = static_cast<fhidbus::wire::HidProtocol>(setup->w_value);
       return ZX_OK;
     }
   }
