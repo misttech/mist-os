@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::{
-    events::GraphObjectEventTracker,
+    events::{GraphObjectEventTracker, MetaEventNode},
     types::{EdgeMarker, GraphObject, VertexMarker},
     VertexId,
 };
@@ -190,7 +190,12 @@ impl<I: VertexId> VertexGraphMetadata<I> {
         initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
         events_tracker: Option<GraphObjectEventTracker<VertexMarker<I>>>,
     ) -> Self {
-        Self { inner: GraphMetadata::new(parent, id, initial_metadata, events_tracker) }
+        let (inner, meta_event_node) =
+            GraphMetadata::new(parent, id, initial_metadata, events_tracker);
+        if let Some(ref events_tracker) = inner.events_tracker {
+            events_tracker.record_added(&inner.id, meta_event_node);
+        }
+        Self { inner }
     }
 
     pub(crate) fn events_tracker(&self) -> Option<&GraphObjectEventTracker<VertexMarker<I>>> {
@@ -228,8 +233,15 @@ impl EdgeGraphMetadata {
         id: u64,
         initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
         events_tracker: Option<GraphObjectEventTracker<EdgeMarker>>,
+        from_id: &str,
+        to_id: &str,
     ) -> Self {
-        Self { inner: GraphMetadata::new(parent, id, initial_metadata, events_tracker) }
+        let (inner, meta_event_node) =
+            GraphMetadata::new(parent, id, initial_metadata, events_tracker);
+        if let Some(ref events_tracker) = inner.events_tracker {
+            events_tracker.record_added(from_id, to_id, id, meta_event_node);
+        }
+        Self { inner }
     }
 
     pub(crate) fn events_tracker(&self) -> Option<&GraphObjectEventTracker<EdgeMarker>> {
@@ -272,15 +284,20 @@ where
         id: T::Id,
         initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
         events_tracker: Option<GraphObjectEventTracker<T>>,
-    ) -> Self {
+    ) -> (Self, MetaEventNode) {
         let node = parent.create_child("meta");
+        let meta_event_node = MetaEventNode::new(&parent);
         let mut map = BTreeMap::default();
         node.atomic_update(|node| {
             for Metadata { key, value, track_events } in initial_metadata.into_iter() {
-                Self::insert_to_map(&node, &mut map, key.to_string(), value, *track_events);
+                let key = key.to_string();
+                if events_tracker.is_some() && *track_events {
+                    value.record_inspect(&meta_event_node, &key);
+                }
+                Self::insert_to_map(&node, &mut map, key, value, *track_events);
             }
         });
-        Self { id, node, map, events_tracker }
+        (Self { id, node, map, events_tracker }, meta_event_node)
     }
 
     fn set<'a, 'b>(&mut self, key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'b>>) {

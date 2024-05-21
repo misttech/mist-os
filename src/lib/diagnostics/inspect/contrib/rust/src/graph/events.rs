@@ -2,16 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{types::*, Metadata, MetadataValue};
+use super::{types::*, MetadataValue};
 use crate::{
     inspect_log,
     nodes::{BoundedListNode, NodeExt},
 };
-use fuchsia_inspect::{self as inspect, ArrayProperty};
+use fuchsia_inspect::{self as inspect, InspectTypeReparentable};
 use std::{
     marker::PhantomData,
+    ops::Deref,
     sync::{Arc, Mutex},
 };
+
+pub struct MetaEventNode(inspect::Node);
+
+impl MetaEventNode {
+    pub fn new(parent: &inspect::Node) -> Self {
+        Self(parent.create_child("meta"))
+    }
+
+    fn take_node(self) -> inspect::Node {
+        self.0
+    }
+}
+
+impl Deref for MetaEventNode {
+    type Target = inspect::Node;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug)]
 pub struct GraphEventsTracker {
@@ -42,17 +62,14 @@ where
         GraphObjectEventTracker { buffer: self.buffer.clone(), _phantom: PhantomData }
     }
 
-    pub fn record_added<'a, M>(&self, id: &I, initial_metadata: M)
-    where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-    {
+    pub fn record_added(&self, id: &I, meta_event_node: MetaEventNode) {
+        let meta_event_node = meta_event_node.take_node();
         self.buffer.lock().unwrap().add_entry(|node| {
             node.record_time("@time");
             node.record_string("event", "add_vertex");
             node.record_string("vertex_id", id.get_id().as_ref());
-            let meta_node = node.create_child("meta");
-            record_metadata_items(&meta_node, initial_metadata.into_iter());
-            node.record(meta_node);
+            let _ = meta_event_node.reparent(&node);
+            node.record(meta_event_node);
         });
     }
 
@@ -66,20 +83,17 @@ where
 }
 
 impl GraphObjectEventTracker<EdgeMarker> {
-    pub fn record_added<'a, M>(&self, from: &str, to: &str, id: u64, initial_metadata: M)
-    where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-    {
+    pub fn record_added(&self, from: &str, to: &str, id: u64, meta_event_node: MetaEventNode) {
         let mut buffer = self.buffer.lock().unwrap();
+        let meta_event_node = meta_event_node.take_node();
         buffer.add_entry(|node| {
             node.record_time("@time");
             node.record_string("event", "add_edge");
             node.record_string("from", from);
             node.record_string("to", to);
             node.record_uint("edge_id", id);
-            let meta_node = node.create_child("meta");
-            record_metadata_items(&meta_node, initial_metadata.into_iter());
-            node.record(meta_node);
+            let _ = meta_event_node.reparent(&node);
+            node.record(meta_event_node);
         });
     }
 
@@ -108,50 +122,6 @@ where
     }
 }
 
-fn record_metadata_items<'a, I>(node: &inspect::Node, metadata: I)
-where
-    I: Iterator<Item = &'a Metadata<'a>>,
-{
-    for meta_item in metadata {
-        if !meta_item.track_events {
-            continue;
-        }
-        match meta_item.value {
-            MetadataValue::Int(value) => node.record_int(meta_item.key.as_ref(), value),
-            MetadataValue::Uint(value) => node.record_uint(meta_item.key.as_ref(), value),
-            MetadataValue::Double(value) => node.record_double(meta_item.key.as_ref(), value),
-            MetadataValue::Str(ref value) => {
-                node.record_string(meta_item.key.as_ref(), value.as_ref())
-            }
-            MetadataValue::Bool(value) => node.record_bool(meta_item.key.as_ref(), value),
-            MetadataValue::IntVec(ref value) => {
-                node.atomic_update(|node| {
-                    let property = node.create_int_array(meta_item.key.as_ref(), value.len());
-                    for (idx, v) in value.iter().enumerate() {
-                        property.set(idx, *v);
-                    }
-                });
-            }
-            MetadataValue::UintVec(ref value) => {
-                node.atomic_update(|node| {
-                    let property = node.create_uint_array(meta_item.key.as_ref(), value.len());
-                    for (idx, v) in value.iter().enumerate() {
-                        property.set(idx, *v);
-                    }
-                });
-            }
-            MetadataValue::DoubleVec(ref value) => {
-                node.atomic_update(|node| {
-                    let property = node.create_double_array(meta_item.key.as_ref(), value.len());
-                    for (idx, v) in value.iter().enumerate() {
-                        property.set(idx, *v);
-                    }
-                });
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,17 +141,9 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
-        vertex_tracker.record_added(
-            &123,
-            &[
-                Metadata::new("string_property", "i'm a string").track_events(),
-                Metadata::new("int_property", 2i64).track_events(),
-                Metadata::new("uint_property", 4u64).track_events(),
-                Metadata::new("boolean_property", true).track_events(),
-                Metadata::new("double_property", 2.5).track_events(),
-                Metadata::new("untracked", 0),
-            ],
-        );
+        let meta_event_node = MetaEventNode::new(inspector.root());
+        meta_event_node.record_bool("placeholder", true);
+        vertex_tracker.record_added(&123, meta_event_node);
         assert_data_tree!(inspector, root: {
             events: {
                 "0": {
@@ -189,11 +151,7 @@ mod tests {
                     event: "add_vertex",
                     vertex_id: "123",
                     meta: {
-                        string_property: "i'm a string",
-                        int_property: 2i64,
-                        uint_property: 4u64,
-                        boolean_property: true,
-                        double_property: 2.5,
+                        placeholder: true,
                     }
                 }
             }
@@ -242,19 +200,9 @@ mod tests {
         let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         let vertex_tracker = tracker.for_vertex::<u64>();
         let edge_tracker = vertex_tracker.for_edge();
-        edge_tracker.record_added(
-            "src",
-            "dst",
-            10,
-            &[
-                Metadata::new("string_property", "i'm a string").track_events(),
-                Metadata::new("int_property", 2i64).track_events(),
-                Metadata::new("uint_property", 4u64).track_events(),
-                Metadata::new("boolean_property", true).track_events(),
-                Metadata::new("double_property", 2.5).track_events(),
-                Metadata::new("untracked", 0),
-            ],
-        );
+        let meta_event_node = MetaEventNode::new(inspector.root());
+        meta_event_node.record_bool("placeholder", true);
+        edge_tracker.record_added("src", "dst", 10, meta_event_node);
         assert_data_tree!(inspector, root: {
             events: {
                 "0": {
@@ -264,11 +212,7 @@ mod tests {
                     to: "dst",
                     edge_id: 10u64,
                     meta: {
-                        string_property: "i'm a string",
-                        int_property: 2i64,
-                        uint_property: 4u64,
-                        boolean_property: true,
-                        double_property: 2.5,
+                        placeholder: true,
                     }
                 }
             }
