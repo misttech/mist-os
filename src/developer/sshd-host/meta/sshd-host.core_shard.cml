@@ -544,6 +544,13 @@
             availability: "optional",
         },
 
+        // Cpu performance domain control
+        {
+            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+            from: "parent",
+            to: "#sshd-host",
+        },
+
         // Others
         {
             protocol: [

@@ -364,6 +364,10 @@
             from: "#boot-drivers",
         },
         {
+            service: "fuchsia.hardware.cpu.ctrl.Service",
+            from: "#boot-drivers",
+        },
+        {
             directory: [
                 "dev-builtin",
                 "dev-class",

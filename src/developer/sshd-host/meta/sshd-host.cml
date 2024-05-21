@@ -312,5 +312,12 @@
             to: "#shell",
             availability: "optional",
         },
+
+        // Services available in the shell
+        {
+            service: [ "fuchsia.hardware.cpu.ctrl.Service" ],
+            from: "parent",
+            to: "#shell",
+        },
     ],
 }
