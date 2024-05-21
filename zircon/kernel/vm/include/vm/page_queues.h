@@ -799,7 +799,7 @@ class PageQueues {
 
   // Determines if anonymous zero page forks are placed in the zero fork queue or in the reclaimable
   // queue.
-  bool zero_fork_is_reclaimable_ TA_GUARDED(lock_) = false;
+  RelaxedAtomic<bool> zero_fork_is_reclaimable_ = false;
 
   // Determines if anonymous pages are placed in the reclaimable queues, or in their own non aging
   // anonymous queues.
