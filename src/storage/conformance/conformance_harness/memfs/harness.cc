@@ -83,14 +83,13 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_unlink(true);
     config.supports_directory_watchers(true);
     config.supports_append(true);
+    config.supports_set_attr(true);
 
     config.supports_remote_dir(false);
     config.supports_executable_file(false);
     config.supports_open2(false);
     config.supports_get_attributes(false);
     config.supports_update_attributes(false);
-    // Only mtime is supported.
-    config.supports_set_attr(false);
 
     completer.Reply(config);
   }

@@ -23,11 +23,12 @@ Vnode::Vnode(Memfs& memfs)
 Vnode::~Vnode() { deleted_ino_ctr_.fetch_add(1, std::memory_order_relaxed); }
 
 fs::VnodeAttributesQuery Vnode::SupportedMutableAttributes() const {
-  return fs::VnodeAttributesQuery::kModificationTime;
+  return fs::VnodeAttributesQuery::kCreationTime | fs::VnodeAttributesQuery::kModificationTime;
 }
 
 zx::result<> Vnode::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) {
-  // TODO(https://fxbug.dev/340626555): Add support for creation time and POSIX mode/uid/gid.
+  // TODO(https://fxbug.dev/340626555): Add support for POSIX mode/uid/gid.
+  create_time_ = attributes.creation_time.value_or(create_time_);
   modify_time_ = attributes.modification_time.value_or(modify_time_);
   return zx::ok();
 }
