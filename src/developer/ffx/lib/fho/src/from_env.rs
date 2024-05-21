@@ -132,7 +132,7 @@ pub struct Connector<T: TryFromEnv> {
 
 impl<T: TryFromEnv> Connector<T> {
     pub const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
-    pub const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
+    pub const KNOCK_TARGET_TIMEOUT: Duration = ffx_target::DEFAULT_RCS_KNOCK_TIMEOUT;
 
     /// Try to get a `T` from the environment. Will wait for the target to
     /// appear if it is non-responsive. If that occurs, `log_target_wait` will
