@@ -319,31 +319,22 @@ impl<PS: ParseStrategy> Policy<PS> {
 }
 
 impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
-    fn access_vector_from_permission<P: sc::ClassPermission + Into<sc::Permission> + 'static>(
-        &self,
-        permission: P,
-    ) -> AccessVector {
-        let permission = self.0.permission(&permission.into());
-
-        // Compute bit flag associated with permission.
-        // Use `permission.id() - 1` below because ids start at `1` to refer to the
-        // "shift `1` by 0 bits".
-        //
-        // id=1 => bits:0...001, id=2 => bits:0...010, etc.
-        AccessVector(1 << (permission.id() - 1))
-    }
-
     fn access_vector_from_permissions<
-        'a,
-        P: sc::ClassPermission + Into<sc::Permission> + 'static,
-        PI: IntoIterator<Item = P>,
+        P: sc::ClassPermission + Into<sc::Permission> + Clone + 'static,
     >(
         &self,
-        permissions: PI,
+        permissions: &[P],
     ) -> AccessVector {
         let mut access_vector = AccessVector::NONE;
-        for permission in permissions.into_iter() {
-            access_vector |= self.access_vector_from_permission(permission);
+        for permission in permissions {
+            let permission_info = self.0.permission(&permission.clone().into());
+
+            // Compute bit flag associated with permission.
+            // Use `permission.id() - 1` below because ids start at `1` to refer to the
+            // "shift `1` by 0 bits".
+            //
+            // id=1 => bits:0...001, id=2 => bits:0...010, etc.
+            access_vector |= AccessVector(1 << (permission_info.id() - 1));
         }
         access_vector
     }
@@ -376,23 +367,15 @@ impl<PS: ParseStrategy> Unvalidated<PS> {
 /// An owner of policy information that can translate [`sc::Permission`] values into
 /// [`AccessVector`] values that are consistent with the owned policy.
 pub trait AccessVectorComputer {
-    /// Returns an [`AccessVector`] with a single bit set that corresponds to `permission`.
-    fn access_vector_from_permission<P: sc::ClassPermission + Into<sc::Permission> + 'static>(
-        &self,
-        permission: P,
-    ) -> AccessVector;
-
     /// Computes an [`AccessVector`] where the only bits set are those that correspond to
     /// all `permissions`. This operation fails if `permissions` contain permissions that refer to
     /// different object classes because an access vector specifies permission bits associated with
     /// one specific object class.
     fn access_vector_from_permissions<
-        'a,
-        P: sc::ClassPermission + Into<sc::Permission> + 'static,
-        PI: IntoIterator<Item = P>,
+        P: sc::ClassPermission + Into<sc::Permission> + Clone + 'static,
     >(
         &self,
-        permissions: PI,
+        permissions: &[P],
     ) -> AccessVector;
 }
 
