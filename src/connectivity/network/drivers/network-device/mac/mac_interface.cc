@@ -34,6 +34,9 @@ MacInterface::~MacInterface() {
   ZX_ASSERT_MSG(clients_.is_empty(),
                 "can't dispose MacInterface while clients are still attached (%ld clients left).",
                 clients_.size_slow());
+  ZX_ASSERT_MSG(dead_clients_.is_empty(),
+                "can't dispose MacInterface while clients are still closing (%ld clients left).",
+                dead_clients_.size_slow());
 }
 
 void MacInterface::Create(fdf::WireSharedClient<fuchsia_hardware_network_driver::MacAddr>&& parent,
@@ -196,12 +199,17 @@ void MacInterface::Consolidate(fit::function<void()> callback) {
 
 void MacInterface::CloseClient(MacClientInstance* client) {
   fbl::AutoLock lock(&lock_);
-  clients_.erase(*client);
-  Consolidate([this]() {
+  // Keep the client alive until consolidation completes. Otherwise another client closure could
+  // observe an empty list of clients and call the the teardown callback before this consolidation
+  // has completed. The client cannot be kept in clients_ as it must not take part in consolidation
+  // now that it's closed.
+  dead_clients_.push_back(clients_.erase(*client));
+  Consolidate([client, this]() {
     fit::callback<void()> teardown;
     {
       fbl::AutoLock lock(&lock_);
-      if (clients_.is_empty() && teardown_callback_) {
+      dead_clients_.erase(*client);
+      if (clients_.is_empty() && dead_clients_.is_empty() && teardown_callback_) {
         teardown = std::move(teardown_callback_);
         impl_ = {};
       }
@@ -273,7 +281,7 @@ void MacInterface::Teardown(fit::callback<void()> callback) {
   fbl::AutoLock lock(&lock_);
   // Can't call teardown if already tearing down.
   ZX_ASSERT(!teardown_callback_);
-  if (clients_.is_empty()) {
+  if (clients_.is_empty() && dead_clients_.is_empty()) {
     lock.release();
     callback();
   } else {
