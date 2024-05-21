@@ -45,6 +45,9 @@ mod index;
 mod reboot;
 mod required_blobs;
 mod retained_packages_service;
+mod root_dir;
+
+use root_dir::{RootDir, RootDirCache, RootDirFactory};
 
 #[cfg(test)]
 mod test_utils;
@@ -182,7 +185,17 @@ async fn main_inner() -> Result<(), Error> {
     )
     .serve_and_log_errors();
     let cobalt_fut = Task::spawn(cobalt_fut);
-    let open_packages = package_directory::RootDirCache::new(blobfs.clone());
+
+    let (root_dir_factory, open_packages) = root_dir::new(
+        fuchsia_fs::directory::open_in_namespace(
+            "/bootfs-blobs",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("open bootfs blobs dir")?,
+        blobfs.clone(),
+    )
+    .await
+    .context("creating root dir helpers")?;
     inspector.root().record_lazy_child("open-packages", open_packages.record_lazy_inspect());
 
     // Use VFS to serve the out dir because ServiceFs does not support OPEN_RIGHT_EXECUTABLE and
@@ -192,6 +205,7 @@ async fn main_inner() -> Result<(), Error> {
     {
         let package_index = Arc::clone(&package_index);
         let blobfs = blobfs.clone();
+        let root_dir_factory = root_dir_factory.clone();
         let open_packages = open_packages.clone();
         let base_packages = Arc::clone(&base_packages);
         let cache_packages = Arc::clone(&cache_packages);
@@ -207,6 +221,7 @@ async fn main_inner() -> Result<(), Error> {
                     cache_service::serve(
                         Arc::clone(&package_index),
                         blobfs.clone(),
+                        root_dir_factory.clone(),
                         Arc::clone(&base_packages),
                         Arc::clone(&cache_packages),
                         executability_restrictions,
@@ -384,7 +399,7 @@ async fn main_inner() -> Result<(), Error> {
 async fn serve_base_package_if_present(
     url: fuchsia_url::UnpinnedAbsolutePackageUrl,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    open_packages: &RootDirCache,
     scope: package_directory::ExecutionScope,
 ) -> anyhow::Result<fio::DirectoryProxy> {
     let (proxy, server) =

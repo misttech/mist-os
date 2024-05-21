@@ -410,7 +410,12 @@ async fn blobs_protected_from_gc_by_open_package_tracking() {
     assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected));
 
     // While dir0 lives, pkg0 protects its blobs.
-    let dir0 = crate::get_and_verify_package(&env.proxies.package_cache, &pkg0).await;
+    let dir0 = crate::get_and_verify_package(
+        &env.proxies.package_cache,
+        fpkg::GcProtection::OpenPackageTracking,
+        &pkg0,
+    )
+    .await;
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
     assert!(env.blobfs.list_blobs().unwrap().is_superset(&pkg0_protected));
 

@@ -23,7 +23,7 @@ pub async fn serve(
     base_packages: Arc<BasePackages>,
     cache_packages: Arc<CachePackages>,
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
-    open_packages: package_directory::RootDirCache<blobfs::Client>,
+    open_packages: crate::RootDirCache,
     commit_status_provider: CommitStatusProviderProxy,
     mut stream: SpaceManagerRequestStream,
 ) -> Result<(), anyhow::Error> {
@@ -54,7 +54,7 @@ async fn gc(
     base_packages: &BasePackages,
     cache_packages: &CachePackages,
     package_index: &Arc<async_lock::RwLock<PackageIndex>>,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    open_packages: &crate::RootDirCache,
     event_pair: &zx::EventPair,
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
@@ -128,7 +128,7 @@ async fn gc(
 
 async fn protect_open_blobs(
     eligible_blobs: &mut HashSet<fuchsia_hash::Hash>,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    open_packages: &crate::RootDirCache,
 ) {
     let mut to_visit = open_packages.list();
     let mut enqueued = to_visit.iter().map(|pkg| *pkg.hash()).collect::<HashSet<_>>();

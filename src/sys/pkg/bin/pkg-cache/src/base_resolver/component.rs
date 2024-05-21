@@ -19,7 +19,7 @@ pub(crate) async fn serve_request_stream(
     mut stream: fcomponent_resolution::ResolverRequestStream,
     base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
-    open_packages: package_directory::RootDirCache<blobfs::Client>,
+    open_packages: crate::RootDirCache,
     scope: package_directory::ExecutionScope,
 ) -> anyhow::Result<()> {
     while let Some(request) =
@@ -88,7 +88,7 @@ async fn resolve(
     url: &str,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
@@ -115,7 +115,7 @@ async fn resolve_with_context(
     context: fcomponent_resolution::Context,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
     authenticator: ContextAuthenticator,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
@@ -205,7 +205,7 @@ mod tests {
                 "relative#meta/missing",
                 &HashMap::new(),
                 ContextAuthenticator::new(),
-                &package_directory::RootDirCache::new(blobfs::Client::new_test().0),
+                &crate::root_dir::new_test(blobfs::Client::new_test().0).await.1,
                 package_directory::ExecutionScope::new(),
             )
             .await,

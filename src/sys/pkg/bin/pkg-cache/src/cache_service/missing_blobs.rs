@@ -25,6 +25,7 @@ pub(super) struct MissingBlobs<'a> {
     /// unique hashes of the package being cached.
     sender: futures::channel::mpsc::UnboundedSender<Vec<fpkg::BlobInfo>>,
     blobfs: blobfs::Client,
+    root_dir_factory: crate::RootDirFactory,
     /// The hashes (both content blobs and subpackage meta.fars) that have been sent with `sender`.
     sent_hashes: HashSet<Hash>,
     /// The subpackage meta.far hashes that have been sent with `sender`.
@@ -39,7 +40,7 @@ pub(super) struct MissingBlobs<'a> {
 }
 
 enum RootDirOrHash<'a> {
-    RootDir(&'a package_directory::RootDir<blobfs::Client>),
+    RootDir(&'a crate::RootDir),
     Hash(Hash),
 }
 
@@ -60,7 +61,8 @@ pub(super) trait BlobRecorder: std::fmt::Debug + Send + Sync {
 impl<'a> MissingBlobs<'a> {
     pub(super) async fn new(
         blobfs: blobfs::Client,
-        root_dir: &package_directory::RootDir<blobfs::Client>,
+        root_dir_factory: crate::RootDirFactory,
+        root_dir: &crate::RootDir,
         blob_recorder: Box<dyn BlobRecorder + 'a>,
     ) -> Result<
         (MissingBlobs<'a>, futures::channel::mpsc::UnboundedReceiver<Vec<fpkg::BlobInfo>>),
@@ -70,6 +72,7 @@ impl<'a> MissingBlobs<'a> {
         let mut self_ = Self {
             sender,
             blobfs,
+            root_dir_factory,
             sent_hashes: HashSet::new(),
             sent_subpackages: HashSet::new(),
             sent_but_not_cached_hashes: HashSet::new(),
@@ -115,7 +118,9 @@ impl<'a> MissingBlobs<'a> {
                 if !self.visited_subpackages.insert(hash) {
                     return Ok(());
                 }
-                root_dir_storage = package_directory::RootDir::new(self.blobfs.clone(), hash)
+                root_dir_storage = self
+                    .root_dir_factory
+                    .create(hash)
                     .await
                     .map_err(ServeNeededBlobsError::CreateSubpackageRootDir)?;
                 &root_dir_storage
@@ -249,7 +254,7 @@ fn to_sorted_vec(missing: &HashSet<Hash>) -> Vec<fpkg::BlobInfo> {
 mod tests {
     use {
         super::*, blobfs_ramdisk::BlobfsRamdisk, fuchsia_pkg_testing::PackageBuilder,
-        futures::stream::StreamExt as _, package_directory::RootDir,
+        futures::stream::StreamExt as _,
     };
 
     #[derive(Clone, Debug)]
@@ -293,114 +298,39 @@ mod tests {
             .collect()
     }
 
+    struct TestEnv {
+        blob_recorder: MockBlobRecorder,
+        blobfs: BlobfsRamdisk,
+        root_dir_factory: crate::RootDirFactory,
+    }
+
+    impl TestEnv {
+        async fn new() -> Self {
+            let blob_recorder = MockBlobRecorder::new();
+            let blobfs = BlobfsRamdisk::start().await.unwrap();
+            let (root_dir_factory, _) = crate::root_dir::new_test(blobfs.client()).await;
+
+            Self { blob_recorder, blobfs, root_dir_factory }
+        }
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sends_content_blob() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let env = TestEnv::new().await;
         let pkg = PackageBuilder::new("pkg")
             .add_resource_at("content-blob", "blob-contents".as_bytes())
             .build()
             .await
             .unwrap();
         let (meta_far, content_blobs) = pkg.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
-        let root_dir = RootDir::new(blobfs.client(), *pkg.hash()).await.unwrap();
-
-        let (missing_blobs, recv) =
-            MissingBlobs::new(blobfs.client(), &root_dir, Box::new(blob_recorder.clone()))
-                .await
-                .unwrap();
-        assert_eq!(missing_blobs.count_not_cached(), 1);
-        drop(missing_blobs);
-
-        assert_eq!(read_receiver(recv).await, vec![*content_blobs.keys().next().unwrap()]);
-        assert_eq!(
-            blob_recorder.hashes().await,
-            HashSet::from_iter([*content_blobs.keys().next().unwrap()])
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn filters_content_blobs_from_blobfs() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
-        let pkg = PackageBuilder::new("pkg")
-            .add_resource_at("filter-me", "blob-contents".as_bytes())
-            .build()
-            .await
-            .unwrap();
-        pkg.write_to_blobfs(&blobfs).await;
-        let root_dir = RootDir::new(blobfs.client(), *pkg.hash()).await.unwrap();
-
-        let (missing_blobs, recv) =
-            MissingBlobs::new(blobfs.client(), &root_dir, Box::new(blob_recorder.clone()))
-                .await
-                .unwrap();
-        assert_eq!(missing_blobs.count_not_cached(), 0);
-        drop(missing_blobs);
-
-        assert_eq!(read_receiver(recv).await, vec![]);
-        assert_eq!(
-            blob_recorder.hashes().await,
-            HashSet::from_iter([*pkg.contents().1.keys().next().unwrap()])
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn deduplicates_content_blobs_within_root_dir() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
-        let pkg = PackageBuilder::new("pkg")
-            .add_resource_at("content-blob", "blob-contents".as_bytes())
-            .add_resource_at("duplicate", "blob-contents".as_bytes())
-            .build()
-            .await
-            .unwrap();
-        let (meta_far, content_blobs) = pkg.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
-        let root_dir = RootDir::new(blobfs.client(), *pkg.hash()).await.unwrap();
-
-        let (missing_blobs, recv) =
-            MissingBlobs::new(blobfs.client(), &root_dir, Box::new(blob_recorder.clone()))
-                .await
-                .unwrap();
-        assert_eq!(missing_blobs.count_not_cached(), 1);
-        drop(missing_blobs);
-
-        assert_eq!(read_receiver(recv).await, vec![*content_blobs.keys().next().unwrap()]);
-        assert_eq!(
-            blob_recorder.hashes().await,
-            HashSet::from_iter([*content_blobs.keys().next().unwrap()])
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn deduplicates_content_blobs_across_root_dirs() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
-        let subpackage = PackageBuilder::new("subpackage")
-            .add_resource_at("content-blob", "blob-contents".as_bytes())
-            .build()
-            .await
-            .unwrap();
-        let (meta_far, content_blobs) = subpackage.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
-
-        let superpackage = PackageBuilder::new("superpackage")
-            .add_resource_at("duplicate", "blob-contents".as_bytes())
-            .add_subpackage("my-subpackage", &subpackage)
-            .build()
-            .await
-            .unwrap();
-        let (meta_far, _) = superpackage.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
-        let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+        let root_dir = env.root_dir_factory.create(*pkg.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
-            blobfs.client(),
-            &superpackage_root_dir,
-            Box::new(blob_recorder.clone()),
+            env.blobfs.client(),
+            env.root_dir_factory,
+            &root_dir,
+            Box::new(env.blob_recorder.clone()),
         )
         .await
         .unwrap();
@@ -409,15 +339,114 @@ mod tests {
 
         assert_eq!(read_receiver(recv).await, vec![*content_blobs.keys().next().unwrap()]);
         assert_eq!(
-            blob_recorder.hashes().await,
+            env.blob_recorder.hashes().await,
+            HashSet::from_iter([*content_blobs.keys().next().unwrap()])
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn filters_content_blobs_from_blobfs() {
+        let env = TestEnv::new().await;
+        let pkg = PackageBuilder::new("pkg")
+            .add_resource_at("filter-me", "blob-contents".as_bytes())
+            .build()
+            .await
+            .unwrap();
+        pkg.write_to_blobfs(&env.blobfs).await;
+        let root_dir = env.root_dir_factory.create(*pkg.hash()).await.unwrap();
+
+        let (missing_blobs, recv) = MissingBlobs::new(
+            env.blobfs.client(),
+            env.root_dir_factory,
+            &root_dir,
+            Box::new(env.blob_recorder.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(missing_blobs.count_not_cached(), 0);
+        drop(missing_blobs);
+
+        assert_eq!(read_receiver(recv).await, vec![]);
+        assert_eq!(
+            env.blob_recorder.hashes().await,
+            HashSet::from_iter([*pkg.contents().1.keys().next().unwrap()])
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn deduplicates_content_blobs_within_root_dir() {
+        let env = TestEnv::new().await;
+        let pkg = PackageBuilder::new("pkg")
+            .add_resource_at("content-blob", "blob-contents".as_bytes())
+            .add_resource_at("duplicate", "blob-contents".as_bytes())
+            .build()
+            .await
+            .unwrap();
+        let (meta_far, content_blobs) = pkg.contents();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+        let root_dir = env.root_dir_factory.create(*pkg.hash()).await.unwrap();
+
+        let (missing_blobs, recv) = MissingBlobs::new(
+            env.blobfs.client(),
+            env.root_dir_factory,
+            &root_dir,
+            Box::new(env.blob_recorder.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(missing_blobs.count_not_cached(), 1);
+        drop(missing_blobs);
+
+        assert_eq!(read_receiver(recv).await, vec![*content_blobs.keys().next().unwrap()]);
+        assert_eq!(
+            env.blob_recorder.hashes().await,
+            HashSet::from_iter([*content_blobs.keys().next().unwrap()])
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn deduplicates_content_blobs_across_root_dirs() {
+        let env = TestEnv::new().await;
+        let subpackage = PackageBuilder::new("subpackage")
+            .add_resource_at("content-blob", "blob-contents".as_bytes())
+            .build()
+            .await
+            .unwrap();
+        let (meta_far, content_blobs) = subpackage.contents();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+
+        let superpackage = PackageBuilder::new("superpackage")
+            .add_resource_at("duplicate", "blob-contents".as_bytes())
+            .add_subpackage("my-subpackage", &subpackage)
+            .build()
+            .await
+            .unwrap();
+        let (meta_far, _) = superpackage.contents();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+        let superpackage_root_dir =
+            env.root_dir_factory.create(*superpackage.hash()).await.unwrap();
+
+        let (missing_blobs, recv) = MissingBlobs::new(
+            env.blobfs.client(),
+            env.root_dir_factory,
+            &superpackage_root_dir,
+            Box::new(env.blob_recorder.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(missing_blobs.count_not_cached(), 1);
+        drop(missing_blobs);
+
+        assert_eq!(read_receiver(recv).await, vec![*content_blobs.keys().next().unwrap()]);
+        assert_eq!(
+            env.blob_recorder.hashes().await,
             HashSet::from_iter([*content_blobs.keys().next().unwrap(), *subpackage.hash()])
         );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sends_subpackage_meta_far() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let env = TestEnv::new().await;
         let subpackage = PackageBuilder::new("subpackage").build().await.unwrap();
 
         let superpackage = PackageBuilder::new("superpackage")
@@ -426,14 +455,15 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = superpackage.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
+            env.root_dir_factory.create(*superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
-            blobfs.client(),
+            env.blobfs.client(),
+            env.root_dir_factory,
             &superpackage_root_dir,
-            Box::new(blob_recorder.clone()),
+            Box::new(env.blob_recorder.clone()),
         )
         .await
         .unwrap();
@@ -441,13 +471,12 @@ mod tests {
         drop(missing_blobs);
 
         assert_eq!(read_receiver(recv).await, vec![*subpackage.hash()]);
-        assert_eq!(blob_recorder.hashes().await, HashSet::from_iter([*subpackage.hash()]));
+        assert_eq!(env.blob_recorder.hashes().await, HashSet::from_iter([*subpackage.hash()]));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn already_cached_subpackage_meta_far_is_recursed_instead_of_sent() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let env = TestEnv::new().await;
         let subsubpackage = PackageBuilder::new("subsubpackage").build().await.unwrap();
 
         let subpackage = PackageBuilder::new("subpackage")
@@ -456,7 +485,7 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = subpackage.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
 
         let superpackage = PackageBuilder::new("superpackage")
             .add_subpackage("my-subpackage", &subpackage)
@@ -464,14 +493,15 @@ mod tests {
             .await
             .unwrap();
         let (meta_far, _) = superpackage.contents();
-        blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
+        env.blobfs.add_blob_from(meta_far.merkle, meta_far.contents.as_slice()).await.unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
+            env.root_dir_factory.create(*superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
-            blobfs.client(),
+            env.blobfs.client(),
+            env.root_dir_factory,
             &superpackage_root_dir,
-            Box::new(blob_recorder.clone()),
+            Box::new(env.blob_recorder.clone()),
         )
         .await
         .unwrap();
@@ -480,15 +510,14 @@ mod tests {
 
         assert_eq!(read_receiver(recv).await, vec![*subsubpackage.hash()]);
         assert_eq!(
-            blob_recorder.hashes().await,
+            env.blob_recorder.hashes().await,
             HashSet::from_iter([*subpackage.hash(), *subsubpackage.hash()])
         );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn deduplicates_content_blobs_with_subpackage_meta_fars() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let env = TestEnv::new().await;
         let subpackage = PackageBuilder::new("subpackage").build().await.unwrap();
         let (subpackage_meta_far, _) = subpackage.contents();
 
@@ -499,17 +528,18 @@ mod tests {
             .await
             .unwrap();
         let (superpackage_meta_far, superpackage_content_blobs) = superpackage.contents();
-        blobfs
+        env.blobfs
             .add_blob_from(superpackage_meta_far.merkle, superpackage_meta_far.contents.as_slice())
             .await
             .unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
+            env.root_dir_factory.create(*superpackage.hash()).await.unwrap();
 
         let (missing_blobs, recv) = MissingBlobs::new(
-            blobfs.client(),
+            env.blobfs.client(),
+            env.root_dir_factory,
             &superpackage_root_dir,
-            Box::new(blob_recorder.clone()),
+            Box::new(env.blob_recorder.clone()),
         )
         .await
         .unwrap();
@@ -520,13 +550,12 @@ mod tests {
             read_receiver(recv).await,
             vec![superpackage_content_blobs.into_keys().next().unwrap()]
         );
-        assert_eq!(blob_recorder.hashes().await, HashSet::from_iter([*subpackage.hash(),]));
+        assert_eq!(env.blob_recorder.hashes().await, HashSet::from_iter([*subpackage.hash(),]));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn deduplicates_subpackage_meta_fars_with_content_blobs() {
-        let blob_recorder = MockBlobRecorder::new();
-        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let env = TestEnv::new().await;
         let subsubpackage = PackageBuilder::new("subsubpackage").build().await.unwrap();
         let (subsubpackage_meta_far, _) = subsubpackage.contents();
 
@@ -545,18 +574,19 @@ mod tests {
             .await
             .unwrap();
         let (superpackage_meta_far, _) = superpackage.contents();
-        blobfs
+        env.blobfs
             .add_blob_from(superpackage_meta_far.merkle, superpackage_meta_far.contents.as_slice())
             .await
             .unwrap();
         let superpackage_root_dir =
-            RootDir::new(blobfs.client(), *superpackage.hash()).await.unwrap();
+            env.root_dir_factory.create(*superpackage.hash()).await.unwrap();
 
         // Sends the subsubpackage meta.far but only as a content blob.
         let (mut missing_blobs, recv) = MissingBlobs::new(
-            blobfs.client(),
+            env.blobfs.client(),
+            env.root_dir_factory,
             &superpackage_root_dir,
-            Box::new(blob_recorder.clone()),
+            Box::new(env.blob_recorder.clone()),
         )
         .await
         .unwrap();
@@ -566,7 +596,7 @@ mod tests {
 
         // Upgrades the hash of the subsubpackage meta.far from a content blob to a subpackage hash
         // but doesn't re-send (only appears once in the receiver).
-        blobfs
+        env.blobfs
             .add_blob_from(subpackage_meta_far.merkle, subpackage_meta_far.contents.as_slice())
             .await
             .unwrap();
@@ -585,7 +615,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            blob_recorder.hashes().await,
+            env.blob_recorder.hashes().await,
             HashSet::from_iter([
                 *subpackage.hash(),
                 *subsubpackage.hash(),

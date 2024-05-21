@@ -44,11 +44,12 @@ mod missing_blobs;
 pub(crate) async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     blobfs: blobfs::Client,
+    root_dir_factory: crate::RootDirFactory,
     base_packages: Arc<BasePackages>,
     cache_packages: Arc<CachePackages>,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     scope: package_directory::ExecutionScope,
-    open_packages: package_directory::RootDirCache<blobfs::Client>,
+    open_packages: crate::RootDirCache,
     stream: PackageCacheRequestStream,
     cobalt_sender: ProtocolSender<MetricEvent>,
     serve_id: Arc<AtomicU32>,
@@ -87,6 +88,7 @@ pub(crate) async fn serve(
                         cache_packages.as_ref(),
                         executability_restrictions,
                         &blobfs,
+                        &root_dir_factory,
                         &open_packages,
                         meta_far_blob,
                         gc_protection,
@@ -153,7 +155,7 @@ pub(crate) async fn serve(
 #[derive(Debug)]
 enum PackageAvailability {
     Always,
-    Open(Arc<package_directory::RootDir<blobfs::Client>>),
+    Open(Arc<crate::RootDir>),
     Unknown,
 }
 
@@ -161,7 +163,7 @@ impl PackageAvailability {
     fn get(
         base_packages: &BasePackages,
         cache_packages: &CachePackages,
-        open_packages: &package_directory::RootDirCache<blobfs::Client>,
+        open_packages: &crate::RootDirCache,
         package: &fuchsia_hash::Hash,
     ) -> Self {
         if base_packages.is_package(*package) {
@@ -213,7 +215,8 @@ async fn get(
     cache_packages: &CachePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    root_dir_factory: &crate::RootDirFactory,
+    open_packages: &crate::RootDirCache,
     meta_far_blob: BlobInfo,
     gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
@@ -230,6 +233,7 @@ async fn get(
         cache_packages,
         executability_restrictions,
         blobfs,
+        root_dir_factory,
         open_packages,
         meta_far_blob,
         gc_protection,
@@ -266,7 +270,8 @@ async fn get_impl(
     cache_packages: &CachePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    root_dir_factory: &crate::RootDirFactory,
+    open_packages: &crate::RootDirCache,
     meta_far_blob: BlobInfo,
     gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
@@ -294,6 +299,7 @@ async fn get_impl(
                 gc_protection,
                 package_index,
                 blobfs,
+                root_dir_factory,
                 node,
             )
             .await
@@ -313,6 +319,7 @@ async fn get_impl(
                         gc_protection,
                         package_index,
                         blobfs,
+                        root_dir_factory,
                         node,
                     )
                     .await
@@ -455,15 +462,19 @@ async fn serve_needed_blobs(
     gc_protection: fpkg::GcProtection,
     package_index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
+    root_dir_factory: &crate::RootDirFactory,
     node: &finspect::Node,
-) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
+) -> Result<crate::RootDir, ServeNeededBlobsError> {
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
-        let root_dir = handle_open_meta_blob(&mut stream, meta_far_info, blobfs, &state).await?;
+        let root_dir =
+            handle_open_meta_blob(&mut stream, meta_far_info, blobfs, root_dir_factory, &state)
+                .await?;
 
         let (missing_blobs, missing_blobs_recv) = missing_blobs::MissingBlobs::new(
             blobfs.clone(),
+            root_dir_factory.clone(),
             &root_dir,
             Box::new(IndexBlobRecorder {
                 package_index,
@@ -503,8 +514,9 @@ async fn handle_open_meta_blob(
     stream: &mut NeededBlobsRequestStream,
     meta_far_info: BlobInfo,
     blobfs: &blobfs::Client,
+    root_dir_factory: &crate::RootDirFactory,
     state: &StringProperty,
-) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
+) -> Result<crate::RootDir, ServeNeededBlobsError> {
     let hash = meta_far_info.blob_id.into();
     let mut opened = false;
 
@@ -555,9 +567,7 @@ async fn handle_open_meta_blob(
 
     state.set("enumerate-missing-blobs");
 
-    package_directory::RootDir::new_raw(blobfs.clone(), hash, None)
-        .await
-        .map_err(ServeNeededBlobsError::CreatePackageRootDir)
+    root_dir_factory.create(hash).await.map_err(ServeNeededBlobsError::CreatePackageRootDir)
 }
 
 async fn handle_get_missing_blobs(
@@ -762,7 +772,7 @@ async fn serve_package_index(
 async fn get_subpackage(
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
-    open_packages: &package_directory::RootDirCache<blobfs::Client>,
+    open_packages: &crate::RootDirCache,
     superpackage: Hash,
     subpackage: String,
     dir: ServerEnd<fio::DirectoryMarker>,
@@ -874,6 +884,7 @@ mod serve_needed_blobs_tests {
                 gc_protection,
                 &package_index,
                 &blobfs,
+                &crate::root_dir::new_test(blobfs.clone()).await.0,
                 &inspector.root().create_child("test-node-name"),
             )
             .await,
@@ -894,6 +905,8 @@ mod serve_needed_blobs_tests {
 
         (
             Task::spawn(async move {
+                let (root_dir_factory, _) = crate::root_dir::new_test(blobfs.clone()).await;
+
                 let guard = package_index
                     .write()
                     .await
@@ -904,6 +917,7 @@ mod serve_needed_blobs_tests {
                     gc_protection,
                     &package_index,
                     &blobfs,
+                    &root_dir_factory,
                     &inspector.root().create_child("test-node-name"),
                 )
                 .await
@@ -2280,9 +2294,9 @@ mod get_handler_tests {
         let (_, stream) = fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (blobfs, _) = blobfs::Client::new_test();
-        let open_packages = package_directory::RootDirCache::new(blobfs.clone());
         let inspector = fuchsia_inspect::Inspector::default();
         let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new()));
+        let (root_dir_factory, open_packages) = crate::root_dir::new_test(blobfs.clone()).await;
 
         assert_matches::assert_matches!(
             get(
@@ -2291,6 +2305,7 @@ mod get_handler_tests {
                 &CachePackages::new_test_only(HashSet::new(), vec![]),
                 system_image::ExecutabilityRestrictions::DoNotEnforce,
                 &blobfs,
+                &root_dir_factory,
                 &open_packages,
                 meta_blob_info,
                 fpkg::GcProtection::OpenPackageTracking,
