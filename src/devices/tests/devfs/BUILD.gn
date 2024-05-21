@@ -21,6 +21,12 @@ test("devfs-bin") {
 }
 
 fuchsia_unittest_package("devfs-test") {
+  # TODO(https://fxbug.dev/330117908): Fix the ERROR logs when running on GCE
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [ ":devfs-bin" ]
 }
 
