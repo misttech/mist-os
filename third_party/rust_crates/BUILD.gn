@@ -560,6 +560,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("nu-ansi-term") {
+  public_deps = [ ":nu-ansi-term-v0_46_0" ]
+}
+
 group("num") {
   public_deps = [ ":num-v0_4_0" ]
 }
@@ -8864,6 +8868,38 @@ rust_library("ntapi-v0_3_4") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":ntapi-v0_3_4.license" ]
+}
+
+license("nu-ansi-term-v0_46_0.license") {
+  public_package_name = "nu_ansi_term"
+  license_files =
+      [ "//third_party/rust_crates/vendor/nu-ansi-term-0.46.0/LICENCE" ]
+}
+
+rust_library("nu-ansi-term-v0_46_0") {
+  crate_name = "nu_ansi_term"
+  crate_root = "//third_party/rust_crates/vendor/nu-ansi-term-0.46.0/src/lib.rs"
+  output_name = "nu_ansi_term-8ffdebcdd74cbc77"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":overload-v0_1_1" ]
+  if (false) {
+    deps += [ ":winapi-v0_3_9" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=8ffdebcdd74cbc77",
+    "-Cextra-filename=-8ffdebcdd74cbc77",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":nu-ansi-term-v0_46_0.license" ]
 }
 
 license("num-v0_4_0.license") {
