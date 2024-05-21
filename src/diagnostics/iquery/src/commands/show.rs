@@ -66,13 +66,31 @@ pub struct ShowCommand {
     pub manifest: Option<String>,
 
     #[argh(positional)]
-    /// selectors for which the selectors should be queried. If no selectors are provided, inspect
-    /// data for the whole system will be returned. If `--manifest` is provided then the selectors
-    /// should be tree selectors, otherwise component selectors or full selectors.
+    /// selectors representing the Inspect data that should be queried.
+    ///
+    /// If no selectors are provided, Inspect data for the whole system will be returned.
+    ///
+    /// This command accepts the following as a selector:
+    ///
+    /// - A component moniker, for example, `core/network/netstack`. Doesn't work if
+    ///   `--manifest` is passed.
+    /// - A component selector, for example, `core/network/*`. Doesn't work if `--manifest`
+    ///   is passed.
+    /// - A tree selector, for example, `core/network/netstack:root/path/to/*:property`
+    ///
+    /// To learn more about selectors see
+    /// https://fuchsia.dev/fuchsia-src/reference/diagnostics/selectors.
+    ///
+    /// The following characters in a selector must be escaped with `\`: `*`, `:`, `\`, `/` and
+    /// whitespace.
+    ///
+    /// When `*` or other characters cause ambiguity with your shell, make sure to wrap the
+    /// selector in single or double quotes. For example:
+    /// `ffx inspect show "bootstrap/boot-drivers:*:root/path/to\:some:prop"`
     pub selectors: Vec<String>,
 
     #[argh(option)]
-    /// A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
+    /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
     /// The selector will be in the form of:
     /// <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName
     ///
