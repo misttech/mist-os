@@ -54,6 +54,83 @@ impl FullmacDriverFixture {
     }
 }
 
+/// Many tests will want to start from a connected state, so this will create and start the test
+/// realm, fullmac driver, and client SME, and then get the client SME into a connected state.
+/// This will use COMPATIBLE_OPEN_BSS as the BssDescription for the connect call.
+async fn setup_connected_to_open_bss(
+    config: FullmacDriverConfig,
+) -> (
+    fidl_sme::ClientSmeProxy,
+    fidl_sme::ConnectTransactionEventStream,
+    FullmacDriverFixture,
+    fidl_sme::GenericSmeProxy,
+) {
+    // This is wrapped in a Box::pin because otherwise the compiler complains about the future
+    // being too large.
+    Box::pin(async {
+        let (mut fullmac_driver, generic_sme_proxy) =
+            FullmacDriverFixture::create_and_get_generic_sme(config).await;
+        let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+
+        let client_fut = async {
+            let (connect_txn, connect_txn_server) =
+                fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+
+            let connect_req = fidl_sme::ConnectRequest {
+                ssid: COMPATIBLE_OPEN_BSS.ssid.clone().into(),
+                bss_description: COMPATIBLE_OPEN_BSS.clone().into(),
+                multiple_bss_candidates: false,
+                authentication: fidl_wlan_security::Authentication {
+                    protocol: fidl_wlan_security::Protocol::Open,
+                    credentials: None,
+                },
+                deprecated_scan_type: fidl_common::ScanType::Passive,
+            };
+
+            client_sme_proxy
+                .connect(&connect_req, Some(connect_txn_server))
+                .expect("Connect FIDL error.");
+
+            connect_txn.take_event_stream()
+        };
+
+        let driver_fut = async {
+            assert_variant!(fullmac_driver.request_stream.next().await,
+            Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Connect { payload: _, responder })) => {
+                responder
+                    .send()
+                    .expect("Failed to respond to Connect");
+            });
+
+            fullmac_driver
+                .ifc_proxy
+                .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
+                    peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
+                    result_code: fidl_ieee80211::StatusCode::Success,
+                    association_id: 0,
+                    association_ies: vec![],
+                })
+                .await
+                .expect("Failed to send ConnectConf");
+
+            assert_variant!(fullmac_driver.request_stream.next().await,
+            Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: _, responder })) => {
+                responder
+                    .send()
+                    .expect("Failed to respond to OnLinkStateChanged");
+            });
+        };
+
+        let (mut connect_txn_event_stream, _) = futures::join!(client_fut, driver_fut);
+        assert_variant!(connect_txn_event_stream.next().await,
+            Some(Ok(fidl_sme::ConnectTransactionEvent::OnConnectResult { result })) =>  {
+                assert_eq!(result.code, fidl_ieee80211::StatusCode::Success);
+            });
+
+        (client_sme_proxy, connect_txn_event_stream, fullmac_driver, generic_sme_proxy)
+    }).await
+}
+
 #[fuchsia::test]
 async fn test_sme_query() {
     // The role and sta_addr are randomly generated for each run of the test case to ensure that
@@ -281,6 +358,7 @@ async fn test_open_connect_request_success() {
 
     let (connect_result, (driver_connect_req, driver_online)) =
         futures::join!(client_fut, driver_fut);
+
     assert_eq!(connect_result.code, fidl_ieee80211::StatusCode::Success);
     assert!(driver_online);
 
@@ -539,4 +617,53 @@ async fn test_wpa2_connect_request_success() {
     assert_eq!(driver_gtk.key_idx.unwrap(), auth_gtk.key_id());
     assert_eq!(driver_gtk.cipher_oui.unwrap(), *auth_gtk.cipher().oui);
     assert_eq!(*driver_gtk.key.as_ref().unwrap(), auth_gtk.tk());
+}
+
+#[fuchsia::test]
+async fn test_sme_disconnect() {
+    let (client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+        setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
+
+    let client_fut = client_sme_proxy
+        .disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
+
+    let driver_fut = async {
+        assert_variant!(fullmac_driver.request_stream.next().await,
+        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: false, responder })) => {
+            responder
+                .send()
+                .expect("Failed to respond to OnLinkStateChanged");
+        });
+
+        let deauth_req = assert_variant!(fullmac_driver.request_stream.next().await,
+        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Deauth { payload, responder })) => {
+            responder
+                .send()
+                .expect("Failed to respond to Connect");
+             payload
+        });
+
+        fullmac_driver
+            .ifc_proxy
+            .deauth_conf(&fidl_fullmac::WlanFullmacImplIfcBaseDeauthConfRequest {
+                peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+                ..Default::default()
+            })
+            .await
+            .expect("Failed to send deauth conf");
+
+        deauth_req
+    };
+
+    let (_, driver_deauth_req) = futures::join!(client_fut, driver_fut);
+    assert_eq!(driver_deauth_req.peer_sta_address.unwrap(), COMPATIBLE_OPEN_BSS.bssid.to_array());
+    assert_eq!(driver_deauth_req.reason_code.unwrap(), fidl_ieee80211::ReasonCode::StaLeaving);
+
+    assert_variant!(
+        connect_txn_event_stream.next().await,
+        Some(Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info })) => {
+            assert!(!info.is_sme_reconnecting);
+            assert_eq!(info.disconnect_source,
+                fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest));
+    });
 }

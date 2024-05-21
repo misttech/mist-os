@@ -57,7 +57,11 @@ class WlanFullmacImplIfcToDriverBridge
   }
   void RoamConf(RoamConfRequest& request, RoamConfCompleter::Sync& completer) override {}
   void AuthInd(AuthIndRequest& request, AuthIndCompleter::Sync& completer) override {}
-  void DeauthConf(DeauthConfRequest& request, DeauthConfCompleter::Sync& completer) override {}
+  void DeauthConf(DeauthConfRequest& request, DeauthConfCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->DeauthConf(request).Then(
+        ForwardResult<WlanFullmacImplIfc::DeauthConf>(completer.ToAsync()));
+  }
   void DeauthInd(DeauthIndRequest& request, DeauthIndCompleter::Sync& completer) override {}
   void AssocInd(AssocIndRequest& request, AssocIndCompleter::Sync& completer) override {}
   void DisassocConf(DisassocConfRequest& request, DisassocConfCompleter::Sync& completer) override {
