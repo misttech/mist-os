@@ -17,6 +17,7 @@ group("tests") {
     "android:tests",
     "diagnostics:tests",
     "gvisor:tests",
+    "memory_attribution:tests",
     "reboot:tests",
     "scheduler:tests",
     "syscalls:tests",
