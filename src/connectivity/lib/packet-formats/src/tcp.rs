@@ -445,6 +445,24 @@ impl<B: ByteSlice> TcpSegment<B> {
 }
 
 impl<B: ByteSliceMut> TcpSegment<B> {
+    /// Set the source port of the UDP packet.
+    pub fn set_src_port(&mut self, new: NonZeroU16) {
+        let old = self.hdr_prefix.src_port;
+        let new = U16::from(new.get());
+        self.hdr_prefix.src_port = new;
+        self.hdr_prefix.checksum =
+            internet_checksum::update(self.hdr_prefix.checksum, old.as_bytes(), new.as_bytes());
+    }
+
+    /// Set the destination port of the UDP packet.
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        let old = self.hdr_prefix.dst_port;
+        let new = U16::from(new.get());
+        self.hdr_prefix.dst_port = new;
+        self.hdr_prefix.checksum =
+            internet_checksum::update(self.hdr_prefix.checksum, old.as_bytes(), new.as_bytes());
+    }
+
     /// Update the checksum to reflect an updated address in the pseudo header.
     pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
         self.hdr_prefix.checksum =
@@ -763,6 +781,16 @@ impl<A: IpAddress, O> TcpSegmentBuilderWithOptions<A, O> {
     pub fn set_dst_ip(&mut self, addr: A) {
         self.prefix_builder.dst_ip = addr;
     }
+
+    /// Sets the source port for the builder.
+    pub fn set_src_port(&mut self, port: NonZeroU16) {
+        self.prefix_builder.src_port = Some(port);
+    }
+
+    /// Sets the destination port for the builder.
+    pub fn set_dst_port(&mut self, port: NonZeroU16) {
+        self.prefix_builder.dst_port = Some(port);
+    }
 }
 
 impl<A: IpAddress, O: InnerPacketBuilder> TcpSegmentBuilderWithOptions<A, O> {
@@ -878,6 +906,16 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
     /// Sets the destination IP address for the builder.
     pub fn set_dst_ip(&mut self, addr: A) {
         self.dst_ip = addr;
+    }
+
+    /// Sets the source port for the builder.
+    pub fn set_src_port(&mut self, port: NonZeroU16) {
+        self.src_port = Some(port);
+    }
+
+    /// Sets the destination port for the builder.
+    pub fn set_dst_port(&mut self, port: NonZeroU16) {
+        self.dst_port = Some(port);
     }
 }
 

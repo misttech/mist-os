@@ -30,8 +30,8 @@ pub use matchers::{
     PortMatcher, TransportProtocolMatcher,
 };
 pub use packets::{
-    ForwardedPacket, IpPacket, MaybeTransportPacket, NestedWithInnerIpPacket,
-    TransportPacketSerializer, TxPacket,
+    ForwardedPacket, IcmpMessage, IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
+    TxPacket,
 };
 pub use state::{
     validation::{ValidRoutines, ValidationError},

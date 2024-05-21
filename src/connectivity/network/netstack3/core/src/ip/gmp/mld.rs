@@ -37,7 +37,6 @@ use zerocopy::ByteSlice;
 use crate::{
     context::HandleableTimer,
     device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
-    filter::MaybeTransportPacket,
     ip::{
         device::IpDeviceSendContext,
         gmp::{
@@ -370,7 +369,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
 fn send_mld_packet<
     BC: MldBindingsContext,
     CC: MldContext<BC>,
-    M: IcmpMldv1MessageType + MaybeTransportPacket,
+    M: IcmpMldv1MessageType + crate::filter::IcmpMessage<Ipv6>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -554,7 +553,7 @@ mod tests {
             _body: S,
         ) -> Result<(), S>
         where
-            S: Serializer + MaybeTransportPacket,
+            S: Serializer,
             S::Buffer: BufferMut,
         {
             unimplemented!();

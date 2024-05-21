@@ -10,8 +10,10 @@ use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::{
-    context::FilterBindingsContext, logic::FilterTimerId, packets::TransportPacket,
-    FilterBindingsTypes, IpPacket, MaybeTransportPacket,
+    context::{FilterBindingsContext, FilterBindingsTypes},
+    logic::FilterTimerId,
+    packets::TransportPacket,
+    packets::{IpPacket, MaybeTransportPacket},
 };
 use netstack3_base::{
     sync::Mutex, CoreTimerContext, Inspectable, Inspector, Instant, TimerContext,

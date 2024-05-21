@@ -58,7 +58,7 @@ use crate::{
         AnyDevice, DeviceIdContext, EitherDeviceId, FrameDestination, StrongDeviceIdentifier,
         WeakDeviceIdentifier,
     },
-    filter::{MaybeTransportPacket, TransportPacketSerializer},
+    filter::TransportPacketSerializer,
     ip::{
         base::TransparentLocalDelivery,
         device::{
@@ -1201,7 +1201,7 @@ where
     CC: IpLayerHandler<Ipv6, BC>,
     S: Serializer,
     S::Buffer: BufferMut,
-    M: IcmpMessage<Ipv6> + MaybeTransportPacket,
+    M: crate::filter::IcmpMessage<Ipv6>,
 {
     // TODO(https://fxbug.dev/42177356): Send through ICMPv6 send path.
     IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
@@ -2687,7 +2687,7 @@ fn send_icmpv6_dest_unreachable<
 
 fn send_icmpv4_error_message<
     B: BufferMut,
-    M: IcmpMessage<Ipv4> + MaybeTransportPacket,
+    M: crate::filter::IcmpMessage<Ipv4>,
     BC: IcmpBindingsContext<Ipv4, CC::DeviceId>,
     CC: InnerIcmpv4Context<BC> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
@@ -2746,7 +2746,7 @@ fn send_icmpv4_error_message<
 
 fn send_icmpv6_error_message<
     B: BufferMut,
-    M: IcmpMessage<Ipv6> + MaybeTransportPacket,
+    M: crate::filter::IcmpMessage<Ipv6>,
     BC: IcmpBindingsContext<Ipv6, CC::DeviceId>,
     CC: InnerIcmpv6Context<BC> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(

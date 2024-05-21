@@ -6,7 +6,7 @@
 
 use core::fmt;
 
-use net_types::ip::{Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ipv6, Ipv6Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::{
     byteorder::network_endian::U32, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
@@ -287,6 +287,10 @@ create_protocol_enum!(
         MulticastListenerReportV2, 143, "Multicast Listener Report V2";
     }
 );
+
+impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv6MessageType {
+    type Type = I::IcmpMessageType;
+}
 
 impl IcmpMessageType for Icmpv6MessageType {
     fn is_err(self) -> bool {

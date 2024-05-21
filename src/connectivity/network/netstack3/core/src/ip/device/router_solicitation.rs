@@ -21,7 +21,6 @@ use crate::{
         TimerHandler,
     },
     device::{AnyDevice, DeviceIdContext, WeakDeviceIdentifier},
-    filter::MaybeTransportPacket,
 };
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router
@@ -113,7 +112,7 @@ pub(super) trait RsContext<BC: RsBindingsTypes>: DeviceIdContext<AnyDevice> {
     /// The callback is called with a source address suitable for an outgoing
     /// router solicitation message and returns the message body.
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf> + MaybeTransportPacket,
+        S: Serializer<Buffer = EmptyBuf>,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,

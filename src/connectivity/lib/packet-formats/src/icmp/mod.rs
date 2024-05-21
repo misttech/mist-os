@@ -36,7 +36,7 @@ use core::mem;
 use byteorder::{ByteOrder, NetworkEndian};
 use derivative::Derivative;
 use internet_checksum::Checksum;
-use net_types::ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::records::options::{Options, OptionsImpl};
 use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, FromRaw,
@@ -91,13 +91,19 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(bytes: &[u8]) -> ParseResult<
 /// An extension trait adding ICMP-related functionality to `Ipv4` and `Ipv6`.
 pub trait IcmpIpExt: IpProtoExt {
     /// The ICMP packet type for this IP version.
-    type IcmpPacketTypeRaw<B: ByteSliceMut>: IcmpPacketTypeRaw<B, Self>;
+    type IcmpPacketTypeRaw<B: ByteSliceMut>: IcmpPacketTypeRaw<B, Self>
+        + GenericOverIp<Self, Type = Self::IcmpPacketTypeRaw<B>>
+        + GenericOverIp<Ipv4, Type = Icmpv4PacketRaw<B>>
+        + GenericOverIp<Ipv6, Type = Icmpv6PacketRaw<B>>;
 
     /// The type of ICMP messages.
     ///
     /// For `Ipv4`, this is `Icmpv4MessageType`, and for `Ipv6`, this is
     /// `Icmpv6MessageType`.
-    type IcmpMessageType: IcmpMessageType;
+    type IcmpMessageType: IcmpMessageType
+        + GenericOverIp<Self, Type = Self::IcmpMessageType>
+        + GenericOverIp<Ipv4, Type = Icmpv4MessageType>
+        + GenericOverIp<Ipv6, Type = Icmpv6MessageType>;
 
     /// The type of an ICMP parameter problem code.
     ///
@@ -199,12 +205,20 @@ impl<B: ByteSliceMut> IcmpPacketTypeRaw<B, Ipv4> for Icmpv4PacketRaw<B> {
     }
 }
 
+impl<I: IcmpIpExt, B: ByteSliceMut> GenericOverIp<I> for Icmpv4PacketRaw<B> {
+    type Type = I::IcmpPacketTypeRaw<B>;
+}
+
 impl<B: ByteSliceMut> IcmpPacketTypeRaw<B, Ipv6> for Icmpv6PacketRaw<B> {
     /// Update the checksum to reflect an updated address in the pseudo header.
     fn update_checksum_pseudo_header_address(&mut self, old: Ipv6Addr, new: Ipv6Addr) {
         let checksum = &mut self.header_prefix_mut().checksum;
         *checksum = internet_checksum::update(*checksum, old.bytes(), new.bytes());
     }
+}
+
+impl<I: IcmpIpExt, B: ByteSliceMut> GenericOverIp<I> for Icmpv6PacketRaw<B> {
+    type Type = I::IcmpPacketTypeRaw<B>;
 }
 
 /// Empty message.
@@ -380,6 +394,28 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     /// Get the ICMP message.
     pub fn message(&self) -> &M {
         &self.header.message
+    }
+}
+
+impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
+    /// Set the ID of the ICMP echo message.
+    pub fn set_id(&mut self, new: u16) {
+        let old = self.header.message.id_seq.id;
+        let new = U16::from(new);
+        self.header.message.id_seq.id = new;
+        self.header.prefix.checksum =
+            internet_checksum::update(self.header.prefix.checksum, old.as_bytes(), new.as_bytes());
+    }
+}
+
+impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoReply> {
+    /// Set the ID of the ICMP echo message.
+    pub fn set_id(&mut self, new: u16) {
+        let old = self.header.message.id_seq.id;
+        let new = U16::from(new);
+        self.header.message.id_seq.id = new;
+        self.header.prefix.checksum =
+            internet_checksum::update(self.header.prefix.checksum, old.as_bytes(), new.as_bytes());
     }
 }
 
@@ -622,6 +658,11 @@ impl<I: IcmpIpExt, M: IcmpMessage<I>> IcmpPacketBuilder<I, M> {
     /// Returns the message in the ICMP packet.
     pub fn message(&self) -> &M {
         &self.msg
+    }
+
+    /// Returns a mutable reference to the message in the ICMP packet.
+    pub fn message_mut(&mut self) -> &mut M {
+        &mut self.msg
     }
 
     /// Sets the source IP address of the ICMP packet.

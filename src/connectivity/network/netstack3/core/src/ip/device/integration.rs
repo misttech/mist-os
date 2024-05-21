@@ -35,7 +35,7 @@ use crate::{
     context::{CoreEventContext, CoreTimerContext, CounterContext},
     device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     error::{ExistsError, NotFoundError},
-    filter::{FilterHandlerProvider, FilterImpl, MaybeTransportPacket},
+    filter::{FilterHandlerProvider, FilterImpl},
     ip::{
         self,
         device::{
@@ -938,7 +938,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
     }
 
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf> + MaybeTransportPacket,
+        S: Serializer<Buffer = EmptyBuf>,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,

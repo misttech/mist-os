@@ -6,7 +6,7 @@
 
 use core::fmt;
 
-use net_types::ip::{Ipv4, Ipv4Addr};
+use net_types::ip::{GenericOverIp, Ipv4, Ipv4Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::{
     byteorder::network_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
@@ -175,6 +175,10 @@ create_protocol_enum!(
         TimestampReply, 14, "Timestamp Reply";
     }
 );
+
+impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv4MessageType {
+    type Type = I::IcmpMessageType;
+}
 
 impl IcmpMessageType for Icmpv4MessageType {
     fn is_err(self) -> bool {

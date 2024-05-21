@@ -565,7 +565,7 @@ mod tests {
             CtxPair, InstantContext as _, SendFrameContext as _,
         },
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
-        filter::{MaybeTransportPacket, ProofOfEgressCheck},
+        filter::ProofOfEgressCheck,
         ip::{
             gmp::{
                 GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
@@ -670,7 +670,7 @@ mod tests {
             _body: S,
         ) -> Result<(), S>
         where
-            S: Serializer + MaybeTransportPacket,
+            S: Serializer,
             S::Buffer: BufferMut,
         {
             unimplemented!();
