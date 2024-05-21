@@ -238,12 +238,7 @@ zx_status_t Ramdisk::BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_gui
 }
 
 zx_status_t Ramdisk::BlockPartitionGetName(char* out_name, size_t capacity) {
-  if (capacity < ZBI_PARTITION_NAME_LEN) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
-  static_assert(ZBI_PARTITION_NAME_LEN <= MAX_PARTITION_NAME_LENGTH, "Name length mismatch");
-  strlcpy(out_name, name_, ZBI_PARTITION_NAME_LEN);
-  return ZX_OK;
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 void Ramdisk::Grow(GrowRequestView request, GrowCompleter::Sync& completer) {
