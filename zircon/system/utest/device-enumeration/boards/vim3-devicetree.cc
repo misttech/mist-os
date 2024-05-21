@@ -29,6 +29,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio-init",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio/gpio-93/fusb302-22_group/fusb302",
+      "sys/platform/hrtimer-0/aml-hrtimer",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-1c000/i2c-1c000_group/aml-i2c/i2c/i2c-1-56/touchscreen-38_group/focaltouch-HidDevice",
       "sys/platform/i2c-5000",

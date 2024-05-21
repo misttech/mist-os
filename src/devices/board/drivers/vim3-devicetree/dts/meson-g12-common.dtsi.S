@@ -248,6 +248,19 @@
 			#size-cells = <2>;
 			ranges = <0x0 0x0 0x0 0xFFD00000 0x0 0x100000>;
 
+			hrtimer: hrtimer@0 {
+				compatible = "amlogic,hrtimer";
+				reg = <0x0 0x0 0x0 A311D_TIMER_LENGTH>;
+				interrupts = <GIC_SPI 10 GIC_IRQ_MODE_EDGE_RISING>, // Timer A
+					<GIC_SPI 11 GIC_IRQ_MODE_EDGE_RISING>, // Timer B
+					<GIC_SPI 6 GIC_IRQ_MODE_EDGE_RISING>, // Timer C
+					<GIC_SPI 29 GIC_IRQ_MODE_EDGE_RISING>, // Timer D
+					<GIC_SPI 60 GIC_IRQ_MODE_EDGE_RISING>, // Timer F. Timer E does not trigger IRQ.
+					<GIC_SPI 61 GIC_IRQ_MODE_EDGE_RISING>, // Timer G
+					<GIC_SPI 62 GIC_IRQ_MODE_EDGE_RISING>, // Timer H
+					<GIC_SPI 63 GIC_IRQ_MODE_EDGE_RISING>; // Timer I
+			};
+
 			reset: register-controller@1000 {
 				compatible = "fuchsia,registers";
 				reg = <0x0 0x1000 0x0 0x100>;
@@ -266,7 +279,6 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 			};
-
 
 		};
 

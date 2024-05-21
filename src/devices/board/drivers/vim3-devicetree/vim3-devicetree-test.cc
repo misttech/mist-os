@@ -49,6 +49,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/fuchsia-sysmem",
       "sys/platform/gpio-controller-ff634400",
       "sys/platform/gpu-ffe40000",
+      "sys/platform/hrtimer-0",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-5000",
       "sys/platform/interrupt-controller-ffc01000",
