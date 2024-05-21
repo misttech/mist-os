@@ -1,0 +1,54 @@
+// Copyright 2024 The Fuchsia Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "ta-manager",
+            url: "ta-manager-realm-test#meta/ta-manager.cm",
+        },
+        {
+            name: "test-config",
+            url: "config#meta/config.cm",
+        },
+    ],
+    collections: [
+        {
+            name: "ta",
+            durability: "single_run",
+        },
+    ],
+    offer: [
+        {
+            directory: "ta",
+            from: "#ta-manager",
+            to: "#test-suite",
+        },
+        {
+            directory: "config",
+            from: "#test-config",
+            to: "#ta-manager",
+        },
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#ta",
+                "#ta-manager",
+                "#test-config", // XXX - why is this required?
+                "#test-suite",
+            ],
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+            to: "#ta-manager",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test-suite",
+        },
+    ],
+}

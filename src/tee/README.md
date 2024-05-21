@@ -4,6 +4,9 @@ This directory contains support for hosting a Trusted Execution Environment insi
 
 ## Structure
 
+The `manager` directory contains the TEE manager component which is responsible for
+instantiating Trusted Applications and managing their lifetime.
+
 The `ta` directory contains Trusted Application implementations for testing
 purposes.
 

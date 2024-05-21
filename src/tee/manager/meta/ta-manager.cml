@@ -1,0 +1,24 @@
+// Copyright 2024 The Fuchsia Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This is the production TA Manager component manifest.
+{
+    include: [ "//src/tee/manager/meta/ta-manager-base.shard.cml" ],
+
+    // The TA collection is managed by us directly in the production configuration.
+    collections: [
+        {
+            name: "ta",
+            durability: "single_run",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+
+            // The fuchsia.component.Realm instance provided by the framework is scoped to this component's collection(s).
+            from: "framework",
+        },
+    ],
+}

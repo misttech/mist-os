@@ -5,6 +5,7 @@
 group("tests") {
   testonly = true
   deps = [
+    "manager:tests",
     "runtime:tests",
     "ta:tests",
     "tee_internal_api:tests",
