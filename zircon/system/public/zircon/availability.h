@@ -125,20 +125,17 @@
 // The target API level is `level` or less.
 #define FUCHSIA_API_LEVEL_AT_MOST(level) (__Fuchsia_API_level__ <= FUCHSIA_API_LEVEL_(level))
 
-// Do NOT use this value directly. Use one of the macros above instead.
-// The value of __Fuchsia_API_level__ when the target API level is HEAD.
-#define FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_() 4292870144
-
-// Obsolete mechanism for determining whether the target API level is HEAD.
-// Use one of the macros above instead.
-// TODO(https://fxbug.dev/42084512): Remove FUCHSIA_HEAD once all code is using
-// the macros above. In the short term, consider defining it as a string like
-// "do not use" so uses of it will fail to compile.
-#define FUCHSIA_HEAD FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_()
-
 // The macros referenced by the output of `FUCHSIA_API_LEVEL_()` must be defined for each API level.
 // They are defined in the following file, which must be included after the macros above because it
 // may use those macros.
 #include <zircon/availability_levels.inc>
+
+// Obsolete mechanism for determining whether the target API level is HEAD.
+// Use one of the macros above instead.
+// Rather than not defining this identifier, which would cause the preprocessor
+// to silently treat any instances as zero, define it as a string, which will
+// cause a compiler error if it is used in a preprocessor comparison.
+#define FUCHSIA_HEAD \
+  "DEPRECATED: Use one of the FUCHSIA_API_LEVEL_*() macros in availability.h instead."
 
 #endif  // ZIRCON_AVAILABILITY_H_

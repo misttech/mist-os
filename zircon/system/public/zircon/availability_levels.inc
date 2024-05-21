@@ -7,7 +7,7 @@
 // API level-independent macros in that file.
 
 // Special named API levels.
-#define FUCHSIA_INTERNAL_LEVEL_HEAD_() FUCHSIA_INTERNAL_USE_ONLY_FUCHSIA_HEAD_()
+#define FUCHSIA_INTERNAL_LEVEL_HEAD_() 4292870144
 #define FUCHSIA_INTERNAL_LEVEL_PLATFORM_() 4293918720
 // TODO(https://fxbug.dev/323889271): Add support for `NEXT` as a parameter.
 // #define FUCHSIA_INTERNAL_LEVEL_NEXT_() TBD
