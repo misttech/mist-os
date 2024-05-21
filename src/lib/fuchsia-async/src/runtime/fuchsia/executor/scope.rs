@@ -112,10 +112,6 @@ impl ScopeRef {
         };
         let weak = child.downgrade();
         self.inner.state.lock().children.insert(weak.clone());
-
-        // Create a Weak to be used in the destructor. Don't save it in the
-        // struct since it should just be a pointer to ourselves.
-        assert_eq!(Weak::into_raw(weak.inner), (&*child.inner as *const ScopeInner));
         Scope { inner: child }
     }
 
