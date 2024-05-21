@@ -6,7 +6,6 @@ use crate::{normalize_field_key, SourceGenError};
 use cm_rust::{ConfigChecksum, ConfigDecl, ConfigField, ConfigNestedValueType, ConfigValueType};
 use handlebars::{handlebars_helper, Handlebars};
 use serde::Serialize;
-use std::str::FromStr;
 
 static CC_ELF_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf.cc.hbs");
 static H_ELF_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf.h.hbs");
@@ -23,41 +22,12 @@ pub struct CppSource {
     pub h_source: String,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum Flavor {
-    ElfProcess,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FlavorParseError {
-    #[error("Unknown flavor '{_0}', expected 'elf'")]
-    UnknownFlavor(String),
-}
-
-impl FromStr for Flavor {
-    type Err = FlavorParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let string = s.to_ascii_lowercase();
-
-        match string.as_str() {
-            "elf" => Ok(Flavor::ElfProcess),
-            _ => Err(FlavorParseError::UnknownFlavor(string)),
-        }
-    }
-}
-
 pub fn create_cpp_wrapper(
     config_decl: &ConfigDecl,
     cpp_namespace: String,
     fidl_library_name: String,
-    flavor: Flavor,
 ) -> Result<CppSource, SourceGenError> {
-    let (cc_source_template, h_source_template) = match flavor {
-        Flavor::ElfProcess => (CC_ELF_SOURCE_TEMPLATE, H_ELF_SOURCE_TEMPLATE),
-    };
-
-    let vars = TemplateVars::from_decl(config_decl, cpp_namespace, fidl_library_name, flavor);
+    let vars = TemplateVars::from_decl(config_decl, cpp_namespace, fidl_library_name);
 
     let mut hbars = Handlebars::new();
     hbars.set_strict_mode(true);
@@ -69,8 +39,8 @@ pub fn create_cpp_wrapper(
     hbars.register_helper("is_string", Box::new(is_string));
     hbars.register_helper("cpp_type", Box::new(cpp_type));
     hbars.register_helper("inspect_type", Box::new(inspect_type));
-    hbars.register_template_string("cc_source", cc_source_template).pretty_unwrap();
-    hbars.register_template_string("h_source", h_source_template).pretty_unwrap();
+    hbars.register_template_string("cc_source", CC_ELF_SOURCE_TEMPLATE).pretty_unwrap();
+    hbars.register_template_string("h_source", H_ELF_SOURCE_TEMPLATE).pretty_unwrap();
     hbars.register_template_string("helpers", HELPERS_SOURCE_TEMPLATE).pretty_unwrap();
     hbars.register_template_string("typedef", TYPEDEF_SOURCE_TEMPLATE).pretty_unwrap();
     hbars.register_template_string("vmo_parse", VMO_PARSE_SOURCE_TEMPLATE).pretty_unwrap();
@@ -101,15 +71,12 @@ impl TemplateVars {
         config_decl: &ConfigDecl,
         cpp_namespace: String,
         fidl_library_name: String,
-        flavor: Flavor,
     ) -> Self {
         let cpp_namespace = cpp_namespace.replace('.', "_").replace('-', "_").to_ascii_lowercase();
         let header_guard = fidl_library_name.replace('.', "_").to_ascii_uppercase();
-        let (fidl_cpp_namespace, fidl_cpp_header_prefix) = match flavor {
-            Flavor::ElfProcess => {
-                let ns = fidl_library_name.replace('.', "_").to_ascii_lowercase();
-                (ns.clone(), ns)
-            }
+        let (fidl_cpp_namespace, fidl_cpp_header_prefix) = {
+            let ns = fidl_library_name.replace('.', "_").to_ascii_lowercase();
+            (ns.clone(), ns)
         };
         let ConfigChecksum::Sha256(expected_checksum) = &config_decl.checksum;
         let expected_checksum = expected_checksum.to_vec();

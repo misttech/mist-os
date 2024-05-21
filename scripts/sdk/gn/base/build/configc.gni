@@ -160,10 +160,6 @@ template("fidl_config_client_lib_source") {
 #     Name for the internal FIDL library.
 #     Type: string
 #
-#   flavor (required)
-#     Runner flavor for client library
-#     Type: string
-#
 #   namespace (optional)
 #     Namespace used by the C++ library.
 #     Type: string
@@ -179,13 +175,17 @@ template("cpp_config_client_lib_source") {
          "the path to a compiled component manifest must be specified")
   assert(defined(invoker.fidl_library_name),
          "the name of the internal FIDL library must be specified")
-  assert(defined(invoker.flavor),
-         "the flavor of the FIDL library must be specified ('elf' or 'driver')")
   if (defined(invoker.namespace)) {
     namespace = invoker.namespace
   } else {
     namespace = target_name
   }
+
+  # TODO(b/341741538): Finish removal of flavor.
+  if (defined(invoker.flavor)) {
+    not_needed([ invoker.flavor ])
+  }
+
   compiled_manifest = invoker.compiled_manifest
 
   clang_format_path = "//third_party/depot_tools/clang-format"
@@ -221,8 +221,6 @@ template("cpp_config_client_lib_source") {
       invoker.fidl_library_name,
       "--clang-format",
       rebase_path(clang_format_path, root_build_dir),
-      "--flavor",
-      invoker.flavor,
     ]
 
     outputs = [

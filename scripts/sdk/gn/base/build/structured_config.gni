@@ -247,7 +247,6 @@ template("fuchsia_structured_config_cpp_elf_lib") {
     namespace = cpp_namespace
     fidl_library_name = fidl_library_name
     compiled_manifest = compiled_manifest
-    flavor = "elf"
     deps = [ invoker.cm_label ]
   }
 

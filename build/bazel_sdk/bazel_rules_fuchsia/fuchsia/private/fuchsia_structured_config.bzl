@@ -135,8 +135,6 @@ def _cpp_config_client_lib_source_impl(ctx):
             ctx.attr.fidl_library_name,
             "--clang-format",
             ctx.executable._clang_format.path,
-            "--flavor",
-            ctx.attr._flavor,
         ],
         inputs = [ctx.file.cm_label, ctx.executable._clang_format],
         outputs = [h_source_file, cc_source_file],
