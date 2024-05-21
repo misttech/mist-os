@@ -91,6 +91,9 @@ pub struct GetCommand {
     )]
     /// how to process results. Possible values are "r/raw", "s/sub/substitute", or "f/file".
     /// Defaults to "substitute". Currently only supported if a name is given.
+    /// The process type "file" returns a scalar value. In the case of the configuration being
+    /// a list, it is treated as an ordered list of alternatives and takes the first value
+    /// that exists.
     pub process: MappingMode,
 
     #[argh(option, from_str_fn(parse_mode), default = "SelectMode::First", short = 's')]

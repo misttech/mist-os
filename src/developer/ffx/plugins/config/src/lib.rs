@@ -80,6 +80,24 @@ fn output_array<W: Write>(
     }
 }
 
+fn output_first_element<W: Write>(mut writer: W, value: Option<Value>) -> Result<()> {
+    match value {
+        Some(Value::Array(vals)) => {
+            if !vals.is_empty() {
+                writeln!(writer, "{}", serde_json::to_string_pretty(&vals[0]).unwrap())
+                    .map_err(|e| anyhow!("{}", e))
+            } else {
+                ffx_bail_with_code!(2, "Value not found")
+            }
+        }
+        Some(v) => writeln!(writer, "{}", serde_json::to_string_pretty(&v).unwrap())
+            .map_err(|e| anyhow!("{}", e)),
+        // Use 2 error code so wrapper scripts don't need check for the string to differentiate
+        // errors.
+        None => ffx_bail_with_code!(2, "Value not found"),
+    }
+}
+
 async fn exec_get<W: Write>(
     ctx: &EnvironmentContext,
     get_cmd: &GetCommand,
@@ -97,7 +115,7 @@ async fn exec_get<W: Write>(
             }
             MappingMode::File => {
                 let value = get_cmd.query(ctx).get_file().await?;
-                output(writer, value)
+                output_first_element(writer, value)
             }
         },
         None => {
@@ -235,9 +253,11 @@ async fn exec_check_ssh_keys<W: Write>(
 
 #[cfg(test)]
 mod test {
+    use std::{env, fs};
+
     use super::*;
     use errors::{FfxError, IntoExitCode};
-    use ffx_config::test_init;
+    use ffx_config::{test_init, SelectMode};
     use serde_json::json;
 
     #[fuchsia::test]
@@ -321,6 +341,241 @@ mod test {
                 }
             }
         };
+    }
+
+    #[fuchsia::test]
+    async fn test_list_processed_by_raw() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let private_path1 = test_env.isolate_root.path().join("privatekey1");
+        let private_path2 = test_env.isolate_root.path().join("privatekey2");
+        fs::write(&private_path1, "path1").expect("key 1 written");
+        fs::write(&private_path2, "path2").expect("key 2 written");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET_2",
+                private_path1.to_string_lossy(),
+                private_path2.to_string_lossy(),
+            ]))
+            .await
+            .expect("set ssh.priv");
+
+        exec_get(
+            &test_env.context,
+            &GetCommand {
+                name: Some("ssh.priv".into()),
+                process: MappingMode::Raw,
+                select: SelectMode::First,
+                build_dir: None,
+            },
+            &mut writer,
+        )
+        .await
+        .expect("exec_get");
+        let got = String::from_utf8_lossy(&writer);
+        let want = serde_json::to_string_pretty(&json!([
+            "$ENV_PATH_THAT_IS_NOT_SET_2",
+            private_path1,
+            private_path2
+        ]))
+        .expect("json output");
+        assert_eq!(got, format!("{}\n", want));
+    }
+
+    #[fuchsia::test]
+    async fn test_list_processed_by_substitute() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let private_path1 = test_env.isolate_root.path().join("privatekey1");
+        let private_path2 = test_env.isolate_root.path().join("privatekey2");
+        fs::write(&private_path1, "path1").expect("key 1 written");
+        fs::write(&private_path2, "path2").expect("key 2 written");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET_2",
+                private_path1.to_string_lossy(),
+                private_path2.to_string_lossy(),
+            ]))
+            .await
+            .expect("set ssh.priv");
+
+        exec_get(
+            &test_env.context,
+            &GetCommand {
+                name: Some("ssh.priv".into()),
+                process: MappingMode::Substitute,
+                select: SelectMode::First,
+                build_dir: None,
+            },
+            &mut writer,
+        )
+        .await
+        .expect("exec_get");
+        let got = String::from_utf8_lossy(&writer);
+        let want = serde_json::to_string_pretty(&json!([private_path1, private_path2]))
+            .expect("json output");
+        assert_eq!(got, format!("{}\n", want));
+    }
+
+    #[fuchsia::test]
+    async fn test_list_processed_by_substitute_with_env() {
+        // Set the env before the test env
+        // assert the key is not already in the environment
+        assert!(
+            env::var("ENV_SSH_PATH_FOR_TESTING_").is_err(),
+            "Expected weird testing env variable to be unset"
+        );
+        env::set_var("ENV_SSH_PATH_FOR_TESTING_", "private_path1");
+
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let private_path1 = test_env.isolate_root.path().join("privatekey1");
+        let private_path2 = test_env.isolate_root.path().join("privatekey2");
+        fs::write(&private_path1, "path1").expect("key 1 written");
+        fs::write(&private_path2, "path2").expect("key 2 written");
+
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!(["$ENV_SSH_PATH_FOR_TESTING_", private_path2.to_string_lossy(),]))
+            .await
+            .expect("set ssh.priv");
+
+        exec_get(
+            &test_env.context,
+            &GetCommand {
+                name: Some("ssh.priv".into()),
+                process: MappingMode::Substitute,
+                select: SelectMode::First,
+                build_dir: None,
+            },
+            &mut writer,
+        )
+        .await
+        .expect("exec_get");
+        let got = String::from_utf8_lossy(&writer);
+        let want = serde_json::to_string_pretty(&json!(["private_path1", private_path2]))
+            .expect("json output");
+        assert_eq!(got, format!("{}\n", want));
+    }
+
+    #[fuchsia::test]
+    async fn test_list_single_by_file() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let private_path1 = test_env.isolate_root.path().join("privatekey1");
+        fs::write(&private_path1, "path1").expect("key 1 written");
+
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([private_path1.to_string_lossy(),]))
+            .await
+            .expect("set ssh.priv");
+
+        exec_get(
+            &test_env.context,
+            &GetCommand {
+                name: Some("ssh.priv".into()),
+                process: MappingMode::File,
+                select: SelectMode::First,
+                build_dir: None,
+            },
+            &mut writer,
+        )
+        .await
+        .expect("exec_get");
+        let got = String::from_utf8_lossy(&writer);
+        assert_eq!(got, format!("{}\n", json!(private_path1)));
+    }
+
+    #[fuchsia::test]
+    async fn test_list_processed_by_file() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let private_path1 = test_env.isolate_root.path().join("privatekey1");
+        let private_path2 = test_env.isolate_root.path().join("privatekey2");
+        fs::write(&private_path1, "path1").expect("key 1 written");
+        fs::write(&private_path2, "path2").expect("key 2 written");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET_2",
+                private_path1.to_string_lossy(),
+                private_path2.to_string_lossy(),
+            ]))
+            .await
+            .expect("set ssh.priv");
+
+        exec_get(
+            &test_env.context,
+            &GetCommand {
+                name: Some("ssh.priv".into()),
+                process: MappingMode::File,
+                select: SelectMode::First,
+                build_dir: None,
+            },
+            &mut writer,
+        )
+        .await
+        .expect("exec_get");
+        let got = String::from_utf8_lossy(&writer);
+        assert_eq!(got, format!("{}\n", json!(private_path1)));
+    }
+
+    #[fuchsia::test]
+    async fn test_list_processed_by_file_with_env() {
+        let private_path1 = tempfile::NamedTempFile::new().expect("temp file 1");
+        // Set the env before the test env
+        // assert the key is not already in the environment
+        assert!(
+            env::var("ENV_SSH_PATH_FOR_TESTING_2").is_err(),
+            "Expected weird testing env variable to be unset"
+        );
+        env::set_var("ENV_SSH_PATH_FOR_TESTING_2", private_path1.path());
+
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let private_path2 = test_env.isolate_root.path().join("privatekey2");
+        fs::write(&private_path2, "path2").expect("key 2 written");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!(["$ENV_SSH_PATH_FOR_TESTING_2", private_path2.to_string_lossy(),]))
+            .await
+            .expect("set ssh.priv");
+
+        exec_get(
+            &test_env.context,
+            &GetCommand {
+                name: Some("ssh.priv".into()),
+                process: MappingMode::File,
+                select: SelectMode::First,
+                build_dir: None,
+            },
+            &mut writer,
+        )
+        .await
+        .expect("exec_get");
+        let got = String::from_utf8_lossy(&writer);
+        assert_eq!(got, format!("{}\n", json!(private_path1.path())));
     }
 
     #[fuchsia::test]
