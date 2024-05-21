@@ -13,7 +13,7 @@ In order to run starnix, we need to build `//src/starnix`.
 For faster iteration, configure your build with incremental compilation:
 
 ```sh
-fx set core.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix,//src/starnix:tests
+fx set workbench.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix:tests, //src/starnix/containers
 fx build
 ```
 
@@ -126,16 +126,24 @@ minimal binary in an empty container.
 
 ### Getting a shell
 
-Once you have a Starnix container running, you can attach a console to that
-container and run a shell. For example, if you have created a container with
-the moniker `/core/starnix_runner/playground:<container-name>`, you can use the
-following command to attach a shell:
-
-```sh
-ffx starnix console -m /core/starnix_runner/playground:<container-name> /bin/bash
+Running a shell first requires running a container that has a shell binary. In
+this example, let's use the bionic container:
+```
+ffx component run /core/starnix_runner/playground:bionic fuchsia-pkg://fuchsia.com/bionic#meta/bionic_container.cm
 ```
 
-This command assumes the container has a shell binary at `/bin/bash`. If you wish
+Note that the bionic container is not included in the build by default, so
+you'll need to add `//src/starnix/containers/bionic:bionic_package` to your
+build targets.
+
+Once you have this Starnix container running, you can attach a console to that
+container and run a shell by running:
+
+```sh
+ffx starnix console -m /core/starnix_runner/playground:bionic /bin/sh
+```
+
+This command assumes the container has a shell binary at `/bin/sh`. If you wish
 to run another binary, you have to specify the full path.
 
 If you omit the `-m` argument, `ffx starnix console` will look for a Starnix
