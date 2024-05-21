@@ -136,12 +136,40 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
   zx::event wake_handling_active_;
 };
 
+class FakeElementControl : public fidl::Server<fuchsia_power_broker::ElementControl> {
+ public:
+  void OpenStatusChannel(OpenStatusChannelRequest& req,
+                         OpenStatusChannelCompleter::Sync& completer) override {}
+
+  void AddDependency(AddDependencyRequest& req, AddDependencyCompleter::Sync& completer) override {
+    EXPECT_EQ(req.dependency_type(), fuchsia_power_broker::DependencyType::kActive);
+    EXPECT_EQ(req.dependent_level(), SdmmcBlockDevice::kPowerLevelOn);
+    EXPECT_TRUE(req.requires_token().is_valid());
+    EXPECT_EQ(req.requires_level(), SdmmcBlockDevice::kPowerLevelOn);
+    dependency_added_ = true;
+    completer.Reply(fit::success());
+  }
+
+  void RemoveDependency(RemoveDependencyRequest& req,
+                        RemoveDependencyCompleter::Sync& completer) override {}
+
+  void RegisterDependencyToken(RegisterDependencyTokenRequest& req,
+                               RegisterDependencyTokenCompleter::Sync& completer) override {}
+
+  void UnregisterDependencyToken(UnregisterDependencyTokenRequest& req,
+                                 UnregisterDependencyTokenCompleter::Sync& completer) override {}
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementControl> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  bool dependency_added_ = false;
+};
+
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
   void AddSideEffect(fit::function<void()> side_effect) { side_effect_ = std::move(side_effect); }
 
-  void Lease(fuchsia_power_broker::LessorLeaseRequest& req,
-             LeaseCompleter::Sync& completer) override {
+  void Lease(LeaseRequest& req, LeaseCompleter::Sync& completer) override {
     if (side_effect_) {
       side_effect_();
     }
@@ -160,8 +188,7 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
 
 class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
  public:
-  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& req,
-              UpdateCompleter::Sync& completer) override {
+  void Update(UpdateRequest& req, UpdateCompleter::Sync& completer) override {
     completer.Reply(fit::success());
   }
 
@@ -183,16 +210,17 @@ class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLeve
 
 class PowerElement {
  public:
-  explicit PowerElement(fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control,
-                        fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
-                        fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
-                        fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
+  explicit PowerElement(
+      fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control,
+      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
+      fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
+      fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
       : element_control_(std::move(element_control)),
         lessor_(std::move(lessor)),
         current_level_(std::move(current_level)),
         required_level_(std::move(required_level)) {}
 
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
+  fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_;
   fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
   fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
   fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
@@ -218,6 +246,22 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     // Make channels to return to client
     auto [element_control_client_end, element_control_server_end] =
         fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+
+    // Instantiate (fake) element control implementation.
+    auto element_control_impl = std::make_unique<FakeElementControl>();
+    if (req.element_name() == SdmmcBlockDevice::kHardwarePowerElementName) {
+      hardware_power_element_control_ = element_control_impl.get();
+    } else if (req.element_name() == SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName) {
+      wake_on_request_element_control_ = element_control_impl.get();
+    } else {
+      ZX_ASSERT_MSG(0, "Unexpected power element.");
+    }
+    fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_binding =
+        fidl::BindServer<fuchsia_power_broker::ElementControl>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+            std::move(element_control_server_end), std::move(element_control_impl),
+            [](FakeElementControl* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::ElementControl> server_end) mutable {});
 
     // Instantiate (fake) lessor implementation.
     auto lessor_impl = std::make_unique<FakeLessor>();
@@ -266,7 +310,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
       });
     }
 
-    servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
+    servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
     fuchsia_power_broker::TopologyAddElementResponse result{
@@ -279,9 +323,11 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
+  FakeElementControl* hardware_power_element_control_ = nullptr;
   FakeLessor* hardware_power_lessor_ = nullptr;
   FakeCurrentLevel* hardware_power_current_level_ = nullptr;
   FakeRequiredLevel* hardware_power_required_level_ = nullptr;
+  FakeElementControl* wake_on_request_element_control_ = nullptr;
   FakeLessor* wake_on_request_lessor_ = nullptr;
   FakeCurrentLevel* wake_on_request_current_level_ = nullptr;
   FakeRequiredLevel* wake_on_request_required_level_ = nullptr;
@@ -290,6 +336,30 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
 
   std::vector<PowerElement> servers_;
+};
+
+class FakePowerTokenProvider : public fidl::Server<fuchsia_hardware_power::PowerTokenProvider> {
+ public:
+  fuchsia_hardware_power::PowerTokenService::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_power::PowerTokenService::InstanceHandler({
+        .token_provider = bindings_.CreateHandler(
+            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  void GetToken(GetTokenCompleter::Sync& completer) override {
+    zx::event token;
+    ASSERT_OK(zx::event::create(0, &token));
+    completer.Reply(fit::success(fuchsia_hardware_power::PowerTokenProviderGetTokenResponse{
+        std::move(token), SdmmcBlockDevice::kHardwarePowerElementName}));
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_power::PowerTokenProvider> md,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings_;
 };
 
 struct IncomingNamespace {
@@ -308,6 +378,7 @@ struct IncomingNamespace {
   zx::event exec_passive, wake_active;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
   FakePowerBroker power_broker;
+  FakePowerTokenProvider power_token_provider;
 };
 
 class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
@@ -423,6 +494,15 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
                             .component()
                             .AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
                                 incoming->power_broker.CreateHandler());
+          ASSERT_TRUE(result.is_ok());
+        }
+
+        // Serve (fake) power_token_provider.
+        {
+          auto result =
+              incoming->env.incoming_directory()
+                  .AddService<fuchsia_hardware_power::PowerTokenService>(
+                      std::move(incoming->power_token_provider.GetInstanceHandler()), "default");
           ASSERT_TRUE(result.is_ok());
         }
       }
@@ -2170,6 +2250,9 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
                               });
 
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/true));
+  EXPECT_TRUE(incoming_.SyncCall([](IncomingNamespace* incoming) {
+    return incoming->power_broker.hardware_power_element_control_->dependency_added_;
+  }));
 
   // Initial power level is kPowerLevelOff.
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });

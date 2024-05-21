@@ -142,7 +142,19 @@ zx::result<> AmlSdmmc::Start() {
     });
     auto result = outgoing()->AddService<fuchsia_hardware_sdmmc::SdmmcService>(std::move(handler));
     if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to add service: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Failed to add sdmmc service: %s", result.status_string());
+      return result.take_error();
+    }
+  }
+
+  {
+    fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
+        .token_provider = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+    });
+    auto result =
+        outgoing()->AddService<fuchsia_hardware_power::PowerTokenService>(std::move(handler));
+    if (result.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to add power token service: %s", result.status_string());
       return result.take_error();
     }
   }
@@ -155,6 +167,7 @@ zx::result<> AmlSdmmc::Start() {
   fidl::Arena arena;
   std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdmmc::SdmmcService>(arena));
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
@@ -344,12 +357,10 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    active_power_dep_tokens_.push_back(std::move(description.active_token_));
-    passive_power_dep_tokens_.push_back(std::move(description.passive_token_));
-
     if (config.element().name().get() == kHardwarePowerElementName) {
-      hardware_power_element_control_client_end_ =
-          std::move(result.value().element_control_channel());
+      hardware_power_element_control_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
+              std::move(result.value().element_control_channel()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =
@@ -358,8 +369,9 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client_.value()), dispatcher());
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_element_control_client_end_ =
-          std::move(result.value().element_control_channel());
+      wake_on_request_element_control_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
+              std::move(result.value().element_control_channel()));
       wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       wake_on_request_current_level_client_ =
@@ -375,8 +387,8 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
     }
   }
 
-  // The lease request on the hardware power element remains persistent throughout the lifetime
-  // of this driver.
+  // Maintain a lease on the hardware power element until a child driver obtains a power dependency
+  // token to it via the GetToken() call.
   zx_status_t status =
       AcquireLease(hardware_power_lessor_client_, hardware_power_lease_control_client_end_);
   if (status != ZX_OK) {
@@ -390,6 +402,55 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
   WatchWakeOnRequestRequiredLevel();
 
   return zx::success();
+}
+
+void AmlSdmmc::GetToken(GetTokenCompleter::Sync& completer) {
+  zx::event token;
+  zx_status_t status = zx::event::create(0, &token);
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to create token.");
+    completer.Reply(fit::error(status));
+    return;
+  }
+
+  zx::event dupe;
+  status = token.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to duplicate token.");
+    completer.Reply(fit::error(status));
+    return;
+  }
+
+  const fidl::WireResult result = hardware_power_element_control_client_->RegisterDependencyToken(
+      std::move(token), fuchsia_power_broker::DependencyType::kActive);
+  if (!result.ok()) {
+    FDF_LOGL(ERROR, logger(), "Call to RegisterDependencyToken failed: %s", result.status_string());
+    completer.Reply(fit::error(result.status()));
+    return;
+  }
+  if (result->is_error()) {
+    switch (result->error_value()) {
+      case fuchsia_power_broker::RegisterDependencyTokenError::kAlreadyInUse:
+        FDF_LOGL(ERROR, logger(), "RegisterDependencyToken returned already in use error.");
+        break;
+      case fuchsia_power_broker::RegisterDependencyTokenError::kInternal:
+        FDF_LOGL(ERROR, logger(), "RegisterDependencyToken returned internal error.");
+        break;
+      default:
+        FDF_LOGL(ERROR, logger(), "RegisterDependencyToken returned unknown error.");
+        break;
+    }
+    completer.Reply(fit::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  // Drop the lease on the hardware power element, and allow the caller to declare a dependency on
+  // it using the power dependency token returned in this call.
+  if (hardware_power_lease_control_client_end_.is_valid()) {
+    hardware_power_lease_control_client_end_.channel().reset();
+  }
+  completer.Reply(fit::success(fuchsia_hardware_power::PowerTokenProviderGetTokenResponse{
+      std::move(dupe), kHardwarePowerElementName}));
 }
 
 void AmlSdmmc::WatchHardwareRequiredLevel() {
