@@ -60,6 +60,8 @@ def weighted_average(arr: Iterable[float], weights: Iterable[int]) -> float:
 #
 # Normally, we'd compute the cross correlation and then take the argmax to line up the signals the
 # closest. Instead we'll do the argmax and the correlation at the same time to save on allocations.
+#
+# Precondition: len(signal) must be >= len(feature) for accurate results
 def cross_correlate_arg_max(
     signal: Sequence[float], feature: Sequence[float]
 ) -> tuple[float, int]:
@@ -71,6 +73,9 @@ def cross_correlate_arg_max(
         Where correlation is the maximum correlation between the signals and idx is the argmax that
         it occurred at.
     """
+
+    assert len(signal) >= len(feature)
+
     # Slide our feature across the signal and compute the dot product at each point
     return max(
         # Produce items of the form [(correlation1, idx1), (correlation2, idx2), ...] of which we
@@ -97,7 +102,7 @@ def cross_correlate_arg_max(
             # [
             #     [1,2] o [1,2],
             #     [2,3] o [1,2],
-            #     [3,5] o [1,2],
+            #     [3,4] o [1,2],
             # ]
             range(len(signal) - len(feature) + 1),
         )
@@ -937,20 +942,36 @@ def merge_power_data(
     # Finally, we can get the cross correlation between power and cpu usage. We run a known cpu
     # heavy workload in the first 5ish seconds of the test so we limit our signal correlation to
     # that portion. Power and CPU readings can be offset in either direction, but shouldn't be
-    # separated by more than a second. Thus, we take the first 4 seconds of the power readings,
-    # attempt to match them up with the first 5 seconds of CPU readings, and then vice-versa.
-    # Afterwards, we choose an alignment by picking the higher of the two correlation scores.
+    # separated by more than a second.
+
+    # Due to limits on the maximum size of our traces, there is potential for particularly busy
+    # traces to not contain the entire first 5 seconds of the test. In order to ensure the
+    # correlation logic operates correctly, we need to compare consistent counts of samples for
+    # power and CPU readings. Thus, we take the a subset of the two datasets limited to a maximum
+    # of ~5 seconds worth of samples. (5khz * 5 seconds = 25000 samples) and compare it to the
+    # first ~4 seconds (80% of ~5 seconds) of the opposite dataset to attempt to match them up.
+    # This amounts to nominally comparing the first 4 seconds of power samples to the first 5
+    # seconds of CPU readings, and then vice-versa.
+    max_sequence_samples = 25000
+    signal_samples = min(
+        max_sequence_samples, len(avg_cpu_combined), len(power_samples)
+    )
+
+    # Ensures feature list is always shorter than the number of signal samples
+    feature_samples = int(0.8 * signal_samples)
     (
         power_after_cpu_correlation,
         power_after_cpu_correlation_idx,
     ) = cross_correlate_arg_max(
-        avg_cpu_combined[0:25000], [s.current for s in power_samples[0:20000]]
+        avg_cpu_combined[0:signal_samples],
+        [s.current for s in power_samples[0:feature_samples]],
     )
     (
         cpu_after_power_correlation,
         cpu_after_power_correlation_idx,
     ) = cross_correlate_arg_max(
-        [s.current for s in power_samples[0:25000]], avg_cpu_combined[0:20000]
+        [s.current for s in power_samples[0:signal_samples]],
+        avg_cpu_combined[0:feature_samples],
     )
     starting_ticks = 0
     if power_after_cpu_correlation >= cpu_after_power_correlation:
