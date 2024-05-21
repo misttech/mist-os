@@ -800,7 +800,7 @@ impl<A: IpAddress, O: InnerPacketBuilder> PacketBuilder for TcpSegmentBuilderWit
 // always has a valid checksum.
 
 /// A builder for TCP segments.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct TcpSegmentBuilder<A: IpAddress> {
     src_ip: A,
     dst_ip: A,
@@ -858,6 +858,26 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
     /// Sets the FIN flag.
     pub fn fin(&mut self, fin: bool) {
         self.data_offset_reserved_flags.set_fin(fin);
+    }
+
+    /// Returns the source port for the builder.
+    pub fn src_port(&self) -> Option<NonZeroU16> {
+        self.src_port
+    }
+
+    /// Returns the destination port for the builder.
+    pub fn dst_port(&self) -> Option<NonZeroU16> {
+        self.dst_port
+    }
+
+    /// Sets the source IP address for the builder.
+    pub fn set_src_ip(&mut self, addr: A) {
+        self.src_ip = addr;
+    }
+
+    /// Sets the destination IP address for the builder.
+    pub fn set_dst_ip(&mut self, addr: A) {
+        self.dst_ip = addr;
     }
 }
 

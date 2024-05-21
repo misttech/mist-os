@@ -780,6 +780,16 @@ impl<B: ByteSlice> Ipv6Packet<B> {
 }
 
 impl<B: ByteSliceMut> Ipv6Packet<B> {
+    /// Set the source IP address.
+    pub fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    pub fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.dst_ip = addr;
+    }
+
     /// Set the hop limit.
     pub fn set_hop_limit(&mut self, hlim: u8) {
         self.fixed_hdr.hop_limit = hlim;
@@ -969,6 +979,18 @@ impl<B: ByteSlice> Ipv6PacketRaw<B> {
     }
 }
 
+impl<B: ByteSliceMut> Ipv6PacketRaw<B> {
+    /// Set the source IP address.
+    pub fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    pub fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.fixed_hdr.dst_ip = addr;
+    }
+}
+
 /// A builder for IPv6 packets.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ipv6PacketBuilder {
@@ -1135,8 +1157,16 @@ impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
         self.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.src_ip = addr;
+    }
+
     fn dst_ip(&self) -> Ipv6Addr {
         self.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.dst_ip = addr;
     }
 
     fn proto(&self) -> Ipv6Proto {
@@ -1197,8 +1227,16 @@ where
         self.prefix_builder.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv6Addr) {
+        self.prefix_builder.src_ip = addr;
+    }
+
     fn dst_ip(&self) -> Ipv6Addr {
         self.prefix_builder.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv6Addr) {
+        self.prefix_builder.dst_ip = addr;
     }
 
     fn proto(&self) -> Ipv6Proto {

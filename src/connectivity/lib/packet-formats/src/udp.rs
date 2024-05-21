@@ -412,7 +412,7 @@ impl<B: ByteSlice> UdpPacketRaw<B> {
 // has a valid checksum.
 
 /// A builder for UDP packets.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct UdpPacketBuilder<A: IpAddress> {
     src_ip: A,
     dst_ip: A,

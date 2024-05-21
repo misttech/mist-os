@@ -4,7 +4,7 @@
 
 use core::{convert::Infallible as Never, num::NonZeroU16};
 
-use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{
     Buf, BufferMut, BufferViewMut, EitherSerializer, EmptyBuf, InnerSerializer, Nested,
     ParsablePacket, ParseBuffer, ParseMetadata, Serializer, SliceBufViewMut,
@@ -24,9 +24,11 @@ use packet_formats::{
     },
     igmp::{self, IgmpPacketBuilder},
     ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-    tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions, TcpSegmentRaw},
+    ipv4::{Ipv4Packet, Ipv4PacketRaw},
+    ipv6::{Ipv6Packet, Ipv6PacketRaw},
+    tcp::{
+        TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions, TcpSegmentRaw,
+    },
     udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
 };
 use zerocopy::ByteSliceMut;
@@ -48,8 +50,14 @@ pub trait IpPacket<I: IpExt> {
     /// The source IP address of the packet.
     fn src_addr(&self) -> I::Addr;
 
+    /// Sets the source IP address of the packet.
+    fn set_src_addr(&mut self, addr: I::Addr);
+
     /// The destination IP address of the packet.
     fn dst_addr(&self) -> I::Addr;
+
+    /// Sets the destination IP address of the packet.
+    fn set_dst_addr(&mut self, addr: I::Addr);
 
     /// The IP protocol of the packet.
     fn protocol(&self) -> I::Proto;
@@ -205,8 +213,41 @@ impl<B: ByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
         self.src_ip()
     }
 
+    fn set_src_addr(&mut self, addr: Ipv4Addr) {
+        let old = self.src_addr();
+        if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_src_addr(old, addr);
+        }
+        // NB: it is important that we do not update the IP layer header until
+        // after parsing the transport header, because if we change the source
+        // address in the IP header and then attempt to parse the transport
+        // header using that address for checksum validation, parsing will fail.
+        //
+        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
+        // transport header updates, which is less expensive and would allow
+        // updating the IP and transport headers to be order-independent.
+        self.set_src_ip_and_update_checksum(addr);
+    }
+
     fn dst_addr(&self) -> Ipv4Addr {
         self.dst_ip()
+    }
+
+    fn set_dst_addr(&mut self, addr: Ipv4Addr) {
+        let old = self.dst_addr();
+        if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_dst_addr(old, addr);
+        }
+        // NB: it is important that we do not update the IP layer header until
+        // after parsing the transport header, because if we change the
+        // destination address in the IP header and then attempt to parse the
+        // transport header using that address for checksum validation, parsing
+        // will fail.
+        //
+        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
+        // transport header updates, which is less expensive and would allow
+        // updating the IP and transport headers to be order-independent.
+        self.set_dst_ip_and_update_checksum(addr);
     }
 
     fn protocol(&self) -> Ipv4Proto {
@@ -235,8 +276,41 @@ impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
         self.src_ip()
     }
 
+    fn set_src_addr(&mut self, addr: Ipv6Addr) {
+        let old = self.src_addr();
+        if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_src_addr(old, addr);
+        }
+        // NB: it is important that we do not update the IP layer header until
+        // after parsing the transport header, because if we change the source
+        // address in the IP header and then attempt to parse the transport
+        // header using that address for checksum validation, parsing will fail.
+        //
+        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
+        // transport header updates, which is less expensive and would allow
+        // updating the IP and transport headers to be order-independent.
+        self.set_src_ip(addr);
+    }
+
     fn dst_addr(&self) -> Ipv6Addr {
         self.dst_ip()
+    }
+
+    fn set_dst_addr(&mut self, addr: Ipv6Addr) {
+        let old = self.dst_addr();
+        if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_dst_addr(old, addr);
+        }
+        // NB: it is important that we do not update the IP layer header until
+        // after parsing the transport header, because if we change the
+        // destination address in the IP header and then attempt to parse the
+        // transport header using that address for checksum validation, parsing
+        // will fail.
+        //
+        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
+        // transport header updates, which is less expensive and would allow
+        // updating the IP and transport headers to be order-independent.
+        self.set_dst_ip(addr);
     }
 
     fn protocol(&self) -> Ipv6Proto {
@@ -259,7 +333,7 @@ impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
 
 /// An outgoing IP packet that has not yet been wrapped into an outer serializer
 /// type.
-#[derive(GenericOverIp)]
+#[derive(Debug, PartialEq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct TxPacket<'a, I: IpExt, S> {
     src_addr: I::Addr,
@@ -278,6 +352,16 @@ impl<'a, I: IpExt, S> TxPacket<'a, I, S> {
     ) -> Self {
         Self { src_addr, dst_addr, protocol, serializer }
     }
+
+    /// The source IP address of the packet.
+    pub fn src_addr(&self) -> I::Addr {
+        self.src_addr
+    }
+
+    /// The destination IP address of the packet.
+    pub fn dst_addr(&self) -> I::Addr {
+        self.dst_addr
+    }
 }
 
 impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, S> {
@@ -288,8 +372,22 @@ impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, 
         self.src_addr
     }
 
+    fn set_src_addr(&mut self, addr: I::Addr) {
+        let old = core::mem::replace(&mut self.src_addr, addr);
+        if let Some(mut packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_src_addr(old, addr);
+        }
+    }
+
     fn dst_addr(&self) -> I::Addr {
         self.dst_addr
+    }
+
+    fn set_dst_addr(&mut self, addr: I::Addr) {
+        let old = core::mem::replace(&mut self.dst_addr, addr);
+        if let Some(mut packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_dst_addr(old, addr);
+        }
     }
 
     fn protocol(&self) -> I::Proto {
@@ -310,7 +408,7 @@ impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, 
 /// NB: this type implements `Serializer` by holding the parse metadata from
 /// parsing the IP header and undoing that parsing when it is serialized. This
 /// allows the buffer to be reused on the egress path in its entirety.
-#[derive(GenericOverIp)]
+#[derive(Debug, PartialEq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct ForwardedPacket<I: IpExt, B> {
     src_addr: I::Addr,
@@ -355,15 +453,85 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
 }
 
 impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
-    type TransportPacket<'a> = Option<ParsedTransportHeader>  where Self: 'a;
+    type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
     type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, I>> where Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
         self.src_addr
     }
 
+    fn set_src_addr(&mut self, addr: I::Addr) {
+        // Re-parse the IP header so we can modify it in place.
+        I::map_ip::<_, ()>(
+            (IpInvariant(&mut self.body), addr),
+            |(IpInvariant(body), addr)| {
+                body.with_header_mut_with_meta(self.meta, |header| {
+                    let mut packet = Ipv4PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
+                        .expect("ForwardedPacket must have been created from a valid IP packet");
+                    packet.set_src_ip_and_update_checksum(addr);
+                });
+            },
+            |(IpInvariant(body), addr)| {
+                body.with_header_mut_with_meta(self.meta, |header| {
+                    let mut packet = Ipv6PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
+                        .expect("ForwardedPacket must have been created from a valid IP packet");
+                    packet.set_src_ip(addr);
+                });
+            },
+        );
+
+        let old = self.src_addr;
+        if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_src_addr(old, addr);
+        }
+        // NB: it is important that we do not update this until after parsing
+        // the transport header, because if we change the source address and
+        // then attempt to parse the transport header using that address for
+        // checksum validation, parsing will fail.
+        //
+        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
+        // transport header updates, which is less expensive and would allow
+        // updating the IP and transport headers to be order-independent.
+        self.src_addr = addr;
+    }
+
     fn dst_addr(&self) -> I::Addr {
         self.dst_addr
+    }
+
+    fn set_dst_addr(&mut self, addr: I::Addr) {
+        // Re-parse the IP header so we can modify it in place.
+        I::map_ip::<_, ()>(
+            (IpInvariant(&mut self.body), addr),
+            |(IpInvariant(body), addr)| {
+                body.with_header_mut_with_meta(self.meta, |header| {
+                    let mut packet = Ipv4PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
+                        .expect("ForwardedPacket must have been created from a valid IP packet");
+                    packet.set_dst_ip_and_update_checksum(addr);
+                });
+            },
+            |(IpInvariant(body), addr)| {
+                body.with_header_mut_with_meta(self.meta, |header| {
+                    let mut packet = Ipv6PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
+                        .expect("ForwardedPacket must have been created from a valid IP packet");
+                    packet.set_dst_ip(addr);
+                });
+            },
+        );
+
+        let old = self.dst_addr;
+        if let Some(packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_dst_addr(old, addr);
+        }
+        // NB: it is important that we do not update this until after parsing
+        // the transport header, because if we change the destination address
+        // and then attempt to parse the transport header using that address for
+        // checksum validation, parsing will fail.
+        //
+        // TODO(https://fxbug.dev/341340810): use raw packet parsing for all
+        // transport header updates, which is less expensive and would allow
+        // updating the IP and transport headers to be order-independent.
+        self.dst_addr = addr;
     }
 
     fn protocol(&self) -> I::Proto {
@@ -415,8 +583,24 @@ impl<I: IpExt, S: TransportPacketSerializer<I>, B: IpPacketBuilder<I>> IpPacket<
         self.outer().src_ip()
     }
 
+    fn set_src_addr(&mut self, addr: I::Addr) {
+        let old = self.outer().src_ip();
+        self.outer_mut().set_src_ip(addr);
+        if let Some(mut packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_src_addr(old, addr);
+        }
+    }
+
     fn dst_addr(&self) -> I::Addr {
         self.outer().dst_ip()
+    }
+
+    fn set_dst_addr(&mut self, addr: I::Addr) {
+        let old = self.outer().dst_ip();
+        self.outer_mut().set_dst_ip(addr);
+        if let Some(mut packet) = self.transport_packet_mut().transport_packet_mut() {
+            packet.update_pseudo_header_dst_addr(old, addr);
+        }
     }
 
     fn protocol(&self) -> I::Proto {
@@ -491,8 +675,16 @@ impl<I: IpExt, Inner: IpPacket<I>, Outer> IpPacket<I> for NestedWithInnerIpPacke
         self.inner().src_addr()
     }
 
+    fn set_src_addr(&mut self, addr: I::Addr) {
+        self.inner_mut().set_src_addr(addr);
+    }
+
     fn dst_addr(&self) -> I::Addr {
         self.inner().dst_addr()
+    }
+
+    fn set_dst_addr(&mut self, addr: I::Addr) {
+        self.inner_mut().set_dst_addr(addr);
     }
 
     fn protocol(&self) -> I::Proto {
@@ -513,11 +705,24 @@ where
     T: TransportPacket,
 {
     fn src_port(&self) -> u16 {
-        (*self).src_port()
+        (**self).src_port()
     }
 
     fn dst_port(&self) -> u16 {
-        (*self).dst_port()
+        (**self).dst_port()
+    }
+}
+
+impl<T: ?Sized> TransportPacket for &mut T
+where
+    T: TransportPacket,
+{
+    fn src_port(&self) -> u16 {
+        (**self).src_port()
+    }
+
+    fn dst_port(&self) -> u16 {
+        (**self).dst_port()
     }
 }
 
@@ -526,16 +731,16 @@ where
     T: TransportPacketMut<I>,
 {
     fn update_pseudo_header_src_addr(&mut self, old: I::Addr, new: I::Addr) {
-        (*self).update_pseudo_header_src_addr(new, old);
+        (*self).update_pseudo_header_src_addr(old, new);
     }
 
     fn update_pseudo_header_dst_addr(&mut self, old: I::Addr, new: I::Addr) {
-        (*self).update_pseudo_header_dst_addr(new, old);
+        (*self).update_pseudo_header_dst_addr(old, new);
     }
 }
 
 impl MaybeTransportPacket for Never {
-    type TransportPacket = Never;
+    type TransportPacket = Self;
 
     fn transport_packet(&self) -> Option<&Self::TransportPacket> {
         match *self {}
@@ -597,6 +802,42 @@ impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, UdpPacketBuil
 }
 
 impl<I: IpExt, Inner> TransportPacketMut<I> for Nested<Inner, UdpPacketBuilder<I::Addr>> {
+    fn update_pseudo_header_src_addr(&mut self, _old: I::Addr, new: I::Addr) {
+        self.outer_mut().set_src_ip(new);
+    }
+
+    fn update_pseudo_header_dst_addr(&mut self, _old: I::Addr, new: I::Addr) {
+        self.outer_mut().set_dst_ip(new);
+    }
+}
+
+impl<A: IpAddress, Inner> MaybeTransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
+    type TransportPacket = Self;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        Some(self)
+    }
+}
+
+impl<A: IpAddress, Inner> TransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
+    fn src_port(&self) -> u16 {
+        TcpSegmentBuilder::src_port(self.outer()).map_or(0, NonZeroU16::get)
+    }
+
+    fn dst_port(&self) -> u16 {
+        TcpSegmentBuilder::dst_port(self.outer()).map_or(0, NonZeroU16::get)
+    }
+}
+
+impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
+    type TransportPacketMut<'a> = &'a mut Self where Self: 'a;
+
+    fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+        Some(self)
+    }
+}
+
+impl<I: IpExt, Inner> TransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
     fn update_pseudo_header_src_addr(&mut self, _old: I::Addr, new: I::Addr) {
         self.outer_mut().set_src_ip(new);
     }
@@ -724,16 +965,6 @@ impl TransportPacket for IcmpEchoRequest {
     }
 }
 
-// TODO(https://fxbug.dev/328057704): parse the IP packet contained in the ICMP
-// error message payload so NAT can be applied to it.
-impl MaybeTransportPacket for Icmpv4TimestampReply {
-    type TransportPacket = Never;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        None
-    }
-}
-
 // Transport layer packet inspection is not currently supported for any ICMP
 // error message types.
 //
@@ -760,6 +991,14 @@ icmp_error_message!(Icmpv4ParameterProblem);
 icmp_error_message!(Icmpv6ParameterProblem);
 
 icmp_error_message!(Icmpv6PacketTooBig);
+
+impl MaybeTransportPacket for Icmpv4TimestampReply {
+    type TransportPacket = Never;
+
+    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        None
+    }
+}
 
 impl MaybeTransportPacket for NeighborSolicitation {
     type TransportPacket = Never;
@@ -1069,7 +1308,7 @@ pub mod testutil {
     #[cfg(test)]
     pub(crate) mod internal {
         use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-        use net_types::ip::{IpInvariant, Subnet};
+        use net_types::ip::Subnet;
 
         use super::*;
 
@@ -1125,8 +1364,16 @@ pub mod testutil {
                 self.src_ip
             }
 
+            fn set_src_addr(&mut self, addr: I::Addr) {
+                self.src_ip = addr;
+            }
+
             fn dst_addr(&self) -> I::Addr {
                 self.dst_ip
+            }
+
+            fn set_dst_addr(&mut self, addr: I::Addr) {
+                self.dst_ip = addr;
             }
 
             fn protocol(&self) -> I::Proto {
@@ -1317,12 +1564,12 @@ pub mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
+    use core::fmt::Debug;
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::IpInvariant;
     use packet::InnerPacketBuilder as _;
-    use packet_formats::{icmp::IcmpUnusedCode, tcp::TcpSegmentBuilder};
+    use packet_formats::icmp::IcmpUnusedCode;
     use test_case::test_case;
 
     use super::{testutil::internal::TestIpExt, *};
@@ -1330,66 +1577,104 @@ mod tests {
     const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
     const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
 
-    enum Protocol {
-        Udp,
-        Tcp,
-        Icmp,
+    trait Protocol {
+        type Serializer<'a, I: IpExt>: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer>
+            + Debug
+            + PartialEq;
+
+        fn proto<I: IpExt>() -> I::Proto;
+
+        fn make_serializer<'a, I: IpExt>(
+            src_ip: I::Addr,
+            dst_ip: I::Addr,
+        ) -> Self::Serializer<'a, I>;
+
+        fn make_packet<I: IpExt>(src_ip: I::Addr, dst_ip: I::Addr) -> Vec<u8> {
+            Self::make_serializer::<I>(src_ip, dst_ip)
+                .serialize_vec_outer()
+                .expect("serialize packet")
+                .unwrap_b()
+                .into_inner()
+        }
     }
 
-    impl Protocol {
-        fn proto<I: IpExt>(&self) -> I::Proto {
-            match self {
-                Self::Udp => IpProto::Udp.into(),
-                Self::Tcp => IpProto::Tcp.into(),
-                Self::Icmp => I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
-            }
+    struct Udp;
+
+    impl Protocol for Udp {
+        type Serializer<'a, I: IpExt> =
+            Nested<InnerSerializer<&'a [u8], EmptyBuf>, UdpPacketBuilder<I::Addr>>;
+
+        fn proto<I: IpExt>() -> I::Proto {
+            IpProto::Udp.into()
         }
 
-        fn make_packet<I: IpExt>(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Vec<u8> {
-            match self {
-                Self::Udp => []
-                    .into_serializer()
-                    .encapsulate(UdpPacketBuilder::new(src_ip, dst_ip, Some(SRC_PORT), DST_PORT))
-                    .serialize_vec_outer()
-                    .expect("serialize UDP packet")
-                    .unwrap_b()
-                    .into_inner(),
-                Self::Tcp => []
-                    .into_serializer()
-                    .encapsulate(TcpSegmentBuilder::new(
-                        src_ip, dst_ip, SRC_PORT, DST_PORT, /* seq_num */ 0,
-                        /* ack_num */ None, /* window_size */ 0,
-                    ))
-                    .serialize_vec_outer()
-                    .expect("serialize TCP segment")
-                    .unwrap_b()
-                    .into_inner(),
-                Self::Icmp => []
-                    .into_serializer()
-                    .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                        src_ip,
-                        dst_ip,
-                        IcmpUnusedCode,
-                        IcmpEchoRequest::new(/* id */ SRC_PORT.get(), /* seq */ 0),
-                    ))
-                    .serialize_vec_outer()
-                    .expect("serialize ICMP echo request")
-                    .unwrap_b()
-                    .into_inner(),
-            }
+        fn make_serializer<'a, I: IpExt>(
+            src_ip: I::Addr,
+            dst_ip: I::Addr,
+        ) -> Self::Serializer<'a, I> {
+            [].into_serializer().encapsulate(UdpPacketBuilder::new(
+                src_ip,
+                dst_ip,
+                Some(SRC_PORT),
+                DST_PORT,
+            ))
+        }
+    }
+
+    struct Tcp;
+
+    impl Protocol for Tcp {
+        type Serializer<'a, I: IpExt> =
+            Nested<InnerSerializer<&'a [u8], EmptyBuf>, TcpSegmentBuilder<I::Addr>>;
+
+        fn proto<I: IpExt>() -> I::Proto {
+            IpProto::Tcp.into()
+        }
+
+        fn make_serializer<'a, I: IpExt>(
+            src_ip: I::Addr,
+            dst_ip: I::Addr,
+        ) -> Self::Serializer<'a, I> {
+            [].into_serializer().encapsulate(TcpSegmentBuilder::new(
+                src_ip, dst_ip, SRC_PORT, DST_PORT, /* seq_num */ 0, /* ack_num */ None,
+                /* window_size */ 0,
+            ))
+        }
+    }
+
+    struct Icmp;
+
+    impl Protocol for Icmp {
+        type Serializer<'a, I: IpExt> =
+            Nested<InnerSerializer<&'a [u8], EmptyBuf>, IcmpPacketBuilder<I, IcmpEchoRequest>>;
+
+        fn proto<I: IpExt>() -> I::Proto {
+            I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
+        }
+
+        fn make_serializer<'a, I: IpExt>(
+            src_ip: I::Addr,
+            dst_ip: I::Addr,
+        ) -> Self::Serializer<'a, I> {
+            [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+                src_ip,
+                dst_ip,
+                IcmpUnusedCode,
+                IcmpEchoRequest::new(/* id */ SRC_PORT.get(), /* seq */ 0),
+            ))
         }
     }
 
     #[ip_test]
-    #[test_case(Protocol::Udp)]
-    #[test_case(Protocol::Tcp)]
-    #[test_case(Protocol::Icmp)]
-    fn update_pseudo_header_address_updates_checksum<I: Ip + TestIpExt>(proto: Protocol) {
-        let mut buf = proto.make_packet::<I>(I::SRC_IP, I::DST_IP);
+    #[test_case(Udp)]
+    #[test_case(Tcp)]
+    #[test_case(Icmp)]
+    fn update_pseudo_header_address_updates_checksum<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+        let mut buf = P::make_packet::<I>(I::SRC_IP, I::DST_IP);
         let view = SliceBufViewMut::new(&mut buf);
 
         let mut packet = I::map_ip::<_, Option<ParsedTransportHeaderMut<'_, I>>>(
-            (I::SRC_IP, I::DST_IP, proto.proto::<I>(), IpInvariant(view)),
+            (I::SRC_IP, I::DST_IP, P::proto::<I>(), IpInvariant(view)),
             |(src, dst, proto, IpInvariant(view))| {
                 ParsedTransportHeaderMut::parse_in_ipv4_packet(src, dst, proto, view)
             },
@@ -1404,8 +1689,100 @@ mod tests {
         // we need to assert equality later.
         drop(packet);
 
-        let equivalent = proto.make_packet::<I>(I::SRC_IP_2, I::DST_IP_2);
+        let equivalent = P::make_packet::<I>(I::SRC_IP_2, I::DST_IP_2);
 
         assert_eq!(equivalent, buf);
+    }
+
+    fn ip_packet<I: IpExt, P: Protocol>(src: I::Addr, dst: I::Addr) -> Buf<Vec<u8>> {
+        Buf::new(P::make_packet::<I>(src, dst), ..)
+            .encapsulate(I::PacketBuilder::new(src, dst, /* ttl */ u8::MAX, P::proto::<I>()))
+            .serialize_vec_outer()
+            .expect("serialize IP packet")
+            .unwrap_b()
+    }
+
+    #[ip_test]
+    #[test_case(Udp)]
+    #[test_case(Tcp)]
+    #[test_case(Icmp)]
+    fn ip_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(_proto: P)
+    where
+        for<'a> I::Packet<&'a mut [u8]>: IpPacket<I>,
+    {
+        let mut buf = ip_packet::<I, P>(I::SRC_IP, I::DST_IP).into_inner();
+
+        let mut packet =
+            I::Packet::parse_mut(SliceBufViewMut::new(&mut buf), ()).expect("parse IP packet");
+        packet.set_src_addr(I::SRC_IP_2);
+        packet.set_dst_addr(I::DST_IP_2);
+        drop(packet);
+
+        let equivalent = ip_packet::<I, P>(I::SRC_IP_2, I::DST_IP_2).into_inner();
+
+        assert_eq!(equivalent, buf);
+    }
+
+    #[ip_test]
+    #[test_case(Udp)]
+    #[test_case(Tcp)]
+    #[test_case(Icmp)]
+    fn forwarded_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(
+        _proto: P,
+    ) {
+        let mut buffer = ip_packet::<I, P>(I::SRC_IP, I::DST_IP);
+        let meta = buffer.parse::<I::Packet<_>>().expect("parse IP packet").parse_metadata();
+        let mut packet =
+            ForwardedPacket::<I, _>::new(I::SRC_IP, I::DST_IP, P::proto::<I>(), meta, buffer);
+        packet.set_src_addr(I::SRC_IP_2);
+        packet.set_dst_addr(I::DST_IP_2);
+
+        let mut buffer = ip_packet::<I, P>(I::SRC_IP_2, I::DST_IP_2);
+        let meta = buffer.parse::<I::Packet<_>>().expect("parse IP packet").parse_metadata();
+        let equivalent =
+            ForwardedPacket::<I, _>::new(I::SRC_IP_2, I::DST_IP_2, P::proto::<I>(), meta, buffer);
+
+        assert_eq!(equivalent, packet);
+    }
+
+    #[ip_test]
+    #[test_case(Udp)]
+    #[test_case(Tcp)]
+    #[test_case(Icmp)]
+    fn tx_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+        let mut body = P::make_serializer::<I>(I::SRC_IP, I::DST_IP);
+        let mut packet = TxPacket::<I, _>::new(I::SRC_IP, I::DST_IP, P::proto::<I>(), &mut body);
+        packet.set_src_addr(I::SRC_IP_2);
+        packet.set_dst_addr(I::DST_IP_2);
+
+        let mut equivalent_body = P::make_serializer::<I>(I::SRC_IP_2, I::DST_IP_2);
+        let equivalent =
+            TxPacket::new(I::SRC_IP_2, I::DST_IP_2, P::proto::<I>(), &mut equivalent_body);
+
+        assert_eq!(equivalent, packet);
+    }
+
+    #[ip_test]
+    #[test_case(Udp)]
+    #[test_case(Tcp)]
+    #[test_case(Icmp)]
+    fn nested_serializer_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(
+        _proto: P,
+    ) {
+        let mut packet = P::make_serializer::<I>(I::SRC_IP, I::DST_IP).encapsulate(
+            I::PacketBuilder::new(I::SRC_IP, I::DST_IP, /* ttl */ u8::MAX, P::proto::<I>()),
+        );
+        packet.set_src_addr(I::SRC_IP_2);
+        packet.set_dst_addr(I::DST_IP_2);
+
+        let equivalent =
+            P::make_serializer::<I>(I::SRC_IP_2, I::DST_IP_2).encapsulate(I::PacketBuilder::new(
+                I::SRC_IP_2,
+                I::DST_IP_2,
+                /* ttl */ u8::MAX,
+                P::proto::<I>(),
+            ));
+
+        assert_eq!(equivalent, packet);
     }
 }

@@ -1608,8 +1608,8 @@ fn dispatch_receive_ipv6_packet<
     }
 
     // These invariants are validated by the caller of this function, but it's
-    // possible possible for the LOCAL_INGRESS hook to rewrite the packet, so we
-    // have to check them again.
+    // possible for the LOCAL_INGRESS hook to rewrite the packet, so we have to
+    // check them again.
     let Some(src_ip) = packet.src_ipv6() else {
         debug!(
             "dispatch_receive_ipv6_packet: received packet from non-unicast source {} after the \

@@ -14,7 +14,7 @@ use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
 use internet_checksum::Checksum;
-use net_types::ip::{Ipv4, Ipv4Addr, Ipv6Addr};
+use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6Addr};
 use packet::records::options::OptionSequenceBuilder;
 use packet::records::options::OptionsRaw;
 use packet::{
@@ -548,10 +548,27 @@ impl<B: ByteSlice> Ipv4Packet<B> {
     }
 }
 
-impl<B> Ipv4Packet<B>
-where
-    B: ByteSliceMut,
-{
+impl<B: ByteSliceMut> Ipv4Packet<B> {
+    /// Set the source IP address.
+    ///
+    /// Set the source IP address and update the header checksum accordingly.
+    pub fn set_src_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.src_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    ///
+    /// Set the destination IP address and update the header checksum accordingly.
+    pub fn set_dst_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.dst_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.dst_ip = addr;
+    }
+
     /// Set the Time To Live (TTL).
     ///
     /// Set the TTL and update the header checksum accordingly.
@@ -663,6 +680,28 @@ impl<B: ByteSlice> Ipv4PacketRaw<B> {
     }
 }
 
+impl<B: ByteSliceMut> Ipv4PacketRaw<B> {
+    /// Set the source IP address.
+    ///
+    /// Set the source IP address and update the header checksum accordingly.
+    pub fn set_src_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.src_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.src_ip = addr;
+    }
+
+    /// Set the destination IP address.
+    ///
+    /// Set the destination IP address and update the header checksum accordingly.
+    pub fn set_dst_ip_and_update_checksum(&mut self, addr: Ipv4Addr) {
+        let old_bytes = self.hdr_prefix.dst_ip.bytes();
+        self.hdr_prefix.hdr_checksum =
+            internet_checksum::update(self.hdr_prefix.hdr_checksum, &old_bytes, addr.bytes());
+        self.hdr_prefix.dst_ip = addr;
+    }
+}
+
 /// A records parser for IPv4 options.
 ///
 /// See [`Options`] for more details.
@@ -753,8 +792,16 @@ where
         self.prefix_builder.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv4Addr) {
+        self.prefix_builder.set_src_ip(addr);
+    }
+
     fn dst_ip(&self) -> Ipv4Addr {
         self.prefix_builder.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv4Addr) {
+        self.prefix_builder.set_dst_ip(addr);
     }
 
     fn proto(&self) -> Ipv4Proto {
@@ -919,8 +966,16 @@ impl IpPacketBuilder<Ipv4> for Ipv4PacketBuilder {
         self.src_ip
     }
 
+    fn set_src_ip(&mut self, addr: Ipv4Addr) {
+        self.src_ip = addr;
+    }
+
     fn dst_ip(&self) -> Ipv4Addr {
         self.dst_ip
+    }
+
+    fn set_dst_ip(&mut self, addr: Ipv4Addr) {
+        self.dst_ip = addr;
     }
 
     fn proto(&self) -> Ipv4Proto {

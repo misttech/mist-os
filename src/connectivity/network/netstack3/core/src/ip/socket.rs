@@ -525,8 +525,12 @@ where
         crate::filter::Verdict::Accept => {}
     }
 
-    let remote_ip: SpecifiedAddr<_> = (*remote_ip).into();
-    let local_ip: SpecifiedAddr<_> = (*local_ip).into();
+    let Some(local_ip) = SpecifiedAddr::new(packet.src_addr()) else {
+        return Err((body, IpSockSendError::Unroutable(ResolveRouteError::NoSrcAddr)));
+    };
+    let Some(remote_ip) = SpecifiedAddr::new(packet.dst_addr()) else {
+        return Err((body, IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
+    };
 
     let (next_hop, broadcast) = next_hop.into_next_hop_and_broadcast_marker(remote_ip);
 

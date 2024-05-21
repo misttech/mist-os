@@ -811,8 +811,7 @@ impl PacketBuilder for Never {
 /// When `I: NestedPacketBuilder` and `O: NestedPacketBuilder`, `Nested<I, O>`
 /// implements [`NestedPacketBuilder`]. When `I: Serializer` and `O:
 /// NestedPacketBuilder`, `Nested<I, O>` implements [`Serializer`].
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq))]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Nested<I, O> {
     inner: I,
     outer: O,

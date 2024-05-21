@@ -1535,7 +1535,7 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
 /// Metadata about a previously-parsed packet used to undo its parsing.
 ///
 /// See [`GrowBuffer::undo_parse`] for more details.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ParseMetadata {
     header_len: usize,
     body_len: usize,

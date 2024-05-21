@@ -600,7 +600,7 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I, Body<B> = ndp::Options<B>>> I
 }
 
 /// A builder for ICMP packets.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct IcmpPacketBuilder<I: IcmpIpExt, M: IcmpMessage<I>> {
     src_ip: I::Addr,
     dst_ip: I::Addr,
