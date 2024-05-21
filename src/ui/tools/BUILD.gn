@@ -13,17 +13,13 @@ group("tools") {
     ":input",
     "paper_shader_compiler",
     "print-input-report",
-    "tiles",
   ]
 }
 
 group("tests") {
   testonly = true
 
-  deps = [
-    "print-input-report:print-input-report-test",
-    "tiles/flatland:tiles-flatland-tests",
-  ]
+  deps = [ "print-input-report:print-input-report-test" ]
 }
 
 # Non-component tools contains the names of shell command tools that do not
