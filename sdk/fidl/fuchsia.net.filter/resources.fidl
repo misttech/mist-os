@@ -320,6 +320,35 @@ type Action = flexible union {
             port uint16;
         };
     };
+    /// A special case of destination NAT (DNAT) that redirects the packet to
+    /// the local host.
+    ///
+    /// This is a terminal action for all NAT routines on the current hook. The
+    /// packet is redirected by rewriting the destination IP address to one
+    /// owned by the ingress interface (if operating on incoming traffic in
+    /// INGRESS) or the loopback address (if operating on locally-generated
+    /// traffic in LOCAL_EGRESS).
+    ///
+    /// As with all DNAT actions, this action is only valid in the INGRESS and
+    /// LOCAL_EGRESS hooks. If a destination port is specified, this action is
+    /// only valid in a rule that ensures the presence of a TCP or UDP header by
+    /// matching on the transport protocol, so that the destination port can be
+    /// rewritten.
+    ///
+    /// This is analogous to the `redirect` statement in Netfilter.
+    6: redirect @generated_name("Redirect") table {
+        /// The optional range of destination ports used to rewrite the packet.
+        ///
+        /// If specified, the destination port of the packet will be rewritten
+        /// to some randomly chosen port in the range. If absent, the
+        /// destination port of the packet will not be rewritten.
+        1: dst_port @generated_name("PortRange") struct {
+            /// The inclusive start of the port range.
+            start uint16;
+            /// The inclusive end of the port range.
+            end uint16;
+        };
+    };
 };
 
 /// A rule is a set of criteria (matchers) and a resultant action.

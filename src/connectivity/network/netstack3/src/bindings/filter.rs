@@ -43,6 +43,7 @@ enum CommitError {
     RuleWithInvalidMatcher(fnet_filter_ext::RuleId),
     RuleWithInvalidAction(fnet_filter_ext::RuleId),
     TransparentProxyWithInvalidMatcher(fnet_filter_ext::RuleId),
+    RedirectWithInvalidMatcher(fnet_filter_ext::RuleId),
     CyclicalRoutineGraph(fnet_filter_ext::RoutineId),
     ErrorOnChange { index: usize, error: fnet_filter::CommitError },
 }
@@ -136,6 +137,9 @@ impl UpdateDispatcherInner {
             netstack3_core::filter::ValidationError::TransparentProxyWithInvalidMatcher(
                 rule_id,
             ) => CommitError::TransparentProxyWithInvalidMatcher(rule_id),
+            netstack3_core::filter::ValidationError::RedirectWithInvalidMatcher(rule_id) => {
+                CommitError::RedirectWithInvalidMatcher(rule_id)
+            }
         })?;
 
         // Only if validation was successful do we actually commit the changes.
@@ -434,12 +438,18 @@ async fn serve_controller(
                                 | FidlConversionError::SubnetHostBitsSet => Error::ReturnToClient(
                                     ChangeValidationError::InvalidAddressMatcher,
                                 ),
-                                FidlConversionError::InvalidPortRange => {
+                                FidlConversionError::InvalidPortMatcherRange => {
                                     Error::ReturnToClient(ChangeValidationError::InvalidPortMatcher)
                                 }
                                 FidlConversionError::UnspecifiedTransparentProxyPort => {
                                     Error::ReturnToClient(
                                         ChangeValidationError::InvalidTransparentProxyAction,
+                                    )
+                                }
+                                FidlConversionError::UnspecifiedRedirectPort
+                                | FidlConversionError::InvalidRedirectPortRange => {
+                                    Error::ReturnToClient(
+                                        ChangeValidationError::InvalidRedirectAction,
                                     )
                                 }
                                 FidlConversionError::NotAnError => unreachable!(
@@ -500,6 +510,9 @@ async fn serve_controller(
                             fnet_filter::CommitResult::TransparentProxyWithInvalidMatcher(
                                 rule.into(),
                             )
+                        }
+                        CommitError::RedirectWithInvalidMatcher(rule) => {
+                            fnet_filter::CommitResult::RedirectWithInvalidMatcher(rule.into())
                         }
                         CommitError::CyclicalRoutineGraph(routine) => {
                             fnet_filter::CommitResult::CyclicalRoutineGraph(routine.into())

@@ -9,6 +9,7 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     num::NonZeroU16,
+    ops::RangeInclusive,
 };
 
 use derivative::Derivative;
@@ -70,6 +71,30 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// Also note that transparently proxied packets will only be delivered to
     /// sockets with the transparent socket option enabled.
     TransparentProxy(TransparentProxy<I>),
+    /// A special case of destination NAT (DNAT) that redirects the packet to
+    /// the local host.
+    ///
+    /// This is a terminal action for all NAT routines on the current hook. The
+    /// packet is redirected by rewriting the destination IP address to one
+    /// owned by the ingress interface (if operating on incoming traffic in
+    /// INGRESS) or the loopback address (if operating on locally-generated
+    /// traffic in LOCAL_EGRESS).
+    ///
+    /// As with all DNAT actions, this action is only valid in the INGRESS and
+    /// LOCAL_EGRESS hooks. If a destination port is specified, this action is
+    /// only valid in a rule that ensures the presence of a TCP or UDP header by
+    /// matching on the transport protocol, so that the destination port can be
+    /// rewritten.
+    ///
+    /// This is analogous to the `redirect` statement in Netfilter.
+    Redirect {
+        /// The optional range of destination ports used to rewrite the packet.
+        ///
+        /// If specified, the destination port of the packet will be rewritten
+        /// to some randomly chosen port in the range. If absent, the
+        /// destination port of the packet will not be rewritten.
+        dst_port: Option<RangeInclusive<NonZeroU16>>,
+    },
 }
 
 /// Transparently intercept the packet and deliver it to a local socket without
@@ -93,7 +118,11 @@ pub enum TransparentProxy<I: IpExt> {
 impl<I: IpExt, DeviceClass: Debug> Inspectable for Action<I, DeviceClass, ()> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let value = match self {
-            Self::Accept | Self::Drop | Self::Return | Self::TransparentProxy { .. } => {
+            Self::Accept
+            | Self::Drop
+            | Self::Return
+            | Self::TransparentProxy(_)
+            | Self::Redirect { .. } => {
                 format!("{self:?}")
             }
             Self::Jump(UninstalledRoutine { routine: _, id }) => {

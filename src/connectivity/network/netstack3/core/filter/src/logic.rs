@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::num::NonZeroU16;
+use core::{num::NonZeroU16, ops::RangeInclusive};
+
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::HandleableTimer;
 use packet_formats::ip::IpExt;
@@ -75,6 +76,16 @@ enum RoutineResult<I: IpExt> {
         /// The bound port of the local socket to redirect the packet to.
         port: NonZeroU16,
     },
+    /// Destination NAT (DNAT) should be performed to redirect the packet to the
+    /// local host.
+    Redirect {
+        /// The optional range of destination ports used to rewrite the packet.
+        ///
+        /// If absent, the destination port of the packet is not rewritten.
+        // TODO(https://fxbug.dev/333419001): implement Redirect NAT.
+        #[allow(dead_code)]
+        dst_port: Option<RangeInclusive<NonZeroU16>>,
+    },
 }
 
 fn check_routine<I, P, D, DeviceClass>(
@@ -98,7 +109,8 @@ where
                 Action::Jump(target) => match check_routine(target.get(), packet, interfaces) {
                     result @ (RoutineResult::Accept
                     | RoutineResult::Drop
-                    | RoutineResult::TransparentLocalDelivery { .. }) => return result,
+                    | RoutineResult::TransparentLocalDelivery { .. }
+                    | RoutineResult::Redirect { .. }) => return result,
                     RoutineResult::Return => continue,
                 },
                 Action::TransparentProxy(proxy) => {
@@ -127,6 +139,9 @@ where
                     };
                     return RoutineResult::TransparentLocalDelivery { addr, port };
                 }
+                Action::Redirect { dst_port } => {
+                    return RoutineResult::Redirect { dst_port: dst_port.clone() }
+                }
             }
         }
     }
@@ -150,8 +165,11 @@ where
             RoutineResult::Drop => return Verdict::Drop,
             result @ RoutineResult::TransparentLocalDelivery { .. } => {
                 unreachable!(
-                    "immediate local delivery is only valid in INGRESS hook; got {result:?}"
+                    "transparent local delivery is only valid in INGRESS hook; got {result:?}"
                 )
+            }
+            result @ RoutineResult::Redirect { .. } => {
+                unreachable!("Redirect NAT is only valid in NAT routines; got {result:?}")
             }
         }
     }
@@ -175,6 +193,9 @@ where
             RoutineResult::Drop => return Verdict::Drop.into(),
             RoutineResult::TransparentLocalDelivery { addr, port } => {
                 return IngressVerdict::TransparentLocalDelivery { addr, port };
+            }
+            result @ RoutineResult::Redirect { .. } => {
+                unreachable!("Redirect NAT is only valid in NAT routines; got {result:?}")
             }
         }
     }

@@ -292,6 +292,9 @@ where
                     };
                     netstack3_core::filter::Action::TransparentProxy(proxy)
                 }
+                fnet_filter_ext::Action::Redirect { dst_port } => {
+                    netstack3_core::filter::Action::Redirect { dst_port }
+                }
             };
 
             Some(Ok(CoreRule { matcher, action, validation_info: rule_id }))
