@@ -147,4 +147,47 @@ TEST_F(InitTest, Inspect) {
   EXPECT_EQ(local_version->value(), kUniproVersion);
 }
 
+TEST_F(InitTest, WriteBoosterIsSupportedSharedBuffer) {
+  // Shared buffer Type
+  mock_device_->GetDeviceDesc().bWriteBoosterBufferType =
+      static_cast<uint8_t>(WriteBoosterBufferType::kSharedBuffer);
+  mock_device_->GetDeviceDesc().dNumSharedWriteBoosterBufferAllocUnits = betoh32(1);
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_TRUE(ufs_->GetDeviceManager().IsWriteBoosterEnabled());
+}
+
+TEST_F(InitTest, WriteBoosterIsSupportedDedicatedBuffer) {
+  // LU dedicated buffer Type
+  mock_device_->GetDeviceDesc().bWriteBoosterBufferType =
+      static_cast<uint8_t>(WriteBoosterBufferType::kLuDedicatedBuffer);
+  mock_device_->GetLogicalUnit(0).GetUnitDesc().dLUNumWriteBoosterBufferAllocUnits = betoh32(1);
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_TRUE(ufs_->GetDeviceManager().IsWriteBoosterEnabled());
+}
+
+TEST_F(InitTest, WriteBoosterIsNotSupported) {
+  // WriteBooster is not supported.
+  ExtendedUfsFeaturesSupport ext_feature_support;
+  ext_feature_support.set_writebooster_support(false);
+  mock_device_->GetDeviceDesc().dExtendedUfsFeaturesSupport = ext_feature_support.value;
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_FALSE(ufs_->GetDeviceManager().IsWriteBoosterEnabled());
+}
+
+TEST_F(InitTest, WriteBoosterZeroAllocUnits) {
+  // Zero alloc units
+  mock_device_->GetDeviceDesc().bWriteBoosterBufferType =
+      static_cast<uint8_t>(WriteBoosterBufferType::kLuDedicatedBuffer);
+  mock_device_->GetLogicalUnit(0).GetUnitDesc().dLUNumWriteBoosterBufferAllocUnits = betoh32(0);
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_FALSE(ufs_->GetDeviceManager().IsWriteBoosterEnabled());
+}
+
+TEST_F(InitTest, WriteBoosterBufferLifeTime) {
+  // Exceeds buffer life time
+  mock_device_->SetAttribute(Attributes::bWBBufferLifeTimeEst, kExceededWriteBoosterBufferLifeTime);
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+  ASSERT_FALSE(ufs_->GetDeviceManager().IsWriteBoosterEnabled());
+}
+
 }  // namespace ufs

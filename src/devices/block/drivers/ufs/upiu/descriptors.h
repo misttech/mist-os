@@ -78,6 +78,28 @@ struct DeviceDescriptor {
 } __PACKED;
 static_assert(sizeof(DeviceDescriptor) == 89, "DeviceDescriptor struct must be 89 bytes");
 
+// Accessing the bits inside DeviceDescriptor::dExtendedUfsFeaturesSupport causes an unaligned
+// access error, so we need to copy it to a separate struct and access it.
+struct ExtendedUfsFeaturesSupport {
+  uint32_t value;
+
+  DEF_SUBBIT(value, 0, field_firmware_update_support);
+  DEF_SUBBIT(value, 1, production_state_awareness_support);
+  DEF_SUBBIT(value, 2, device_life_span_support);
+  DEF_SUBBIT(value, 3, refresh_operation_support);
+  DEF_SUBBIT(value, 4, too_high_temperature_support);
+  DEF_SUBBIT(value, 5, too_low_temperature_support);
+  DEF_SUBBIT(value, 6, extended_temperature_support);
+  DEF_SUBBIT(value, 7, reserved_for_hpb_extension_specification);
+  DEF_SUBBIT(value, 8, writebooster_support);
+  DEF_SUBBIT(value, 9, performance_throttling_support);
+  DEF_SUBBIT(value, 10, advanced_rpmb_support);
+  DEF_SUBBIT(value, 14, barrier_support);
+  DEF_SUBBIT(value, 15, clear_error_history_functionality_support);
+  DEF_SUBBIT(value, 16, ext_iid_support);
+  DEF_SUBBIT(value, 17, reserved_for_fbo_extension_specification);
+};
+
 // UFS Specification Version 3.1, section 14.1.4.3 "Configuration Descriptor".
 // ConfigurationDescriptor use big-endian byte ordering.
 struct UnitDescriptorConfigurableParameters {

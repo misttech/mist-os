@@ -451,6 +451,7 @@ zx_status_t Ufs::Init() {
   PopulateCapabilitiesInspect(caps_reg, &inspect_node_, &inspector_);
 
   auto controller_node = inspect_node_.CreateChild("controller");
+  auto wb_node = controller_node.CreateChild("writebooster");
 
   if (zx::result<> result = InitQuirk(); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize quirk: %s", result.status_string());
@@ -469,6 +470,15 @@ zx_status_t Ufs::Init() {
   if (zx::result<> result = device_manager_->GetControllerDescriptor(); result.is_error()) {
     zxlogf(ERROR, "Failed to get controller descriptor: %s", result.status_string());
     return result.error_value();
+  }
+
+  if (zx::result<> result = device_manager_->ConfigureWriteBooster(wb_node); result.is_error()) {
+    if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
+      zxlogf(WARNING, "This device does not support WriteBooster");
+    } else {
+      zxlogf(ERROR, "Failed to configure WriteBooster %s", result.status_string());
+      return result.error_value();
+    }
   }
 
   // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
@@ -490,6 +500,7 @@ zx_status_t Ufs::Init() {
   controller_node.RecordUint("logical_unit_count", logical_unit_count_);
 
   inspector_.emplace(std::move(controller_node));
+  inspector_.emplace(std::move(wb_node));
   zxlogf(INFO, "Bind Success");
 
   return ZX_OK;
@@ -702,16 +713,7 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
 }
 
 zx::result<uint32_t> Ufs::AddLogicalUnits() {
-  uint8_t max_luns = 0;
-  if (device_manager_->GetGeometryDescriptor().bMaxNumberLU == 0) {
-    max_luns = 8;
-  } else if (device_manager_->GetGeometryDescriptor().bMaxNumberLU == 1) {
-    max_luns = 32;
-  } else {
-    zxlogf(ERROR, "Invalid Geometry Descriptor bMaxNumberLU value=%d",
-           device_manager_->GetGeometryDescriptor().bMaxNumberLU);
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
+  uint8_t max_luns = device_manager_->GetMaxLunCount();
   ZX_ASSERT(max_luns <= kMaxLunCount);
 
   auto read_unit_descriptor = [this](uint16_t lun, size_t block_size,

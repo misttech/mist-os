@@ -37,12 +37,13 @@ device. The UIC layer automatically detects and recovers I/O errors through the 
 and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
-* Support write booster
 * Support RPMB logical unit
 * Support Utp Task Management Request
 * Support write protect
 * Support runtime suspend
 * Support background operation
+* Power management - Dynamic clock scaling
+* Interrupt aggregation
 * Implement Ufs tools
 * Support UFS 4.0 Spec (multi queue)
 * Support multiple platform (exynos, snapdragon, etc.)

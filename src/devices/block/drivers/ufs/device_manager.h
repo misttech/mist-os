@@ -40,6 +40,17 @@ enum class LinkState : uint8_t {
   kBroken = 3,
 };
 
+// UFS Specification Version 4.0, section 13.4.18 "WriteBooster".
+enum class WriteBoosterBufferType : uint8_t {
+  kLuDedicatedBuffer = 0x00,
+  kSharedBuffer = 0x01,
+};
+
+enum class UserSpaceConfigurationOption : uint8_t {
+  kUserSpaceReduction = 0x00,
+  kPreserveUserSpace = 0x01,
+};
+
 using PowerModeMap = std::map<UfsPowerMode, std::pair<scsi::PowerCondition, LinkState>>;
 
 // UFS Specification Version 3.1, section 5.1.2 "UFS Device Manager"
@@ -68,6 +79,10 @@ class DeviceManager {
   zx::result<> GetControllerDescriptor();
   zx::result<UnitDescriptor> ReadUnitDescriptor(uint8_t lun);
 
+  // WriteBooster
+  zx::result<> ConfigureWriteBooster(inspect::Node &wb_node);
+  bool IsWriteBoosterEnabled() const { return is_write_booster_enabled_; }
+
   // Device power management.
   zx::result<> InitReferenceClock(inspect::Node &controller_node);
   zx::result<> InitUniproAttributes(inspect::Node &unipro_node);
@@ -88,6 +103,8 @@ class DeviceManager {
     current_link_state_ = power_mode_map_[power_mode].second;
   }
 
+  uint8_t GetMaxLunCount() const { return max_lun_count_; }
+
   // for test
   DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   PowerModeMap &GetPowerModeMap() { return power_mode_map_; }
@@ -98,19 +115,34 @@ class DeviceManager {
  private:
   friend class UfsTest;
 
-  zx::result<uint32_t> ReadAttribute(Attributes attribute);
-  zx::result<> WriteAttribute(Attributes attribute, uint32_t value);
+  zx::result<uint32_t> ReadAttribute(Attributes attribute, uint8_t index = 0);
+  zx::result<> WriteAttribute(Attributes attribute, uint32_t value, uint8_t index = 0);
   zx::result<uint32_t> DmeGet(uint16_t mbi_attribute);
   zx::result<uint32_t> DmePeerGet(uint16_t mbi_attribute);
   zx::result<> DmeSet(uint16_t mbi_attribute, uint32_t value);
 
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition);
 
+  zx::result<bool> IsWriteBoosterBufferLifeTimeLeft();
+  zx::result<> EnableWriteBooster(inspect::Node &wb_node);
+  zx::result<> DisableWriteBooster();
+  zx::result<bool> NeedWriteBoosterBufferFlush();
+
   Ufs &controller_;
   TransferRequestProcessor &req_processor_;
 
   DeviceDescriptor device_descriptor_;
   GeometryDescriptor geometry_descriptor_;
+
+  uint8_t max_lun_count_;
+
+  // WriteBooster
+  bool is_write_booster_enabled_ = false;
+  bool is_write_booster_flush_enabled_ = false;
+  uint8_t write_booster_dedicated_lu_;
+  WriteBoosterBufferType write_booster_buffer_type_;
+  UserSpaceConfigurationOption user_space_configuration_option_;
+  uint32_t write_booster_flush_threshold_ = 4;  // 40% of the available buffer size.
 
   // Power management
   UfsPowerMode current_power_mode_ = UfsPowerMode::kIdle;

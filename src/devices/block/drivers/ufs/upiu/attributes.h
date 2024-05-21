@@ -48,6 +48,8 @@ enum class Attributes {
   kAttributeCount = 0x30,
 };
 
+constexpr uint8_t kExceededWriteBoosterBufferLifeTime = 0x0b;
+
 // UFS Specification Version 3.1, section 6.4 "Reference Clock".
 enum AttributeReferenceClock {
   k19_2MHz = 0x0,
@@ -58,14 +60,14 @@ enum AttributeReferenceClock {
 
 class ReadAttributeUpiu : public QueryReadRequestUpiu {
  public:
-  explicit ReadAttributeUpiu(Attributes type)
-      : QueryReadRequestUpiu(QueryOpcode::kReadAttribute, static_cast<uint8_t>(type)) {}
+  explicit ReadAttributeUpiu(Attributes type, uint8_t index = 0)
+      : QueryReadRequestUpiu(QueryOpcode::kReadAttribute, static_cast<uint8_t>(type), index) {}
 };
 
 class WriteAttributeUpiu : public QueryWriteRequestUpiu {
  public:
-  explicit WriteAttributeUpiu(Attributes type, uint32_t value)
-      : QueryWriteRequestUpiu(QueryOpcode::kWriteAttribute, static_cast<uint8_t>(type)) {
+  explicit WriteAttributeUpiu(Attributes type, uint32_t value, uint8_t index = 0)
+      : QueryWriteRequestUpiu(QueryOpcode::kWriteAttribute, static_cast<uint8_t>(type), index) {
     if (value) {
       GetData<QueryRequestUpiuData>()->value = htobe32(value);
     }
