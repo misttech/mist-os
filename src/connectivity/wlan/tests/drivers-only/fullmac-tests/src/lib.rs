@@ -797,3 +797,32 @@ async fn test_channel_switch() {
         }))
     );
 }
+
+#[fuchsia::test]
+async fn test_signal_report() {
+    let (_client_sme_proxy, mut connect_txn_event_stream, fullmac_driver, _generic_sme_proxy) =
+        setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
+
+    for i in 0..10 {
+        let expected_rssi_dbm = -40 + i;
+        let expected_snr_db = 30 + i;
+        fullmac_driver
+            .ifc_proxy
+            .signal_report(&fidl_fullmac::WlanFullmacSignalReportIndication {
+                rssi_dbm: expected_rssi_dbm,
+                snr_db: expected_snr_db,
+            })
+            .await
+            .expect("Could not send SignalReport");
+
+        assert_variant!(
+            connect_txn_event_stream.next().await,
+            Some(Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport {
+                ind: fidl_internal::SignalReportIndication { rssi_dbm, snr_db }
+            })) => {
+                assert_eq!(rssi_dbm, expected_rssi_dbm);
+                assert_eq!(snr_db, expected_snr_db);
+            }
+        );
+    }
+}

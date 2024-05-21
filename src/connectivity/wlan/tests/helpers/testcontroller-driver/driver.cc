@@ -89,6 +89,9 @@ class WlanFullmacImplIfcToDriverBridge
         ForwardResult<WlanFullmacImplIfc::OnChannelSwitch>(completer.ToAsync()));
   }
   void SignalReport(SignalReportRequest& request, SignalReportCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->SignalReport(request).Then(
+        ForwardResult<WlanFullmacImplIfc::SignalReport>(completer.ToAsync()));
   }
   void EapolInd(EapolIndRequest& request, EapolIndCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
