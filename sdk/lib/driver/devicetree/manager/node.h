@@ -32,6 +32,10 @@ class NodeManager {
  public:
   // Returns node with phandle |id|.
   virtual zx::result<ReferenceNode> GetReferenceNode(Phandle id) = 0;
+
+  virtual uint32_t GetPublishIndex(uint32_t node_id) = 0;
+
+  virtual zx::result<> ChangePublishOrder(uint32_t node_id, uint32_t new_index) = 0;
 };
 
 // Node represents the nodes in the device tree along with it's properties.
@@ -58,6 +62,13 @@ class Node {
   void AddSmc(fuchsia_hardware_platform_bus::Smc smc);
 
   void AddPowerConfig(fuchsia_hardware_power::PowerElementConfiguration config);
+
+  // Returns the index of the node in the nodes publish list.
+  uint32_t GetPublishIndex() const;
+
+  // Move this node up/down in the publish list.
+  // Returns error if the index is out of range.
+  zx::result<> ChangePublishOrder(uint32_t new_index);
 
   // Publish this node.
   // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.

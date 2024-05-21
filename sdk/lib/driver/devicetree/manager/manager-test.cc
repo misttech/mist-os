@@ -484,5 +484,21 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
                                          (*mgr_request.parents())[1].bind_rules(), false));
 }
 
+TEST_F(ManagerTest, TestPublishOrder) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
+  DefaultVisitors<> visitor;
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
+  auto& first_node = manager.nodes()[0];
+  auto first_node_id = first_node->id();
+  auto& second_node = manager.nodes()[1];
+  auto second_node_id = second_node->id();
+  EXPECT_EQ(first_node->GetPublishIndex(), 0u);
+  EXPECT_EQ(second_node->GetPublishIndex(), 1u);
+  EXPECT_TRUE(first_node->ChangePublishOrder(1u).is_ok());
+  EXPECT_EQ(manager.nodes()[0]->id(), second_node_id);
+  EXPECT_EQ(manager.nodes()[1]->id(), first_node_id);
+  ASSERT_TRUE(DoPublish(manager).is_ok());
+}
+
 }  // namespace
 }  // namespace fdf_devicetree

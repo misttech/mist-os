@@ -65,7 +65,8 @@ zx::result<> SysmemVisitor::DriverVisit(fdf_devicetree::Node& node,
           sysmem_metadata.contiguous_memory_size().value_or(0),
           sysmem_metadata.protected_memory_size().value_or(0));
 
-  return zx::ok();
+  // Sysmem should be published first so that it can reserve memory as needed.
+  return node.ChangePublishOrder(1u);
 }
 
 zx::result<> SysmemVisitor::AddChildNodeSpec(fdf_devicetree::Node& child) {

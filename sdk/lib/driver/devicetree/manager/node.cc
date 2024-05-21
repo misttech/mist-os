@@ -127,6 +127,12 @@ void Node::AddPowerConfig(fuchsia_hardware_power::PowerElementConfiguration powe
   add_platform_device_ = true;
 }
 
+uint32_t Node::GetPublishIndex() const { return manager_->GetPublishIndex(id()); }
+
+zx::result<> Node::ChangePublishOrder(uint32_t new_index) {
+  return manager_->ChangePublishOrder(id(), new_index);
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr,
                            fidl::SyncClient<fuchsia_driver_framework::Node> &fdf_node) {
