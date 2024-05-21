@@ -113,21 +113,29 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    Type: bool
 #    Default: false
 #
-#  pb_name_override (optional)
+#  generate_product_bundle (optional; default = true)
+#    Whether to generate the product bundle metadata for this product bundle.
+#
+#  product_bundle_name (optional; default = 'product.board')
 #    The product bundle will use this name instead of the currently active product.board name.
 #
-#  use_bazel_images_only (optional)
-#    Overrides the currently active gn global of the same name.
+#  generate_image (optional; default = use_bazel_images_only)
+#    Whether to generate image metadata for this product bundle.
 #
-#  fxfs_blob (optional)
-#    Overrides the currently active gn global of the same name.
+#  image_has_fxfs_blob (optional; default = fxfs_blob)
+#    Whether the image contains an fxfs blob partition.
 #
-#  fvm (optional; default= opposite of fxfs_blob)
-#    Whether the image generated should contain an fvm. This is exclusive to fxfs_blob. But both
-#    can be false.
+#  image_has_fvm (optional; default = opposite of image_fxfs_blob)
+#    Whether the image contains an fvm. This is exclusive to fxfs_blob, but both can be false.
 #
-#  has_recovery (optional; default=true)
+#  image_supports_fastboot_fvm (optional; default = supports_fastboot_fvm)
+#    Whether the image supports a fastboot fvm.
+#
+#  image_has_recovery (optional; default = true)
 #    Whether the image should contain a recovery partition.
+#
+#  image_use_vbmeta (optional; default = use_vbmeta)
+#    Whether the image should contain a vbmeta.
 #
 #  deps
 #  metadata
@@ -155,11 +163,6 @@ template("bazel_product_bundle") {
     if (defined(invoker.bazel_license_review_target)) {
       license_review_bazel_action_target = "${target_name}_license_review"
     }
-  }
-
-  _use_bazel_images_only = use_bazel_images_only
-  if (defined(invoker.use_bazel_images_only)) {
-    _use_bazel_images_only = invoker.use_bazel_images_only
   }
 
   files = {
@@ -194,6 +197,11 @@ template("bazel_product_bundle") {
   }
   foreach(_aib, _aibs_to_use) {
     _aib_bazel_inputs += [ "${_aib}_bazel_inputs" ]
+  }
+
+  _generate_image = use_bazel_images_only
+  if (defined(invoker.generate_image)) {
+    _generate_image = invoker.generate_image
   }
 
   # NOTE: Only depend on product image targets if your outputs are not included
@@ -239,7 +247,7 @@ template("bazel_product_bundle") {
     ]
     directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
 
-    if (_use_bazel_images_only) {
+    if (_generate_image) {
       _full_label = get_label_info(":${target_name}", "label_with_toolchain")
       metadata = {
         assembly_manifests = [
@@ -493,16 +501,6 @@ template("bazel_product_bundle") {
 
     bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
 
-    _fxfs_blob = fxfs_blob
-    if (defined(invoker.fxfs_blob)) {
-      _fxfs_blob = invoker.fxfs_blob
-    }
-
-    _fvm = !_fxfs_blob
-    if (defined(invoker.fvm)) {
-      _fvm = invoker.fvm
-    }
-
     # Directory outputs are OK because `product_bundle.json` correctly
     # represents the freshness of all outputs.
     allow_directory_in_outputs = true
@@ -516,36 +514,16 @@ template("bazel_product_bundle") {
       "${files.product_bundle_out_dir}/product_bundle.json",
       "${files.product_bundle_out_dir}/system_a/fuchsia.zbi",
     ]
-    if (_fxfs_blob) {
-      directory_timestamp_outputs +=
-          [ "${files.product_bundle_out_dir}/system_a/fxfs.blk" ]
-      not_needed([ "_fvm" ])
-    } else if (_fvm) {
-      directory_timestamp_outputs +=
-          [ "${files.product_bundle_out_dir}/system_a/fvm.blk" ]
-    }
-    if (use_vbmeta) {
-      directory_timestamp_outputs +=
-          [ "${files.product_bundle_out_dir}/system_a/fuchsia.vbmeta" ]
+
+    _generate_product_bundle = true
+    if (defined(invoker.generate_product_bundle)) {
+      _generate_product_bundle = invoker.generate_product_bundle
     }
 
-    # Populate metadata when Bazel image is not used will pollute GN assembly.
-    if (_use_bazel_images_only) {
-      _full_label = get_label_info(":${target_name}", "label_with_toolchain")
-      _system_a_root = rebase_path(target_out_dir, root_out_dir) +
-                       "/${files.product_bundle_out_dir}/system_a"
+    metadata = {
+    }
 
-      _has_recovery = true
-      if (defined(invoker.has_recovery)) {
-        _has_recovery = invoker.has_recovery
-      }
-
-      if (_has_recovery) {
-        _system_r_root = rebase_path(target_out_dir, root_out_dir) +
-                         "/${files.product_bundle_out_dir}/system_r"
-        _recovery_name = get_label_info(recovery_label, "name")
-      }
-
+    if (_generate_product_bundle) {
       # This value can be set (e.g. for testing) with `--args sdk_id=1234` on
       # the `fx set` call.
       # In the future, the product bundles should be versioned independently of
@@ -553,179 +531,241 @@ template("bazel_product_bundle") {
       product_version = sdk_id
       assert(product_version != "")
 
-      _pb_name = "${build_info_product}.${build_info_board}"
-      if (defined(invoker.pb_name_override)) {
-        _pb_name = invoker.pb_name_override
+      _product_bundle_name = "${build_info_product}.${build_info_board}"
+      if (defined(invoker.product_bundle_name)) {
+        _product_bundle_name = invoker.product_bundle_name
+      }
+
+      metadata.product_bundles = [
+        {
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          path =
+              rebase_path("${target_out_dir}/${files.product_bundle_out_dir}",
+                          root_build_dir)
+          name = _product_bundle_name
+          product_version = product_version
+          transfer_manifest_path =
+              rebase_path("${target_out_dir}/${files.transfer_json}",
+                          root_build_dir)
+          transfer_manifest_url = "file://" + transfer_manifest_path
+        },
+      ]
+    } else {
+      not_needed(invoker, "product_bundle_name")
+    }
+
+    # Populate metadata when Bazel image is not used will pollute GN assembly.
+    if (_generate_image) {
+      _full_label = get_label_info(":${target_name}", "label_with_toolchain")
+      _system_a_root = rebase_path(target_out_dir, root_out_dir) +
+                       "/${files.product_bundle_out_dir}/system_a"
+
+      _image_has_fxfs_blob = fxfs_blob
+      if (defined(invoker.image_has_fxfs_blob)) {
+        _image_has_fxfs_blob = invoker.image_has_fxfs_blob
+      }
+
+      _image_has_fvm = !_image_has_fxfs_blob
+      if (defined(invoker.image_has_fvm)) {
+        _image_has_fvm = invoker.image_has_fvm
+      }
+
+      if (_image_has_fxfs_blob) {
+        directory_timestamp_outputs +=
+            [ "${files.product_bundle_out_dir}/system_a/fxfs.blk" ]
+        assert(!_image_has_fvm, "Cannot have both fxfs and fvm.")
+      } else if (_image_has_fvm) {
+        directory_timestamp_outputs +=
+            [ "${files.product_bundle_out_dir}/system_a/fvm.blk" ]
+      }
+
+      _image_use_vbmeta = use_vbmeta
+      if (defined(invoker.image_use_vbmeta)) {
+        _image_use_vbmeta = invoker.image_use_vbmeta
+      }
+
+      if (_image_use_vbmeta) {
+        directory_timestamp_outputs +=
+            [ "${files.product_bundle_out_dir}/system_a/fuchsia.vbmeta" ]
+      }
+
+      _image_has_recovery = true
+      if (defined(invoker.image_has_recovery)) {
+        _image_has_recovery = invoker.image_has_recovery
+      }
+
+      if (_image_has_recovery) {
+        _system_r_root = rebase_path(target_out_dir, root_out_dir) +
+                         "/${files.product_bundle_out_dir}/system_r"
+        _recovery_name = get_label_info(recovery_label, "name")
       }
 
       # TODO(https://fxbug.dev/42078046): Add metadata for recovery image as well.
-      metadata = {
-        images = [
+      metadata.images = [
+        {
+          name = "zircon-a"
+          type = "zbi"
+          cpu = current_cpu
+          label = _full_label
+          path = "${_system_a_root}/fuchsia.zbi"
+
+          archive = true
+          bootserver_pave = []
+          if (!sign_zbi) {
+            bootserver_pave += [ "--zircona" ]
+            fastboot_flash = []
+            if (zircon_a_partition != "") {
+              fastboot_flash += [ zircon_a_partition ]
+            }
+            if (zircon_b_partition != "") {
+              fastboot_flash += [ zircon_b_partition ]
+            }
+          }
+        },
+      ]
+
+      if (_image_has_recovery) {
+        metadata.images += [
           {
-            name = "zircon-a"
-            type = "zbi"
+            name = "zircon-r"
             cpu = current_cpu
+            type = "zbi"
             label = _full_label
-            path = "${_system_a_root}/fuchsia.zbi"
+            path = "${_system_r_root}/${_recovery_name}.zbi"
 
             archive = true
-            bootserver_pave = []
-            if (!sign_zbi) {
-              bootserver_pave += [ "--zircona" ]
-              fastboot_flash = []
-              if (zircon_a_partition != "") {
-                fastboot_flash += [ zircon_a_partition ]
-              }
-              if (zircon_b_partition != "") {
-                fastboot_flash += [ zircon_b_partition ]
-              }
+            bootserver_pave = [ "--zirconr" ]
+            fastboot_flash = []
+            if (zircon_r_partition != "") {
+              fastboot_flash = [ zircon_r_partition ]
+            }
+            if (recovery_is_zedboot) {
+              bootserver_pave_zedboot = [ "--zircona" ]
+            }
+          },
+        ]
+      }
+
+      if (_image_has_fxfs_blob) {
+        metadata.images += [
+          {
+            name = "storage-full"
+            type = "fxfs-blk"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/fxfs.blk"
+            archive = add_qemu_to_build_archives
+          },
+          {
+            name = "fuchsia.fxfs_sparse"
+            type = "blk"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/fxfs.sparse.blk"
+            archive = true
+            bootserver_pave = [ "--fxfs" ]
+          },
+        ]
+      } else if (_image_has_fvm) {
+        metadata.images += [
+          {
+            name = "blob"
+            type = "blk"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/blob.blk"
+          },
+          {
+            name = "storage-full"
+            type = "blk"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/fvm.blk"
+            archive = add_qemu_to_build_archives
+          },
+          {
+            name = "storage-sparse"
+            type = "blk"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/fvm.sparse.blk"
+            archive = true
+            bootserver_pave = [ "--fvm" ]
+          },
+        ]
+
+        _image_supports_fastboot_fvm = supports_fastboot_fvm
+        if (defined(invoker.image_supports_fastboot_fvm)) {
+          _image_supports_fastboot_fvm = invoker.image_supports_fastboot_fvm
+        }
+
+        if (_image_supports_fastboot_fvm) {
+          metadata.images += [
+            {
+              name = "fvm.fastboot"
+              cpu = current_cpu
+              type = "blk"
+              label = _full_label
+              path = "${_system_a_root}/fvm.fastboot.blk"
+
+              archive = true
+              fastboot_flash = [ fvm_partition ]
+            },
+          ]
+        }
+      }
+
+      if (_image_use_vbmeta) {
+        metadata.images += [
+          {
+            name = "zircon-a"
+            cpu = current_cpu
+            type = "vbmeta"
+            label = _full_label
+            path = "${_system_a_root}/fuchsia.vbmeta"
+            archive = true
+            bootserver_pave = [ "--vbmetaa" ]
+            fastboot_flash = []
+            if (vbmeta_a_partition != "") {
+              fastboot_flash += [ vbmeta_a_partition ]
+            }
+            if (vbmeta_b_partition != "") {
+              fastboot_flash += [ vbmeta_b_partition ]
             }
           },
         ]
 
-        if (_has_recovery) {
-          images += [
+        if (_image_has_recovery) {
+          metadata.images += [
             {
               name = "zircon-r"
               cpu = current_cpu
-              type = "zbi"
-              label = _full_label
-              path = "${_system_r_root}/${_recovery_name}.zbi"
-
-              archive = true
-              bootserver_pave = [ "--zirconr" ]
-              fastboot_flash = []
-              if (zircon_r_partition != "") {
-                fastboot_flash = [ zircon_r_partition ]
-              }
-              if (recovery_is_zedboot) {
-                bootserver_pave_zedboot = [ "--zircona" ]
-              }
-            },
-          ]
-        }
-
-        if (_fxfs_blob) {
-          images += [
-            {
-              name = "storage-full"
-              type = "fxfs-blk"
-              cpu = current_cpu
-              label = _full_label
-              path = "${_system_a_root}/fxfs.blk"
-              archive = add_qemu_to_build_archives
-            },
-            {
-              name = "fuchsia.fxfs_sparse"
-              type = "blk"
-              cpu = current_cpu
-              label = _full_label
-              path = "${_system_a_root}/fxfs.sparse.blk"
-              archive = true
-              bootserver_pave = [ "--fxfs" ]
-            },
-          ]
-        } else if (_fvm) {
-          images += [
-            {
-              name = "blob"
-              type = "blk"
-              cpu = current_cpu
-              label = _full_label
-              path = "${_system_a_root}/blob.blk"
-            },
-            {
-              name = "storage-full"
-              type = "blk"
-              cpu = current_cpu
-              label = _full_label
-              path = "${_system_a_root}/fvm.blk"
-              archive = add_qemu_to_build_archives
-            },
-            {
-              name = "storage-sparse"
-              type = "blk"
-              cpu = current_cpu
-              label = _full_label
-              path = "${_system_a_root}/fvm.sparse.blk"
-              archive = true
-              bootserver_pave = [ "--fvm" ]
-            },
-          ]
-          if (supports_fastboot_fvm) {
-            images += [
-              {
-                name = "fvm.fastboot"
-                cpu = current_cpu
-                type = "blk"
-                label = _full_label
-                path = "${_system_a_root}/fvm.fastboot.blk"
-
-                archive = true
-                fastboot_flash = [ fvm_partition ]
-              },
-            ]
-          }
-        }
-
-        if (use_vbmeta) {
-          images += [
-            {
-              name = "zircon-a"
-              cpu = current_cpu
               type = "vbmeta"
               label = _full_label
-              path = "${_system_a_root}/fuchsia.vbmeta"
+              path = "${_system_r_root}/${_recovery_name}.vbmeta"
+
               archive = true
-              bootserver_pave = [ "--vbmetaa" ]
+              bootserver_pave = [ "--vbmetar" ]
               fastboot_flash = []
-              if (vbmeta_a_partition != "") {
-                fastboot_flash += [ vbmeta_a_partition ]
+              if (vbmeta_r_partition != "") {
+                fastboot_flash = [ vbmeta_r_partition ]
               }
-              if (vbmeta_b_partition != "") {
-                fastboot_flash += [ vbmeta_b_partition ]
+              if (recovery_is_zedboot) {
+                bootserver_pave_zedboot = [ "--vbmetaa" ]
               }
             },
           ]
-
-          if (_has_recovery) {
-            images += [
-              {
-                name = "zircon-r"
-                cpu = current_cpu
-                type = "vbmeta"
-                label = _full_label
-                path = "${_system_r_root}/${_recovery_name}.vbmeta"
-
-                archive = true
-                bootserver_pave = [ "--vbmetar" ]
-                fastboot_flash = []
-                if (vbmeta_r_partition != "") {
-                  fastboot_flash = [ vbmeta_r_partition ]
-                }
-                if (recovery_is_zedboot) {
-                  bootserver_pave_zedboot = [ "--vbmetaa" ]
-                }
-              },
-            ]
-          }
         }
-
-        product_bundles = [
-          {
-            label = get_label_info(":$target_name", "label_with_toolchain")
-            path =
-                rebase_path("${target_out_dir}/${files.product_bundle_out_dir}",
-                            root_build_dir)
-            name = _pb_name
-            product_version = product_version
-            transfer_manifest_path =
-                rebase_path("${target_out_dir}/${files.transfer_json}",
-                            root_build_dir)
-            transfer_manifest_url = "file://" + transfer_manifest_path
-          },
-        ]
       }
+    } else {
+      not_needed(invoker,
+                 [
+                   "image_has_fvm",
+                   "image_has_fxfs_blob",
+                   "image_has_recovery",
+                   "image_supports_fastboot_fvm",
+                   "image_use_vbmeta",
+                 ])
     }
   }
 

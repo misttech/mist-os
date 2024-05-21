@@ -35,11 +35,8 @@ bazel_input_resource_directory("test_wrapped") {
 bazel_product_bundle("product_bundle") {
   testonly = true
   allow_eng_platform_bundle_use = true
-  use_bazel_images_only = true
-  fxfs_blob = false
-  fvm = false
-  has_recovery = false
-  pb_name_override = "power_testing_storage.power_testing_storage_vim3"
+  generate_image = false
+  product_bundle_name = "power_testing_storage.power_testing_storage_vim3"
   bazel_product_bundle_target = ":product_bundle.power_testing_storage_vim3"
   bazel_product_image_target = ":image.power_testing_storage_vim3"
   bazel_inputs_from_gn = [
