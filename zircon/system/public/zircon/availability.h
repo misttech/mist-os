@@ -108,13 +108,16 @@
 // Use to guard code that is added and/or removed at specific API levels.
 // `level` must be a one of:
 //  * a positive decimal integer literal no greater than the largest current stable API level
-//    * Supported levels are defined in availability_levels.h.
-//    * Support for older retired API levels may be removed over time.
+//    * Valid levels are defined in availability_levels.inc.
+//    * Support for older retired API levels as parameters may be removed over time.
 //  * `NEXT` - for code to be included in the next stable API level.
-//    * TODO(https://fxbug.dev/323889271): Add support for NEXT as a parameter.
+//    * TODO(https://fxbug.dev/326277078): Add support for NEXT as a parameter.
 //  * `HEAD` - for either of the following:
 //    * In-development code that is not ready to be exposed in an SDK
-//  * * Code that should only be in Platform builds.
+//    * Code that should only be in Platform builds.
+//  * `PLATFORM` - for code that must behave differently when building the Fuchsia Platform vs.
+//     when building code that runs on it. This is useful when removing an API element while
+//     continuing to provide runtime support at previous API levels. It should only be used in-tree.
 
 // The target API level is `level` or greater.
 #define FUCHSIA_API_LEVEL_AT_LEAST(level) (__Fuchsia_API_level__ >= FUCHSIA_API_LEVEL_(level))
