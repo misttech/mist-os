@@ -5,6 +5,7 @@
 import("//build/python/python_library.gni")
 
 python_library("pyjson5") {
+  enable_mypy = false
   library_name = "json5"
   sources = [
     "__init__.py",

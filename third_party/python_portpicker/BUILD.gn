@@ -5,6 +5,7 @@
 import("//build/python/python_library.gni")
 
 python_library("portpicker") {
+  enable_mypy = false
   source_root = "src/src"
   sources = [
     "portpicker.py",
