@@ -138,8 +138,8 @@ void InitMemory(void* bootloader_data, AddressSpace* aspace) {
   // First translate the data into ZBI item format in gLegacyBoot.mem_config.
   PopulateMemRages(bp);
 
-  // Now prime the allocator from that information.
-  LegacyBootInitMemory();
+  // Now prime the allocator from that information and then set up paging.
+  LegacyBootInitMemory(aspace);
 
   // That may have set up the console, so these messages might be seen.
   if (cmdline_ptr.is_error()) {
@@ -159,14 +159,4 @@ void InitMemory(void* bootloader_data, AddressSpace* aspace) {
   // Note this doesn't remove the memory covering the boot_params (zero page)
   // just examined.  We assume those have already been consumed as needed
   // before allocation starts.
-
-  if (aspace) {
-    // This is a no-op in 32-bit mode, which doesn't have paging turned on yet.
-    // There, paging will only be used as part of switching to long mode.  In
-    // the 64-bit build, this is necessary to ensure full identity mapping is
-    // in place, as the Linux/x86 64-bit boot protocol only requires the boot
-    // loader to set up mappings covering the kernel image itself and the
-    // pointers it passes in (boot_params, cmdline, ramdisk).
-    ArchSetUpAddressSpaceEarly(*aspace);
-  }
 }

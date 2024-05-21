@@ -46,17 +46,23 @@ class AddressSpace;
 // registered as any instance that calls AddressSpace::Install().
 extern AddressSpace* gAddressSpace;
 
-// Perform architecture-specific address space set-up. The "Early" variant
-// assumes that only the boot conditions hold and is expected to be called
-// before "normal work" can proceed; otherwise, the "Late" variant assumes that
-// we are in the opposite context and, in particular, that memory can be
-// allocated such that it will not be clobbered before the next kernel sets up
-// the address space again,
-//
-// In certain architectural contexts, early or late set-up will not make
-// practical sense, and the associated functions may be no-ops.
-void ArchSetUpAddressSpaceEarly(AddressSpace& aspace);
-void ArchSetUpAddressSpaceLate(AddressSpace& aspace);
+// Perform architecture-specific address space set-up.  This assumes that only
+// the boot conditions hold and is expected to be called before "normal work"
+// can proceed.  The AddressSpace object will be used as gAddressSpace and must
+// not go out of scope.  It's usually on the stack of PhysMain.
+void ArchSetUpAddressSpace(AddressSpace& aspace);
+
+// Reset and repeat the work of ArchSetUpAddressSpace.  This reuses the
+// AddressSpace object installed in gAddressSpace by ArchSetUpAddressSpace, but
+// calls its Init() method to reset its state afresh.  This uses the current
+// state of the Allocation pool for all new page table pages, so they will only
+// be in physical pages that are currently free.  This is necessary to prepare
+// for TrampolineBoot::Boot (after TrampolineBoot::Load has reserved whatever
+// space it needs to from the pool).  Even the .bss space of the phys image
+// itself may no longer be safe to use as page table pages, and pages allocated
+// from the pool before TrampolineBoot::Load could overlap with memory that
+// will be clobbered by the trampoline.
+void ArchPrepareAddressSpaceForTrampoline();
 
 // A representation of a virtual address space.
 //

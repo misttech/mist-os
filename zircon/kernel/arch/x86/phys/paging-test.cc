@@ -19,7 +19,6 @@ int TestMain(void* ptr, arch::EarlyTicks) {
 
   AddressSpace aspace;
   InitMemory(ptr, &aspace);
-  ArchSetUpAddressSpaceLate(aspace);
 
   static volatile int datum = 17;
   ZX_ASSERT(datum == 17);

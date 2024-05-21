@@ -70,8 +70,7 @@ void ApplyRelocations();
 // found for the allocator.
 //
 // Further, if an address space object is provided, it will be used to install
-// an identity-mapped virtual address space (calling one of the
-// ArchSetUpAddressSpace{Early,Late} routines).
+// an identity-mapped virtual address space via ArchSetUpAddressSpace().
 void InitMemory(void* bootloader_data, AddressSpace* aspace = nullptr);
 
 // This does most of the InitMemory() work for ZBI executables, where

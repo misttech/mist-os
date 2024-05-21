@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <string_view>
 
+class AddressSpace;
+
 // This holds information collected from a legacy boot loader protocol.
 struct LegacyBoot {
   std::string_view bootloader;
@@ -41,7 +43,7 @@ extern LegacyBoot gLegacyBoot;
 void LegacyBootSetUartConsole(const uart::all::Driver& uart);
 
 // This is a subroutine of InitMemory().  It primes the allocator and reserves
-// ranges based on the data in gLegacyBoot.
-void LegacyBootInitMemory();
+// ranges based on the data in gLegacyBoot, then sets up paging.
+void LegacyBootInitMemory(AddressSpace* aspace);
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_LEGACY_BOOT_H_

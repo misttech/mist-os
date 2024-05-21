@@ -125,7 +125,7 @@ void AddressSpace::ArchInstall() const {
   }
 }
 
-void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
+void ArchSetUpAddressSpace(AddressSpace& aspace) {
   if (gBootOptions && !gBootOptions->arm64_phys_mmu) {
     return;
   }
@@ -139,4 +139,5 @@ void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
   aspace.Install();
 }
 
-void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {}
+// The MMU will be off when the trampoline runs, so there is nothing to do.
+void ArchPrepareAddressSpaceForTrampoline() {}

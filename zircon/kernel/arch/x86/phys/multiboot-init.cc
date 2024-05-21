@@ -122,9 +122,9 @@ void InitMemory(void* bootloader_data, AddressSpace* aspace) {
     LegacyBootQuirks();
   }
 
-  LegacyBootInitMemory();
-
   // Note this doesn't remove the memory covering the Multiboot info itself or
   // the memory map or module list data just examined.  We assume those have
   // already been consumed as needed before allocation starts.
+
+  LegacyBootInitMemory(aspace);
 }
