@@ -112,7 +112,9 @@ fuchsia_test_package("starnix_magma_tests") {
     environments = [
       atlas_env,
       nuc7_env,
-      nuc11_env,
+
+      # TODO(b/341369599): Disable this test in NUC11 until bug is fixed.
+      # nuc11_env,
       vim3_env,
     ]
   }
