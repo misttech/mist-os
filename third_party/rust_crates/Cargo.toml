@@ -243,7 +243,7 @@ zerocopy = { version = "0.8.0-alpha.5", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
-version = "0.3.15"
+version = "0.3.18"
 default-features = false
 features = ["env-filter", "fmt", "registry", "std", "tracing-log"]
 
