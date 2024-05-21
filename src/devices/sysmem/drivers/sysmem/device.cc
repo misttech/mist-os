@@ -40,6 +40,7 @@
 #include "lib/ddk/debug.h"
 #include "lib/ddk/driver.h"
 #include "macros.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/metrics/metrics.cb.h"
 #include "utils.h"
 
@@ -652,6 +653,9 @@ zx_status_t Device::Bind() {
   }
   cmdline_protected_ranges_disable_dynamic_ = protected_ranges_disable_dynamic.value();
 
+  // TODO(b/333399746): Remove OverrideSizeFromCommandLine() calls once the kernel command line
+  // arguments "driver.sysmem.protected_memory_size" and "driver.sysmem.contiguous_memory_size" are
+  // no longer set in any Fuchsia build.
   status =
       OverrideSizeFromCommandLine("driver.sysmem.protected_memory_size", &protected_memory_size);
   if (status != ZX_OK) {
@@ -663,6 +667,24 @@ zx_status_t Device::Bind() {
   if (status != ZX_OK) {
     // OverrideSizeFromCommandLine() already printed an error.
     return status;
+  }
+
+  zx_handle_t structured_config_vmo;
+  status = device_get_config_vmo(parent_, &structured_config_vmo);
+  if (status != ZX_OK) {
+    DRIVER_ERROR("Failed to get config vmo: %s", zx_status_get_string(status));
+    return status;
+  }
+  if (structured_config_vmo == ZX_HANDLE_INVALID) {
+    DRIVER_DEBUG("Skipping config: config vmo handle does not exist");
+  } else {
+    auto config = sysmem_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo));
+    if (config.driver_sysmem_protected_memory_size_override() >= 0) {
+      protected_memory_size = config.driver_sysmem_protected_memory_size_override();
+    }
+    if (config.driver_sysmem_contiguous_memory_size_override() >= 0) {
+      contiguous_memory_size = config.driver_sysmem_contiguous_memory_size_override();
+    }
   }
 
   // Negative values are interpreted as a percentage of physical RAM.

@@ -79,13 +79,6 @@ kernel_cmdline("kernel_active_aging_2_15_2") {
   ]
 }
 
-kernel_cmdline("low-memory-pools") {
-  args = [
-    "driver.sysmem.contiguous_memory_size=0",
-    "driver.sysmem.protected_memory_size=0",
-  ]
-}
-
 kernel_cmdline("oom.reboot-timeout--low") {
   args = [ "kernel.oom.reboot-timeout-ms=8000" ]
 }
