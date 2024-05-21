@@ -1603,7 +1603,7 @@ async fn route_set_closed_when_table_removed<
             .await
             .expect("fidl should succeed")
             .expect("removal should succeed");
-        assert!(user_route_table.is_closed());
+        let _: zx::Signals = user_route_table.on_closed().await.expect("observing channel close");
     } else {
         std::mem::drop(user_route_table);
     }
