@@ -6,8 +6,8 @@
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
@@ -43,7 +43,7 @@ constexpr size_t kMaxLayerCount = 3;  // This is the max size of layer array.
 
 // TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
-class FakeAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+class FakeAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {}
 };
@@ -73,7 +73,7 @@ class GoldfishDisplayEngineTest : public testing::Test {
   std::unique_ptr<DisplayEngine> display_engine_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
-  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::Allocator>> allocator_binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::Allocator>> allocator_binding_;
   async::Loop loop_;
   FakePipe* fake_pipe_;
   FakeAllocator mock_allocator_;
@@ -86,7 +86,7 @@ void GoldfishDisplayEngineTest::SetUp() {
       fidl::Endpoints<fuchsia_hardware_goldfish::ControlDevice>::Create();
   auto [pipe_client, pipe_server] =
       fidl::Endpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>::Create();
-  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
+  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
   allocator_binding_ =
       fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &mock_allocator_);
 
@@ -399,9 +399,9 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
 }
 
 TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
-  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
-  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
