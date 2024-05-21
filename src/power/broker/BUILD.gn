@@ -50,6 +50,7 @@ rustc_binary("bin") {
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/power/broker/client",
+    "//third_party/rust_crates:lazy_static",
   ]
 
   sources = [

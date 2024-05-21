@@ -153,22 +153,60 @@ pub struct Topology {
     elements: HashMap<ElementID, Element>,
     active_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     passive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
+    unsatisfiable_element_id: ElementID,
     inspect_graph: IGraph<ElementID>,
     _inspect_node: INode, // keeps inspect_graph alive
 }
 
 impl Topology {
+    const TOPOLOGY_UNSATISFIABLE_ELEMENT: &'static str = "TOPOLOGY_UNSATISFIABLE_ELEMENT";
+    const TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS: [PowerLevel; 2] =
+        [PowerLevel::MIN, PowerLevel::MAX];
+
     pub fn new(inspect_node: INode, inspect_max_event: usize) -> Self {
-        Topology {
+        let mut topology = Topology {
             elements: HashMap::new(),
             active_dependencies: HashMap::new(),
             passive_dependencies: HashMap::new(),
+            unsatisfiable_element_id: ElementID::from(""),
             inspect_graph: IGraph::new(
                 &inspect_node,
                 IGraphOpts::default().track_events(inspect_max_event),
             ),
             _inspect_node: inspect_node,
-        }
+        };
+        topology.unsatisfiable_element_id = topology
+            .add_element(
+                Self::TOPOLOGY_UNSATISFIABLE_ELEMENT,
+                Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS.to_vec(),
+            )
+            .ok()
+            .expect("Failed to add unsatisfiable element");
+        topology
+    }
+
+    #[cfg(test)]
+    pub fn get_unsatisfiable_element(&self) -> Element {
+        self.elements.get(&self.unsatisfiable_element_id).unwrap().clone()
+    }
+
+    #[cfg(test)]
+    pub fn get_unsatisfiable_element_name(&self) -> String {
+        Self::TOPOLOGY_UNSATISFIABLE_ELEMENT.to_string().clone()
+    }
+
+    #[cfg(test)]
+    pub fn get_unsatisfiable_element_id(&self) -> ElementID {
+        self.unsatisfiable_element_id.clone()
+    }
+
+    #[cfg(test)]
+    pub fn get_unsatisfiable_element_levels(&self) -> Vec<u64> {
+        Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS
+            .iter()
+            .map(|&v| v as u64)
+            .collect::<Vec<_>>()
+            .clone()
     }
 
     pub fn add_element(
@@ -203,7 +241,10 @@ impl Topology {
     }
 
     pub fn remove_element(&mut self, element_id: &ElementID) {
-        self.elements.remove(element_id);
+        if self.unsatisfiable_element_id != *element_id {
+            self.invalidate_dependent_elements(element_id);
+            self.elements.remove(element_id);
+        }
     }
 
     pub fn minimum_level(&self, element_id: &ElementID) -> PowerLevel {
@@ -279,6 +320,84 @@ impl Topology {
         (active_dependencies, passive_dependencies)
     }
 
+    /// Elements that have any type of dependency on the provided ElementID are 'invalidated'
+    /// by replacing their dependency on the provided ElementID with the 'unsatisfiable' element that
+    /// will never be turned on.
+    fn invalidate_dependent_elements(&mut self, invalid_element_id: &ElementID) {
+        // Prior to removing any dependencies that are no longer valid, ensure that we add a
+        // passive dependency to the unsatisfiable element, which forces *future* leases into the
+        // contingent state and prevents the broker from attempting to turn on other dependent
+        // elements. Existing activated leases will remain active.
+        let active_dependents_of_invalid_elements: Vec<ElementLevel> = self
+            .active_dependencies
+            .iter()
+            .filter_map(|(dependent, requires)| {
+                if requires
+                    .iter()
+                    .any(|required_level| required_level.element_id == *invalid_element_id)
+                {
+                    Some(dependent.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for dependent in active_dependents_of_invalid_elements {
+            self.add_passive_dependency(&Dependency {
+                dependent: dependent.clone(),
+                requires: ElementLevel {
+                    element_id: self.unsatisfiable_element_id.clone(),
+                    level: PowerLevel::MAX,
+                },
+            })
+            .expect("failed to replace active dependency with unsatisfiable dependency");
+            for requires in self.active_dependencies.get(&dependent).unwrap().clone() {
+                if requires.element_id == *invalid_element_id {
+                    self.remove_active_dependency(&Dependency {
+                        dependent: dependent.clone(),
+                        requires: requires.clone(),
+                    })
+                    .expect("failed to remove invalid active dependency");
+                }
+            }
+        }
+        let passive_dependents_of_invalid_elements: Vec<ElementLevel> = self
+            .passive_dependencies
+            .iter()
+            .filter_map(|(dependent, requires)| {
+                if requires
+                    .iter()
+                    .any(|required_level| required_level.element_id == *invalid_element_id)
+                {
+                    Some(dependent.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for dependent in passive_dependents_of_invalid_elements {
+            self.add_passive_dependency(&Dependency {
+                dependent: dependent.clone(),
+                requires: ElementLevel {
+                    element_id: self.unsatisfiable_element_id.clone(),
+                    level: PowerLevel::MAX,
+                },
+            })
+            .expect("failed to replace passive dependency with unsatisfiable dependency");
+            for requires in self.passive_dependencies.get(&dependent).unwrap().clone() {
+                if requires.element_id == *invalid_element_id {
+                    self.remove_passive_dependency(&Dependency {
+                        dependent: dependent.clone(),
+                        requires: requires.clone(),
+                    })
+                    .expect("failed to remove invalid passive dependency");
+                }
+            }
+        }
+        self.active_dependencies.retain(|key, _| key.element_id != *invalid_element_id);
+        self.passive_dependencies.retain(|key, _| key.element_id != *invalid_element_id);
+    }
+
     /// Checks that a dependency is valid. Returns ModifyDependencyError if not.
     fn check_valid_dependency(&self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
         if &dep.dependent.element_id == &dep.requires.element_id {
@@ -294,6 +413,9 @@ impl Topology {
             return Err(ModifyDependencyError::Invalid);
         }
         if !self.is_valid_level(&dep.requires.element_id, dep.requires.level) {
+            return Err(ModifyDependencyError::Invalid);
+        }
+        if self.unsatisfiable_element_id == dep.dependent.element_id {
             return Err(ModifyDependencyError::Invalid);
         }
         Ok(())
@@ -428,7 +550,13 @@ mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl_fuchsia_power_broker::BinaryPowerLevel;
+    use lazy_static::lazy_static;
     use power_broker_client::BINARY_POWER_LEVELS;
+
+    lazy_static! {
+        static ref TOPOLOGY_UNSATISFIABLE_MAX_LEVEL: String =
+            format!("{}p", PowerLevel::MAX.to_string());
+    }
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
@@ -446,6 +574,14 @@ mod tests {
             test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         water.to_string() => {
                             meta: {
                                 name: "Water",
@@ -499,6 +635,14 @@ mod tests {
            test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+            t.get_unsatisfiable_element().id.to_string() => {
+                meta: {
+                    name: t.get_unsatisfiable_element().name,
+                    valid_levels: t.get_unsatisfiable_element_levels(),
+                    required_level: "unset",
+                    current_level: "unset",
+                },
+                relationships: {}},
                         water.to_string() => {
                             meta: {
                                 name: "Water",
@@ -569,6 +713,14 @@ mod tests {
            test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         water.to_string() => {
                             meta: {
                                 name: "Water",
@@ -634,6 +786,14 @@ mod tests {
            test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         water.to_string() => {
                             meta: {
                                 name: "Water",
@@ -687,6 +847,14 @@ mod tests {
            test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         water.to_string() => {
                             meta: {
                                 name: "Water",
@@ -710,6 +878,79 @@ mod tests {
                             },
                             relationships: {},
                         },
+        }}}});
+
+        t.add_active_dependency(&Dependency {
+            dependent: ElementLevel {
+                element_id: water.clone(),
+                level: BinaryPowerLevel::On.into_primitive(),
+            },
+            requires: ElementLevel {
+                element_id: earth.clone(),
+                level: BinaryPowerLevel::On.into_primitive(),
+            },
+        })
+        .expect("add_active_dependency failed");
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            t.get_unsatisfiable_element().id.to_string() => {
+                meta: {
+                    name: t.get_unsatisfiable_element().name,
+                    valid_levels: t.get_unsatisfiable_element_levels(),
+                    required_level: "unset",
+                    current_level: "unset",
+                },
+                relationships: {}},
+            water.to_string() => {
+                meta: {
+                    name: "Water",
+                    valid_levels: v01.clone(),
+                    required_level: "unset",
+                    current_level: "unset",
+                },
+                relationships: {
+                    earth.to_string() => {
+                        edge_id: AnyProperty,
+                        "meta": { "1": "1" }
+                    },
+                },
+            },
+            earth.to_string() => {
+                meta: {
+                    name: "Earth",
+                    valid_levels: v01.clone(),
+                    required_level: "unset",
+                    current_level: "unset",
+                },
+                relationships: {},
+            },
+        }}}});
+
+        t.remove_element(&earth);
+        assert_eq!(t.element_exists(&earth), false);
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+            t.get_unsatisfiable_element().id.to_string() => {
+                meta: {
+                    name: t.get_unsatisfiable_element().name,
+                    valid_levels: t.get_unsatisfiable_element_levels(),
+                    required_level: "unset",
+                    current_level: "unset",
+                },
+                relationships: {}
+            },
+            water.to_string() => {
+                meta: {
+                    name: "Water",
+                    valid_levels: v01.clone(),
+                    required_level: "unset",
+                    current_level: "unset",
+                },
+                relationships: {
+                    t.get_unsatisfiable_element().id.to_string() => {
+                        edge_id: AnyProperty,
+                        "meta": { "1": TOPOLOGY_UNSATISFIABLE_MAX_LEVEL.as_str() }
+                    },
+                },
+            },
         }}}});
     }
 
@@ -751,6 +992,14 @@ mod tests {
             test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         a.to_string() => {
                             meta: {
                                 name: "A",
@@ -844,6 +1093,14 @@ mod tests {
             test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         a.to_string() => {
                             meta: {
                                 name: "A",
@@ -912,6 +1169,14 @@ mod tests {
             test: {
                 "fuchsia.inspect.Graph": {
                     topology: {
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                            },
+                            relationships: {}},
                         a.to_string() => {
                             meta: {
                                 name: "A",
