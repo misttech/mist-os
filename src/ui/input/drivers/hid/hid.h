@@ -5,6 +5,7 @@
 #ifndef SRC_UI_INPUT_DRIVERS_HID_HID_H_
 #define SRC_UI_INPUT_DRIVERS_HID_HID_H_
 
+#include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <fuchsia/hardware/hiddevice/cpp/banjo.h>
@@ -48,12 +49,24 @@ using HidDeviceType =
                 ddk::Unbindable>;
 
 class HidDevice : public HidDeviceType,
-                  public ddk::HidDeviceProtocol<HidDevice, ddk::base_protocol> {
+                  public ddk::HidDeviceProtocol<HidDevice, ddk::base_protocol>,
+                  public fidl::WireAsyncEventHandler<fuchsia_hardware_hidbus::Hidbus> {
  public:
-  explicit HidDevice(zx_device_t* parent) : HidDeviceType(parent) {}
+  using BanjoHidbusClient = ddk::HidbusProtocolClient;
+  using FidlHidbusClient = fidl::WireClient<fuchsia_hardware_hidbus::Hidbus>;
+  using HidbusClient = std::variant<BanjoHidbusClient, FidlHidbusClient>;
+
+  // Banjo Constructor
+  explicit HidDevice(zx_device_t* parent, BanjoHidbusClient hidbus)
+      : HidDeviceType(parent), hidbus_(hidbus) {}
+  // FIDL Constructor
+  explicit HidDevice(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hidbus::Hidbus> hidbus)
+      : HidDeviceType(parent),
+        hidbus_(FidlHidbusClient(std::move(hidbus),
+                                 fdf::Dispatcher::GetCurrent()->async_dispatcher(), this)) {}
   ~HidDevice() override = default;
 
-  zx_status_t Bind(ddk::HidbusProtocolClient hidbus_proto);
+  zx_status_t Bind();
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
@@ -76,7 +89,11 @@ class HidDevice : public HidDeviceType,
   // |HidDeviceProtocol|
   void HidDeviceGetHidDeviceInfo(hid_device_info_t* out_info);
 
+  // fuchsia.hardware.hidbus/HidbusIfc:
   static void IoQueue(void* cookie, const uint8_t* buf, size_t len, zx_time_t time);
+  // fidl::WireAsyncEventHandler<fuchsia_hardware_hidbus::Hidbus>:
+  void OnReportReceived(
+      fidl::WireEvent<fuchsia_hardware_hidbus::Hidbus::OnReportReceived>* event) override;
 
   size_t GetMaxInputReportSize();
 
@@ -84,7 +101,7 @@ class HidDevice : public HidDeviceType,
   fuchsia_hardware_input::wire::BootProtocol GetBootProtocol();
   hid_info_t GetHidInfo() { return info_; }
 
-  ddk::HidbusProtocolClient* GetHidbusProtocol() { return &hidbus_; }
+  HidbusClient& GetHidbusProtocol() { return hidbus_; }
 
   zx::result<fbl::RefPtr<HidInstance>> CreateInstance(
       async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_hardware_input::Device> session);
@@ -106,7 +123,7 @@ class HidDevice : public HidDeviceType,
 
   std::set<HidPageUsage> page_usage_;
   hid_info_t info_ = {};
-  ddk::HidbusProtocolClient hidbus_;
+  HidbusClient hidbus_;
 
   // Reassembly buffer for input events too large to fit in a single interrupt
   // transaction.
