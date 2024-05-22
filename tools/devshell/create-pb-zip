@@ -21,7 +21,7 @@ main() {
         case "$1" in
         -o)
             shift
-            output="$1"
+            output=$(realpath "$1")
             ;;
         esac
         shift
