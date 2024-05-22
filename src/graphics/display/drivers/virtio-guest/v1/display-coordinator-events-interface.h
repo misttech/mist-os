@@ -6,7 +6,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_COORDINATOR_EVENTS_INTERFACE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_COORDINATOR_EVENTS_INTERFACE_H_
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/stdcompat/span.h>

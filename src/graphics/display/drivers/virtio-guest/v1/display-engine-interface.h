@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_INTERFACE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_INTERFACE_H_
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/zx/result.h>
@@ -42,7 +42,7 @@ class DisplayEngineInterface {
 
   virtual zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId driver_buffer_collection_id,
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> buffer_collection_token) = 0;
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) = 0;
   virtual zx::result<> ReleaseBufferCollection(
       display::DriverBufferCollectionId driver_buffer_collection_id) = 0;
 

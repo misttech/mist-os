@@ -6,7 +6,7 @@
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
@@ -56,7 +56,7 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel banjo_buffer_collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
-  fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> buffer_collection_token(
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token(
       std::move(banjo_buffer_collection_token));
 
   zx::result<> result = engine_.ImportBufferCollection(driver_buffer_collection_id,
