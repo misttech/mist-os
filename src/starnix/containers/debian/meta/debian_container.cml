@@ -7,7 +7,7 @@
         features: [
             "ashmem",
             "custom_artifacts",
-            "framebuffer",
+            "framebuffer2",
             "magma",
             "test_data",
         ],

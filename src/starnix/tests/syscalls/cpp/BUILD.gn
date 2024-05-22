@@ -358,5 +358,10 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     _env += [ gce_env ]
     _env -= [ gce_env ]
     environments = _env
+
+    log_settings = {
+      # Tests exercise failure cases, so ERROR logs are expected.
+      max_severity = "ERROR"
+    }
   }
 }

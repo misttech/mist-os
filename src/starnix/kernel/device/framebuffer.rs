@@ -126,16 +126,14 @@ impl Framebuffer {
         if let Some(server) = &self.server {
             let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
             let view_identity = self.view_identity.lock().take().unwrap();
-            if let Some(incoming_dir) = incoming_dir {
-                log_info!("Presenting view using GraphicalPresenter");
-                start_presentation_loop(
-                    kernel,
-                    server.clone(),
-                    view_bound_protocols,
-                    view_identity,
-                    incoming_dir,
-                );
-            }
+            log_info!("Presenting view using GraphicalPresenter");
+            start_presentation_loop(
+                kernel,
+                server.clone(),
+                view_bound_protocols,
+                view_identity,
+                incoming_dir,
+            );
         }
 
         Ok(())

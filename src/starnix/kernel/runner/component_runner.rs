@@ -4,8 +4,10 @@
 
 use crate::run_component_features;
 use anyhow::{anyhow, bail, Error};
-use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
-use fidl::AsyncChannel;
+use fidl::{
+    endpoints::{ControlHandle, RequestStream, ServerEnd},
+    AsyncChannel,
+};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner::{
     ComponentControllerMarker, ComponentControllerRequest, ComponentControllerRequestStream,

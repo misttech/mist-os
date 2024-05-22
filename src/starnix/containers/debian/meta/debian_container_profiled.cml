@@ -6,7 +6,7 @@
     program: {
         features: [
             "custom_artifacts",
-            "framebuffer",
+            "framebuffer2",
             "magma",
             "self_profile",
             "test_data",

@@ -11,4 +11,11 @@
         uid: "0",
         component_features: [ "magma" ],
     },
+    offer: [
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "#ui",
+            to: [ "#container" ],
+        },
+    ],
 }

@@ -23,4 +23,11 @@
             path: "/data",
         },
     ],
+    offer: [
+        {
+            protocol: [ "fuchsia.element.GraphicalPresenter" ],
+            from: "#ui",
+            to: [ "#container" ],
+        },
+    ],
 }

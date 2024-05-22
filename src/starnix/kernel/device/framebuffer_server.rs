@@ -294,13 +294,14 @@ pub fn start_presentation_loop(
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     view_identity: fuiviews::ViewIdentityOnCreation,
-    incoming_dir: fidl_fuchsia_io::DirectoryProxy,
+    incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
 ) {
     let flatland = server.flatland.clone();
     let mut flatland_event_stream = flatland.take_event_stream();
     let server_clone = server.clone();
     let mut presentation_receiver = server_clone.presentation_receiver.lock();
     let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
+    let kernel_clone = kernel.clone();
     kernel.kthreads.spawner().spawn(|_, _| {
         let mut executor = fasync::LocalExecutor::new();
         let scheduler = ThroughputScheduler::new();
@@ -353,11 +354,20 @@ pub fn start_presentation_loop(
                 .unwrap_or(());
             };
 
-            let graphical_presenter = connect_to_protocol_at_dir_root::<
+            let graphical_presenter = if let Some(incoming_dir) = incoming_dir {
+                connect_to_protocol_at_dir_root::<
                 felement::GraphicalPresenterMarker,
             >(&incoming_dir)
             .map_err(|_| errno!(ENOENT))
-            .expect("Failed to connect to GraphicalPresenter");
+            .expect("Failed to connect to GraphicalPresenter")
+            } else {
+            kernel_clone.connect_to_protocol_at_container_svc::<
+                felement::GraphicalPresenterMarker,
+            >()
+            .map_err(|_| errno!(ENOENT))
+            .expect("Failed to connect to GraphicalPresenter").into_proxy().expect("Failed to convert GraphicalPresenter to proxy")
+            };
+
 
             let (view_controller_proxy, view_controller_server_end) =
                 fidl::endpoints::create_proxy::<felement::ViewControllerMarker>()

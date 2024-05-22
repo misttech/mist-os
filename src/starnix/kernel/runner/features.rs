@@ -25,7 +25,6 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{error, errors::Errno};
 use std::sync::Arc;
 
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sysinfo as fsysinfo;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_input3 as fuiinput;
@@ -43,6 +42,7 @@ pub struct Features {
     pub ashmem: bool,
 
     pub framebuffer: bool,
+    pub framebuffer2: bool,
 
     pub gralloc: bool,
 
@@ -94,6 +94,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
+            ("framebuffer2", _) => features.framebuffer2 = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
             ("gfxstream", _) => features.gfxstream = true,
@@ -132,7 +133,7 @@ pub fn run_container_features(
     let kernel = system_task.kernel();
 
     let mut enabled_profiling = false;
-    if features.framebuffer {
+    if features.framebuffer || features.framebuffer2 {
         fb_device_init(locked, system_task);
 
         let (touch_source_proxy, touch_source_stream) = fidl::endpoints::create_sync_proxy();
@@ -180,6 +181,13 @@ pub fn run_container_features(
         touch_device.start_touch_relay(&kernel, touch_source_proxy);
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
         keyboard_device.start_button_relay(&kernel, registry_proxy);
+
+        if features.framebuffer2 {
+            kernel
+                .framebuffer
+                .start_server(kernel, None)
+                .expect("Failed to start framebuffer server");
+        }
     }
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
@@ -229,7 +237,7 @@ pub fn run_container_features(
 pub fn run_component_features(
     kernel: &Arc<Kernel>,
     entries: &Vec<String>,
-    mut incoming_dir: Option<fio::DirectoryProxy>,
+    mut incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
