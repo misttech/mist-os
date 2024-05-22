@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl_fuchsia_component as fcomponent;
+use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_memory_attribution as fattribution;
 use fidl_fuchsia_settings as fsettings;
-use fidl_fuchsia_starnix_container as fstarnix;
 use fidl_fuchsia_starnix_runner as fstarnixrunner;
-use fuchsia_component::{
-    client::{connect_to_protocol, connect_to_protocol_sync},
-    server::ServiceFs,
-};
+use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{HandleBased, Task};
@@ -21,12 +18,13 @@ use std::sync::Arc;
 use tracing::{info, warn};
 use zx::AsHandleRef;
 
-/// The component URL of the Starnix kernel.
-const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
+mod kernels;
+use crate::kernels::Kernels;
 
 enum Services {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     StarnixManager(fstarnixrunner::ManagerRequestStream),
+    AttributionProvider(fattribution::ProviderRequestStream),
 }
 
 #[fuchsia::main(logging_tags = ["starnix_runner"])]
@@ -49,23 +47,26 @@ async fn main() -> Result<(), Error> {
         }
     }
 
-    let kernels = Arc::new(Mutex::new(vec![]));
-
+    let kernels = Kernels::new();
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(Services::ComponentRunner);
     fs.dir("svc").add_fidl_service(Services::StarnixManager);
+    fs.dir("svc").add_fidl_service(Services::AttributionProvider);
     fs.take_and_serve_directory_handle()?;
     let suspended_processes = Arc::new(Mutex::new(vec![]));
     fs.for_each_concurrent(None, |request: Services| async {
         match request {
-            Services::ComponentRunner(stream) => serve_component_runner(stream, kernels.clone())
+            Services::ComponentRunner(stream) => serve_component_runner(stream, &kernels)
                 .await
                 .expect("failed to start component runner"),
             Services::StarnixManager(stream) => {
-                serve_starnix_manager(stream, suspended_processes.clone(), kernels.clone())
+                serve_starnix_manager(stream, suspended_processes.clone(), &kernels)
                     .await
                     .expect("failed to serve starnix manager")
             }
+            Services::AttributionProvider(stream) => serve_attribution_provider(stream, &kernels)
+                .await
+                .expect("failed to serve attribution provider"),
         }
     })
     .await;
@@ -74,16 +75,12 @@ async fn main() -> Result<(), Error> {
 
 async fn serve_component_runner(
     mut stream: frunner::ComponentRunnerRequestStream,
-    kernels: Arc<Mutex<Vec<StarnixKernel>>>,
+    kernels: &Kernels,
 ) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                let realm = connect_to_protocol::<fcomponent::RealmMarker>()
-                    .expect("Failed to connect to realm.");
-                let kernel =
-                    StarnixKernel::create(realm, KERNEL_URL, start_info, controller).await?;
-                kernels.lock().push(kernel);
+                kernels.start(start_info, controller).await?;
             }
         }
     }
@@ -93,13 +90,13 @@ async fn serve_component_runner(
 async fn serve_starnix_manager(
     mut stream: fstarnixrunner::ManagerRequestStream,
     suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
-    kernels: Arc<Mutex<Vec<StarnixKernel>>>,
+    kernels: &Kernels,
 ) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         match event {
             fstarnixrunner::ManagerRequest::Suspend { .. } => {
-                let kernels = kernels.lock();
-                for kernel in kernels.iter() {
+                let kernels = kernels.list();
+                for kernel in kernels {
                     suspended_processes.lock().append(&mut suspend_kernel(&kernel).await);
                 }
             }
@@ -113,19 +110,30 @@ async fn serve_starnix_manager(
     Ok(())
 }
 
+async fn serve_attribution_provider(
+    mut stream: fattribution::ProviderRequestStream,
+    kernels: &Kernels,
+) -> Result<(), Error> {
+    let observer = kernels.new_memory_attribution_observer(stream.control_handle());
+    while let Some(event) = stream.try_next().await? {
+        match event {
+            fattribution::ProviderRequest::Get { responder } => {
+                observer.next(responder);
+            }
+            fattribution::ProviderRequest::_UnknownMethod { ordinal, control_handle, .. } => {
+                tracing::error!("Invalid request to AttributionProvider: {ordinal}");
+                control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Suspends `kernel` by suspending all the processes in the kernel's job.
 async fn suspend_kernel(kernel: &StarnixKernel) -> Vec<zx::Handle> {
-    let container_controller =
-        kernel.connect_to_protocol::<fstarnix::ControllerMarker>().expect("Failed to connect");
-    let fstarnix::ControllerGetJobHandleResponse { job, .. } =
-        container_controller.get_job_handle().await.expect("failed to get handles");
-    let Some(job) = job else {
-        return vec![];
-    };
-
     let mut handles = std::collections::HashMap::<zx::Koid, zx::Handle>::new();
     loop {
-        let process_koids = job.processes().expect("failed to get processes");
+        let process_koids = kernel.job().processes().expect("failed to get processes");
         let mut found_new_process = false;
         let mut processes = vec![];
 
@@ -136,7 +144,8 @@ async fn suspend_kernel(kernel: &StarnixKernel) -> Vec<zx::Handle> {
 
             found_new_process = true;
 
-            if let Ok(process_handle) = job.get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
+            if let Ok(process_handle) =
+                kernel.job().get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
             {
                 let process = zx::Process::from_handle(process_handle);
                 if let Ok(suspend_handle) = process.suspend() {
