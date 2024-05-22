@@ -18,7 +18,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/update"
 )
 
 const usage = `Usage: %s [-k key] [-m manifest] [-o output dir] [-t tempdir] <command> [-help]
@@ -29,7 +28,6 @@ IMPORTANT: Please note that pm is being sunset and will be removed.
 
 Package Commands:
     build    - perform update and seal in order
-    update   - update the merkle roots in meta/contents
     seal     - seal package metadata into a meta.far
     archive  - construct a single .far representation of the package
 
@@ -116,7 +114,8 @@ func doMain() int {
 		err = nil
 
 	case "update":
-		err = update.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "update is deprecated without replacement")
+		err = nil
 
 	case "verify":
 		fmt.Fprintf(os.Stderr, "verify is deprecated without replacement")
