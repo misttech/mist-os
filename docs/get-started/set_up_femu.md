@@ -46,24 +46,15 @@ For more information on supported boards and products, see the
 (**Linux only**) Most Linux machines support VM acceleration through
 KVM, which greatly improves the performance and usability of the emulator.
 
-If KVM is available on your machine, update your group permission to
-enable KVM.
-
-* {Linux}
-
-  Note: You only need to do this once per machine.
-
-  To enable KVM on your machine, do the following:
-
-  1.  Add yourself to the `kvm` group on your machine:
+1. If KVM is available on your machine, add yourself to the `kvm` group on your machine:
 
       ```posix-terminal
       sudo usermod -a -G kvm ${USER}
       ```
 
-  1.  Log out of all desktop sessions to your machine and then log in again.
+1.  Log out of all desktop sessions to your machine and then log in again.
 
-  1.  To verify that KVM is configured correctly, run the following command:
+1.  To verify that KVM is configured correctly, run the following command:
 
       ```posix-terminal
       if [[ -r /dev/kvm ]] && grep '^flags' /proc/cpuinfo | grep -qE 'vmx|svm'; then echo 'KVM is working'; else echo 'KVM not working'; fi
@@ -77,13 +68,6 @@ enable KVM.
 
       If you see `KVM not working`, you may need to reboot your machine for
       the permission change to take effect.
-
-* {macOS}
-
-  No additional setup is required for macOS.
-
-  Instead of KVM, the Fuchsia emulator on macOS uses the
-  [Hypervisor framework][hypervisor-framework]{: .external}.
 
 ## 4. Start FEMU {#start-femu}
 
@@ -104,9 +88,7 @@ Alternatively you can background the `fx serve` process.
 
 To start the emulator on your Linux machine, do the following:
 
-* {Linux}
-
-  1. Configure the upscript by running the following command:
+1. Configure the upscript by running the following command:
 
      ```posix-terminal
      ffx config set emu.upscript {{ '<var>' }}FUCHSIA_ROOT{{ '</var>' }}/scripts/start-unsecure-internet.sh
@@ -127,7 +109,7 @@ To start the emulator on your Linux machine, do the following:
      at <code>{{ '<var>' }}FUCHSIA_ROOT{{ '</var>' }}/scripts/start-unsecure-internet.sh</code>
      should work for the majority of non-corporate users.
 
-  1. To start the emulator with access to external networks,
+1. To start the emulator with access to external networks,
      run the following command:
 
      ```posix-terminal
@@ -147,36 +129,6 @@ To start the emulator on your Linux machine, do the following:
      Starting the emulator opens a new window with the title
      **Fuchsia Emulator**. When the emulator is finished booting, you are
      returned to the command prompt, and the emulator runs in the background.
-
-* {macOS}
-
-  To start FEMU on macOS, do the following:
-
-  1. Start FEMU:
-
-     ```posix-terminal
-     ffx emu start
-     ```
-
-     If you launch FEMU for the first time on your macOS (including after a reboot),
-     a window pops up asking if you want to allow the process `aemu` to run on your
-     machine. Click **Allow**.
-
-     This command opens a new window with the title **Fuchsia Emulator**.
-     When the emulator is finished booting, you are returned to the command
-     prompt, and the emulator runs in the background.
-
-  2. (Optional) If you need to specify the launched Fuchsia emulator, you can
-     run the `fx set-device` command in the same terminal:
-
-     ```posix-terminal
-     fx set-device {{ '<var>' }}NAME{{ '</var>' }}
-     ```
-
-     Replace the following:
-
-     * `NAME`: Use the desired value from the `ffx emu list` or `ffx target list`
-       command's output. `fuchsia-emulator` is the default value.
 
 ## 5. Discover FEMU {#discover-femu}
 
@@ -263,33 +215,22 @@ ffx emu stop
 This section provides instructions on how to configure an IPv6 network
 for FEMU on Linux machine using [TUN/TAP][tuntap]{: .external}.
 
-* {Linux}
+Note: You only need to do this once per machine.
 
-  Note: You only need to do this once per machine.
+To enable networking in FEMU using
+[tap networking][tap-networking]{: .external}, do the following:
 
-  To enable networking in FEMU using
-  [tap networking][tap-networking]{: .external}, do the following:
-
-  1. Set up `tuntap`:
+1. Set up `tuntap`:
 
      ```posix-terminal
      sudo ip tuntap add dev qemu mode tap user $USER
      ```
 
-  1. Enable the network for `qemu`:
+1. Enable the network for `qemu`:
 
      ```posix-terminal
      sudo ip link set qemu up
      ```
-
-* {macOS}
-
-  No additional IPv6 network setup is required for macOS.
-
-  [User Networking (SLIRP)][slirp]{: .external} is the default network setup
-  for FEMU on macOS – while this setup does not support Fuchsia device
-  discovery, you can still use `fx` tools (for example,`fx ssh`) to
-  interact with your FEMU instance.
 
 ### Specify GPU mode for FEMU (Experimental)
 
