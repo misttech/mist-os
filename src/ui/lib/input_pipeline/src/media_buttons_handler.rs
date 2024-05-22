@@ -176,6 +176,7 @@ impl MediaButtonsHandler {
             pause: Some(false),
             camera_disable: Some(false),
             power: Some(false),
+            function: Some(false),
             ..Default::default()
         };
         for button in &event.pressed_buttons {
@@ -196,6 +197,9 @@ impl MediaButtonsHandler {
                     new_event.camera_disable = Some(true);
                 }
                 fidl_input_report::ConsumerControlButton::Function => {
+                    new_event.function = Some(true);
+                }
+                fidl_input_report::ConsumerControlButton::Power => {
                     new_event.power = Some(true);
                 }
                 _ => {}
@@ -308,6 +312,7 @@ mod tests {
         pause: Option<bool>,
         camera_disable: Option<bool>,
         power: Option<bool>,
+        function: Option<bool>,
     ) -> fidl_ui_input::MediaButtonsEvent {
         fidl_ui_input::MediaButtonsEvent {
             volume,
@@ -315,6 +320,7 @@ mod tests {
             pause,
             camera_disable,
             power,
+            function,
             ..Default::default()
         }
     }
@@ -354,6 +360,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )),
                 send_event_task_tracker: LocalTaskTracker::new(),
             }),
@@ -373,7 +380,8 @@ mod tests {
         };
 
         // Assert listener was registered and received last event.
-        let expected_event = create_ui_input_media_buttons_event(Some(1), None, None, None, None);
+        let expected_event =
+            create_ui_input_media_buttons_event(Some(1), None, None, None, None, None);
         let assert_fut = async {
             match listener_stream.next().await {
                 Some(Ok(fidl_ui_policy::MediaButtonsListenerRequest::OnEvent {
@@ -417,12 +425,14 @@ mod tests {
                 fidl_input_report::ConsumerControlButton::MicMute,
                 fidl_input_report::ConsumerControlButton::CameraDisable,
                 fidl_input_report::ConsumerControlButton::Function,
+                fidl_input_report::ConsumerControlButton::Power,
             ],
             event_time,
             &descriptor,
         )];
         let expected_events = vec![create_ui_input_media_buttons_event(
             Some(0),
+            Some(true),
             Some(true),
             Some(true),
             Some(true),
@@ -469,6 +479,7 @@ mod tests {
         )];
         let expected_events = vec![create_ui_input_media_buttons_event(
             Some(1),
+            Some(false),
             Some(false),
             Some(false),
             Some(false),
@@ -528,6 +539,7 @@ mod tests {
 
             let expected_media_buttons_event = create_ui_input_media_buttons_event(
                 Some(1),
+                Some(false),
                 Some(false),
                 Some(false),
                 Some(false),
@@ -619,6 +631,7 @@ mod tests {
             Some(false),
             Some(false),
             Some(false),
+            Some(false),
         );
 
         assert_matches!(
@@ -676,6 +689,7 @@ mod tests {
         let second_expected_media_buttons_event = create_ui_input_media_buttons_event(
             Some(0),
             Some(true),
+            Some(false),
             Some(false),
             Some(false),
             Some(false),

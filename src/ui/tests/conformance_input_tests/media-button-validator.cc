@@ -135,42 +135,47 @@ class MediaButtonConformanceTest : public ui_conformance_test_base::ConformanceT
 };
 
 fui::MediaButtonsEvent MakeMediaButtonsEvent(int8_t volume, bool mic_mute, bool pause,
-                                             bool camera_disable, bool power) {
+                                             bool camera_disable, bool power, bool function) {
   fui::MediaButtonsEvent e;
   e.set_volume(volume);
   e.set_mic_mute(mic_mute);
   e.set_pause(pause);
   e.set_camera_disable(camera_disable);
   e.set_power(power);
+  e.set_function(function);
   return e;
 }
 
 fui::MediaButtonsEvent MakeEmptyEvent() {
-  return MakeMediaButtonsEvent(0, false, false, false, false);
+  return MakeMediaButtonsEvent(0, false, false, false, false, false);
 }
 
 fui::MediaButtonsEvent MakeVolumeUpEvent() {
-  return MakeMediaButtonsEvent(1, false, false, false, false);
+  return MakeMediaButtonsEvent(1, false, false, false, false, false);
 }
 
 fui::MediaButtonsEvent MakeVolumeDownEvent() {
-  return MakeMediaButtonsEvent(-1, false, false, false, false);
+  return MakeMediaButtonsEvent(-1, false, false, false, false, false);
 }
 
 fui::MediaButtonsEvent MakePauseEvent() {
-  return MakeMediaButtonsEvent(0, false, true, false, false);
+  return MakeMediaButtonsEvent(0, false, true, false, false, false);
 }
 
 fui::MediaButtonsEvent MakeMicMuteEvent() {
-  return MakeMediaButtonsEvent(0, true, false, false, false);
+  return MakeMediaButtonsEvent(0, true, false, false, false, false);
 }
 
 fui::MediaButtonsEvent MakeCameraDisableEvent() {
-  return MakeMediaButtonsEvent(0, false, false, true, false);
+  return MakeMediaButtonsEvent(0, false, false, true, false, false);
 }
 
 fui::MediaButtonsEvent MakePowerEvent() {
-  return MakeMediaButtonsEvent(0, false, false, false, true);
+  return MakeMediaButtonsEvent(0, false, false, false, true, false);
+}
+
+fui::MediaButtonsEvent MakeFunctionEvent() {
+  return MakeMediaButtonsEvent(0, false, false, false, false, true);
 }
 
 std::string ToString(const fui::MediaButtonsEvent& e) {
@@ -240,26 +245,22 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
     FX_LOGS(INFO) << "wait for button FUNCTION";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
-    // TODO(https://fxbug.dev/329271369): Soft-migrate function-button
-    // functionality.
-    // EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakePowerEvent()));
+    EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakeFunctionEvent()));
     EXPECT_EQ(ToString(listener.events_received()[1]), ToString(MakeEmptyEvent()));
     listener.clear_events();
   }
 
-  // We did not handle following button yet.
   {
     SimulatePress(fir::ConsumerControlButton::POWER);
     FX_LOGS(INFO) << "wait for button POWER";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
-    // TODO(https://fxbug.dev/329271369): Soft-migrate power-button
-    // functionality.
-    // EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakeEmptyEvent()));
+    EXPECT_EQ(ToString(listener.events_received()[0]), ToString(MakePowerEvent()));
     EXPECT_EQ(ToString(listener.events_received()[1]), ToString(MakeEmptyEvent()));
     listener.clear_events();
   }
 
+  // The following button types are not yet supported.
   {
     SimulatePress(fir::ConsumerControlButton::REBOOT);
     FX_LOGS(INFO) << "wait for button REBOOT";
@@ -299,7 +300,7 @@ TEST_F(MediaButtonConformanceTest, MultiPress) {
     RunLoopUntil([&listener]() { return listener.events_received().size() > 0; });
     EXPECT_EQ(listener.events_received().size(), 1u);
     EXPECT_EQ(ToString(listener.events_received()[0]),
-              ToString(MakeMediaButtonsEvent(1, true, true, true, false)));
+              ToString(MakeMediaButtonsEvent(1, true, true, true, false, false)));
     listener.clear_events();
   }
 

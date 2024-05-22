@@ -166,6 +166,8 @@ type MediaButtonsEvent = table {
     4: camera_disable bool;
     @available(added=15)
     5: power bool;
+    @available(added=20)
+    6: function bool;
 };
 
 type InputEvent = strict union {

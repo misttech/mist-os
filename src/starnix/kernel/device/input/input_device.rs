@@ -234,10 +234,19 @@ impl InputDevice {
                 if let Err(e) = registry_proxy.register_listener(listener, zx::Time::INFINITE) {
                     log_warn!("Failed to register media buttons listener: {:?}", e);
                 }
+                let mut power_was_pressed = false;
+                let mut function_was_pressed = false;
                 while let Some(Ok(request)) = listener_stream.next().await {
                     match request {
                         fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder } => {
-                            let new_events = parse_fidl_button_event(&event);
+                            let (new_events, power_is_pressed, function_is_pressed) =
+                                parse_fidl_button_event(
+                                    &event,
+                                    power_was_pressed,
+                                    function_was_pressed,
+                                );
+                            power_was_pressed = power_is_pressed;
+                            function_was_pressed = function_is_pressed;
 
                             let mut files = slf.open_files.lock();
                             let filtered_files: Vec<Arc<InputFile>> =
@@ -367,7 +376,11 @@ fn parse_fidl_touch_event(fidl_event: &FidlTouchEvent) -> Option<TouchEvent> {
     }
 }
 
-fn parse_fidl_button_event(fidl_event: &MediaButtonsEvent) -> Vec<uapi::input_event> {
+fn parse_fidl_button_event(
+    fidl_event: &MediaButtonsEvent,
+    power_was_pressed: bool,
+    function_was_pressed: bool,
+) -> (Vec<uapi::input_event>, bool /* power_is_pressed */, bool /* function_is_pressed */) {
     let time = timeval_from_time(zx::Time::get_monotonic());
     let mut events = vec![];
     let sync_event = uapi::input_event {
@@ -377,32 +390,26 @@ fn parse_fidl_button_event(fidl_event: &MediaButtonsEvent) -> Vec<uapi::input_ev
         code: uapi::SYN_REPORT as u16,
         value: 0,
     };
-    match fidl_event {
-        &MediaButtonsEvent { power: Some(true), .. } => {
-            let key_event = uapi::input_event {
+
+    let power_is_pressed = fidl_event.power.unwrap_or(false);
+    let function_is_pressed = fidl_event.function.unwrap_or(false);
+    for (then, now, key_code) in [
+        (power_was_pressed, power_is_pressed, uapi::KEY_POWER),
+        (function_was_pressed, function_is_pressed, uapi::KEY_SCREENSAVER),
+    ] {
+        // Button state changed. Send an event.
+        if then != now {
+            events.push(uapi::input_event {
                 time,
                 type_: uapi::EV_KEY as u16,
-                code: uapi::KEY_POWER as u16,
-                value: 1,
-            };
-            events.push(key_event);
+                code: key_code as u16,
+                value: now as i32,
+            });
             events.push(sync_event);
         }
-        // Power button is released
-        &MediaButtonsEvent { power: Some(false), .. } => {
-            let key_event = uapi::input_event {
-                time,
-                type_: uapi::EV_KEY as u16,
-                code: uapi::KEY_POWER as u16,
-                value: 0,
-            };
-            events.push(key_event);
-            events.push(sync_event);
-        }
-        _ => {}
     }
 
-    events
+    (events, power_is_pressed, function_is_pressed)
 }
 
 /// Returns a FIDL response for `fidl_event`.
@@ -1079,7 +1086,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn sends_button_events() {
+    async fn sends_power_button_events() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut device_listener_stream) =
             start_button_input(&current_task);
@@ -1103,6 +1110,7 @@ mod test {
             pause: Some(false),
             camera_disable: Some(false),
             power: Some(true),
+            function: Some(false),
             ..Default::default()
         };
 
@@ -1114,6 +1122,164 @@ mod test {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].code, uapi::KEY_POWER as u16);
         assert_eq!(events[0].value, 1);
+    }
+
+    #[::fuchsia::test]
+    async fn sends_function_button_events() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut device_listener_stream) =
+            start_button_input(&current_task);
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let function_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(false),
+            function: Some(true),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&function_event).await;
+        std::mem::drop(device_listener_stream); // Close Zircon channel.
+        std::mem::drop(buttons_listener); // Close Zircon channel.
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[0].value, 1);
+    }
+
+    #[::fuchsia::test]
+    async fn sends_overlapping_button_events() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut device_listener_stream) =
+            start_button_input(&current_task);
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let power_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let function_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(true),
+            ..Default::default()
+        };
+
+        let function_release_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let power_release_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(false),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_event).await;
+        let _ = buttons_listener.on_event(&function_event).await;
+        let _ = buttons_listener.on_event(&function_release_event).await;
+        let _ = buttons_listener.on_event(&power_release_event).await;
+        std::mem::drop(device_listener_stream); // Close Zircon channel.
+        std::mem::drop(buttons_listener); // Close Zircon channel.
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events.len(), 8);
+        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[0].value, 1);
+        assert_eq!(events[2].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[2].value, 1);
+        assert_eq!(events[4].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[4].value, 0);
+        assert_eq!(events[6].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[6].value, 0);
+    }
+
+    #[::fuchsia::test]
+    async fn sends_simultaneous_button_events() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut device_listener_stream) =
+            start_button_input(&current_task);
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let power_and_function_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(true),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_and_function_event).await;
+        std::mem::drop(device_listener_stream); // Close Zircon channel.
+        std::mem::drop(buttons_listener); // Close Zircon channel.
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[0].value, 1);
+        assert_eq!(events[2].code, uapi::KEY_SCREENSAVER as u16);
+        assert_eq!(events[2].value, 1);
     }
 
     #[::fuchsia::test]

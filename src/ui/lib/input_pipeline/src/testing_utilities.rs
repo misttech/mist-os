@@ -241,6 +241,7 @@ pub fn consumer_controls_device_descriptor() -> input_device::InputDeviceDescrip
                 fidl_input_report::ConsumerControlButton::Function,
                 fidl_input_report::ConsumerControlButton::MicMute,
                 fidl_input_report::ConsumerControlButton::Pause,
+                fidl_input_report::ConsumerControlButton::Power,
                 fidl_input_report::ConsumerControlButton::VolumeDown,
                 fidl_input_report::ConsumerControlButton::VolumeUp,
             ],
