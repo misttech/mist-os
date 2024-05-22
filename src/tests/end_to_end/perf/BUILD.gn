@@ -6,6 +6,7 @@ import("//build/testing/perf/test.gni")
 
 python_perf_test("perf_publish_example") {
   main_source = "test/perf_publish_example.py"
+  data_package_name = "test_data"
   expected_metric_names_filepaths = [
     "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.example.txt",
   ]
@@ -26,6 +27,7 @@ python_perf_test("perftest_trace_events_test") {
 
 python_perf_test("tracing_microbenchmarks_test") {
   main_source = "test/tracing_microbenchmarks_test.py"
+  data_package_name = "test_data"
   expected_metric_names_filepaths = [
     "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.tracing.txt",
     "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.tracing_categories_disabled.txt",

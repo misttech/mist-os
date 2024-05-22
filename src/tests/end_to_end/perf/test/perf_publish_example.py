@@ -7,10 +7,13 @@
 import json
 import os
 import random
+from importlib.resources import as_file, files
 
-from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
+
+import test_data
 import perf_publish.publish as publish
+from fuchsia_base_test import fuchsia_base_test
 
 
 class ExampleMetricPublishing(fuchsia_base_test.FuchsiaBaseTest):
@@ -32,10 +35,11 @@ class ExampleMetricPublishing(fuchsia_base_test.FuchsiaBaseTest):
         with open(test_perf_file, "w") as f:
             json.dump(fuchsiaperf_data, f, indent=4)
 
-        publish.publish_fuchsiaperf(
-            [test_perf_file],
-            "fuchsia.example.txt",
-        )
+        with as_file(files(test_data).joinpath("fuchsia.example.txt")) as f:
+            publish.publish_fuchsiaperf(
+                [test_perf_file],
+                str(f),
+            )
 
 
 if __name__ == "__main__":

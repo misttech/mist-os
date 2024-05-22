@@ -6,8 +6,10 @@
 
 import os
 import time
+from importlib.resources import as_file, files
 from pathlib import Path
 
+import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
@@ -107,10 +109,11 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         )
 
         expected_metrics_file = f"{TEST_NAME}.txt"
-        publish.publish_fuchsiaperf(
-            fuchsia_perf_file_paths=[fuchsiaperf_json_path],
-            expected_metric_names_filename=expected_metrics_file,
-        )
+        with as_file(files(test_data).joinpath(expected_metrics_file)) as f:
+            publish.publish_fuchsiaperf(
+                fuchsia_perf_file_paths=[fuchsiaperf_json_path],
+                expected_metric_names_filename=str(f),
+            )
 
 
 if __name__ == "__main__":

@@ -8,12 +8,16 @@ import ipaddress
 import logging
 import json
 import os
+import stat
 import statistics
 import subprocess
 import time
 from enum import Enum
+from importlib.resources import as_file, files
 from typing import Any
 
+
+import test_data
 import honeydew
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -461,31 +465,30 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         self, cmd_args: list[str], output_filename: str
     ) -> str:
         # Run iperf3 client from the host-tools
-        host_path = os.path.join(
-            utils.get_associated_runtime_deps_dir(__file__), "iperf3"
-        )
-        process = await asyncio.create_subprocess_exec(
-            host_path,
-            *cmd_args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
-        stdout_str = stdout.decode("utf-8")
-        stderr_str = stderr.decode("utf-8")
+        with as_file(files(test_data).joinpath("iperf3")) as host_bin:
+            host_bin.chmod(host_bin.stat().st_mode | stat.S_IEXEC)
+            process = await asyncio.create_subprocess_exec(
+                str(host_bin),
+                *cmd_args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+            stdout_str = stdout.decode("utf-8")
+            stderr_str = stderr.decode("utf-8")
 
-        asserts.assert_equal(
-            process.returncode,
-            0,
-            f"output: {stdout_str} stderr: {stderr_str}",
-        )
-        results_path = os.path.join(
-            self.test_case_path,
-            output_filename,
-        )
-        with open(results_path, "wb") as f:
-            f.write(stdout)
-        return results_path
+            asserts.assert_equal(
+                process.returncode,
+                0,
+                f"output: {stdout_str} stderr: {stderr_str}",
+            )
+            results_path = os.path.join(
+                self.test_case_path,
+                output_filename,
+            )
+            with open(results_path, "wb") as f:
+                f.write(stdout)
+            return results_path
 
     def _iperf_results_to_fuchsiaperf(
         self,

@@ -7,7 +7,12 @@ component that publishes a fuchsiaperf.json file.
 """
 
 import os
+from importlib.resources import as_file, files
 
+# LINT.IfChange
+import test_data
+
+# LINT.ThenChange(//build/testing/perf/test.gni)
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from perf_publish import publish
@@ -88,10 +93,12 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
             process_runs=process_runs,
         )
 
-        publish.publish_fuchsiaperf(
-            result_files,
-            os.path.basename(expected_metric_names_filepath),
-        )
+        expected_metric_file = os.path.basename(expected_metric_names_filepath)
+        with as_file(files(test_data).joinpath(expected_metric_file)) as f:
+            publish.publish_fuchsiaperf(
+                result_files,
+                str(f),
+            )
 
 
 if __name__ == "__main__":

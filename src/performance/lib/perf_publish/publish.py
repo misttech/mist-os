@@ -48,7 +48,7 @@ ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: str = (
 
 def publish_fuchsiaperf(
     fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
-    expected_metric_names_filename: str,
+    expected_metric_names_filename: str | os.PathLike[str],
     env: dict[str, str] = dict(os.environ),
     runtime_deps_dir: str | os.PathLike[str] | None = None,
 ) -> None:
@@ -57,11 +57,11 @@ def publish_fuchsiaperf(
     Args:
         fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics. These
             will be summarized into a single fuchsiaperf.json file.
+        expected_metric_names_filename: file name or path to file containing
+            expected metric names to validate the actual metrics against.
         env: map holding the environment variables.
         runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
              metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
-        expected_metric_names_filename: name of file containing expected metric names to validate
-            the actual metrics against.
     """
     converter = CatapultConverter.from_env(
         fuchsia_perf_file_paths,
@@ -76,7 +76,7 @@ class CatapultConverter:
     def __init__(
         self,
         fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
-        expected_metric_names_filename: str,
+        expected_metric_names_filename: str | os.PathLike[str],
         master: str | None = None,
         bot: str | None = None,
         build_bucket_id: str | None = None,
@@ -92,8 +92,8 @@ class CatapultConverter:
         Args:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
                 These will be summarized into a single fuchsiaperf.json file.
-            expected_metric_names_filename: name of file containing expected metric names to
-                validate the actual metrics against.
+            expected_metric_names_filename: file name or path to file containing
+            expected metric names to validate the actual metrics against.
             fuchsia_expected_metric_names_dest_dir: directory to which expected metrics are written.
             current_time: the current time, useful for testing. Defaults to time.time.
             subprocess_check_call: allows to execute a process raising an exception on error.
@@ -147,7 +147,9 @@ class CatapultConverter:
         fuchsia_perf_file_paths = self._check_extension_and_relocate(
             fuchsia_perf_file_paths
         )
-
+        # TODO(b/340319757): Remove after //v/g has migrated to data resources.
+        # os.path.join() supports both file name or absolute path to be
+        # provided in "expected_metric_names_file" to allow for soft-transition.
         expected_metric_names_file: str = os.path.join(
             self._runtime_deps_dir, expected_metric_names_filename
         )
@@ -219,7 +221,7 @@ class CatapultConverter:
     def from_env(
         cls,
         fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
-        expected_metric_names_filename: str,
+        expected_metric_names_filename: str | os.PathLike[str],
         env: dict[str, str] = dict(os.environ),
         runtime_deps_dir: str | os.PathLike[str] | None = None,
         current_time: int | None = None,
@@ -229,8 +231,8 @@ class CatapultConverter:
 
         Args:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
-            expected_metric_names_filename: name of file containing expected metric names to
-                validate the actual metrics against.
+            expected_metric_names_filename: file name or path to file containing expected metric names to
+            validate the actual metrics against.
             env: map holding the environment variables.
             current_time: the current time, useful for testing. Defaults to time.time.
             runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
@@ -267,7 +269,7 @@ class CatapultConverter:
 
     def _check_fuchsia_perf_metrics_naming(
         self,
-        expected_metric_names_file: str,
+        expected_metric_names_file: str | os.PathLike[str],
         input_files: list[str],
     ) -> bool:
         metrics = self._extract_perf_file_metrics(input_files)
@@ -336,7 +338,7 @@ class CatapultConverter:
     def _write_expectation_file(
         self,
         metrics: set[str],
-        expected_metric_names_filename: str,
+        expected_metric_names_filename: str | os.PathLike[str],
         fuchsia_expected_metric_names_dest_dir: str,
     ) -> None:
         dest_file: str = os.path.join(

@@ -48,6 +48,15 @@ def main() -> int:
         nargs="*",
     )
     parser.add_argument(
+        "--data_package_name",
+        help="Name of the Python package to store data sources in",
+    )
+    parser.add_argument(
+        "--data_sources",
+        help="Data sources of this target",
+        nargs="*",
+    )
+    parser.add_argument(
         "--library_infos",
         help="Path to the library infos JSON file",
         type=argparse.FileType("r"),
@@ -83,7 +92,15 @@ def main() -> int:
     os.makedirs(app_dir, exist_ok=True)
 
     # Copy over the sources of this binary.
-    if copy_binary_sources(app_dir, args.sources) != 0:
+    if (
+        copy_binary_sources(
+            dest_dir=app_dir,
+            sources=args.sources,
+            data_sources=args.data_sources,
+            data_package_name=args.data_package_name,
+        )
+        != 0
+    ):
         return 1
 
     # Make sub directories for all libraries and copy over their sources.
@@ -130,7 +147,12 @@ sys.exit({args.main_callable}())
         mypy_ret_code = 0
         if args.enable_mypy:
             mypy_ret_code = mypy_checker.run_mypy_on_binary_target(
-                args.target_name, args.gen_dir, args.sources, infos
+                target_name=args.target_name,
+                gen_dir=args.gen_dir,
+                src_files=args.sources,
+                data_package_name=args.data_package_name,
+                data_sources=args.data_sources,
+                lib_infos=infos,
             )
     finally:
         remove_dir(app_dir)
@@ -138,13 +160,19 @@ sys.exit({args.main_callable}())
 
 
 def copy_binary_sources(
-    dest_dir: str, sources: list[str], src_map: dict[str, str] = {}
+    dest_dir: str,
+    sources: list[str],
+    data_sources: list[str],
+    data_package_name: str | None,
+    src_map: dict[str, str] = {},
 ) -> int:
     """Copies the sources of this binary into the given destination directory.
 
     Args:
         dest_dir: The destination directory to copy the sources to.
         sources: The list of source file paths relative to the src_root.
+        data_sources: The list of data source file paths.
+        data_package_name: Name of the Python package to store data sources in.
         src_map: The mapping from the tmp dir to the original source paths.
     """
     for source in sources:
@@ -158,6 +186,26 @@ def copy_binary_sources(
         dest = os.path.join(dest_dir, basename)
         src_map[dest] = source
         shutil.copy2(source, dest)
+
+    if data_sources:
+        if data_package_name is None:
+            print(
+                "--data_package_name must be provided if data sources exist.",
+                file=sys.stderr,
+            )
+            return 1
+        # Data sources are copied from their original locations to the
+        # "data_package_name" directory relative to the PYZ root dir.
+        dest_data_root = os.path.join(dest_dir, data_package_name)
+        os.makedirs(dest_data_root, exist_ok=True)
+        # Create __init__.py to make the data package importable.
+        data_init_path = os.path.join(dest_data_root, "__init__.py")
+        Path(data_init_path).touch()
+        for data_src in data_sources:
+            src = data_src
+            dest = os.path.join(dest_data_root, os.path.basename(data_src))
+            src_map[dest] = src
+            shutil.copy2(src, dest)
     return 0
 
 
