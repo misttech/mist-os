@@ -89,9 +89,13 @@ class UserAddress {
 
   size_t operator-(const UserAddress& rhs) const { return ptr() - rhs.ptr(); }
 
+  static UserAddress from(uint64_t value) { return UserAddress(value); }
+
  private:
   uint64_t address_ = kNullPtr;
 };
+
+using UserCString = UserAddress;
 
 }  // namespace starnix_uapi
 
