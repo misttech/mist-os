@@ -875,7 +875,9 @@ impl Allocator {
             );
         }
         // Build free extent structure from disk.
-        self.rebuild_strategy().await.context("Build free extents")?;
+        if !self.rebuild_strategy().await.context("Build free extents")? {
+            tracing::info!("Device contains no free space.");
+        }
 
         assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);
         Ok(())
@@ -884,7 +886,9 @@ impl Allocator {
     /// Walk all allocations to generate the set of free regions between allocations.
     /// It is safe to re-run this on live filesystems but it should not be called concurrently
     /// with allocations, trims or other rebuild_strategy invocations -- use allocation_mutex.
-    async fn rebuild_strategy(self: &Arc<Self>) -> Result<(), Error> {
+    /// Returns true if the rebuild made changes.
+    async fn rebuild_strategy(self: &Arc<Self>) -> Result<bool, Error> {
+        let mut changed = false;
         let mut layer_set = self.tree.empty_layer_set();
         layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
         self.tree.add_all_layers_to_layer_set(&mut layer_set);
@@ -925,17 +929,15 @@ impl Allocator {
             if to_add.len() > 100 {
                 let mut inner = self.inner.lock().unwrap();
                 for range in to_add.drain(..) {
-                    inner.strategy.remove(range.clone());
-                    inner.strategy.free(range)?;
+                    changed |= inner.strategy.force_free(range)?;
                 }
             }
         }
         let mut inner = self.inner.lock().unwrap();
         for range in to_add {
-            inner.strategy.remove(range.clone());
-            inner.strategy.free(range)?;
+            changed |= inner.strategy.force_free(range)?;
         }
-        Ok(())
+        Ok(changed)
     }
 
     /// Collects up to `extents_per_batch` free extents of size up to `max_extent_size` from
@@ -1326,7 +1328,10 @@ impl Allocator {
             // We've run out of extents of the requested length in RAM but there
             // exists more of this size on device. Rescan device and circle back.
             // We already hold the allocation_mutex, so exclusive access is guaranteed.
-            self.rebuild_strategy().await?;
+            if !self.rebuild_strategy().await? {
+                tracing::error!("Cannot find additional free space. Corruption?");
+                return Err(FxfsError::Inconsistent.into());
+            }
         };
 
         debug!(device_range = ?result, "allocate");

@@ -113,6 +113,34 @@ impl BestFit {
         }
     }
 
+    /// This is effectively an optimized path for "remove" followed by "free" on the same range.
+    /// Returns true if this resulted in changes to overall free space.
+    pub fn force_free(&mut self, range: Range<u64>) -> Result<bool, Error> {
+        let mut to_add = Vec::new();
+        let mut last = range.start;
+        for (&end, &offset) in self.by_end.range(range.start + 1..) {
+            if offset >= range.end {
+                break;
+            }
+            if offset > last {
+                to_add.push(last..offset);
+            }
+            last = end;
+            assert!(end > range.start);
+        }
+        if last < range.end {
+            to_add.push(last..range.end);
+        }
+        Ok(if to_add.is_empty() {
+            false
+        } else {
+            for range in to_add {
+                self.free(range)?;
+            }
+            true
+        })
+    }
+
     /// Removes all free extents in the given range.
     pub fn remove(&mut self, range: Range<u64>) {
         let mut to_add = Vec::new();
@@ -389,5 +417,49 @@ mod test {
         assert!(bestfit.free(10..20).is_err());
         assert!(bestfit.free(9..10).is_ok());
         assert!(bestfit.free(20..21).is_ok());
+    }
+
+    #[test]
+    fn force_free() {
+        let mut bestfit = BestFit::default();
+        bestfit.free(0..100).unwrap();
+        assert_eq!(bestfit.force_free(0..100).unwrap(), false);
+        assert_eq!(bestfit.force_free(10..100).unwrap(), false);
+        assert_eq!(bestfit.force_free(0..90).unwrap(), false);
+        assert_eq!(bestfit.force_free(10..90).unwrap(), false);
+
+        let mut bestfit = BestFit::default();
+        bestfit.free(0..40).unwrap();
+        bestfit.free(60..100).unwrap();
+        assert_eq!(bestfit.force_free(10..90).unwrap(), true);
+        assert_eq!(bestfit.allocate(100), Ok(0..100));
+
+        let mut bestfit = BestFit::default();
+        bestfit.free(0..40).unwrap();
+        bestfit.free(60..100).unwrap();
+        assert_eq!(bestfit.force_free(10..100).unwrap(), true);
+        assert_eq!(bestfit.allocate(100), Ok(0..100));
+
+        let mut bestfit = BestFit::default();
+        bestfit.free(10..40).unwrap();
+        bestfit.free(60..100).unwrap();
+        assert_eq!(bestfit.force_free(0..110).unwrap(), true);
+        assert_eq!(bestfit.allocate(110), Ok(0..110));
+
+        let mut bestfit = BestFit::default();
+        bestfit.free(10..40).unwrap();
+        bestfit.free(60..100).unwrap();
+        assert_eq!(bestfit.force_free(10..110).unwrap(), true);
+        assert_eq!(bestfit.allocate(100), Ok(10..110));
+
+        let mut bestfit = BestFit::default();
+        bestfit.free(10..40).unwrap();
+        bestfit.free(60..100).unwrap();
+        assert_eq!(bestfit.force_free(0..100).unwrap(), true);
+        assert_eq!(bestfit.allocate(100), Ok(0..100));
+
+        let mut bestfit = BestFit::default();
+        assert_eq!(bestfit.force_free(0..100).unwrap(), true);
+        assert_eq!(bestfit.allocate(100), Ok(0..100));
     }
 }
