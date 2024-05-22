@@ -5,10 +5,14 @@ with build actions running on RBE (remote build execution).
 
 The top-level remote execution wrappers are used as command prefixes:
 
-*   `cxx_remote_wrapper.py`: prefix wrapper for remote compiling C++
-*   `rustc_remote_wrapper.py`: prefix wrapper for remote compiling Rust
+*   `reclient_cxx.sh`: prefix wrapper for remote compiling C++
+    *   `cxx_remote_wrapper.py`: is a similar heavier wrapper with additional features
+        and workarounds.
+*   `rustc_remote_wrapper.py`: prefix wrapper for remote compiling and linking Rust
     *   Detects and gathers all inputs and tools needed for remote compiling.
     *   Detects extra outputs to download produced by remote compiling.
+*   `cxx_link_remote_wrapper.py`: prefix wrapper for remote ilnking C++
+*   `prebuilt_tool_remote_wrapper.py`: prefix wrapper for simple tools
 *   `remote_action.py`: prefix wrapper for generic remote actions
     * Exists as standalone wrapper and library.
     * Includes detailed diagnostics for certain error conditions.
@@ -17,6 +21,7 @@ The top-level remote execution wrappers are used as command prefixes:
       script.
 *   `fuchsia-reproxy-wrap.sh`: automatically start/shutdown `reproxy` (needed by
     `rewrapper`) around any command.  Used by `fx build`.
+*   `dlwrap.py`: downloads artifacts from RBE's CAS using download stub files
 
 More details can be found by running with `--help`.
 
@@ -33,6 +38,8 @@ More details can be found by running with `--help`.
     into equivalent commands with relative paths.  This can be useful for
     build systems that insist on absolute paths, like `cmake`.
 *   `rustc.py`: for understanding structure of `rustc` compile commands
+*   `tablefmt.py`: utilities for printing readable ASCII tables
+*   `textpb.py`: generic protobuf text parsing library
 
 ## Configurations
 
@@ -68,14 +75,17 @@ All tools have more detailed usage with `--help`.
 
 *   `build/toolchain/rbe.gni`: global `args.gn` variables for RBE
 
-*   `build/toolchain/clang_toolchain.gni`: uses RBE wrappers depending on
+*   `build/toolchain/clang_toolchain.gni` and
+    `build/toolchain/zircon/zircon_toolchain.gni`: use RBE wrappers depending on
     configuration
 *   `build/rust/rustc_*.gni`: uses RBE wrappers depending on configuration
 
 # Metrics and logs
 
+*   `build_summary.py`: If your environment sets `FX_BUILD_RBE_STATS=1`,
+    this script will be run after each build and display a summary of
+    cache and download metrics.
 *   `upload_reproxy_logs.py`: pushes RBE metrics and detailed logs to
      BigQuery.
      *   This can be enabled by `fx build-metrics`.
-
 *   `pb_message_util.py`: library for translating protobufs to JSON
