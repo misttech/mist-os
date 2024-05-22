@@ -24,6 +24,10 @@ pub enum LogError {
     FidlError(#[from] fidl::Error),
     #[error("No boot timestamp")]
     NoBootTimestamp,
+    #[error(
+        "SDK not available, please use --symbolize off to disable symbolization. Reason: {msg}"
+    )]
+    SdkNotAvailable { msg: &'static str },
     #[error("failed to connect: {:?}", error)]
     ConnectCapabilityError { error: ConnectCapabilityError },
     #[error(transparent)]
@@ -70,6 +74,7 @@ impl From<LogError> for fho::Error {
             | OpenTargetError { .. }
             | TargetConnectionError { .. }
             | IdentifyHostError { .. }
+            | SdkNotAvailable { .. }
             | ConnectCapabilityError { .. } => fho::Error::User(value.into()),
             // these errors are probably an unexpected problem with no actionable error output.
             FidlError(err) => fho::Error::Unexpected(err.into()),
