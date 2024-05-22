@@ -12,16 +12,16 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/pt/sherlock/post-init/post-init",
       "sys/platform/05:04:1/aml-gpio/gpio",
       "sys/platform/05:04:1/aml-gpio/gpio-init",
-      "sys/platform/05:00:14/clocks",
-      "sys/platform/05:00:14/clocks/clock-init",
-      "sys/platform/05:00:1c/aml_light",
+      "sys/platform/sherlock-clk/clocks",
+      "sys/platform/sherlock-clk/clocks/clock-init",
+      "sys/platform/gpio-light/aml_light",
       "sys/platform/05:00:2/i2c-0/aml-i2c",
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
-      "sys/platform/05:00:10/aml-canvas",
+      "sys/platform/canvas/aml-canvas",
       "sys/platform/05:04:a/aml_thermal_pll/thermal",
-      "sys/platform/05:04:d/display/amlogic-display/display-coordinator",
-      "sys/platform/05:04:18/aml_usb_phy",
+      "sys/platform/display/display/amlogic-display/display-coordinator",
+      "sys/platform/aml-usb-phy/aml_usb_phy",
 
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
@@ -44,25 +44,25 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
-      "sys/platform/05:04:1c/aml_nna",
-      "sys/platform/05:04:1d",  // pwm
-      "sys/platform/05:00:1c/aml_light",
-      "sys/platform/05:04:17/aml-gpu-composite/aml-gpu",
-      "sys/platform/05:04:13/aml_pdm/sherlock-audio-pdm-in",
-      "sys/platform/05:04:12:1/aml_tdm/sherlock-audio-i2s-out",
+      "sys/platform/aml-nna/aml_nna",
+      "sys/platform/pwm",  // pwm
+      "sys/platform/gpio-light/aml_light",
+      "sys/platform/aml_gpu/aml-gpu-composite/aml-gpu",
+      "sys/platform/sherlock-pdm-audio-in/aml_pdm/sherlock-audio-pdm-in",
+      "sys/platform/sherlock-i2s-audio-out/aml_tdm/sherlock-audio-i2s-out",
       "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch",
-      "sys/platform/00:00:e/tee/optee",
-      "sys/platform/05:04:1:1/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
-      "sys/platform/00:00:36/sherlock-buttons/buttons",
+      "sys/platform/tee/tee/optee",
+      "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
+      "sys/platform/sherlock-buttons/sherlock-buttons/buttons",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
-      "sys/platform/05:04:1a/aml_securemem/aml-securemem",
-      "sys/platform/05:04:1d/aml-pwm-device/pwm-4/pwm_init",
+      "sys/platform/aml-secure-mem/aml_securemem/aml-securemem",
+      "sys/platform/pwm/aml-pwm-device/pwm-4/pwm_init",
       "sys/platform/05:04:24/ram",
-      "sys/platform/00:00:29",  // registers device
+      "sys/platform/registers",  // registers device
 
       // CPU Devices.
-      "sys/platform/03:05:6",
+      "sys/platform/aml-cpu",
       "class/cpu-ctrl/000",
       "class/cpu-ctrl/001",
       "sys/platform/05:04:a/aml_thermal_pll/thermal/aml_cpu_legacy/big-cluster",
@@ -98,22 +98,22 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
 
 #ifdef include_packaged_drivers
 
-      "sys/platform/05:04:15/aml-mipi",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/gdc",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/ge2d",
+      "sys/platform/mipi-csi2/aml-mipi",
+      "sys/platform/mipi-csi2/aml-mipi/imx227_sensor",
+      "sys/platform/mipi-csi2/aml-mipi/imx227_sensor/imx227/gdc",
+      "sys/platform/mipi-csi2/aml-mipi/imx227_sensor/imx227/ge2d",
 
-      "sys/platform/05:04:e/aml_video",
-      "sys/platform/05:04:23/aml-video-enc",
+      "sys/platform/aml_video/aml_video",
+      "sys/platform/aml-video-enc/aml-video-enc",
 
-      "sys/platform/05:04:1:1/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
+      "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
 
       // WLAN
       "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
       "sys/platform/05:00:6/sherlock_sd_emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
+      "sys/platform/mipi-csi2/aml-mipi/imx227_sensor/imx227/isp",
+      "sys/platform/mipi-csi2/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
 #endif
   };
 

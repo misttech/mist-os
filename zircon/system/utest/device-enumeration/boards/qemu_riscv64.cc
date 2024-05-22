@@ -9,7 +9,7 @@ namespace {
 TEST_F(DeviceEnumerationTest, QemuRiscv64Test) {
   // clang-format off
   static const char* kDevicePaths[] = {
-      "sys/platform/03:0d:b",             // goldfish-rtc
+      "sys/platform/goldfish-rtc",        // goldfish-rtc
       "sys/platform/pt/PCI0/bus/00:00.0", // host bridge
       "sys/platform/pt/qemu-riscv64",     // board driver
   };

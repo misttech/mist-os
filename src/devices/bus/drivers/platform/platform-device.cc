@@ -24,6 +24,8 @@
 #include <zircon/errors.h>
 #include <zircon/syscalls/resource.h>
 
+#include <unordered_set>
+
 #include <fbl/string_printf.h>
 
 #include "src/devices/bus/drivers/platform/node-util.h"
@@ -316,17 +318,48 @@ zx_status_t PlatformDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
 void PlatformDevice::DdkRelease() { delete this; }
 
 zx_status_t PlatformDevice::Start() {
+  // TODO(b/340283894): Remove.
+  static const std::unordered_set<std::string> kLegacyNameAllowlist{
+      "ram-disk",          // 00:00:2d
+      "ram-nand",          // 00:00:2e
+      "virtual-audio",     // 00:00:2f
+      "bt-hci-emulator",   // 00:00:30
+      "i2c-0",             // 05:00:2
+      "i2c-2",             // 05:00:2:2
+      "vim3-sdio",         // 05:00:6
+      "aml_emmc",          // 05:00:8
+      "aml-sdio",          // 05:00:6,05:00:7
+      "aml-ram-ctl",       // 05:05:24,05:03:24,05:04:24
+      "aml-thermal-pll",   // 05:05:a,05:03:a,05:04:a
+      "nelson-emmc",       // 05:00:8
+      "thermistor",        // 03:0a:27
+      "i2c-1",             // 05:00:2:1
+      "raw_nand",          // 05:00:f
+      "aml-thermal-ddr",   // 05:03:28,05:04:28
+      "sherlock-emmc",     // 05:00:8
+      "sherlock-sd-emmc",  // 05:00:6
+      "pll-temp-sensor",   // 05:06:39
+      "sysmem",            // 00:00:1b
+      "fake-battery",      // 00:00:33
+      "gpio",              // 05:04:1,05:03:1,05:05:1,05:06:1
+  };
+
   char name[ZX_DEVICE_NAME_MAX];
   if (vid_ == PDEV_VID_GENERIC && pid_ == PDEV_PID_GENERIC && did_ == PDEV_DID_KPCI) {
     strlcpy(name, "pci", sizeof(name));
   } else if (did_ == PDEV_DID_DEVICETREE_NODE) {
     strlcpy(name, name_, sizeof(name));
   } else {
-    if (instance_id_ == 0) {
-      // For backwards compatability, we elide instance id when it is 0.
-      snprintf(name, sizeof(name), "%02x:%02x:%01x", vid_, pid_, did_);
+    // TODO(b/340283894): Remove legacy name format once `kLegacyNameAllowlist` is removed.
+    if (kLegacyNameAllowlist.find(name_) != kLegacyNameAllowlist.end()) {
+      if (instance_id_ == 0) {
+        // For backwards compatibility, we elide instance id when it is 0.
+        snprintf(name, sizeof(name), "%02x:%02x:%01x", vid_, pid_, did_);
+      } else {
+        snprintf(name, sizeof(name), "%02x:%02x:%01x:%01x", vid_, pid_, did_, instance_id_);
+      }
     } else {
-      snprintf(name, sizeof(name), "%02x:%02x:%01x:%01x", vid_, pid_, did_, instance_id_);
+      strlcpy(name, name_, sizeof(name));
     }
   }
 

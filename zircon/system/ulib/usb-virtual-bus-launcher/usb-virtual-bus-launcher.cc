@@ -25,9 +25,12 @@ namespace usb_virtual {
 using driver_integration_test::IsolatedDevmgr;
 
 zx::result<BusLauncher> BusLauncher::Create(IsolatedDevmgr::Args args) {
+  static constexpr char kPlatformDeviceName[board_test::kNameLengthMax] = "bus-platform-device";
+
   args.disable_block_watcher = true;
 
   board_test::DeviceEntry dev = {};
+  strlcpy(dev.name, kPlatformDeviceName, sizeof(dev.name));
   dev.did = 0;
   dev.vid = PDEV_VID_TEST;
   dev.pid = PDEV_PID_USB_VBUS_TEST;
@@ -40,8 +43,10 @@ zx::result<BusLauncher> BusLauncher::Create(IsolatedDevmgr::Args args) {
     return zx::error(status);
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(launcher.devmgr_.devfs_root().get(),
-                                                            "sys/platform/11:03:0/usb-virtual-bus");
+  std::ostringstream path;
+  path << "sys/platform/" << kPlatformDeviceName << "/usb-virtual-bus";
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(launcher.devmgr_.devfs_root().get(), path.str().c_str());
   if (channel.is_error()) {
     std::cout << "Failed to wait for usb-virtual-bus: " << channel.status_string() << '\n';
     return channel.take_error();

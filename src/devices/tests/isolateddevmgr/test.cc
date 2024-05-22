@@ -21,73 +21,93 @@ using driver_integration_test::IsolatedDevmgr;
 
 namespace {
 
-class IsolatedDevMgrTest : public zxtest::Test {};
+class IsolatedDevMgrTest : public zxtest::Test {
+ protected:
+  static constexpr char kPlatformDeviceName1[board_test::kNameLengthMax] = "metadata-test-1";
+  static const std::vector<uint8_t> kMetadata1;
+  static const board_test::DeviceEntry kDeviceEntry1;
 
-const std::vector<uint8_t> metadata1 = {1, 2, 3, 4, 5};
-const board_test::DeviceEntry kDeviceEntry1 = []() {
-  board_test::DeviceEntry entry = {};
-  strcpy(entry.name, "metadata-test");
-  entry.vid = PDEV_VID_TEST;
-  entry.pid = PDEV_PID_METADATA_TEST;
-  entry.did = PDEV_DID_TEST_CHILD_1;
-  entry.metadata_size = metadata1.size();
-  entry.metadata = metadata1.data();
-  return entry;
-}();
+  static constexpr char kPlatformDeviceName2[board_test::kNameLengthMax] = "metadata-test-2";
+  static const std::vector<uint8_t> kMetadata2;
+  static const board_test::DeviceEntry kDeviceEntry2;
 
-const std::vector<uint8_t> metadata2 = {7, 6, 5, 4, 3, 2, 1};
-const board_test::DeviceEntry kDeviceEntry2 = []() {
-  board_test::DeviceEntry entry = {};
-  strcpy(entry.name, "metadata-test");
-  entry.vid = PDEV_VID_TEST;
-  entry.pid = PDEV_PID_METADATA_TEST;
-  entry.did = PDEV_DID_TEST_CHILD_2;
-  entry.metadata_size = metadata2.size();
-  entry.metadata = metadata2.data();
-  return entry;
-}();
+  static board_test::DeviceEntry CreateEntry(const char* name, uint32_t vid, uint32_t pid,
+                                             uint32_t did, cpp20::span<const uint8_t> metadata) {
+    board_test::DeviceEntry entry = {};
+    strlcpy(entry.name, name, sizeof(entry.name));
+    entry.vid = vid;
+    entry.pid = pid;
+    entry.did = did;
+    entry.metadata_size = metadata.size();
+    entry.metadata = metadata.data();
+    return entry;
+  }
 
-void CheckMetadata(fidl::WireSyncClient<fuchsia_device_manager_test::Metadata>& client,
-                   const std::vector<uint8_t>& expected_metadata) {
-  fidl::WireResult result = client->GetMetadata(DEVICE_METADATA_TEST);
-  ASSERT_OK(result.status());
-  fidl::VectorView<uint8_t> received_metadata = std::move(result->data);
-  ASSERT_EQ(received_metadata.count(), expected_metadata.size());
+  static std::string GetDevice1Path() {
+    std::ostringstream path;
+    path << "sys/platform/" << kPlatformDeviceName1 << "/metadata-test";
+    return path.str();
+  }
 
-  EXPECT_BYTES_EQ(received_metadata.data(), expected_metadata.data(), expected_metadata.size());
-}
+  static std::string GetDevice2Path() {
+    std::ostringstream path;
+    path << "sys/platform/" << kPlatformDeviceName2 << "/metadata-test";
+    return path.str();
+  }
+
+  static void CheckMetadata(fidl::WireSyncClient<fuchsia_device_manager_test::Metadata>& client,
+                            const std::vector<uint8_t>& expected_metadata) {
+    fidl::WireResult result = client->GetMetadata(DEVICE_METADATA_TEST);
+    ASSERT_OK(result.status());
+    fidl::VectorView<uint8_t> received_metadata = std::move(result->data);
+    ASSERT_EQ(received_metadata.count(), expected_metadata.size());
+
+    EXPECT_BYTES_EQ(received_metadata.data(), expected_metadata.data(), expected_metadata.size());
+  }
+
+  IsolatedDevmgr& devmgr() { return devmgr_; }
+
+ private:
+  IsolatedDevmgr devmgr_;
+};
+
+const std::vector<uint8_t> IsolatedDevMgrTest::kMetadata1 = {1, 2, 3, 4, 5};
+const board_test::DeviceEntry IsolatedDevMgrTest::kDeviceEntry1 = IsolatedDevMgrTest::CreateEntry(
+    IsolatedDevMgrTest::kPlatformDeviceName1, PDEV_VID_TEST, PDEV_PID_METADATA_TEST,
+    PDEV_DID_TEST_CHILD_1, IsolatedDevMgrTest::kMetadata1);
+
+const std::vector<uint8_t> IsolatedDevMgrTest::kMetadata2 = {7, 6, 5, 4, 3, 2, 1};
+const board_test::DeviceEntry IsolatedDevMgrTest::kDeviceEntry2 = IsolatedDevMgrTest::CreateEntry(
+    IsolatedDevMgrTest::kPlatformDeviceName2, PDEV_VID_TEST, PDEV_PID_METADATA_TEST,
+    PDEV_DID_TEST_CHILD_2, IsolatedDevMgrTest::kMetadata2);
 
 TEST_F(IsolatedDevMgrTest, MetadataOneDriverTest) {
-  IsolatedDevmgr devmgr;
-
   // Set the driver arguments.
   IsolatedDevmgr::Args args;
   args.device_list.push_back(kDeviceEntry1);
 
   // Create the isolated Devmgr.
-  zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr);
+  zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr());
   ASSERT_OK(status);
 
   // Wait for Metadata-test driver to be created
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(),
-                                                            "sys/platform/11:07:2/metadata-test");
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devmgr().devfs_root().get(), GetDevice1Path().c_str());
   ASSERT_OK(channel.status_value());
 
   fidl::WireSyncClient client{
       fidl::ClientEnd<fuchsia_device_manager_test::Metadata>(std::move(channel.value()))};
-  ASSERT_NO_FATAL_FAILURE(CheckMetadata(client, metadata1));
+  ASSERT_NO_FATAL_FAILURE(CheckMetadata(client, kMetadata1));
 }
 
 TEST_F(IsolatedDevMgrTest, MetadataTwoDriverTest) {
-  IsolatedDevmgr devmgr;
-
   // Set the driver arguments.
   IsolatedDevmgr::Args args;
   args.device_list.push_back(kDeviceEntry1);
   args.device_list.push_back(kDeviceEntry2);
 
   // Create the isolated Devmgr.
-  zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr);
+  zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr());
   ASSERT_OK(status);
 
   struct MetadataTest {
@@ -97,19 +117,19 @@ TEST_F(IsolatedDevMgrTest, MetadataTwoDriverTest) {
 
   std::vector<MetadataTest> tests{
       {
-          .path = "sys/platform/11:07:2/metadata-test",
-          .metadata = metadata1,
+          .path = GetDevice1Path(),
+          .metadata = kMetadata1,
       },
       {
-          .path = "sys/platform/11:07:3/metadata-test",
-          .metadata = metadata2,
+          .path = GetDevice2Path(),
+          .metadata = kMetadata2,
       },
   };
 
   for (MetadataTest& test : tests) {
     SCOPED_TRACE(test.path);
     zx::result channel =
-        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), test.path.c_str());
+        device_watcher::RecursiveWaitForFile(devmgr().devfs_root().get(), test.path.c_str());
     ASSERT_OK(channel.status_value());
     fidl::WireSyncClient client{
         fidl::ClientEnd<fuchsia_device_manager_test::Metadata>(std::move(channel.value()))};

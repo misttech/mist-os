@@ -25,14 +25,6 @@ using driver_integration_test::IsolatedDevmgr;
 using fuchsia_device_lifecycle_test::Lifecycle;
 using fuchsia_device_lifecycle_test::TestDevice;
 
-namespace {
-constexpr char kLifecycleTopoPath[] = "sys/platform/11:10:0/ddk-lifecycle-test";
-constexpr char kLifecycleControllerTopoPath[] =
-    "sys/platform/11:10:0/ddk-lifecycle-test/device_controller";
-constexpr char kChildTopoPath[] =
-    "sys/platform/11:10:0/ddk-lifecycle-test/ddk-lifecycle-test-child-0";
-}  // namespace
-
 class LifecycleTest : public zxtest::Test {
  public:
   ~LifecycleTest() override = default;
@@ -40,6 +32,7 @@ class LifecycleTest : public zxtest::Test {
     IsolatedDevmgr::Args args;
 
     board_test::DeviceEntry dev = {};
+    strlcpy(dev.name, kPlatformDeviceName, sizeof(dev.name));
     dev.vid = PDEV_VID_TEST;
     dev.pid = PDEV_PID_LIFECYCLE_TEST;
     dev.did = 0;
@@ -47,8 +40,8 @@ class LifecycleTest : public zxtest::Test {
 
     zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr_);
     ASSERT_OK(status);
-    zx::result channel =
-        device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kLifecycleTopoPath);
+    zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
+                                                              GetLifecycleTopoPath().c_str());
     ASSERT_OK(channel.status_value());
     chan_ = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
 
@@ -62,12 +55,35 @@ class LifecycleTest : public zxtest::Test {
   }
 
  protected:
+  static std::string GetLifecycleTopoPath() {
+    std::ostringstream path;
+    path << "sys/platform/" << kPlatformDeviceName << '/' << kLifecycleDeviceName;
+    return path.str();
+  }
+
+  static std::string GetLifecycleControllerTopoPath() {
+    std::ostringstream path;
+    path << GetLifecycleTopoPath() << "/device_controller";
+    return path.str();
+  }
+
+  static std::string GetChildTopoPath() {
+    std::ostringstream path;
+    path << GetLifecycleTopoPath() << '/' << kChildDeviceName;
+    return path.str();
+  }
+
   void WaitPreRelease(uint64_t child_id);
 
   fidl::ClientEnd<TestDevice> chan_;
   IsolatedDevmgr devmgr_;
 
   fidl::ClientEnd<Lifecycle> lifecycle_chan_;
+
+ private:
+  static constexpr char kPlatformDeviceName[board_test::kNameLengthMax] = "ddk-platform-device";
+  static constexpr std::string_view kLifecycleDeviceName = "ddk-lifecycle-test";
+  static constexpr std::string_view kChildDeviceName = "ddk-lifecycle-test-child-0";
 };
 
 void LifecycleTest::WaitPreRelease(uint64_t child_id) {
@@ -145,7 +161,7 @@ TEST_F(LifecycleTest, CloseAllConnectionsOnChildUnbind) {
   auto child_id = result->value()->child_id;
 
   zx::result channel =
-      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kChildTopoPath);
+      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), GetChildTopoPath().c_str());
   ASSERT_OK(channel.status_value());
 
   zx::channel chan = std::move(channel.value());
@@ -181,13 +197,16 @@ TEST_F(LifecycleTest, CallsFailDuringUnbind) {
   const fbl::unique_fd& fd = devmgr_.devfs_root();
   async_dispatcher_t* const dispatcher = loop.dispatcher();
 
-  zx::result queryable = MakeClient<fuchsia_unknown::Queryable>(fd, kChildTopoPath, dispatcher);
+  zx::result queryable =
+      MakeClient<fuchsia_unknown::Queryable>(fd, GetChildTopoPath().c_str(), dispatcher);
   ASSERT_OK(queryable);
 
-  zx::result controller = MakeClient<fuchsia_device::Controller>(fd, kChildTopoPath, dispatcher);
+  zx::result controller =
+      MakeClient<fuchsia_device::Controller>(fd, GetChildTopoPath().c_str(), dispatcher);
   ASSERT_OK(controller);
 
-  zx::result device = MakeClient<fuchsia_hardware_serial::Device>(fd, kChildTopoPath, dispatcher);
+  zx::result device =
+      MakeClient<fuchsia_hardware_serial::Device>(fd, GetChildTopoPath().c_str(), dispatcher);
   ASSERT_OK(device);
 
   ASSERT_OK(loop.RunUntilIdle());
@@ -215,15 +234,15 @@ TEST_F(LifecycleTest, CallsFailDuringUnbind) {
 
   ASSERT_STATUS(loop.Run(), ZX_ERR_CANCELED);
 
-  ASSERT_EQ(open(kChildTopoPath, O_RDWR), -1);
+  ASSERT_EQ(open(GetChildTopoPath().c_str(), O_RDWR), -1);
   ASSERT_EQ(errno, ENOENT);
 
   ASSERT_OK(fidl::WireCall(chan_)->CompleteUnbind(child_id).status());
 }
 
 TEST_F(LifecycleTest, CloseAllConnectionsOnUnbind) {
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                            kLifecycleControllerTopoPath);
+  zx::result channel = device_watcher::RecursiveWaitForFile(
+      devmgr_.devfs_root().get(), GetLifecycleControllerTopoPath().c_str());
   ASSERT_OK(channel);
   fidl::WireSyncClient controller{
       fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
@@ -250,8 +269,8 @@ TEST_F(LifecycleTest, FailedInit) {
 }
 
 TEST_F(LifecycleTest, RebindNoChildren) {
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                            kLifecycleControllerTopoPath);
+  zx::result channel = device_watcher::RecursiveWaitForFile(
+      devmgr_.devfs_root().get(), GetLifecycleControllerTopoPath().c_str());
   ASSERT_OK(channel);
   fidl::WireSyncClient controller{
       fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
@@ -268,8 +287,8 @@ TEST_F(LifecycleTest, RebindChildren) {
     ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                            kLifecycleControllerTopoPath);
+  zx::result channel = device_watcher::RecursiveWaitForFile(
+      devmgr_.devfs_root().get(), GetLifecycleControllerTopoPath().c_str());
   ASSERT_OK(channel);
   fidl::WireSyncClient controller{
       fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};

@@ -7,8 +7,6 @@
 #include <lib/fdio/directory.h>
 #include <zircon/syscalls.h>
 
-#include <unordered_set>
-
 #include <zxtest/zxtest.h>
 
 using driver_integration_test::IsolatedDevmgr;
@@ -19,6 +17,7 @@ class FallbackTest : public zxtest::Test {
   // Set up and launch the devmgr.
   void LaunchDevmgr(IsolatedDevmgr::Args args) {
     board_test::DeviceEntry dev = {};
+    strlcpy(dev.name, kPlatformDeviceName, sizeof(dev.name));
     dev.vid = PDEV_VID_TEST;
     dev.pid = PDEV_PID_FALLBACK_TEST;
     dev.did = 0;
@@ -31,7 +30,7 @@ class FallbackTest : public zxtest::Test {
   // Check that the correct driver was bound. `fallback` indicates if we expect the fallback or
   // not-fallback driver to have bound.
   void CheckDriverBound(bool fallback) {
-    fbl::String path = fbl::StringPrintf("sys/platform/11:16:0/ddk-%s-test",
+    fbl::String path = fbl::StringPrintf("sys/platform/%s/ddk-%s-test", kPlatformDeviceName,
                                          fallback ? "fallback" : "not-fallback");
     zx::result channel =
         device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), path.c_str());
@@ -44,6 +43,9 @@ class FallbackTest : public zxtest::Test {
  protected:
   zx::channel chan_;
   IsolatedDevmgr devmgr_;
+
+ private:
+  static constexpr char kPlatformDeviceName[board_test::kNameLengthMax] = "ddk-test";
 };
 
 TEST_F(FallbackTest, TestNotFallbackTakesPriority) {

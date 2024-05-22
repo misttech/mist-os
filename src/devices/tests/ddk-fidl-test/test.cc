@@ -54,21 +54,31 @@ void CheckTransaction(const board_test::DeviceEntry& entry, const char* device_f
 
 // Test that the transaction does not incorrectly close handles during Reply.
 TEST(FidlDDKDispatcherTest, SyncTransactionHandleTest) {
+  static constexpr char kPlatformDeviceName[board_test::kNameLengthMax] =
+      "ddk-fidl-platform-device";
+
   board_test::DeviceEntry entry = {};
-  strcpy(entry.name, "ddk-fidl");
+  strlcpy(entry.name, kPlatformDeviceName, sizeof(entry.name));
   entry.vid = PDEV_VID_TEST;
   entry.pid = PDEV_PID_DDKFIDL_TEST;
   entry.did = PDEV_DID_TEST_DDKFIDL;
-  CheckTransaction(entry, "sys/platform/11:09:d/ddk-fidl");
+  std::ostringstream device_fs;
+  device_fs << "sys/platform/" << kPlatformDeviceName << "/ddk-fidl";
+  CheckTransaction(entry, device_fs.str().c_str());
 }
 
 TEST(FidlDDKDispatcherTest, AsyncTransactionHandleTest) {
+  static constexpr char kPlatformDeviceName[board_test::kNameLengthMax] =
+      "ddk-async-fidl-platform-device";
+
   board_test::DeviceEntry entry = {};
-  strcpy(entry.name, "ddk-async-fidl");
+  strlcpy(entry.name, kPlatformDeviceName, sizeof(entry.name));
   entry.vid = PDEV_VID_TEST;
   entry.pid = PDEV_PID_DDKFIDL_TEST;
   entry.did = PDEV_DID_TEST_DDKASYNCFIDL;
-  CheckTransaction(entry, "sys/platform/11:09:15/ddk-async-fidl");
+  std::ostringstream device_fs;
+  device_fs << "sys/platform/" << kPlatformDeviceName << "/ddk-async-fidl";
+  CheckTransaction(entry, device_fs.str().c_str());
 }
 
 }  // namespace
