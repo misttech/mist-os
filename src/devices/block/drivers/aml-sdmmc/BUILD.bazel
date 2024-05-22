@@ -98,7 +98,7 @@ fuchsia_structured_config_values(
     name = "sc-values",
     cm_label = ":manifest",
     values = {
-        "enable_suspend": "false",
+        "enable_suspend": False,
     },
 )
 

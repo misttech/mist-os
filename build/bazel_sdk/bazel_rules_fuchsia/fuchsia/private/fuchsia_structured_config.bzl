@@ -210,10 +210,11 @@ def fuchsia_structured_config_values(
         _generated_values_label = "%s_generated_values" % name
         _value_file_deps = [":" + _generated_values_label]
         _value_file = "%s_values_from_literal.json" % name
+        _json_string = json.encode(values).replace("\"", "\\\"")
         native.genrule(
             name = _generated_values_label,
             outs = [_value_file],
-            cmd = "echo %s > $@" % values,
+            cmd = "echo \"%s\" > $@" % _json_string,
         )
 
     _cvf_output_name = component_name
@@ -221,7 +222,6 @@ def fuchsia_structured_config_values(
         _cvf_output_name = cvf_output_name
 
     # compile the value file
-    resource_target = name
     cvf_target = "%s_cvf" % name
     _cvf(
         name = cvf_target,
@@ -231,9 +231,11 @@ def fuchsia_structured_config_values(
 
     # package the value file
     fuchsia_package_resource(
-        name = resource_target,
+        name = name,
         src = ":" + cvf_target,
+        # LINT.IfChange
         dest = "meta/%s.cvf" % _cvf_output_name,
+        # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/fuchsia_component_manifest.bzl)
     )
 
 #######################################
