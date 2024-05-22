@@ -48,6 +48,7 @@ enum class InodeInfoFlag {
   kDataExist,     // indicate data exists
   kBad,           // should drop this inode without purging
   kNoExtent,      // not to use the extent cache
+  kSyncInode,     // need to write its inode block during fdatasync
   kFlagSize,
 };
 
@@ -84,12 +85,12 @@ class VnodeF2fs : public fs::PagedVnode,
 
   void Init(LockedPage &node_page) __TA_EXCLUDES(mutex_);
   void InitTime() __TA_EXCLUDES(mutex_);
-  void InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
+  zx_status_t InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
 
   ino_t GetKey() const { return ino_; }
 
   void Sync(SyncCallback closure) override;
-  zx_status_t SyncFile(loff_t start, loff_t end, int datasync)
+  zx_status_t SyncFile(loff_t start, loff_t end, bool datasync = true)
       __TA_EXCLUDES(f2fs::GetGlobalLock(), mutex_);
 
   void fbl_recycle() { RecycleNode(); }
@@ -214,12 +215,19 @@ class VnodeF2fs : public fs::PagedVnode,
     return safemath::CheckDiv<uint64_t>(fbl::round_up(GetSize(), kBlockSize), kBlockSize)
         .ValueOrDie();
   }
-  void IncBlocks(const block_t &nblocks) { num_blocks_.fetch_add(nblocks); }
+  void IncBlocks(const block_t &nblocks) {
+    if (!nblocks) {
+      return;
+    }
+    SetFlag(InodeInfoFlag::kSyncInode);
+    num_blocks_.fetch_add(nblocks);
+  }
   void DecBlocks(const block_t &nblocks) {
-    ZX_ASSERT(num_blocks_ >= nblocks);
+    ZX_DEBUG_ASSERT(nblocks > 0);
+    ZX_DEBUG_ASSERT(num_blocks_ >= nblocks);
+    SetFlag(InodeInfoFlag::kSyncInode);
     num_blocks_.fetch_sub(nblocks, std::memory_order_release);
   }
-  void InitBlocks() { SetBlocks(0); }
   block_t GetBlocks() const { return num_blocks_.load(std::memory_order_acquire); }
   void SetBlocks(const uint64_t &blocks) {
     num_blocks_.store(safemath::checked_cast<block_t>(blocks), std::memory_order_release);
@@ -342,7 +350,7 @@ class VnodeF2fs : public fs::PagedVnode,
   VmoManager &GetVmoManager() { return vmo_manager(); }
   const VmoManager &GetVmoManager() const { return vmo_manager(); }
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
-  void InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
+  zx_status_t InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
 
   // for testing
   void ResetFileCache() { file_cache_->Reset(); }
