@@ -313,7 +313,7 @@ struct MemoryManagerState {
 
 class CurrentTask;
 
-class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccessorExt {
+class MemoryManager : public fbl::RefCounted<MemoryManager> {
  public:
   // The root VMAR for the child process.
   //
@@ -377,13 +377,6 @@ class MemoryManager : public fbl::RefCounted<MemoryManager>, public MemoryAccess
   size_t get_mapping_count();
 
   UserAddress get_random_base(size_t length);
-
-  // impl MemoryAccessor for MemoryManager
-  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
-                                                     ktl::span<uint8_t>& bytes) const final;
-
-  fit::result<Errno, size_t> write_memory(UserAddress addr,
-                                          const ktl::span<const uint8_t>& bytes) const final;
 
   fit::result<Errno, ktl::span<uint8_t>> unified_read_memory(const CurrentTask& current_task,
                                                              UserAddress addr,

@@ -814,17 +814,6 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
   return fit::ok();
 }
 
-// impl MemoryAccessor for MemoryManager
-fit::result<Errno, ktl::span<uint8_t>> MemoryManager::read_memory(UserAddress addr,
-                                                                  ktl::span<uint8_t>& bytes) const {
-  return vmo_read_memory(addr, bytes);
-}
-
-fit::result<Errno, size_t> MemoryManager::write_memory(
-    UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
-  return vmo_write_memory(addr, bytes);
-}
-
 fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory(
     const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const {
   DEBUG_ASSERT(has_same_address_space(current_task->mm()));
