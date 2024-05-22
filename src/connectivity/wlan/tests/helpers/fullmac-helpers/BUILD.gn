@@ -30,5 +30,6 @@ rustc_library("fullmac-helpers") {
     "src/config.rs",
     "src/fake_ap.rs",
     "src/lib.rs",
+    "src/recorded_request_stream.rs",
   ]
 }

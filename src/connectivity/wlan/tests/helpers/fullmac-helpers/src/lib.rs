@@ -15,6 +15,7 @@ use {
 
 pub mod config;
 pub mod fake_ap;
+pub mod recorded_request_stream;
 
 // Compatible BSS descriptions are defined here.
 // "Compatible" here means that that an SME  with default configuration

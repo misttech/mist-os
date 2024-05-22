@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use {
+    crate::recorded_request_stream::RecordedRequestStream,
     fidl_fuchsia_wlan_common_security as fidl_wlan_security,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_mlme::EapolResultCode,
-    futures::StreamExt,
     ieee80211::MacAddr,
     std::sync::{Arc, Mutex},
     wlan_common::{
@@ -71,7 +71,7 @@ pub async fn handle_fourway_eapol_handshake(
     frame_to_client: eapol::KeyFrameBuf,
     bssid: [u8; 6],
     client_sta_addr: [u8; 6],
-    fullmac_req_stream: &mut fidl_fullmac::WlanFullmacImplBridgeRequestStream,
+    fullmac_req_stream: &mut RecordedRequestStream,
     fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
 ) -> UpdateSink {
     let mut update_sink = UpdateSink::new();
@@ -85,13 +85,8 @@ pub async fn handle_fourway_eapol_handshake(
         fullmac_ifc_proxy,
     )
     .await;
-    let frame_to_auth_data = get_eapol_frame_from_test_realm(
-        bssid.clone(),
-        client_sta_addr.clone(),
-        fullmac_req_stream,
-        fullmac_ifc_proxy,
-    )
-    .await;
+    let frame_to_auth_data =
+        get_eapol_frame_from_test_realm(bssid.clone(), fullmac_req_stream, fullmac_ifc_proxy).await;
     let frame_to_auth = eapol::KeyFrameRx::parse(mic_size as usize, &frame_to_auth_data[..])
         .expect("Could not parse EAPOL key frame");
     authenticator
@@ -107,13 +102,8 @@ pub async fn handle_fourway_eapol_handshake(
         fullmac_ifc_proxy,
     )
     .await;
-    let frame_to_auth_data = get_eapol_frame_from_test_realm(
-        bssid.clone(),
-        client_sta_addr.clone(),
-        fullmac_req_stream,
-        fullmac_ifc_proxy,
-    )
-    .await;
+    let frame_to_auth_data =
+        get_eapol_frame_from_test_realm(bssid.clone(), fullmac_req_stream, fullmac_ifc_proxy).await;
     let frame_to_auth = eapol::KeyFrameRx::parse(mic_size as usize, &frame_to_auth_data[..])
         .expect("Could not parse EAPOL key frame");
     authenticator
@@ -149,17 +139,14 @@ async fn send_eapol_frame_to_test_realm(
 /// Returns the buffer containing EAPOL frame data from the test realm through |fullmac_req_stream|.
 async fn get_eapol_frame_from_test_realm(
     authenticator_addr: [u8; 6],
-    client_addr: [u8; 6],
-    fullmac_req_stream: &mut fidl_fullmac::WlanFullmacImplBridgeRequestStream,
+    fullmac_req_stream: &mut RecordedRequestStream,
     fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
 ) -> Vec<u8> {
     let frame_data = assert_variant!(fullmac_req_stream.next().await,
-    Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::EapolTx { payload, responder })) => {
+    fidl_fullmac::WlanFullmacImplBridgeRequest::EapolTx { payload, responder } => {
         responder
             .send()
             .expect("Failed to respond to EapolTx");
-
-        assert!(payload.src_addr.unwrap() == client_addr && payload.dst_addr.unwrap() == authenticator_addr);
         payload.data.unwrap()
     });
 
