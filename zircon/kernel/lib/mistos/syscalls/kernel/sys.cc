@@ -52,7 +52,7 @@ long sys_getppid() {
 }
 
 long sys_getpgid(pid_t pid) {
-  LTRACEF_LEVEL(2, "pid=%d\n", pid);
+  LTRACEF_LEVEL(2, "pid %d\n", pid);
   auto ut = ThreadDispatcher::GetCurrent();
   auto syscall_ret = sys_getpgid(CurrentTask::From(TaskBuilder(ut->task()->task())), pid);
   if (syscall_ret.is_error()) {
@@ -65,6 +65,46 @@ long sys_getpgrp() {
   LTRACE;
   auto ut = ThreadDispatcher::GetCurrent();
   auto syscall_ret = sys_getpgrp(CurrentTask::From(TaskBuilder(ut->task()->task())));
+  if (syscall_ret.is_error()) {
+    return syscall_ret.error_value().return_value();
+  }
+  return SyscallResult::From(*syscall_ret).value();
+}
+
+long sys_getuid() {
+  LTRACE;
+  auto ut = ThreadDispatcher::GetCurrent();
+  auto syscall_ret = sys_getuid(CurrentTask::From(TaskBuilder(ut->task()->task())));
+  if (syscall_ret.is_error()) {
+    return syscall_ret.error_value().return_value();
+  }
+  return SyscallResult::From(*syscall_ret).value();
+}
+
+long sys_getgid() {
+  LTRACE;
+  auto ut = ThreadDispatcher::GetCurrent();
+  auto syscall_ret = sys_getgid(CurrentTask::From(TaskBuilder(ut->task()->task())));
+  if (syscall_ret.is_error()) {
+    return syscall_ret.error_value().return_value();
+  }
+  return SyscallResult::From(*syscall_ret).value();
+}
+
+long sys_geteuid() {
+  LTRACE;
+  auto ut = ThreadDispatcher::GetCurrent();
+  auto syscall_ret = sys_geteuid(CurrentTask::From(TaskBuilder(ut->task()->task())));
+  if (syscall_ret.is_error()) {
+    return syscall_ret.error_value().return_value();
+  }
+  return SyscallResult::From(*syscall_ret).value();
+}
+
+long sys_getegid() {
+  LTRACE;
+  auto ut = ThreadDispatcher::GetCurrent();
+  auto syscall_ret = sys_getegid(CurrentTask::From(TaskBuilder(ut->task()->task())));
   if (syscall_ret.is_error()) {
     return syscall_ret.error_value().return_value();
   }

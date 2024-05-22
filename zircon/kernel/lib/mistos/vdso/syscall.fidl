@@ -260,20 +260,27 @@ closed protocol Syscall {
     strict Times() -> () error int64;
     ///STUB 101
     strict Ptrace() -> () error int64;
-    ///STUB 102
+
+    // #102, SYSCALL_DEFINE0(getuid)
     strict Getuid() -> () error int64;
+
     ///STUB 103
     strict Syslog() -> () error int64;
-    ///STUB 104
+
+    // #104, SYSCALL_DEFINE0(getgid)
     strict Getgid() -> () error int64;
+
     ///STUB 105
     strict Setuid() -> () error int64;
     ///STUB 106
     strict Setgid() -> () error int64;
-    ///STUB 107
+
+    // #107, SYSCALL_DEFINE0(geteuid)
     strict Geteuid() -> () error int64;
-    ///STUB 108
+
+    // #108, SYSCALL_DEFINE0(getegid)
     strict Getegid() -> () error int64;
+
     ///STUB 109
     strict Setpgid() -> () error int64;
 

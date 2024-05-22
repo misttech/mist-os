@@ -70,6 +70,21 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
   return fit::ok(pgid);
 }
 
+fit::result<Errno, uid_t> sys_getuid(const CurrentTask& current_task) {
+  return fit::ok(current_task->creds().uid);
+}
+
+fit::result<Errno, uid_t> sys_getgid(const CurrentTask& current_task) {
+  return fit::ok(current_task->creds().gid);
+}
+
+fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task) {
+  return fit::ok(current_task->creds().euid);
+}
+
+fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task) {
+  return fit::ok(current_task->creds().egid);
+}
 
 fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int option,
                                             uint64_t arg2, uint64_t arg3, uint64_t arg4,
