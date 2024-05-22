@@ -3,13 +3,18 @@
 // found in the LICENSE file.
 
 use lock_order::{lock::RwLockFor, relation::LockBefore, wrap::prelude::*};
-use net_types::ip::{Ipv4, Ipv6};
+use net_types::{
+    ip::{Ip, Ipv4, Ipv6},
+    NonMappedAddr, SpecifiedAddr,
+};
 use packet_formats::ip::IpExt;
 
 use crate::{
     filter::{
-        FilterBindingsContext, FilterContext, FilterHandler, FilterImpl, FilterIpContext, State,
+        FilterBindingsContext, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
+        NatContext, State,
     },
+    ip::IpDeviceStateContext,
     BindingsContext, CoreCtx, StackState,
 };
 
@@ -21,6 +26,7 @@ pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsContext> {
     fn filter_handler(&mut self) -> Self::Handler<'_>;
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterHandlerProvider<I, BC> for CoreCtx<'a, BC, L>
 {
@@ -31,12 +37,32 @@ impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Filt
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterIpContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    fn with_filter_state<O, F: FnOnce(&State<I, BC>) -> O>(&mut self, cb: F) -> O {
-        let state = self.read_lock::<crate::lock_ordering::FilterState<I>>();
-        cb(&state)
+    type NatCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::FilterState<I>>;
+
+    fn with_filter_state_and_nat_ctx<O, F: FnOnce(&State<I, BC>, &mut Self::NatCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (state, mut locked) = self.read_lock_and::<crate::lock_ordering::FilterState<I>>();
+        cb(&state, &mut locked)
+    }
+}
+
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>> NatContext<I>
+    for CoreCtx<'_, BC, L>
+{
+    fn get_local_addr_for_remote(
+        &mut self,
+        device_id: &Self::DeviceId,
+        remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
+    ) -> Option<NonMappedAddr<SpecifiedAddr<<I as Ip>::Addr>>> {
+        IpDeviceStateContext::<I, BC>::get_local_addr_for_remote(self, device_id, remote)
+            .map(|addr| addr.into_inner())
     }
 }
 

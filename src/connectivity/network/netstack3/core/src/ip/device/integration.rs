@@ -23,12 +23,9 @@ use net_types::{
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{EmptyBuf, Serializer};
-use packet_formats::{
-    icmp::{
-        ndp::{NeighborSolicitation, RouterSolicitation},
-        IcmpUnusedCode,
-    },
-    ip::IpExt,
+use packet_formats::icmp::{
+    ndp::{NeighborSolicitation, RouterSolicitation},
+    IcmpUnusedCode,
 };
 
 use crate::{
@@ -1422,6 +1419,7 @@ where
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
         'a,
         I: IpExt,
@@ -1434,7 +1432,7 @@ impl<
 
     fn filter_handler(&mut self) -> Self::Handler<'_> {
         let Self { config: _, core_ctx } = self;
-        FilterHandlerProvider::filter_handler(core_ctx)
+        FilterHandlerProvider::<I, BC>::filter_handler(core_ctx)
     }
 }
 

@@ -150,6 +150,12 @@ impl<A: IpAddress> SocketIpAddr<A> {
         **addr
     }
 
+    /// Returns the inner address, including all witness types.
+    pub fn into_inner(self) -> NonMappedAddr<SpecifiedAddr<A>> {
+        let SocketIpAddr(addr) = self;
+        addr
+    }
+
     /// Constructs a [`SocketIpAddr`] from the given multicast address.
     pub fn new_from_multicast(addr: MulticastAddr<A>) -> SocketIpAddr<A> {
         let addr: MulticastAddr<NonMappedAddr<_>> = addr.non_mapped().transpose();

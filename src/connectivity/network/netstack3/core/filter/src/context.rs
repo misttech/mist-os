@@ -4,8 +4,13 @@
 
 use core::fmt::Debug;
 
-use net_types::ip::{Ipv4, Ipv6};
-use netstack3_base::{InstantBindingsTypes, TimerBindingsTypes, TimerContext};
+use net_types::{
+    ip::{Ipv4, Ipv6},
+    NonMappedAddr, SpecifiedAddr,
+};
+use netstack3_base::{
+    AnyDevice, DeviceIdContext, InstantBindingsTypes, TimerBindingsTypes, TimerContext,
+};
 use packet_formats::ip::IpExt;
 
 use crate::state::State;
@@ -33,8 +38,31 @@ impl<BC: TimerContext + FilterBindingsTypes> FilterBindingsContext for BC {}
 /// ordering types to enforce that filtering state is only acquired at or before
 /// a given lock level, while keeping test code free of locking concerns.
 pub trait FilterIpContext<I: IpExt, BT: FilterBindingsTypes> {
+    /// The execution context that allows the filtering engine to perform
+    /// Network Address Translation (NAT).
+    type NatCtx<'a>: NatContext<I>;
+
     /// Calls the function with a reference to filtering state.
-    fn with_filter_state<O, F: FnOnce(&State<I, BT>) -> O>(&mut self, cb: F) -> O;
+    fn with_filter_state<O, F: FnOnce(&State<I, BT>) -> O>(&mut self, cb: F) -> O {
+        self.with_filter_state_and_nat_ctx(|state, _ctx| cb(state))
+    }
+
+    /// Calls the function with a reference to filtering state and the NAT
+    /// context.
+    fn with_filter_state_and_nat_ctx<O, F: FnOnce(&State<I, BT>, &mut Self::NatCtx<'_>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
+}
+
+/// The execution context for Network Address Translation (NAT).
+pub trait NatContext<I: IpExt>: DeviceIdContext<AnyDevice> {
+    /// Returns the best local address for communicating with the remote.
+    fn get_local_addr_for_remote(
+        &mut self,
+        device_id: &Self::DeviceId,
+        remote: Option<SpecifiedAddr<I::Addr>>,
+    ) -> Option<NonMappedAddr<SpecifiedAddr<I::Addr>>>;
 }
 
 /// A context for mutably accessing all filtering state at once, to allow IPv4
@@ -57,11 +85,12 @@ impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, Fram
 
 #[cfg(test)]
 pub(crate) mod testutil {
+    use alloc::collections::HashMap;
     use core::time::Duration;
 
     use net_types::ip::Ip;
     use netstack3_base::{
-        testutil::{FakeInstant, FakeTimerCtx, WithFakeTimerContext},
+        testutil::{FakeInstant, FakeTimerCtx, FakeWeakDeviceId, WithFakeTimerContext},
         InstantContext, IntoCoreTimerCtx,
     };
 
@@ -69,16 +98,25 @@ pub(crate) mod testutil {
     use crate::{
         conntrack,
         logic::FilterTimerId,
+        matchers::testutil::FakeDeviceId,
         state::{validation::ValidRoutines, ConntrackExternalData, IpRoutines, Routines},
     };
 
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {
         Ethernet,
         Wlan,
     }
 
-    pub struct FakeCtx<I: IpExt>(State<I, FakeBindingsCtx<I>>);
+    pub struct FakeCtx<I: IpExt> {
+        state: State<I, FakeBindingsCtx<I>>,
+        nat: FakeNatCtx<I>,
+    }
+
+    #[derive(Default)]
+    pub struct FakeNatCtx<I: IpExt> {
+        device_addrs: HashMap<FakeDeviceId, NonMappedAddr<SpecifiedAddr<I::Addr>>>,
+    }
 
     impl<I: IpExt> FakeCtx<I> {
         pub fn with_ip_routines(
@@ -88,27 +126,50 @@ pub(crate) mod testutil {
             let (installed_routines, uninstalled_routines) =
                 ValidRoutines::new(Routines { ip: routines, ..Default::default() })
                     .expect("invalid state");
-            Self(State {
-                installed_routines,
-                uninstalled_routines,
-                conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
-            })
+            Self {
+                state: State {
+                    installed_routines,
+                    uninstalled_routines,
+                    conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
+                },
+                nat: FakeNatCtx::default(),
+            }
         }
 
         pub fn conntrack(
             &mut self,
         ) -> &conntrack::Table<I, FakeBindingsCtx<I>, ConntrackExternalData> {
-            &self.0.conntrack
+            &self.state.conntrack
         }
     }
 
     impl<I: IpExt> FilterIpContext<I, FakeBindingsCtx<I>> for FakeCtx<I> {
-        fn with_filter_state<O, F: FnOnce(&State<I, FakeBindingsCtx<I>>) -> O>(
+        type NatCtx<'a> = FakeNatCtx<I>;
+
+        fn with_filter_state_and_nat_ctx<
+            O,
+            F: FnOnce(&State<I, FakeBindingsCtx<I>>, &mut Self::NatCtx<'_>) -> O,
+        >(
             &mut self,
             cb: F,
         ) -> O {
-            let Self(state) = self;
-            cb(&*state)
+            let Self { state, nat } = self;
+            cb(state, nat)
+        }
+    }
+
+    impl<I: IpExt> DeviceIdContext<AnyDevice> for FakeNatCtx<I> {
+        type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
+    }
+
+    impl<I: IpExt> NatContext<I> for FakeNatCtx<I> {
+        fn get_local_addr_for_remote(
+            &mut self,
+            device_id: &Self::DeviceId,
+            _remote: Option<SpecifiedAddr<I::Addr>>,
+        ) -> Option<NonMappedAddr<SpecifiedAddr<I::Addr>>> {
+            self.device_addrs.get(device_id).cloned()
         }
     }
 

@@ -21,7 +21,9 @@ mod state;
 pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, state::ConntrackExternalData>;
 
 pub use api::FilterApi;
-pub use context::{FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext};
+pub use context::{
+    FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
+};
 pub use logic::{
     FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,
 };
