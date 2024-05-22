@@ -690,4 +690,94 @@ mod tests {
             }
         });
     }
+
+    #[test]
+    fn graph_with_nested_meta() {
+        let inspector = inspect::Inspector::default();
+
+        // Create a new graph.
+        let graph = Digraph::new(inspector.root(), DigraphOpts::default().track_events(3));
+
+        // Create a new node with some properties.
+        let mut vertex = graph.add_vertex(
+            "test-node",
+            [
+                Metadata::nested(
+                    "nested",
+                    [
+                        Metadata::new("int", 2i64).track_events(),
+                        Metadata::nested("nested2", [Metadata::new("boolean", false)]),
+                    ],
+                ),
+                Metadata::nested("other_nested", [Metadata::new("string", "hello")]),
+            ],
+        );
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Graph": {
+                "events": {
+                    "0": {
+                        "@time": AnyProperty,
+                        "event": "add_vertex",
+                        "vertex_id": "test-node",
+                        "meta": {
+                            "nested": {
+                                "int": 2i64,
+                            }
+                        }
+                    }
+                },
+                "topology": {
+                    "test-node": {
+                        "meta": {
+                            nested: {
+                                int: 2i64,
+                                nested2: {
+                                    boolean: false
+                                }
+                            },
+                            other_nested: {
+                                string: "hello",
+                            }
+                        },
+                        "relationships": {}
+                    },
+                }
+            }
+        });
+
+        vertex.meta().set("nested/int", 5i64);
+        vertex.meta().set("nested/nested2/boolean", true);
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Graph": {
+                "events": {
+                    "0": contains {},
+                    "1": {
+                        "@time": AnyProperty,
+                        "key": "nested/int",
+                        "update": 5i64,
+                        "event": "update_key",
+                        "vertex_id": "test-node",
+                    },
+                },
+                "topology": {
+                    "test-node": {
+                        "meta": {
+                            nested: {
+                                int: 5i64,
+                                nested2: {
+                                    boolean: true
+                                }
+                            },
+                            other_nested: {
+                                string: "hello",
+                            }
+                        },
+                        "relationships": {}
+                    },
+                }
+            }
+        });
+    }
 }

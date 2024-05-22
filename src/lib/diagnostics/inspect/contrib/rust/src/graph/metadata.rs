@@ -8,7 +8,7 @@ use super::{
     VertexId,
 };
 use fuchsia_inspect::{self as inspect, ArrayProperty, Property};
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{borrow::Cow, collections::BTreeMap, ops::Deref};
 
 /// An enum encoding all the possible metadata value types and contents.
 pub enum MetadataValue<'a> {
@@ -141,23 +141,44 @@ pub struct Metadata<'a> {
     /// The key of the metadata field.
     pub(crate) key: Cow<'a, str>,
     /// The value of the metadata field.
-    pub(crate) value: MetadataValue<'a>,
-    /// Whether or not changes to this metadata field should be tracked.
-    pub(crate) track_events: bool,
+    inner: InnerMetadata<'a>,
 }
 
 impl<'a> Metadata<'a> {
     /// Create a new metadata item with the given `key` and `value`.
     pub fn new(key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'a>>) -> Self {
-        Self { key: key.into(), value: value.into(), track_events: false }
+        Self {
+            key: key.into(),
+            inner: InnerMetadata::Value { value: value.into(), track_events: false },
+        }
+    }
+
+    pub fn nested(
+        key: impl Into<Cow<'a, str>>,
+        value: impl IntoIterator<Item = Metadata<'a>> + 'a,
+    ) -> Self {
+        Self { key: key.into(), inner: InnerMetadata::Nested(Box::new(value.into_iter())) }
     }
 
     /// Require that changes to this metadata node must be tracked. To support tracking events
     /// about changes the graph must be configured to support tracking events.
+    /// This is a no-op if called on a nested node. It only works on leaf properties.
     pub fn track_events(mut self) -> Self {
-        self.track_events = true;
+        match &mut self.inner {
+            InnerMetadata::Value { ref mut track_events, .. } => *track_events = true,
+            InnerMetadata::Nested(_) => {}
+        }
         self
     }
+}
+
+enum InnerMetadata<'a> {
+    Value {
+        value: MetadataValue<'a>,
+        // Whether or not changes to this metadata field should be tracked.
+        track_events: bool,
+    },
+    Nested(Box<dyn Iterator<Item = Metadata<'a>> + 'a>),
 }
 
 #[derive(Debug)]
@@ -287,14 +308,28 @@ where
     ) -> (Self, MetaEventNode) {
         let node = parent.create_child("meta");
         let meta_event_node = MetaEventNode::new(&parent);
+
         let mut map = BTreeMap::default();
         node.atomic_update(|node| {
-            for Metadata { key, value, track_events } in initial_metadata.into_iter() {
-                let key = key.to_string();
-                if events_tracker.is_some() && track_events {
-                    value.record_inspect(&meta_event_node, &key);
+            for Metadata { key, inner } in initial_metadata.into_iter() {
+                match inner {
+                    InnerMetadata::Nested(_) => {
+                        Self::insert_nested_to_map(
+                            &node,
+                            meta_event_node.deref(),
+                            &mut vec![],
+                            &mut map,
+                            Metadata { key, inner },
+                        );
+                    }
+                    InnerMetadata::Value { value, track_events } => {
+                        let key = key.to_string();
+                        if events_tracker.is_some() && track_events {
+                            value.record_inspect(&meta_event_node, &key);
+                        }
+                        Self::insert_to_map(&node, &mut map, &[key.into()], value, track_events)
+                    }
                 }
-                Self::insert_to_map(&node, &mut map, key, value, track_events);
             }
         });
         (Self { id, node, map, events_tracker }, meta_event_node)
@@ -363,16 +398,10 @@ where
                     self.log_update_key(key.as_ref(), &value)
                 }
                 let track_events = *track_events;
-                Self::insert_to_map(
-                    &self.node,
-                    &mut self.map,
-                    key.into_owned(),
-                    value,
-                    track_events,
-                );
+                Self::insert_to_map(&self.node, &mut self.map, &[key], value, track_events);
             }
             (None, value) => {
-                Self::insert_to_map(&self.node, &mut self.map, key.into_owned(), value, false);
+                Self::insert_to_map(&self.node, &mut self.map, &[key], value, false);
             }
         }
     }
@@ -387,64 +416,117 @@ where
         }
     }
 
-    fn insert_to_map(
+    fn insert_to_map<'a>(
         node: &inspect::Node,
         map: &mut BTreeMap<String, (MetadataProperty, bool)>,
-        key: String,
+        key_path: &[Cow<'a, str>],
         value: MetadataValue<'_>,
         track_events: bool,
     ) {
+        let node_key = key_path.last().unwrap().as_ref();
+        let map_key = key_path.join("/");
         match value {
             MetadataValue::Int(value) => {
-                let property = node.create_int(&key, value);
-                map.insert(key, (MetadataProperty::Int(property), track_events));
+                let property = node.create_int(node_key, value);
+                map.insert(map_key, (MetadataProperty::Int(property), track_events));
             }
             MetadataValue::Uint(value) => {
-                let property = node.create_uint(&key, value);
-                map.insert(key, (MetadataProperty::Uint(property), track_events));
+                let property = node.create_uint(node_key, value);
+                map.insert(map_key, (MetadataProperty::Uint(property), track_events));
             }
             MetadataValue::Double(value) => {
-                let property = node.create_double(&key, value);
-                map.insert(key, (MetadataProperty::Double(property), track_events));
+                let property = node.create_double(node_key, value);
+                map.insert(map_key, (MetadataProperty::Double(property), track_events));
             }
             MetadataValue::Str(value) => {
-                let property = node.create_string(&key, value);
-                map.insert(key, (MetadataProperty::Str(property), track_events));
+                let property = node.create_string(node_key, value);
+                map.insert(map_key, (MetadataProperty::Str(property), track_events));
             }
             MetadataValue::Bool(value) => {
-                let property = node.create_bool(&key, value);
-                map.insert(key, (MetadataProperty::Bool(property), track_events));
+                let property = node.create_bool(node_key, value);
+                map.insert(map_key, (MetadataProperty::Bool(property), track_events));
             }
             MetadataValue::IntVec(value) => {
                 let property = node.atomic_update(|node| {
-                    let property = node.create_int_array(&key, value.len());
+                    let property = node.create_int_array(node_key, value.len());
                     for (idx, v) in value.into_iter().enumerate() {
                         property.set(idx, v);
                     }
                     property
                 });
-                map.insert(key, (MetadataProperty::IntVec(property), track_events));
+                map.insert(map_key, (MetadataProperty::IntVec(property), track_events));
             }
             MetadataValue::UintVec(value) => {
                 let property = node.atomic_update(|node| {
-                    let property = node.create_uint_array(&key, value.len());
+                    let property = node.create_uint_array(node_key, value.len());
                     for (idx, v) in value.into_iter().enumerate() {
                         property.set(idx, v);
                     }
                     property
                 });
-                map.insert(key, (MetadataProperty::UintVec(property), track_events));
+                map.insert(map_key, (MetadataProperty::UintVec(property), track_events));
             }
             MetadataValue::DoubleVec(value) => {
                 let property = node.atomic_update(|node| {
-                    let property = node.create_double_array(&key, value.len());
+                    let property = node.create_double_array(node_key, value.len());
                     for (idx, v) in value.into_iter().enumerate() {
                         property.set(idx, v);
                     }
                     property
                 });
-                map.insert(key, (MetadataProperty::DoubleVec(property), track_events));
+                map.insert(map_key, (MetadataProperty::DoubleVec(property), track_events));
             }
         }
+    }
+
+    fn insert_nested_to_map<'a>(
+        parent: &inspect::Node,
+        parent_event_node: &inspect::Node,
+        key_path: &mut Vec<Cow<'a, str>>,
+        map: &mut BTreeMap<String, (MetadataProperty, bool)>,
+        metadata: Metadata<'a>,
+    ) -> bool {
+        let Metadata { key, inner: InnerMetadata::Nested(children) } = metadata else {
+            unreachable!("We can only reach this function with nested nodes.");
+        };
+        let meta_node = parent.create_child(key.as_ref());
+        let event_node = parent_event_node.create_child(key.as_ref());
+
+        key_path.push(key);
+
+        let mut recorded_events = false;
+        for Metadata { inner: child_inner, key: child_key } in children {
+            match child_inner {
+                InnerMetadata::Nested(_) => {
+                    recorded_events |= Self::insert_nested_to_map(
+                        &meta_node,
+                        &event_node,
+                        key_path,
+                        map,
+                        Metadata { inner: child_inner, key: child_key },
+                    );
+                }
+                InnerMetadata::Value { value, track_events } => {
+                    if track_events {
+                        recorded_events = true;
+                        value.record_inspect(&event_node, &child_key);
+                    }
+                    key_path.push(child_key);
+                    Self::insert_to_map(&meta_node, map, &key_path, value, track_events);
+                    key_path.pop();
+                }
+            }
+        }
+
+        key_path.pop();
+
+        // Tie the lifetime of the nodes to that of the parent. If there were no events recorded on
+        // this node, we can safely drop the event_node.
+        parent.record(meta_node);
+        if recorded_events {
+            parent_event_node.record(event_node);
+        }
+
+        recorded_events
     }
 }
