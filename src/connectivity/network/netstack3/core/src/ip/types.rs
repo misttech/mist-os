@@ -164,17 +164,6 @@ pub struct AddableEntryAndGeneration<A: IpAddress, D> {
     pub generation: Generation,
 }
 
-/// Wraps a callback to upgrade a "stored" entry to a "live" entry.
-#[derive(GenericOverIp)]
-#[generic_over_ip(A, IpAddress)]
-pub struct EntryUpgrader<'a, A: IpAddress, DeviceId, WeakDeviceId>(
-    // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub  &'a mut dyn FnMut(
-        AddableEntryAndGeneration<A, WeakDeviceId>,
-    ) -> Option<EntryAndGeneration<A, DeviceId>>,
-);
-
 impl<A: IpAddress, D> From<Entry<A, D>> for AddableEntry<A, D> {
     fn from(Entry { subnet, device, gateway, metric }: Entry<A, D>) -> Self {
         Self { subnet: subnet, device: device, gateway: gateway, metric: metric.into() }
