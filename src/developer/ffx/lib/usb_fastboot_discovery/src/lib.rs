@@ -192,6 +192,23 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     }
 }
 
+/// Loops continually testing if the usb device with given `serial` is
+/// accepting fastboot connections, returning when it does.
+///
+/// Sleeeps for `sleep_interval` between tests
+pub async fn wait_for_live(
+    serial: &str,
+    tester: &mut impl FastbootUsbLiveTester,
+    sleep_interval: Duration,
+) {
+    loop {
+        if tester.is_fastboot_usb_live(serial).await {
+            return;
+        }
+        Timer::new(sleep_interval).await;
+    }
+}
+
 #[allow(async_fn_in_trait)]
 pub trait FastbootUsbLiveTester: Send + 'static {
     /// Checks if the interface with the given serial number is Ready to accept
@@ -391,7 +408,7 @@ mod test {
     use futures::channel::mpsc::unbounded;
     use pretty_assertions::assert_eq;
     use std::{
-        collections::HashMap,
+        collections::{HashMap, VecDeque},
         sync::{Arc, Mutex},
     };
 
@@ -432,7 +449,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_usb_watcher() -> Result<()> {
         let empty_signal = Arc::new(Mutex::new(false));
         let serial_finder = TestSerialNumberFinder {
@@ -497,6 +514,32 @@ mod test {
             ]
         );
         // Reiterating... serial ABCD was not in fastboot so it should not appear in our results
+        Ok(())
+    }
+
+    struct StackedFastbootUsbLiveTester {
+        is_live_queue: VecDeque<bool>,
+        call_count: u32,
+    }
+
+    impl FastbootUsbLiveTester for StackedFastbootUsbLiveTester {
+        async fn is_fastboot_usb_live(&mut self, _serial: &str) -> bool {
+            self.call_count += 1;
+            self.is_live_queue.pop_front().expect("should have enough calls in the queue")
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_wait_for_live() -> Result<()> {
+        let mut tester = StackedFastbootUsbLiveTester {
+            is_live_queue: VecDeque::from([false, false, false, true]),
+            call_count: 0,
+        };
+
+        wait_for_live("some-awesome-serial", &mut tester, Duration::from_millis(10)).await;
+
+        assert_eq!(tester.call_count, 4);
+
         Ok(())
     }
 }
