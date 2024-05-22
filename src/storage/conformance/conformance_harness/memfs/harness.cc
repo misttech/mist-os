@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.io.test/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/log_settings.h>
@@ -24,6 +25,7 @@
 #include "src/storage/memfs/vnode_dir.h"
 #include "src/storage/memfs/vnode_file.h"
 
+namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
 void AddEntry(const fio_test::DirectoryEntry& entry, memfs::VnodeDir& dir) {
@@ -83,7 +85,8 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_unlink(true);
     config.supports_directory_watchers(true);
     config.supports_append(true);
-    config.supports_set_attr(true);
+    config.supported_attributes(fio::NodeAttributesQuery::kChangeTime |
+                                fio::NodeAttributesQuery::kModificationTime);
 
     config.supports_remote_dir(false);
     config.supports_executable_file(false);

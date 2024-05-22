@@ -48,7 +48,6 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_executable_file(false);
     config.supports_rename(false);
     config.supports_link(false);
-    config.supports_set_attr(false);
     config.supports_unlink(false);
     config.supports_get_attributes(false);
     config.supports_update_attributes(false);

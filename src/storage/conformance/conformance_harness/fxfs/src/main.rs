@@ -75,7 +75,6 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_remote_dir: Some(false),
                     supports_rename: Some(true),
                     supports_link: Some(true),
-                    supports_set_attr: Some(true),
                     supports_get_token: Some(true),
                     supports_unlink: Some(true),
                     supports_open2: Some(true),
@@ -84,6 +83,21 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_link_into: Some(true),
                     supports_directory_watchers: Some(true),
                     supports_append: Some(true),
+                    supported_attributes: Some(
+                        fio::NodeAttributesQuery::PROTOCOLS
+                            | fio::NodeAttributesQuery::ABILITIES
+                            | fio::NodeAttributesQuery::CONTENT_SIZE
+                            | fio::NodeAttributesQuery::STORAGE_SIZE
+                            | fio::NodeAttributesQuery::LINK_COUNT
+                            | fio::NodeAttributesQuery::ID
+                            | fio::NodeAttributesQuery::CREATION_TIME
+                            | fio::NodeAttributesQuery::MODIFICATION_TIME
+                            | fio::NodeAttributesQuery::MODE
+                            | fio::NodeAttributesQuery::UID
+                            | fio::NodeAttributesQuery::GID
+                            | fio::NodeAttributesQuery::RDEV
+                            | fio::NodeAttributesQuery::ACCESS_TIME,
+                    ),
                     ..Default::default()
                 })?;
             }

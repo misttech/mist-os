@@ -40,6 +40,12 @@ impl TestHarness {
             );
         }
 
+        if config.supports_update_attributes.unwrap_or_default() {
+            config
+                .supported_attributes
+                .expect("supported_attributes must be set for testing SetAttr/UpdateAttributes!");
+        }
+
         // Generate set of supported open rights for each object type.
         let dir_rights = Rights::new(get_supported_dir_rights(&config));
         let file_rights =
@@ -78,6 +84,13 @@ impl TestHarness {
             | fio::Abilities::ENUMERATE
             | fio::Abilities::TRAVERSE
             | fio::Abilities::MODIFY_DIRECTORY
+    }
+
+    /// True if the harness supports all attributes the io1 SetAttr method supports.
+    pub fn supports_set_attr(&self) -> bool {
+        self.config.supported_attributes.unwrap_or_default().contains(
+            fio::NodeAttributesQuery::CREATION_TIME | fio::NodeAttributesQuery::MODIFICATION_TIME,
+        )
     }
 }
 

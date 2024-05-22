@@ -61,7 +61,6 @@ class TestHarness : public fio_test::Io1Harness {
     config.set_supports_executable_file(false);
     config.set_supports_rename(false);
     config.set_supports_link(false);
-    config.set_supports_set_attr(false);
     config.set_supports_unlink(false);
     config.set_supports_get_attributes(false);
     config.set_supports_update_attributes(false);

@@ -72,9 +72,8 @@ impl Node for SimpleFile {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
         let content_size: u64 = self.data.lock().unwrap().len().try_into().unwrap();
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES

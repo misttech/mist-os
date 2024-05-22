@@ -54,9 +54,6 @@ type Io1Config = table {
     /// Link is supported.
     8: supports_link bool;
 
-    /// SetAttr is supported.
-    9: supports_set_attr bool;
-
     /// GetToken is supported.
     10: supports_get_token bool;
 
@@ -67,9 +64,11 @@ type Io1Config = table {
     13: supports_open2 bool;
 
     /// Supports fuchsia.io's GetAttributes method.
+    // TODO(https://fxbug.dev/340626555): Remove this when all harnesses support GetAttributes.
     14: supports_get_attributes bool;
 
     /// Supports fuchsia.io's UpdateAttributes method.
+    // TODO(https://fxbug.dev/340626555): Remove this when all harnesses support UpdateAttributes.
     15: supports_update_attributes bool;
 
     /// Supports fuchsia.io's LinkInto method.
@@ -80,6 +79,10 @@ type Io1Config = table {
 
     /// Files can be opened in append mode.
     18: supports_append bool;
+
+    /// The set of attributes the filesystem supports. If mutable attributes are reported, they must
+    /// allow being updating via SetAttr/UpdateAttributes.
+    19: supported_attributes fuchsia.io.NodeAttributesQuery;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.

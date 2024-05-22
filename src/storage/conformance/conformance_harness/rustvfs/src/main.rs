@@ -104,12 +104,18 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_open2: Some(true),
                     supports_directory_watchers: Some(true),
                     supports_append: Some(true),
+                    supported_attributes: Some(
+                        fio::NodeAttributesQuery::PROTOCOLS
+                            | fio::NodeAttributesQuery::ABILITIES
+                            | fio::NodeAttributesQuery::CONTENT_SIZE
+                            | fio::NodeAttributesQuery::STORAGE_SIZE
+                            | fio::NodeAttributesQuery::LINK_COUNT
+                            | fio::NodeAttributesQuery::ID,
+                    ),
 
                     // Unsupported options:
                     supports_link: Some(false), // Link is not supported using a pseudo filesystem.
-                    // TODO(https://fxbug.dev/42152303): SetAttr should work, investigate why the test fails.
-                    supports_set_attr: Some(false),
-                    // TODO(https://fxbug.dev/42152303): same issue as SetAttr not working.
+                    // Pseudo-files don't support mutable attributes.
                     supports_update_attributes: Some(false),
 
                     ..Default::default()

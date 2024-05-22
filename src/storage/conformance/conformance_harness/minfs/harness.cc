@@ -73,11 +73,12 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     config.set_supports_create(true);
     config.set_supports_rename(true);
     config.set_supports_link(true);
-    config.set_supports_set_attr(true);
     config.set_supports_get_token(true);
     config.set_supports_unlink(true);
     config.set_supports_directory_watchers(true);
     config.set_supports_append(true);
+    config.set_supported_attributes(fuchsia::io::NodeAttributesQuery::CHANGE_TIME |
+                                    fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME);
 
     // Unsupported options
     config.set_supports_executable_file(false);
