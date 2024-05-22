@@ -10,16 +10,14 @@ use {
     ffx_writer::{ToolIO, VerifiedMachineWriter},
     fho::{moniker, FfxContext, FfxMain, FfxTool},
     fidl_fuchsia_io as fio,
-    fidl_fuchsia_math::SizeU,
     fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest},
     futures::stream::{FuturesOrdered, StreamExt},
-    png::HasParameters,
     schemars::JsonSchema,
     serde::{Deserialize, Serialize},
     std::{
         fmt::{Display, Formatter, Result as FmtResult},
         fs,
-        io::{BufWriter, Write},
+        io::Write,
         path::{Path, PathBuf},
     },
 };
@@ -119,13 +117,24 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
         }
     };
 
+    let format = match cmd.format {
+        Format::PNG => {
+            screenshot_file_path.set_extension("png");
+            ScreenshotFormat::Png
+        }
+        Format::BGRA => {
+            screenshot_file_path.set_extension("bgra");
+            ScreenshotFormat::BgraRaw
+        }
+        Format::RGBA => {
+            screenshot_file_path.set_extension("rgba");
+            ScreenshotFormat::BgraRaw
+        }
+    };
+
     // TODO(https://fxbug.dev/42060028): Use rgba format when available.
-    // TODO(https://fxbug.dev/42054822): Use png format when available.
     let screenshot_response = screenshot_proxy
-        .take_file(ScreenshotTakeFileRequest {
-            format: Some(ScreenshotFormat::BgraRaw),
-            ..Default::default()
-        })
+        .take_file(ScreenshotTakeFileRequest { format: Some(format), ..Default::default() })
         .await
         .map_err(|e| {
             fho::Error::from(anyhow!("Error: Could not get the screenshot from the target: {e:?}"))
@@ -140,18 +149,12 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
     // VMO in |file_proxy| may be padded for alignment.
     img_data.resize((img_size.width * img_size.height * 4).try_into().unwrap(), 0);
 
-    match cmd.format {
-        Format::PNG => {
-            save_as_png(&mut screenshot_file_path, &mut img_data, img_size);
-        }
-        Format::BGRA => {
-            save_as_bgra(&mut screenshot_file_path, &mut img_data);
-        }
-        Format::RGBA => {
-            save_as_rgba(&mut screenshot_file_path, &mut img_data);
-        }
-    };
+    if cmd.format == Format::RGBA {
+        bgra_to_rgba(&mut img_data);
+    }
 
+    let mut screenshot_file = create_file(&mut screenshot_file_path);
+    screenshot_file.write_all(&img_data[..]).expect("failed to write image data.");
     writer.item(&ScreenshotOutput { output_file: screenshot_file_path })?;
 
     Ok(())
@@ -187,38 +190,6 @@ fn create_file(screenshot_file_path: &mut PathBuf) -> fs::File {
         .unwrap_or_else(|_| panic!("cannot create file {}", screenshot_file_path.to_string_lossy()))
 }
 
-fn save_as_bgra(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
-    screenshot_file_path.set_extension("bgra");
-    let mut screenshot_file = create_file(screenshot_file_path);
-
-    screenshot_file.write_all(&img_data[..]).expect("failed to write bgra image data.");
-}
-
-// TODO(https://fxbug.dev/42060028): Use rgba format when available.
-fn save_as_rgba(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
-    bgra_to_rgba(img_data);
-
-    screenshot_file_path.set_extension("rgba");
-    let mut screenshot_file = create_file(screenshot_file_path);
-    screenshot_file.write_all(&img_data[..]).expect("failed to write rgba image data.");
-}
-
-// TODO(https://fxbug.dev/42054822): Use png format when available.
-fn save_as_png(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>, img_size: SizeU) {
-    bgra_to_rgba(img_data);
-
-    screenshot_file_path.set_extension("png");
-    let screenshot_file = create_file(screenshot_file_path);
-
-    let ref mut w = BufWriter::new(screenshot_file);
-    let mut encoder = png::Encoder::new(w, img_size.width, img_size.height);
-
-    encoder.set(png::BitDepth::Eight);
-    encoder.set(png::ColorType::RGBA);
-    let mut png_writer = encoder.write_header().unwrap();
-    png_writer.write_image_data(&img_data).expect("failed to write image data as PNG");
-}
-
 /// Performs inplace BGRA -> RGBA.
 fn bgra_to_rgba(img_data: &mut Vec<u8>) {
     let bytes_per_pixel = 4;
@@ -244,6 +215,7 @@ mod test {
         super::*,
         ffx_writer::{Format as WriterFormat, TestBuffers},
         fidl::endpoints::ServerEnd,
+        fidl_fuchsia_math::SizeU,
         fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse},
         futures::TryStreamExt,
         std::os::unix::ffi::OsStrExt,

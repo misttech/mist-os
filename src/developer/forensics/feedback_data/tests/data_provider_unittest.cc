@@ -15,6 +15,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <deque>
 #include <memory>
 #include <optional>
@@ -266,7 +267,10 @@ class DataProviderTest : public UnitTestFixture {
 TEST_F(DataProviderTest, GetScreenshot_SucceedOnScreenshotReturningSuccess) {
   const size_t image_dim_in_px = 100;
   std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_responses;
-  screenshot_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px));
+  auto fake_png = stubs::CreateFakePNGScreenshot(image_dim_in_px);
+  zx::vmo fake_png_dup;
+  fake_png.vmo().duplicate(ZX_RIGHT_SAME_RIGHTS, &fake_png_dup);
+  screenshot_responses.emplace_back(std::move(fake_png));
   auto screenshot = std::make_unique<stubs::Screenshot>();
   screenshot->set_responses(std::move(screenshot_responses));
   SetUpScreenshotServer(std::move(screenshot));
@@ -281,12 +285,14 @@ TEST_F(DataProviderTest, GetScreenshot_SucceedOnScreenshotReturningSuccess) {
             image_dim_in_px);
   EXPECT_TRUE(feedback_response.screenshot->image.vmo.is_valid());
 
-  fsl::SizedVmo expected_sized_vmo;
-  ASSERT_TRUE(fsl::VmoFromFilename("/pkg/data/checkerboard_100.png", &expected_sized_vmo));
-  std::vector<uint8_t> expected_pixels;
-  ASSERT_TRUE(fsl::VectorFromVmo(expected_sized_vmo, &expected_pixels));
   std::vector<uint8_t> actual_pixels;
   ASSERT_TRUE(fsl::VectorFromVmo(feedback_response.screenshot->image, &actual_pixels));
+
+  std::vector<uint8_t> expected_pixels;
+  uint64_t fake_png_size = 0;
+  fake_png_dup.get_size(&fake_png_size);
+  ASSERT_TRUE(fsl::VectorFromVmo(fsl::SizedVmo(std::move(fake_png_dup), fake_png_size), &expected_pixels));
+
   EXPECT_EQ(actual_pixels, expected_pixels);
 }
 
@@ -304,8 +310,8 @@ TEST_F(DataProviderTest, GetScreenshot_ParallelRequests) {
   const size_t image_dim_in_px_0 = 10u;
   const size_t image_dim_in_px_1 = 20u;
   std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_responses;
-  screenshot_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px_0));
-  screenshot_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px_1));
+  screenshot_responses.emplace_back(stubs::CreateFakePNGScreenshot(image_dim_in_px_0));
+  screenshot_responses.emplace_back(stubs::CreateFakePNGScreenshot(image_dim_in_px_1));
   ASSERT_EQ(screenshot_responses.size(), num_calls);
   auto screenshot = std::make_unique<stubs::Screenshot>();
   screenshot->set_responses(std::move(screenshot_responses));

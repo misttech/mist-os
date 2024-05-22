@@ -40,10 +40,12 @@ class TakeScreenshotTest : public UnitTestFixture {
   ::fpromise::result<ScreenshotData, Error> TakeScreenshot(
       const zx::duration timeout = zx::sec(1)) {
     ::fpromise::result<ScreenshotData, Error> result;
-    executor_.schedule_task(feedback_data::TakeScreenshot(dispatcher(), services(), timeout)
-                                .then([&result](::fpromise::result<ScreenshotData, Error>& res) {
-                                  result = std::move(res);
-                                }));
+    executor_.schedule_task(
+        feedback_data::TakeScreenshot(dispatcher(), services(),
+                                      fuchsia::ui::composition::ScreenshotFormat::PNG, timeout)
+            .then([&result](::fpromise::result<ScreenshotData, Error>& res) {
+              result = std::move(res);
+            }));
     RunLoopFor(timeout);
     return result;
   }
@@ -58,7 +60,7 @@ class TakeScreenshotTest : public UnitTestFixture {
 TEST_F(TakeScreenshotTest, Succeed_CheckerboardScreenshot) {
   const size_t image_dim_in_px = 100;
   std::deque<fuchsia::ui::composition::ScreenshotTakeResponse> screenshot_server_responses;
-  screenshot_server_responses.emplace_back(stubs::CreateCheckerboardScreenshot(image_dim_in_px));
+  screenshot_server_responses.emplace_back(stubs::CreateFakePNGScreenshot(image_dim_in_px));
   std::unique_ptr<stubs::Screenshot> server = std::make_unique<stubs::Screenshot>();
   server->set_responses(std::move(screenshot_server_responses));
   SetUpScreenshotServer(std::move(server));
@@ -70,8 +72,6 @@ TEST_F(TakeScreenshotTest, Succeed_CheckerboardScreenshot) {
   EXPECT_TRUE(screenshot.data.vmo().is_valid());
   EXPECT_EQ(static_cast<size_t>(screenshot.info.height), image_dim_in_px);
   EXPECT_EQ(static_cast<size_t>(screenshot.info.width), image_dim_in_px);
-  EXPECT_EQ(screenshot.info.stride, image_dim_in_px * 4u);
-  EXPECT_EQ(screenshot.info.pixel_format, fuchsia::images::PixelFormat::BGRA_8);
 }
 
 }  // namespace

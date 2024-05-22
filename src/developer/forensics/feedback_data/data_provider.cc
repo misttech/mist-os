@@ -5,6 +5,7 @@
 #include "src/developer/forensics/feedback_data/data_provider.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
@@ -24,7 +25,6 @@
 #include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
-#include "src/developer/forensics/feedback_data/image_conversion.h"
 #include "src/developer/forensics/feedback_data/screenshot.h"
 #include "src/developer/forensics/utils/archive.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
@@ -40,6 +40,7 @@ namespace {
 using fuchsia::feedback::ImageEncoding;
 using fuchsia::feedback::Screenshot;
 using fuchsia::feedback::Snapshot;
+using fuchsia::ui::composition::ScreenshotFormat;
 
 // Timeout for a single asynchronous piece of data, e.g., syslog collection, if the client didn't
 // specify one.
@@ -243,8 +244,9 @@ bool ServedArchive::Serve(zx::channel server_end, async_dispatcher_t* dispatcher
 }
 
 void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback callback) {
+  FX_CHECK(encoding == ImageEncoding::PNG);
   auto promise =
-      TakeScreenshot(dispatcher_, services_, kScreenshotTimeout)
+      TakeScreenshot(dispatcher_, services_, ScreenshotFormat::PNG, kScreenshotTimeout)
           .or_else([this](const Error& error) {
             if (error != Error::kTimeout) {
               return ::fpromise::error();
@@ -253,25 +255,13 @@ void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback c
             cobalt_->LogOccurrence(cobalt::TimedOutData::kScreenshot);
             return ::fpromise::error();
           })
-          .and_then([encoding](ScreenshotData& raw_screenshot) -> ::fpromise::result<Screenshot> {
+          .and_then([](ScreenshotData& screenshot_data) -> ::fpromise::result<Screenshot> {
             Screenshot screenshot;
-            screenshot.dimensions_in_px.height = raw_screenshot.info.height;
-            screenshot.dimensions_in_px.width = raw_screenshot.info.width;
-            switch (encoding) {
-              case ImageEncoding::PNG:
-                std::vector<uint8_t> raw;
-                if (!fsl::VectorFromVmo(raw_screenshot.data, &raw)) {
-                  FX_LOGS(ERROR) << "Failed to read raw screenshot VMO";
-                  return ::fpromise::error();
-                }
-                if (!RawToPng(raw, raw_screenshot.info.height, raw_screenshot.info.width,
-                              raw_screenshot.info.stride, raw_screenshot.info.pixel_format,
-                              &screenshot.image)) {
-                  FX_LOGS(ERROR) << "Failed to convert raw screenshot to PNG";
-                  return ::fpromise::error();
-                }
-                break;
-            }
+            screenshot.dimensions_in_px.height = screenshot_data.info.height;
+            screenshot.dimensions_in_px.width = screenshot_data.info.width;
+            screenshot.image =
+                fsl::SizedVmo(std::move(screenshot_data.data.vmo()), screenshot_data.data.size())
+                    .ToTransport();
             return ::fpromise::ok(std::move(screenshot));
           })
           .then([callback = std::move(callback)](::fpromise::result<Screenshot>& result) {

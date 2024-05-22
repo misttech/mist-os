@@ -24,8 +24,6 @@ source_set("data_provider") {
   sources = [
     "data_provider.cc",
     "data_provider.h",
-    "image_conversion.cc",
-    "image_conversion.h",
   ]
 
   public_deps = [
@@ -48,6 +46,7 @@ source_set("data_provider") {
     ":constants",
     ":screenshot",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
     "//src/developer/forensics/feedback/attachments",
@@ -56,7 +55,6 @@ source_set("data_provider") {
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/uuid",
-    "//third_party/libpng",
   ]
 }
 
@@ -140,6 +138,7 @@ source_set("screenshot") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
@@ -148,7 +147,6 @@ source_set("screenshot") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/utils:errors",
     "//src/developer/forensics/utils:fidl_oneshot",
