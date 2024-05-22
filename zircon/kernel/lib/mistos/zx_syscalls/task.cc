@@ -44,7 +44,7 @@
 
 namespace {
 
-// KCOUNTER(thread_legacy_yield, "thread.legacy_yield")
+KCOUNTER(thread_legacy_yield, "thread.legacy_yield")
 
 // constexpr size_t kMaxDebugReadBlock = 64 * 1024u * 1024u;
 // constexpr size_t kMaxDebugWriteBlock = 64 * 1024u * 1024u;
@@ -208,9 +208,9 @@ zx_status_t sys_thread_raise_exception(uint32_t options, zx_excp_type_t type,
   thread->process()->OnUserExceptionForJobDebugger(thread, &context);
   return ZX_OK;
 }
+#endif
 
-// zx_status_t zx_thread_legacy_yield
-zx_status_t sys_thread_legacy_yield(uint32_t options) {
+zx_status_t zx_thread_legacy_yield(uint32_t options) {
   if (options != 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -219,6 +219,7 @@ zx_status_t sys_thread_legacy_yield(uint32_t options) {
   return ZX_OK;
 }
 
+#if 0
 // zx_status_t zx_task_suspend
 zx_status_t sys_task_suspend(zx_handle_t handle, zx_handle_t* token) {
   LTRACE_ENTRY;

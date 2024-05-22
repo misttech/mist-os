@@ -98,8 +98,10 @@ closed protocol Syscall {
     strict Pipe() -> () error int64;
     ///STUB 23
     strict Select() -> () error int64;
-    ///STUB 24
+
+    // #24, SYSCALL_DEFINE0(sched_yield)
     strict SchedYield() -> () error int64;
+
     ///STUB 25
     strict Mremap() -> () error int64;
     ///STUB 26
