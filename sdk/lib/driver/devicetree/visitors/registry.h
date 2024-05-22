@@ -17,6 +17,13 @@ class VisitorRegistry : public fdf_devicetree::Visitor {
     return zx::ok();
   }
 
+  template <class VisitorImpl, class... Args>
+  zx::result<> RegisterVisitor(Args&&... args) {
+    static_assert(std::is_base_of_v<Visitor, VisitorImpl>, "VisitorImpl must derive from Visitor");
+    visitors_.emplace_back(std::make_unique<VisitorImpl>(std::forward<Args>(args)...));
+    return zx::ok();
+  }
+
   zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
     zx::result<> final_status = zx::ok();
     for (const auto& visitor : visitors_) {

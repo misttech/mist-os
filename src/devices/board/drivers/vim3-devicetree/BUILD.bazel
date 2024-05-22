@@ -58,14 +58,17 @@ fuchsia_package_resource_collection(
 fuchsia_cc_driver(
     name = "vim3-devicetree-driver",
     srcs = [
-        "vim3-adc-buttons.cc",
-        "vim3-adc-buttons.h",
         "vim3-devicetree.cc",
         "vim3-devicetree.h",
+        "visitors/vim3-adc-buttons.cc",
+        "visitors/vim3-adc-buttons.h",
+        "visitors/vim3-gpio-buttons.cc",
+        "visitors/vim3-gpio-buttons.h",
     ],
     linkshared = True,
     output_name = "vim3-devicetree",
     deps = [
+        "//src/lib/ddk:ddk_buttons_metadata",
         "//src/lib/ddk:ddk_metadata",
         "@fuchsia_sdk//bind/fuchsia.adc:fuchsia.adc_cc",
         "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
@@ -75,7 +78,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@internal_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cc",
+        "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
         "@internal_sdk//pkg/devicetree-driver-visitors",
         "@internal_sdk//pkg/devicetree-load-visitors",

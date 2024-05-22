@@ -117,6 +117,12 @@
 		pinctrl-0 = <&bt_uart_pins>;
 		pwm-init = <&pwm_init>;
 	};
+
+	power_button: gpio-buttons {
+		compatible = "fuchsia,gpio-buttons";
+		gpios = <&gpio 97 0>;
+		gpio-names = "POWER";
+	};
 };
 
 &gpio {

@@ -83,8 +83,10 @@ bazel_fuchsia_test_package("vim3-devicetree-test-package") {
     "vim3-devicetree-test.cc",
     "vim3-devicetree.cc",
     "vim3-devicetree.h",
-    "vim3-adc-buttons.cc",
-    "vim3-adc-buttons.h",
+    "visitors/vim3-adc-buttons.cc",
+    "visitors/vim3-adc-buttons.h",
+    "visitors/vim3-gpio-buttons.cc",
+    "visitors/vim3-gpio-buttons.h",
   ]
 }
 

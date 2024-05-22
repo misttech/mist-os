@@ -7,10 +7,15 @@ composite buttons;
 using fuchsia.gpio;
 using fuchsia.hardware.gpio;
 using fuchsia.platform;
+using fuchsia.devicetree;
 
 primary node "platform-device" {
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "fuchsia,gpio-buttons" {
+    true;
+  } else {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.BUTTONS;
+  }
 }
 
 optional node "mic-privacy" {

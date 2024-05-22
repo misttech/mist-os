@@ -20,3 +20,14 @@ cc_library(
         "@fuchsia_sdk//pkg/zbi-format",
     ],
 )
+
+cc_library(
+    name = "ddk_buttons_metadata",
+    hdrs = [
+        "include/ddk/metadata/buttons.h",
+    ],
+    includes = [
+        "include",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)

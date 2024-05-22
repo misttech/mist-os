@@ -116,6 +116,12 @@
 		smcs = <0x02 0x01 0x00>;
 	};
 
+	gpio-buttons {
+		compatible = "fuchsia,gpio-buttons";
+		gpio-names = "POWER";
+		gpios = <0x07 0x61 0x00>;
+	};
+
 	iommu {
 		#iommu-cells = <0x01>;
 		phandle = <0x03>;

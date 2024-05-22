@@ -15,7 +15,6 @@
 
 #include <bind/fuchsia/adc/cpp/bind.h>
 #include <bind/fuchsia/hardware/adc/cpp/bind.h>
-#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 
 namespace vim3_dt {
 

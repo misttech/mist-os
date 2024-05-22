@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VIM3_ADC_BUTTONS_H_
-#define SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VIM3_ADC_BUTTONS_H_
+#ifndef SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VISITORS_VIM3_ADC_BUTTONS_H_
+#define SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VISITORS_VIM3_ADC_BUTTONS_H_
 
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
 
@@ -27,4 +27,4 @@ class Vim3AdcButtonsVisitor : public fdf_devicetree::DriverVisitor {
 
 }  // namespace vim3_dt
 
-#endif  // SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VIM3_ADC_BUTTONS_H_
+#endif  // SRC_DEVICES_BOARD_DRIVERS_VIM3_DEVICETREE_VISITORS_VIM3_ADC_BUTTONS_H_

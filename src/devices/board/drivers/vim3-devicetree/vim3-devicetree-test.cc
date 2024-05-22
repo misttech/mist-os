@@ -48,6 +48,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/dwmac-ff3f0000",
       "sys/platform/ethernet-phy-ff634000",
       "sys/platform/fuchsia-sysmem",
+      "sys/platform/gpio-buttons",
       "sys/platform/gpio-controller-ff634400",
       "sys/platform/gpu-ffe40000",
       "sys/platform/hdmi-display-ff900000",
