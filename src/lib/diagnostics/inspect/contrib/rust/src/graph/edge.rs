@@ -28,8 +28,7 @@ impl Edge {
     ) -> Self
     where
         I: VertexId,
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-        M::IntoIter: Clone,
+        M: IntoIterator<Item = Metadata<'a>>,
     {
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let to_id = to.id().get_id();

@@ -187,7 +187,7 @@ impl<I: VertexId> VertexGraphMetadata<I> {
     pub(crate) fn new<'a>(
         parent: &inspect::Node,
         id: I,
-        initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
+        initial_metadata: impl Iterator<Item = Metadata<'a>>,
         events_tracker: Option<GraphObjectEventTracker<VertexMarker<I>>>,
     ) -> Self {
         let (inner, meta_event_node) =
@@ -231,7 +231,7 @@ impl EdgeGraphMetadata {
     pub(crate) fn new<'a>(
         parent: &inspect::Node,
         id: u64,
-        initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
+        initial_metadata: impl Iterator<Item = Metadata<'a>>,
         events_tracker: Option<GraphObjectEventTracker<EdgeMarker>>,
         from_id: &str,
         to_id: &str,
@@ -282,7 +282,7 @@ where
     fn new<'a>(
         parent: &inspect::Node,
         id: T::Id,
-        initial_metadata: impl Iterator<Item = &'a Metadata<'a>>,
+        initial_metadata: impl Iterator<Item = Metadata<'a>>,
         events_tracker: Option<GraphObjectEventTracker<T>>,
     ) -> (Self, MetaEventNode) {
         let node = parent.create_child("meta");
@@ -291,10 +291,10 @@ where
         node.atomic_update(|node| {
             for Metadata { key, value, track_events } in initial_metadata.into_iter() {
                 let key = key.to_string();
-                if events_tracker.is_some() && *track_events {
+                if events_tracker.is_some() && track_events {
                     value.record_inspect(&meta_event_node, &key);
                 }
-                Self::insert_to_map(&node, &mut map, key, value, *track_events);
+                Self::insert_to_map(&node, &mut map, key, value, track_events);
             }
         });
         (Self { id, node, map, events_tracker }, meta_event_node)
@@ -303,38 +303,50 @@ where
     fn set<'a, 'b>(&mut self, key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'b>>) {
         let key: Cow<'a, str> = key.into();
         let value = value.into();
-        match (self.map.get(key.as_ref()), &value) {
-            (Some((MetadataProperty::Int(property), track_events)), MetadataValue::Int(x)) => {
-                property.set(*x);
+        match (self.map.get(key.as_ref()), value) {
+            (
+                Some((MetadataProperty::Int(property), track_events)),
+                value @ MetadataValue::Int(x),
+            ) => {
+                property.set(x);
                 if *track_events {
                     self.log_update_key(key.as_ref(), &value)
                 }
             }
-            (Some((MetadataProperty::Uint(property), track_events)), MetadataValue::Uint(x)) => {
-                property.set(*x);
+            (
+                Some((MetadataProperty::Uint(property), track_events)),
+                value @ MetadataValue::Uint(x),
+            ) => {
+                property.set(x);
                 if *track_events {
                     self.log_update_key(key.as_ref(), &value)
                 }
             }
             (
                 Some((MetadataProperty::Double(property), track_events)),
-                MetadataValue::Double(x),
+                value @ MetadataValue::Double(x),
             ) => {
-                property.set(*x);
+                property.set(x);
                 if *track_events {
                     self.log_update_key(key.as_ref(), &value)
                 }
             }
-            (Some((MetadataProperty::Bool(property), track_events)), MetadataValue::Bool(x)) => {
-                property.set(*x);
+            (
+                Some((MetadataProperty::Bool(property), track_events)),
+                value @ MetadataValue::Bool(x),
+            ) => {
+                property.set(x);
                 if *track_events {
                     self.log_update_key(key.as_ref(), &value)
                 }
             }
-            (Some((MetadataProperty::Str(property), track_events)), MetadataValue::Str(x)) => {
-                property.set(x.as_ref());
+            (
+                Some((MetadataProperty::Str(property), track_events)),
+                ref value @ MetadataValue::Str(ref x),
+            ) => {
+                property.set(x);
                 if *track_events {
-                    self.log_update_key(key.as_ref(), &value)
+                    self.log_update_key(key.as_ref(), value)
                 }
             }
             (Some((MetadataProperty::IntVec(_), _)), MetadataValue::IntVec(_)) => {
@@ -355,12 +367,12 @@ where
                     &self.node,
                     &mut self.map,
                     key.into_owned(),
-                    &value,
+                    value,
                     track_events,
                 );
             }
             (None, value) => {
-                Self::insert_to_map(&self.node, &mut self.map, key.into_owned(), &value, false);
+                Self::insert_to_map(&self.node, &mut self.map, key.into_owned(), value, false);
             }
         }
     }
@@ -379,20 +391,20 @@ where
         node: &inspect::Node,
         map: &mut BTreeMap<String, (MetadataProperty, bool)>,
         key: String,
-        value: &MetadataValue<'_>,
+        value: MetadataValue<'_>,
         track_events: bool,
     ) {
         match value {
             MetadataValue::Int(value) => {
-                let property = node.create_int(&key, *value);
+                let property = node.create_int(&key, value);
                 map.insert(key, (MetadataProperty::Int(property), track_events));
             }
             MetadataValue::Uint(value) => {
-                let property = node.create_uint(&key, *value);
+                let property = node.create_uint(&key, value);
                 map.insert(key, (MetadataProperty::Uint(property), track_events));
             }
             MetadataValue::Double(value) => {
-                let property = node.create_double(&key, *value);
+                let property = node.create_double(&key, value);
                 map.insert(key, (MetadataProperty::Double(property), track_events));
             }
             MetadataValue::Str(value) => {
@@ -400,14 +412,14 @@ where
                 map.insert(key, (MetadataProperty::Str(property), track_events));
             }
             MetadataValue::Bool(value) => {
-                let property = node.create_bool(&key, *value);
+                let property = node.create_bool(&key, value);
                 map.insert(key, (MetadataProperty::Bool(property), track_events));
             }
             MetadataValue::IntVec(value) => {
                 let property = node.atomic_update(|node| {
                     let property = node.create_int_array(&key, value.len());
                     for (idx, v) in value.into_iter().enumerate() {
-                        property.set(idx, *v);
+                        property.set(idx, v);
                     }
                     property
                 });
@@ -417,7 +429,7 @@ where
                 let property = node.atomic_update(|node| {
                     let property = node.create_uint_array(&key, value.len());
                     for (idx, v) in value.into_iter().enumerate() {
-                        property.set(idx, *v);
+                        property.set(idx, v);
                     }
                     property
                 });
@@ -427,7 +439,7 @@ where
                 let property = node.atomic_update(|node| {
                     let property = node.create_double_array(&key, value.len());
                     for (idx, v) in value.into_iter().enumerate() {
-                        property.set(idx, *v);
+                        property.set(idx, v);
                     }
                     property
                 });

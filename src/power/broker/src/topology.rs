@@ -221,7 +221,7 @@ impl Topology {
         };
         let inspect_vertex = self.inspect_graph.add_vertex(
             id.clone(),
-            &[
+            [
                 IGraphMeta::new("name", name),
                 IGraphMeta::new("valid_levels", valid_levels.clone()),
                 IGraphMeta::new("current_level", "unset").track_events(),
@@ -516,7 +516,7 @@ impl Topology {
                 let mut rq_vertex = rq.inspect_vertex.borrow_mut();
                 dp_vertex.add_edge(
                     &mut rq_vertex,
-                    &[IGraphMeta::new(dp_level.to_string(), "unset").track_events()],
+                    [IGraphMeta::new(dp_level.to_string(), "unset").track_events()],
                 )
             })
             .meta()

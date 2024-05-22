@@ -36,8 +36,7 @@ where
         events_tracker: Option<GraphObjectEventTracker<VertexMarker<I>>>,
     ) -> Self
     where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-        M::IntoIter: Clone,
+        M: IntoIterator<Item = Metadata<'a>>,
     {
         let internal_id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let metadata_iterator = initial_metadata.into_iter();
@@ -60,8 +59,7 @@ where
     /// given metadata.
     pub fn add_edge<'a, M>(&self, to: &mut Vertex<I>, initial_metadata: M) -> Edge
     where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-        M::IntoIter: Clone,
+        M: IntoIterator<Item = Metadata<'a>>,
     {
         Edge::new(self, to, initial_metadata, self.metadata.events_tracker().map(|e| e.for_edge()))
     }

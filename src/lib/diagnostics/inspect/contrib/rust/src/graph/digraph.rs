@@ -52,8 +52,7 @@ where
     /// metadata.
     pub fn add_vertex<'a, M>(&self, id: I, initial_metadata: M) -> Vertex<I>
     where
-        M: IntoIterator<Item = &'a Metadata<'a>>,
-        M::IntoIter: Clone,
+        M: IntoIterator<Item = Metadata<'a>>,
     {
         Vertex::new(
             id,
@@ -78,15 +77,15 @@ mod tests {
 
         // Create a new node with some properties.
         let vertex_foo = graph
-            .add_vertex("element-1", &[Metadata::new("name", "foo"), Metadata::new("level", 1u64)]);
+            .add_vertex("element-1", [Metadata::new("name", "foo"), Metadata::new("level", 1u64)]);
 
         let mut vertex_bar = graph
-            .add_vertex("element-2", &[Metadata::new("name", "bar"), Metadata::new("level", 2i64)]);
+            .add_vertex("element-2", [Metadata::new("name", "bar"), Metadata::new("level", 2i64)]);
 
         // Create a new edge.
         let edge_foo_bar = vertex_foo.add_edge(
             &mut vertex_bar,
-            &[
+            [
                 Metadata::new("src", "on"),
                 Metadata::new("dst", "off"),
                 Metadata::new("type", "passive"),
@@ -134,7 +133,7 @@ mod tests {
         // Create a new node with some properties.
         let mut vertex = graph.add_vertex(
             "test-node",
-            &[
+            [
                 Metadata::new("string_property", "i'm a string"),
                 Metadata::new("int_property", 2i64),
                 Metadata::new("uint_property", 4u64),
@@ -233,11 +232,11 @@ mod tests {
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
 
         // Create a new node with some properties.
-        let vertex_one = graph.add_vertex("test-node-1", &[]);
-        let mut vertex_two = graph.add_vertex("test-node-2", &[]);
+        let vertex_one = graph.add_vertex("test-node-1", []);
+        let mut vertex_two = graph.add_vertex("test-node-2", []);
         let mut edge = vertex_one.add_edge(
             &mut vertex_two,
-            &[
+            [
                 Metadata::new("string_property", "i'm a string"),
                 Metadata::new("int_property", 2i64),
                 Metadata::new("uint_property", 4u64),
@@ -362,12 +361,12 @@ mod tests {
     fn test_raii_semantics() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
-        let mut foo = graph.add_vertex("foo", &[Metadata::new("hello", true)]);
-        let bar = graph.add_vertex("bar", &[Metadata::new("hello", false)]);
-        let mut baz = graph.add_vertex("baz", &[]);
+        let mut foo = graph.add_vertex("foo", [Metadata::new("hello", true)]);
+        let bar = graph.add_vertex("bar", [Metadata::new("hello", false)]);
+        let mut baz = graph.add_vertex("baz", []);
 
-        let edge = bar.add_edge(&mut foo, &[Metadata::new("hey", "hi")]);
-        let edge_to_baz = bar.add_edge(&mut baz, &[Metadata::new("good", "bye")]);
+        let edge = bar.add_edge(&mut foo, [Metadata::new("hey", "hi")]);
+        let edge_to_baz = bar.add_edge(&mut baz, [Metadata::new("good", "bye")]);
 
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
@@ -473,9 +472,9 @@ mod tests {
     fn drop_target_semantics() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
-        let vertex_one = graph.add_vertex("test-node-1", &[]);
-        let mut vertex_two = graph.add_vertex("test-node-2", &[]);
-        let edge = vertex_one.add_edge(&mut vertex_two, &[]);
+        let vertex_one = graph.add_vertex("test-node-1", []);
+        let mut vertex_two = graph.add_vertex("test-node-2", []);
+        let edge = vertex_one.add_edge(&mut vertex_two, []);
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 "topology": {
@@ -518,12 +517,12 @@ mod tests {
         let graph = Digraph::new(inspector.root(), DigraphOpts::default().track_events(5));
         let mut vertex_one = graph.add_vertex(
             "test-node-1",
-            &[Metadata::new("name", "foo"), Metadata::new("level", 1u64).track_events()],
+            [Metadata::new("name", "foo"), Metadata::new("level", 1u64).track_events()],
         );
-        let mut vertex_two = graph.add_vertex("test-node-2", &[Metadata::new("name", "bar")]);
+        let mut vertex_two = graph.add_vertex("test-node-2", [Metadata::new("name", "bar")]);
         let mut edge = vertex_one.add_edge(
             &mut vertex_two,
-            &[
+            [
                 Metadata::new("some-property", 10i64).track_events(),
                 Metadata::new("other", "not tracked"),
             ],
