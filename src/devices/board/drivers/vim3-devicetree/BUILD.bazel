@@ -66,6 +66,8 @@ fuchsia_cc_driver(
         "visitors/vim3-adc-buttons.h",
         "visitors/vim3-gpio-buttons.cc",
         "visitors/vim3-gpio-buttons.h",
+        "visitors/vim3-nna.cc",
+        "visitors/vim3-nna.h",
         "visitors/vim3-wifi.cc",
         "visitors/vim3-wifi.h",
     ],

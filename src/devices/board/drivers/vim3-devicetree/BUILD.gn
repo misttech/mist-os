@@ -89,6 +89,8 @@ bazel_fuchsia_test_package("vim3-devicetree-test-package") {
     "visitors/vim3-gpio-buttons.h",
     "visitors/vim3-wifi.cc",
     "visitors/vim3-wifi.h",
+    "visitors/vim3-nna.cc",
+    "visitors/vim3-nna.h",
   ]
 }
 

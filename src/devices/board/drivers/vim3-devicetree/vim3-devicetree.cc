@@ -11,6 +11,7 @@
 
 #include "visitors/vim3-adc-buttons.h"
 #include "visitors/vim3-gpio-buttons.h"
+#include "visitors/vim3-nna.h"
 #include "visitors/vim3-wifi.h"
 
 namespace vim3_dt {
@@ -46,6 +47,11 @@ zx::result<> Vim3Devicetree::Start() {
 
   if (zx::result result = (*visitors)->RegisterVisitor<Vim3WifiVisitor>(); result.is_error()) {
     FDF_LOG(ERROR, "Failed to register vim3 wifi visitor");
+    return result.take_error();
+  };
+
+  if (zx::result result = (*visitors)->RegisterVisitor<Vim3NnaVisitor>(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to register vim3 nna visitor");
     return result.take_error();
   };
 
