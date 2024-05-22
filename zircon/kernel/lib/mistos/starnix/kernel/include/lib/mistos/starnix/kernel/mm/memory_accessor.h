@@ -7,10 +7,12 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_MM_MEMORY_ACCESSOR_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 
 #include <fbl/vector.h>
+#include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/span.h>
 
@@ -36,8 +38,8 @@ class MemoryAccessor {
   /// known, only the maximum length is.
   ///
   /// Returns the bytes that have been read to on success.
-  // virtual fit::result<Errno, ktl::span<uint8_t>> read_memory_partial_until_null_byte(
-  //     UserAddress addr, ktl::span<uint8_t>& bytes);
+  virtual fit::result<Errno, ktl::span<uint8_t>> read_memory_partial_until_null_byte(
+      UserAddress addr, ktl::span<uint8_t>& bytes) const = 0;
 
   /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
   /// or no more bytes can be read from the target.
@@ -81,8 +83,11 @@ class MemoryAccessor {
 class MemoryAccessorExt : public MemoryAccessor {
  public:
   /// Read exactly `len` bytes of memory, returning them as a a fbl::Vector.
-  virtual fit::result<Errno, fbl::Vector<uint8_t>> read_memory_to_vec(UserAddress addr,
-                                                                      size_t len) const;
+  fit::result<Errno, fbl::Vector<uint8_t>> read_memory_to_vec(UserAddress addr, size_t len) const;
+
+  /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and
+  /// returning the results as a Vec.
+  fit::result<Errno, FsString> read_c_string_to_vec(UserCString string, size_t max_size) const;
 
   virtual ~MemoryAccessorExt() = default;
 };

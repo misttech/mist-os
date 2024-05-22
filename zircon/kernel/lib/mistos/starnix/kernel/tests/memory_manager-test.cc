@@ -12,11 +12,13 @@
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
+#include <zircon/syscalls.h>
 
 #include <tuple>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/string.h>
 #include <fbl/vector.h>
 #include <lockdep/guard.h>
 #include <zxtest/zxtest.h>
@@ -27,7 +29,7 @@ using namespace starnix::testing;
 namespace starnix {
 
 TEST(MemoryManager, test_brk) {
-  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto [kernel, current_task] = create_kernel_and_task();
 
   auto mm = current_task->mm();
 
@@ -92,8 +94,7 @@ TEST(MemoryManager, test_brk) {
 }
 
 TEST(MemoryManager, test_mm_exec) {
-  auto result = starnix::testing::create_kernel_and_task();
-  auto [kernel, current_task] = result;
+  auto [kernel, current_task] = create_kernel_and_task();
 
   auto mm = current_task->mm();
 
@@ -126,7 +127,7 @@ TEST(MemoryManager, test_mm_exec) {
 }
 
 TEST(MemoryManager, test_get_contiguous_mappings_at) {
-  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
 
   // Create four one-page mappings with a hole between the third one and the fourth one.
@@ -298,7 +299,7 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
 }
 
 TEST(MemoryManager, test_read_write_crossing_mappings) {
-  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
   auto ma = *current_task;
 
@@ -332,7 +333,7 @@ TEST(MemoryManager, test_read_write_crossing_mappings) {
 }
 
 TEST(MemoryManager, test_read_write_errors) {
-  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto [kernel, current_task] = create_kernel_and_task();
   auto ma = *current_task;
 
   size_t page_size = PAGE_SIZE;
@@ -363,9 +364,91 @@ TEST(MemoryManager, test_read_write_errors) {
   ASSERT_FALSE(ma.read_memory_to_vec(unmapped_addr, 0).is_error(), "failed to read no data");
 }
 
+TEST(MemoryManager, test_read_c_string_to_vec_large) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+  auto ma = *current_task;
+
+  size_t page_size = PAGE_SIZE;
+  auto max_size = 4 * page_size;
+  auto addr = mm->base_addr + 10 * page_size;
+
+  ASSERT_EQ(addr, map_memory(*current_task, addr, max_size));
+
+  fbl::AllocChecker ac;
+  fbl::Vector<uint8_t> random_data;
+  random_data.resize(max_size, &ac);
+  ASSERT(ac.check());
+  zx_cprng_draw(random_data.data(), max_size);
+
+  // Remove all NUL bytes.
+  for (size_t i = 0; i < random_data.size(); i++) {
+    if (random_data[i] == 0) {
+      random_data[i] = 1;
+    }
+  }
+  random_data[max_size - 1] = 0;
+
+  auto write_result = ma.write_memory(addr, {random_data.data(), random_data.size()});
+  ASSERT_TRUE(write_result.is_ok(), "failed to write test string, error %d",
+              write_result.error_value().error_code());
+
+  // We should read the same value minus the last byte (NUL char).
+  auto read_result = ma.read_c_string_to_vec(addr, max_size);
+  ASSERT_TRUE(read_result.is_ok(), "failed to read c string, error %d",
+              read_result.error_value().error_code());
+
+  ASSERT_EQ(fbl::String((char*)random_data.data(), max_size - 1), read_result.value());
+}
+
+TEST(MemoryManager, test_read_c_string_to_vec) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+  auto ma = *current_task;
+
+  size_t page_size = PAGE_SIZE;
+  auto max_size = 2 * page_size;
+  auto addr = mm->base_addr + 10 * page_size;
+
+  // Map a page at a fixed address and write an unterminated string at the end of it.
+  ASSERT_EQ(addr, map_memory(*current_task, addr, page_size));
+
+  ktl::span<uint8_t> test_str((uint8_t*)"foo!", 4);
+  auto test_addr = addr + page_size - test_str.size();
+  ASSERT_TRUE(ma.write_memory(test_addr, test_str).is_ok(), "failed to write test string");
+
+  // Expect error if the string is not terminated.
+  ASSERT_EQ(errno(ENAMETOOLONG), ma.read_c_string_to_vec(test_addr, max_size).error_value());
+
+  // Expect success if the string is terminated.
+  ASSERT_TRUE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"\0", 1}).is_ok(),
+              "failed to write test string");
+
+  auto string_of_error = ma.read_c_string_to_vec(test_addr, max_size);
+  ASSERT_TRUE(string_of_error.is_ok(), "error %d", string_of_error.error_value().error_code());
+  ASSERT_EQ(fbl::String("foo"), string_of_error.value());
+
+  // Expect success if the string spans over two mappings.
+  ASSERT_EQ(addr + page_size, map_memory(*current_task, addr + page_size, page_size));
+  // TODO: Adjacent private anonymous mappings are collapsed. To test this case this test needs to
+  // provide a backing for the second mapping.
+  // assert_eq!(mm.get_mapping_count(), 2);
+  ASSERT_TRUE(ma.write_memory(addr + (page_size - 1), {(uint8_t*)"bar\0", 4}).is_ok(),
+              "failed to write extra chars");
+
+  string_of_error = ma.read_c_string_to_vec(test_addr, max_size);
+  ASSERT_TRUE(string_of_error.is_ok(), "error %d", string_of_error.error_value().error_code());
+  ASSERT_EQ(fbl::String("foobar"), string_of_error.value());
+
+  // Expect error if the string exceeds max limit
+  ASSERT_EQ(errno(ENAMETOOLONG), ma.read_c_string_to_vec(test_addr, 2).error_value());
+
+  // Expect error if the address is invalid.
+  ASSERT_EQ(errno(EFAULT), ma.read_c_string_to_vec(UserCString(), max_size).error_value());
+}
+
 TEST(MemoryManager, test_unmap_returned_mappings) {
-  auto result = starnix::testing::create_kernel_and_task();
-  auto [kernel, current_task] = result;
+  auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
   auto addr = map_memory(*current_task, 0, PAGE_SIZE * 2);
 
@@ -376,8 +459,7 @@ TEST(MemoryManager, test_unmap_returned_mappings) {
 }
 
 TEST(MemoryManager, test_unmap_returns_multiple_mappings) {
-  auto result = starnix::testing::create_kernel_and_task();
-  auto [kernel, current_task] = result;
+  auto [kernel, current_task] = create_kernel_and_task();
   auto mm = current_task->mm();
   auto addr = map_memory(*current_task, 0, PAGE_SIZE);
   map_memory(*current_task, addr.ptr() + 2 * PAGE_SIZE, PAGE_SIZE);

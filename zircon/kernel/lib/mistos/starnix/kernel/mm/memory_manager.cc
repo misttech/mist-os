@@ -33,6 +33,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
+#include <ktl/iterator.h>
 #include <object/thread_dispatcher.h>
 
 #include "../kernel_priv.h"
@@ -453,7 +454,7 @@ fit::result<Errno> MemoryManagerState::protect(UserAddress addr, size_t length,
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
-  size_t bytes_written = 0;
+  size_t bytes_read = 0;
   auto vec = get_contiguous_mappings_at(addr, bytes.size());
   if (vec.is_error()) {
     LTRACEF_LEVEL(2, "error code %d\n", vec.error_value().error_code());
@@ -461,18 +462,19 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
   }
 
   for (auto [mapping, len] : vec.value()) {
-    auto next_offset = bytes_written + len;
-    ktl::span<uint8_t> current_span{bytes.data() + bytes_written, next_offset};
-    auto result = read_mapping_memory(addr + bytes_written, mapping, current_span);
+    auto next_offset = bytes_read + len;
+    ktl::span<uint8_t> span{bytes.data() + bytes_read, bytes.data() + next_offset};
+    auto result = read_mapping_memory(addr + bytes_read, mapping, span);
     if (result.is_error())
       return result.take_error();
-    bytes_written = next_offset;
+    bytes_read = next_offset;
   }
 
-  if (bytes_written != bytes.size()) {
+  if (bytes_read != bytes.size()) {
     return fit::error(errno(EFAULT));
   } else {
-    return fit::ok(bytes);
+    LTRACEF("bytes read %lu\n", bytes_read);
+    return fit::ok(ktl::span<uint8_t>{bytes.data(), bytes_read});
   }
 }
 
@@ -492,6 +494,49 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_mapping_memory(
                     mapping->backing().variant);
 }
 
+fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory_partial(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
+  size_t bytes_read = 0;
+  auto mappings_or_error = get_contiguous_mappings_at(addr, bytes.size());
+  if (mappings_or_error.is_error()) {
+    LTRACEF_LEVEL(2, "error code %d\n", mappings_or_error.error_value().error_code());
+    return mappings_or_error.take_error();
+  }
+  for (auto [mapping, len] : mappings_or_error.value()) {
+    auto next_offset = bytes_read + len;
+    ktl::span<uint8_t> span{bytes.data() + bytes_read, bytes.data() + next_offset};
+    if (read_mapping_memory(addr + bytes_read, mapping, span).is_error()) {
+      break;
+    }
+    bytes_read = next_offset;
+  }
+
+  // If at least one byte was requested but we got none, it means that `addr` was invalid.
+  if ((bytes.size() != 0) && (bytes_read == 0)) {
+    return fit::error(errno(EFAULT));
+  } else {
+    LTRACEF("bytes read %lu\n", bytes_read);
+    return fit::ok(ktl::span<uint8_t>(bytes.data(), bytes_read));
+  }
+}
+
+fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory_partial_until_null_byte(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  auto read_bytes_or_error = read_memory_partial(addr, bytes);
+  if (read_bytes_or_error.is_error())
+    return read_bytes_or_error.take_error();
+
+  auto read_bytes = read_bytes_or_error.value();
+  auto null_position = ktl::find(read_bytes.begin(), read_bytes.end(), '\0');
+
+  size_t max_len = (null_position == read_bytes.end())
+                       ? read_bytes.size()
+                       : ktl::distance(read_bytes.begin(), null_position) + 1;
+
+  return fit::ok(ktl::span<uint8_t>(bytes.data(), max_len));
+}
+
 fit::result<Errno, size_t> MemoryManagerState::write_memory(
     UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
@@ -503,15 +548,17 @@ fit::result<Errno, size_t> MemoryManagerState::write_memory(
   }
 
   for (auto [mapping, len] : vec.value()) {
+    LTRACEF_LEVEL(2, "len %zu\n", len);
     auto next_offset = bytes_written + len;
     auto result = write_mapping_memory(addr + bytes_written, mapping,
-                                       {bytes.data() + bytes_written, next_offset});
+                                       {bytes.data() + bytes_written, bytes.data() + next_offset});
     if (result.is_error())
       return result.take_error();
     bytes_written = next_offset;
   }
 
   if (bytes_written != bytes.size()) {
+    LTRACEF_LEVEL(2, "bytes_written %zu bytes.size() %zu\n", bytes_written, bytes.size());
     return fit::error(errno(EFAULT));
   } else {
     return fit::ok(bytes.size());
@@ -835,6 +882,21 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory(
 fit::result<Errno, ktl::span<uint8_t>> MemoryManager::vmo_read_memory(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
   return state.Read()->read_memory(addr, bytes);
+}
+
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::unified_read_memory_partial_until_null_byte(
+    const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  DEBUG_ASSERT(has_same_address_space(current_task->mm()));
+  if (ThreadDispatcher::GetCurrent()) {
+    return fit::error(errno(ENOSYS));
+  } else {
+    return vmo_read_memory_partial_until_null_byte(addr, bytes);
+  }
+}
+
+fit::result<Errno, ktl::span<uint8_t>> MemoryManager::vmo_read_memory_partial_until_null_byte(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
+  return state.Read()->read_memory_partial_until_null_byte(addr, bytes);
 }
 
 fit::result<Errno, size_t> MemoryManager::unified_write_memory(

@@ -292,6 +292,23 @@ struct MemoryManagerState {
                                                              fbl::RefPtr<Mapping>& mapping,
                                                              ktl::span<uint8_t>& bytes) const;
 
+  /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
+  /// or no more bytes can be read.
+  ///
+  /// This is used, for example, to read null-terminated strings where the exact length is not
+  /// known, only the maximum length is.
+  ///
+  /// # Parameters
+  /// - `addr`: The address to read data from.
+  /// - `bytes`: The byte array to read into.
+  fit::result<Errno, ktl::span<uint8_t>> read_memory_partial(UserAddress addr,
+                                                             ktl::span<uint8_t>& bytes) const;
+
+  /// Like `read_memory_partial` but only returns the bytes up to and including
+  /// a null (zero) byte.
+  fit::result<Errno, ktl::span<uint8_t>> read_memory_partial_until_null_byte(
+      UserAddress addr, ktl::span<uint8_t>& bytes) const;
+
   /// Writes the provided bytes.
   ///
   /// In case of success, the number of bytes written will always be `bytes.len()`.
@@ -384,6 +401,12 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory(UserAddress addr,
                                                          ktl::span<uint8_t>& bytes) const;
+
+  fit::result<Errno, ktl::span<uint8_t>> unified_read_memory_partial_until_null_byte(
+      const CurrentTask& current_task, UserAddress addr, ktl::span<uint8_t>& bytes) const;
+
+  fit::result<Errno, ktl::span<uint8_t>> vmo_read_memory_partial_until_null_byte(
+      UserAddress addr, ktl::span<uint8_t>& bytes) const;
 
   fit::result<Errno, size_t> unified_write_memory(const CurrentTask& current_task, UserAddress addr,
                                                   const ktl::span<const uint8_t>& bytes) const;
