@@ -43,6 +43,20 @@ group("components") {
   deps = libc_components
 }
 
+# The older code neither from musl nor from llvm-libc does not have
+# corresponding unit tests.
+group("legacy-components") {
+  visibility = [ ":*" ]
+  deps = [
+    ":exit",
+    "sanitizers",
+    "setjmp",
+    "stubs",
+    "zircon",
+    "//zircon/system/ulib/zx-panic-libc:as_source",
+  ]
+}
+
 # This isn't a test per se, but using libc_test will apply the test configs
 # we want.
 libc_test("test_utils") {
@@ -275,6 +289,20 @@ if (zircon_toolchain == false) {
     ]
   }
 
+  config("libc-shlib.config") {
+    visibility = [ ":*" ]
+
+    # Don't link against the shared libc++.
+    configs = [ "//build/config/zircon:static-libc++" ]
+
+    # This directory contains just a libc++.a file that is a stub input linker
+    # script to prevent the real libc++.a from being found by the linker.
+    # Instead, it will find the empty file and any references to symbols
+    # defined in the real libc++.a (which includes libc++abi) will cause the
+    # link to fail.
+    lib_dirs = [ "libc++-stub" ]
+  }
+
   # This builds the actual shared library.  It's only used indirectly via the
   # "libc" target, see below.
   shared_library("libc.so") {
@@ -290,12 +318,7 @@ if (zircon_toolchain == false) {
     configs -= default_shared_library_configs
     configs += default_common_binary_configs
 
-    # This directory contains just a libc++.a file that is a stub input linker
-    # script to prevent the real libc++.a from being found by the linker.
-    # Instead, it will find the empty file and any references to symbols
-    # defined in the real libc++.a (which includes libc++abi) will cause the
-    # link to fail.
-    lib_dirs = [ "libc++-stub" ]
+    configs += [ ":libc-shlib.config" ]
 
     # At link time and in DT_SONAME, musl is known as libc.so.  But the
     # (only) place it needs to be installed at runtime is where the
@@ -319,23 +342,11 @@ if (zircon_toolchain == false) {
 
     public_deps = [ ":headers" ]
 
-    # The code comes from musl, where a source_set is defined.
-    sources = []
-
     deps = [
       ":components",
-      ":exit",
-      "sanitizers",
-      "setjmp",
-      "stubs",
-      "zircon",
-      "//src/zircon/lib/zircon",
-      "//zircon/system/ulib/zx-panic-libc:as_source",
-      "//zircon/third_party/ulib/musl",
+      ":legacy-components",
+      "//zircon/third_party/ulib/musl:legacy-impl",
     ]
-
-    # Don't link against the shared libc++.
-    configs += [ "//build/config/zircon:static-libc++" ]
 
     if (!is_gcc && current_cpu == "riscv64" &&
         toolchain_variant.tags + [ "instrumented" ] - [ "instrumented" ] !=
@@ -359,7 +370,11 @@ if (zircon_toolchain == false) {
 
 source_set("exit") {
   sources = [ "_Exit.cc" ]
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  deps = [
+    ":headers",
+    "//src/zircon/lib/zircon",
+    "//zircon/system/public",
+  ]
 }
 
 if (zircon_toolchain == false) {
