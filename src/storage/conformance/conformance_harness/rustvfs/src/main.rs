@@ -52,13 +52,10 @@ fn add_entry(
 ) -> Result<(), Error> {
     match entry {
         io_test::DirectoryEntry::Directory(io_test::Directory { name, entries, .. }) => {
-            let name = name.expect("Directory must have name");
             let new_dir = simple();
-            if let Some(entries) = entries {
-                for entry in entries {
-                    let entry = *entry.expect("Directory entries must not be null");
-                    add_entry(entry, &new_dir)?;
-                }
+            for entry in entries {
+                let entry = *entry.expect("Directory entries must not be null");
+                add_entry(entry, &new_dir)?;
             }
             dest.add_entry(name, new_dir)?;
         }
@@ -67,19 +64,13 @@ fn add_entry(
             remote_client,
             ..
         }) => {
-            let name = name.expect("RemoteDirectory must have name");
-            let dir_proxy =
-                remote_client.expect("RemoteDirectory must have a remote client").into_proxy()?;
-            dest.add_entry(name, remote_dir(dir_proxy))?;
+            dest.add_entry(name, remote_dir(remote_client.into_proxy()?))?;
         }
         io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
-            let name = name.expect("File must have name");
-            let contents = contents.expect("File must have contents");
             let new_file = vmo::read_write(contents);
             dest.add_entry(name, new_file)?;
         }
         io_test::DirectoryEntry::ExecutableFile(io_test::ExecutableFile { name, .. }) => {
-            let name = name.expect("Executable file must have a name");
             let executable_file = new_executable_file()?;
             dest.add_entry(name, executable_file)?;
         }
@@ -93,32 +84,29 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
             Io1HarnessRequest::GetConfig { responder } => {
                 let config = Io1Config {
                     // Supported options:
-                    supports_create: Some(true),
-                    supports_executable_file: Some(true),
-                    supports_get_backing_memory: Some(true),
-                    supports_remote_dir: Some(true),
-                    supports_rename: Some(true),
-                    supports_get_token: Some(true),
-                    supports_unlink: Some(true),
-                    supports_get_attributes: Some(true),
-                    supports_open2: Some(true),
-                    supports_directory_watchers: Some(true),
-                    supports_append: Some(true),
-                    supported_attributes: Some(
-                        fio::NodeAttributesQuery::PROTOCOLS
-                            | fio::NodeAttributesQuery::ABILITIES
-                            | fio::NodeAttributesQuery::CONTENT_SIZE
-                            | fio::NodeAttributesQuery::STORAGE_SIZE
-                            | fio::NodeAttributesQuery::LINK_COUNT
-                            | fio::NodeAttributesQuery::ID,
-                    ),
+                    supports_create: true,
+                    supports_executable_file: true,
+                    supports_get_backing_memory: true,
+                    supports_remote_dir: true,
+                    supports_rename: true,
+                    supports_get_token: true,
+                    supports_unlink: true,
+                    supports_get_attributes: true,
+                    supports_open2: true,
+                    supports_directory_watchers: true,
+                    supports_append: true,
+                    supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
+                        | fio::NodeAttributesQuery::ABILITIES
+                        | fio::NodeAttributesQuery::CONTENT_SIZE
+                        | fio::NodeAttributesQuery::STORAGE_SIZE
+                        | fio::NodeAttributesQuery::LINK_COUNT
+                        | fio::NodeAttributesQuery::ID,
 
                     // Unsupported options:
-                    supports_link: Some(false), // Link is not supported using a pseudo filesystem.
+                    supports_link: false, // Link is not supported using a pseudo filesystem.
+                    supports_link_into: false,
                     // Pseudo-files don't support mutable attributes.
-                    supports_update_attributes: Some(false),
-
-                    ..Default::default()
+                    supports_update_attributes: false,
                 };
                 responder.send(&config)?;
                 continue;
@@ -130,9 +118,8 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                 control_handle: _,
             } => {
                 let dir = simple();
-                if let Some(entries) = root.entries {
-                    for entry in entries {
-                        let entry = entry.expect("Directory entries must not be null");
+                for entry in root.entries {
+                    if let Some(entry) = entry {
                         add_entry(*entry, &dir)?;
                     }
                 }

@@ -10,7 +10,7 @@ use {
 #[fuchsia::test]
 async fn file_get_readable_memory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory {
         return;
     }
 
@@ -45,7 +45,7 @@ async fn file_get_readable_memory_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_get_readable_memory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory {
         return;
     }
 
@@ -63,7 +63,7 @@ async fn file_get_readable_memory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_get_writable_memory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory {
         return;
     }
     // Writable VMOs currently require private sharing mode.
@@ -87,7 +87,7 @@ async fn file_get_writable_memory_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_get_writable_memory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory {
         return;
     }
     const VMO_FLAGS: fio::VmoFlags =
@@ -107,7 +107,7 @@ async fn file_get_writable_memory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_get_executable_memory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_executable_file.unwrap_or_default() {
+    if !harness.config.supports_executable_file {
         return;
     }
 
@@ -135,7 +135,7 @@ async fn file_get_executable_memory_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_get_executable_memory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_executable_file.unwrap_or_default() {
+    if !harness.config.supports_executable_file {
         return;
     }
     // We should fail to get the backing memory if the connection lacks execute rights.
@@ -170,7 +170,7 @@ async fn file_get_executable_memory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_get_backing_memory_shared_buffer() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_backing_memory.unwrap_or_default() {
+    if !harness.config.supports_get_backing_memory {
         return;
     }
 

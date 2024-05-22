@@ -10,7 +10,7 @@ use {
 #[fuchsia::test]
 async fn unlink_file_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_unlink.unwrap_or_default() {
+    if !harness.config.supports_unlink {
         return;
     }
     let contents = "abcdef".as_bytes();
@@ -55,7 +55,7 @@ async fn unlink_file_with_sufficient_rights() {
 #[fuchsia::test]
 async fn unlink_file_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_unlink.unwrap_or_default() {
+    if !harness.config.supports_unlink {
         return;
     }
     let contents = "abcdef".as_bytes();
@@ -83,7 +83,7 @@ async fn unlink_file_with_insufficient_rights() {
 #[fuchsia::test]
 async fn unlink_directory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_unlink.unwrap_or_default() {
+    if !harness.config.supports_unlink {
         return;
     }
 
@@ -103,7 +103,7 @@ async fn unlink_directory_with_sufficient_rights() {
 #[fuchsia::test]
 async fn unlink_directory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_unlink.unwrap_or_default() {
+    if !harness.config.supports_unlink {
         return;
     }
 
@@ -127,7 +127,7 @@ async fn unlink_directory_with_insufficient_rights() {
 async fn unlink_must_be_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_unlink.unwrap_or_default() {
+    if !harness.config.supports_unlink {
         return;
     }
 

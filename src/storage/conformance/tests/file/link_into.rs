@@ -18,9 +18,7 @@ struct Fixture {
 impl Fixture {
     async fn new(rights: fio::OpenFlags) -> Option<Self> {
         let harness = TestHarness::new().await;
-        if !harness.config.supports_link_into.unwrap_or_default()
-            || !harness.config.supports_get_token.unwrap_or_default()
-        {
+        if !harness.config.supports_link_into || !harness.config.supports_get_token {
             return None;
         }
 
@@ -40,8 +38,11 @@ impl Fixture {
 
 #[fuchsia::test]
 async fn file_link_into() {
-    let Some(fixture) = Fixture::new(fio::OpenFlags::RIGHT_READABLE
-                                     | fio::OpenFlags::RIGHT_WRITABLE).await else { return };
+    let Some(fixture) =
+        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
+    else {
+        return;
+    };
 
     fixture
         .file
@@ -55,8 +56,11 @@ async fn file_link_into() {
 
 #[fuchsia::test]
 async fn file_link_into_bad_name() {
-    let Some(fixture) = Fixture::new(fio::OpenFlags::RIGHT_READABLE
-                                     | fio::OpenFlags::RIGHT_WRITABLE).await else { return };
+    let Some(fixture) =
+        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
+    else {
+        return;
+    };
 
     for bad_name in ["/linked", ".", "..", "\0"] {
         assert_eq!(
@@ -89,8 +93,11 @@ async fn file_link_into_insufficient_rights() {
 
 #[fuchsia::test]
 async fn file_link_into_for_unlinked_file() {
-    let Some(fixture) = Fixture::new(fio::OpenFlags::RIGHT_READABLE
-                                     | fio::OpenFlags::RIGHT_WRITABLE).await else { return };
+    let Some(fixture) =
+        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
+    else {
+        return;
+    };
 
     fixture
         .test_dir
@@ -112,8 +119,11 @@ async fn file_link_into_for_unlinked_file() {
 
 #[fuchsia::test]
 async fn file_link_into_existing() {
-    let Some(fixture) = Fixture::new(fio::OpenFlags::RIGHT_READABLE
-                                     | fio::OpenFlags::RIGHT_WRITABLE).await else { return };
+    let Some(fixture) =
+        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
+    else {
+        return;
+    };
 
     assert_eq!(
         fixture
@@ -128,8 +138,11 @@ async fn file_link_into_existing() {
 
 #[fuchsia::test]
 async fn file_link_into_target_unlinked_dir() {
-    let Some(fixture) = Fixture::new(fio::OpenFlags::RIGHT_READABLE
-                                     | fio::OpenFlags::RIGHT_WRITABLE).await else { return };
+    let Some(fixture) =
+        Fixture::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE).await
+    else {
+        return;
+    };
 
     let target_dir = open_dir_with_flags(
         &fixture.test_dir,

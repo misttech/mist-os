@@ -70,24 +70,17 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     fuchsia::io::test::Io1Config config;
 
     // Supported options
-    config.set_supports_create(true);
-    config.set_supports_rename(true);
-    config.set_supports_link(true);
-    config.set_supports_get_token(true);
-    config.set_supports_unlink(true);
-    config.set_supports_directory_watchers(true);
-    config.set_supports_append(true);
-    config.set_supported_attributes(fuchsia::io::NodeAttributesQuery::CHANGE_TIME |
-                                    fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME);
+    config.supports_create = true;
+    config.supports_rename = true;
+    config.supports_link = true;
+    config.supports_get_token = true;
+    config.supports_unlink = true;
+    config.supports_directory_watchers = true;
+    config.supports_append = true;
+    config.supported_attributes = fuchsia::io::NodeAttributesQuery::CHANGE_TIME |
+                                  fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME;
 
-    // Unsupported options
-    config.set_supports_executable_file(false);
-    config.set_supports_get_backing_memory(false);
-    config.set_supports_remote_dir(false);
-    config.set_supports_get_attributes(false);
-    config.set_supports_update_attributes(false);
-
-    callback(std::move(config));
+    callback(config);
   }
 
   void GetDirectory(fuchsia::io::test::Directory root, fuchsia::io::OpenFlags flags,
@@ -95,9 +88,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     // Create a unique directory within the root of minfs for each request and popuplate it with the
     // requested contents.
     auto directory = CreateUniqueDirectory();
-    if (root.has_entries()) {
-      PopulateDirectory(root.entries(), *directory);
-    }
+    PopulateDirectory(root.entries, *directory);
     zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(
         fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
     ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
@@ -118,26 +109,26 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
   void AddEntry(const fuchsia::io::test::DirectoryEntry& entry, Directory& parent) {
     switch (entry.Which()) {
       case fuchsia::io::test::DirectoryEntry::Tag::kDirectory: {
-        zx::result vnode = parent.Create(entry.directory().name(), fs::CreationType::kDirectory);
+        zx::result vnode = parent.Create(entry.directory().name, fs::CreationType::kDirectory);
         ZX_ASSERT_MSG(vnode.is_ok(), "Failed to create a directory: %s", vnode.status_string());
         auto directory = fbl::RefPtr<Directory>::Downcast(*std::move(vnode));
         ZX_ASSERT_MSG(directory != nullptr, "A vnode of the wrong type was created");
-        if (entry.directory().has_entries()) {
-          PopulateDirectory(entry.directory().entries(), *directory);
-        }
+        PopulateDirectory(entry.directory().entries, *directory);
         // The directory was opened when it was created.
         directory->Close();
         break;
       }
       case fuchsia::io::test::DirectoryEntry::Tag::kFile: {
-        zx::result file = parent.Create(entry.file().name(), fs::CreationType::kFile);
+        zx::result file = parent.Create(entry.file().name, fs::CreationType::kFile);
         ZX_ASSERT_MSG(file.is_ok(), "Failed to create a file: %s", file.status_string());
-
-        size_t actual = 0;
-        zx_status_t status =
-            file->Write(entry.file().contents().data(), entry.file().contents().size(),
-                        /*offset=*/0, &actual);
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to file: %s", zx_status_get_string(status));
+        if (!entry.file().contents.empty()) {
+          size_t actual = 0;
+          zx_status_t status =
+              file->Write(entry.file().contents.data(), entry.file().contents.size(),
+                          /*offset=*/0, &actual);
+          ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to file: %s",
+                        zx_status_get_string(status));
+        }
         // The file was opened when it was created.
         file->Close();
         break;

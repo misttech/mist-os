@@ -134,7 +134,7 @@ async fn validate_file_rights() {
 #[fuchsia::test]
 async fn validate_executable_file_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_executable_file.unwrap_or_default() {
+    if !harness.config.supports_executable_file {
         return;
     }
     // Create a test directory with an ExecutableFile object, and ensure the directory has all rights.
@@ -384,7 +384,7 @@ async fn open_file_with_extra_rights() {
 async fn open2_directory_unsupported() {
     let harness = TestHarness::new().await;
 
-    if harness.config.supports_open2.unwrap_or_default() {
+    if harness.config.supports_open2 {
         return;
     }
 
@@ -403,7 +403,7 @@ async fn open2_directory_unsupported() {
 async fn open2_rights() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -472,7 +472,7 @@ async fn open2_rights() {
 async fn open2_invalid() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -529,7 +529,7 @@ async fn open2_invalid() {
 async fn open2_create_dot_fails_with_already_exists() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -559,7 +559,7 @@ async fn open2_create_dot_fails_with_already_exists() {
 async fn open2_open_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -635,7 +635,7 @@ async fn open2_open_directory() {
 async fn open2_open_file() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -715,9 +715,7 @@ async fn open2_open_file() {
 async fn open2_file_append() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default()
-        || !harness.config.supports_append.unwrap_or_default()
-    {
+    if !harness.config.supports_open2 || !harness.config.supports_append {
         return;
     }
 
@@ -753,7 +751,7 @@ async fn open2_file_append() {
 async fn open2_file_truncate_invalid() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -782,7 +780,7 @@ async fn open2_file_truncate_invalid() {
 async fn open2_file_truncate() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -813,7 +811,7 @@ async fn open2_file_truncate() {
 async fn open2_directory_get_representation() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -853,14 +851,14 @@ async fn open2_directory_get_representation() {
 async fn open2_file_get_representation() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
     let test_dir = harness
         .get_directory(root_directory(vec![file("file", vec![])]), fio::OpenFlags::RIGHT_READABLE);
 
-    let file_protocols = if harness.config.supports_append.unwrap_or_default() {
+    let file_protocols = if harness.config.supports_append {
         Some(fio::FileProtocolFlags::APPEND)
     } else {
         Some(fio::FileProtocolFlags::default())
@@ -903,7 +901,7 @@ async fn open2_file_get_representation() {
 async fn open2_dir_optional_rights() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -943,7 +941,7 @@ async fn open2_dir_optional_rights() {
 async fn open2_request_attributes_rights_failure() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 
@@ -976,7 +974,7 @@ async fn open2_request_attributes_rights_failure() {
 async fn open2_open_existing_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2 {
         return;
     }
 

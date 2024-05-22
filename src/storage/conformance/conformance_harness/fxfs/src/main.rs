@@ -32,24 +32,18 @@ async fn add_entries(
         for entry in entries {
             match *entry.unwrap() {
                 io_test::DirectoryEntry::Directory(io_test::Directory {
-                    name: Some(name),
-                    entries,
-                    ..
+                    name, entries, ..
                 }) => {
                     let new_dir = open_dir(&dest, FLAGS | fio::OpenFlags::DIRECTORY, &name)
                         .await
                         .context(format!("failed to create directory {name}"))?;
-                    if let Some(entries) = entries {
-                        queue.push((new_dir, entries));
-                    }
+                    queue.push((new_dir, entries));
                 }
-                io_test::DirectoryEntry::File(io_test::File {
-                    name: Some(name), contents, ..
-                }) => {
+                io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
                     let file = open_file(&dest, FLAGS, &name)
                         .await
                         .context(format!("failed to create file {name}"))?;
-                    if let Some(contents) = contents {
+                    if !contents.is_empty() {
                         fuchsia_fs::file::write(&file, contents)
                             .await
                             .context(format!("failed to write contents for {name}"))?;
@@ -69,36 +63,33 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
         match request {
             Io1HarnessRequest::GetConfig { responder } => {
                 responder.send(&Io1Config {
-                    supports_create: Some(true),
-                    supports_executable_file: Some(false),
-                    supports_get_backing_memory: Some(true),
-                    supports_remote_dir: Some(false),
-                    supports_rename: Some(true),
-                    supports_link: Some(true),
-                    supports_get_token: Some(true),
-                    supports_unlink: Some(true),
-                    supports_open2: Some(true),
-                    supports_get_attributes: Some(true),
-                    supports_update_attributes: Some(true),
-                    supports_link_into: Some(true),
-                    supports_directory_watchers: Some(true),
-                    supports_append: Some(true),
-                    supported_attributes: Some(
-                        fio::NodeAttributesQuery::PROTOCOLS
-                            | fio::NodeAttributesQuery::ABILITIES
-                            | fio::NodeAttributesQuery::CONTENT_SIZE
-                            | fio::NodeAttributesQuery::STORAGE_SIZE
-                            | fio::NodeAttributesQuery::LINK_COUNT
-                            | fio::NodeAttributesQuery::ID
-                            | fio::NodeAttributesQuery::CREATION_TIME
-                            | fio::NodeAttributesQuery::MODIFICATION_TIME
-                            | fio::NodeAttributesQuery::MODE
-                            | fio::NodeAttributesQuery::UID
-                            | fio::NodeAttributesQuery::GID
-                            | fio::NodeAttributesQuery::RDEV
-                            | fio::NodeAttributesQuery::ACCESS_TIME,
-                    ),
-                    ..Default::default()
+                    supports_create: true,
+                    supports_executable_file: false,
+                    supports_get_backing_memory: true,
+                    supports_remote_dir: false,
+                    supports_rename: true,
+                    supports_link: true,
+                    supports_get_token: true,
+                    supports_unlink: true,
+                    supports_open2: true,
+                    supports_get_attributes: true,
+                    supports_update_attributes: true,
+                    supports_link_into: true,
+                    supports_directory_watchers: true,
+                    supports_append: true,
+                    supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
+                        | fio::NodeAttributesQuery::ABILITIES
+                        | fio::NodeAttributesQuery::CONTENT_SIZE
+                        | fio::NodeAttributesQuery::STORAGE_SIZE
+                        | fio::NodeAttributesQuery::LINK_COUNT
+                        | fio::NodeAttributesQuery::ID
+                        | fio::NodeAttributesQuery::CREATION_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME
+                        | fio::NodeAttributesQuery::MODE
+                        | fio::NodeAttributesQuery::UID
+                        | fio::NodeAttributesQuery::GID
+                        | fio::NodeAttributesQuery::RDEV
+                        | fio::NodeAttributesQuery::ACCESS_TIME,
                 })?;
             }
             Io1HarnessRequest::GetDirectory {
@@ -115,14 +106,12 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                 )
                 .await
                 .unwrap();
-                if let Some(entries) = root.entries {
-                    add_entries(
-                        fuchsia_fs::directory::clone_no_describe(&dir, None).expect("clone failed"),
-                        entries,
-                    )
-                    .await
-                    .expect("add_entries failed");
-                }
+                add_entries(
+                    fuchsia_fs::directory::clone_no_describe(&dir, None).expect("clone failed"),
+                    root.entries,
+                )
+                .await
+                .expect("add_entries failed");
                 dir.open(
                     flags,
                     fio::ModeType::empty(),

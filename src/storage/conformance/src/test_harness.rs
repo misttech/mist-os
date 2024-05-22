@@ -33,17 +33,11 @@ impl TestHarness {
         let config = proxy.get_config().await.expect("Could not get config from proxy");
 
         // Validate configuration options for consistency, disallow invalid combinations.
-        if config.supports_rename.unwrap_or_default() || config.supports_link.unwrap_or_default() {
+        if config.supports_rename || config.supports_link {
             assert!(
-                config.supports_get_token.unwrap_or_default(),
+                config.supports_get_token,
                 "GetToken must be supported for testing Rename/Link!"
             );
-        }
-
-        if config.supports_update_attributes.unwrap_or_default() {
-            config
-                .supported_attributes
-                .expect("supported_attributes must be set for testing SetAttr/UpdateAttributes!");
         }
 
         // Generate set of supported open rights for each object type.
@@ -88,7 +82,7 @@ impl TestHarness {
 
     /// True if the harness supports all attributes the io1 SetAttr method supports.
     pub fn supports_set_attr(&self) -> bool {
-        self.config.supported_attributes.unwrap_or_default().contains(
+        self.config.supported_attributes.contains(
             fio::NodeAttributesQuery::CREATION_TIME | fio::NodeAttributesQuery::MODIFICATION_TIME,
         )
     }
@@ -124,7 +118,7 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
 fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
     fio::OpenFlags::RIGHT_READABLE
         | fio::OpenFlags::RIGHT_WRITABLE
-        | if config.supports_executable_file.unwrap_or(false) {
+        | if config.supports_executable_file {
             fio::OpenFlags::RIGHT_EXECUTABLE
         } else {
             fio::OpenFlags::empty()

@@ -52,34 +52,20 @@ class TestHarness : public fio_test::Io1Harness {
     fio_test::Io1Config config;
 
     // Supported options
-    config.set_supports_get_backing_memory(true);
-    config.set_supports_remote_dir(true);
-    config.set_supports_get_token(true);
-
-    // Unsupported options
-    config.set_supports_create(false);
-    config.set_supports_executable_file(false);
-    config.set_supports_rename(false);
-    config.set_supports_link(false);
-    config.set_supports_unlink(false);
-    config.set_supports_get_attributes(false);
-    config.set_supports_update_attributes(false);
-    config.set_supports_directory_watchers(false);
-    config.set_supports_open2(false);
+    config.supports_get_backing_memory = true;
+    config.supports_remote_dir = true;
+    config.supports_get_token = true;
     // TODO(https://fxbug.dev/324112857): Support append mode when adding open2 support.
-    config.set_supports_append(false);
 
-    callback(std::move(config));
+    callback(config);
   }
 
   void GetDirectory(fio_test::Directory root, fuchsia::io::OpenFlags flags,
                     fidl::InterfaceRequest<fuchsia::io::Directory> directory_request) final {
     fbl::RefPtr<fs::PseudoDir> dir{fbl::MakeRefCounted<fs::PseudoDir>()};
 
-    if (root.has_entries()) {
-      for (auto& entry : *root.mutable_entries()) {
-        AddEntry(std::move(*entry), *dir);
-      }
+    for (auto& entry : root.entries) {
+      AddEntry(std::move(*entry), *dir);
     }
     zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(
         fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
@@ -97,12 +83,10 @@ class TestHarness : public fio_test::Io1Harness {
         fio_test::Directory directory = std::move(entry.directory());
         // TODO(https://fxbug.dev/42109125): Set the correct flags on this directory.
         auto dir_entry = fbl::MakeRefCounted<fs::PseudoDir>();
-        if (directory.has_entries()) {
-          for (auto& child : *directory.mutable_entries()) {
-            AddEntry(std::move(*child), *dir_entry);
-          }
+        for (auto& child : directory.entries) {
+          AddEntry(std::move(*child), *dir_entry);
         }
-        dest.AddEntry(directory.name(), dir_entry);
+        dest.AddEntry(directory.name, dir_entry);
         break;
       }
       case fio_test::DirectoryEntry::Tag::kRemoteDirectory: {
@@ -110,21 +94,24 @@ class TestHarness : public fio_test::Io1Harness {
         // Convert the HLCPP InterfaceHandle to a LLCPP ClientEnd.
         // We use a temporary `interface_handle` here to show that the conversion is safe.
         fidl::InterfaceHandle<fuchsia::io::Directory> interface_handle =
-            std::move(*remote_dir.mutable_remote_client());
+            std::move(remote_dir.remote_client);
         fidl::ClientEnd<fuchsia_io::Directory> remote_client(interface_handle.TakeChannel());
         auto remote_entry = fbl::MakeRefCounted<fs::RemoteDir>(std::move(remote_client));
-        dest.AddEntry(remote_dir.name(), std::move(remote_entry));
+        dest.AddEntry(remote_dir.name, std::move(remote_entry));
         break;
       }
       case fio_test::DirectoryEntry::Tag::kFile: {
         fio_test::File file = std::move(entry.file());
         zx::vmo vmo;
-        zx_status_t status = zx::vmo::create(file.contents().size(), {}, &vmo);
+        zx_status_t status = zx::vmo::create(file.contents.size(), {}, &vmo);
         ZX_ASSERT_MSG(status == ZX_OK, "Failed to create VMO: %s", zx_status_get_string(status));
-        status = vmo.write(file.contents().data(), 0, file.contents().size());
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s", zx_status_get_string(status));
-        dest.AddEntry(file.name(),
-                      fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), file.contents().size(),
+        if (!file.contents.empty()) {
+          status = vmo.write(file.contents.data(), 0, file.contents.size());
+          ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to VMO: %s",
+                        zx_status_get_string(status));
+        }
+        dest.AddEntry(file.name,
+                      fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), file.contents.size(),
                                                        /*writable=*/true));
         break;
       }

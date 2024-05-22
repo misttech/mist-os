@@ -35,72 +35,72 @@ using zx;
 /// about the filesystem implementation. For example, setting [`ImmutableFile`]
 /// to true informs the test suites that files hosted by this harness do not
 /// support mutation.
-type Io1Config = table {
+type Io1Config = struct {
     /// Directories support the CREATE flag for creating new files.
-    2: supports_create bool;
+    supports_create bool;
 
     /// ExecutableFile objects are supported.
-    3: supports_executable_file bool;
+    supports_executable_file bool;
 
     /// GetBackingMemory is supported.
-    4: supports_get_backing_memory bool;
+    supports_get_backing_memory bool;
 
     /// Remote directories are supported.
-    5: supports_remote_dir bool;
+    supports_remote_dir bool;
 
     /// Rename is supported.
-    7: supports_rename bool;
+    supports_rename bool;
 
     /// Link is supported.
-    8: supports_link bool;
+    supports_link bool;
 
     /// GetToken is supported.
-    10: supports_get_token bool;
+    supports_get_token bool;
 
     /// Unlink is supported.
-    12: supports_unlink bool;
+    supports_unlink bool;
 
     /// Supports fuchsia.io's Open2 method.
-    13: supports_open2 bool;
+    supports_open2 bool;
 
     /// Supports fuchsia.io's GetAttributes method.
     // TODO(https://fxbug.dev/340626555): Remove this when all harnesses support GetAttributes.
-    14: supports_get_attributes bool;
+    supports_get_attributes bool;
 
     /// Supports fuchsia.io's UpdateAttributes method.
     // TODO(https://fxbug.dev/340626555): Remove this when all harnesses support UpdateAttributes.
-    15: supports_update_attributes bool;
+    supports_update_attributes bool;
 
     /// Supports fuchsia.io's LinkInto method.
-    16: supports_link_into bool;
+    supports_link_into bool;
 
     /// Supports directory watchers.
-    17: supports_directory_watchers bool;
+    supports_directory_watchers bool;
 
     /// Files can be opened in append mode.
-    18: supports_append bool;
+    supports_append bool;
 
     /// The set of attributes the filesystem supports. If mutable attributes are reported, they must
     /// allow being updating via SetAttr/UpdateAttributes.
-    19: supported_attributes fuchsia.io.NodeAttributesQuery;
+    supported_attributes fuchsia.io.NodeAttributesQuery;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
-type Directory = resource table {
+type Directory = resource struct {
     /// Name not required for root directory.
-    1: name string;
+    name string;
 
     /// Nullable to sidestep recursion rules. Don't actually supply nulls.
-    2: entries vector<DirectoryEntry:optional>;
+    entries vector<DirectoryEntry:optional>;
 };
 
 /// Remote directory which forwards FIDL requests from the server to the specified directory.
-type RemoteDirectory = resource table {
+type RemoteDirectory = resource struct {
     /// Name not required for root directory.
-    1: name string;
+    name string;
 
     /// Remote client to forward Directory requests to.
-    2: remote_client client_end:fuchsia.io.Directory;
+    remote_client client_end:fuchsia.io.Directory;
 };
 
 /// File object which supports reading and writing.
@@ -109,9 +109,9 @@ type RemoteDirectory = resource table {
 /// should fail with ACCESS_DENIED.
 ///
 /// If executable files are required, use ExecutableFile instead.
-type File = table {
-    1: name string;
-    2: contents vector<uint8>:MAX;
+type File = struct {
+    name string;
+    contents vector<uint8>:MAX;
 };
 
 /// Adds an executable file that supports opening as readable + executable. The file has a non-zero
@@ -122,8 +122,8 @@ type File = table {
 ///
 /// As the conformance tests verify W^X enforcement, opening an ExecutableFile with RIGHT_WRITABLE
 /// should fail with ACCESS_DENIED. If writable files are required, use File instead.
-type ExecutableFile = table {
-    1: name string;
+type ExecutableFile = struct {
+    name string;
 };
 
 type DirectoryEntry = strict resource union {

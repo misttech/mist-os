@@ -165,12 +165,11 @@ pub async fn assert_file_not_found(dir: &fio::DirectoryProxy, path: &str) {
 pub fn get_directory_entry_name(dir_entry: &io_test::DirectoryEntry) -> String {
     use io_test::DirectoryEntry;
     match dir_entry {
-        DirectoryEntry::Directory(entry) => entry.name.as_ref(),
-        DirectoryEntry::RemoteDirectory(entry) => entry.name.as_ref(),
-        DirectoryEntry::File(entry) => entry.name.as_ref(),
-        DirectoryEntry::ExecutableFile(entry) => entry.name.as_ref(),
+        DirectoryEntry::Directory(entry) => &entry.name,
+        DirectoryEntry::RemoteDirectory(entry) => &entry.name,
+        DirectoryEntry::File(entry) => &entry.name,
+        DirectoryEntry::ExecutableFile(entry) => &entry.name,
     }
-    .expect("DirectoryEntry name is None!")
     .clone()
 }
 
@@ -235,13 +234,13 @@ pub fn root_directory(entries: Vec<io_test::DirectoryEntry>) -> io_test::Directo
     // Convert the simple vector of entries into the convoluted FIDL field type.
     let entries: Vec<Option<Box<io_test::DirectoryEntry>>> =
         entries.into_iter().map(|e| Some(Box::new(e))).collect();
-    io_test::Directory { name: None, entries: Some(entries), ..Default::default() }
+    io_test::Directory { name: "/".to_string(), entries }
 }
 
 /// Makes a subdirectory with a name and a set of entries.
 pub fn directory(name: &str, entries: Vec<io_test::DirectoryEntry>) -> io_test::DirectoryEntry {
     let mut dir = root_directory(entries);
-    dir.name = Some(name.to_string());
+    dir.name = name.to_string();
     io_test::DirectoryEntry::Directory(dir)
 }
 
@@ -252,27 +251,19 @@ pub fn remote_directory(name: &str, remote_dir: fio::DirectoryProxy) -> io_test:
     );
 
     io_test::DirectoryEntry::RemoteDirectory(io_test::RemoteDirectory {
-        name: Some(name.to_string()),
-        remote_client: Some(remote_client),
-        ..Default::default()
+        name: name.to_string(),
+        remote_client,
     })
 }
 
 /// Makes a file to be placed in the test directory.
 pub fn file(name: &str, contents: Vec<u8>) -> io_test::DirectoryEntry {
-    io_test::DirectoryEntry::File(io_test::File {
-        name: Some(name.to_string()),
-        contents: Some(contents),
-        ..Default::default()
-    })
+    io_test::DirectoryEntry::File(io_test::File { name: name.to_string(), contents })
 }
 
 /// Makes an executable file to be placed in the test directory.
 pub fn executable_file(name: &str) -> io_test::DirectoryEntry {
-    io_test::DirectoryEntry::ExecutableFile(io_test::ExecutableFile {
-        name: Some(name.to_string()),
-        ..Default::default()
-    })
+    io_test::DirectoryEntry::ExecutableFile(io_test::ExecutableFile { name: name.to_string() })
 }
 
 /// Extension trait for [`fio::DirectoryProxy`] to make interactions with the fuchsia.io protocol
