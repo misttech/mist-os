@@ -225,6 +225,7 @@ test("driver_host_runner_test") {
   sources = [ "driver_host_runner_test.cc" ]
   deps = [
     ":driver_runner_test_fixture",
+    "//src/devices/bin/driver_loader:driver_loader",
     "//src/devices/bin/driver_manager:driver_host_runner",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
@@ -273,4 +274,12 @@ fuchsia_test_package("driver-manager-tests") {
 fuchsia_test_package("driver-host-runner-tests") {
   test_components = [ ":driver-host-runner-test" ]
   deps = [ "//src/devices/bin/driver_host2:component" ]
+
+  # TODO(https://fxbug.dev/341966687): the driver host runner will log an error
+  # due to the loader library not yet been implemented.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

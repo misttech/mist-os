@@ -18,6 +18,7 @@
 
 #include <random>
 
+#include "src/devices/bin/driver_loader/loader.h"
 #include "src/devices/lib/log/log.h"
 
 namespace fio = fuchsia_io;
@@ -99,11 +100,26 @@ zx::result<fidl::ClientEnd<fio::File>> OpenPkgFile(
   return zx::ok(std::move(client_end));
 }
 
+// TODO(https://fxbug.dev/341358132): support retrieving different vdsos. For now we will
+// just use the driver manager's vdso.
+zx::result<zx::vmo> GetVdsoVmo() {
+  static const zx::vmo vdso{zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0))};
+  zx::vmo copy;
+  zx_status_t status = vdso.duplicate(ZX_RIGHT_SAME_RIGHTS, &copy);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(copy));
+}
+
 }  // namespace
 
 DriverHostRunner::DriverHostRunner(async_dispatcher_t* dispatcher,
-                                   fidl::ClientEnd<fcomponent::Realm> realm)
-    : dispatcher_(dispatcher), realm_(fidl::WireClient(std::move(realm), dispatcher)) {
+                                   fidl::ClientEnd<fcomponent::Realm> realm,
+                                   std::unique_ptr<driver_loader::Loader> loader)
+    : dispatcher_(dispatcher),
+      realm_(fidl::WireClient(std::move(realm), dispatcher)),
+      loader_(std::move(loader)) {
   // Pick a non-zero starting id so that folks cannot rely on the driver host process names being
   // stable.
   std::random_device rd;
@@ -225,6 +241,15 @@ void DriverHostRunner::LoadDriverHost(
     return;
   }
 
+  zx::vmo exec_vmo = std::move(result->vmo());
+
+  auto vdso_result = GetVdsoVmo();
+  if (vdso_result.is_error()) {
+    LOGF(ERROR, "Failed to get vdso vmo, %s", vdso_result.status_string());
+    return;
+  }
+  zx::vmo vdso_vmo = std::move(*vdso_result);
+
   zx::result<DriverHost*> driver_host = CreateDriverHost(name);
   if (driver_host.is_error()) {
     LOGF(ERROR, "Failed to create driver host env: %s", driver_host.status_string());
@@ -241,7 +266,12 @@ void DriverHostRunner::LoadDriverHost(
     return;
   }
 
-  // TODO(https://fxbug.dev/330775896) call the loader.
+  status = loader_->Start(std::move(process), std::move(thread), std::move(root_vmar),
+                          std::move(exec_vmo), std::move(vdso_vmo));
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Loader failed to start driver host: %lu", zx_status_get_string(status));
+    return;
+  }
 }
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,

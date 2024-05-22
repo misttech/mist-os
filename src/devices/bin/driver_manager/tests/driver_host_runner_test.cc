@@ -15,6 +15,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/devices/bin/driver_loader/loader.h"
 #include "src/devices/bin/driver_manager/tests/driver_runner_test_fixture.h"
 
 namespace {
@@ -177,7 +178,12 @@ TEST_F(DriverHostRunnerTest, Start) {
         created_component = true;
       });
 
-  driver_manager::DriverHostRunner driver_host_runner(dispatcher(), ConnectToRealm());
+  // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
+  // entire thing.
+  std::unique_ptr<driver_loader::Loader> loader = driver_loader::Loader::Create();
+  ASSERT_NE(nullptr, loader);
+  driver_manager::DriverHostRunner driver_host_runner(dispatcher(), ConnectToRealm(),
+                                                      std::move(loader));
   auto res = driver_host_runner.StartDriverHost();
   ASSERT_EQ(ZX_OK, res.status_value());
 

@@ -145,6 +145,7 @@ source_set("driver_host_runner") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/lib/vfs/cpp",
+    "//src/devices/bin/driver_loader",
     "//zircon/system/ulib/fbl",
   ]
 }

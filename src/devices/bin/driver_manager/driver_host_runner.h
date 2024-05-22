@@ -17,6 +17,7 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/bin/driver_loader/loader.h"
 #include "src/devices/lib/log/log.h"
 
 namespace driver_manager {
@@ -34,7 +35,7 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
     zx_status_t GetDuplicateHandles(zx::process* out_process, zx::thread* out_thread,
                                     zx::vmar* out_root_vmar);
 
-    const zx::process& process() { return process_; }
+    const zx::process& process() const { return process_; }
 
    private:
     zx::process process_;
@@ -42,7 +43,9 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
     zx::vmar root_vmar_;
   };
 
-  DriverHostRunner(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_component::Realm> realm);
+  // TODO(https://fxbug.dev/340928556): start the loader as a separate process instead.
+  DriverHostRunner(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_component::Realm> realm,
+                   std::unique_ptr<driver_loader::Loader> loader);
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
 
@@ -79,6 +82,9 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   uint64_t next_driver_host_id_ = 0;
   fbl::DoublyLinkedList<std::unique_ptr<DriverHost>> driver_hosts_;
+
+  // TODO(https://fxbug.dev/340928556): start the loader as a separate process instead.
+  std::unique_ptr<driver_loader::Loader> loader_;
 };
 
 }  // namespace driver_manager
