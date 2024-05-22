@@ -47,7 +47,6 @@ rustc_library_with_features("netstack3-core") {
     "src/device/id.rs",
     "src/device/integration.rs",
     "src/device/integration_tests.rs",
-    "src/device/link.rs",
     "src/device/loopback.rs",
     "src/device/loopback/integration.rs",
     "src/device/loopback/integration_tests.rs",

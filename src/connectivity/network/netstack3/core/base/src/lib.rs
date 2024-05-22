@@ -35,6 +35,7 @@ pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::{
+    link::{LinkAddress, LinkDevice, LinkUnicastAddress},
     AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
     StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
@@ -125,9 +126,12 @@ pub mod testutil {
     mod misc;
     mod monotonic_id;
 
-    pub use crate::device::testutil::{
-        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-        MultipleDevicesId,
+    pub use crate::device::{
+        link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
+        testutil::{
+            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+            MultipleDevicesId,
+        },
     };
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};

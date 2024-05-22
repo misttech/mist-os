@@ -70,12 +70,21 @@ pub mod device {
     pub(crate) mod ethernet;
     pub(crate) mod id;
     pub(crate) mod integration;
-    pub(crate) mod link;
     pub(crate) mod loopback;
     pub(crate) mod pure_ip;
     pub(crate) mod queue;
     pub(crate) mod socket;
     mod state;
+
+    pub(crate) mod link {
+        pub(crate) use netstack3_base::{LinkAddress, LinkDevice, LinkUnicastAddress};
+        #[cfg(test)]
+        pub(crate) mod testutil {
+            pub(crate) use netstack3_base::testutil::{
+                FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId,
+            };
+        }
+    }
 
     #[cfg(test)]
     mod integration_tests;

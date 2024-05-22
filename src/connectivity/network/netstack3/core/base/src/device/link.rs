@@ -12,7 +12,7 @@ use core::fmt::Debug;
 use net_types::{ethernet::Mac, UnicastAddress};
 use zerocopy::{AsBytes, FromBytes, NoCell, Unaligned};
 
-use crate::device::Device;
+use crate::Device;
 
 /// The type of address used by a link device.
 pub trait LinkAddress:
@@ -63,23 +63,20 @@ pub trait LinkDevice: Device + Debug {
 }
 
 /// Utilities for testing link devices.
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
 
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
     use super::*;
     use crate::{
-        context::testutil::FakeCoreCtx,
-        device::{
-            testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-            DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier,
-        },
+        testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId},
+        DeviceIdContext, DeviceIdentifier, StrongDeviceIdentifier,
     };
 
     /// A fake [`LinkDevice`].
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-    pub(crate) enum FakeLinkDevice {}
+    pub enum FakeLinkDevice {}
 
     const FAKE_LINK_ADDRESS_LEN: usize = 1;
 
@@ -90,7 +87,7 @@ pub(crate) mod testutil {
         FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Copy, Clone, Debug, Hash, PartialEq, Eq,
     )]
     #[repr(transparent)]
-    pub(crate) struct FakeLinkAddress(pub(crate) [u8; FAKE_LINK_ADDRESS_LEN]);
+    pub struct FakeLinkAddress(pub [u8; FAKE_LINK_ADDRESS_LEN]);
 
     impl UnicastAddress for FakeLinkAddress {
         fn is_unicast(&self) -> bool {
@@ -119,7 +116,7 @@ pub(crate) mod testutil {
 
     /// A fake ID identifying a [`FakeLinkDevice`].
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-    pub(crate) struct FakeLinkDeviceId;
+    pub struct FakeLinkDeviceId;
 
     impl StrongDeviceIdentifier for FakeLinkDeviceId {
         type Weak = FakeWeakDeviceId<Self>;

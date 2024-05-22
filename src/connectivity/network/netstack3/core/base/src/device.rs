@@ -18,6 +18,8 @@
 use alloc::borrow::Cow;
 use core::{borrow::Borrow, fmt::Debug, hash::Hash};
 
+pub(crate) mod link;
+
 /// An identifier for a device.
 pub trait DeviceIdentifier: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static {
     /// Returns true if the device is a loopback device.
