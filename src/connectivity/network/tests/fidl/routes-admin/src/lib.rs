@@ -35,7 +35,7 @@ use netstack_testing_common::{
 };
 use netstack_testing_macros::netstack_test;
 use std::pin::pin;
-use test_case::test_case;
+use test_case::{test_case, test_matrix};
 
 const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
     fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty);
@@ -1576,19 +1576,27 @@ async fn add_route_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteI
 }
 
 #[netstack_test]
-#[test_case(true; "explicitly remove")]
-#[test_case(false; "dropping the proxy")]
+#[test_matrix(
+    [true, false],
+    [true, false]
+)]
 async fn route_set_closed_when_table_removed<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
 >(
     name: &str,
     explicit_remove: bool,
+    detach: bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // We don't support multiple route tables in netstack2.
-    let realm = sandbox
-        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let TestSetup {
+        realm,
+        network: _network,
+        interface,
+        route_table: _,
+        global_route_table: _,
+        state: _,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
     let route_table_provider = realm
         .connect_to_protocol::<I::RouteTableProviderMarker>()
         .expect("connect to main route table");
@@ -1597,6 +1605,12 @@ async fn route_set_closed_when_table_removed<
             .expect("create new user table");
     let user_route_set = fnet_routes_ext::admin::new_route_set::<I>(&user_route_table)
         .expect("failed to create new route set");
+
+    if detach {
+        fnet_routes_ext::admin::detach_route_table::<I>(&user_route_table)
+            .await
+            .expect("fidl should succeed");
+    }
 
     if explicit_remove {
         fnet_routes_ext::admin::remove_route_table::<I>(&user_route_table)
@@ -1608,17 +1622,29 @@ async fn route_set_closed_when_table_removed<
         std::mem::drop(user_route_table);
     }
 
-    let channel = user_route_set
-        .into_channel()
-        .unwrap_or_else(|_err| panic!("failed to turn a proxy into a channel"));
-    let client = fidl::client::Client::new(channel, I::RouteSetMarker::DEBUG_NAME);
-    let mut event_receiver = client.take_event_receiver();
-    assert_matches!(
-        event_receiver.next().await,
-        Some(Err(fidl::Error::ClientChannelClosed {
-            status: zx::Status::UNAVAILABLE,
-            protocol_name: _,
-        }))
-    );
-    assert_matches!(event_receiver.next().await, None);
+    if detach && !explicit_remove {
+        // If detached, the route table still exists if not explicitly removed.
+        let grant = interface.get_authorization().await.expect("getting grant should succeed");
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&user_route_set, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+    } else {
+        // If not detached, or the table is explicitly removed, the route set
+        // should be closed.
+        let channel = user_route_set
+            .into_channel()
+            .unwrap_or_else(|_err| panic!("failed to turn a proxy into a channel"));
+        let client = fidl::client::Client::new(channel, I::RouteSetMarker::DEBUG_NAME);
+        let mut event_receiver = client.take_event_receiver();
+        assert_matches!(
+            event_receiver.next().await,
+            Some(Err(fidl::Error::ClientChannelClosed {
+                status: zx::Status::UNAVAILABLE,
+                protocol_name: _,
+            }))
+        );
+        assert_matches!(event_receiver.next().await, None);
+    }
 }

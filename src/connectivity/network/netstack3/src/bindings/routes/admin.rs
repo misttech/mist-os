@@ -211,7 +211,9 @@ async fn serve_route_table_inner<
             RouteTableRequest::GetTableId { responder } => {
                 responder.send(route_table.borrow().id().into())?;
             }
-            RouteTableRequest::Detach { control_handle: _ } => {}
+            RouteTableRequest::Detach { control_handle: _ } => {
+                route_table.borrow_mut().detach();
+            }
             RouteTableRequest::Remove { responder } => {
                 let fidl_result = match route_table.borrow_mut().remove().await {
                     Ok(()) | Err(TableRemoveError::Removed) => Ok(()),
@@ -231,12 +233,21 @@ async fn serve_route_table_inner<
         }
     }
 
-    // TODO(https://fxbug.dev/337868190): match on the result when detach is
-    // implemented.
-    let _: Result<(), _> = route_table.borrow_mut().remove().await;
+    if route_table.borrow().detached() {
+        tracing::debug!(
+            "RouteTable protocol for {:?} is shutting down, but the table is detached",
+            route_table.borrow().id()
+        );
+    } else {
+        assert_matches!(
+            route_table.borrow_mut().remove().await,
+            Ok(()) | Err(TableRemoveError::Removed)
+        );
+    }
     Ok(())
 }
 
+#[derive(Debug)]
 pub(crate) enum TableRemoveError {
     Removed,
     InvalidOp,
@@ -252,6 +263,10 @@ pub(crate) trait RouteTable<I: FidlRouteAdminIpExt + FidlRouteIpExt>: Send + Syn
     fn token(&self) -> zx::Event;
     /// Removes this route table from the system.
     async fn remove(&mut self) -> Result<(), TableRemoveError>;
+    /// Detaches the lifetime of the route table from this protocol.
+    fn detach(&mut self);
+    /// Returns whether the table was detached.
+    fn detached(&self) -> bool;
     /// Serves the user route set.
     fn serve_user_route_set(&self, spawner: TaskWaitGroupSpawner, stream: I::RouteSetRequestStream);
 }
@@ -280,6 +295,12 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
     async fn remove(&mut self) -> Result<(), TableRemoveError> {
         Err(TableRemoveError::InvalidOp)
     }
+    fn detach(&mut self) {
+        // Nothing to do - main table are always detached.
+    }
+    fn detached(&self) -> bool {
+        true
+    }
     fn serve_user_route_set(
         &self,
         spawner: TaskWaitGroupSpawner,
@@ -307,6 +328,7 @@ pub(crate) struct UserRouteTable<I: Ip> {
     token: zx::Event,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
     cancel_event: Event,
+    detached: bool,
 }
 
 impl<I: Ip> UserRouteTable<I> {
@@ -317,7 +339,15 @@ impl<I: Ip> UserRouteTable<I> {
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
     ) -> Self {
         let token = zx::Event::create();
-        Self { ctx, _name: name, table_id, token, route_work_sink, cancel_event: Event::new() }
+        Self {
+            ctx,
+            _name: name,
+            table_id,
+            token,
+            route_work_sink,
+            cancel_event: Event::new(),
+            detached: false,
+        }
     }
 }
 
@@ -344,6 +374,7 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
                     result,
                     Ok(routes::ChangeOutcome::Changed | routes::ChangeOutcome::NoChange)
                 );
+                assert!(self.cancel_event.signal());
                 Ok(())
             }
             Err(e) => {
@@ -352,6 +383,12 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
             }
         }
     }
+    fn detach(&mut self) {
+        self.detached = true;
+    }
+    fn detached(&self) -> bool {
+        self.detached
+    }
     fn serve_user_route_set(
         &self,
         spawner: TaskWaitGroupSpawner,
@@ -359,13 +396,10 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for UserRouteTable<I
     ) {
         let mut user_route_set =
             UserRouteSet::new(self.ctx.clone(), self.table_id, self.route_work_sink.clone());
-        // We never signal the event, only wait for the signaler to be dropped.
-        let cancel_token = {
-            let wait_or_dropped = self.cancel_event.wait_or_dropped();
-            async move {
-                assert_matches!(wait_or_dropped.await, Err(async_utils::event::Dropped));
-            }
-        };
+        // Wait on the event to be signaled, if the signaler was dropped without
+        // signalling, this means the table was detached and we don't cancel
+        // serving the user route sets.
+        let cancel_token = self.cancel_event.wait();
         spawner.spawn(async move {
             serve_route_set::<I, UserRouteSet<I>, _, _>(stream, &mut user_route_set, cancel_token)
                 .await;
