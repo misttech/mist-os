@@ -23,7 +23,7 @@ namespace {
 // Creates a `Kernel`, `Task`, and `Locked<Unlocked>` for testing purposes.
 //
 // The `Task` is backed by a real process, and can be used to test syscalls.
-std::tuple<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_fs_and_selinux(
     std::function<FileSystemHandle(const fbl::RefPtr<Kernel>&)> create_fs/*,
     security_server: Option<Arc<SecurityServer>>*/) {
@@ -35,10 +35,10 @@ create_kernel_task_and_unlocked_with_fs_and_selinux(
   auto fs = FsContext::New(create_fs(kernel));
   auto init_task = CurrentTask::create_init_process(kernel, init_pid, "test-task", fs);
 
-  return {std::move(kernel), testing::AutoReleasableTask::From(init_task.value())};
+  return {ktl::move(kernel), testing::AutoReleasableTask::From(init_task.value())};
 }
 
-std::tuple<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked() {
   return create_kernel_task_and_unlocked_with_fs_and_selinux(
       [](const fbl::RefPtr<Kernel>& kernel) -> FileSystemHandle { return TmpFs::new_fs(kernel); });
@@ -48,13 +48,13 @@ create_kernel_task_and_unlocked() {
 
 namespace starnix::testing {
 
-std::tuple<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
+ktl::pair<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
   return create_kernel_task_and_unlocked();
 }
 
 AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const fbl::String& task_name) {
   auto init_task = CurrentTask::create_init_child_process(kernel, task_name);
-  return std::move(testing::AutoReleasableTask::From(init_task.value()));
+  return ktl::move(testing::AutoReleasableTask::From(init_task.value()));
 }
 
 UserAddress map_memory(CurrentTask& current_task, UserAddress address, uint64_t length) {

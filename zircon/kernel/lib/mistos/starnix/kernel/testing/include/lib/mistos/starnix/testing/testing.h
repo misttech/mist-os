@@ -8,9 +8,9 @@
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/vfs/forward.h>
 
-#include <optional>
-
 #include <fbl/ref_ptr.h>
+#include <ktl/optional.h>
+#include <ktl/pair.h>
 
 namespace starnix {
 
@@ -32,23 +32,23 @@ class AutoReleasableTask {
 
   starnix::CurrentTask& operator*() {
     ASSERT_MSG(task_.has_value(),
-               "called `operator*` on std::optional that does not contain a value.");
+               "called `operator*` on ktl::optional that does not contain a value.");
     return task_.value();
   }
 
   starnix::CurrentTask operator->() {
     ASSERT_MSG(task_.has_value(),
-               "called `operator->` on std::optional that does not contain a value.");
+               "called `operator->` on ktl::optional that does not contain a value.");
     return task_.value();
   }
 
  private:
-  AutoReleasableTask(std::optional<starnix::CurrentTask> task) : task_(std::move(task)) {}
+  AutoReleasableTask(ktl::optional<starnix::CurrentTask> task) : task_(ktl::move(task)) {}
 
-  std::optional<starnix::CurrentTask> task_;
+  ktl::optional<starnix::CurrentTask> task_;
 };
 
-std::tuple<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_and_task();
+ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_and_task();
 
 // Creates a new `Task` in the provided kernel.
 //
