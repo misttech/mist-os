@@ -42,6 +42,8 @@
 
 #include "../kernel_priv.h"
 
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 using namespace util;
@@ -306,16 +308,16 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const fbl::String& 
   }
 
   fbl::AllocChecker ac;
-  auto fh = fbl::MakeRefCountedChecked<FileObject>(&ac, std::move(open_result.value()));
+  auto fh = fbl::MakeRefCountedChecked<FileObject>(&ac, ktl::move(open_result.value()));
   if (!ac.check()) {
     return fit::error(errno(from_status_like_fdio(ZX_ERR_NO_MEMORY)));
   }
 
-  return fit::ok(std::move(fh));
+  return fit::ok(ktl::move(fh));
 }
 
-fit::result<Errno, std::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
-    FdNumber dir_fd, FsStr path, ResolveFlags flags) {
+fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
+    FdNumber dir_fd, FsStr path, ResolveFlags flags) const {
   LTRACEF_LEVEL(2, "dir_fd=%d, path=%s\n", dir_fd.raw(), path.c_str());
 
   bool path_is_absolute = (path.size() > 1) && path[0] == '/';
@@ -323,7 +325,7 @@ fit::result<Errno, std::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     if (flags.contains(ResolveFlagsEnum::BENEATH)) {
       return fit::error(errno(EXDEV));
     }
-    path = std::string_view(path).substr(1);
+    path = ktl::string_view(path).substr(1);
   }
 
   auto dir_result = [this, &path_is_absolute, &flags,
@@ -363,10 +365,10 @@ fit::result<Errno, std::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     }
   }
 
-  return fit::ok(std::make_pair(dir, path));
+  return fit::ok(ktl::pair(dir, path));
 }
 
-fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFlags flags) {
+fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFlags flags) const {
   LTRACEF_LEVEL(2, "path=%s, flags=0x%x\n", path.c_str(), flags.bits());
   if (flags.contains(OpenFlagsEnum::CREAT)) {
     // In order to support OpenFlags::CREAT we would need to take a
@@ -376,8 +378,9 @@ fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFla
   return open_file_at(FdNumber::_AT_FDCWD, path, flags, FileMode(), ResolveFlags::empty());
 }
 
-fit::result<Errno, std::pair<NamespaceNode, bool>> CurrentTask::resolve_open_path(
-    LookupContext& context, NamespaceNode dir, const FsStr& path, FileMode mode, OpenFlags flags) {
+fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_path(
+    LookupContext& context, NamespaceNode dir, const FsStr& path, FileMode mode,
+    OpenFlags flags) const {
   LTRACEF_LEVEL(2, "path=%s, flags=0x%x\n", path.c_str(), flags.bits());
   context.update_for_path(path);
   auto parent_content = context.with(SymlinkMode::Follow);
@@ -412,7 +415,7 @@ fit::result<Errno, std::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
         // descriptor referencing the symbolic link will be
         // returned.
         // See https://man7.org/linux/man-pages/man2/openat2.2.html
-        return fit::ok(std::make_pair(name, false));
+        return fit::ok(ktl::pair(name, false));
       }
 
       if ((!flags.contains(OpenFlagsEnum::PATH) && context.symlink_mode == SymlinkMode::NoFollow) ||
@@ -435,18 +438,18 @@ fit::result<Errno, std::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
       auto readlink_result = name.readlink(*this);
       if (readlink_result.is_error())
         return readlink_result.take_error();
-      return std::visit(
+      return ktl::visit(
           SymlinkTarget::overloaded{
-              [&, p = std::move(parent)](
-                  const FsString& path) -> fit::result<Errno, std::pair<NamespaceNode, bool>> {
+              [&, p = ktl::move(parent)](
+                  const FsString& path) -> fit::result<Errno, ktl::pair<NamespaceNode, bool>> {
                 auto dir = (path[0] == '/') ? (*this)->fs()->root() : p;
                 return resolve_open_path(context, dir, path, mode, flags);
               },
-              [&](NamespaceNode node) -> fit::result<Errno, std::pair<NamespaceNode, bool>> {
+              [&](NamespaceNode node) -> fit::result<Errno, ktl::pair<NamespaceNode, bool>> {
                 if (context.resolve_flags.contains(ResolveFlagsEnum::NO_MAGICLINKS)) {
                   return fit::error(errno(ELOOP));
                 }
-                return fit::ok(std::make_pair(node, false));
+                return fit::ok(ktl::pair(node, false));
               },
           },
           readlink_result.value().value);
@@ -455,7 +458,7 @@ fit::result<Errno, std::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
       if (must_create) {
         return fit::error(errno(EEXIST));
       }
-      return fit::ok(std::make_pair(name, false));
+      return fit::ok(ktl::pair(name, false));
     }
   } else {
     auto _errno = lookup_child_result.error_value();
@@ -468,7 +471,7 @@ fit::result<Errno, std::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
       if (open_create_node_result.is_error())
         return open_create_node_result.take_error();
 
-      return fit::ok(std::make_pair(open_create_node_result.value(), true));
+      return fit::ok(ktl::pair(open_create_node_result.value(), true));
     } else {
       return lookup_child_result.take_error();
     }
@@ -477,7 +480,7 @@ fit::result<Errno, std::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
 
 fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const FsStr& path,
                                                          OpenFlags flags, FileMode mode,
-                                                         ResolveFlags resolve_flags) {
+                                                         ResolveFlags resolve_flags) const {
   LTRACEF_LEVEL(2, "path=%s, flags=0x%x, mode=0x%x, resolve_flags=0x%x\n", path.c_str(),
                 flags.bits(), mode.bits(), resolve_flags.bits());
 
@@ -493,10 +496,9 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const 
   return open_namespace_node_at(dir, _path, flags, mode, resolve_flags);
 }
 
-fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(NamespaceNode dir,
-                                                                   const FsStr& path,
-                                                                   OpenFlags _flags, FileMode mode,
-                                                                   ResolveFlags& resolve_flags) {
+fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
+    NamespaceNode dir, const FsStr& path, OpenFlags _flags, FileMode mode,
+    ResolveFlags& resolve_flags) const {
   LTRACEF_LEVEL(2, "path=%s, flags=0x%x, mode=0x%x, resolve_flags=0x%x\n", path.c_str(),
                 _flags.bits(), mode.bits(), resolve_flags.bits());
 
@@ -564,7 +566,7 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(NamespaceNode
 
   auto [name, created] = result.value();
 
-  auto name_result = [&, name_ = std::move(name),
+  auto name_result = [&, name_ = ktl::move(name),
                       created_ = created]() -> fit::result<Errno, NamespaceNode> {
     if (flags.contains(OpenFlagsEnum::TMPFILE)) {
       return name_.create_tmpfile(*this, mode.with_type(FileMode::IFREG), flags);
@@ -619,11 +621,11 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(NamespaceNode
   return _name.open(*this, flags, !created);
 }
 
-fit::result<Errno, std::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent_at() const {
+fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent_at() const {
   return fit::error(errno(EINVAL));
 }
 
-fit::result<Errno, std::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent(
+fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent(
     LookupContext& context, const NamespaceNode& dir, const FsStr& path) const {
   context.update_for_path(path);
 
@@ -640,7 +642,7 @@ fit::result<Errno, std::pair<NamespaceNode, FsString>> CurrentTask::lookup_paren
       current_path_component = *it;
     }
   }
-  return fit::ok(std::make_pair(current_node, current_path_component));
+  return fit::ok(ktl::pair(current_node, current_path_component));
 }
 
 fit::result<Errno, NamespaceNode> CurrentTask::lookup_path(LookupContext& context,

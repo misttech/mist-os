@@ -106,14 +106,14 @@ class CurrentTask : public MemoryAccessorExt {
   /// Determine namespace node indicated by the dir_fd.
   ///
   /// Returns the namespace node and the path to use relative to that node.
-  fit::result<Errno, std::pair<NamespaceNode, FsStr>> resolve_dir_fd(FdNumber dir_fd, FsStr path,
-                                                                     ResolveFlags flags);
+  fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> resolve_dir_fd(FdNumber dir_fd, FsStr path,
+                                                                     ResolveFlags flags) const;
 
   // A convenient wrapper for opening files relative to FdNumber::AT_FDCWD.
   ///
   /// Returns a FileHandle but does not install the FileHandle in the FdTable
   /// for this task.
-  fit::result<Errno, FileHandle> open_file(const FsStr& path, OpenFlags flags);
+  fit::result<Errno, FileHandle> open_file(const FsStr& path, OpenFlags flags) const;
 
   /// Resolves a path for open.
   ///
@@ -125,8 +125,11 @@ class CurrentTask : public MemoryAccessorExt {
   /// final path component.
   ///
   /// This returns the resolved node, and a boolean indicating whether the node has been created.
-  fit::result<Errno, std::pair<NamespaceNode, bool>> resolve_open_path(
-      LookupContext& context, NamespaceNode dir, const FsStr& path, FileMode mode, OpenFlags flags);
+  fit::result<Errno, ktl::pair<NamespaceNode, bool>> resolve_open_path(LookupContext& context,
+                                                                       NamespaceNode dir,
+                                                                       const FsStr& path,
+                                                                       FileMode mode,
+                                                                       OpenFlags flags) const;
 
   // The primary entry point for opening files relative to a task.
   ///
@@ -138,11 +141,11 @@ class CurrentTask : public MemoryAccessorExt {
   /// Returns a FileHandle but does not install the FileHandle in the FdTable
   /// for this task.
   fit::result<Errno, FileHandle> open_file_at(FdNumber dir_fd, const FsStr& path, OpenFlags flags,
-                                              FileMode mode, ResolveFlags resolve_flags);
+                                              FileMode mode, ResolveFlags resolve_flags) const;
 
   fit::result<Errno, FileHandle> open_namespace_node_at(NamespaceNode dir, const FsStr& path,
                                                         OpenFlags flags, FileMode mode,
-                                                        ResolveFlags& resolve_flags);
+                                                        ResolveFlags& resolve_flags) const;
 
   /// A wrapper for FsContext::lookup_parent_at that resolves the given
   /// dir_fd to a NamespaceNode.
@@ -151,7 +154,7 @@ class CurrentTask : public MemoryAccessorExt {
   /// this task. Relative paths are resolve relative to dir_fd. To resolve
   /// relative to the current working directory, pass FdNumber::AT_FDCWD for
   /// dir_fd.
-  fit::result<Errno, std::pair<NamespaceNode, FsString>> lookup_parent_at() const;
+  fit::result<Errno, ktl::pair<NamespaceNode, FsString>> lookup_parent_at() const;
 
   /// Lookup the parent of a namespace node.
   ///
@@ -167,7 +170,7 @@ class CurrentTask : public MemoryAccessorExt {
   /// returned along with the parent.
   ///
   /// The returned parent might not be a directory.
-  fit::result<Errno, std::pair<NamespaceNode, FsString>> lookup_parent(LookupContext& context,
+  fit::result<Errno, ktl::pair<NamespaceNode, FsString>> lookup_parent(LookupContext& context,
                                                                        const NamespaceNode& dir,
                                                                        const FsStr& path) const;
 
