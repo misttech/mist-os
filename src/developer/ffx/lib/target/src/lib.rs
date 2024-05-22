@@ -673,7 +673,7 @@ pub async fn add_manual_target(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::overnet_connector::{OvernetConnection, OvernetConnector};
+    use crate::overnet_connector::{OvernetConnection, OvernetConnectionError, OvernetConnector};
     use async_channel::Receiver;
     use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
     use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
@@ -857,7 +857,7 @@ mod test {
     }
 
     impl OvernetConnector for FakeOvernet {
-        async fn connect(&mut self) -> Result<OvernetConnection> {
+        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             let circuit_socket = create_overnet_circuit(self.circuit_node.clone());
             let (rcs_sender, rcs_receiver) = async_channel::unbounded();
             self.circuit_node

@@ -13,8 +13,24 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite, BufReader};
 
 pub(crate) const BUFFER_SIZE: usize = 65536;
 
+#[derive(thiserror::Error, Debug)]
+pub enum OvernetConnectionError {
+    /// A non-recoverable error. Any errors converted via From<> trait are automatically converted
+    /// to this value.
+    #[error("encountered fatal error during connect {0}")]
+    Fatal(#[from] anyhow::Error),
+    /// A potentially recoverable error, signalling the invoker that they may reattempt to connect.
+    /// This error must be returned explicitly rather than converted into via the `?` operator.
+    #[error("encountered potentially recoverable error during connect: {0}")]
+    NonFatal(#[source] anyhow::Error),
+}
+
 pub(crate) trait OvernetConnector: Debug {
-    async fn connect(&mut self) -> Result<OvernetConnection>;
+    /// Attempts a connection to an Overnet device. This function, if it fails and returns a
+    /// `NonFatal` error, should be capable of running again. It will be the caller's responsibility
+    /// to determine whether and how often to re-attempt connecting when receiving a NonFatal
+    /// error.
+    async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError>;
 }
 
 pub(crate) struct OvernetConnection {

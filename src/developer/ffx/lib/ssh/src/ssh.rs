@@ -13,17 +13,27 @@ use tokio::io::AsyncRead;
 
 const SSH_PRIV: &str = "ssh.priv";
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(thiserror::Error, Debug, Hash, Clone, PartialEq, Eq)]
 pub enum SshError {
+    #[error("unknown ssh error: {0}")]
     Unknown(String),
+    #[error("permission denied")]
     PermissionDenied,
+    #[error("connection refused")]
     ConnectionRefused,
+    #[error("unknown name or service")]
     UnknownNameOrService,
+    #[error("timeout")]
     Timeout,
+    #[error("key verification failure")]
     KeyVerificationFailure,
+    #[error("no route to host")]
     NoRouteToHost,
+    #[error("network unreachable")]
     NetworkUnreachable,
+    #[error("invalid argument")]
     InvalidArgument,
+    #[error("target not compatible")]
     TargetIncompatible,
 }
 
