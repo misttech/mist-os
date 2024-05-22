@@ -90,7 +90,7 @@ enum RoutineResult<I: IpExt> {
 
 fn check_routine<I, P, D, DeviceClass>(
     Routine { rules }: &Routine<I, DeviceClass, ()>,
-    packet: &mut P,
+    packet: &P,
     interfaces: &Interfaces<'_, D>,
 ) -> RoutineResult<I>
 where
@@ -150,7 +150,7 @@ where
 
 fn check_routines_for_hook<I, P, D, DeviceClass>(
     hook: &Hook<I, DeviceClass, ()>,
-    packet: &mut P,
+    packet: &P,
     interfaces: Interfaces<'_, D>,
 ) -> Verdict
 where
@@ -178,7 +178,7 @@ where
 
 fn check_routines_for_ingress<I, P, D, DeviceClass>(
     hook: &Hook<I, DeviceClass, ()>,
-    packet: &mut P,
+    packet: &P,
     interfaces: Interfaces<'_, D>,
 ) -> IngressVerdict<I>
 where
@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &Routine { rules: Vec::new() },
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Return
@@ -628,7 +628,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Drop
@@ -657,7 +657,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &Hook::default(),
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Accept
@@ -675,7 +675,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &hook,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Accept
@@ -695,7 +695,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Accept
@@ -719,7 +719,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Accept
@@ -744,7 +744,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &hook,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Drop
@@ -773,7 +773,7 @@ mod tests {
         assert_eq!(
             check_routines_for_hook::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &hook,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             Verdict::Drop
@@ -804,7 +804,7 @@ mod tests {
         assert_eq!(
             check_routines_for_ingress::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &ingress,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
             IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: TPROXY_PORT }
@@ -827,7 +827,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Drop
@@ -850,7 +850,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Accept
@@ -873,7 +873,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Drop
@@ -893,7 +893,7 @@ mod tests {
         assert_eq!(
             check_routine::<Ipv4, _, FakeDeviceId, FakeDeviceClass>(
                 &routine,
-                &mut FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
+                &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 &Interfaces { ingress: None, egress: None },
             ),
             RoutineResult::Return
