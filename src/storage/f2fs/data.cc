@@ -225,8 +225,8 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
   size_t new_size = (index + 1) * kPageSize;
   if (new_i_size && GetSize() < new_size) {
     SetSize(new_size);
+    // TODO: mark sync when fdatasync is available.
     SetFlag(InodeInfoFlag::kUpdateDir);
-    SetFlag(InodeInfoFlag::kSyncInode);
     SetDirty();
   }
 

@@ -42,6 +42,7 @@ bool Page::SetDirty() {
       !flags_[static_cast<uint8_t>(PageFlag::kPageDirty)].test_and_set(std::memory_order_acquire)) {
     VnodeF2fs &vnode = GetVnode();
     SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
+    vnode.SetDirty();
     vnode.IncreaseDirtyPageCount();
     if (vnode.IsNode()) {
       superblock_info.IncreasePageCount(CountType::kDirtyNodes);

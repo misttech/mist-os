@@ -122,7 +122,6 @@ class VmoManager {
 
   void UpdateSizeUnsafe() __TA_REQUIRES(mutex_);
   void SetContentSize(const size_t nbytes) __TA_EXCLUDES(mutex_);
-  bool UpdateContentSize() __TA_EXCLUDES(mutex_);
   uint64_t GetContentSize(bool round_up = false) __TA_EXCLUDES(mutex_);
   uint64_t GetContentSizeUnsafe(bool round_up) __TA_REQUIRES_SHARED(mutex_);
 

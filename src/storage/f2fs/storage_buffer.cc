@@ -38,10 +38,8 @@ zx::result<size_t> StorageBuffer::ReserveWriteOperation(Page &page) {
   storage::OperationType type = storage::OperationType::kWrite;
   if (page.IsCommit()) {
     type = storage::OperationType::kWritePreflushAndFua;
-    page.ClearCommit();
   } else if (page.IsSync()) {
     type = storage::OperationType::kWriteFua;
-    page.ClearSync();
   }
   storage::Operation op = {
       .type = type,

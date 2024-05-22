@@ -527,7 +527,6 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
     inode.i_inline &= ~kInlineXattr;
   }
 
-  ClearFlag(InodeInfoFlag::kSyncInode);
   inode_page.SetDirty();
 }
 
@@ -547,7 +546,6 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
   }
 
   SetTime<Timestamps::ModificationTime>();
-  SetFlag(InodeInfoFlag::kSyncInode);
   SetDirty();
   return ZX_OK;
 }
@@ -663,19 +661,17 @@ void VnodeF2fs::EvictVnode() {
   fs()->EvictVnode(this);
 }
 
-zx_status_t VnodeF2fs::InitFileCache(uint64_t nbytes) {
+void VnodeF2fs::InitFileCache(uint64_t nbytes) {
   std::lock_guard lock(mutex_);
-  return InitFileCacheUnsafe(nbytes);
+  InitFileCacheUnsafe(nbytes);
 }
 
-zx_status_t VnodeF2fs::InitFileCacheUnsafe(uint64_t nbytes) {
+void VnodeF2fs::InitFileCacheUnsafe(uint64_t nbytes) {
   zx::vmo vmo;
   VmoMode mode;
   size_t vmo_node_size = 0;
 
-  if (file_cache_) {
-    return ZX_ERR_ALREADY_EXISTS;
-  }
+  ZX_DEBUG_ASSERT(!file_cache_);
   if (IsReg()) {
     if (auto size_or = CreatePagedVmo(nbytes); size_or.is_ok()) {
       zx_rights_t right = ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ |
@@ -692,7 +688,6 @@ zx_status_t VnodeF2fs::InitFileCacheUnsafe(uint64_t nbytes) {
   ZX_ASSERT(!(vmo_node_size % zx_system_get_page_size()));
   vmo_manager_ = std::make_unique<VmoManager>(mode, nbytes, vmo_node_size, std::move(vmo));
   file_cache_ = std::make_unique<FileCache>(this, vmo_manager_.get());
-  return ZX_OK;
 }
 
 void VnodeF2fs::InitTime() {
@@ -763,7 +758,8 @@ void VnodeF2fs::Init(LockedPage &node_page) {
     }
   }
 
-  // During recovery, only orphan vnodes create file cache.
+  // If the roll-forward recovery creates it, it will initialize its cache from the latest inode
+  // block later.
   if (!fs()->IsOnRecovery() || !GetNlink()) {
     InitFileCacheUnsafe(LeToCpu(inode.i_size));
   }
@@ -776,15 +772,12 @@ bool VnodeF2fs::SetDirty() {
   return fs()->GetVCache().AddDirty(*this) == ZX_OK;
 }
 
-bool VnodeF2fs::ClearDirty() {
-  ClearFlag(InodeInfoFlag::kSyncInode);
-  return fs()->GetVCache().RemoveDirty(this) == ZX_OK;
-}
+bool VnodeF2fs::ClearDirty() { return fs()->GetVCache().RemoveDirty(this) == ZX_OK; }
 
 bool VnodeF2fs::IsDirty() { return fs()->GetVCache().IsDirty(*this); }
 
 void VnodeF2fs::Sync(SyncCallback closure) {
-  closure(SyncFile(0, safemath::checked_cast<loff_t>(GetSize())));
+  closure(SyncFile(0, safemath::checked_cast<loff_t>(GetSize()), 0));
 }
 
 bool VnodeF2fs::NeedToCheckpoint() {
@@ -822,11 +815,12 @@ uint64_t VnodeF2fs::GetSize() const {
   return vmo_manager().GetContentSize();
 }
 
-zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, bool datasync) {
+zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
   if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
 
+  // TODO: When fdatasync is available, check if it should be written.
   if (!IsDirty()) {
     return ZX_OK;
   }
@@ -843,7 +837,7 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, bool datasync) {
     }
   } else {
     fs::SharedLock lock(f2fs::GetGlobalLock());
-    if (!datasync || TestFlag(InodeInfoFlag::kSyncInode)) {
+    {
       LockedPage page;
       if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &page); ret != ZX_OK) {
         return ret;
@@ -851,15 +845,14 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, bool datasync) {
       UpdateInodePage(page);
     }
     fs()->GetNodeManager().FsyncNodePages(Ino());
-    if (!GetDirtyPageCount()) {
-      ClearDirty();
-    }
+    // TODO: Add flags to log recovery information to NAT entries and decide whether to write
+    // inode or not.
   }
   return ZX_OK;
 }
 
 bool VnodeF2fs::NeedToSyncDir() const {
-  ZX_DEBUG_ASSERT(GetParentNid() < kNullIno);
+  ZX_ASSERT(GetParentNid() < kNullIno);
   return !fs()->GetNodeManager().IsCheckpointedNode(GetParentNid());
 }
 

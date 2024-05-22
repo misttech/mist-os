@@ -29,7 +29,7 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   }
 
   vnode->InitNlink();
-  vnode->SetBlocks(0);
+  vnode->InitBlocks();
   vnode->InitTime();
   vnode->SetGeneration(superblock_info_.GetNextGeneration());
   superblock_info_.IncNextGeneration();

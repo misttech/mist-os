@@ -314,12 +314,6 @@ uint64_t VmoManager::GetContentSize(bool round_up) {
   return GetContentSizeUnsafe(round_up);
 }
 
-bool VmoManager::UpdateContentSize() {
-  std::lock_guard lock(mutex_);
-  uint64_t old = content_size_;
-  return old != GetContentSizeUnsafe(false);
-}
-
 void VmoManager::UpdateSizeUnsafe() {
   if (mode_ != VmoMode::kPaged) {
     return;

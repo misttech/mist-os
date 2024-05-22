@@ -77,9 +77,8 @@ fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
                       }
                     }
                   }
-                  if (page->GetVnode().IsNode()) {
-                    fbl::RefPtr<NodePage>::Downcast(page)->SetFsyncMark(false);
-                  }
+                  page->ClearSync();
+                  page->ClearCommit();
                   page->ClearColdData();
                   page->ClearWriteback();
                 }

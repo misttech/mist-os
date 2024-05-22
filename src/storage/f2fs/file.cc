@@ -372,10 +372,7 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   }
   SetTime<Timestamps::ModificationTime>();
   SetDirty();
-  VnodeF2fs::VmoDirty(offset, length);
-  if (vmo_manager().UpdateContentSize()) {
-    SetFlag(InodeInfoFlag::kSyncInode);
-  }
+  return VnodeF2fs::VmoDirty(offset, length);
 }
 
 void File::VmoRead(uint64_t offset, uint64_t length) {

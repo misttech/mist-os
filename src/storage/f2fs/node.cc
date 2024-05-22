@@ -596,11 +596,12 @@ pgoff_t NodeManager::FsyncNodePages(nid_t ino) {
   };
   op.page_cb = [ino, this](fbl::RefPtr<Page> page, bool is_last_dnode) {
     auto node_page = fbl::RefPtr<NodePage>::Downcast(std::move(page));
-    node_page->SetFsyncMark(true);
+    node_page->SetFsyncMark(false);
     if (node_page->IsInode()) {
       node_page->SetDentryMark(!IsCheckpointedNode(ino));
     }
     if (is_last_dnode) {
+      node_page->SetFsyncMark(true);
       node_page->SetSync();
     }
     return ZX_OK;
