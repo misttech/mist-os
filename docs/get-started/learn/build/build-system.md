@@ -211,3 +211,102 @@ Notice that the configuration points to the build you just completed on your
 machine.
 
 You are now running your own build of Fuchsia!
+
+## Exercise: Run a repository server and serve packages
+
+In this exercise, you'll run a repository server to serve the packages available
+in the `universe` set to your running Fuchsia target on the emulator.
+
+To learn more about repository and the different package sets, refer
+to [RFC-0212 Package Sets](/docs/contribute/governance/rfcs/0212_package_sets.md)
+
+For example, running `ffx debug connect` will fail because the target needs the
+a component that exposes the `fuchsia.debugger.Launcher` capability. This is
+available in the `debug_agent` package in the `universe` set of `minimal.x64`.
+
+### List the packages in the universe set
+
+Run `fx list-packages` to list the packages in the `universe` set. For
+`minimal.x64` there is only one package:
+
+```posix-terminal
+fx list-packages --universe
+```
+
+The output shows only `debug_agent` package. The `debug_agent` includes a
+component that provides the `fuchsia.debugger.Launcher` capability. We will
+exercise this capability by launching a debugger in the next steps.
+
+### Start a repository server and register it with the Fuchsia target
+
+The `fx serve` command starts the repository server and registers it with
+the target.
+
+```posix-terminal
+$ fx serve
+```
+
+You will see the following output if the command is run successfully:
+
+```posix-terminal
+2024-05-20 12:51:03 [serve] Discovery...
+2024-05-20 12:51:07 [serve] Device up
+2024-05-20 12:51:07 [serve] Registering devhost as update source
+Serving repository '/usr/local/google/home/amituttam/fuchsia/out/minimal.x64/amber-files' to target 'fuchsia-emulator' over address '[::]:8083'.
+```
+
+Leave this command running the foreground. To run in verbose mode pass the
+`--verbose` or `-v` flag to `fx serve`.
+
+## Exercise: Run the debugger and list the running processes
+
+With the repository server running, and the Fuchsia target configured to resolve
+packages from that repository, we can run a command that resolves the package
+and runs the component within.
+
+First, let's run logs so we can see what is happening:
+
+```posix-terminal
+ffx log --filter debug_agent
+```
+
+Run the above command in a separate terminal, the output will be empty. Leave
+the command running. Here, we are filtering on `debug_agent` as the system will
+need to resolve that package to run the debugger.
+
+In the other terminal, connect the debugger to the running system:
+
+```posix-terminal
+ffx debug connect
+```
+
+The command should launch `zxdb` and place you in an interactive shell. If you
+switch back to the other terminal with the running `ffx log`, you will see
+output along the lines of:
+
+```
+[01949.544917][pkg-resolver] INFO: attempting to resolve fuchsia-pkg://fuchsia.com/debug_agent as fuchsia-pkg://devhost/debug_agent with TUF
+[01949.624075][pkg-resolver] INFO: updated local TUF metadata for "fuchsia-pkg://devhost" to version RepoVersions { root: 9, timestamp: Some(1715399460), snapshot: Some(1715399460), targets: Some(1715399460) } while getting merkle for TargetPath("debug_agent/0")
+[01949.835760][pkg-resolver] INFO: resolved fuchsia-pkg://fuchsia.com/debug_agent as fuchsia-pkg://devhost/debug_agent to 3f9783abed30d70b72d5f0730bd6e6033481073126aac0b74cbbf2d14909497e with TUF
+[01949.882891][debugger] INFO: [main_launcher.cc(182)] Start listening on FIDL fuchsia::debugger::Launcher.
+```
+
+Here the system attempts to resolve the `debug_agent` package and is able to do
+so from the configured `devhost` repository. Once it resolves the package, the
+component is launched that listens for the debugger launcher protocol.
+
+Back to `zxdb`, you can now run `ps` to see the list of running processes on
+the system.
+
+```
+[zxdb] ps
+ j: 1033 root
+   p: 1102 bin/component_manager
+   j: 1649
+     j: 1780 bootstrap/console fuchsia-boot:///console#meta/console.cm
+       p: 1822 console.cm
+     j: 1989 bootstrap/archivist fuchsia-boot:///archivist#meta/archivist.cm
+       p: 2051 archivist.cm
+     j: 2064 bootstrap/console-launcher fuchsia-boot:///console-launcher#meta/console-launcher.cm
+...
+```
