@@ -24,11 +24,13 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/clock-controller-ff63c000/clocks",
       "sys/platform/clock-controller-ff63c000/clocks/clock-init",
+      "sys/platform/dsi-display-ff900000",
       "sys/platform/ethernet-phy-ff634000/ethernet-phy-ff634000_group/aml-ethernet/dwmac-ff3f0000_group/dwmac/eth_phy/phy_null_device",
       "sys/platform/fuchsia-sysmem/sysmem",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio-init",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio",
       "sys/platform/gpio-controller-ff634400/aml-gpio/gpio/gpio-93/fusb302-22_group/fusb302",
+      "sys/platform/hdmi-display-ff900000",
       "sys/platform/hrtimer-0/aml-hrtimer",
       "sys/platform/i2c-1c000",
       "sys/platform/i2c-1c000/i2c-1c000_group/aml-i2c/i2c/i2c-1-56/touchscreen-38_group/focaltouch-HidDevice",
@@ -93,6 +95,13 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+
+  static const char* kDisplayDevicePaths[] = {
+      "sys/platform/hdmi-display-ff900000/hdmi-display-ff900000_group/amlogic-display/display-coordinator",
+      "sys/platform/dsi-display-ff900000/dsi-display-ff900000_group/amlogic-display/display-coordinator",
+  };
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
+      cpp20::span(kDisplayDevicePaths, std::size(kDisplayDevicePaths))));
 }
 
 }  // namespace

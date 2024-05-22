@@ -10,6 +10,8 @@
 
 namespace display_panel_visitor_dt {
 
+// TODO(https://fxbug.dev/342016112): This visitor will have to be redone or removed once the
+// display panel metadata is updated or moved into structured config.
 class DisplayPanelVisitor : public fdf_devicetree::Visitor {
  public:
   static constexpr char kPanelType[] = "panel-type";

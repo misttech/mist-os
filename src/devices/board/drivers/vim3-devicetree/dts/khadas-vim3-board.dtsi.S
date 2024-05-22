@@ -12,7 +12,6 @@
 
 #include "sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2/arm-gicv2.h"
 
-
 / {
 	compatible = "khadas,vim3", "amlogic,a311d";
 	model = "Khadas Vim3";
@@ -74,6 +73,35 @@
 		pwm-names = "LCD_BRIGHTNESS";
 		display-detect = <&display_detect>;
 		display-detect-names = "MIPI_DSI";
+	};
+
+	dsi-display@ff900000 {
+		compatible = "amlogic,display";
+		reg = <0x0 A311D_VPU_BASE 0x0 A311D_VPU_LENGTH>,
+			<0x0 A311D_TOP_MIPI_DSI_BASE 0x0 A311D_TOP_MIPI_DSI_LENGTH>,
+			<0x0 A311D_DSI_PHY_BASE 0x0 A311D_DSI_PHY_LENGTH>,
+			<0x0 A311D_MIPI_DSI_BASE 0x0 A311D_MIPI_DSI_LENGTH>,
+			<0x0 A311D_HIU_BASE 0x0 A311D_HIU_LENGTH>,
+			<0x0 A311D_AOBUS_BASE 0x0 A311D_AOBUS_LENGTH>,
+			<0x0 A311D_RESET_BASE 0x0 A311D_RESET_LENGTH>,
+			<0x0 A311D_GPIO_BASE 0x0 A311D_GPIO_LENGTH>,
+			<0x0 A311D_HDMITX_CONTROLLER_IP_BASE 0x0 A311D_HDMITX_CONTROLLER_IP_LENGTH>,
+			<0x0 A311D_HDMITX_TOP_LEVEL_BASE 0x0 A311D_HDMITX_TOP_LEVEL_LENGTH>;
+		interrupts = <GIC_SPI 3 GIC_IRQ_MODE_EDGE_RISING>,
+			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
+			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
+		iommus = <&dummy_iommu 9>;
+		smcs = <2 1 0>;
+		gpios = <&gpio_expander 0 0>,
+			<&gpio A311D_GPIOH(2) 0>;
+		gpio-names = "LCD_RESET", "HDMI_HOTPLUG_DETECT";
+		fuchsia,sysmem = <&sysmem>;
+		amlogic,canvas = <&canvas>;
+		display-detect = <&display_detect>;
+		display-detect-names = "MIPI_DSI";
+		panel-type = <0xc>;
+		display-width = <1080>;
+		display-height = <1920>;
 	};
 
 	function_button: adc-buttons {

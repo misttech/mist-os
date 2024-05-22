@@ -32,6 +32,7 @@ devicetree_fragment("khadas-vim3-board") {
   sources = [ "dts/khadas-vim3-board.dtsi.S" ]
   deps = [
     ":amlogic-a311d",
+    ":meson-g12-common",
     "//src/devices/lib/amlogic",
     "//zircon/system/ulib/ddk-platform-defs",
   ]

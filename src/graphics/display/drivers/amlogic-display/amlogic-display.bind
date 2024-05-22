@@ -11,16 +11,21 @@ using fuchsia.platform;
 using fuchsia.display;
 using fuchsia.hardware.sysmem;
 using fuchsia.amlogic.platform;
+using fuchsia.devicetree;
 
 primary node "pdev" {
-  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY;
-  accept fuchsia.BIND_PLATFORM_DEV_PID {
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
-    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,display" {
+    true;
+  } else {
+    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY;
+    accept fuchsia.BIND_PLATFORM_DEV_PID {
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
+      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
+    }
   }
 }
 
