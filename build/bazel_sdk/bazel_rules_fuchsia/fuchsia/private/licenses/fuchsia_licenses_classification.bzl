@@ -15,6 +15,7 @@ def _fuchsia_licenses_classification_impl(ctx):
         "--identify_license_bin=%s" % ctx.executable.identify_license.path,
         "--identify_license_output=%s" % identify_license_output_json.path,
         "--output_file=%s" % out_json.path,
+        "--quiet",
     ]
 
     if ctx.attr.default_is_project_shipped:

@@ -15,8 +15,12 @@ from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
 
+_VERBOSE = True
+
+
 def _log(*kwargs):
-    print(*kwargs, file=stderr)
+    if _VERBOSE:
+        print(*kwargs, file=stderr)
 
 
 def _dedup(input: List[str]) -> List[str]:
@@ -323,7 +327,17 @@ def main():
         help="Where to write all the output files.",
         required=True,
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Decrease verbosity.",
+    )
+
     args = parser.parse_args()
+
+    if args.quiet:
+        global _VERBOSE
+        _VERBOSE = False
 
     _log(f"Got these args {args}!")
 

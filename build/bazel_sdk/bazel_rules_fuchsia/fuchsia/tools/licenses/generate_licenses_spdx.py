@@ -13,8 +13,12 @@ from fuchsia.tools.licenses.common_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
 
+_VERBOSE = False
+
+
 def _log(*kwargs):
-    print(*kwargs, file=stderr)
+    if _VERBOSE:
+        print(*kwargs, file=stderr)
 
 
 def _create_doc_from_licenses_used_json(
@@ -146,7 +150,18 @@ def main():
         help="Base URL for license paths that are local files.",
         required=True,
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Decrease verbosity.",
+    )
+
     args = parser.parse_args()
+
+    if args.quiet:
+        global _VERBOSE
+        _VERBOSE = False
+
     _log(f"Got these args {args}!")
 
     output_path = args.spdx_output

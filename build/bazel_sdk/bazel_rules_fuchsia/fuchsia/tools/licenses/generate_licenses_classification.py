@@ -12,9 +12,12 @@ from pathlib import Path
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
+_VERBOSE = True
+
 
 def _log(*kwargs):
-    print(*kwargs, file=sys.stderr)
+    if _VERBOSE:
+        print(*kwargs, file=sys.stderr)
 
 
 def _prepare_license_files(
@@ -265,7 +268,18 @@ allowing downstream customers to provide project specific instructions.
         help="Where to write the output json",
         required=True,
     )
+
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Decrease verbosity.",
+    )
+
     args = parser.parse_args()
+
+    if args.quiet:
+        global _VERBOSE
+        _VERBOSE = False
 
     spdx_input = args.spdx_input
 
