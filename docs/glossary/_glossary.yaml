@@ -616,6 +616,17 @@
   related_guides: [""]
   area: ["UI"]
 
+- term: "Dictionary"
+  short_description: "A capability that bundles multiple capabilities together."
+  full_description: "A capability that bundles multiple capabilities together.
+  A dictionary is a key-value data collection, where the key is a <a
+  href=\"https://fuchsia.dev/reference/cml#names\">capability name string</a> and the value is a
+  capability. The value itself may be another dictionary, which can be used to achieve
+  directory-like nesting."
+  see_also: ["<a href=\"/docs/concepts/components/v2/capabilities/dictionary.md\">dictionary</a>"]
+  related_guides: [""]
+  area: ["Component Framework"]
+
 - term: "Directory capability"
   short_description: "A
   <a href=\"/docs/glossary#capability\">capability</a> that permits access to a filesystem

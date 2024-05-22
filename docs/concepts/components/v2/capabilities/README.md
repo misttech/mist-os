@@ -1,11 +1,11 @@
 # Capabilities
 
-Components interact with one another through [capabilities][glossary.capability].
-A capability combines access to a resource and a set of rights, providing a
-access control and a means for interacting with the resource. Fuchsia
-capabilities typically access underlying [kernel objects][glossary.kernel-object]
-through [handles][glossary.handle] provided in the component's
-[namespace][glossary.namespace].
+Components interact with one another through
+[capabilities][glossary.capability]. A capability combines access to a resource
+and a set of rights, providing a access control and a means for interacting with
+the resource. Fuchsia capabilities typically access underlying
+[kernel objects][glossary.kernel-object] through [handles][glossary.handle]
+provided in the component's [namespace][glossary.namespace].
 
 A component can interact with the system and other components only through the
 discoverable capabilities from its namespace and the few
@@ -25,13 +25,14 @@ to their children, parent components play an important role in defining the
 sandboxes for their child components.
 
 Some capability types are routed to [environments][glossary.environment] rather
-than individual component instances. Environments configure the behavior of
-the framework for the realms where they are assigned. Capabilities routed to
+than individual component instances. Environments configure the behavior of the
+framework for the realms where they are assigned. Capabilities routed to
 environments are accessed and used by the framework. Component instances do not
 have runtime access to the capabilities in their environment.
 
-The [availability][capability-availability] feature lets components declare expectations
-about the circumstances under which they expect capabilities to be available.
+The [availability][capability-availability] feature lets components declare
+expectations about the circumstances under which they expect capabilities to be
+available.
 
 ### Routing terminology {#routing-terminology}
 
@@ -59,30 +60,15 @@ Routing terminology divides into the following categories:
 
 The following capabilities can be routed:
 
-| type                                 | description                   | routed to                         |
-| ------------------------------------ | ----------------------------- | --------------------------------- |
-| [`protocol`][capability-protocol]    | A filesystem node that is     | components                        |
-:                                      : used to open a channel backed :                                   :
-:                                      : by a FIDL protocol.           :                                   :
-| [`service`][capability-service]      | A filesystem directory that   | components                        |
-:                                      : is used to open a channel to  :                                   :
-:                                      : one of several service        :                                   :
-:                                      : instances.                    :                                   :
-| [`directory`][capability-directory]  | A filesystem directory.       | components                        |
-:                                      :                               :                                   :
-| [`storage`][capability-storage]      | A writable filesystem         | components                        |
-:                                      : directory that is isolated to :                                   :
-:                                      : the component using it.       :                                   :
-| [`resolver`][capability-resolver]    | A capability that, when       | [environments][doc-environments]  |
-:                                      : registered in an environment, :                                   :
-:                                      : causes a component with a     :                                   :
-:                                      : particular URL scheme to be   :                                   :
-:                                      : resolved with that resolver.  :                                   :
-| [`runner`][capability-runner]        | A capability that, when       | [environments][doc-environments]  |
-:                                      : registered in an environment, :                                   :
-:                                      : allows the framework to use   :                                   :
-:                                      : that runner when starting     :                                   :
-:                                      : components.                   :                                   :
+type                                  | description                                                                                                                              | routed to
+------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------
+[`protocol`][capability-protocol]     | A filesystem node that is used to open a channel backed by a FIDL protocol.                                                              | components
+[`service`][capability-service]       | A filesystem directory that is used to open a channel to one of several service instances.                                               | components
+[`directory`][capability-directory]   | A filesystem directory.                                                                                                                  | components
+[`storage`][capability-storage]       | A writable filesystem directory that is isolated to the component using it.                                                              | components
+[`dictionary`][capability-dictionary] | A capability that bundles other capabilities together.                                                                                   | components
+[`resolver`][capability-resolver]     | A capability that, when registered in an environment, causes a component with a particular URL scheme to be resolved with that resolver. | [environments][doc-environments]
+[`runner`][capability-runner]         | A capability that, when registered in an environment, allows the framework to use that runner when starting components.                  | [environments][doc-environments]
 
 ## Examples {#examples}
 
@@ -93,13 +79,13 @@ component instance tree:
 
 In this example:
 
--   The `echo` component instance provides the `fuchsia.Echo` protocol as one
-    of its declared *capabilities*.
--   The `echo_tool` component instance requires the *use* of the
-    `fuchsia.Echo` protocol capability.
+-   The `echo` component instance provides the `fuchsia.Echo` protocol as one of
+    its declared *capabilities*.
+-   The `echo_tool` component instance requires the *use* of the `fuchsia.Echo`
+    protocol capability.
 
-Each intermediate component cooperates to explicitly route `fuchsia.Echo`
-from `echo` to `echo_tool`:
+Each intermediate component cooperates to explicitly route `fuchsia.Echo` from
+`echo` to `echo_tool`:
 
 1.  `echo` *exposes* `fuchsia.Echo` from `self` so the protocol is visible to
     its parent, `services`.
@@ -110,13 +96,15 @@ from `echo` to `echo_tool`:
 1.  `tools` *offers* `fuchsia.Echo` from `parent` to its child, `echo_tool`.
 
 Component Framework grants the request from `echo_tool` to use `fuchsia.Echo`
-because a valid route is found to a component providing that protocol capability.
+because a valid route is found to a component providing that protocol
+capability.
 
 For more information on how components connect to capabilities at runtime, see
 [Life of a protocol open][doc-protocol-open].
 
 [capability-protocol]: /docs/concepts/components/v2/capabilities/protocol.md
 [capability-service]: /docs/concepts/components/v2/capabilities/service.md
+[capability-dictionary]: /docs/concepts/components/v2/capabilities/dictionary.md
 [capability-directory]: /docs/concepts/components/v2/capabilities/directory.md
 [capability-storage]: /docs/concepts/components/v2/capabilities/storage.md
 [capability-resolver]: /docs/concepts/components/v2/capabilities/resolver.md
