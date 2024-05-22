@@ -108,6 +108,12 @@
             to: [ "#kernels" ],
         },
         {
+            protocol: [ "fuchsia.session.power.Handoff" ],
+            from: "void",
+            to: "#playground",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: "#playground",
