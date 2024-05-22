@@ -636,8 +636,7 @@ fn map_in_vmar(
         } else {
             // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that doesn't
             // need it.
-            // TODO(https://fxbug.dev/42082608) use a gentler signal when available
-            zx::VmoOp::ALWAYS_NEED
+            zx::VmoOp::PREFETCH
         };
         trace_duration!(CATEGORY_STARNIX_MM, c"MmapCommitPages");
         let _ = vmo.op_range(op, vmo_offset, length as u64);
