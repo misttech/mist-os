@@ -129,7 +129,7 @@ class Node {
 
 class ReferenceNode {
  public:
-  explicit ReferenceNode(const Node* node) : node_(node) {}
+  explicit ReferenceNode(Node* node) : node_(node) {}
 
   const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
     return node_->properties();
@@ -142,12 +142,14 @@ class ReferenceNode {
 
   std::optional<Phandle> phandle() const { return node_->phandle(); }
 
+  Node* GetNode() const { return node_; }
+
   ParentNode parent() const;
 
   explicit operator bool() const { return (node_ != nullptr); }
 
  private:
-  const Node* node_;
+  Node* node_;
 };
 
 class ParentNode {

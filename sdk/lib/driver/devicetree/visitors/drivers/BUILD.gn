@@ -8,6 +8,7 @@ group("tests") {
   deps = [
     "amlogic-canvas:tests",
     "clock-controllers:tests",
+    "cpu:tests",
     "display:tests",
     "ethernet:tests",
     "gpio-controllers:tests",
@@ -32,6 +33,7 @@ devicetree_visitor_collection("all-driver-visitors") {
   deps = [
     "//sdk/lib/driver/devicetree/visitors/drivers/amlogic-canvas:amlogic-canvas-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/cpu/performance-domain:performance-domain-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/display/display-detect:display-detect-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/display/display-panel:display-panel-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/ethernet/ethernet-phy:ethernet-phy-visitor",

@@ -90,6 +90,7 @@ zx_library("amlogic") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//src/devices/lib/mmio",
+    "//src/lib/ddk:ddk_metadata",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
