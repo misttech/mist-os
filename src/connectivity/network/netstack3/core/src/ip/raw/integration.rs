@@ -8,12 +8,9 @@
 use lock_order::{lock::LockLevelFor, relation::LockBefore, wrap::LockedWrapperApi};
 
 use crate::{
-    ip::{
-        raw::{
-            RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
-            RawIpSocketState, RawIpSocketStateContext, RawIpSocketsIpExt,
-        },
-        IpLayerIpExt,
+    ip::raw::{
+        RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
+        RawIpSocketState, RawIpSocketStateContext, RawIpSocketsIpExt,
     },
     lock_ordering, BindingsTypes, CoreCtx,
 };
@@ -45,7 +42,8 @@ impl<
     }
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSockets<I>>>
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I: RawIpSocketsIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSockets<I>>>
     RawIpSocketMapContext<I, BT> for CoreCtx<'_, BT, L>
 {
     fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O {

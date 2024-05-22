@@ -27,7 +27,7 @@ use crate::{
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
         },
         icmp::{IcmpBindingsContext, IcmpBindingsTypes},
-        raw::{RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
+        raw::{RawIpSocketMapContext, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
@@ -85,7 +85,7 @@ pub trait CoreContext<I, BC>:
         EthernetLinkDevice,
         DeviceId = EthernetDeviceId<BC>,
         WeakDeviceId = EthernetWeakDeviceId<BC>,
-    >
+    > + RawIpSocketMapContext<I, BC>
 where
     I: IpExt,
     BC: IpBindingsContext<I>,
@@ -111,7 +111,7 @@ where
             EthernetLinkDevice,
             DeviceId = EthernetDeviceId<BC>,
             WeakDeviceId = EthernetWeakDeviceId<BC>,
-        >,
+        > + RawIpSocketMapContext<I, BC>,
 {
 }
 

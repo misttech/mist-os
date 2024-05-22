@@ -278,7 +278,7 @@ pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
 }
 
 /// An IPv4 or IPv6 protocol number.
-pub trait IpProtocol: From<IpProto> + Sealed + Send + Sync + 'static {}
+pub trait IpProtocol: From<IpProto> + From<u8> + Sealed + Send + Sync + 'static {}
 
 impl Sealed for Never {}
 

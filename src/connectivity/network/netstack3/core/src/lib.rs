@@ -212,7 +212,8 @@ pub mod ip {
         AddressRemovedReason, IpAddressState, IpDeviceEvent,
     };
     pub use raw::{
-        RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, RawIpSocketsIpExt,
+        protocol::RawIpSocketProtocol, RawIpSocketId, RawIpSocketsBindingsContext,
+        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }

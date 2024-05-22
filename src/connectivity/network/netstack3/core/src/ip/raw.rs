@@ -18,11 +18,11 @@ use crate::{
         protocol::RawIpSocketProtocol,
         state::{RawIpSocketLockedState, RawIpSocketState},
     },
-    sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc},
+    sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc, WeakRc},
 };
 
 mod integration;
-mod protocol;
+pub(crate) mod protocol;
 mod state;
 
 /// An IP extension trait for use with raw IP sockets.
@@ -133,12 +133,29 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, BT> {
         let RawIpSocketId(strong_rc) = self;
         strong_rc.protocol()
     }
+    /// Downgrades this ID to a weak reference.
+    pub fn downgrade(&self) -> WeakRawIpSocketId<I, BT> {
+        let Self(rc) = self;
+        WeakRawIpSocketId(StrongRc::downgrade(rc))
+    }
 }
 
 impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for RawIpSocketId<I, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("RawIpSocketId").field(&StrongRc::debug_id(rc)).finish()
+    }
+}
+
+/// A weak reference to a raw IP socket.
+pub struct WeakRawIpSocketId<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>(
+    WeakRc<RawIpSocketState<I, BT>>,
+);
+
+impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for WeakRawIpSocketId<I, BT> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("WeakRawIpSocketId").field(&WeakRc::debug_id(rc)).finish()
     }
 }
 

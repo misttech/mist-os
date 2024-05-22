@@ -5,19 +5,26 @@
 use std::ops::ControlFlow;
 
 use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
-use net_types::ip::Ip;
-use netstack3_core::ip::{
-    RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, RawIpSocketsIpExt,
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use netstack3_core::{
+    ip::{
+        RawIpSocketId, RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
+    },
+    IpExt,
 };
 use tracing::error;
 use zerocopy::ByteSlice;
 use zx::{HandleBased, Peered};
 
-use crate::bindings::{BindingsCtx, Ctx};
+use crate::bindings::{
+    util::{RemoveResourceResultExt, TryFromFidl},
+    BindingsCtx, Ctx,
+};
 
 use super::{
     worker::{self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection},
@@ -26,10 +33,10 @@ use super::{
 
 impl RawIpSocketsBindingsTypes for BindingsCtx {
     // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
-    type RawIpSocketState<I: Ip> = ();
+    type RawIpSocketState<I: Ip> = SocketState;
 }
 
-impl<I: RawIpSocketsIpExt> RawIpSocketsBindingsContext<I> for BindingsCtx {
+impl<I: IpExt> RawIpSocketsBindingsContext<I> for BindingsCtx {
     fn receive_packet<B: ByteSlice>(
         &self,
         _socket: &RawIpSocketId<I, Self>,
@@ -39,17 +46,24 @@ impl<I: RawIpSocketsIpExt> RawIpSocketsBindingsContext<I> for BindingsCtx {
     }
 }
 
+/// The Core held state of a raw IP socket.
 #[derive(Debug)]
-struct BindingData {
+pub struct SocketState {}
+
+/// The worker held state of a raw IP socket.
+#[derive(Debug)]
+struct SocketWorkerState<I: IpExt> {
     /// The event to hand off for [`fpraw::SocketRequest::Describe`].
     peer_event: zx::EventPair,
+    /// The identifier for the [`netstack3_core`] socket resource.
+    id: RawIpSocketId<I, BindingsCtx>,
 }
 
-impl BindingData {
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+impl<I: IpExt> SocketWorkerState<I> {
     fn new(
-        _ctx: &Ctx,
-        _domain: fposix_socket::Domain,
-        _proto: fpraw::ProtocolAssociation,
+        ctx: &mut Ctx,
+        proto: RawIpSocketProtocol<I>,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
@@ -57,8 +71,9 @@ impl BindingData {
             Ok(()) => (),
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         };
+        let id = ctx.api().raw_ip_socket().create(proto, SocketState {});
 
-        BindingData { peer_event }
+        SocketWorkerState { peer_event, id }
     }
 }
 
@@ -68,7 +83,8 @@ impl CloseResponder for fpraw::SocketCloseResponder {
     }
 }
 
-impl SocketWorkerHandler for BindingData {
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+impl<I: IpExt> SocketWorkerHandler for SocketWorkerState<I> {
     type Request = fpraw::SocketRequest;
 
     type RequestStream = fpraw::SocketRequestStream;
@@ -88,17 +104,49 @@ impl SocketWorkerHandler for BindingData {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
 
-    async fn close(self, _ctx: &mut Ctx) {}
+    async fn close(self, ctx: &mut Ctx) {
+        let SocketWorkerState { peer_event: _, id } = self;
+        let weak = id.downgrade();
+        let SocketState {} = ctx
+            .api()
+            .raw_ip_socket()
+            .close(id)
+            .map_deferred(|d| d.into_future("raw IP socket", &weak))
+            .into_future()
+            .await;
+    }
 }
 
-struct RequestHandler<'a> {
+/// On Error, logs the `Errno` with additional debugging context.
+///
+/// The provided result is passed through unchanged.
+///
+/// Implemented as a macro to avoid erasing the callsite information.
+macro_rules! maybe_log_error {
+    ($operation:expr, $result:expr) => {
+        match $result {
+            Ok(val) => Ok(val),
+            Err(errno) => {
+                crate::bindings::socket::log_errno!(
+                    errno,
+                    "raw IP socket failed to handle {}: {:?}",
+                    $operation,
+                    errno
+                );
+                Err(errno)
+            }
+        }
+    };
+}
+
+struct RequestHandler<'a, I: IpExt> {
     ctx: &'a Ctx,
-    data: &'a mut BindingData,
+    data: &'a mut SocketWorkerState<I>,
 }
 
-impl<'a> RequestHandler<'a> {
+impl<'a, I: IpExt> RequestHandler<'a, I> {
     fn describe(self) -> fpraw::SocketDescribeResponse {
-        let Self { ctx: _ctx, data: BindingData { peer_event } } = self;
+        let Self { ctx: _ctx, data: SocketWorkerState { peer_event, id: _ } } = self;
         let peer = peer_event
             .duplicate_handle(
                 // The client only needs to be able to receive signals so don't
@@ -421,25 +469,110 @@ pub(crate) async fn serve(
                 }
             };
             match req {
-                fpraw::ProviderRequest::Socket { responder, domain, proto } => {
-                    let (client, request_stream) = fidl::endpoints::create_request_stream()
-                        .expect("failed to create a new request stream");
-
-                    spawner.spawn(SocketWorker::serve_stream_with(
-                        ctx.clone(),
-                        move |ctx, properties| BindingData::new(ctx, domain, proto, properties),
-                        SocketWorkerProperties {},
-                        request_stream,
-                        (),
-                        spawner.clone(),
-                    ));
-                    responder
-                        .send(Ok(client))
-                        .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
-                }
+                fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
+                    .send(maybe_log_error!(
+                        "create",
+                        handle_create_socket(ctx.clone(), domain, proto, &spawner)
+                    ))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             }
         })
         .collect::<()>()
         .await;
     wait_group
+}
+
+/// Handler for a [`fpraw::ProviderRequest::Socket`] request.
+fn handle_create_socket(
+    ctx: Ctx,
+    domain: fposix_socket::Domain,
+    protocol: fpraw::ProtocolAssociation,
+    spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
+) -> Result<fidl::endpoints::ClientEnd<fpraw::SocketMarker>, fposix::Errno> {
+    let (client, request_stream) =
+        fidl::endpoints::create_request_stream().expect("failed to create a new request stream");
+    match domain {
+        fposix_socket::Domain::Ipv4 => {
+            let protocol = RawIpSocketProtocol::<Ipv4>::try_from_fidl(protocol)?;
+            spawner.spawn(SocketWorker::serve_stream_with(
+                ctx,
+                move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
+                SocketWorkerProperties {},
+                request_stream,
+                (),
+                spawner.clone(),
+            ))
+        }
+        fposix_socket::Domain::Ipv6 => {
+            let protocol = RawIpSocketProtocol::<Ipv6>::try_from_fidl(protocol)?;
+            spawner.spawn(SocketWorker::serve_stream_with(
+                ctx,
+                move |ctx, properties| SocketWorkerState::new(ctx, protocol, properties),
+                SocketWorkerProperties {},
+                request_stream,
+                (),
+                spawner.clone(),
+            ))
+        }
+    }
+    Ok(client)
+}
+
+impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {
+    type Error = fposix::Errno;
+
+    fn try_from_fidl(proto: fpraw::ProtocolAssociation) -> Result<Self, Self::Error> {
+        match proto {
+            fpraw::ProtocolAssociation::Unassociated(fpraw::Empty) => Ok(RawIpSocketProtocol::Raw),
+            fpraw::ProtocolAssociation::Associated(val) => {
+                let protocol = RawIpSocketProtocol::<I>::new(I::Proto::from(val));
+                match &protocol {
+                    RawIpSocketProtocol::Raw => Err(fposix::Errno::Einval),
+                    RawIpSocketProtocol::Proto(_) => Ok(protocol),
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ip_test_macro::ip_test;
+    use packet_formats::ip::IpProto;
+    use test_case::test_case;
+
+    #[ip_test]
+    #[test_case(
+        fpraw::ProtocolAssociation::Unassociated(fpraw::Empty),
+        Ok(RawIpSocketProtocol::Raw);
+        "unassociated"
+    )]
+    #[test_case(
+        fpraw::ProtocolAssociation::Associated(255),
+        Err(fposix::Errno::Einval);
+        "associated_with_iana_reserved_protocol"
+    )]
+    fn raw_protocol_from_fidl<I: Ip + IpExt>(
+        fidl: fpraw::ProtocolAssociation,
+        expected_result: Result<RawIpSocketProtocol<I>, fposix::Errno>,
+    ) {
+        assert_eq!(RawIpSocketProtocol::<I>::try_from_fidl(fidl), expected_result);
+    }
+
+    #[ip_test]
+    #[test_case(fpraw::ProtocolAssociation::Associated(6), IpProto::Tcp)]
+    #[test_case(fpraw::ProtocolAssociation::Associated(17), IpProto::Udp)]
+    fn protocol_from_fidl<I: Ip + IpExt>(
+        fidl: fpraw::ProtocolAssociation,
+        expected_proto: IpProto,
+    ) {
+        assert_eq!(
+            RawIpSocketProtocol::<I>::try_from_fidl(fidl)
+                .expect("conversion should succeed")
+                .proto(),
+            expected_proto.into(),
+        );
+    }
 }
