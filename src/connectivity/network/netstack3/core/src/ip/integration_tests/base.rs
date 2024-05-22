@@ -8,6 +8,7 @@ use assert_matches::assert_matches;
 use core::{num::NonZeroU16, time::Duration};
 
 use ip_test_macro::ip_test;
+use net_declare::net_ip_v4;
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -37,11 +38,11 @@ use crate::{
     context::{testutil::FakeInstant, InstantContext as _},
     device::{
         ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
-        loopback::{LoopbackCreationProperties, LoopbackDevice},
         DeviceId, FrameDestination,
     },
     ip::{
         self,
+        base::{AddressStatus, IpDeviceStateContext},
         device::{
             config::{
                 IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
@@ -54,7 +55,8 @@ use crate::{
         socket::IpSocketContext,
         types::{AddableEntryEither, AddableMetric, RawMetric, ResolvedRoute, RoutableIpAddr},
         types::{Destination, NextHop},
-        DropReason, IpLayerTimerId, ReceivePacketAction, ResolveRouteError,
+        DropReason, IpLayerTimerId, Ipv4PresentAddressStatus, ReceivePacketAction,
+        ResolveRouteError,
     },
     testutil::{
         new_rng, new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _,
@@ -1703,22 +1705,7 @@ fn make_test_ctx<I: Ip + TestIpExt + IpExt>(
         }
     }
 
-    let loopback_id = ctx
-        .core_api()
-        .device::<LoopbackDevice>()
-        .add_device_with_default_state(
-            LoopbackCreationProperties { mtu: Ipv6::MINIMUM_LINK_MTU },
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-    ctx.test_api().enable_device(&loopback_id);
-    ctx.core_api()
-        .device_ip::<I>()
-        .add_ip_addr_subnet(
-            &loopback_id,
-            AddrSubnet::from_witness(I::LOOPBACK_ADDRESS, I::LOOPBACK_SUBNET.prefix()).unwrap(),
-        )
-        .unwrap();
+    let loopback_id = ctx.test_api().add_loopback().into();
     assert_eq!(device_ids.len(), Device::Loopback.index());
     device_ids.push(loopback_id);
     (ctx, device_ids)
@@ -1938,4 +1925,26 @@ fn lookup_route_v6only(
 
     let result = do_route_lookup(&mut ctx, device_ids, egress_device, local_ip, dest_ip);
     assert_eq!(result, expected_result);
+}
+
+#[test_case(net_ip_v4!("127.0.0.1"), Ipv4PresentAddressStatus::Unicast)]
+#[test_case(net_ip_v4!("127.0.0.2"), Ipv4PresentAddressStatus::LoopbackSubnet)]
+#[test_case(net_ip_v4!("127.255.255.255"), Ipv4PresentAddressStatus::SubnetBroadcast)]
+fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus) {
+    set_logger_for_test();
+
+    // Initialize a fake Ctx with a loopback device.
+    let builder = FakeCtxBuilder::default();
+    let (mut ctx, _device_ids) = builder.build();
+    let loopback_id = ctx.test_api().add_loopback().into();
+
+    let addr = SpecifiedAddr::new(addr).expect("test cases should provide specified addrs");
+    assert_eq!(
+        IpDeviceStateContext::<Ipv4, _>::address_status_for_device(
+            &mut ctx.core_ctx(),
+            addr,
+            &loopback_id
+        ),
+        AddressStatus::Present(status)
+    );
 }

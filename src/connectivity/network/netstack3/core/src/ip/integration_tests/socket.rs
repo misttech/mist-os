@@ -12,7 +12,7 @@ use ip_test_macro::ip_test;
 use net_types::{
     ip::{
         AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Mtu,
+        Ipv6Addr,
     },
     SpecifiedAddr, Witness,
 };
@@ -27,10 +27,7 @@ use packet_formats::{
 use test_case::test_case;
 
 use crate::{
-    device::{
-        loopback::{LoopbackCreationProperties, LoopbackDevice},
-        DeviceId, EitherDeviceId, EthernetLinkDevice,
-    },
+    device::{DeviceId, EitherDeviceId, EthernetLinkDevice},
     ip::{
         self,
         device::IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext,
@@ -44,7 +41,7 @@ use crate::{
     socket::SocketIpAddr,
     testutil::{
         set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, TestAddrs,
-        TestIpExt, DEFAULT_INTERFACE_METRIC,
+        TestIpExt,
     },
     IpExt,
 };
@@ -213,24 +210,15 @@ fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
 
     let TestAddrs { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } = cfg;
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(cfg).build();
-    let loopback_device_id = ctx
-        .core_api()
-        .device::<LoopbackDevice>()
-        .add_device_with_default_state(
-            LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-
-    ctx.test_api().enable_device(&loopback_device_id);
+    let loopback_device_id = ctx.test_api().add_loopback();
 
     let NewSocketTestCase { local_ip_type, remote_ip_type, expected_result, device_type } =
         test_case;
 
-    let local_device = match device_type {
+    let local_device: Option<DeviceId<_>> = match device_type {
         DeviceType::Unspecified => None,
         DeviceType::LocalDevice => Some(device_ids[0].clone().into()),
-        DeviceType::OtherDevice => Some(loopback_device_id),
+        DeviceType::OtherDevice => Some(loopback_device_id.into()),
     };
 
     let (expected_from_ip, from_ip) = match local_ip_type {
@@ -318,15 +306,7 @@ fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
         ))
         .unwrap();
 
-    let loopback_device_id = ctx
-        .core_api()
-        .device::<LoopbackDevice>()
-        .add_device_with_default_state(
-            LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-    ctx.test_api().enable_device(&loopback_device_id);
+    let _loopback_device_id = ctx.test_api().add_loopback();
     let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
     let (expected_from_ip, from_ip) = match from_addr_type {

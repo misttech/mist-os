@@ -9,7 +9,7 @@ use core::{fmt::Debug, num::NonZeroU16};
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use net_types::{
-    ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     SpecifiedAddr, Witness, ZonedAddr,
 };
 use packet::Buf;
@@ -29,12 +29,12 @@ use packet_formats::{
 use test_case::test_case;
 
 use crate::{
-    device::{DeviceId, FrameDestination, LoopbackCreationProperties, LoopbackDevice},
+    device::{DeviceId, FrameDestination},
     ip::icmp::Icmpv4StateBuilder,
     socket::datagram,
     testutil::{
         new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _, FakeBindingsCtx,
-        FakeCtxBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, TEST_ADDRS_V4, TEST_ADDRS_V6,
+        FakeCtxBuilder, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     },
     transport::udp::UdpStateBuilder,
     IpExt, StackStateBuilder,
@@ -92,15 +92,7 @@ fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + IpExt>(
         IcmpConnectionType::Remote => (config.remote_ip, REMOTE_CTX_NAME),
     };
 
-    let loopback_device_id = net.with_context(LOCAL_CTX_NAME, |ctx| {
-        ctx.core_api()
-            .device::<LoopbackDevice>()
-            .add_device_with_default_state(
-                LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
-                DEFAULT_INTERFACE_METRIC,
-            )
-            .into()
-    });
+    let _loopback_device_id = net.with_context(LOCAL_CTX_NAME, |ctx| ctx.test_api().add_loopback());
 
     let echo_body = vec![1, 2, 3, 4];
     let buf = Buf::new(echo_body.clone(), ..)
@@ -114,7 +106,6 @@ fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + IpExt>(
         .unwrap()
         .into_inner();
     let conn = net.with_context(LOCAL_CTX_NAME, |ctx| {
-        ctx.test_api().enable_device(&loopback_device_id);
         let mut socket_api = ctx.core_api().icmp_echo::<I>();
         let conn = socket_api.create();
         if bind_to_device {

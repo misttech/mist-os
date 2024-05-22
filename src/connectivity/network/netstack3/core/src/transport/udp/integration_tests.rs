@@ -16,14 +16,7 @@ use packet::Buf;
 use test_case::test_case;
 
 use crate::{
-    device::{
-        loopback::{LoopbackCreationProperties, LoopbackDevice},
-        DeviceId,
-    },
-    testutil::{
-        set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder, TestIpExt,
-        DEFAULT_INTERFACE_METRIC,
-    },
+    testutil::{set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder, TestIpExt},
     IpExt,
 };
 
@@ -38,15 +31,7 @@ fn loopback_bind_to_device<I: Ip + IpExt + TestIpExt>(bind_to_device: bool) {
     const HELLO: &'static [u8] = b"Hello";
     let (mut ctx, local_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
 
-    let loopback_device_id: DeviceId<FakeBindingsCtx> = ctx
-        .core_api()
-        .device::<LoopbackDevice>()
-        .add_device_with_default_state(
-            LoopbackCreationProperties { mtu: net_types::ip::Mtu::new(u16::MAX as u32) },
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-    ctx.test_api().enable_device(&loopback_device_id);
+    let _loopback_device_id = ctx.test_api().add_loopback();
     let mut api = ctx.core_api().udp::<I>();
     let socket = api.create();
     api.listen(&socket, None, Some(LOCAL_PORT)).unwrap();

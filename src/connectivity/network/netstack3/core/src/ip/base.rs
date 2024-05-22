@@ -426,6 +426,7 @@ impl<
 }
 
 /// The status of an IP address on an interface.
+#[derive(Debug, PartialEq)]
 pub enum AddressStatus<S> {
     Present(S),
     Unassigned,
@@ -445,11 +446,23 @@ impl<S: GenericOverIp<I>, I: Ip> GenericOverIp<I> for AddressStatus<S> {
 }
 
 /// The status of an IPv4 address.
+#[derive(Debug, PartialEq)]
 pub enum Ipv4PresentAddressStatus {
     LimitedBroadcast,
     SubnetBroadcast,
     Multicast,
     Unicast,
+    /// This status indicates that the queried device was Loopback. The address
+    /// belongs to a subnet that is assigned to the interface. This status
+    /// takes lower precedence than `Unicast` and `SubnetBroadcast``, E.g. if
+    /// the loopback device is assigned `127.0.0.1/8`:
+    ///   * address `127.0.0.1` -> `Unicast`
+    ///   * address `127.0.0.2` -> `LoopbackSubnet`
+    ///   * address `127.255.255.255` -> `SubnetBroadcast`
+    /// This exists for Linux conformance, which on the Loopback device,
+    /// considers an IPv4 address assigned if it belongs to one of the device's
+    /// assigned subnets.
+    LoopbackSubnet,
 }
 
 /// The status of an IPv6 address.
@@ -653,7 +666,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
     I::map_ip(
         WrapAddressStatus(status),
         |WrapAddressStatus(status)| match status {
-            Ipv4PresentAddressStatus::Unicast => true,
+            Ipv4PresentAddressStatus::Unicast | Ipv4PresentAddressStatus::LoopbackSubnet => true,
             Ipv4PresentAddressStatus::LimitedBroadcast
             | Ipv4PresentAddressStatus::SubnetBroadcast
             | Ipv4PresentAddressStatus::Multicast => false,
@@ -2569,7 +2582,8 @@ pub fn receive_ipv4_packet_action<
             Ipv4PresentAddressStatus::LimitedBroadcast
             | Ipv4PresentAddressStatus::SubnetBroadcast
             | Ipv4PresentAddressStatus::Multicast
-            | Ipv4PresentAddressStatus::Unicast,
+            | Ipv4PresentAddressStatus::Unicast
+            | Ipv4PresentAddressStatus::LoopbackSubnet,
         ) => {
             core_ctx.increment(|counters| &counters.version_rx.deliver);
             ReceivePacketAction::Deliver

@@ -41,7 +41,6 @@ use crate::{
     },
     device::{
         ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-        loopback::{LoopbackCreationProperties, LoopbackDevice},
         DeviceIdContext, EthernetDeviceId, FrameDestination, WeakDeviceId,
     },
     ip::{
@@ -52,7 +51,7 @@ use crate::{
                 NeighborState, NudConfigContext, NudContext, NudHandler, Reachable, Stale,
             },
             slaac::SlaacConfiguration,
-            Ipv6DeviceConfigurationUpdate, Mtu,
+            Ipv6DeviceConfigurationUpdate,
         },
         icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT},
     },
@@ -656,16 +655,7 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>
 
     // Add a loopback interface because local delivery of the ICMP error
     // relies on loopback.
-    const MTU: Mtu = Mtu::new(65536);
-    let device = ctx
-        .core_api()
-        .device::<LoopbackDevice>()
-        .add_device_with_default_state(
-            LoopbackCreationProperties { mtu: MTU },
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-    ctx.test_api().enable_device(&device);
+    let _loopback_id = ctx.test_api().add_loopback();
 
     let mut tcp_api = ctx.core_api().tcp::<I>();
     let socket = tcp_api.create(tcp::buffer::testutil::ProvidedBuffers::default());

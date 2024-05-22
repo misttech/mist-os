@@ -29,8 +29,8 @@ use net_types::MulticastAddr;
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
+        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion,
+        Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet, SubnetEither,
     },
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
@@ -56,8 +56,9 @@ use crate::{
         loopback::LoopbackDeviceId,
         DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
         DeviceLayerStateTypes, DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId,
-        EthernetWeakDeviceId, PureIpDeviceId, PureIpWeakDeviceId, ReceiveQueueBindingsContext,
-        TransmitQueueBindingsContext, WeakDeviceId,
+        EthernetWeakDeviceId, LoopbackCreationProperties, LoopbackDevice, PureIpDeviceId,
+        PureIpWeakDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
+        WeakDeviceId,
     },
     filter::{FilterBindingsTypes, FilterTimerId},
     ip::{
@@ -288,6 +289,7 @@ where
                 Ipv4PresentAddressStatus::Multicast => true,
                 Ipv4PresentAddressStatus::LimitedBroadcast
                 | Ipv4PresentAddressStatus::SubnetBroadcast
+                | Ipv4PresentAddressStatus::LoopbackSubnet
                 | Ipv4PresentAddressStatus::Unicast => false,
             },
             |Wrap(v6)| match v6 {
@@ -445,6 +447,39 @@ where
         let configuration = self.core_api().device_ip::<I>().get_configuration(device);
         let IpDeviceConfiguration { forwarding_enabled, .. } = configuration.as_ref();
         *forwarding_enabled
+    }
+
+    /// Adds a loopback device with the IPv4/IPv6 loopback addresses assigned.
+    pub fn add_loopback(&mut self) -> LoopbackDeviceId<BC>
+    where
+        <BC as DeviceLayerStateTypes>::DeviceIdentifier: Default,
+        <BC as DeviceLayerStateTypes>::LoopbackDeviceState: Default,
+    {
+        let loopback_id = self.core_api().device::<LoopbackDevice>().add_device_with_default_state(
+            LoopbackCreationProperties { mtu: Mtu::new(u32::MAX) },
+            DEFAULT_INTERFACE_METRIC,
+        );
+        let device_id: DeviceId<_> = loopback_id.clone().into();
+        self.enable_device(&device_id);
+
+        self.core_api()
+            .device_ip::<Ipv4>()
+            .add_ip_addr_subnet(
+                &device_id,
+                AddrSubnet::from_witness(Ipv4::LOOPBACK_ADDRESS, Ipv4::LOOPBACK_SUBNET.prefix())
+                    .unwrap(),
+            )
+            .unwrap();
+
+        self.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(
+                &device_id,
+                AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
+                    .unwrap(),
+            )
+            .unwrap();
+        loopback_id
     }
 }
 

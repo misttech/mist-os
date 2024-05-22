@@ -30,7 +30,7 @@ use packet_formats::icmp::{
 
 use crate::{
     context::{CoreEventContext, CoreTimerContext, CounterContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, DeviceIdentifier, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     filter::{FilterHandlerProvider, FilterImpl},
     ip::{
@@ -564,6 +564,8 @@ fn assignment_state_v4<
                     Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
                 } else if addr.get() == subnet.broadcast() {
                     Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
+                } else if device.is_loopback() && subnet.contains(addr.as_ref()) {
+                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::LoopbackSubnet))
                 } else {
                     None
                 }
