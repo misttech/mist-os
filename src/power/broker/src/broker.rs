@@ -972,6 +972,60 @@ impl Catalog {
             .collect()
     }
 
+    // Given a set of active and passive claims, filter out any redundant claims. A claim
+    // is redundant if there exists another *active* claim between the *same pair of elements*
+    // at an *equal or higher level*.
+    fn filter_out_redundant_claims(
+        &self,
+        redundant_active_claims: &Vec<Claim>,
+        redudnant_passive_claims: &Vec<Claim>,
+    ) -> (Vec<Claim>, Vec<Claim>) {
+        let mut active_claims: Vec<Claim> = redundant_active_claims.clone();
+        let mut passive_claims: Vec<Claim> = redudnant_passive_claims.clone();
+        let mut essential_active_claims: Vec<Claim> = Vec::new();
+        let mut essential_passive_claims: Vec<Claim> = Vec::new();
+        let mut observed_pairs: HashMap<(ElementID, ElementID), ElementLevel> = HashMap::new();
+        active_claims.sort_unstable_by_key(|claim| {
+            (
+                claim.dependent().element_id.clone(),
+                claim.requires().element_id.clone(),
+                PowerLevel::max_value() - claim.requires().level,
+            )
+        });
+        passive_claims.sort_unstable_by_key(|claim| {
+            (
+                claim.dependent().element_id.clone(),
+                claim.requires().element_id.clone(),
+                PowerLevel::max_value() - claim.requires().level,
+            )
+        });
+        for claim in active_claims {
+            let element_pair =
+                (claim.dependent().element_id.clone(), claim.requires().element_id.clone());
+            if observed_pairs.contains_key(&element_pair) {
+                continue;
+            } else {
+                observed_pairs.insert(element_pair, claim.requires().clone());
+            }
+            essential_active_claims.push(claim.clone());
+        }
+        for claim in passive_claims {
+            let element_pair =
+                (claim.dependent().element_id.clone(), claim.requires().element_id.clone());
+            if observed_pairs.contains_key(&element_pair) {
+                if let Some(requires) = observed_pairs.get(&element_pair) {
+                    if requires.level.satisfies(claim.requires().level) {
+                        continue;
+                    }
+                }
+            } else {
+                observed_pairs.insert(element_pair, claim.requires().clone());
+            }
+            essential_passive_claims.push(claim.clone());
+        }
+        (essential_active_claims, essential_passive_claims)
+    }
+
     /// Creates a new lease for the given element and level along with all
     /// claims necessary to satisfy this lease and adds them to pending_claims.
     /// Returns the new lease and the Vec of active (pending) claims created.
@@ -984,24 +1038,28 @@ impl Catalog {
         // TODO: Add lease validation and control.
         let lease = Lease::new(&element_id, level);
         self.leases.insert(lease.id.clone(), lease.clone());
-        let mut active_claims = Vec::new();
         let element_level = ElementLevel { element_id: element_id.clone(), level: level.clone() };
         let (active_dependencies, passive_dependencies) =
             self.topology.all_active_and_passive_dependencies(&element_level);
-        // Create pending active claims for each of the active dependencies.
-        for dependency in active_dependencies {
-            let active_claim = Claim::new(dependency, &lease.id);
-            tracing::debug!("lease({element_id}@{level}): created active claim {active_claim}");
-            self.active_claims.pending.add(active_claim.clone());
-            active_claims.push(active_claim);
+        // Create all possible claims from the active and passive dependencies.
+        let active_claims = active_dependencies
+            .into_iter()
+            .map(|dependency| Claim::new(dependency.clone(), &lease.id))
+            .collect::<Vec<Claim>>();
+        let passive_claims = passive_dependencies
+            .into_iter()
+            .map(|dependency| Claim::new(dependency.clone(), &lease.id))
+            .collect::<Vec<Claim>>();
+        // Filter claims down to only the essential (i.e. non-redundant) claims.
+        let (essential_active_claims, essential_passive_claims) =
+            self.filter_out_redundant_claims(&active_claims, &passive_claims);
+        for claim in &essential_active_claims {
+            self.active_claims.pending.add(claim.clone());
         }
-        // Create pending passive claims for each of the passive dependencies.
-        for dependency in passive_dependencies {
-            let passive_claim = Claim::new(dependency, &lease.id);
-            tracing::debug!("lease({element_id}@{level}): created passive claim {passive_claim}");
-            self.passive_claims.pending.add(passive_claim.clone());
+        for claim in &essential_passive_claims {
+            self.passive_claims.pending.add(claim.clone());
         }
-        (lease, active_claims)
+        (lease, essential_active_claims)
     }
 
     /// Drops an existing lease, and initiates process of releasing all
@@ -1472,6 +1530,153 @@ mod tests {
             received_b.push(level)
         }
         assert_eq!(received_b, vec![None, Some(BinaryPowerLevel::On.into_primitive())]);
+    }
+
+    fn create_test_claim(
+        dependent_element_id: ElementID,
+        dependent_element_level: PowerLevel,
+        requires_element_id: ElementID,
+        requires_element_level: PowerLevel,
+    ) -> Claim {
+        Claim::new(
+            Dependency {
+                dependent: ElementLevel {
+                    element_id: dependent_element_id,
+                    level: dependent_element_level,
+                },
+                requires: ElementLevel {
+                    element_id: requires_element_id,
+                    level: requires_element_level,
+                },
+            },
+            &LeaseID::new(),
+        )
+    }
+
+    #[fuchsia::test]
+    fn test_filter_out_redundant_claims() {
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let broker = Broker::new(inspect_node);
+
+        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
+        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
+        let claim_a_1_c_1 = create_test_claim("A".into(), 1, "C".into(), 1);
+        let claim_b_1_c_1 = create_test_claim("B".into(), 1, "C".into(), 1);
+        let claim_a_2_c_2 = create_test_claim("A".into(), 2, "C".into(), 2);
+
+        //  A     B
+        //  1 ==> 1 (redundant with A@2=>B@2)
+        //  2 ==> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_b_1.clone(), claim_a_2_b_2.clone()],
+                &vec![],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_2_b_2.clone()]);
+        assert_eq!(essential_passive_claims, vec![]);
+
+        //  A     B
+        //  1 --> 1 (redundant with A@2=>B@2)
+        //  2 ==> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_2_b_2.clone()],
+                &vec![claim_a_1_b_1.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_2_b_2.clone()]);
+        assert_eq!(essential_passive_claims, vec![]);
+
+        //  A     B
+        //  1 ==> 1 (not redundant, passive claims cannot satisfy active claims)
+        //  2 --> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_b_1.clone()],
+                &vec![claim_a_2_b_2.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_1_b_1.clone()]);
+        assert_eq!(essential_passive_claims, vec![claim_a_2_b_2.clone()]);
+
+        //  A     B
+        //  1 --> 1 (redundant with A@2->B@2)
+        //  2 --> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![],
+                &vec![claim_a_1_b_1.clone(), claim_a_2_b_2.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![]);
+        assert_eq!(essential_passive_claims, vec![claim_a_2_b_2.clone()]);
+
+        //  A     B     C
+        //  1 ========> 1 (not redundant, not between same elements)
+        //  2 ==> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_c_1.clone(), claim_a_2_b_2.clone()],
+                &vec![],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_2_b_2.clone(), claim_a_1_c_1.clone()]);
+        assert_eq!(essential_passive_claims, vec![]);
+
+        //  A     B     C
+        //  1 --------> 1 (not redundant, not between same elements)
+        //  2 --> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![],
+                &vec![claim_a_1_c_1.clone(), claim_a_2_b_2.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![]);
+        assert_eq!(essential_passive_claims, vec![claim_a_2_b_2.clone(), claim_a_1_c_1.clone()]);
+
+        //  A     B     C
+        //  1 ==> 1 ==> 1 (not redundant, A@2=>C@2 cannot satisfy B@1=>C@1, not between same elements)
+        //  2 ========> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone(), claim_a_2_c_2.clone()],
+                &vec![],
+            );
+        assert_eq!(
+            essential_active_claims,
+            vec![claim_a_1_b_1.clone(), claim_a_2_c_2.clone(), claim_b_1_c_1.clone()]
+        );
+        assert_eq!(essential_passive_claims, vec![]);
+
+        //  A     B     C
+        //  1 ==> 1 --> 1 (not redundant, A@2=>C@2 - B@1->C@1, not between same elements)
+        //  2 ========> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_b_1.clone(), claim_a_2_c_2.clone()],
+                &vec![claim_b_1_c_1.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_1_b_1.clone(), claim_a_2_c_2.clone()]);
+        assert_eq!(essential_passive_claims, vec![claim_b_1_c_1.clone()]);
+
+        //  A     B     C
+        //  1 ==> 1 ==> 1 (not redundant, A@2->C@2 - B@1=>C@1, not between same elements)
+        //  2 --------> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone()],
+                &vec![claim_a_2_c_2.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone()]);
+        assert_eq!(essential_passive_claims, vec![claim_a_2_c_2.clone()]);
+
+        //  A     B     C
+        //  1 ==> 1 --> 1 (not redundant, A@2->C@2 - B@1->C@1, not between same elements)
+        //  2 --------> 2
+        let (essential_active_claims, essential_passive_claims) =
+            broker.catalog.filter_out_redundant_claims(
+                &vec![claim_a_1_b_1.clone()],
+                &vec![claim_b_1_c_1.clone(), claim_a_2_c_2.clone()],
+            );
+        assert_eq!(essential_active_claims, vec![claim_a_1_b_1.clone()]);
+        assert_eq!(essential_passive_claims, vec![claim_a_2_c_2.clone(), claim_b_1_c_1.clone()]);
     }
 
     #[fuchsia::test]
