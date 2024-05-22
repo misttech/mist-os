@@ -127,20 +127,20 @@ minimal binary in an empty container.
 ### Getting a shell
 
 Running a shell first requires running a container that has a shell binary. In
-this example, let's use the bionic container:
+this example, let's use the Alpine container:
 ```
-ffx component run /core/starnix_runner/playground:bionic fuchsia-pkg://fuchsia.com/bionic#meta/bionic_container.cm
+ffx component run /core/starnix_runner/playground:alpine fuchsia-pkg://fuchsia.com/alpine#meta/alpine_container.cm
 ```
 
-Note that the bionic container is not included in the build by default, so
-you'll need to add `//src/starnix/containers/bionic:bionic_package` to your
+Note that the alpine container is not included in the build by default, so
+you'll need to add `//src/starnix/containers/alpine:alpine_package` to your
 build targets.
 
 Once you have this Starnix container running, you can attach a console to that
 container and run a shell by running:
 
 ```sh
-ffx starnix console -m /core/starnix_runner/playground:bionic /bin/sh
+ffx starnix console -m /core/starnix_runner/playground:alpine /bin/sh
 ```
 
 This command assumes the container has a shell binary at `/bin/sh`. If you wish
@@ -270,14 +270,14 @@ You can view Inspect data exposed by starnix using `ffx inspect`.
 To view the thread groups currently running, run:
 
 ```
-ffx inspect show core/starnix_runner/bionic:root/container/kernel/thread_groups
+ffx inspect show core/starnix_runner/alpine:root/container/kernel/thread_groups
 ```
 
 You can also view the number of syscalls that have been executed (after enabling
 the "syscall_stats" feature):
 
 ```
-ffx inspect show core/starnix_runner/bionic:root:syscall_stats
+ffx inspect show core/starnix_runner/alpine:root:syscall_stats
 ```
 
 ## Logging
