@@ -7,8 +7,9 @@ use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
-use starnix_sync::Mutex;
-use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, PortWaitResult};
+use starnix_sync::{
+    EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,
+};
 use starnix_uapi::{
     error,
     errors::{Errno, EINTR},
@@ -729,6 +730,10 @@ impl Drop for SimpleWaiter {
 enum WaiterKind {
     Port(Weak<PortWaiter>),
     Event(Weak<InterruptibleEvent>),
+    // TODO(https://fxbug.dev/332317144): Use to consume network async FIDL
+    // helpers while implementing TUN support.
+    #[allow(unused)]
+    AbortHandle(Weak<futures::stream::AbortHandle>),
 }
 
 impl Default for WaiterKind {
@@ -751,10 +756,18 @@ impl WaiterRef {
         WaiterRef(WaiterKind::Event(Arc::downgrade(event)))
     }
 
+    // TODO(https://fxbug.dev/332317144): Use to consume network async FIDL
+    // helpers while implementing TUN support.
+    #[allow(unused)]
+    pub(crate) fn from_abort_handle(handle: &Arc<futures::stream::AbortHandle>) -> WaiterRef {
+        WaiterRef(WaiterKind::AbortHandle(Arc::downgrade(handle)))
+    }
+
     pub fn is_valid(&self) -> bool {
         match &self.0 {
             WaiterKind::Port(waiter) => waiter.strong_count() != 0,
             WaiterKind::Event(event) => event.strong_count() != 0,
+            WaiterKind::AbortHandle(handle) => handle.strong_count() != 0,
         }
     }
 
@@ -768,6 +781,11 @@ impl WaiterRef {
             WaiterKind::Event(event) => {
                 if let Some(event) = event.upgrade() {
                     event.interrupt();
+                }
+            }
+            WaiterKind::AbortHandle(handle) => {
+                if let Some(handle) = handle.upgrade() {
+                    handle.abort();
                 }
             }
         }
@@ -803,6 +821,8 @@ impl WaiterRef {
     ///
     /// If the client is using an `SimpleWaiter`, they will be notified but they will not learn
     /// which events occurred.
+    ///
+    /// If the client is using an `AbortHandle`, `AbortHandle::abort()` will be called.
     fn notify(&self, key: &WaitKey, events: WaitEvents) -> bool {
         match &self.0 {
             WaiterKind::Port(waiter) => {
@@ -814,6 +834,12 @@ impl WaiterRef {
             WaiterKind::Event(event) => {
                 if let Some(event) = event.upgrade() {
                     event.notify();
+                    return true;
+                }
+            }
+            WaiterKind::AbortHandle(handle) => {
+                if let Some(handle) = handle.upgrade() {
+                    handle.abort();
                     return true;
                 }
             }
@@ -845,6 +871,7 @@ impl PartialEq for WaiterRef {
         match (&self.0, &other.0) {
             (WaiterKind::Port(lhs), WaiterKind::Port(rhs)) => Weak::ptr_eq(lhs, rhs),
             (WaiterKind::Event(lhs), WaiterKind::Event(rhs)) => Weak::ptr_eq(lhs, rhs),
+            (WaiterKind::AbortHandle(lhs), WaiterKind::AbortHandle(rhs)) => Weak::ptr_eq(lhs, rhs),
             _ => false,
         }
     }
@@ -1038,6 +1065,7 @@ mod tests {
             eventfd::{new_eventfd, EventFdType},
         },
     };
+    use assert_matches::assert_matches;
     use starnix_uapi::open_flags::OpenFlags;
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
@@ -1179,5 +1207,30 @@ mod tests {
         // Only the remaining (unnotified) waiters should be notified.
         queue.notify_all();
         assert_eq!(total_waiters - INITIAL_NOTIFY_COUNT, woken());
+    }
+
+    #[::fuchsia::test]
+    fn waiter_kind_abort_handle() {
+        let mut executor = fuchsia_async::TestExecutor::new();
+        let (_kernel, current_task) = create_kernel_and_task();
+        let (abort_handle, abort_registration) = futures::stream::AbortHandle::new_pair();
+        let abort_handle = Arc::new(abort_handle);
+        let waiter_ref = WaiterRef::from_abort_handle(&abort_handle);
+
+        let mut fut =
+            futures::stream::Abortable::new(futures::future::pending::<()>(), abort_registration);
+
+        assert_matches!(executor.run_until_stalled(&mut fut), std::task::Poll::Pending);
+
+        waiter_ref.interrupt();
+        let output =
+            current_task.run_in_state(RunState::Waiter(waiter_ref), move || {
+                match executor.run_singlethreaded(&mut fut) {
+                    Ok(()) => unreachable!("future never terminates normally"),
+                    Err(futures::stream::Aborted) => Ok(()),
+                }
+            });
+
+        assert_eq!(output, Ok(()));
     }
 }
