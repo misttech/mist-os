@@ -85,7 +85,7 @@ struct EmulatorWatcherHandler {
     cutoff: Duration,
 }
 #[tracing::instrument()]
-pub async fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher> {
+pub fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher> {
     let (emu_instance_tx, emu_instance_rx) = mpsc::channel::<EmulatorInstanceEvent>(100);
     if !instance_root.exists() {
         create_dir_all(&instance_root).context("Creating instance root directory")?;

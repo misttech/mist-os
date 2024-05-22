@@ -107,10 +107,7 @@ struct EmulatorWatcher {
 }
 
 impl EmulatorWatcher {
-    async fn new(
-        instance_root: PathBuf,
-        sender: UnboundedSender<Result<TargetEvent>>,
-    ) -> Result<Self> {
+    fn new(instance_root: PathBuf, sender: UnboundedSender<Result<TargetEvent>>) -> Result<Self> {
         let emu_instances = EmulatorInstances::new(instance_root.clone());
         let existing = emulator_instance::get_all_targets(&emu_instances)?;
         for i in existing {
@@ -123,7 +120,7 @@ impl EmulatorWatcher {
 
         // Emulator (and therefore notify thread) lifetime should last as long as the task,
         // because it is moved into the loop
-        let mut watcher = emulator_instance::start_emulator_watching(instance_root.clone()).await?;
+        let mut watcher = emulator_instance::start_emulator_watching(instance_root.clone())?;
         let task = Task::local(async move {
             loop {
                 if let Some(act) = watcher.emulator_target_detected().await {
@@ -179,6 +176,103 @@ where
     }
 }
 
+pub trait TargetEventStream: Stream<Item = Result<TargetEvent>> + std::marker::Unpin {}
+
+impl TargetEventStream for TargetStream {}
+
+pub trait TargetDiscovery<F> {
+    fn discover_devices(
+        &self,
+        filter: F,
+    ) -> impl std::future::Future<Output = Result<impl TargetEventStream>>;
+}
+
+pub struct DiscoveryBuilder {
+    emulator_instance_root: Option<PathBuf>,
+    notify_added: bool,
+    notify_removed: bool,
+    sources: DiscoverySources,
+}
+
+impl DiscoveryBuilder {
+    pub fn set_source(mut self, source: DiscoverySources) -> Self {
+        self.sources = source;
+        self
+    }
+
+    pub fn with_source(mut self, source: DiscoverySources) -> Self {
+        self.sources.insert(source);
+        self
+    }
+
+    pub fn with_emulator_instance_root(mut self, emulator_instance_root: PathBuf) -> Self {
+        self.emulator_instance_root = Some(emulator_instance_root);
+        self.sources.insert(DiscoverySources::EMULATOR);
+        self
+    }
+
+    pub fn notify_added(mut self, notify_added: bool) -> Self {
+        self.notify_added = notify_added;
+        self
+    }
+
+    pub fn notify_removed(mut self, notify_removed: bool) -> Self {
+        self.notify_removed = notify_removed;
+        self
+    }
+
+    pub fn build(self) -> Discovery {
+        Discovery {
+            emulator_instance_root: self.emulator_instance_root,
+            notify_added: self.notify_added,
+            notify_removed: self.notify_removed,
+            sources: self.sources,
+        }
+    }
+}
+
+impl Default for DiscoveryBuilder {
+    fn default() -> Self {
+        Self {
+            emulator_instance_root: None,
+            notify_added: true,
+            notify_removed: true,
+            sources: DiscoverySources::default(),
+        }
+    }
+}
+
+pub struct Discovery {
+    emulator_instance_root: Option<PathBuf>,
+    notify_added: bool,
+    notify_removed: bool,
+    sources: DiscoverySources,
+}
+
+impl Discovery {
+    pub fn builder() -> DiscoveryBuilder {
+        DiscoveryBuilder::default()
+    }
+}
+
+impl<F> TargetDiscovery<F> for Discovery
+where
+    F: TargetFilter,
+{
+    #[allow(refining_impl_trait)]
+    async fn discover_devices(&self, filter: F) -> Result<TargetStream> {
+        let stream = wait_for_devices(
+            filter,
+            self.emulator_instance_root.clone(),
+            self.notify_added,
+            self.notify_removed,
+            self.sources,
+        )
+        .await?;
+        Ok(stream)
+    }
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct DiscoverySources: u8 {
@@ -188,6 +282,13 @@ bitflags! {
         const EMULATOR = 1 << 3;
     }
 }
+
+impl Default for DiscoverySources {
+    fn default() -> Self {
+        DiscoverySources::all()
+    }
+}
+
 pub async fn wait_for_devices<F>(
     filter: F,
     emulator_instance_root: Option<PathBuf>,
@@ -258,13 +359,14 @@ where
     let emulator_watcher = if sources.contains(DiscoverySources::EMULATOR) {
         let emulator_sender = sender.clone();
         if let Some(instance_root) = emulator_instance_root {
-            Some(EmulatorWatcher::new(instance_root, emulator_sender).await?)
+            Some(EmulatorWatcher::new(instance_root, emulator_sender)?)
         } else {
             None
         }
     } else {
         None
     };
+
     Ok(TargetStream {
         filter: Some(Box::new(filter)),
         queue,
@@ -464,18 +566,165 @@ impl Stream for TargetStream {
     }
 }
 
-// TODO(colnnelson): Should add a builder struct to allow for building of
-// custom TargetStreams
-
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::*;
     use futures::StreamExt;
     use manual_targets::watcher::ManualTarget;
     use pretty_assertions::assert_eq;
     use std::fs::File;
+    use std::io::Write;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
     use std::str::FromStr;
+    use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+
+    /// Used for testing functions that take a TargetDiscovery<TargetFilter>
+    ///
+    /// In discover_devices the `filter` parameter is explicitly not used.
+    /// Test authors are expected to pass the VecDeque with the events "pre filtered"
+    /// You should have separate tests for your TargetFilter impls
+    pub struct TestDiscovery {
+        events: Rc<RefCell<VecDeque<Result<TargetEvent>>>>,
+    }
+
+    impl<F> TargetDiscovery<F> for TestDiscovery
+    where
+        F: TargetFilter,
+    {
+        #[allow(refining_impl_trait)]
+        async fn discover_devices(&self, _filter: F) -> Result<TestTargetStream> {
+            Ok(TestTargetStream { events: self.events.clone() })
+        }
+    }
+
+    pub struct TestTargetStream {
+        events: Rc<RefCell<VecDeque<Result<TargetEvent>>>>,
+    }
+
+    impl TargetEventStream for TestTargetStream {}
+
+    impl Stream for TestTargetStream {
+        type Item = Result<TargetEvent>;
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            let event = self.events.borrow_mut().pop_front();
+            Poll::Ready(event)
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Example TestDiscovery Usage
+    ///////////////////////////////////////////////////////////////////////////
+
+    fn write_target_event<W: Write>(writer: &mut W, event: TargetEvent) -> Result<()> {
+        let symbol = match event {
+            TargetEvent::Added(_) => "+",
+            TargetEvent::Removed(_) => "-",
+        };
+
+        let handle = match event {
+            TargetEvent::Added(handle) => handle,
+            TargetEvent::Removed(handle) => handle,
+        };
+
+        let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+        let state = handle.state;
+
+        writeln!(writer, "{symbol}  {node_name}  {state}")?;
+        Ok(())
+    }
+
+    /// Writes the events in a target event stream to the given writer
+    async fn write_event_stream(writer: &mut impl Write, mut stream: impl TargetEventStream) {
+        while let Some(s) = stream.next().await {
+            if let Ok(event) = s {
+                let _ = write_target_event(writer, event);
+            }
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_write_event_stream() -> Result<()> {
+        let mut writer = vec![];
+        let disco = TestDiscovery {
+            events: Rc::new(RefCell::new(VecDeque::from([
+                Ok(TargetEvent::Added(TargetHandle {
+                    node_name: Some("magnus".to_string()),
+                    state: TargetState::Unknown,
+                })),
+                Ok(TargetEvent::Added(TargetHandle {
+                    node_name: Some("abagail".to_string()),
+                    state: TargetState::Unknown,
+                })),
+                Ok(TargetEvent::Removed(TargetHandle {
+                    node_name: Some("abagail".to_string()),
+                    state: TargetState::Unknown,
+                })),
+            ]))),
+        };
+
+        let stream = disco.discover_devices(|_: &_| true).await?;
+
+        write_event_stream(&mut writer, stream).await;
+
+        assert_eq!(
+            String::from_utf8(writer).expect("we write uft8"),
+            r#"+  magnus  Unknown
++  abagail  Unknown
+-  abagail  Unknown
+"#
+        );
+
+        Ok(())
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Test DiscoveryBuilder
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_discovery_builder_default() -> Result<()> {
+        let discovery = Discovery::builder().build();
+        assert_eq!(discovery.notify_added, true);
+        assert_eq!(discovery.notify_removed, true);
+        assert_eq!(discovery.sources, DiscoverySources::all());
+        assert!(discovery.emulator_instance_root.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_discovery_builder_changes() -> Result<()> {
+        let discovery = Discovery::builder()
+            .notify_added(false)
+            .notify_removed(false)
+            .set_source(DiscoverySources::MANUAL)
+            .with_source(DiscoverySources::EMULATOR)
+            .set_source(DiscoverySources::MDNS)
+            .with_source(DiscoverySources::USB)
+            .build();
+        assert_eq!(discovery.notify_added, false);
+        assert_eq!(discovery.notify_removed, false);
+        assert_eq!(discovery.sources, DiscoverySources::USB | DiscoverySources::MDNS);
+        assert!(discovery.emulator_instance_root.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_discovery_builder_with_root() -> Result<()> {
+        let discovery = Discovery::builder()
+            .set_source(DiscoverySources::MANUAL)
+            .with_emulator_instance_root(PathBuf::from_str("/tmp").expect("tmp is a valid path"))
+            .build();
+
+        assert_eq!(discovery.notify_added, true);
+        assert_eq!(discovery.notify_removed, true);
+        assert_eq!(discovery.sources, DiscoverySources::MANUAL | DiscoverySources::EMULATOR);
+        assert_eq!(
+            discovery.emulator_instance_root,
+            Some(PathBuf::from_str("/tmp").expect("tmp is a valid path"))
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_from_fastbootevent_for_targetevent() -> Result<()> {
@@ -955,7 +1204,6 @@ mod test {
     }
 
     fn build_instance_file(dir: &PathBuf, name: &str) -> Result<File> {
-        use std::io::Write;
         let new_instance_dir = dir.join(String::from(name));
         std::fs::create_dir_all(&new_instance_dir)?;
         let new_instance_engine_file = new_instance_dir.join("engine.json");
