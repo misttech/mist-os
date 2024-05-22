@@ -36,15 +36,9 @@ struct FdTableId {
 
 struct FdTableEntry {
  public:
-  FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags)
-      : file(std::move(_file)), fd_table_id_(fd_table_id), flags_(flags) {}
-  ~FdTableEntry();
-
   FileHandle file;
 
  private:
-  friend class FdTable;
-
   // Identifier of the FdTable containing this entry.
   FdTableId fd_table_id_;
 
@@ -52,12 +46,27 @@ struct FdTableEntry {
   // as a bitfield over the file descriptors because there is only one flag
   // currently (CLOEXEC) and file descriptor numbers tend to cluster near 0.
   FdFlags flags_;
+
+ public:
+  FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags)
+      : file(std::move(_file)), fd_table_id_(fd_table_id), flags_(flags) {}
+  ~FdTableEntry();
+
+ private:
+  friend class FdTable;
 };
 
 /// Having the map a separate data structure allows us to memoize next_fd, which is the
 /// lowest numbered file descriptor not in use.
 class FdTableStore {
+ private:
+  std::vector<ktl::optional<FdTableEntry>> entries_ = {};
+
+  FdNumber next_fd_ = FdNumber::from_raw(0);
+
  public:
+  /// impl FdTableStore
+
   fit::result<Errno, ktl::optional<FdTableEntry>> insert_entry(FdNumber fd, uint64_t rlimit,
                                                                FdTableEntry entry);
 
@@ -71,9 +80,6 @@ class FdTableStore {
  private:
   friend class FdTableInner;
   friend class FdTable;
-
-  std::vector<ktl::optional<FdTableEntry>> entries_ = {};
-  FdNumber next_fd_ = FdNumber::from_raw(0);
 };
 
 class FdTableInner : public fbl::RefCounted<FdTableInner> {
@@ -90,6 +96,7 @@ class Task;
 class FdTable {
  public:
   static FdTable Create();
+
   FdTable(const FdTable& other) { inner_.Lock()->swap(*other.inner_.Lock()); }
 
   FdTableId id() const { return inner_.Lock()->get()->id(); }
@@ -106,6 +113,8 @@ class FdTable {
 
   fit::result<Errno> close(FdNumber fd) const;
 
+  fit::result<Errno, FdFlags> get_fd_flags(FdNumber fd) const;
+
   // Drop the fd table, closing any files opened exclusively by this table.
   void release() const { inner_.Lock()->reset(); }
 
@@ -116,5 +125,10 @@ class FdTable {
 };
 
 }  // namespace starnix
+
+template <>
+constexpr Flag<starnix::FdFlagsEnum> Flags<starnix::FdFlagsEnum>::FLAGS[] = {
+    {starnix::FdFlagsEnum::CLOEXEC},
+};
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_

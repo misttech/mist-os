@@ -7,6 +7,7 @@ import("//build/zbi/zbi_input.gni")
 
 source_set("tests") {
   sources = [
+    "arch/${current_cpu}/syscalls-test.cc",
     "atomic_counter-test.cc",
     "current_task-test.cc",
     "fd_table-test.cc",
@@ -23,6 +24,7 @@ source_set("tests") {
     "task/syscalls-test.cc",
     "thread_group-test.cc",
     "tmpfs-test.cc",
+    "vfs/syscalls-test.cc",
   ]
   deps = [
     "../testing",

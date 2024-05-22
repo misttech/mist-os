@@ -1,4 +1,5 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -9,6 +10,7 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
+#include <lib/mistos/starnix/kernel/vfs/forward.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -310,6 +312,10 @@ class Task : public fbl::RefCountedUpgradeable<Task> {
                                ktl::optional<zx::thread> thread, FdTable files,
                                fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
                                Credentials creds);
+
+  fit::result<Errno, FdNumber> add_file(FileHandle file, FdFlags flags) const {
+    return files.add_with_flags(*this, file, flags);
+  }
 
   Credentials creds() const { return (*persistent_info.Lock())->creds(); }
 

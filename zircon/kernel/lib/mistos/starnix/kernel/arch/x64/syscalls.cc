@@ -9,11 +9,31 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
+#include <lib/mistos/starnix/kernel/vfs/syscalls.h>
+#include <lib/mistos/starnix_uapi/open_flags.h>
 
 namespace starnix {
 
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
+fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
+                                       starnix_uapi::UserCString user_path,
+                                       starnix_uapi::FileMode mode) {
+  return sys_open(current_task, user_path,
+                  (OpenFlags(OpenFlagsEnum::WRONLY) | OpenFlags(OpenFlagsEnum::CREAT) |
+                   OpenFlags(OpenFlagsEnum::TRUNC))
+                      .bits(),
+                  mode);
+}
+
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
   return fit::ok(current_task->thread_group->read().process_group->leader);
+}
+
+fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
+                                      starnix_uapi::UserCString user_path, uint32_t flags,
+                                      starnix_uapi::FileMode mode) {
+  return sys_openat(current_task, FdNumber::_AT_FDCWD, user_path, flags, mode);
 }
 
 }  // namespace starnix

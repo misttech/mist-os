@@ -6,8 +6,8 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("kernel") {
   sources = [
-    "arch/x64/loader.cc",
-    "arch/x64/syscalls.cc",
+    "arch/${current_cpu}/loader.cc",
+    "arch/${current_cpu}/syscalls.cc",
     "debugcommands.cc",
     "execution/executor.cc",
     "fs/mistos/syslog.cc",
@@ -40,6 +40,7 @@ zx_library("kernel") {
     "vfs/fs_node.cc",
     "vfs/module.cc",
     "vfs/namespace.cc",
+    "vfs/syscalls.cc",
     "vfs/vmo_file.cc",
     "vfs/xattr.cc",
     "zircon/task_dispatcher.cc",

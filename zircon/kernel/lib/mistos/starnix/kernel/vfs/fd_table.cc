@@ -16,9 +16,9 @@
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
-namespace starnix {
-
 using namespace starnix_uapi;
+
+namespace starnix {
 
 FdTableEntry::~FdTableEntry() {
   LTRACEF_LEVEL(3, "fd_table_id %zx\n", fd_table_id_.id);
@@ -170,6 +170,14 @@ fit::result<Errno> FdTable::close(FdNumber fd) const {
   } else {
     return fit::error(errno(EBADF));
   }
+}
+
+fit::result<Errno, FdFlags> FdTable::get_fd_flags(FdNumber fd) const {
+  auto result = get_allowing_opath_with_flags(fd);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  return fit::ok(result->second);
 }
 
 }  // namespace starnix

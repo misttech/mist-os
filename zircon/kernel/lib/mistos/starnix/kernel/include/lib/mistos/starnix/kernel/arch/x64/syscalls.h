@@ -7,13 +7,22 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/starnix_uapi/file_mode.h>
+#include <lib/mistos/starnix_uapi/user_address.h>
 
 namespace starnix {
 
 class CurrentTask;
 
+fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
+                                       starnix_uapi::UserCString user_path,
+                                       starnix_uapi::FileMode mode);
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task);
+fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
+                                   starnix_uapi::UserCString user_path, uint32_t flags,
+                                   starnix_uapi::FileMode mode);
 
 }  // namespace starnix
 

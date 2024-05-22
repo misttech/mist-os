@@ -48,6 +48,9 @@ class AutoReleasableTask {
   ktl::optional<starnix::CurrentTask> task_;
 };
 
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+create_kernel_task_and_unlocked_with_pkgfs();
+
 ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_and_task();
 
 // Creates a new `Task` in the provided kernel.
