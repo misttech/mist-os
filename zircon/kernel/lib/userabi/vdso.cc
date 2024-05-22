@@ -196,6 +196,39 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
   ASSERT(ticks_to_mono_ratio.numerator() != 0);
   ASSERT(ticks_to_mono_ratio.denominator() != 0);
 
+  // Check if usermode can access ticks.
+  const bool usermode_can_access_ticks =
+      platform_usermode_can_access_tick_registers() && !gBootOptions->vdso_ticks_get_force_syscall;
+  bool needs_a73_mitigation = false;
+#if ARCH_ARM64
+  // We only need to install the A73 quirks for zx_ticks_get if we can access ticks from usermode.
+  if (usermode_can_access_ticks) {
+    // Before we got here (during an INIT_HOOK run at LK_INIT_LEVEL_USER - 1),
+    // we should have already waited for all of the CPUs in the system to have
+    // started up and checked in.
+    //
+    // Now that all CPUs have started, it should be safe to check whether or not
+    // we need to deploy the ARM A73 timer read mitigation. In the case that the
+    // CPUs did not all manage to start, go ahead and install the mitigation
+    // anyway. This would be a bad situation, and the mitigation is slower then
+    // the alternative if it is not needed, but at least it will read correctly
+    // on all cores.
+    //
+    // see arch/quirks.h for details about the quirk itself.
+    const zx_status_t wait_status = mp_wait_for_all_cpus_ready(Deadline::no_slack(0));
+    if ((wait_status != ZX_OK) || arch_quirks_needs_arm_erratum_858921_mitigation()) {
+      if (wait_status != ZX_OK) {
+        dprintf(ALWAYS,
+                "WARNING: Timed out waiting for all CPUs to start.  "
+                "Installing A73 quirks for zx_ticks_get in VDSO as a defensive measure.\n");
+      } else {
+        dprintf(INFO, "Installing A73 quirks for zx_ticks_get in VDSO\n");
+      }
+      needs_a73_mitigation = true;
+    }
+  }
+#endif
+
   // Initialize the time values that should be visible to the vDSO.
   internal::TimeValues values = {
       .version = 1,
@@ -203,13 +236,8 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
       .raw_ticks_to_ticks_offset = platform_get_raw_ticks_to_ticks_offset(),
       .ticks_to_mono_numerator = ticks_to_mono_ratio.numerator(),
       .ticks_to_mono_denominator = ticks_to_mono_ratio.denominator(),
-      .usermode_can_access_ticks = platform_usermode_can_access_tick_registers() &&
-                                   !gBootOptions->vdso_ticks_get_force_syscall,
-#if ARCH_ARM64
-      .use_a73_errata_mitigation = arch_quirks_needs_arm_erratum_858921_mitigation(),
-#else
-      .use_a73_errata_mitigation = false,
-#endif
+      .usermode_can_access_ticks = usermode_can_access_ticks,
+      .use_a73_errata_mitigation = needs_a73_mitigation,
   };
 
   // Write the time values to the appropriate section in the vDSO.
@@ -279,33 +307,6 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
   if (need_syscall_for_ticks) {
     REDIRECT_SYSCALL(mutator, zx_ticks_get, SYSCALL_zx_ticks_get_via_kernel);
   }
-#if ARCH_ARM64
-  else {
-    // Before we got here (during an INIT_HOOK run at LK_INIT_LEVEL_USER - 1),
-    // we should have already waited for all of the CPUs in the system to have
-    // started up and checked in.
-    //
-    // Now that all CPUs have started, it should be safe to check whether or not
-    // we need to deploy the ARM A73 timer read mitigation. In the case that the
-    // CPUs did not all manage to start, go ahead and install the mitigation
-    // anyway. This would be a bad situation, and the mitigation is slower then
-    // the alternative if it is not needed, but at least it will read correctly
-    // on all cores.
-    //
-    // see arch/quirks.h for details about the quirk itself.
-    const zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::no_slack(0));
-    if ((status != ZX_OK) || arch_quirks_needs_arm_erratum_858921_mitigation()) {
-      if (status != ZX_OK) {
-        dprintf(ALWAYS,
-                "WARNING: Timed out waiting for all CPUs to start.  "
-                "Installing A73 quirks for zx_ticks_get in VDSO as a defensive measure.\n");
-      } else {
-        dprintf(INFO, "Installing A73 quirks for zx_ticks_get in VDSO\n");
-      }
-      REDIRECT_SYSCALL(mutator, zx_ticks_get, ticks_get_arm_a73);
-    }
-  }
-#endif
 
   if (gBootOptions->vdso_clock_get_monotonic_force_syscall) {
     // Force a syscall for zx_clock_get_monotonic if instructed to do so by the
