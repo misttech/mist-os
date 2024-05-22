@@ -1547,7 +1547,7 @@ fn dispatch_receive_ipv4_packet<
         return Ok(());
     };
 
-    core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+    core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &device);
 
     let buffer = Buf::new(packet.body_mut(), ..);
 
@@ -1641,7 +1641,7 @@ fn dispatch_receive_ipv6_packet<
         return Ok(());
     };
 
-    core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+    core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &device);
 
     let buffer = Buf::new(packet.body_mut(), ..);
 

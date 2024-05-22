@@ -12,6 +12,7 @@ use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_core::{
+    device::DeviceId,
     ip::{
         RawIpSocketId, RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
     },
@@ -36,11 +37,12 @@ impl RawIpSocketsBindingsTypes for BindingsCtx {
     type RawIpSocketState<I: Ip> = SocketState;
 }
 
-impl<I: IpExt> RawIpSocketsBindingsContext<I> for BindingsCtx {
+impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for BindingsCtx {
     fn receive_packet<B: ByteSlice>(
         &self,
         _socket: &RawIpSocketId<I, Self>,
         _packet: &I::Packet<B>,
+        _device: &DeviceId<Self>,
     ) {
         // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
     }

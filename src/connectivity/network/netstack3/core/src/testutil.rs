@@ -1264,11 +1264,12 @@ impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for Fake
     }
 }
 
-impl<I: crate::IpExt> RawIpSocketsBindingsContext<I> for FakeBindingsCtx {
+impl<I: crate::IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_packet<B: ByteSlice>(
         &self,
         _socket: &RawIpSocketId<I, Self>,
         _packet: &I::Packet<B>,
+        _device: &DeviceId<Self>,
     ) {
         unimplemented!()
     }

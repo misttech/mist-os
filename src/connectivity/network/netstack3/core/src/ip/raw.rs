@@ -14,6 +14,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     context::{ContextPair, ReferenceNotifiers, ReferenceNotifiersExt as _},
+    device::{AnyDevice, DeviceIdContext},
     ip::raw::{
         protocol::RawIpSocketProtocol,
         state::{RawIpSocketLockedState, RawIpSocketState},
@@ -36,11 +37,16 @@ pub trait RawIpSocketsBindingsTypes {
 }
 
 /// Functionality provided by bindings used in the raw IP socket implementation.
-pub trait RawIpSocketsBindingsContext<I: RawIpSocketsIpExt>:
+pub trait RawIpSocketsBindingsContext<I: RawIpSocketsIpExt, D>:
     RawIpSocketsBindingsTypes + Sized
 {
     /// Called for each received IP packet that matches the provided socket.
-    fn receive_packet<B: ByteSlice>(&self, socket: &RawIpSocketId<I, Self>, packet: &I::Packet<B>);
+    fn receive_packet<B: ByteSlice>(
+        &self,
+        socket: &RawIpSocketId<I, Self>,
+        packet: &I::Packet<B>,
+        device: &D,
+    );
 }
 
 /// The raw IP socket API.
@@ -257,25 +263,29 @@ pub trait RawIpSocketMapContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTy
 }
 
 /// A type that provides the raw IP socket functionality required by core.
-pub(crate) trait RawIpSocketHandler<I: RawIpSocketsIpExt, BC> {
+pub(crate) trait RawIpSocketHandler<I: RawIpSocketsIpExt, BC>:
+    DeviceIdContext<AnyDevice>
+{
     /// Deliver a received IP packet to all appropriate raw IP sockets.
     fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &I::Packet<B>,
+        device: &Self::DeviceId,
     );
 }
 
 impl<I, BC, CC> RawIpSocketHandler<I, BC> for CC
 where
     I: RawIpSocketsIpExt,
-    BC: RawIpSocketsBindingsContext<I>,
-    CC: RawIpSocketMapContext<I, BC>,
+    BC: RawIpSocketsBindingsContext<I, CC::DeviceId>,
+    CC: RawIpSocketMapContext<I, BC> + DeviceIdContext<AnyDevice>,
 {
     fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &I::Packet<B>,
+        device: &CC::DeviceId,
     ) {
         let protocol = RawIpSocketProtocol::new(packet.proto());
 
@@ -295,7 +305,7 @@ where
                 // before delivering.
                 // TODO(https://fxbug.dev/337818991): Check bound device before
                 // delivering.
-                bindings_ctx.receive_packet(socket, packet)
+                bindings_ctx.receive_packet(socket, packet, device)
             })
         })
     }
@@ -306,7 +316,7 @@ mod test {
     use super::*;
 
     use alloc::{vec, vec::Vec};
-    use core::convert::Infallible as Never;
+    use core::{convert::Infallible as Never, marker::PhantomData};
     use ip_test_macro::ip_test;
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
     use netstack3_base::sync::DynDebugReferences;
@@ -316,45 +326,63 @@ mod test {
 
     use crate::{
         context::{ContextProvider, CtxPair},
+        device::testutil::{FakeStrongDeviceId, MultipleDevicesId},
         sync::Mutex,
     };
 
-    #[derive(Default, Debug)]
-    struct FakeExternalSocketState {
+    #[derive(Derivative, Debug)]
+    #[derivative(Default(bound = ""))]
+    struct FakeExternalSocketState<D> {
         /// The collection of IP packets received on this socket.
-        received_packets: Mutex<Vec<Vec<u8>>>,
+        received_packets: Mutex<Vec<ReceivedIpPacket<D>>>,
     }
 
-    #[derive(Default)]
-    struct FakeBindingsCtx {}
-    #[derive(Default)]
-    struct FakeCoreCtx<I: RawIpSocketsIpExt> {
-        socket_map: RawIpSocketMap<I, FakeBindingsCtx>,
+    #[derive(Debug, PartialEq)]
+    struct ReceivedIpPacket<D> {
+        data: Vec<u8>,
+        device: D,
     }
 
-    impl RawIpSocketsBindingsTypes for FakeBindingsCtx {
-        type RawIpSocketState<I: Ip> = FakeExternalSocketState;
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    struct FakeBindingsCtx<D> {
+        _device_id_type: PhantomData<D>,
+    }
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    struct FakeCoreCtx<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> {
+        socket_map: RawIpSocketMap<I, FakeBindingsCtx<D>>,
     }
 
-    impl<I: RawIpSocketsIpExt> RawIpSocketsBindingsContext<I> for FakeBindingsCtx {
+    impl<D: FakeStrongDeviceId> RawIpSocketsBindingsTypes for FakeBindingsCtx<D> {
+        type RawIpSocketState<I: Ip> = FakeExternalSocketState<D>;
+    }
+
+    impl<I: RawIpSocketsIpExt, D: Copy + FakeStrongDeviceId> RawIpSocketsBindingsContext<I, D>
+        for FakeBindingsCtx<D>
+    {
         fn receive_packet<B: ByteSlice>(
             &self,
             socket: &RawIpSocketId<I, Self>,
             packet: &I::Packet<B>,
+            device: &D,
         ) {
+            let packet = ReceivedIpPacket { data: packet.to_vec(), device: *device };
             let FakeExternalSocketState { received_packets } = socket.external_state();
-            received_packets.lock().push(packet.to_vec());
+            received_packets.lock().push(packet);
         }
     }
 
-    impl<I: RawIpSocketsIpExt> RawIpSocketMapContext<I, FakeBindingsCtx> for FakeCoreCtx<I> {
-        fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, FakeBindingsCtx>) -> O>(
+    impl<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> RawIpSocketMapContext<I, FakeBindingsCtx<D>>
+        for FakeCoreCtx<I, D>
+    {
+        fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, FakeBindingsCtx<D>>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
             cb(&self.socket_map)
         }
-        fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, FakeBindingsCtx>) -> O>(
+        fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, FakeBindingsCtx<D>>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
@@ -362,21 +390,21 @@ mod test {
         }
     }
 
-    impl ContextProvider for FakeBindingsCtx {
-        type Context = FakeBindingsCtx;
+    impl<D> ContextProvider for FakeBindingsCtx<D> {
+        type Context = FakeBindingsCtx<D>;
         fn context(&mut self) -> &mut Self::Context {
             self
         }
     }
 
-    impl<I: RawIpSocketsIpExt> ContextProvider for FakeCoreCtx<I> {
-        type Context = FakeCoreCtx<I>;
+    impl<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> ContextProvider for FakeCoreCtx<I, D> {
+        type Context = FakeCoreCtx<I, D>;
         fn context(&mut self) -> &mut Self::Context {
             self
         }
     }
 
-    impl ReferenceNotifiers for FakeBindingsCtx {
+    impl<D> ReferenceNotifiers for FakeBindingsCtx<D> {
         type ReferenceReceiver<T: 'static> = Never;
 
         type ReferenceNotifier<T: Send + 'static> = Never;
@@ -388,8 +416,13 @@ mod test {
         }
     }
 
-    fn new_raw_ip_socket_api<I: RawIpSocketsIpExt>(
-    ) -> RawIpSocketApi<I, CtxPair<FakeCoreCtx<I>, FakeBindingsCtx>> {
+    impl<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeCoreCtx<I, D> {
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
+    }
+
+    fn new_raw_ip_socket_api<I: RawIpSocketsIpExt, D: FakeStrongDeviceId>(
+    ) -> RawIpSocketApi<I, CtxPair<FakeCoreCtx<I, D>, FakeBindingsCtx<D>>> {
         RawIpSocketApi::new(Default::default())
     }
 
@@ -415,14 +448,14 @@ mod test {
     #[test_case(IpProto::Udp; "UDP")]
     #[test_case(IpProto::Reserved; "IPPROTO_RAW")]
     fn create_and_close<I: Ip + RawIpSocketsIpExt>(proto: IpProto) {
-        let mut api = new_raw_ip_socket_api::<I>();
+        let mut api = new_raw_ip_socket_api::<I, MultipleDevicesId>();
         let sock = api.create(RawIpSocketProtocol::new(proto.into()), Default::default());
         let FakeExternalSocketState { received_packets: _ } = api.close(sock).into_removed();
     }
 
     #[ip_test]
     fn receive_ip_packet<I: Ip + RawIpSocketsIpExt>() {
-        let mut api = new_raw_ip_socket_api::<I>();
+        let mut api = new_raw_ip_socket_api::<I, MultipleDevicesId>();
 
         // Create two sockets with the right protocol, and one socket with the
         // wrong protocol.
@@ -434,12 +467,13 @@ mod test {
 
         // Receive an IP packet with protocol `proto`.
         const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        const DEVICE: MultipleDevicesId = MultipleDevicesId::A;
         let buf = new_ip_packet_buf::<I>(&IP_BODY, proto);
         let mut buf_ref = buf.as_ref();
         let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
         {
             let (core_ctx, bindings_ctx) = api.ctx.contexts();
-            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &DEVICE);
         }
 
         let FakeExternalSocketState { received_packets: sock1_packets } =
@@ -450,8 +484,12 @@ mod test {
             api.close(wrong_sock).into_removed();
 
         // Expect delivery to the two right sockets, but not the wrong socket.
-        assert_eq!(&sock1_packets.lock().pop().unwrap()[..], buf.as_ref());
-        assert_eq!(&sock2_packets.lock().pop().unwrap()[..], buf.as_ref());
+        for ReceivedIpPacket { data, device } in
+            [sock1_packets.lock().pop().unwrap(), sock2_packets.lock().pop().unwrap()]
+        {
+            assert_eq!(&data[..], buf.as_ref());
+            assert_eq!(device, DEVICE);
+        }
         assert_eq!(wrong_sock_packets.lock().pop(), None);
     }
 
@@ -459,7 +497,7 @@ mod test {
     // receive packets
     #[ip_test]
     fn cannot_receive_ip_packet_with_proto_raw<I: Ip + RawIpSocketsIpExt>() {
-        let mut api = new_raw_ip_socket_api::<I>();
+        let mut api = new_raw_ip_socket_api::<I, MultipleDevicesId>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
 
         // Try to deliver to an arbitrary proto (UDP), and to the reserved
@@ -476,7 +514,7 @@ mod test {
             let mut buf_ref = buf.as_ref();
             let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
             let (core_ctx, bindings_ctx) = api.ctx.contexts();
-            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &MultipleDevicesId::A);
         }
 
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
