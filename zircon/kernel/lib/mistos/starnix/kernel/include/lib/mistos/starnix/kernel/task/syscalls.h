@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/task/forward.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 
 namespace starnix {
@@ -22,6 +23,11 @@ fit::result<Errno, uid_t> sys_getuid(const CurrentTask& current_task);
 fit::result<Errno, uid_t> sys_getgid(const CurrentTask& current_task);
 fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task);
 fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task);
+
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_prctl(const CurrentTask& current_task,
+                                                              int option, uint64_t arg2,
+                                                              uint64_t arg3, uint64_t arg4,
+                                                              uint64_t arg5);
 
 }  // namespace starnix
 

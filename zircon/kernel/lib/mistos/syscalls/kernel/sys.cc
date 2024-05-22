@@ -70,3 +70,17 @@ long sys_getpgrp() {
   }
   return SyscallResult::From(*syscall_ret).value();
 }
+
+long sys_prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4,
+               unsigned long arg5) {
+  LTRACEF_LEVEL(2, "option %d arg2 0x%lx arg3 0x%lx arg4 0x%lx arg5 0x%lx\n", option, arg2, arg3,
+                arg4, arg5);
+
+  auto ut = ThreadDispatcher::GetCurrent();
+  auto syscall_ret =
+      sys_prctl(CurrentTask::From(TaskBuilder(ut->task()->task())), option, arg2, arg3, arg4, arg5);
+  if (syscall_ret.is_error()) {
+    return syscall_ret.error_value().return_value();
+  }
+  return syscall_ret->value();
+}

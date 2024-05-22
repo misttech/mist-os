@@ -377,10 +377,22 @@ closed protocol Syscall {
     strict PivotRoot() -> () error int64;
     ///STUB 156 Not Implemented syscall
     strict Ni_156() -> () error int64;
-    ///STUB 157
-    strict Prctl() -> () error int64;
-    ///STUB 158
-    strict ArchPrctl() -> () error int64;
+
+    // #157, SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5)
+    strict Prctl(resource struct {
+        option int32;
+        arg2 uint64;
+        arg3 uint64;
+        arg4 uint64;
+        arg5 uint64;
+    }) -> () error int64;
+
+    // #158, SYSCALL_DEFINE2(arch_prctl, int, option, unsigned long, arg2)
+    strict ArchPrctl(resource struct {
+        option int32;
+        arg2 uint64;
+    }) -> () error int64;
+
     ///STUB 159
     strict Adjtimex() -> () error int64;
     ///STUB 160

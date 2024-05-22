@@ -29,6 +29,7 @@ zx_library("syscalls") {
 source_set("impl") {
   visibility = [ ":*" ]
   sources = [
+    "arch/$zircon_cpu/kernel/process_64.cc",
     "arch/$zircon_cpu/kernel/sys_x86_64.cc",
     "drivers/char/random.cc",
     "fs/read_write.cc",
