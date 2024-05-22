@@ -71,19 +71,12 @@ where
         &mut self,
         protocol: RawIpSocketProtocol<I>,
         external_state: <C::BindingsContext as RawIpSocketsBindingsTypes>::RawIpSocketState<I>,
-    ) -> Result<RawIpApiSocketId<I, C>, RawIpSocketCreationError> {
-        // TODO(https://fxbug.dev/339692009): Support IPPROTO_RAW.
-        match protocol {
-            RawIpSocketProtocol::Raw => {
-                return Err(RawIpSocketCreationError::IpProtoRawNotSupported)
-            }
-            RawIpSocketProtocol::Proto(_) => {}
-        }
+    ) -> RawIpApiSocketId<I, C> {
         let socket =
             PrimaryRawIpSocketId(PrimaryRc::new(RawIpSocketState::new(protocol, external_state)));
         let strong = self.core_ctx().with_socket_map_mut(|socket_map| socket_map.insert(socket));
         debug!("created raw IP socket {strong:?}, on protocol {protocol:?}");
-        Ok(strong)
+        strong
     }
 
     /// Removes the raw IP socket from the system, returning its external state.
@@ -108,14 +101,6 @@ where
             |state: RawIpSocketState<I, C::BindingsContext>| state.into_external_state(),
         )
     }
-}
-
-/// Errors that can occur while creating a raw IP socket.
-#[derive(Debug, PartialEq)]
-pub enum RawIpSocketCreationError {
-    /// IPPROTO_RAW (IANA Internet Protocol 255) is not yet supported.
-    // TODO(https://fxbug.dev/339692009): Support IPPROTO_RAW.
-    IpProtoRawNotSupported,
 }
 
 /// The owner of socket state.
@@ -303,13 +288,14 @@ where
 mod test {
     use super::*;
 
-    use alloc::vec::Vec;
+    use alloc::{vec, vec::Vec};
     use core::convert::Infallible as Never;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
+    use net_types::ip::{IpVersion, Ipv4, Ipv6};
     use netstack3_base::sync::DynDebugReferences;
     use packet::{InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
+    use test_case::test_case;
 
     use crate::{
         context::{ContextProvider, CtxPair},
@@ -409,23 +395,12 @@ mod test {
     }
 
     #[ip_test]
-    fn create_and_close<I: Ip + RawIpSocketsIpExt>() {
+    #[test_case(IpProto::Udp; "UDP")]
+    #[test_case(IpProto::Reserved; "IPPROTO_RAW")]
+    fn create_and_close<I: Ip + RawIpSocketsIpExt>(proto: IpProto) {
         let mut api = new_raw_ip_socket_api::<I>();
-        let sock = api
-            .create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default())
-            .expect("create should succeed");
+        let sock = api.create(RawIpSocketProtocol::new(proto.into()), Default::default());
         let FakeExternalSocketState { received_packets: _ } = api.close(sock).into_removed();
-    }
-
-    #[ip_test]
-    fn create_fails_with_ip_proto_raw<I: Ip + RawIpSocketsIpExt>() {
-        let mut api = new_raw_ip_socket_api::<I>();
-        let protocol = RawIpSocketProtocol::new(IpProto::Reserved.into());
-        assert_eq!(protocol, RawIpSocketProtocol::Raw);
-        assert_eq!(
-            api.create(protocol, Default::default()),
-            Err(RawIpSocketCreationError::IpProtoRawNotSupported)
-        );
     }
 
     #[ip_test]
@@ -436,15 +411,9 @@ mod test {
         // wrong protocol.
         let proto: I::Proto = IpProto::Udp.into();
         let wrong_proto: I::Proto = IpProto::Tcp.into();
-        let sock1 = api
-            .create(RawIpSocketProtocol::new(proto), Default::default())
-            .expect("create should succeed");
-        let sock2 = api
-            .create(RawIpSocketProtocol::new(proto), Default::default())
-            .expect("create should succeed");
-        let wrong_sock = api
-            .create(RawIpSocketProtocol::new(wrong_proto), Default::default())
-            .expect("create should succeed");
+        let sock1 = api.create(RawIpSocketProtocol::new(proto), Default::default());
+        let sock2 = api.create(RawIpSocketProtocol::new(proto), Default::default());
+        let wrong_sock = api.create(RawIpSocketProtocol::new(wrong_proto), Default::default());
 
         // Receive an IP packet with protocol `proto`.
         const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -467,5 +436,33 @@ mod test {
         assert_eq!(&sock1_packets.lock().pop().unwrap()[..], buf.as_ref());
         assert_eq!(&sock2_packets.lock().pop().unwrap()[..], buf.as_ref());
         assert_eq!(wrong_sock_packets.lock().pop(), None);
+    }
+
+    // Verify that sockets created with `RawIpSocketProtocol::Raw` cannot
+    // receive packets
+    #[ip_test]
+    fn cannot_receive_ip_packet_with_proto_raw<I: Ip + RawIpSocketsIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
+
+        // Try to deliver to an arbitrary proto (UDP), and to the reserved
+        // proto; neither should be delivered to the socket.
+        let protocols_to_test = match I::VERSION {
+            IpVersion::V4 => vec![IpProto::Udp, IpProto::Reserved],
+            // NB: Don't test `Reserved` with IPv6; the packet will fail to
+            // parse.
+            IpVersion::V6 => vec![IpProto::Udp],
+        };
+        for proto in protocols_to_test {
+            const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+            let buf = new_ip_packet_buf::<I>(&IP_BODY, proto.into());
+            let mut buf_ref = buf.as_ref();
+            let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet);
+        }
+
+        let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
+        assert_eq!(received_packets.lock().pop(), None);
     }
 }
