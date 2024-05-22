@@ -1,6 +1,9 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+#include "lib/mistos/starnix/testing/testing.h"
 
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
@@ -11,10 +14,8 @@
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
-#include <lib/mistos/starnix/testing/testing.h>
 
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
 
 using namespace starnix;
 
@@ -83,7 +84,7 @@ UserAddress map_memory_with_flags(CurrentTask& current_task, UserAddress address
                                   uint32_t flags) {
   auto result = do_mmap(current_task, address, length, PROT_READ | PROT_WRITE, flags,
                         FdNumber::from_raw(-1), 0);
-  EXPECT_FALSE(result.is_error(), "Could not map memory");
+  ASSERT_MSG(result.is_ok(), "Could not map memory");
   return result.value();
 }
 

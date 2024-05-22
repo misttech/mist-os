@@ -1,9 +1,10 @@
 // Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_TESTING_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_TESTING_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
+#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
+#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
 
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/vfs/forward.h>
@@ -74,4 +75,4 @@ UserAddress map_memory_with_flags(starnix::CurrentTask& current_task, UserAddres
 }  // namespace testing
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_TESTING_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
+#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_

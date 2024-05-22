@@ -27,7 +27,6 @@ source_set("tests") {
     "vfs/syscalls-test.cc",
   ]
   deps = [
-    "../testing",
     "//zircon/kernel/lib/mistos/starnix/kernel",
     "//zircon/system/ulib/zxtest:zxtest-mistos",
   ]

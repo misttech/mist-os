@@ -28,6 +28,7 @@ zx_library("kernel") {
     "task/syscalls.cc",
     "task/task.cc",
     "task/thread_group.cc",
+    "testing.cc",
     "vfs/anon_node.cc",
     "vfs/buffers/io_buffers.cc",
     "vfs/dir_entry.cc",
