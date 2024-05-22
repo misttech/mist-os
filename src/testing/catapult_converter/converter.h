@@ -25,6 +25,7 @@ struct ConverterArgs {
   const char* product_versions = nullptr;
   const char* integration_internal_git_commit = nullptr;
   const char* integration_public_git_commit = nullptr;
+  const char* smart_integration_git_commit = nullptr;
 
   // Generate deterministic GUIDs instead of random GUIDs.  This is used
   // only for testing.

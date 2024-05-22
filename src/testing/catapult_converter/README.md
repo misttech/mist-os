@@ -56,15 +56,16 @@ the dashboard:
 * fuchsiaIntegrationInternalRevisions/fuchsiaIntegrationPublicRevisions:
   Unlike Catapult, which uses the above pointId, Skia Perf is provided with
   Git commit hashes. To be compatible, use `--integration-internal-git-commit`
-  and optionally `--integration-public-git-commit` to provide the commit
-  hash the results were recorded from.
+  and optionally `--integration-public-git-commit` or `--smart-integration-git-commit`
+  to provide the commit hash the results were recorded from.
 
   Example: `7106610114a0e86f6c94be3724fb4d4c30141e40`
 
   As the results are intended to be uploaded from infra,
-  `--integration_internal_git_commit` should refer to the private
-  integration.git commit hash while `--integration_public_git_commit` should
+  `--integration-internal-git-commit` should refer to the private
+  integration.git commit hash while `--integration-public-git-commit` should
   refer to the public integration.git commit hash if there is one.
+  Likewise, results uploaded from smart-integration can pass `--smart-integration-git-commit`.
 
 
 This is an optional parameter that the Catapult dashboard accepts:
