@@ -183,11 +183,12 @@ class CallFromDestructor {
   // `callback` will be called when this instance is destroyed.
   explicit CallFromDestructor(Callable callback);
 
-  // Move support is needed for the fit::inline_callback instances using this.
+  // Move construction support is needed for the fit::inline_callback instances
+  // that use CallFromDestructor in lambda captures.
   CallFromDestructor(const CallFromDestructor&) = delete;
   CallFromDestructor(CallFromDestructor&& rhs);
   CallFromDestructor& operator=(const CallFromDestructor&) = delete;
-  CallFromDestructor& operator=(CallFromDestructor&& rhs);
+  CallFromDestructor& operator=(CallFromDestructor&& rhs) = delete;
 
   ~CallFromDestructor();
 
@@ -313,14 +314,6 @@ template <typename Callable>
 CallFromDestructor<Callable>::CallFromDestructor(CallFromDestructor&& rhs)
     : callback_(std::move(rhs.callback_)) {
   rhs.moved_from_ = true;
-}
-
-template <typename Callable>
-CallFromDestructor<Callable>& CallFromDestructor<Callable>::operator=(CallFromDestructor&& rhs) {
-  callback_ = std::move(rhs.callback_);
-  moved_from_ = false;
-  rhs.moved_from_ = true;
-  return *this;
 }
 
 template <typename Callable>
