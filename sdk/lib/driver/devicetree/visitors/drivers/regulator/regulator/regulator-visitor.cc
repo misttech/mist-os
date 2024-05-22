@@ -15,6 +15,7 @@
 #include <memory>
 #include <regex>
 
+#include <bind/fuchsia/hardware/vreg/cpp/bind.h>
 #include <bind/fuchsia/regulator/cpp/bind.h>
 
 namespace regulator_visitor_dt {
@@ -152,11 +153,15 @@ zx::result<> RegulatorVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
   auto regulator_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
+                                      bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia_regulator::NAME,
                                       *regulator_name->second.AsString()),
           },
       .properties =
           {
+              fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
+                                bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeProperty(bind_fuchsia_regulator::NAME, *regulator_name->second.AsString()),
           },
   }};

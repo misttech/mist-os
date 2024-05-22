@@ -10,18 +10,23 @@ using fuchsia.google.platform;
 using fuchsia.hardware.vreg;
 using fuchsia.hardware.pwm;
 using fuchsia.regulator;
+using fuchsia.devicetree;
 
 primary node "pdev" {
-  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.POWER;
-  if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE {
-    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO;
-  } else if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC {
-    accept fuchsia.BIND_PLATFORM_DEV_PID {
-      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
-      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
-    }
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,power" {
+    true;
   } else {
-    false;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.POWER;
+    if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE {
+      fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO;
+    } else if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC {
+      accept fuchsia.BIND_PLATFORM_DEV_PID {
+        fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
+        fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+      }
+    } else {
+      false;
+    }
   }
 }
 

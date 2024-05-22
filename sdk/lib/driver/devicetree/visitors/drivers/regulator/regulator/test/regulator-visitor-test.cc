@@ -11,6 +11,7 @@
 #include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
 #include <lib/driver/devicetree/visitors/registry.h>
 
+#include <bind/fuchsia/hardware/vreg/cpp/bind.h>
 #include <bind/fuchsia/regulator/cpp/bind.h>
 #include <gtest/gtest.h>
 
@@ -84,10 +85,14 @@ TEST(RegulatorVisitorTest, TestMetadataAndBindProperty) {
 
       // Check for regulator parent node specs. Skip the 1st one as it is either pdev/board device.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
+          {{fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
+                              bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeProperty(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
+                                    bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
+            fdf::MakeAcceptBindRule(bind_fuchsia_regulator::NAME, REGULATOR_NAME)}},
           (*mgr_request.parents())[1].bind_rules(), false));
     }
   }

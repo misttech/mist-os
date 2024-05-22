@@ -12,20 +12,25 @@ using fuchsia.hardware.clock;
 using fuchsia.hardware.power;
 using fuchsia.platform;
 using fuchsia.power;
+using fuchsia.devicetree;
 
 node "pdev" {
- if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE {
-    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOOGLE_AMLOGIC_CPU;
-    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO;
-  } else if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC {
-    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.CPU;
-    accept fuchsia.BIND_PLATFORM_DEV_PID {
-      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
-      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
-      fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A1,
-    }
+  if fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,cpu" {
+    true;
   } else {
-    false;
+    if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE {
+      fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOOGLE_AMLOGIC_CPU;
+      fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.ASTRO;
+    } else if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC {
+      fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.CPU;
+      accept fuchsia.BIND_PLATFORM_DEV_PID {
+        fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
+        fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+        fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A1,
+      }
+    } else {
+      false;
+    }
   }
 }
 

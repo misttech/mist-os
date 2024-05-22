@@ -12,20 +12,20 @@
 	};
 
 	backlight {
-		display-detect = <0x26>;
+		display-detect = <0x31>;
 		display-detect-names = "MIPI_DSI";
 		gpio-names = "LCD_BACKLIGHT_ENABLE";
-		gpios = <0x11 0x01 0x00>;
+		gpios = <0x1a 0x01 0x00>;
 		pwm-names = "LCD_BRIGHTNESS";
-		pwms = <0x12 0x08 0x00 0x00>;
+		pwms = <0x1b 0x08 0x00 0x00>;
 	};
 
 	bt-uart@ffd24000 {
 		boot-metadata = "CAMm\0\0\0";
 		compatible = "amlogic,bt-uart";
 		interrupts = <0x00 0x1a 0x01>;
-		pinctrl-0 = <0x29>;
-		pwm-init = <0x19>;
+		pinctrl-0 = <0x34>;
+		pwm-init = <0x22>;
 		reg = <0x00 0xffd24000 0x00 0x18>;
 		serial-port = <0x02 0x06 0x03>;
 
@@ -37,7 +37,7 @@
 
 					handling-level {
 						level = <0x01>;
-						level-dependencies = <0x0f 0x01>;
+						level-dependencies = <0x18 0x01>;
 
 						level-transition-table {
 
@@ -78,23 +78,109 @@
 		reg = <0x00 0xff63c000 0x00 0x2000 0x00 0xff620000 0x00 0x10000 0x00 0xffd18000 0x00 0x1000>;
 	};
 
+	cpus {
+		#address-cells = <0x02>;
+		#size-cells = <0x00>;
+
+		cpu-map {
+
+			cluster0 {
+
+				core0 {
+					cpu = <0x15>;
+				};
+
+				core1 {
+					cpu = <0x16>;
+				};
+			};
+
+			cluster1 {
+
+				core0 {
+					cpu = <0x10>;
+				};
+
+				core1 {
+					cpu = <0x11>;
+				};
+
+				core2 {
+					cpu = <0x12>;
+				};
+
+				core3 {
+					cpu = <0x13>;
+				};
+			};
+		};
+
+		cpu@0 {
+			compatible = "arm,cortex-a53\0arm,armv8";
+			device_type = "cpu";
+			enable-method = "psci";
+			phandle = <0x15>;
+			reg = <0x00 0x00>;
+		};
+
+		cpu@1 {
+			compatible = "arm,cortex-a53\0arm,armv8";
+			device_type = "cpu";
+			enable-method = "psci";
+			phandle = <0x16>;
+			reg = <0x00 0x01>;
+		};
+
+		cpu@100 {
+			compatible = "arm,cortex-a73\0arm,armv8";
+			device_type = "cpu";
+			enable-method = "psci";
+			phandle = <0x10>;
+			reg = <0x00 0x100>;
+		};
+
+		cpu@101 {
+			compatible = "arm,cortex-a73\0arm,armv8";
+			device_type = "cpu";
+			enable-method = "psci";
+			phandle = <0x11>;
+			reg = <0x00 0x101>;
+		};
+
+		cpu@102 {
+			compatible = "arm,cortex-a73\0arm,armv8";
+			device_type = "cpu";
+			enable-method = "psci";
+			phandle = <0x12>;
+			reg = <0x00 0x102>;
+		};
+
+		cpu@103 {
+			compatible = "arm,cortex-a73\0arm,armv8";
+			device_type = "cpu";
+			enable-method = "psci";
+			phandle = <0x13>;
+			reg = <0x00 0x103>;
+		};
+	};
+
 	display-detect {
 		#display-detect-cells = <0x00>;
 		gpio-names = "LCD_RESET";
-		gpios = <0x11 0x00 0x00>;
-		phandle = <0x26>;
+		gpios = <0x1a 0x00 0x00>;
+		phandle = <0x31>;
 	};
 
 	dsi-display@ff900000 {
 		amlogic,canvas = <0x05>;
 		compatible = "amlogic,display";
-		display-detect = <0x26>;
+		display-detect = <0x31>;
 		display-detect-names = "MIPI_DSI";
 		display-height = <0x780>;
 		display-width = <0x438>;
 		fuchsia,sysmem = <0x04>;
 		gpio-names = "LCD_RESET\0HDMI_HOTPLUG_DETECT";
-		gpios = <0x11 0x00 0x00 0x07 0x4e 0x00>;
+		gpios = <0x1a 0x00 0x00 0x07 0x4e 0x00>;
 		interrupts = <0x00 0x03 0x01 0x00 0x59 0x01 0x00 0x56 0x01>;
 		iommus = <0x03 0x09>;
 		panel-type = <0x0c>;
@@ -111,11 +197,11 @@
 	hdmi-display@ff900000 {
 		amlogic,canvas = <0x05>;
 		compatible = "amlogic,display";
-		display-detect = <0x26>;
+		display-detect = <0x31>;
 		display-detect-names = "HDMI";
 		fuchsia,sysmem = <0x04>;
 		gpio-names = "LCD_RESET\0HDMI_HOTPLUG_DETECT";
-		gpios = <0x11 0x00 0x00 0x07 0x4e 0x00>;
+		gpios = <0x1a 0x00 0x00 0x07 0x4e 0x00>;
 		interrupts = <0x00 0x03 0x01 0x00 0x59 0x01 0x00 0x56 0x01>;
 		iommus = <0x03 0x09>;
 		reg = <0x00 0xff900000 0x00 0x40000 0x00 0xffd073c0 0x00 0x40 0x00 0xff644000 0x00 0x2000 0x00 0xffd07000 0x00 0x1000 0x00 0xff63c000 0x00 0x2000 0x00 0xff800000 0x00 0x100000 0x00 0xffd01000 0x00 0x100 0x00 0xff634400 0x00 0x400 0x00 0xff600000 0x00 0x8000 0x00 0xff608000 0x00 0x8000>;
@@ -132,14 +218,121 @@
 		interrupts = <0x00 0x93 0x04>;
 		iommus = <0x03 0x03>;
 		reg = <0x00 0xff100000 0x00 0x30000 0x00 0xff63c000 0x00 0x2000 0x00 0xff800000 0x00 0x1000 0x00 0xff63c000 0x00 0x1000 0x00 0xff000000 0x00 0x100000>;
-		registers = <0x14 0x88 0x04 0x00 0x1000>;
+		registers = <0x1d 0x88 0x04 0x00 0x1000>;
+	};
+
+	opp-table-0 {
+		phandle = <0x17>;
+
+		opp-1000000000 {
+			opp-hz = <0x00 0x3b9aca00>;
+			opp-microvolt = <0xb9ca8>;
+		};
+
+		opp-1200000000 {
+			opp-hz = <0x00 0x47868c00>;
+			opp-microvolt = <0xbeac8>;
+		};
+
+		opp-1398000000 {
+			opp-hz = <0x00 0x5353c980>;
+			opp-microvolt = <0xc5ff8>;
+		};
+
+		opp-1512000000 {
+			opp-hz = <0x00 0x5a1f4a00>;
+			opp-microvolt = <0xd2348>;
+		};
+
+		opp-1608000000 {
+			opp-hz = <0x00 0x5fd82200>;
+			opp-microvolt = <0xdbf88>;
+		};
+
+		opp-1704000000 {
+			opp-hz = <0x00 0x6590fa00>;
+			opp-microvolt = <0xe82d8>;
+		};
+
+		opp-1800000000 {
+			opp-hz = <0x00 0x6b49d200>;
+			opp-microvolt = <0xf4628>;
+		};
+	};
+
+	opp-table-1 {
+		phandle = <0x14>;
+
+		opp-1000000000 {
+			opp-hz = <0x00 0x3b9aca00>;
+			opp-microvolt = <0xb2778>;
+		};
+
+		opp-1200000000 {
+			opp-hz = <0x00 0x47868c00>;
+			opp-microvolt = <0xb7598>;
+		};
+
+		opp-1398000000 {
+			opp-hz = <0x00 0x5353c980>;
+			opp-microvolt = <0xbc3b8>;
+		};
+
+		opp-1512000000 {
+			opp-hz = <0x00 0x5a1f4a00>;
+			opp-microvolt = <0xbc3b8>;
+		};
+
+		opp-1608000000 {
+			opp-hz = <0x00 0x5fd82200>;
+			opp-microvolt = <0xbeac8>;
+		};
+
+		opp-1704000000 {
+			opp-hz = <0x00 0x6590fa00>;
+			opp-microvolt = <0xc11d8>;
+		};
+
+		opp-1800000000 {
+			opp-hz = <0x00 0x6b49d200>;
+			opp-microvolt = <0xcae18>;
+		};
+
+		opp-1908000000 {
+			opp-hz = <0x00 0x71b9c500>;
+			opp-microvolt = <0xd2348>;
+		};
+
+		opp-2016000000 {
+			opp-hz = <0x00 0x7829b800>;
+			opp-microvolt = <0xde698>;
+		};
+
+		opp-2108000000 {
+			opp-hz = <0x00 0x7da58700>;
+			opp-microvolt = <0xe82d8>;
+		};
+
+		opp-2208000000 {
+			opp-hz = <0x00 0x839b6800>;
+			opp-microvolt = <0xf6d38>;
+		};
+	};
+
+	power-controller {
+		#power-domain-cells = <0x01>;
+		compatible = "amlogic,power";
+		phandle = <0x0f>;
+		regulator-names = "pwm_vreg_little\0pwm_vreg_big";
+		regulators = <0x2f 0x30>;
 	};
 
 	pwm_a-regulator {
 		#regulator-cells = <0x00>;
 		compatible = "amlogic,pwm-regulator";
-		pinctrl-0 = <0x28>;
-		pwms = <0x12 0x00 0x4e2 0x00>;
+		phandle = <0x30>;
+		pinctrl-0 = <0x33>;
+		pwms = <0x1b 0x00 0x4e2 0x00>;
 		regulator-max-microvolt = <0x100590>;
 		regulator-min-microvolt = <0xa8750>;
 		regulator-name = "pwm_vreg_big";
@@ -149,8 +342,9 @@
 	pwm_a0_d-regulator {
 		#regulator-cells = <0x00>;
 		compatible = "amlogic,pwm-regulator";
-		pinctrl-0 = <0x27>;
-		pwms = <0x12 0x09 0x4e2 0x00>;
+		phandle = <0x2f>;
+		pinctrl-0 = <0x32>;
+		pwms = <0x1b 0x09 0x4e2 0x00>;
 		regulator-max-microvolt = <0x100590>;
 		regulator-min-microvolt = <0xa8750>;
 		regulator-name = "pwm_vreg_little";
@@ -221,6 +415,31 @@
 				reg = <0x00 0x9000 0x00 0x1000 0x00 0x00 0x00 0x100000>;
 			};
 
+			cpu-controller@0 {
+				clock-names = "SYS_PLL_DIV16\0SYS_CPU_DIV16\0SYS_CPU_BIG_CLK\0SYS_PLLB_DIV16\0SYS_CPUB_DIV16\0SYS_CPU_LITTLE_CLK";
+				clocks = <0x06 0x10000 0x06 0x10001 0x06 0x100000 0x06 0x10003 0x06 0x10004 0x06 0x100001>;
+				compatible = "amlogic,cpu";
+				power-domains = <0x0f 0x00 0x0f 0x01>;
+				reg = <0x00 0x00 0x00 0x100000>;
+
+				performance-domains {
+
+					a311d-arm-a53-domain {
+						cpus = <0x15 0x16>;
+						domain-id = <0x02>;
+						operating-points = <0x17>;
+						relative-performance = <0x70>;
+					};
+
+					a311d-arm-a73-domain {
+						cpus = <0x10 0x11 0x12 0x13>;
+						domain-id = <0x01>;
+						operating-points = <0x14>;
+						relative-performance = <0xff>;
+					};
+				};
+			};
+
 			i2c@5000 {
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
@@ -239,7 +458,7 @@
 					#gpio-cells = <0x02>;
 					compatible = "ti,tca6408a";
 					gpio-controller;
-					phandle = <0x11>;
+					phandle = <0x1a>;
 					reg = <0x20>;
 				};
 
@@ -283,7 +502,7 @@
 
 							on-level {
 								level = <0x01>;
-								level-dependencies = <0x0f 0x01>;
+								level-dependencies = <0x18 0x01>;
 							};
 						};
 					};
@@ -295,13 +514,13 @@
 				#size-cells = <0x00>;
 				compatible = "amlogic,meson-axg-i2c";
 				interrupts = <0x00 0x27 0x01>;
-				pinctrl-0 = <0x10>;
+				pinctrl-0 = <0x19>;
 				reg = <0x00 0x1c000 0x00 0x20>;
 
 				touchscreen@38 {
 					compatible = "focaltech,ft5336";
 					gpio-names = "TOUCH_INTERRUPT\0TOUCH_RESET";
-					gpios = <0x07 0x15 0x00 0x11 0x06 0x00>;
+					gpios = <0x07 0x15 0x00 0x1a 0x06 0x00>;
 					reg = <0x38>;
 				};
 			};
@@ -309,7 +528,7 @@
 			register-controller@1000 {
 				#register-cells = <0x04>;
 				compatible = "fuchsia,registers";
-				phandle = <0x14>;
+				phandle = <0x1d>;
 				reg = <0x00 0x1000 0x00 0x100>;
 			};
 		};
@@ -369,37 +588,37 @@
 
 			bt-uart-pins {
 				function = <0x00 0x01>;
-				phandle = <0x29>;
+				phandle = <0x34>;
 				pins = <0x44 0x45 0x46 0x47>;
 			};
 
 			emmc-clk-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1e>;
+				phandle = <0x27>;
 				pins = <0x28>;
 			};
 
 			emmc-cmd-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1f>;
+				phandle = <0x28>;
 				pins = <0x2a>;
 			};
 
 			emmc-cs-cfg {
 				output-high;
-				phandle = <0x21>;
+				phandle = <0x2a>;
 				pins = <0x2e>;
 			};
 
 			emmc-d0-d7-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1d>;
+				phandle = <0x26>;
 				pins = <0x20 0x21 0x22 0x23 0x24 0x25 0x26 0x27>;
 			};
 
 			emmc-ds-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x20>;
+				phandle = <0x29>;
 				pins = <0x2d>;
 			};
 
@@ -418,37 +637,39 @@
 
 			i2c3-pins {
 				function = <0x00 0x02>;
-				phandle = <0x10>;
+				phandle = <0x19>;
 				pins = <0x1f 0x1e>;
 			};
 
 			pwm-a-regulator-pins {
 				function = <0x00 0x03>;
-				phandle = <0x28>;
+				output-low;
+				phandle = <0x33>;
 				pins = <0x63>;
 			};
 
 			pwm-a0-d-regulator-pins {
 				function = <0x00 0x03>;
-				phandle = <0x27>;
+				output-low;
+				phandle = <0x32>;
 				pins = <0x62>;
 			};
 
 			sdcard-clk-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1b>;
+				phandle = <0x24>;
 				pins = <0x34>;
 			};
 
 			sdcard-cmd-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1c>;
+				phandle = <0x25>;
 				pins = <0x35>;
 			};
 
 			sdcard-d0-d3-cfg {
 				function = <0x00 0x01>;
-				phandle = <0x1a>;
+				phandle = <0x23>;
 				pins = <0x30 0x31 0x32 0x33>;
 			};
 
@@ -457,7 +678,7 @@
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
 				input-enable;
-				phandle = <0x17>;
+				phandle = <0x20>;
 				pins = <0x3c>;
 			};
 
@@ -466,7 +687,7 @@
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
 				input-enable;
-				phandle = <0x18>;
+				phandle = <0x21>;
 				pins = <0x3d>;
 			};
 
@@ -475,13 +696,13 @@
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
 				input-enable;
-				phandle = <0x16>;
+				phandle = <0x1f>;
 				pins = <0x38 0x39 0x3a 0x3b>;
 			};
 
 			usb-power {
 				output-high;
-				phandle = <0x13>;
+				phandle = <0x1c>;
 				pins = <0x16>;
 			};
 		};
@@ -490,16 +711,16 @@
 			#address-cells = <0x02>;
 			#size-cells = <0x02>;
 			compatible = "amlogic,gpu";
-			phandle = <0x23>;
+			phandle = <0x2c>;
 			ranges = <0x00 0x00 0x00 0xffe40000 0x00 0x40000>;
 			reg = <0x00 0xffe40000 0x00 0x40000 0x00 0xff63c000 0x00 0x2000>;
-			registers = <0x14 0x40 0x04 0x00 0x100000 0x14 0x80 0x04 0x00 0x100000 0x14 0x48 0x04 0x00 0x4000 0x14 0x88 0x04 0x00 0x4000>;
+			registers = <0x1d 0x40 0x04 0x00 0x100000 0x1d 0x80 0x04 0x00 0x100000 0x1d 0x48 0x04 0x00 0x4000 0x1d 0x88 0x04 0x00 0x4000>;
 
 			arm-mali@0 {
 				compatible = "arm,mali-gpu";
 				interrupts = <0x00 0xa2 0x04 0x00 0xa1 0x04 0x00 0xa0 0x04>;
 				iommus = <0x03 0x05>;
-				mali-gpu-parent = <0x23>;
+				mali-gpu-parent = <0x2c>;
 				reg = <0x00 0x00 0x00 0x40000>;
 
 				power-elements {
@@ -522,7 +743,7 @@
 
 							on-level {
 								level = <0x01>;
-								level-dependencies = <0x22 0x02>;
+								level-dependencies = <0x2b 0x02>;
 
 								level-transition-table {
 
@@ -555,8 +776,8 @@
 			interrupts = <0x00 0xbd 0x01>;
 			iommus = <0x03 0x0a>;
 			max-frequency = <0x5f5e100>;
-			pinctrl-0 = <0x16 0x17 0x18>;
-			pwm-init = <0x19>;
+			pinctrl-0 = <0x1f 0x20 0x21>;
+			pwm-init = <0x22>;
 			reg = <0x00 0xffe03000 0x00 0x2000>;
 		};
 
@@ -565,7 +786,7 @@
 			interrupts = <0x00 0xbe 0x01>;
 			iommus = <0x03 0x07>;
 			max-frequency = <0x2faf080>;
-			pinctrl-0 = <0x1a 0x1b 0x1c>;
+			pinctrl-0 = <0x23 0x24 0x25>;
 			reg = <0x00 0xffe05000 0x00 0x2000>;
 		};
 
@@ -580,7 +801,7 @@
 			max-frequency = <0x7270e00>;
 			no-mmc-hs400;
 			non-removable;
-			pinctrl-0 = <0x1d 0x1e 0x1f 0x20 0x21>;
+			pinctrl-0 = <0x26 0x27 0x28 0x29 0x2a>;
 			reg = <0x00 0xffe07000 0x00 0x2000>;
 			use-fidl;
 
@@ -604,7 +825,7 @@
 
 						on-level {
 							level = <0x01>;
-							level-dependencies = <0x22 0x02>;
+							level-dependencies = <0x2b 0x02>;
 
 							level-transition-table {
 
@@ -635,7 +856,7 @@
 
 						on-level {
 							level = <0x01>;
-							level-dependencies = <0x0f 0x01>;
+							level-dependencies = <0x18 0x01>;
 
 							level-transition-table {
 
@@ -658,24 +879,24 @@
 			dr_modes = "host\0peripheral\0host";
 			interrupts = <0x00 0x10 0x01>;
 			iommus = <0x03 0x06>;
-			phandle = <0x15>;
-			pinctrl-0 = <0x13>;
+			phandle = <0x1e>;
+			pinctrl-0 = <0x1c>;
 			reg = <0x00 0xffe09000 0x00 0x2000 0x00 0xff636000 0x00 0x2000 0x00 0xff63a000 0x00 0x2000 0x00 0xff646000 0x00 0x2000>;
 			reg-names = "usb-ctrl\0usb2-phy\0usb2-otg-phy\0usb3-phy";
-			registers = <0x14 0x08 0x04 0x00 0x10004 0x14 0x84 0x04 0x00 0x30000>;
+			registers = <0x1d 0x08 0x04 0x00 0x10004 0x1d 0x84 0x04 0x00 0x30000>;
 		};
 
 		pwm-init {
 			gpio-names = "WIFI_LPO\0BT_REG_ON";
 			gpios = <0x07 0x48 0x00 0x07 0x49 0x00>;
-			phandle = <0x19>;
-			pwms = <0x12 0x04 0x00 0x00>;
+			phandle = <0x22>;
+			pwms = <0x1b 0x04 0x00 0x00>;
 		};
 
 		pwm@ffd1b000 {
 			#pwm-cells = <0x03>;
 			compatible = "amlogic,meson-g12a-ee-pwm";
-			phandle = <0x12>;
+			phandle = <0x1b>;
 			reg = <0x00 0xffd1b000 0x00 0x1000 0x00 0xffd1a000 0x00 0x1000 0x00 0xffd19000 0x00 0x1000 0x00 0xff807000 0x00 0x1000 0x00 0xff802000 0x00 0x1000>;
 		};
 
@@ -684,7 +905,7 @@
 			assigned-clocks = <0x06 0x1000d>;
 			compatible = "amlogic,g12a-thermal";
 			interrupts = <0x00 0x23 0x01>;
-			phandle = <0x24>;
+			phandle = <0x2d>;
 			reg = <0x00 0xff634800 0x00 0x80 0x00 0xff800268 0x00 0x04>;
 		};
 
@@ -693,7 +914,7 @@
 			assigned-clocks = <0x06 0x1000d>;
 			compatible = "amlogic,g12a-thermal";
 			interrupts = <0x00 0x24 0x01>;
-			phandle = <0x25>;
+			phandle = <0x2e>;
 			reg = <0x00 0xff634c00 0x00 0x80 0x00 0xff800230 0x00 0x04>;
 		};
 
@@ -708,7 +929,7 @@
 			interrupts = <0x00 0x1f 0x01>;
 			iommus = <0x03 0x06>;
 			phy-names = "dwc2-phy";
-			phys = <0x15>;
+			phys = <0x1e>;
 			reg = <0x00 0xff400000 0x00 0x100000>;
 		};
 
@@ -717,7 +938,7 @@
 			interrupts = <0x00 0x1e 0x01>;
 			iommus = <0x03 0x06>;
 			phy-names = "xhci-phy";
-			phys = <0x15>;
+			phys = <0x1e>;
 			reg = <0x00 0xff500000 0x00 0x100000>;
 		};
 
@@ -776,7 +997,7 @@
 
 					wake-handling-level {
 						level = <0x01>;
-						phandle = <0x22>;
+						phandle = <0x2b>;
 					};
 				};
 			};
@@ -787,7 +1008,7 @@
 
 					active-level {
 						level = <0x01>;
-						phandle = <0x0f>;
+						phandle = <0x18>;
 					};
 
 					inactive-level {
@@ -801,7 +1022,7 @@
 	thermal-zones {
 
 		cpu-thermal {
-			thermal-sensors = <0x24>;
+			thermal-sensors = <0x2d>;
 
 			trips {
 
@@ -813,7 +1034,7 @@
 		};
 
 		ddr-thermal {
-			thermal-sensors = <0x25>;
+			thermal-sensors = <0x2e>;
 
 			trips {
 

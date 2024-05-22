@@ -26,6 +26,7 @@ source_set("regulator-visitor-impl") {
     "regulator-visitor.h",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
@@ -41,6 +42,7 @@ test("regulator-visitor-test-bin") {
   sources = [ "test/regulator-visitor-test.cc" ]
   deps = [
     ":regulator-visitor-impl",
+    "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
     "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
     "//sdk/lib/driver/devicetree/visitors:registry",

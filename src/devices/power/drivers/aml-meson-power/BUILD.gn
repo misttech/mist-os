@@ -16,6 +16,7 @@ driver_bind_rules("aml-meson-power-bind") {
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.regulator",
   ]
