@@ -25,6 +25,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/clock-controller-ff63c000/clocks",
       "sys/platform/clock-controller-ff63c000/clocks/clock-init",
       "sys/platform/dsi-display-ff900000",
+      // TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
+      // netdevice migration.
+      "sys/platform/ethernet-phy-ff634000/ethernet-phy-ff634000_group/aml-ethernet/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/ethernet-phy-ff634000/ethernet-phy-ff634000_group/aml-ethernet/dwmac-ff3f0000_group/dwmac/eth_phy/phy_null_device",
       "sys/platform/fuchsia-sysmem/sysmem",
       "sys/platform/gpio-buttons/gpio-buttons_group/buttons",
@@ -72,7 +75,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2",
-      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral/function-000/cdc-eth-function",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/xhci",
       "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-0",
       "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-0/cpu-controller-0_group/a311d-arm-a53",
@@ -80,13 +83,23 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/power-controller/power-controller_group/power-impl/power-core/power-1",
       "sys/platform/pt",
       "sys/platform/pt/dt-root",
-      "sys/platform/pt/suspend",
+      "sys/platform/pt/suspend/aml-suspend-device",
       "sys/platform/pwm-ffd1b000/aml-pwm-device",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-0/pwm_a-regulator_group/pwm_vreg_big",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-4/pwm-init_group/aml-pwm-init",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-9/pwm_a0_d-regulator_group/pwm_vreg_little",
       "sys/platform/register-controller-1000",
-      "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
+      "sys/platform/temperature-sensor-ff634800/temperature-sensor-ff634800_group/aml-trip-device",
+      "sys/platform/temperature-sensor-ff634c00/temperature-sensor-ff634c00_group/aml-trip-device",
+
+      "sys/platform/usb-ff500000/usb-ff500000_group/xhci",
+      // USB 2.0 Hub
+      // Ignored because we've had a spate of vim3 devices that seem to have
+      // broken or flaky root hubs, and we don't make use of the XHCI bus in
+      // any way so we'd rather ignore such failures than cause flakiness or
+      // have to remove more devices from the fleet.
+      // See b/296738636 for more information.
+      // "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
       "sys/platform/video-decoder-ffd00000",
 
 #ifdef include_packaged_drivers
