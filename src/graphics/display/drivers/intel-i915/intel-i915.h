@@ -164,7 +164,7 @@ class Controller : public DeviceType,
 
   void ResetMmioSpaceForTesting() { mmio_space_.reset(); }
 
-  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem) {
+  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem) {
     sysmem_ = std::move(sysmem);
     return ZX_OK;
   }
@@ -267,11 +267,11 @@ class Controller : public DeviceType,
   zx_device_t* display_controller_dev_ = nullptr;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+                     fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
