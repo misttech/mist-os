@@ -123,6 +123,12 @@
 		gpios = <&gpio 97 0>;
 		gpio-names = "POWER";
 	};
+
+	wifi {
+		compatible = "broadcom,bcm4359";
+		gpios = <&gpio A311D_GPIOX(7) 0>;
+		gpio-names = "WIFI_WAKE_HOST";
+	};
 };
 
 &gpio {

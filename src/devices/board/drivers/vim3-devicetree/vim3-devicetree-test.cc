@@ -76,6 +76,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/usb-ff400000",
       "sys/platform/usb-ff500000",
       "sys/platform/video-decoder-ffd00000",
+      "sys/platform/wifi",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

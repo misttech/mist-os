@@ -209,6 +209,7 @@ driver_bind_rules("brcmfmac_sdio_bind") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib",
     "//src/devices/bind/fuchsia.broadcom.platform",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

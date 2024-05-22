@@ -50,6 +50,13 @@
                     "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
                 }
+            },
+            {
+                "name": "Match devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"broadcom,bcm4359\""
+                }
             }
         ]
     }

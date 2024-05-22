@@ -89,6 +89,10 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       // RTC
       "sys/platform/i2c-5000/i2c-5000_group/aml-i2c/i2c/i2c-0-81/rtc",
 
+      // WLAN
+      "sys/platform/mmc-ffe03000/mmc-ffe03000_group/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi_group/brcmfmac-wlanphyimpl",
+      "sys/platform/mmc-ffe03000/mmc-ffe03000_group/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi_group/brcmfmac-wlanphyimpl/wlanphy",
+
       // GPU
       "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
 #endif

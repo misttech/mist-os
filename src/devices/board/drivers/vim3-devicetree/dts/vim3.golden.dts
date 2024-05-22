@@ -824,4 +824,10 @@
 			};
 		};
 	};
+
+	wifi {
+		compatible = "broadcom,bcm4359";
+		gpio-names = "WIFI_WAKE_HOST";
+		gpios = <0x07 0x3f 0x00>;
+	};
 };
