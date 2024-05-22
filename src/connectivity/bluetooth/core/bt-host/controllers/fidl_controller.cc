@@ -89,12 +89,11 @@ fhbt::ScoSampleRate ScoSampleRateToFidl(pw::bluetooth::Controller::ScoSampleRate
 
 VendorEventHandler::VendorEventHandler(
     std::function<void(zx_status_t)> unbind_callback,
-    std::function<void(fuchsia_hardware_bluetooth::VendorFeatures)> on_vendor_connected_callback)
+    std::function<void(fhbt::VendorFeatures)> on_vendor_connected_callback)
     : unbind_callback_(unbind_callback),
       on_vendor_connected_callback_(on_vendor_connected_callback) {}
 
-void VendorEventHandler::handle_unknown_event(
-    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Vendor> metadata) {
+void VendorEventHandler::handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Vendor> metadata) {
   bt_log(WARN, "controllers", "Unknown event from Vendor server: %lu", metadata.event_ordinal);
 }
 
@@ -103,16 +102,14 @@ void VendorEventHandler::on_fidl_error(fidl::UnbindInfo error) {
   unbind_callback_(ZX_ERR_PEER_CLOSED);
 }
 
-void VendorEventHandler::OnFeatures(
-    fidl::Event<fuchsia_hardware_bluetooth::Vendor::OnFeatures>& event) {
+void VendorEventHandler::OnFeatures(fidl::Event<fhbt::Vendor::OnFeatures>& event) {
   on_vendor_connected_callback_(event);
 }
 
 HciEventHandler::HciEventHandler(std::function<void(zx_status_t)> unbind_callback)
     : unbind_callback_(unbind_callback) {}
 
-void HciEventHandler::handle_unknown_event(
-    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Hci> metadata) {
+void HciEventHandler::handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Hci> metadata) {
   bt_log(WARN, "controllers", "Unknown event from Hci server: %lu", metadata.event_ordinal);
 }
 
@@ -121,11 +118,10 @@ void HciEventHandler::on_fidl_error(fidl::UnbindInfo error) {
   unbind_callback_(ZX_ERR_PEER_CLOSED);
 }
 
-FidlController::FidlController(
-    fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end,
-    async_dispatcher_t* dispatcher)
+FidlController::FidlController(fidl::ClientEnd<fhbt::Vendor> vendor_client_end,
+                               async_dispatcher_t* dispatcher)
     : vendor_event_handler_([this](zx_status_t status) { OnError(status); },
-                            [this](fuchsia_hardware_bluetooth::VendorFeatures features) {
+                            [this](fhbt::VendorFeatures features) {
                               vendor_features_ = features;
                               ReportVendorFeaturesIfAvailable();
                             }),
@@ -142,31 +138,28 @@ void FidlController::Initialize(PwStatusCallback complete_callback,
   initialize_complete_cb_ = std::move(complete_callback);
   error_cb_ = std::move(error_callback);
 
-  vendor_ = fidl::Client<fuchsia_hardware_bluetooth::Vendor>(std::move(vendor_client_end_),
-                                                             dispatcher_, &vendor_event_handler_);
+  vendor_ = fidl::Client<fhbt::Vendor>(std::move(vendor_client_end_), dispatcher_,
+                                       &vendor_event_handler_);
 
   // Connect to Hci protocol
-  vendor_->OpenHci().ThenExactlyOnce(
-      [this](fidl::Result<fuchsia_hardware_bluetooth::Vendor::OpenHci>& result) {
-        if (!result.is_ok()) {
-          bt_log(ERROR, "bt-host", "Failed to open Hci: %s",
-                 result.error_value().FormatDescription().c_str());
-          if (result.error_value().is_framework_error()) {
-            OnError(result.error_value().framework_error().status());
-          } else {
-            OnError(result.error_value().domain_error());
-          }
-          return;
-        }
+  vendor_->OpenHci().ThenExactlyOnce([this](fidl::Result<fhbt::Vendor::OpenHci>& result) {
+    if (!result.is_ok()) {
+      bt_log(ERROR, "bt-host", "Failed to open Hci: %s",
+             result.error_value().FormatDescription().c_str());
+      if (result.error_value().is_framework_error()) {
+        OnError(result.error_value().framework_error().status());
+      } else {
+        OnError(result.error_value().domain_error());
+      }
+      return;
+    }
 
-        InitializeHci(std::move(result->channel()));
-      });
+    InitializeHci(std::move(result->channel()));
+  });
 }
 
-void FidlController::InitializeHci(
-    fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci_client_end) {
-  hci_ = fidl::Client<fuchsia_hardware_bluetooth::Hci>(std::move(hci_client_end), dispatcher_,
-                                                       &hci_event_handler_);
+void FidlController::InitializeHci(fidl::ClientEnd<fhbt::Hci> hci_client_end) {
+  hci_ = fidl::Client<fhbt::Hci>(std::move(hci_client_end), dispatcher_, &hci_event_handler_);
 
   zx::channel their_command_chan;
   zx_status_t status = zx::channel::create(0, &command_channel_, &their_command_chan);
@@ -176,13 +169,12 @@ void FidlController::InitializeHci(
     return;
   }
   hci_->OpenCommandChannel(std::move(their_command_chan))
-      .ThenExactlyOnce(
-          [](fidl::Result<fuchsia_hardware_bluetooth::Hci::OpenCommandChannel>& result) {
-            if (!result.is_ok()) {
-              bt_log(ERROR, "controllers", "Failed to open command channel: %s",
-                     result.error_value().FormatDescription().c_str());
-            }
-          });
+      .ThenExactlyOnce([](fidl::Result<fhbt::Hci::OpenCommandChannel>& result) {
+        if (!result.is_ok()) {
+          bt_log(ERROR, "controllers", "Failed to open command channel: %s",
+                 result.error_value().FormatDescription().c_str());
+        }
+      });
   InitializeWait(command_wait_, command_channel_);
 
   zx::channel their_acl_chan;
@@ -193,13 +185,12 @@ void FidlController::InitializeHci(
     return;
   }
   hci_->OpenAclDataChannel(std::move(their_acl_chan))
-      .ThenExactlyOnce(
-          [](fidl::Result<fuchsia_hardware_bluetooth::Hci::OpenAclDataChannel>& result) {
-            if (!result.is_ok()) {
-              bt_log(ERROR, "controllers", "Failed to open ACL data channel: %s",
-                     result.error_value().FormatDescription().c_str());
-            }
-          });
+      .ThenExactlyOnce([](fidl::Result<fhbt::Hci::OpenAclDataChannel>& result) {
+        if (!result.is_ok()) {
+          bt_log(ERROR, "controllers", "Failed to open ACL data channel: %s",
+                 result.error_value().FormatDescription().c_str());
+        }
+      });
   InitializeWait(acl_wait_, acl_channel_);
 
   zx::channel their_sco_chan;
@@ -210,18 +201,17 @@ void FidlController::InitializeHci(
     return;
   }
   hci_->OpenScoDataChannel(std::move(their_sco_chan))
-      .ThenExactlyOnce(
-          [this](fidl::Result<fuchsia_hardware_bluetooth::Hci::OpenScoDataChannel>& result) {
-            if (!result.is_ok()) {
-              // Non-fatal - may simply indicate a lack of SCO data support
-              // in the driver.
-              bt_log(INFO, "controllers", "Failed to open SCO data channel: %s",
-                     result.error_value().FormatDescription().c_str());
-              sco_channel_.reset();
-            } else {
-              InitializeWait(sco_wait_, sco_channel_);
-            }
-          });
+      .ThenExactlyOnce([this](fidl::Result<fhbt::Hci::OpenScoDataChannel>& result) {
+        if (!result.is_ok()) {
+          // Non-fatal - may simply indicate a lack of SCO data support
+          // in the driver.
+          bt_log(INFO, "controllers", "Failed to open SCO data channel: %s",
+                 result.error_value().FormatDescription().c_str());
+          sco_channel_.reset();
+        } else {
+          InitializeWait(sco_wait_, sco_channel_);
+        }
+      });
 
   zx::channel their_iso_chan;
   status = zx::channel::create(0, &iso_channel_, &their_iso_chan);
@@ -231,20 +221,19 @@ void FidlController::InitializeHci(
     return;
   }
   hci_->OpenIsoDataChannel(std::move(their_iso_chan))
-      .ThenExactlyOnce(
-          [this](fidl::Result<fuchsia_hardware_bluetooth::Hci::OpenIsoDataChannel>& result) {
-            if (!result.is_ok()) {
-              // Non-fatal - may simply indicate a lack of ISO data support
-              // in the driver.
-              bt_log(INFO, "controllers", "Failed to open ISO data channel: %s",
-                     result.error_value().FormatDescription().c_str());
-              iso_channel_.reset();
-            } else {
-              // Don't wait on channel signals until we have confirmation from
-              // the driver that the channel has been established. b/328504823
-              InitializeWait(iso_wait_, iso_channel_);
-            }
-          });
+      .ThenExactlyOnce([this](fidl::Result<fhbt::Hci::OpenIsoDataChannel>& result) {
+        if (!result.is_ok()) {
+          // Non-fatal - may simply indicate a lack of ISO data support
+          // in the driver.
+          bt_log(INFO, "controllers", "Failed to open ISO data channel: %s",
+                 result.error_value().FormatDescription().c_str());
+          iso_channel_.reset();
+        } else {
+          // Don't wait on channel signals until we have confirmation from
+          // the driver that the channel has been established. b/328504823
+          InitializeWait(iso_wait_, iso_channel_);
+        }
+      });
 
   initialize_complete_cb_(PW_STATUS_OK);
 }
@@ -306,8 +295,7 @@ void FidlController::ConfigureSco(ScoCodingFormat coding_format, ScoEncoding enc
   hci_->ConfigureSco({ScoCodingFormatToFidl(coding_format), ScoEncodingToFidl(encoding),
                       ScoSampleRateToFidl(sample_rate)})
       .ThenExactlyOnce(
-          [cb = std::move(callback)](
-              fidl::Result<fuchsia_hardware_bluetooth::Hci::ConfigureSco>& result) mutable {
+          [cb = std::move(callback)](fidl::Result<fhbt::Hci::ConfigureSco>& result) mutable {
             if (!result.is_ok()) {
               bt_log(ERROR, "controllers", "Failed to configure SCO: %s",
                      result.error_value().FormatDescription().c_str());
@@ -324,8 +312,7 @@ void FidlController::ConfigureSco(ScoCodingFormat coding_format, ScoEncoding enc
 
 void FidlController::ResetSco(pw::Callback<void(pw::Status)> callback) {
   hci_->ResetSco().ThenExactlyOnce(
-      [cb = std::move(callback)](
-          fidl::Result<fuchsia_hardware_bluetooth::Hci::ResetSco>& result) mutable {
+      [cb = std::move(callback)](fidl::Result<fhbt::Hci::ResetSco>& result) mutable {
         if (!result.is_ok()) {
           bt_log(ERROR, "controllers", "Failed to reset SCO: %s",
                  result.error_value().FormatDescription().c_str());
@@ -367,8 +354,7 @@ void FidlController::EncodeVendorCommand(
 
   vendor_->EncodeCommand(std::move(command))
       .ThenExactlyOnce(
-          [cb = std::move(callback)](
-              fidl::Result<fuchsia_hardware_bluetooth::Vendor::EncodeCommand>& result) mutable {
+          [cb = std::move(callback)](fidl::Result<fhbt::Vendor::EncodeCommand>& result) mutable {
             if (!result.is_ok()) {
               bt_log(ERROR, "controllers", "Failed to encode vendor command: %s",
                      result.error_value().FormatDescription().c_str());

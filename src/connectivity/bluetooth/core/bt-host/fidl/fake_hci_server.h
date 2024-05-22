@@ -19,11 +19,10 @@
 
 namespace bt::fidl::testing {
 
-namespace fhbt = fuchsia_hardware_bluetooth;
-
-class FakeHciServer final : public ::fidl::Server<fhbt::Hci> {
+class FakeHciServer final : public ::fidl::Server<fuchsia_hardware_bluetooth::Hci> {
  public:
-  FakeHciServer(::fidl::ServerEnd<fhbt::Hci> server_end, async_dispatcher_t* dispatcher)
+  FakeHciServer(::fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end,
+                async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher),
         binding_(::fidl::BindServer(dispatcher_, std::move(server_end), this)) {}
 
@@ -70,8 +69,9 @@ class FakeHciServer final : public ::fidl::Server<fhbt::Hci> {
   }
 
   // Use custom |ConfigureScoTestCallback| to manually verify configuration fields from tests
-  using ConfigureScoTestCallback =
-      fit::function<void(fhbt::ScoCodingFormat, fhbt::ScoEncoding, fhbt::ScoSampleRate)>;
+  using ConfigureScoTestCallback = fit::function<void(fuchsia_hardware_bluetooth::ScoCodingFormat,
+                                                      fuchsia_hardware_bluetooth::ScoEncoding,
+                                                      fuchsia_hardware_bluetooth::ScoSampleRate)>;
   void set_check_configure_sco(ConfigureScoTestCallback callback) {
     check_configure_sco_ = std::move(callback);
   }
@@ -246,7 +246,7 @@ class FakeHciServer final : public ::fidl::Server<fhbt::Hci> {
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnIsoSignal> iso_wait_{this};
 
   async_dispatcher_t* dispatcher_;
-  ::fidl::ServerBindingRef<fhbt::Hci> binding_;
+  ::fidl::ServerBindingRef<fuchsia_hardware_bluetooth::Hci> binding_;
 };
 
 }  // namespace bt::fidl::testing

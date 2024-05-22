@@ -24,8 +24,7 @@ const StaticByteBuffer kSetAclPrioritySinkCommand(0x02);
 class FidlControllerTest : public bt::testing::TestLoopFixture {
  public:
   void SetUp() override {
-    auto [vendor_client_end, vendor_server_end] =
-        ::fidl::Endpoints<fuchsia_hardware_bluetooth::Vendor>::Create();
+    auto [vendor_client_end, vendor_server_end] = ::fidl::Endpoints<fhbt::Vendor>::Create();
 
     fake_vendor_server_.emplace(std::move(vendor_server_end), dispatcher());
     fidl_controller_.emplace(std::move(vendor_client_end), dispatcher());
