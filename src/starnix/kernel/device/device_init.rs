@@ -6,11 +6,10 @@ use crate::{
     device::{
         device_mapper::{create_device_mapper, device_mapper_init},
         kobject::DeviceMetadata,
-        loop_device::create_loop_control_device,
-        loop_device::loop_device_init,
-        mem::mem_device_init,
-        mem::DevRandom,
+        loop_device::{create_loop_control_device, loop_device_init},
+        mem::{mem_device_init, DevRandom},
         simple_device_ops,
+        tun::DevTun,
         zram::zram_device_init,
         DeviceMode,
     },
@@ -65,6 +64,15 @@ where
         misc_class.clone(),
         DeviceDirectory::new,
         create_loop_control_device,
+    );
+    registry.add_and_register_device(
+        locked,
+        current_task,
+        "tun".into(),
+        DeviceMetadata::new("tun".into(), DeviceType::TUN, DeviceMode::Char),
+        misc_class.clone(),
+        DeviceDirectory::new,
+        simple_device_ops::<DevTun>,
     );
 }
 

@@ -41,6 +41,7 @@
 #include <linux/futex.h>
 #include <linux/if_arp.h>
 #include <linux/if_packet.h>
+#include <linux/if_tun.h>
 #include <linux/inotify.h>
 #include <linux/input.h>
 #include <linux/ip.h>

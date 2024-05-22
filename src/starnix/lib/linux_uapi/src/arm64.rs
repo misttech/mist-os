@@ -2628,6 +2628,32 @@ pub const ATF_PUBL: u32 = 8;
 pub const ATF_USETRAILERS: u32 = 16;
 pub const ATF_NETMASK: u32 = 32;
 pub const ATF_DONTPUB: u32 = 64;
+pub const TUN_READQ_SIZE: u32 = 500;
+pub const TUN_TYPE_MASK: u32 = 15;
+pub const IFF_TUN: u32 = 1;
+pub const IFF_TAP: u32 = 2;
+pub const IFF_NAPI: u32 = 16;
+pub const IFF_NAPI_FRAGS: u32 = 32;
+pub const IFF_NO_CARRIER: u32 = 64;
+pub const IFF_NO_PI: u32 = 4096;
+pub const IFF_ONE_QUEUE: u32 = 8192;
+pub const IFF_VNET_HDR: u32 = 16384;
+pub const IFF_TUN_EXCL: u32 = 32768;
+pub const IFF_MULTI_QUEUE: u32 = 256;
+pub const IFF_ATTACH_QUEUE: u32 = 512;
+pub const IFF_DETACH_QUEUE: u32 = 1024;
+pub const IFF_PERSIST: u32 = 2048;
+pub const IFF_NOFILTER: u32 = 4096;
+pub const TUN_TX_TIMESTAMP: u32 = 1;
+pub const TUN_F_CSUM: u32 = 1;
+pub const TUN_F_TSO4: u32 = 2;
+pub const TUN_F_TSO6: u32 = 4;
+pub const TUN_F_TSO_ECN: u32 = 8;
+pub const TUN_F_UFO: u32 = 16;
+pub const TUN_F_USO4: u32 = 32;
+pub const TUN_F_USO6: u32 = 64;
+pub const TUN_PKT_STRIP: u32 = 1;
+pub const TUN_FLT_ALLMULTI: u32 = 1;
 pub const IN_ACCESS: u32 = 1;
 pub const IN_MODIFY: u32 = 2;
 pub const IN_ATTRIB: u32 = 4;
@@ -12843,6 +12869,19 @@ pub struct arphdr {
     pub ar_op: __be16,
 }
 #[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct tun_pi {
+    pub flags: __u16,
+    pub proto: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct tun_filter {
+    pub flags: __u16,
+    pub count: __u16,
+    pub addr: __IncompleteArrayField<[__u8; 6usize]>,
+}
+#[repr(C)]
 #[derive(Debug, Default, AsBytes, NoCell)]
 pub struct inotify_event {
     pub wd: __s32,
@@ -17782,6 +17821,7 @@ pub type gid_t = __kernel_gid_t;
 pub type ino_t = __kernel_ino_t;
 pub type mode_t = __kernel_mode_t;
 pub type off_t = __kernel_off_t;
+pub const TUNSETIFF: __u32 = 1074025674;
 pub type __uint128_t = u128;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]

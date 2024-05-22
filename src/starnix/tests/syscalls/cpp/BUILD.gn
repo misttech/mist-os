@@ -148,6 +148,7 @@ test("syscalls_cpp_test_bin") {
     "timerfd_test.cc",
     "tmpfs_test.cc",
     "trivial_test.cc",
+    "tun_test.cc",
     "udev_test.cc",
     "uio_test.cc",
     "vdso_test.cc",

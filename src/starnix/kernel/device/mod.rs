@@ -24,4 +24,5 @@ pub mod remote_block_device;
 pub mod sync_fence_registry;
 pub mod sync_file;
 pub mod terminal;
+pub mod tun;
 pub mod zram;

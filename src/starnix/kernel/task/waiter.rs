@@ -730,9 +730,6 @@ impl Drop for SimpleWaiter {
 enum WaiterKind {
     Port(Weak<PortWaiter>),
     Event(Weak<InterruptibleEvent>),
-    // TODO(https://fxbug.dev/332317144): Use to consume network async FIDL
-    // helpers while implementing TUN support.
-    #[allow(unused)]
     AbortHandle(Weak<futures::stream::AbortHandle>),
 }
 
@@ -756,9 +753,6 @@ impl WaiterRef {
         WaiterRef(WaiterKind::Event(Arc::downgrade(event)))
     }
 
-    // TODO(https://fxbug.dev/332317144): Use to consume network async FIDL
-    // helpers while implementing TUN support.
-    #[allow(unused)]
     pub(crate) fn from_abort_handle(handle: &Arc<futures::stream::AbortHandle>) -> WaiterRef {
         WaiterRef(WaiterKind::AbortHandle(Arc::downgrade(handle)))
     }

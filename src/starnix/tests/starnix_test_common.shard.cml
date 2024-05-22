@@ -23,6 +23,10 @@
             url: "netstack#meta/netstack.cm",
         },
         {
+            name: "network-tun",
+            url: "network-tun#meta/network-tun.cm",
+        },
+        {
             name: "fake-power-broker",
             url: "fake-power-broker#meta/fake-power-broker.cm",
         },
@@ -103,6 +107,7 @@
         },
         {
             protocol: [
+                "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableV4",
@@ -114,6 +119,11 @@
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#netstack",
+            to: [ "#kernel" ],
+        },
+        {
+            protocol: [ "fuchsia.net.tun.Control" ],
+            from: "#network-tun",
             to: [ "#kernel" ],
         },
         {

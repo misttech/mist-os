@@ -20,6 +20,7 @@
         },
         {
             protocol: [
+                "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
@@ -30,6 +31,11 @@
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#network",
+            to: "#starnix_runner",
+        },
+        {
+            protocol: [ "fuchsia.net.tun.Control" ],
+            from: "#network-tun",
             to: "#starnix_runner",
         },
         {

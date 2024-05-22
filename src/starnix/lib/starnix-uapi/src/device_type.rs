@@ -50,6 +50,9 @@ impl DeviceType {
     // Frame buffer
     pub const FB0: DeviceType = DeviceType::new(FB_MAJOR, 0);
 
+    // TUN
+    pub const TUN: DeviceType = DeviceType::new(MISC_MAJOR, 200);
+
     pub const fn new(major: u32, minor: u32) -> DeviceType {
         // This encoding is part of the Linux UAPI. The encoded value is
         // returned to userspace in the stat struct.
