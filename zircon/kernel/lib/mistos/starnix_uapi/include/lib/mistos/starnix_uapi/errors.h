@@ -39,7 +39,7 @@ class Errno {
   uint64_t return_value() const { return code_.return_value(); }
   uint32_t error_code() const { return code_.error_code(); }
 
-  bool operator==(Errno other) const { return code_ == other.code_; }
+  bool operator==(const Errno& other) const { return code_ == other.code_; }
 
  private:
   friend zx_status_t From(const Errno& code);
