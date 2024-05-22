@@ -5,13 +5,17 @@
 #ifndef SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_
 #define SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_
 
-#include <fidl/fuchsia.hardware.overnet/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.overnet/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/fit/function.h>
 #include <lib/zx/socket.h>
 #include <zircon/compiler.h>
@@ -25,6 +29,7 @@
 #include <thread>
 #include <variant>
 
+#include <bind/fuchsia/google/platform/usb/cpp/bind.h>
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <usb/request-cpp.h>
@@ -33,20 +38,23 @@
 
 #include "fbl/auto_lock.h"
 
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
+
 class OvernetUsb;
 
-using OvernetUsbType = ddk::Device<OvernetUsb, ddk::Unbindable, ddk::Suspendable,
-                                   ddk::Messageable<fuchsia_hardware_overnet::Device>::Mixin>;
-class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtocol<OvernetUsb> {
+class OvernetUsb : public fdf::DriverBase,
+                   public fidl::WireServer<fuchsia_hardware_overnet::Device>,
+                   public ddk::UsbFunctionInterfaceProtocol<OvernetUsb> {
  public:
-  explicit OvernetUsb(zx_device_t* parent)
-      : OvernetUsbType(parent),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        function_(parent) {}
+  explicit OvernetUsb(fdf::DriverStartArgs start_args,
+                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase("overnet-usb", std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&OvernetUsb::FidlConnect>(this)) {}
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkRelease();
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter Completer) override;
 
   void SetCallback(fuchsia_hardware_overnet::wire::DeviceSetCallbackRequest* request,
                    SetCallbackCompleter::Sync& completer) override;
@@ -60,9 +68,6 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
   zx_status_t UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed);
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-  zx_status_t Bind();
-
  private:
   // Called whenever the socket from RCS is readable. Reads data out of the socket and places it
   // into bulk IN requests.
@@ -72,6 +77,9 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
   // into the socket.
   void HandleSocketWritable(async_dispatcher_t*, async::WaitBase*, zx_status_t status,
                             const zx_packet_signal_t*);
+
+  // Connect a FIDL interface.
+  void FidlConnect(fidl::ServerEnd<fuchsia_hardware_overnet::Device> request);
 
   // Internal state machine for this driver. There are four states:
   //
@@ -180,7 +188,7 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
     }
 
     ~Running() {
-      async::PostTask(owner_->loop_.dispatcher(),
+      async::PostTask(owner_->dispatcher_,
                       [read_waiter = std::move(read_waiter_),
                        write_waiter = std::move(write_waiter_), socket = std::move(socket_)]() {
                         if (read_waiter)
@@ -275,12 +283,12 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
   // Start watching our RCS socket for readability and call HandleSocketReadable when it is
   // readable.
   void ProcessReadsFromSocket() {
-    async::PostTask(loop_.dispatcher(), [this]() {
+    async::PostTask(dispatcher_, [this]() {
       fbl::AutoLock lock(&lock_);
       if (auto state = std::get_if<Running>(&state_)) {
-        auto status = state->read_waiter()->Begin(loop_.dispatcher());
+        auto status = state->read_waiter()->Begin(dispatcher_);
         if (status != ZX_OK && status != ZX_ERR_ALREADY_EXISTS) {
-          zxlogf(ERROR, "Failed to wait on socket: %s", zx_status_get_string(status));
+          FDF_SLOG(ERROR, "Failed to wait on socket", KV("status", zx_status_get_string(status)));
           ResetState();
         }
       }
@@ -290,12 +298,12 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
   // Start watching our RCS socket for writability and call HandleSocketReadable when it is
   // writable.
   void ProcessWritesToSocket() {
-    async::PostTask(loop_.dispatcher(), [this]() {
+    async::PostTask(dispatcher_, [this]() {
       fbl::AutoLock lock(&lock_);
       if (auto state = std::get_if<Running>(&state_)) {
-        auto status = state->write_waiter()->Begin(loop_.dispatcher());
+        auto status = state->write_waiter()->Begin(dispatcher_);
         if (status != ZX_OK && status != ZX_ERR_ALREADY_EXISTS) {
-          zxlogf(ERROR, "Failed to wait on socket: %s", zx_status_get_string(status));
+          FDF_SLOG(ERROR, "Failed to wait on socket", KV("status", zx_status_get_string(status)));
           ResetState();
         }
       }
@@ -311,9 +319,13 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
   // USB max packet size for our interface descriptor.
   static constexpr uint16_t kMaxPacketSize = 512;
 
-  async::Loop loop_;
   std::optional<Callback> callback_ __TA_GUARDED(lock_);
   std::optional<zx::socket> peer_socket_;
+
+  fidl::SyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::SyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+  driver_devfs::Connector<fuchsia_hardware_overnet::Device> devfs_connector_;
+  fidl::ServerBindingGroup<fuchsia_hardware_overnet::Device> device_binding_group_;
 
   ddk::UsbFunctionProtocolClient function_;
   size_t usb_request_size_;
@@ -330,7 +342,7 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
       .callback =
           [](void* ctx, usb_request_t* request) {
             auto overnet_usb = reinterpret_cast<OvernetUsb*>(ctx);
-            async::PostTask(overnet_usb->loop_.dispatcher(),
+            async::PostTask(overnet_usb->dispatcher_,
                             [overnet_usb, request]() { overnet_usb->ReadComplete(request); });
           },
       .ctx = this,
@@ -340,7 +352,7 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
       .callback =
           [](void* ctx, usb_request_t* request) {
             auto overnet_usb = reinterpret_cast<OvernetUsb*>(ctx);
-            async::PostTask(overnet_usb->loop_.dispatcher(),
+            async::PostTask(overnet_usb->dispatcher_,
                             [overnet_usb, request]() { overnet_usb->WriteComplete(request); });
           },
       .ctx = this,
@@ -350,7 +362,38 @@ class OvernetUsb : public OvernetUsbType, public ddk::UsbFunctionInterfaceProtoc
     usb_interface_descriptor_t data_interface;
     usb_endpoint_descriptor_t out_ep;
     usb_endpoint_descriptor_t in_ep;
-  } __PACKED descriptors_;
+  } __PACKED descriptors_ = {
+      .data_interface =
+          {
+              .b_length = sizeof(usb_interface_descriptor_t),
+              .b_descriptor_type = USB_DT_INTERFACE,
+              .b_interface_number = 0,  // set later
+              .b_alternate_setting = 0,
+              .b_num_endpoints = 2,
+              .b_interface_class = USB_CLASS_VENDOR,
+              .b_interface_sub_class = bind_fuchsia_google_platform_usb::BIND_USB_SUBCLASS_OVERNET,
+              .b_interface_protocol = bind_fuchsia_google_platform_usb::BIND_USB_PROTOCOL_OVERNET,
+              .i_interface = 0,
+          },
+      .out_ep =
+          {
+              .b_length = sizeof(usb_endpoint_descriptor_t),
+              .b_descriptor_type = USB_DT_ENDPOINT,
+              .b_endpoint_address = 0,  // set later
+              .bm_attributes = USB_ENDPOINT_BULK,
+              .w_max_packet_size = htole16(kMaxPacketSize),
+              .b_interval = 0,
+          },
+      .in_ep = {
+          .b_length = sizeof(usb_endpoint_descriptor_t),
+          .b_descriptor_type = USB_DT_ENDPOINT,
+          .b_endpoint_address = 0,  // set later
+          .bm_attributes = USB_ENDPOINT_BULK,
+          .w_max_packet_size = htole16(kMaxPacketSize),
+          .b_interval = 0,
+      }};
+
+  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 };
 
 #endif  // SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_

@@ -8,6 +8,8 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
@@ -18,7 +20,6 @@
 #include <optional>
 #include <variant>
 
-#include <bind/fuchsia/google/platform/usb/cpp/bind.h>
 #include <fbl/auto_lock.h>
 #include <usb/request-cpp.h>
 
@@ -30,6 +31,125 @@
 
 static constexpr uint8_t kOvernetMagic[] = "OVERNET USB\xff\x00\xff\x00\xff";
 static constexpr size_t kOvernetMagicSize = sizeof(kOvernetMagic) - 1;
+
+zx::result<> OvernetUsb::Start() {
+  zx::result<ddk::UsbFunctionProtocolClient> function =
+      compat::ConnectBanjo<ddk::UsbFunctionProtocolClient>(incoming());
+
+  if (function.is_error()) {
+    FDF_SLOG(ERROR, "Failed to connect function", KV("status", function.status_string()));
+    return function.take_error();
+  }
+  function_ = *function;
+
+  zx_status_t status =
+      function_.AllocStringDesc("Overnet USB interface", &descriptors_.data_interface.i_interface);
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to allocate string descriptor",
+             KV("status", zx_status_get_string(status)));
+    return zx::error(status);
+  }
+
+  status = function_.AllocInterface(&descriptors_.data_interface.b_interface_number);
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to allocate data interface",
+             KV("status", zx_status_get_string(status)));
+    return zx::error(status);
+  }
+
+  status = function_.AllocEp(USB_DIR_OUT, &descriptors_.out_ep.b_endpoint_address);
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to allocate bulk out interface",
+             KV("status", zx_status_get_string(status)));
+    return zx::error(status);
+  }
+
+  status = function_.AllocEp(USB_DIR_IN, &descriptors_.in_ep.b_endpoint_address);
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to allocate bulk in interface",
+             KV("status", zx_status_get_string(status)));
+    return zx::error(status);
+  }
+
+  usb_request_size_ = function_.GetRequestSize();
+
+  fbl::AutoLock lock(&lock_);
+
+  for (size_t i = 0; i < kRequestPoolSize; i++) {
+    std::optional<usb::Request<>> request;
+    status = usb::Request<>::Alloc(&request, kMtu, BulkOutAddress(), usb_request_size_);
+    if (status != ZX_OK) {
+      FDF_SLOG(ERROR, "Allocating reads failed", KV("status", status));
+      return zx::error(status);
+    }
+    free_read_pool_.Add(*std::move(request));
+  }
+
+  for (size_t i = 0; i < kRequestPoolSize; i++) {
+    std::optional<usb::Request<>> request;
+    status = usb::Request<>::Alloc(&request, kMtu, BulkInAddress(), usb_request_size_);
+    if (status != ZX_OK) {
+      FDF_SLOG(ERROR, "Allocating writes failed", KV("status", status));
+      return zx::error(status);
+    }
+    free_write_pool_.Add(*std::move(request));
+  }
+
+  function_.SetInterface(this, &usb_function_interface_protocol_ops_);
+
+  auto connector = devfs_connector_.Bind(dispatcher_);
+
+  if (connector.is_error()) {
+    FDF_SLOG(ERROR, "devfs_connector_.Bind() failed", KV("error", connector.status_string()));
+    return connector.take_error();
+  }
+
+  fdf::DevfsAddArgs devfs;
+  devfs.connector(std::move(connector.value()));
+  devfs.class_name("overnet_usb");
+
+  fdf::NodeAddArgs args;
+  args.devfs_args(std::move(devfs));
+  args.name("overnet_usb");
+
+  auto controller_eps = fidl::CreateEndpoints<fdf::NodeController>();
+  if (controller_eps.is_error()) {
+    FDF_SLOG(ERROR, "Could not create node controller endpoints",
+             KV("error", controller_eps.status_string()));
+    return controller_eps.take_error();
+  }
+  node_controller_.Bind(std::move(controller_eps->client));
+
+  auto node_eps = fidl::CreateEndpoints<fdf::Node>();
+  if (node_eps.is_error()) {
+    FDF_SLOG(ERROR, "Could not create node endpoints", KV("error", node_eps.status_string()));
+    return node_eps.take_error();
+  }
+  node_.Bind(std::move(node_eps->client));
+
+  auto result = fidl::Call(node())->AddChild({{
+      .args = std::move(args),
+      .controller = std::move(controller_eps->server),
+      .node = std::move(node_eps->server),
+  }});
+
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Could not add child node",
+             KV("error", result.error_value().FormatDescription().c_str()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  return zx::ok();
+}
+
+void OvernetUsb::FidlConnect(fidl::ServerEnd<fuchsia_hardware_overnet::Device> request) {
+  device_binding_group_.AddBinding(dispatcher_, std::move(request), this,
+                                   fidl::kIgnoreBindingClosure);
+}
+
+void OvernetUsb::PrepareStop(fdf::PrepareStopCompleter completer) {
+  Shutdown([completer = std::move(completer)]() mutable { completer(zx::ok()); });
+}
 
 size_t OvernetUsb::UsbFunctionInterfaceGetDescriptorsSize() { return sizeof(descriptors_); }
 
@@ -46,7 +166,7 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceControl(const usb_setup_t* setup,
                                                     const uint8_t* write_buffer, size_t write_size,
                                                     uint8_t* out_read_buffer, size_t read_size,
                                                     size_t* out_read_actual) {
-  zxlogf(WARNING, "Overnet USB driver received control message");
+  FDF_SLOG(WARNING, "Overnet USB driver received control message");
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -65,12 +185,14 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetConfigured(bool configured, usb_s
 
     zx_status_t status = function_.DisableEp(BulkInAddress());
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to disable data in endpoint: %s", zx_status_get_string(status));
+      FDF_SLOG(ERROR, "Failed to disable data in endpoint",
+               KV("status", zx_status_get_string(status)));
       return status;
     }
     status = function_.DisableEp(BulkOutAddress());
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to disable data out endpoint: %s", zx_status_get_string(status));
+      FDF_SLOG(ERROR, "Failed to disable data out endpoint",
+               KV("status", zx_status_get_string(status)));
       return status;
     }
     return ZX_OK;
@@ -82,12 +204,14 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetConfigured(bool configured, usb_s
 
   zx_status_t status = function_.ConfigEp(&descriptors_.in_ep, nullptr);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure bulk in endpoint: %s", zx_status_get_string(status));
+    FDF_SLOG(ERROR, "Failed to configure bulk in endpoint",
+             KV("status", zx_status_get_string(status)));
     return status;
   }
   status = function_.ConfigEp(&descriptors_.out_ep, nullptr);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure bulk out endpoint: %s", zx_status_get_string(status));
+    FDF_SLOG(ERROR, "Failed to configure bulk out endpoint",
+             KV("status", zx_status_get_string(status)));
     return status;
   }
 
@@ -116,7 +240,7 @@ std::optional<usb::Request<>> OvernetUsb::PrepareTx() {
   std::optional<usb::Request<>> request;
   request = free_write_pool_.Get(usb::Request<>::RequestSize(usb_request_size_));
   if (!request) {
-    zxlogf(DEBUG, "No available TX requests");
+    FDF_SLOG(DEBUG, "No available TX requests");
     return std::nullopt;
   }
 
@@ -127,7 +251,8 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
                                       const zx_packet_signal_t*) {
   if (status != ZX_OK) {
     if (status != ZX_ERR_CANCELED) {
-      zxlogf(WARNING, "Unexpected error waiting on socket: %s", zx_status_get_string(status));
+      FDF_SLOG(WARNING, "Unexpected error waiting on socket",
+               KV("status", zx_status_get_string(status)));
     }
 
     return;
@@ -144,7 +269,7 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
   status = request->Mmap(reinterpret_cast<void**>(&buf));
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map TX buffer: %s", zx_status_get_string(status));
+    FDF_SLOG(ERROR, "Failed to map TX buffer", KV("status", zx_status_get_string(status)));
     free_write_pool_.Add(*std::move(request));
     // Not clear what the right way to handle this error is. We'll just drop the socket. We could
     // retry but we'd end up retrying in a tight loop if the failure persists.
@@ -182,7 +307,7 @@ OvernetUsb::State OvernetUsb::Running::SendData(uint8_t* data, size_t len, size_
 
   if (*status != ZX_OK && *status != ZX_ERR_SHOULD_WAIT) {
     if (*status != ZX_ERR_PEER_CLOSED) {
-      zxlogf(ERROR, "Failed to read from socket: %s", zx_status_get_string(*status));
+      FDF_SLOG(ERROR, "Failed to read from socket", KV("status", zx_status_get_string(*status)));
     }
     return Ready();
   }
@@ -196,7 +321,8 @@ void OvernetUsb::HandleSocketWritable(async_dispatcher_t*, async::WaitBase*, zx_
 
   if (status != ZX_OK) {
     if (status != ZX_ERR_CANCELED) {
-      zxlogf(WARNING, "Unexpected error waiting on socket: %s", zx_status_get_string(status));
+      FDF_SLOG(WARNING, "Unexpected error waiting on socket",
+               KV("status", zx_status_get_string(status)));
     }
 
     return;
@@ -228,7 +354,7 @@ OvernetUsb::State OvernetUsb::Running::Writable() && {
                             socket_out_queue_.begin() + static_cast<ssize_t>(actual));
   } else if (status != ZX_ERR_SHOULD_WAIT) {
     if (status != ZX_ERR_PEER_CLOSED) {
-      zxlogf(ERROR, "Failed to read from socket: %s", zx_status_get_string(status));
+      FDF_SLOG(ERROR, "Failed to read from socket", KV("status", zx_status_get_string(status)));
     }
     return Ready();
   }
@@ -239,7 +365,7 @@ OvernetUsb::State OvernetUsb::Running::Writable() && {
 void OvernetUsb::SetCallback(fuchsia_hardware_overnet::wire::DeviceSetCallbackRequest* request,
                              SetCallbackCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
-  callback_ = Callback(fidl::WireSharedClient(std::move(request->callback), loop_.dispatcher(),
+  callback_ = Callback(fidl::WireSharedClient(std::move(request->callback), dispatcher_,
                                               fidl::ObserveTeardown([this]() {
                                                 fbl::AutoLock lock(&lock_);
                                                 callback_ = std::nullopt;
@@ -272,7 +398,7 @@ void OvernetUsb::Callback::operator()(zx::socket socket) {
       .Then([](fidl::WireUnownedResult<fuchsia_hardware_overnet::Callback::NewLink>& result) {
         if (!result.ok()) {
           auto res = result.FormatDescription();
-          zxlogf(ERROR, "Failed to share socket with component: %s", res.c_str());
+          FDF_SLOG(ERROR, "Failed to share socket with component", KV("status", res));
         }
       });
 }
@@ -280,14 +406,14 @@ void OvernetUsb::Callback::operator()(zx::socket socket) {
 OvernetUsb::State OvernetUsb::Unconfigured::ReceiveData(uint8_t*, size_t len,
                                                         std::optional<zx::socket>*,
                                                         OvernetUsb* owner) && {
-  zxlogf(WARNING, "Dropped %zu bytes of incoming data (device not configured)", len);
+  FDF_SLOG(WARNING, "Dropped incoming data (device not configured)", KV("bytes", len));
   return *this;
 }
 
 OvernetUsb::State OvernetUsb::ShuttingDown::ReceiveData(uint8_t*, size_t len,
                                                         std::optional<zx::socket>*,
                                                         OvernetUsb* owner) && {
-  zxlogf(WARNING, "Dropped %zu bytes of incoming data (device shutting down)", len);
+  FDF_SLOG(WARNING, "Dropped incoming data (device shutting down)", KV("bytes", len));
   return std::move(*this);
 }
 
@@ -296,7 +422,7 @@ OvernetUsb::State OvernetUsb::Ready::ReceiveData(uint8_t* data, size_t len,
                                                  OvernetUsb* owner) && {
   if (len != kOvernetMagicSize ||
       !std::equal(kOvernetMagic, kOvernetMagic + kOvernetMagicSize, data)) {
-    zxlogf(WARNING, "Dropped %zu bytes of incoming data (driver not synchronized)", len);
+    FDF_SLOG(WARNING, "Dropped incoming data (driver not synchronized)", KV("bytes", len));
     return *this;
   }
 
@@ -305,7 +431,7 @@ OvernetUsb::State OvernetUsb::Ready::ReceiveData(uint8_t* data, size_t len,
 
   zx_status_t status = zx::socket::create(ZX_SOCKET_STREAM, &socket, &peer_socket->value());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create socket: %s", zx_status_get_string(status));
+    FDF_SLOG(ERROR, "Failed to create socket", KV("status", zx_status_get_string(status)));
     // There are two errors that can happen here: a kernel out of memory condition which the docs
     // say we shouldn't try to handle, and invalid arguments, which should be impossible.
     abort();
@@ -343,7 +469,7 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
 
     if (status != ZX_ERR_SHOULD_WAIT) {
       if (status != ZX_ERR_PEER_CLOSED) {
-        zxlogf(ERROR, "Failed to write to socket: %s", zx_status_get_string(status));
+        FDF_SLOG(ERROR, "Failed to write to socket", KV("status", zx_status_get_string(status)));
       }
       return Ready();
     }
@@ -359,7 +485,7 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
 void OvernetUsb::SendMagicReply(usb::Request<> request) {
   ssize_t result = request.CopyTo(kOvernetMagic, kOvernetMagicSize, 0);
   if (result < 0) {
-    zxlogf(ERROR, "Failed to copy reply magic data: %zd", result);
+    FDF_SLOG(ERROR, "Failed to copy reply magic data", KV("status", result));
     free_write_pool_.Add(std::move(request));
     ResetState();
     return;
@@ -384,7 +510,7 @@ void OvernetUsb::SendMagicReply(usb::Request<> request) {
 void OvernetUsb::Running::MagicSent() {
   socket_is_new_ = false;
 
-  async::PostTask(owner_->loop_.dispatcher(), [this]() {
+  async::PostTask(owner_->dispatcher_, [this]() {
     fbl::AutoLock lock(&owner_->lock_);
     owner_->pending_requests_--;
 
@@ -432,7 +558,7 @@ void OvernetUsb::ReadComplete(usb_request_t* usb_request) {
     uint8_t* data;
     zx_status_t status = request.Mmap(reinterpret_cast<void**>(&data));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to map RX data: %s", zx_status_get_string(status));
+      FDF_SLOG(ERROR, "Failed to map RX data", KV("status", zx_status_get_string(status)));
       return;
     }
 
@@ -459,7 +585,8 @@ void OvernetUsb::ReadComplete(usb_request_t* usb_request) {
         },
         state_);
   } else if (usb_request->response.status != ZX_ERR_CANCELED) {
-    zxlogf(ERROR, "Read failed: %s", zx_status_get_string(usb_request->response.status));
+    FDF_SLOG(ERROR, "Read failed",
+             KV("status", zx_status_get_string(usb_request->response.status)));
   }
 
   if (Online()) {
@@ -502,100 +629,6 @@ void OvernetUsb::WriteComplete(usb_request_t* usb_request) {
   ProcessReadsFromSocket();
 }
 
-zx_status_t OvernetUsb::Bind() {
-  descriptors_.data_interface = usb_interface_descriptor_t{
-      .b_length = sizeof(usb_interface_descriptor_t),
-      .b_descriptor_type = USB_DT_INTERFACE,
-      .b_interface_number = 0,  // set later
-      .b_alternate_setting = 0,
-      .b_num_endpoints = 2,
-      .b_interface_class = USB_CLASS_VENDOR,
-      .b_interface_sub_class = bind_fuchsia_google_platform_usb::BIND_USB_SUBCLASS_OVERNET,
-      .b_interface_protocol = bind_fuchsia_google_platform_usb::BIND_USB_PROTOCOL_OVERNET,
-      .i_interface = 0,
-  };
-  descriptors_.in_ep = usb_endpoint_descriptor_t{
-      .b_length = sizeof(usb_endpoint_descriptor_t),
-      .b_descriptor_type = USB_DT_ENDPOINT,
-      .b_endpoint_address = 0,  // set later
-      .bm_attributes = USB_ENDPOINT_BULK,
-      .w_max_packet_size = htole16(kMaxPacketSize),
-      .b_interval = 0,
-  };
-  descriptors_.out_ep = usb_endpoint_descriptor_t{
-      .b_length = sizeof(usb_endpoint_descriptor_t),
-      .b_descriptor_type = USB_DT_ENDPOINT,
-      .b_endpoint_address = 0,  // set later
-      .bm_attributes = USB_ENDPOINT_BULK,
-      .w_max_packet_size = htole16(kMaxPacketSize),
-      .b_interval = 0,
-  };
-
-  zx_status_t status =
-      function_.AllocStringDesc("Overnet USB interface", &descriptors_.data_interface.i_interface);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate string descriptor: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = function_.AllocInterface(&descriptors_.data_interface.b_interface_number);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate data interface: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = function_.AllocEp(USB_DIR_OUT, &descriptors_.out_ep.b_endpoint_address);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate bulk out interface: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = function_.AllocEp(USB_DIR_IN, &descriptors_.in_ep.b_endpoint_address);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate bulk in interface: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  usb_request_size_ = function_.GetRequestSize();
-
-  fbl::AutoLock lock(&lock_);
-
-  for (size_t i = 0; i < kRequestPoolSize; i++) {
-    std::optional<usb::Request<>> request;
-    status = usb::Request<>::Alloc(&request, kMtu, BulkOutAddress(), usb_request_size_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Allocating reads failed %d", status);
-      return status;
-    }
-    free_read_pool_.Add(*std::move(request));
-  }
-
-  for (size_t i = 0; i < kRequestPoolSize; i++) {
-    std::optional<usb::Request<>> request;
-    status = usb::Request<>::Alloc(&request, kMtu, BulkInAddress(), usb_request_size_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Allocating writes failed %d", status);
-      return status;
-    }
-    free_write_pool_.Add(*std::move(request));
-  }
-
-  status = loop_.StartThread("overnet-usb-dispatch");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start thread: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = DdkAdd(ddk::DeviceAddArgs("overnet-usb").set_proto_id(ZX_PROTOCOL_OVERNET));
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  function_.SetInterface(this, &usb_function_interface_protocol_ops_);
-
-  return ZX_OK;
-}
-
 void OvernetUsb::Shutdown(fit::function<void()> callback) {
   fbl::AutoLock lock(&lock_);
   function_.CancelAll(BulkInAddress());
@@ -616,43 +649,8 @@ void OvernetUsb::ShutdownComplete() {
   if (auto state = std::get_if<ShuttingDown>(&state_)) {
     state->FinishWithCallback();
   } else {
-    zxlogf(ERROR, "ShutdownComplete called outside of shutdown path");
+    FDF_SLOG(ERROR, "ShutdownComplete called outside of shutdown path");
   }
 }
 
-void OvernetUsb::DdkUnbind(ddk::UnbindTxn txn) {
-  fbl::AutoLock lock(&lock_);
-  if (std::holds_alternative<ShuttingDown>(state_)) {
-    txn.Reply();
-    return;
-  }
-  lock.release();
-  Shutdown([unbind_txn = std::move(txn)]() mutable { unbind_txn.Reply(); });
-}
-
-void OvernetUsb::DdkSuspend(ddk::SuspendTxn txn) {
-  Shutdown([suspend_txn = std::move(txn)]() mutable { suspend_txn.Reply(ZX_OK, 0); });
-}
-
-void OvernetUsb::DdkRelease() { delete this; }
-
-zx_status_t OvernetUsb::Create(void* ctx, zx_device_t* parent) {
-  auto device = std::make_unique<OvernetUsb>(parent);
-
-  device->Bind();
-
-  // Intentionally leak this device because it's owned by the driver framework.
-  [[maybe_unused]] auto unused = device.release();
-  return ZX_OK;
-}
-
-namespace {
-zx_driver_ops_t usb_overnet_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops{};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = OvernetUsb::Create;
-  return ops;
-}();
-}  //  namespace
-
-ZIRCON_DRIVER(usb_overnet, usb_overnet_driver_ops, "fuchsia", "0.1");
+FUCHSIA_DRIVER_EXPORT(OvernetUsb);

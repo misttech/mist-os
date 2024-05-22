@@ -61,7 +61,7 @@ forensics
 ?network
 ?network-tun
 ?omaha-client
-?overnet-usb-package
+?overnet-usb
 pkg-resolver
 ?pkgctl
 ?process-resolver
