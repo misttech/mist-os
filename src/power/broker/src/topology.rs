@@ -309,6 +309,11 @@ impl Topology {
         let mut passive_dependencies = Vec::<Dependency>::new();
         let mut element_levels_to_inspect = vec![element_level.clone()];
         while let Some(element_level) = element_levels_to_inspect.pop() {
+            if element_level.level != self.minimum_level(&element_level.element_id) {
+                let mut lower_element_level = element_level.clone();
+                lower_element_level.level = element_level.level - 1;
+                element_levels_to_inspect.push(lower_element_level);
+            }
             for dep in self.direct_active_dependencies(&element_level) {
                 element_levels_to_inspect.push(dep.requires.clone());
                 active_dependencies.push(dep);
@@ -1076,19 +1081,20 @@ mod tests {
         let inspect_node = inspect.root().create_child("test");
         let mut t = Topology::new(inspect_node, 0);
 
-        let (v023_u8, v015_u8, v01_u8, v03_u8): (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) =
-            (vec![0, 2, 3], vec![0, 1, 5], vec![0, 1], vec![0, 3]);
-        let (v023, v015, v01, v03): (Vec<u64>, Vec<u64>, Vec<u64>, Vec<u64>) = (
-            v023_u8.iter().map(|&v| v as u64).collect(),
+        let (v0123_u8, v015_u8, v01_u8, v013_u8): (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) =
+            (vec![0, 1, 2, 3], vec![0, 1, 5], vec![0, 1], vec![0, 1, 3]);
+        let (v0123, v015, v01, v013): (Vec<u64>, Vec<u64>, Vec<u64>, Vec<u64>) = (
+            v0123_u8.iter().map(|&v| v as u64).collect(),
             v015_u8.iter().map(|&v| v as u64).collect(),
             v01_u8.iter().map(|&v| v as u64).collect(),
-            v03_u8.iter().map(|&v| v as u64).collect(),
+            v013_u8.iter().map(|&v| v as u64).collect(),
         );
 
-        let a = t.add_element("A", vec![0, 2, 3]).expect("add_element failed");
+        let a = t.add_element("A", vec![0, 1, 2, 3]).expect("add_element failed");
         let b = t.add_element("B", vec![0, 1, 5]).expect("add_element failed");
         let c = t.add_element("C", vec![0, 1]).expect("add_element failed");
-        let d = t.add_element("D", vec![0, 3]).expect("add_element failed");
+        let d = t.add_element("D", vec![0, 1, 3]).expect("add_element failed");
+        let e = t.add_element("E", vec![0, 1]).expect("add_element failed");
         assert_data_tree!(inspect, root: {
             test: {
                 "fuchsia.inspect.Graph": {
@@ -1104,7 +1110,7 @@ mod tests {
                         a.to_string() => {
                             meta: {
                                 name: "A",
-                                valid_levels: v023.clone(),
+                                valid_levels: v0123.clone(),
                                 current_level: "unset",
                                 required_level: "unset",
                             },
@@ -1131,7 +1137,16 @@ mod tests {
                         d.to_string() => {
                             meta: {
                                 name: "D",
-                                valid_levels: v03.clone(),
+                                valid_levels: v013.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {},
+                        },
+                        e.to_string() => {
+                            meta: {
+                                name: "E",
+                                valid_levels: v01.clone(),
                                 current_level: "unset",
                                 required_level: "unset",
                             },
@@ -1141,8 +1156,14 @@ mod tests {
 
         // C has direct active dependencies on B and D.
         // B only has passive dependencies on A.
-        // Therefore, C has a transitive passive dependency on A.
-        // A <- B <= C => D
+        // D only has an active dependency on A.
+        //
+        // C has a transitive passive dependency on A[3] (through B[5]).
+        // C has an *implicit* transitive passive dependency on A[2] (through B[1]).
+        // C has an *implicit* transitive active dependency on A (through D[1]).
+        //
+        // A    B    C    D    E
+        // 1 <=========== 1 => 1
         // 2 <- 1
         // 3 <- 5 <= 1 => 3
         let b1_a2 = Dependency {
@@ -1165,6 +1186,16 @@ mod tests {
             requires: ElementLevel { element_id: d.clone(), level: 3 },
         };
         t.add_active_dependency(&c1_d3).expect("add_active_dependency failed");
+        let d1_a1 = Dependency {
+            dependent: ElementLevel { element_id: d.clone(), level: 1 },
+            requires: ElementLevel { element_id: a.clone(), level: 1 },
+        };
+        t.add_active_dependency(&d1_a1).expect("add_active_dependency failed");
+        let d1_e1 = Dependency {
+            dependent: ElementLevel { element_id: d.clone(), level: 1 },
+            requires: ElementLevel { element_id: e.clone(), level: 1 },
+        };
+        t.add_active_dependency(&d1_e1).expect("add_active_dependency failed");
         assert_data_tree!(inspect, root: {
             test: {
                 "fuchsia.inspect.Graph": {
@@ -1180,7 +1211,7 @@ mod tests {
                         a.to_string() => {
                             meta: {
                                 name: "A",
-                                valid_levels: v023.clone(),
+                                valid_levels: v0123.clone(),
                                 current_level: "unset",
                                 required_level: "unset",
                             },
@@ -1224,7 +1255,25 @@ mod tests {
                         d.to_string() => {
                             meta: {
                                 name: "D",
-                                valid_levels: v03.clone(),
+                                valid_levels: v013.clone(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            },
+                            relationships: {
+                                a.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "1" },
+                                },
+                                e.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: { "1": "1" },
+                                },
+                            },
+                        },
+                        e.to_string() => {
+                            meta: {
+                                name: "E",
+                                valid_levels: v01.clone(),
                                 current_level: "unset",
                                 required_level: "unset",
                             },
@@ -1242,23 +1291,29 @@ mod tests {
         assert_eq!(b1_active_deps, []);
         assert_eq!(b1_passive_deps, [b1_a2.clone()]);
 
-        let (b5_active_deps, b5_passive_deps) = t
+        let (b5_active_deps, mut b5_passive_deps) = t
             .all_active_and_passive_dependencies(&ElementLevel { element_id: b.clone(), level: 5 });
+        let mut want_b5_passive_deps = [b5_a3.clone(), b1_a2.clone()];
+        b5_passive_deps.sort();
+        want_b5_passive_deps.sort();
         assert_eq!(b5_active_deps, []);
-        assert_eq!(b5_passive_deps, [b5_a3.clone()]);
+        assert_eq!(b5_passive_deps, want_b5_passive_deps);
 
-        let (mut c_active_deps, c_passive_deps) = t
+        let (mut c_active_deps, mut c_passive_deps) = t
             .all_active_and_passive_dependencies(&ElementLevel { element_id: c.clone(), level: 1 });
-        let mut want_c_active_deps = [c1_b5.clone(), c1_d3.clone()];
+        let mut want_c_active_deps = [c1_b5.clone(), c1_d3.clone(), d1_a1.clone(), d1_e1.clone()];
         c_active_deps.sort();
         want_c_active_deps.sort();
         assert_eq!(c_active_deps, want_c_active_deps);
-        assert_eq!(c_passive_deps, [b5_a3.clone()]);
+        let mut want_c_passive_deps = [b5_a3.clone(), b1_a2.clone()];
+        c_passive_deps.sort();
+        want_c_passive_deps.sort();
+        assert_eq!(c_passive_deps, want_c_passive_deps);
 
         t.remove_active_dependency(&c1_d3).expect("remove_direct_dep failed");
         let (c_active_deps, c_passive_deps) = t
             .all_active_and_passive_dependencies(&ElementLevel { element_id: c.clone(), level: 1 });
         assert_eq!(c_active_deps, [c1_b5.clone()]);
-        assert_eq!(c_passive_deps, [b5_a3.clone()]);
+        assert_eq!(c_passive_deps, [b5_a3.clone(), b1_a2.clone()]);
     }
 }

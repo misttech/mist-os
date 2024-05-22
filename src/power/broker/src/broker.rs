@@ -190,9 +190,10 @@ impl Broker {
                 }
                 self.catalog.passive_claims.activate_claim(&claim.id)
             }
-            // Update the status of all leases whose claims were satisfied.
+            // Find the set of leases for all claims satisfied:
             let leases_to_check_if_satisfied: HashSet<LeaseID> =
                 claims_satisfied.into_iter().map(|c| c.lease_id).collect();
+            // Update the status of all leases whose claims were satisfied.
             tracing::debug!(
                 "update_current_level({element_id}): leases_to_check_if_satisfied = {:?})",
                 &leases_to_check_if_satisfied
@@ -376,7 +377,10 @@ impl Broker {
             let matching_active_claim = activated_claims
                 .into_iter()
                 .chain(pending_claims)
-                .filter(|c| !self.is_lease_contingent(&c.lease_id))
+                // Consider an active claim to match if is part of this lease. This captures the
+                // scenario where a lease is 'self-satisfying' - it holds an active claim for an
+                // element and a passive claim for the same element (at the same or lower level).
+                .filter(|c| lease_id == &c.lease_id || !self.is_lease_contingent(&c.lease_id))
                 .find(|c| c.requires().level.satisfies(claim.requires().level));
             if let Some(matching_active_claim) = matching_active_claim {
                 tracing::debug!("{matching_active_claim} satisfies passive {claim}");
@@ -5977,6 +5981,649 @@ mod tests {
         // Leases D and E should be cleaned up.
         assert_lease_cleaned_up(&broker.catalog, &lease_d_id);
         assert_lease_cleaned_up(&broker.catalog, &lease_e_id);
+    }
+
+    #[fuchsia::test]
+    async fn test_lease_cumulative_implicit_dependency() {
+        // Tests that cumulative implicit dependencies are properly resolved when a lease is
+        // acquired. Verifies a simple case of active dependencies only.
+        //
+        // A[1] has an active dependency on B[1].
+        // A[2] has an active dependency on C[1].
+        //
+        // A[2] has an implicit, active dependency on B[1].
+        //
+        //  A     B     C
+        //  1 ==> 1
+        //  2 ========> 1
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+
+        let v012_u8: Vec<u8> = vec![0, 1, 2];
+
+        let token_b_active = DependencyToken::create();
+        let token_c_active = DependencyToken::create();
+        let element_b = broker
+            .add_element(
+                "B",
+                0,
+                v012_u8.clone(),
+                vec![],
+                vec![token_b_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c = broker
+            .add_element(
+                "C",
+                0,
+                v012_u8.clone(),
+                vec![],
+                vec![token_c_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_a = broker
+            .add_element(
+                "A",
+                0,
+                v012_u8.clone(),
+                vec![
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 1,
+                        requires_token: token_b_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 2,
+                        requires_token: token_c_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                ],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        // Initial required level for all elements should be OFF.
+        // Set all current levels to OFF.
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+        broker.update_current_level(&element_a, 0);
+        broker.update_current_level(&element_b, 0);
+        broker.update_current_level(&element_c, 0);
+
+        // Lease A[2].
+        //
+        // A has two active dependencies, B[1] and C[1].
+        //
+        // A's required level should not change.
+        // B and C's required level should be 1.
+        //
+        // A's lease is pending and not contingent.
+        let lease_a = broker.acquire_lease(&element_a, 2).expect("acquire failed");
+        let lease_a_id = lease_a.id.clone();
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(1));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+
+        // Update B, C's current level to 1.
+        //
+        // A's current level should now be 2.
+        // B and C's current level should not change.
+        //
+        // A's lease should be satisfied and not contingent.
+        broker.update_current_level(&element_b, 1);
+        broker.update_current_level(&element_c, 1);
+        assert_eq!(broker.get_required_level(&element_a), Some(2));
+        assert_eq!(broker.get_required_level(&element_b), Some(1));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+
+        // Drop Lease A.
+        //
+        // A, B and C's required level should be 0.
+        //
+        // Lease A should be pending and not contingent.
+        broker.drop_lease(&lease_a.id).expect("drop_lease failed");
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+
+        // All leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_a_id);
+    }
+
+    #[fuchsia::test]
+    async fn test_lease_cumulative_implicit_transitive_dependency() {
+        // Tests that cumulative implicit transitive dependencies (both passive
+        // and active) are properly requested when a lease is acquired.
+        //
+        // A[1] has an active dependency on D[1].
+        // A[2] has a passive dependency on C[1].
+        // A[3] has an active dependency on B[2].
+        // D[1] has an active dependency on E[1].
+        // D[1] has a passive dependency on B[1].
+        // F[1] has an active dependency on C[1].
+        //
+        // A[3] has an implicit, transitive, passive dependency on B[1].
+        // A[3] has an implicit, passive dependency on C[1].
+        // A[3] has an implicit, active dependency on D[1].
+        // A[3] has an implicit, transitive, active dependency on E[1].
+        //
+        //  A     B     C     D     E     F
+        //  1 ==============> 1 ==> 1
+        //        1 <-------- 1
+        //  2 --------> 1 <============== 1
+        //  3 ==> 2
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+
+        let v0123_u8: Vec<u8> = vec![0, 1, 2, 3];
+
+        let token_b_active = DependencyToken::create();
+        let token_b_passive = DependencyToken::create();
+        let token_c_active = DependencyToken::create();
+        let token_c_passive = DependencyToken::create();
+        let token_d_active = DependencyToken::create();
+        let token_e_active = DependencyToken::create();
+        let element_b = broker
+            .add_element(
+                "B",
+                0,
+                v0123_u8.clone(),
+                vec![],
+                vec![token_b_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_b_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_e = broker
+            .add_element(
+                "E",
+                0,
+                v0123_u8.clone(),
+                vec![],
+                vec![token_e_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_d = broker
+            .add_element(
+                "D",
+                0,
+                v0123_u8.clone(),
+                vec![
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 1,
+                        requires_token: token_e_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Passive,
+                        dependent_level: 1,
+                        requires_token: token_b_passive
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                ],
+                vec![token_d_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c = broker
+            .add_element(
+                "C",
+                0,
+                v0123_u8.clone(),
+                vec![],
+                vec![token_c_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_c_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_f = broker
+            .add_element(
+                "F",
+                0,
+                v0123_u8.clone(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: 1,
+                    requires_token: token_c_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: 1,
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_a = broker
+            .add_element(
+                "A",
+                0,
+                v0123_u8.clone(),
+                vec![
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 1,
+                        requires_token: token_d_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Passive,
+                        dependent_level: 2,
+                        requires_token: token_c_passive
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 3,
+                        requires_token: token_b_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 2,
+                    },
+                ],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        // Initial required level for all elements should be OFF.
+        // Set all current levels to OFF.
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        assert_eq!(broker.get_required_level(&element_e), Some(0));
+        assert_eq!(broker.get_required_level(&element_f), Some(0));
+        broker.update_current_level(&element_a, 0);
+        broker.update_current_level(&element_b, 0);
+        broker.update_current_level(&element_c, 0);
+        broker.update_current_level(&element_d, 0);
+        broker.update_current_level(&element_e, 0);
+        broker.update_current_level(&element_f, 0);
+
+        // Lease A[3].
+        //
+        // A has two passive dependencies, on B[1] and D[1].
+        // A, B, C, D, E and F's required levels should not change.
+        //
+        // A's lease is pending and contingent.
+        let lease_a = broker.acquire_lease(&element_a, 3).expect("acquire failed");
+        let lease_a_id = lease_a.id.clone();
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        assert_eq!(broker.get_required_level(&element_e), Some(0));
+        assert_eq!(broker.get_required_level(&element_f), Some(0));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), true);
+
+        // Lease F[1].
+        //
+        // F has an active claim on C[1].
+        // A has an active claim on B[2] that should now satisfy D[1]->B[1].
+        // B's required level should now be 2.
+        // C's required level should now be 1.
+        // E's required level should now be 1.
+        // A, D and F's required level should not change.
+        //
+        // A's lease is pending and not contingent.
+        // F's lease is pending and not contingent.
+        let lease_f = broker.acquire_lease(&element_f, 1).expect("acquire failed");
+        let lease_f_id = lease_f.id.clone();
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        assert_eq!(broker.get_required_level(&element_e), Some(1));
+        assert_eq!(broker.get_required_level(&element_f), Some(0));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_f.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_f.id), false);
+
+        // Update B, C and E's current level to 1.
+        //
+        // D's required level should now be 1.
+        // A, B, C, E, and F's required level should not change.
+        //
+        // A's lease should be pending and not contingent.
+        // F's lease should be satisfied and not contingent.
+        broker.update_current_level(&element_b, 1);
+        broker.update_current_level(&element_c, 1);
+        broker.update_current_level(&element_e, 1);
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_required_level(&element_d), Some(1));
+        assert_eq!(broker.get_required_level(&element_e), Some(1));
+        assert_eq!(broker.get_required_level(&element_f), Some(1));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_f.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_f.id), false);
+
+        // Update B's current level to 2 and D's current level to 1.
+        //
+        // A's required level should now be 3.
+        // D's required level should now be 1.
+        // B, C, E, and F's required level should not change.
+        //
+        // A's lease should be satisfied and not contingent.
+        // F's lease should be satisfied and not contingent.
+        broker.update_current_level(&element_b, 2);
+        broker.update_current_level(&element_d, 1);
+        assert_eq!(broker.get_required_level(&element_a), Some(3));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_required_level(&element_d), Some(1));
+        assert_eq!(broker.get_required_level(&element_e), Some(1));
+        assert_eq!(broker.get_required_level(&element_f), Some(1));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.get_lease_status(&lease_f.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_f.id), false);
+
+        // Update A's current level to 3 and F's current level to 1.
+        //
+        // No required levels should change.
+        //
+        // Both leases should be satisfied and not contingent.
+        broker.update_current_level(&element_a, 3);
+        broker.update_current_level(&element_f, 1);
+        assert_eq!(broker.get_required_level(&element_a), Some(3));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_required_level(&element_d), Some(1));
+        assert_eq!(broker.get_required_level(&element_e), Some(1));
+        assert_eq!(broker.get_required_level(&element_f), Some(1));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.get_lease_status(&lease_f.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+        assert_eq!(broker.is_lease_contingent(&lease_f.id), false);
+
+        // Drop Lease F.
+        //
+        // B's required level should stay at 2.
+        // C's required level should stay at 1.
+        // D's required level should stay at 1.
+        // E's required level should stay at 1.
+        //
+        // Lease A should be pending and contingent.
+        broker.drop_lease(&lease_f.id).expect("drop_lease failed");
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+        assert_eq!(broker.get_required_level(&element_d), Some(1));
+        assert_eq!(broker.get_required_level(&element_e), Some(1));
+        assert_eq!(broker.get_required_level(&element_f), Some(0));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), true);
+
+        // Drop Lease A.
+        //
+        // B's required level should stay at 1 (still used by D[1]).
+        // E's required level should stay at 1 (still used by D[1]).
+        //
+        // All required levels should drop to 0.
+        broker.drop_lease(&lease_a.id).expect("drop_lease failed");
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(1));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        assert_eq!(broker.get_required_level(&element_e), Some(1));
+        assert_eq!(broker.get_required_level(&element_f), Some(0));
+
+        // Update D's current level to 0.
+        //
+        // B's required level should drop to 0.
+        broker.update_current_level(&element_d, 0);
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+        assert_eq!(broker.get_required_level(&element_d), Some(0));
+        assert_eq!(broker.get_required_level(&element_e), Some(0));
+        assert_eq!(broker.get_required_level(&element_f), Some(0));
+
+        // All leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_a_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_f_id);
+    }
+
+    #[fuchsia::test]
+    async fn test_lease_implicit_dependency_self_satisfying() {
+        // Tests that cumulative implicit dependencies (both passive and active) are properly
+        // requested when a lease is acquired and when the requested element can satisfy it's
+        // passive dependency with it's own active dependency.
+        //
+        // A[1] has a passive dependency on B[1].
+        // A[2] has an active dependency on B[2].
+        // A[3] has an active dependency on C[2].
+        // B[2] has a passive dependency on C[1].
+        //
+        // A[3] has an implicit, passive dependency on B[1].
+        // A[3] has an implicit, active dependency on B[2].
+        // A[2] has an implicit, transitive, passive dependency on C[1].
+        //
+        // As A[3]->C[2] satisfies the passive dependency B[2]->C[1], and A[2]->B[2] satisfies the
+        // passive dependency A[1]->B[1], this lease would be self-satisfying.
+        //
+        //  A     B     C
+        //  1 --> 1
+        //  2 ==> 2 --> 1
+        //  3 ========> 2
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+
+        let v0123_u8: Vec<u8> = vec![0, 1, 2, 3];
+
+        let token_b_active = DependencyToken::create();
+        let token_b_passive = DependencyToken::create();
+        let token_c_active = DependencyToken::create();
+        let token_c_passive = DependencyToken::create();
+        let element_c = broker
+            .add_element(
+                "C",
+                0,
+                v0123_u8.clone(),
+                vec![],
+                vec![token_c_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_c_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_b = broker
+            .add_element(
+                "B",
+                0,
+                v0123_u8.clone(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Passive,
+                    dependent_level: 2,
+                    requires_token: token_c_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: 1,
+                }],
+                vec![token_b_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_b_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_a = broker
+            .add_element(
+                "A",
+                0,
+                v0123_u8.clone(),
+                vec![
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Passive,
+                        dependent_level: 1,
+                        requires_token: token_b_passive
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 1,
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 2,
+                        requires_token: token_b_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 2,
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: 3,
+                        requires_token: token_c_active
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level: 2,
+                    },
+                ],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        // Initial required level for all elements should be OFF.
+        // Set all current levels to OFF.
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+        broker.update_current_level(&element_a, 0);
+        broker.update_current_level(&element_b, 0);
+        broker.update_current_level(&element_c, 0);
+
+        // Lease A[3].
+        //
+        // C's required level should now be 2.
+        // A and B's required level should not change.
+        //
+        // A's lease should be pending and not contingent.
+        let lease_a = broker.acquire_lease(&element_a, 3).expect("acquire failed");
+        let lease_a_id = lease_a.id.clone();
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(2));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+
+        // Update C's current level to 2.
+        //
+        // B's required level should now be 2.
+        // A and C's required level should not change.
+        //
+        // A's lease should be pending and not contingent.
+        broker.update_current_level(&element_c, 2);
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(2));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+
+        // Update B's current level to 2.
+        //
+        // A's required level should now be 3.
+        // B and C's required level should not change.
+        //
+        // A's lease should be satisfied and not contingent.
+        broker.update_current_level(&element_b, 2);
+        assert_eq!(broker.get_required_level(&element_a), Some(3));
+        assert_eq!(broker.get_required_level(&element_b), Some(2));
+        assert_eq!(broker.get_required_level(&element_c), Some(2));
+        assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_a.id), false);
+
+        // Drop Lease A[3].
+        //
+        // C's required level should stay at 1 (required by B[2]).
+        broker.drop_lease(&lease_a.id).expect("drop_lease failed");
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(1));
+
+        // Update B's current level to 0.
+        //
+        // A and B's required level should not change.
+        // C's required level should now be 0.
+        broker.update_current_level(&element_b, 0);
+        assert_eq!(broker.get_required_level(&element_a), Some(0));
+        assert_eq!(broker.get_required_level(&element_b), Some(0));
+        assert_eq!(broker.get_required_level(&element_c), Some(0));
+
+        // All leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_a_id);
     }
 
     #[fuchsia::test]
