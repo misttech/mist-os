@@ -1312,7 +1312,9 @@ pub(crate) mod test {
     use fidl_fuchsia_bluetooth_gatt2::{
         LocalServiceProxy, Server_Request, Server_RequestStream as GattServerRequestStream,
     };
-    use fidl_fuchsia_bluetooth_host::{HostRequest, HostRequestStream};
+    use fidl_fuchsia_bluetooth_host::{
+        BondingDelegateRequestStream, HostRequest, HostRequestStream,
+    };
     use futures::{future::join, StreamExt};
 
     pub(crate) fn make_test_dispatcher(
@@ -1366,9 +1368,10 @@ pub(crate) mod test {
 
     async fn handle_standard_host_server_init(
         mut host_server: HostRequestStream,
-    ) -> (HostRequestStream, GasEndpoints) {
+    ) -> (HostRequestStream, GasEndpoints, BondingDelegateRequestStream) {
         let mut gas_endpoints = GasEndpoints::default();
-        while gas_endpoints.gatt_server.is_none() {
+        let mut bonding_delegate: Option<BondingDelegateRequestStream> = None;
+        while gas_endpoints.gatt_server.is_none() || bonding_delegate.is_none() {
             match host_server.next().await {
                 Some(Ok(HostRequest::SetLocalName { responder, .. })) => {
                     info!("Setting Local Name");
@@ -1401,24 +1404,29 @@ pub(crate) mod test {
                     info!("Setting connectable");
                     let _ = responder.send(Ok(()));
                 }
+                Some(Ok(HostRequest::SetBondingDelegate { delegate, .. })) => {
+                    info!("Storing Bonding Delegate");
+                    bonding_delegate = Some(delegate.into_stream().unwrap());
+                }
                 Some(Ok(req)) => info!("Unhandled Host Request in add: {:?}", req),
                 Some(Err(e)) => error!("Error in host server: {:?}", e),
                 None => break,
             }
         }
         info!("Finishing host_device mocking for add host");
-        (host_server, gas_endpoints)
+        (host_server, gas_endpoints, bonding_delegate.unwrap())
     }
 
     pub(crate) async fn create_and_add_test_host_to_dispatcher(
         id: HostId,
         dispatcher: &HostDispatcher,
-    ) -> types::Result<(HostRequestStream, HostDevice, GasEndpoints)> {
+    ) -> types::Result<(HostRequestStream, HostDevice, GasEndpoints, BondingDelegateRequestStream)>
+    {
         let (host_server, host_device) = HostDevice::mock_from_id(id);
         let host_server_init_handler = handle_standard_host_server_init(host_server);
-        let (res, (host_server, gas_endpoints)) =
+        let (res, (host_server, gas_endpoints, bonding_delegate)) =
             join(dispatcher.add_host_device(&host_device), host_server_init_handler).await;
         res?;
-        Ok((host_server, host_device, gas_endpoints))
+        Ok((host_server, host_device, gas_endpoints, bonding_delegate))
     }
 }

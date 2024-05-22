@@ -4,7 +4,7 @@
 
 use {
     anyhow::{format_err, Context, Error},
-    fidl_fuchsia_bluetooth_host::{HostProxy, PeerWatcherGetNextResponse},
+    fidl_fuchsia_bluetooth_host::{BondingDelegateProxy, HostProxy, PeerWatcherGetNextResponse},
     fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
     fuchsia_bluetooth::{
         expectation::{
@@ -72,6 +72,7 @@ impl AsRef<EmulatorState> for HostState {
 pub struct Aux {
     pub host: HostProxy,
     pub emulator: EmulatorProxy,
+    pub bonding_delegate: BondingDelegateProxy,
 }
 
 impl AsRef<EmulatorProxy> for Aux {
@@ -159,9 +160,12 @@ async fn new_host_harness(realm: Arc<HostRealm>) -> Result<(HostHarness, Emulato
 
     let peers = HashMap::new();
 
+    let (bonding_delegate, bonding_server) = fidl::endpoints::create_proxy().unwrap();
+    host.set_bonding_delegate(bonding_server).context("Error setting bonding delegate")?;
+
     let harness = HostHarness(expectable(
         HostState { emulator_state: EmulatorState::default(), host_info, peers },
-        Aux { host, emulator: emulator.emulator().clone() },
+        Aux { host, emulator: emulator.emulator().clone(), bonding_delegate },
     ));
 
     Ok((harness, emulator))

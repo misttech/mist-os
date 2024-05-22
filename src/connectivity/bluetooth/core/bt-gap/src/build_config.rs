@@ -202,6 +202,7 @@ mod tests {
                             assert!(expected_reqs.remove("set_bredr_security_mode"));
                             assert_eq!(test_config.bredr.security_mode, bredr_security_mode);
                         }
+                        HostRequest::SetBondingDelegate { .. } => {}
                         _ => panic!("unexpected HostRequest!"),
                     };
                     future::ok(())

@@ -27,7 +27,7 @@ async fn setup_configuration_test() -> types::Result<(
     ConfigurationRequestStream,
 )> {
     let dispatcher = hd_test::make_simple_test_dispatcher();
-    let (host_server, _, _gatt_server) =
+    let (host_server, _, _gatt_server, _delegate) =
         hd_test::create_and_add_test_host_to_dispatcher(HostId(42), &dispatcher).await?;
     let (client, server) =
         fidl::endpoints::create_proxy_and_stream::<ConfigurationMarker>().unwrap();
@@ -196,7 +196,7 @@ async fn configure_applies_to_multiple_devices() {
         setup_configuration_test().await.unwrap();
     let host1_info = dispatcher.active_host().await.unwrap().info();
     let host2_id = HostId(host1_info.id.0 + 1);
-    let (host2_server, _, _gatt_server) =
+    let (host2_server, _, _gatt_server, _bonding) =
         hd_test::create_and_add_test_host_to_dispatcher(host2_id, &dispatcher).await.unwrap();
 
     let run_configuration = configuration::run(dispatcher, server);

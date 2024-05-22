@@ -5,7 +5,8 @@
 use anyhow::{format_err, Context};
 use fidl_fuchsia_bluetooth::{self as fbt, DeviceClass};
 use fidl_fuchsia_bluetooth_host::{
-    DiscoverySessionMarker, DiscoverySessionProxy, HostEvent, HostProxy, HostStartDiscoveryRequest,
+    BondingDelegateMarker, BondingDelegateProxy, BondingDelegateWatchBondsResponse,
+    DiscoverySessionMarker, DiscoverySessionProxy, HostProxy, HostStartDiscoveryRequest,
     PeerWatcherGetNextResponse, PeerWatcherMarker,
 };
 use fidl_fuchsia_bluetooth_sys as sys;
@@ -13,7 +14,7 @@ use fuchsia_async as fasync;
 use fuchsia_bluetooth::inspect::Inspectable;
 use fuchsia_bluetooth::types::{Address, BondingData, HostData, HostId, HostInfo, Peer, PeerId};
 use fuchsia_sync::RwLock;
-use futures::{future::try_join_all, Future, FutureExt, StreamExt, TryFutureExt};
+use futures::{future::try_join_all, Future, FutureExt, TryFutureExt};
 use std::pin::pin;
 use std::sync::{Arc, Weak};
 use tracing::{debug, error, info, trace, warn};
@@ -57,6 +58,7 @@ pub struct HostDeviceState {
     device_path: String,
     proxy: HostProxy,
     info: RwLock<Inspectable<HostInfo>>,
+    bonding_delegate_proxy: BondingDelegateProxy,
 }
 
 /// A type for easy debug printing of the main identifiers for the host device, namely: The device
@@ -81,7 +83,15 @@ pub struct HostDebugIdentifiers {
 // the future was polled.
 impl HostDevice {
     pub fn new(device_path: String, proxy: HostProxy, info: Inspectable<HostInfo>) -> Self {
-        HostDevice(Arc::new(HostDeviceState { device_path, proxy, info: RwLock::new(info) }))
+        let (bonding_delegate_proxy, server) =
+            fidl::endpoints::create_proxy::<BondingDelegateMarker>().unwrap();
+        proxy.set_bonding_delegate(server).unwrap();
+        HostDevice(Arc::new(HostDeviceState {
+            device_path,
+            proxy,
+            info: RwLock::new(info),
+            bonding_delegate_proxy,
+        }))
     }
 
     pub fn proxy(&self) -> &HostProxy {
@@ -178,8 +188,11 @@ impl HostDevice {
 
         // Bonds that can't be restored are sent back in Ok(Vec<_>), which would not cause
         // try_join_all to bail early
-        try_join_all(bonds_chunks.map(|c| self.0.proxy.restore_bonds(c).map_err(|e| e.into())))
-            .map_ok(|v| v.into_iter().flatten().collect())
+        try_join_all(
+            bonds_chunks
+                .map(|c| self.0.bonding_delegate_proxy.restore_bonds(c).map_err(|e| e.into())),
+        )
+        .map_ok(|v| v.into_iter().flatten().collect())
     }
 
     pub fn set_connectable(&self, value: bool) -> impl Future<Output = types::Result<()>> {
@@ -259,16 +272,51 @@ impl HostDevice {
     /// a task that never ends in successful operation and only returns in case of a failure to
     /// communicate with the bt-host device.
     pub async fn watch_events<H: HostListener + Clone>(self, listener: H) -> anyhow::Result<()> {
-        let handle_fidl = self.handle_fidl_events(listener.clone());
         let watch_peers = self.watch_peers(listener.clone());
+        let watch_bonds = self.watch_bonds(listener.clone());
         let watch_state = self.watch_state(listener);
-        let handle_fidl = pin!(handle_fidl);
         let watch_peers = pin!(watch_peers);
         let watch_state = pin!(watch_state);
         futures::select! {
-            res1 = handle_fidl.fuse() => res1.context("failed to handle fuchsia.bluetooth.Host event"),
-            res2 = watch_peers.fuse() => res2.context("failed to relay peer watcher from Host"),
-            res3 = watch_state.fuse() => res3.context("failed to watch Host for HostInfo"),
+            res = watch_peers.fuse() => res.context("failed to relay peer watcher from Host"),
+            res = watch_state.fuse() => res.context("failed to watch Host for HostInfo"),
+            res = watch_bonds.fuse() => res.context("failed to watch bonds"),
+        }
+    }
+
+    fn watch_bonds<H: HostListener>(
+        &self,
+        mut listener: H,
+    ) -> impl Future<Output = types::Result<()>> {
+        let bonding_delegate_proxy = self.0.bonding_delegate_proxy.clone();
+        async move {
+            loop {
+                match bonding_delegate_proxy.watch_bonds().await {
+                    Ok(BondingDelegateWatchBondsResponse::Updated(data)) => {
+                        info!("Received bonding data");
+                        let data: BondingData = match data.try_into() {
+                            Err(e) => {
+                                error!("Invalid bonding data, ignoring: {:#?}", e);
+                                continue;
+                            }
+                            Ok(data) => data,
+                        };
+                        if let Err(e) = listener.on_new_host_bond(data.into()).await {
+                            error!("Failed to persist bonding data: {:#?}", e);
+                        }
+                    }
+                    Ok(BondingDelegateWatchBondsResponse::Removed(_)) => {
+                        // TODO(https://fxbug.dev/42158854): Support removing bonds.
+                        info!("ignoring watch_bonds() removed bond result");
+                    }
+                    Ok(_) => {
+                        debug!("ignoring watch_bonds() unknown result");
+                    }
+                    Err(err) => {
+                        return Err(format_err!("watch_bonds() error: {:?}", err).into());
+                    }
+                }
+            }
         }
     }
 
@@ -308,36 +356,6 @@ impl HostDevice {
         loop {
             let info = self.clone().refresh_host_info().await?;
             listener.on_host_updated(info).await?;
-        }
-    }
-
-    fn handle_fidl_events<H: HostListener>(
-        &self,
-        mut listener: H,
-    ) -> impl Future<Output = types::Result<()>> {
-        let mut stream = self.0.proxy.take_event_stream();
-        async move {
-            while let Some(event) = stream.next().await {
-                match event? {
-                    HostEvent::OnNewBondingData { data } => {
-                        info!("Received bonding data");
-                        let data: BondingData = match data.try_into() {
-                            Err(e) => {
-                                error!("Invalid bonding data, ignoring: {:#?}", e);
-                                continue;
-                            }
-                            Ok(data) => data,
-                        };
-                        if let Err(e) = listener.on_new_host_bond(data.into()).await {
-                            error!("Failed to persist bonding data: {:#?}", e);
-                        }
-                    }
-                    HostEvent::_UnknownEvent { ordinal, .. } => {
-                        warn!("Received unknown event with ordinal {ordinal}");
-                    }
-                };
-            }
-            Err(types::Error::InternalError(format_err!("Host FIDL event stream terminated")))
         }
     }
 
@@ -424,30 +442,59 @@ pub trait HostListener {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use fidl_fuchsia_bluetooth_host::BondingDelegateRequestStream;
+
     use super::*;
 
     use {
         async_helpers::maybe_stream::MaybeStream,
         fidl_fuchsia_bluetooth_host::{
-            DiscoverySessionRequest, DiscoverySessionRequestStream, HostRequest, HostRequestStream,
-            PeerWatcherRequestStream,
+            BondingDelegateRequest, DiscoverySessionRequest, DiscoverySessionRequestStream,
+            HostRequest, HostRequestStream, PeerWatcherRequestStream,
         },
         fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
-        futures::select,
+        futures::{select, StreamExt},
     };
 
-    struct FakeHostServer {
+    pub(crate) struct FakeHostServer {
         host_stream: HostRequestStream,
         host_info: Arc<RwLock<HostInfo>>,
         discovery_stream: MaybeStream<DiscoverySessionRequestStream>,
         peer_watcher_stream: MaybeStream<PeerWatcherRequestStream>,
+        bonding_delegate_stream: MaybeStream<BondingDelegateRequestStream>,
+        pub num_restore_bonds_calls: i32,
     }
 
     impl FakeHostServer {
-        async fn run(&mut self) -> Result<(), anyhow::Error> {
+        pub(crate) fn new(
+            server: HostRequestStream,
+            host_info: Arc<RwLock<HostInfo>>,
+        ) -> FakeHostServer {
+            FakeHostServer {
+                host_stream: server,
+                host_info,
+                discovery_stream: MaybeStream::default(),
+                peer_watcher_stream: MaybeStream::default(),
+                bonding_delegate_stream: MaybeStream::default(),
+                num_restore_bonds_calls: 0,
+            }
+        }
+
+        pub(crate) async fn run(&mut self) -> Result<(), anyhow::Error> {
             loop {
                 select! {
-                req = self.discovery_stream.next() => {
+                    req = self.bonding_delegate_stream.next() => {
+                        info!("FakeHostServer: bonding_delegate_stream: {:?}", req);
+                        match req {
+                            Some(Ok(BondingDelegateRequest::RestoreBonds { responder, .. })) => {
+                                let _ = responder.send(&[]);
+                                self.num_restore_bonds_calls += 1;
+                            }
+                            Some(Ok(BondingDelegateRequest::WatchBonds {..})) => {}
+                            x => panic!("Unexpected request in fake host server: {:?}", x),
+                        }
+                    },
+                    req = self.discovery_stream.next() => {
                          info!("FakeHostServer: discovery_stream: {:?}", req);
                          match req {
                             Some(Ok(DiscoverySessionRequest::Stop { .. })) | None => {
@@ -461,6 +508,10 @@ pub(crate) mod test {
                     req = self.host_stream.next() => {
                          info!("FakeHostServer: {:?}", req);
                          match req {
+                             Some(Ok(HostRequest::SetLocalName {local_name, responder })) => {
+                                 self.host_info.write().local_name = Some(local_name);
+                                 let _ = responder.send(Ok(()))?;
+                             }
                              Some(Ok(HostRequest::StartDiscovery { payload, .. })) => {
                                  assert!(!self.host_info.read().discovering);
                                  self.host_info.write().discovering = true;
@@ -478,6 +529,10 @@ pub(crate) mod test {
                                 assert!(!self.peer_watcher_stream.is_some());
                                 self.peer_watcher_stream.set(peer_watcher.into_stream().unwrap());
                              }
+                             Some(Ok(HostRequest::SetBondingDelegate { delegate, .. })) => {
+                                assert!(!self.bonding_delegate_stream.is_some());
+                                self.bonding_delegate_stream.set(delegate.into_stream().unwrap());
+                             }
                              None => {
                                  return Ok(());
                              }
@@ -494,12 +549,7 @@ pub(crate) mod test {
         server: HostRequestStream,
         host_info: Arc<RwLock<HostInfo>>,
     ) -> Result<(), anyhow::Error> {
-        let mut host_server = FakeHostServer {
-            host_stream: server,
-            host_info,
-            discovery_stream: MaybeStream::default(),
-            peer_watcher_stream: MaybeStream::default(),
-        };
+        let mut host_server = FakeHostServer::new(server, host_info);
         host_server.run().await
     }
 }
