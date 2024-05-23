@@ -95,7 +95,7 @@ template <typename T>
 struct HasOperatorUInt32<
     T,
     std::enable_if_t<std::is_same_v<uint32_t, decltype((std::declval<T>().operator uint32_t()))>>>
-    : std::true_type {};
+    : std::true_type{};
 
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::PixelFormatType>::value);
 static_assert(HasOperatorUInt32<fuchsia_images2::PixelFormat>::value);
@@ -107,7 +107,7 @@ template <typename T>
 struct HasOperatorUInt64<
     T,
     std::enable_if_t<std::is_same_v<uint64_t, decltype((std::declval<T>().operator uint64_t()))>>>
-    : std::true_type {};
+    : std::true_type{};
 
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::PixelFormatType>::value);
 static_assert(!HasOperatorUInt64<fuchsia_images2::PixelFormat>::value);
@@ -121,12 +121,12 @@ struct IsFidlEnum : std::false_type {};
 template <typename T>
 struct IsFidlEnum<
     T, typename std::enable_if<fidl::IsFidlType<T>::value && std::is_enum<T>::value>::type>
-    : std::true_type {};
+    : std::true_type{};
 template <typename T>
 struct IsFidlEnum<T, typename std::enable_if<fidl::IsFidlType<T>::value &&
                                              (internal::HasOperatorUInt32<T>::value ||
                                               internal::HasOperatorUInt64<T>::value)>::type>
-    : std::true_type {};
+    : std::true_type{};
 
 enum TestEnum {
   kTestEnumZero,
@@ -318,6 +318,11 @@ V1CopyFromV2ImageFormatConstraints(const fuchsia_sysmem2::ImageFormatConstraints
 V1CopyFromV2ImageFormatConstraints(const fuchsia_sysmem2::wire::ImageFormatConstraints& v2);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
+    const fuchsia_images2::ImageFormat& v2);
+[[nodiscard]] fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
+    const fuchsia_images2::wire::ImageFormat& v2);
+// The parameter will not be modified; the const-parameter alternatives above are preferred.
+[[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
     fuchsia_images2::ImageFormat& v2);
 [[nodiscard]] fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
     fuchsia_images2::wire::ImageFormat& v2);
@@ -392,6 +397,9 @@ fuchsia_sysmem2::Heap MakeHeap(std::string heap_type, uint64_t heap_id);
 V2CopyFromV1ImageFormatConstraints(const fuchsia_sysmem::ImageFormatConstraints& v1);
 [[nodiscard]] fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
     const fuchsia_sysmem::ImageFormat2& v1);
+[[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
+    const fuchsia_images2::ImageFormat& v2);
+// The parameter won't be modified; the const-parameter version above is preferred.
 [[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
     fuchsia_images2::ImageFormat& v2);
 
