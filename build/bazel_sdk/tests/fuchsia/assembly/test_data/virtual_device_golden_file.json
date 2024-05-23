@@ -27,6 +27,7 @@
         },
         "name": "test",
         "ports": {
+            "adb": 5555,
             "debug": 2345,
             "mdns": 5353,
             "ssh": 22

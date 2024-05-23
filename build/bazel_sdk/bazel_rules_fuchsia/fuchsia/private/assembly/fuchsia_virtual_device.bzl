@@ -49,6 +49,7 @@ def _fuchsia_virtual_device_impl(ctx):
                 "ssh": 22,
                 "mdns": 5353,
                 "debug": 2345,
+                "adb": 5555,
             },
         },
     }
