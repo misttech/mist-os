@@ -7,7 +7,7 @@ use {
     async_trait::async_trait,
     camino::{Utf8Path, Utf8PathBuf},
     errors::ffx_bail,
-    ffx_config::EnvironmentContext,
+    ffx_config::{environment::EnvironmentKind, EnvironmentContext},
     ffx_repository_serve_args::ServeCommand,
     ffx_target::{get_target_specifier, knock_target_by_name},
     fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter},
@@ -36,7 +36,7 @@ use {
         consts::signal::{SIGHUP, SIGINT, SIGTERM},
         iterator::Signals,
     },
-    std::{fs, io::Write, path::Path, sync::Arc, time::Duration},
+    std::{fs, io::Write, sync::Arc, time::Duration},
     timeout::timeout,
     tuf::metadata::RawSignedMetadata,
 };
@@ -276,12 +276,15 @@ $ ffx doctor --restart-daemon"#,
         (repo_path, None) => {
             let repo_path = if let Some(repo_path) = repo_path {
                 repo_path
-            } else {
-                let fuchsia_build_dir = context.build_dir().unwrap_or(&Path::new(""));
-                let fuchsia_build_dir = Utf8Path::from_path(fuchsia_build_dir)
+            } else if let EnvironmentKind::InTree { build_dir: Some(build_dir), .. } =
+                context.env_kind()
+            {
+                let build_dir = Utf8Path::from_path(build_dir)
                     .with_context(|| format!("converting repo path to UTF-8 {:?}", repo_path))?;
 
-                fuchsia_build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
+                build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
+            } else {
+                ffx_bail!("Either --repo-path or --product-bundle need to be specified");
             };
 
             // Create PmRepository and RepoClient
