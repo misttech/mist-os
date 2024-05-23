@@ -7,6 +7,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
+#include <lib/mistos/starnix/kernel/execution/shared.h>
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -19,6 +20,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -29,6 +31,7 @@
 #include <lib/mistos/zbi_parser/bootfs.h>
 #include <lib/mistos/zbi_parser/option.h>
 #include <lib/mistos/zbi_parser/zbi.h>
+#include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -43,6 +46,8 @@
 #include "../kernel_priv.h"
 
 #include <ktl/enforce.h>
+
+#include <linux/sched.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
@@ -143,6 +148,227 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   }
 
   return fit::ok(builder);
+}
+
+fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
+                                                        ktl::optional<Signal> child_exit_signal,
+                                                        user_out_ptr<pid_t> user_parent_tid,
+                                                        user_out_ptr<pid_t> user_child_tid) {
+  const uint64_t IMPLEMENTED_FLAGS =
+      (CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM |
+       CLONE_SETTLS | CLONE_PARENT_SETTID | CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID |
+       CLONE_VFORK | CLONE_PTRACE);
+
+  // A mask with all valid flags set, because we want to return a different error code for an
+  // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
+  // mask with all flags below it set. Shift up by one to make sure the largest flag is also
+  // set.
+  const uint64_t VALID_FLAGS = (CLONE_INTO_CGROUP << 1) - 1;
+
+  auto clone_files = (flags & CLONE_FILES) != 0;
+  auto clone_fs = (flags & CLONE_FS) != 0;
+  // auto clone_parent_settid = (flags & CLONE_PARENT_SETTID) != 0;
+  // auto clone_child_cleartid = (flags & CLONE_CHILD_CLEARTID) != 0;
+  // auto clone_child_settid = (flags & CLONE_CHILD_SETTID) != 0;
+  auto clone_sysvsem = (flags & CLONE_SYSVSEM) != 0;
+  auto clone_ptrace = (flags & CLONE_PTRACE) != 0;
+  auto clone_thread = (flags & CLONE_THREAD) != 0;
+  auto clone_vm = (flags & CLONE_VM) != 0;
+  auto clone_sighand = (flags & CLONE_SIGHAND) != 0;
+  auto clone_vfork = (flags & CLONE_VFORK) != 0;
+
+  // auto new_uts = (flags & CLONE_NEWUTS) != 0;
+
+  if (clone_ptrace) {
+    // track_stub !(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
+  }
+
+  if (clone_sysvsem) {
+    // track_stub !(TODO("https://fxbug.dev/322875185"), "CLONE_SYSVSEM");
+  }
+
+  if (clone_sighand && !clone_vm) {
+    return fit::error(errno(EINVAL));
+  }
+  if (clone_thread && !clone_sighand) {
+    return fit::error(errno(EINVAL));
+  }
+  if ((flags & ~VALID_FLAGS) != 0) {
+    return fit::error(errno((EINVAL)));
+  }
+
+  if (clone_vm && !clone_thread) {
+    // TODO(https://fxbug.dev/42066087) Implement CLONE_VM for child processes (not just child
+    // threads). Currently this executes CLONE_VM (explicitly passed to clone() or as
+    // used by vfork()) as a fork (the VM in the child is copy-on-write) which is almost
+    // always OK.
+    //
+    // CLONE_VM is primarily as an optimization to avoid making a copy-on-write version of a
+    // process' VM that will be immediately replaced with a call to exec(). The main users
+    // (libc and language runtimes) don't actually rely on the memory being shared between
+    // the two processes. And the vfork() man page explicitly allows vfork() to be
+    // implemented as fork() which is what we do here.
+    if (!clone_vfork) {
+      // track_stub !(TODO("https://fxbug.dev/322875227"),"CLONE_VM without CLONE_THREAD or
+      // CLONE_VFORK");
+    }
+  } else if (clone_thread && !clone_vm) {
+    // track_stub !(TODO("https://fxbug.dev/322875167"), "CLONE_THREAD without CLONE_VM");
+    return fit::error(errno(ENOSYS));
+  }
+
+  if ((flags & ~IMPLEMENTED_FLAGS) != 0) {
+    // track_stub !(TODO("https://fxbug.dev/322875130"), "clone unknown flags", flags &
+    // !IMPLEMENTED_FLAGS);
+    return fit::error(errno(ENOSYS));
+  }
+
+  auto fs = clone_fs ? (*this)->fs() : (*this)->fs()->fork();
+  auto files = clone_files ? (*this)->files : (*this)->files.fork();
+
+  auto kernel = (*this)->kernel();
+  auto& pids = *kernel->pids.Write();
+
+  pid_t pid;
+  fbl::String command;
+  Credentials creds;
+  // let scheduler_policy;
+  // let uts_ns;
+  bool no_new_privs;
+  // let seccomp_filters;
+  // let robust_list_head = UserAddress::NULL.into();
+  // let child_signal_mask;
+  // let timerslack_ns;
+
+  auto task_info_or_error = [&]() -> fit::result<Errno, TaskInfo> {
+    // Make sure to drop these locks ASAP to avoid inversion
+    auto self = (*this);
+    auto& thread_group_state = self->thread_group->write();
+    auto state = self->mutable_state_.Read();
+
+    no_new_privs = (*state).no_new_privs();
+    // seccomp_filters = state.seccomp_filters.clone();
+    // child_signal_mask = state.signals.mask();
+
+    pid = pids.allocate_pid();
+    command = self->command();
+    creds = self->creds();
+    // scheduler_policy = state.scheduler_policy.fork();
+    // timerslack_ns = state.timerslack_ns;
+
+    /*
+    uts_ns = if new_uts {
+        if !self.creds().has_capability(CAP_SYS_ADMIN) {
+            return error!(EPERM);
+        }
+
+        // Fork the UTS namespace of the existing task.
+        let new_uts_ns = state.uts_ns.read().clone();
+        Arc::new(RwLock::new(new_uts_ns))
+    } else {
+        // Inherit the UTS of the existing task.
+        state.uts_ns.clone()
+    };
+    */
+
+    if (clone_thread) {
+      auto thread_group = (*this)->thread_group;
+      auto memory_manager = (*this)->mm();
+      return fit::ok(TaskInfo{{}, thread_group, memory_manager});
+    } else {
+      // Drop the lock on this task before entering `create_zircon_process`, because it will
+      // take a lock on the new thread group, and locks on thread groups have a higher
+      // priority than locks on the task in the thread group.
+      /*
+      std::mem::drop(state);
+      let signal_actions = if clone_sighand {
+          self.thread_group.signal_actions.clone()
+      } else {
+          self.thread_group.signal_actions.fork()
+      };
+      */
+      auto process_group = thread_group_state.process_group;
+      return create_zircon_process(kernel, (*this)->thread_group, pid, process_group, command);
+    }
+  }();
+  if (task_info_or_error.is_error())
+    return task_info_or_error.take_error();
+
+  // Only create the vfork event when the caller requested CLONE_VFORK.
+  // let vfork_event = if clone_vfork { Some(Arc::new (zx::Event::create())) }
+  // else {None};
+
+  auto& [thread, thread_group, memory_manager] = task_info_or_error.value();
+
+  auto child = TaskBuilder(
+      Task::New(pid, command, thread_group, ktl::move(thread), files, memory_manager, fs, creds));
+
+  {
+    auto child_task = child.task;
+    // Drop the pids lock as soon as possible after creating the child. Destroying the child
+    // and removing it from the pids table itself requires the pids lock, so if an early exit
+    // takes place we have a self deadlock.
+    pids.add_task(child_task);
+    if (!clone_thread) {
+      pids.add_thread_group(child->thread_group);
+    }
+    // std::mem::drop(pids);
+
+    // Child lock must be taken before this lock. Drop the lock on the task, take a writable
+    // lock on the child and take the current state back.
+
+    /*
+    #[cfg(any(test, debug_assertions))]
+    {
+        // Take the lock on the thread group and its child in the correct order to ensure any wrong
+    ordering
+        // will trigger the tracing-mutex at the right call site.
+        if !clone_thread {
+            let _l1 = self.thread_group.read();
+            let _l2 = child.thread_group.read();
+        }
+    }
+    */
+
+    if (clone_thread) {
+      auto result = (*this)->thread_group->add(child_task);
+      if (result.is_error())
+        return result.take_error();
+
+    } else {
+      auto result = child->thread_group->add(child_task);
+      if (result.is_error())
+        return result.take_error();
+
+      // let mut child_state = child.write();
+      // let state = self.read();
+      // child_state.signals.alt_stack = state.signals.alt_stack;
+      // child_state.signals.set_mask(state.signals.mask());
+      result = (*this)->mm()->snapshot_to(child->mm());
+      if (result.is_error())
+        return result.take_error();
+    }
+  }
+
+  /*
+  // Take the lock on thread group and task in the correct order to ensure any wrong ordering
+  // will trigger the tracing-mutex at the right call site.
+  #[cfg(any(test, debug_assertions))]
+  {
+      let _l1 = child.thread_group.read();
+      let _l2 = child.read();
+  }
+  */
+
+  return fit::ok(child);
+}
+
+starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
+    uint64_t flags, ktl::optional<Signal> exit_signal) {
+  auto result = clone_task(flags, exit_signal, make_user_out_ptr<pid_t>(nullptr),
+                           make_user_out_ptr<pid_t>(nullptr));
+  ASSERT_MSG(result.is_ok(), "failed to create task in test");
+  return starnix::testing::AutoReleasableTask::From(result.value());
 }
 
 fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const fbl::String& path,

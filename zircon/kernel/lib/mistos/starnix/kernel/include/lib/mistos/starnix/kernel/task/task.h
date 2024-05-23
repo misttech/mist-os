@@ -84,6 +84,7 @@ class TaskMutableState {
   /// by any other thread that shares this namespace.
   // pub uts_ns: UtsNamespaceHandle,
 
+ private:
   /// Bit that determines whether a newly started program can have privileges its parent does
   /// not have.  See Documentation/prctl/no_new_privs.txt in the Linux kernel for details.
   /// Note that Starnix does not currently implement the relevant privileges (e.g.,
@@ -93,7 +94,7 @@ class TaskMutableState {
   /// The documentation indicates that this can only ever be set to
   /// true, and it cannot be reverted to false.  Accessor methods
   /// for this field ensure this property.
-  // no_new_privs: bool,
+  bool no_new_privs_;
 
   /// Userspace hint about how to adjust the OOM score for this process.
   // pub oom_score_adj: i32,
@@ -122,6 +123,10 @@ class TaskMutableState {
   /// Information that a tracer needs to communicate with this process, if it
   /// is being traced.
   // pub ptrace: Option<PtraceState>,
+
+ public:
+  /// impl TaskMutableState
+  bool no_new_privs() { return no_new_privs_; }
 
  public:
   // TaskMutableState(const TaskMutableState&) = delete;
@@ -325,9 +330,9 @@ class Task : public fbl::RefCountedUpgradeable<Task> {
     }
   */
 
-  const fbl::RefPtr<FsContext>& fs() const;
+  fbl::RefPtr<FsContext>& fs();
 
-  const fbl::RefPtr<MemoryManager>& mm() const;
+  fbl::RefPtr<MemoryManager>& mm();
 
   util::WeakPtr<Task> get_task(pid_t pid);
 
@@ -341,11 +346,15 @@ class Task : public fbl::RefCountedUpgradeable<Task> {
 
   FsCred as_fscred() const { return creds().as_fscred(); }
 
+  fbl::String command() const { return persistent_info->Lock()->command(); }
+
   // C++
  public:
   ~Task();
 
  private:
+  friend class CurrentTask;
+
   Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group, ktl::optional<zx::thread> thread,
        FdTable files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
        ktl::optional<fbl::RefPtr<FsContext>> fs);

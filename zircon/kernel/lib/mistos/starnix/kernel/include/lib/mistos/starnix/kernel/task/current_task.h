@@ -18,8 +18,10 @@
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/user_copy/user_ptr.h>
 #include <zircon/types.h>
 
 #include <utility>
@@ -27,12 +29,17 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 #include <fbl/vector.h>
+#include <ktl/optional.h>
 
 namespace starnix {
 
+namespace testing {
+class AutoReleasableTask;
+}
+
 class Task;
 
-// The thread related information of a `CurrentTask`. The information should never be used  outside
+// The thread related information of a `CurrentTask`. The information should never be used outside
 // of the thread owning the `CurrentTask`.
 struct ThreadState {
   // A copy of the registers associated with the Zircon thread. Up-to-date values can be read
@@ -251,6 +258,26 @@ class CurrentTask : public MemoryAccessorExt {
       const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
       const fbl::String& initial_name, fbl::RefPtr<FsContext> root_fs,
       TaskInfoFactory&& task_info_factory);
+
+  /// Clone this task.
+  ///
+  /// Creates a new task object that shares some state with this task
+  /// according to the given flags.
+  ///
+  /// Used by the clone() syscall to create both processes and threads.
+  ///
+  /// The exit signal is broken out from the flags parameter like clone3() rather than being
+  /// bitwise-ORed like clone().
+  fit::result<Errno, TaskBuilder> clone_task(uint64_t flags,
+                                             ktl::optional<Signal> child_exit_signal,
+                                             user_out_ptr<pid_t> user_parent_tid,
+                                             user_out_ptr<pid_t> user_child_tid);
+
+ public:
+  /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
+  /// exit signal as in clone().
+  starnix::testing::AutoReleasableTask clone_task_for_test(uint64_t flags,
+                                                           ktl::optional<Signal> exit_signal);
 
  public:
   // FIXME(Herrera) Temporay method to be deleted

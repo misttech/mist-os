@@ -39,7 +39,7 @@ fbl::RefPtr<Task> Task::New(pid_t id, const fbl::String& command,
                             Credentials creds) {
   fbl::AllocChecker ac;
   fbl::RefPtr<Task> task =
-      fbl::AdoptRef(new (&ac) Task(id, thread_group, std::move(thread), files, mm, fs));
+      fbl::AdoptRef(new (&ac) Task(id, thread_group, ktl::move(thread), ktl::move(files), mm, fs));
   ASSERT(ac.check());
 
   pid_t pid = thread_group->leader;
@@ -54,19 +54,19 @@ Task::Task(pid_t _id, fbl::RefPtr<ThreadGroup> _thread_group, ktl::optional<zx::
     : id(_id),
       thread_group(ktl::move(_thread_group)),
       files(_files),
-      mm_(std::move(mm)),
-      fs_(std::move(fs)) {
+      mm_(ktl::move(mm)),
+      fs_(ktl::move(fs)) {
   *thread.Write() = ktl::move(_thread);
 }
 
 Task::~Task() = default;
 
-const fbl::RefPtr<FsContext>& Task::fs() const {
+fbl::RefPtr<FsContext>& Task::fs() {
   ASSERT_MSG(fs_.has_value(), "fs must be set");
   return fs_.value();
 }
 
-const fbl::RefPtr<MemoryManager>& Task::mm() const {
+fbl::RefPtr<MemoryManager>& Task::mm() {
   ASSERT_MSG(mm_.has_value(), "mm must be set");
   return mm_.value();
 }
