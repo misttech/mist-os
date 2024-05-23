@@ -54,7 +54,8 @@ class TestListExecutionEntry:
 class TestListEntry:
     """A single test entry stored in test-list.json."""
 
-    # The name of the test. Must be unique in the file.
+    # The name of the test. Must be unique in the file for device tests, may
+    # overlap for host.
     name: str
 
     # A list of tags for the test, stored as KV pairs.
