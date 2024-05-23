@@ -22,13 +22,13 @@ void LdLoadZirconProcessTestsBase::set_process(zx::process process) {
 
 int64_t LdLoadZirconProcessTestsBase::Wait() {
   int64_t result = -1;
-
-  auto wait_for_termination = [this, &result]() {
+  auto wait_for_termination = [process = std::exchange(process_, {}), &result]() {
+    ASSERT_TRUE(process) << "Wait() called before Init()?";
     zx_signals_t signals;
-    ASSERT_EQ(process_.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), &signals), ZX_OK);
+    ASSERT_EQ(process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), &signals), ZX_OK);
     ASSERT_TRUE(signals & ZX_PROCESS_TERMINATED);
     zx_info_process_t info;
-    ASSERT_EQ(process_.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr), ZX_OK);
+    ASSERT_EQ(process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr), ZX_OK);
     ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_STARTED);
     ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_EXITED);
     result = info.return_code;
@@ -91,7 +91,7 @@ int64_t LdLoadZirconProcessTestsBase::Run(  //
     TestProcessArgs* bootstrap, std::optional<size_t> stack_size, const zx::thread& thread,
     uintptr_t entry, uintptr_t vdso_base, const zx::vmar& root_vmar) {
   Start(bootstrap, {}, stack_size, thread, entry, vdso_base, root_vmar);
-  return ::testing::Test::HasFailure() ? -1 : Wait();
+  return ::testing::Test::HasFatalFailure() ? -1 : Wait();
 }
 
 LdLoadZirconProcessTestsBase::~LdLoadZirconProcessTestsBase() {

@@ -102,9 +102,15 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
 
   const zx::vmar& root_vmar() { return root_vmar_; }
 
+  uintptr_t entry() const { return entry_; }
+
   void set_entry(uintptr_t entry) { entry_ = entry; }
 
+  uintptr_t vdso_base() const { return vdso_base_; }
+
   void set_vdso_base(uintptr_t vdso_base) { vdso_base_ = vdso_base; }
+
+  std::optional<size_t> stack_size() const { return stack_size_; }
 
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 

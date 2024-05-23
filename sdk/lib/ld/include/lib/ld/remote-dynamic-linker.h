@@ -22,7 +22,11 @@ namespace ld {
 // It may or may not be the first or only dynamic linking session performed on
 // the same process.  Each dynamic linking session defines its own symbolic
 // dynamic linking domain and has its own passive ABI (stub dynamic linker).
-// TODO(https://fxbug.dev/326524302): Describe Zygote options.
+//
+// The second optional template parameter can select the "zygote mode"
+// implementation.  This is used by the <lib/ld/remote-zygote.h> API, which
+// provides the ld::RemoteZygote::Linker alias.  The zygote-mode linker is used
+// in the same ways as the plain ld::RemoteDynamicLinker described here.
 //
 // Before creating an ld::RemoteDynamicLinker, the ld::RemoteAbiStub must be
 // provided (see <lib/ld/remote-abi-stub.h>).  Only a single ld::RemoteAbiStub
@@ -131,8 +135,9 @@ namespace ld {
 // The VMAR handles are no longer available and the VmarLoader objects would
 // need to be reinitialized to be used again.  The segment VMO handles are
 // still available, but when not in zygote mode they are in use by process
-// mappings and must not be touched.  TODO(https://fxbug.dev/326524302): In
-// Zygote mode, it can also be distilled into a zygote.
+// mappings and must not be touched.  In zygote mode, the relocated segment
+// VMOs will be made read-only and then reused (directly for RELRO mappings or
+// via copy-on-write copies) to load additional as-relocated process images.
 //
 // Various other methods are provided for interrogating the list of modules and
 // accessing the dynamic linker stub module and the ld::RemoteAbi object.
@@ -326,8 +331,8 @@ class RemoteDynamicLinker {
 
   // Other accessors should be used only after a successful Init call (below).
 
-  RemoteAbi<Elf>& remote_abi() { return remote_abi_; }
-  const RemoteAbi<Elf>& remote_abi() const { return remote_abi_; }
+  RemoteAbi<Module>& remote_abi() { return remote_abi_; }
+  const RemoteAbi<Module>& remote_abi() const { return remote_abi_; }
 
   List& modules() { return modules_; }
   const List& modules() const { return modules_; }
@@ -702,7 +707,28 @@ class RemoteDynamicLinker {
       // Resolve against the successfully decoded modules, ignoring the others.
       return module.Relocate(diag, valid_modules, tls_desc_resolver);
     };
-    return OnModules(valid_modules, relocate) && FinishAbi(diag);
+
+    // After the segments are complete, make sure all the VMO handles are
+    // read-only so they don't accidentally get mutated.  This isn't necessary
+    // in non-zygote mode since the object won't usually be saved long anyway.
+    auto protect_segments = [&diag](auto& module) -> bool {
+      return module.load_info().VisitSegments([&diag](auto& segment) -> bool {
+        using SegmentType = std::decay_t<decltype(segment)>;
+        if constexpr (elfldltl::kSegmentHasFilesz<SegmentType>) {
+          zx::result<> result = segment.MakeImmutable();
+          if (result.is_error()) [[unlikely]] {
+            return diag.SystemError(  //
+                "cannot drop ZX_RIGHT_WRITE from finished zygote VMO",
+                elfldltl::ZirconError{result.error_value()});
+          }
+        }
+        return true;
+      });
+    };
+
+    return OnModules(valid_modules, relocate) && FinishAbi(diag) &&
+           (Zygote == RemoteLoadZygote::kNo ||  // No need for non-zygote.
+            OnModules(valid_modules, protect_segments));
   }
 
   // Load each module into the VMARs created by Allocate.  This should only be
@@ -734,7 +760,11 @@ class RemoteDynamicLinker {
   // mappings and must not be disturbed.  The VmarLoader object for each module
   // will be in moved-from state, and cannot be used without reinitialization.
   //
-  // TODO(https://fxbug.dev/326524302): Describe Zygote options.
+  // In zygote mode, this object can be moved into the ld::RemoteZygote
+  // constructor after Commit().  If it's moved in without Commit(), then all
+  // the mappings made in the original process VMAR will be destroyed and the
+  // existing process should not be started, but the zygote will still work
+  // just the same to start more processes.
   void Commit() {
     for (Module& module : ValidModules()) {
       // After this, destroying the module won't destroy its VMAR any more.  No
@@ -849,7 +879,7 @@ class RemoteDynamicLinker {
   }
 
   AbiStubPtr abi_stub_;
-  RemoteAbi<Elf> remote_abi_;
+  RemoteAbi<Module> remote_abi_;
   List modules_;
   size_type max_tls_modid_ = 0;
   uint32_t stub_modid_ = 0;

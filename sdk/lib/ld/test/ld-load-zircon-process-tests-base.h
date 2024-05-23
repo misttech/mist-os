@@ -46,6 +46,7 @@ class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
               const zx::vmar& root_vmar);
 
   // Wait for the process to die and collect its exit code.
+  // This clears the process() so a new one can be installed.
   int64_t Wait();
 
  private:

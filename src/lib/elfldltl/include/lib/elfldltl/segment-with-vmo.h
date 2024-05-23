@@ -6,6 +6,7 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SEGMENT_WITH_VMO_H_
 
 #include <lib/fit/result.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 
@@ -71,6 +72,16 @@ class SegmentWithVmo {
 
     zx::vmo& vmo() { return vmo_; }
     const zx::vmo& vmo() const { return vmo_; }
+
+    // Replace the VMO handle with an immutable one so no further modifications
+    // can be made.  Note that writable mappings may already exist, but no new
+    // writable mappings can be made with vmo() after this.
+    zx::result<> MakeImmutable() {
+      if (vmo_) {
+        return zx::make_result(vmo_.replace(kReadonlyRights, &vmo_));
+      }
+      return zx::ok();
+    }
 
    private:
     zx::vmo vmo_;
@@ -147,6 +158,7 @@ class SegmentWithVmo {
 
         if (*other_vmo) {
           assert(copy.filesz() == other.filesz());
+
           zx_status_t status =  //
               CopyVmo(other_vmo->borrow(), 0, copy.filesz(), copy.vmo());
           if (status != ZX_OK) [[unlikely]] {
@@ -218,6 +230,31 @@ class SegmentWithVmo {
   using NoCopy = Wrapper<std::false_type>::template Type<Segment>;
   using NoCopySegmentVmo = Wrapper<std::true_type>::SegmentVmo;
 
+  // What's not obvious is that ZX_DEFAULT_VMO_RIGHTS &~ ZX_VM_RIGHT_WRITE
+  // cannot be used here.  The handle from the VMO created in MakeMutable will
+  // certainly have ZX_VM_RIGHT_WRITE, but it won't necessarily have all the
+  // rights in ZX_DEFAULT_VMO_RIGHTS.  The zx_handle_replace system call does
+  // not have a way to mask off rights, only choose a whole new set of rights
+  // that must be a subset of the existing rights--so you have to be sure
+  // what's truly a subset of the existing rights.
+  //
+  // We shouldn't presume exactly what rights the filesystem or loader service
+  // or whatnot gave us on the file VMO handle.  The per-segment VMOs are from
+  // zx_vmo_create_child (in CopyVmo, below), which returns the new VMO via a
+  // handle with rights that depend on the original VMO handle's rights.  So
+  // even though segment.vmo() is a handle we made ourselves, we can't presume
+  // exactly what rights it has.
+  //
+  // So to drop ZX_RIGHT_WRITE for the readonly case below, we'd need to do one
+  // of two things: do a ZX_INFO_HANDLE_BASIC query to find the rights before
+  // masking off ZX_RIGHT_WRITE in zx_handle_replace; or, just use a fixed set
+  // of rights that's small enough to be surely a subset of the VMO rights we
+  // have (as derived from the file VMO handle's rights by the behavior of
+  // zx_vmo_create_child).  Since we know how these particular VMOs will need
+  // to be used later, we do the latter.
+  static constexpr zx_rights_t kReadonlyRights =
+      ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_MAP | ZX_RIGHT_READ;
+
   // This takes a LoadInfo::*Segment type that has file contents (i.e. not
   // ZeroFillSegment), and ensures that segment.vmo() is a valid segment.
   // Unless there's a VMO handle there already, it creates a new copy-on-write
@@ -251,35 +288,6 @@ class SegmentWithVmo {
     using DataWithZeroFillSegment = typename LoadInfo::DataWithZeroFillSegment;
     auto align_segment = [vmo, page_size, readonly, &diag](auto& segment) {
       using Segment = std::decay_t<decltype(segment)>;
-
-      // When there's a partial page to zero, this will create a new VMO.  With
-      // the readonly flag, we want to ensure this VMO won't be modified in the
-      // future, so we want to drop ZX_VM_RIGHT_WRITE from our handle to it.
-      // What's not obvious is that ZX_DEFAULT_VMO_RIGHTS &~ ZX_VM_RIGHT_WRITE
-      // cannot be used here.  The handle from the VMO created in MakeMutable
-      // will certainly have ZX_VM_RIGHT_WRITE, but it won't necessarily have
-      // all the rights in ZX_DEFAULT_VMO_RIGHTS.  The zx_handle_replace system
-      // call does not have a way to mask off rights, only choose a whole new
-      // set of rights that must be a subset of the existing rights--so you
-      // have to be sure what's truly a subset of the existing rights.
-      //
-      // We shouldn't presume exactly what rights the filesystem or loader
-      // service or whatnot gave us on the file VMO handle.  The per-segment
-      // VMOs are from zx_vmo_create_child (in CopyVmo, below), which returns
-      // the new VMO via a handle with rights that depend on the original VMO
-      // handle's rights.  So even though segment.vmo() is a handle we made
-      // ourselves, we can't presume exactly what rights it has.
-      //
-      // So to drop ZX_RIGHT_WRITE for the readonly case below, we'd need to do
-      // one of two things: do a ZX_INFO_HANDLE_BASIC query to find the rights
-      // before masking off ZX_RIGHT_WRITE in zx_handle_replace; or, just use a
-      // fixed set of rights that's small enough to be surely a subset of the
-      // VMO rights we have (as derived from the file VMO handle's rights by
-      // the behavior of zx_vmo_create_child).  Since we know how these
-      // particular VMOs will need to be used later, we do the latter.
-      constexpr zx_rights_t kReadonlyRights =
-          ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_MAP | ZX_RIGHT_READ;
-
       if constexpr (std::is_same_v<Segment, DataWithZeroFillSegment>) {
         const size_t zero_size = segment.MakeAligned(page_size);
         if (zero_size > 0) {
@@ -287,15 +295,21 @@ class SegmentWithVmo {
           if (!MakeMutable(diag, segment, vmo->borrow())) [[unlikely]] {
             return false;
           }
+
           const uint64_t zero_offset = segment.filesz() - zero_size;
           zx_status_t status = ZeroVmo(segment.vmo().borrow(), zero_offset, zero_size);
           if (status != ZX_OK) [[unlikely]] {
             return SystemError(diag, segment, kZeroVmoFail, status);
           }
+
+          // When there's a partial page to zero, this will create a new VMO.
+          // With the readonly flag, we want to ensure this VMO won't be
+          // modified in the future, so we want to drop ZX_VM_RIGHT_WRITE
+          // from our handle to it.
           if (readonly) {
-            status = segment.vmo().replace(kReadonlyRights, &segment.vmo());
-            if (status != ZX_OK) [[unlikely]] {
-              return SystemError(diag, segment, kProtectVmoFail, status);
+            zx::result<> result = segment.MakeImmutable();
+            if (result.is_error()) [[unlikely]] {
+              return SystemError(diag, segment, kProtectVmoFail, result.error_value());
             }
           }
         }

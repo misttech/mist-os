@@ -5,6 +5,7 @@
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-dynamic-linker.h>
+#include <lib/ld/remote-zygote.h>
 
 #include <gtest/gtest.h>
 
@@ -397,6 +398,168 @@ TEST_F(LdRemoteTests, SecondSession) {
   EXPECT_EQ(Wait(), kReturnValue);
 
   ExpectLog("");
+}
+
+TEST_F(LdRemoteTests, Zygote) {
+  constexpr int64_t kReturnValue = 17;
+  constexpr int64_t kSecondaryReturnValue = 23;
+  constexpr int kZygoteCount = 10;
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  const ld::RemoteAbiStub<>::Ptr abi_stub =
+      ld::RemoteAbiStub<>::Create(diag, TakeStubLdVmo(), kPageSize);
+  ASSERT_TRUE(abi_stub);
+
+  // Linker::Module::Decoded and ZygoteLinker::Module::Decoded are the same but
+  // Linker and ZygoteLinker are not quite the same.
+  using ZygoteLinker = ld::RemoteZygote<>::Linker;
+  ZygoteLinker linker{abi_stub};
+
+  zx::vmo exec_vmo = GetExecutableVmo("zygote");
+  EXPECT_TRUE(exec_vmo);
+  zx::vmo vdso_vmo;
+  zx_status_t status = ld::testing::GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+  EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  Linker::Module::DecodedPtr executable =
+      Linker::Module::Decoded::Create(diag, std::move(exec_vmo), kPageSize);
+  Linker::Module::DecodedPtr vdso =
+      Linker::Module::Decoded::Create(diag, std::move(vdso_vmo), kPageSize);
+  ASSERT_TRUE(executable);
+  ASSERT_TRUE(vdso);
+
+  ZygoteLinker::InitModuleList init_modules{{
+      ZygoteLinker::Executable(std::move(executable)),
+      ZygoteLinker::Implicit(std::move(vdso)),
+  }};
+  auto get_dep = GetDepFunction(diag);  // Needed primes this.
+  ASSERT_NO_FATAL_FAILURE(Needed({"libzygote-dep.so"}));
+  auto init_result = linker.Init(diag, std::move(init_modules), get_dep);
+  ASSERT_TRUE(init_result);
+  VerifyAndClearNeeded();
+
+  // Create a process that will be the first to run.  Its ASLR will choose the
+  // load addresses used again for all later zygote processes.
+  ASSERT_NO_FATAL_FAILURE(Init());
+
+  EXPECT_TRUE(linker.Allocate(diag, root_vmar().borrow()));
+  ASSERT_TRUE(linker.Relocate(diag));
+  ASSERT_TRUE(linker.Load(diag));
+
+  // Collect what's needed to start the process.
+  const ZygoteLinker::Module& loaded_vdso = *init_result->back();
+  set_vdso_base(loaded_vdso.module().vaddr_start());
+  set_entry(linker.main_entry());
+  set_stack_size(linker.main_stack_size());
+
+  // The prototype process is ready to start.  The linker object is now
+  // consumed in making the zygote.
+  linker.Commit();
+
+  // Capture the settled load details of the executable and vDSO for later.
+  ZygoteLinker::InitModuleList secondary_init_modules = linker.PreloadedImplicit(*init_result);
+
+  // Make a zygote that holds onto the DecodedPtr references.
+  ld::RemoteZygote<ld::RemoteZygoteVmo::kDecodedPtr> original_zygote;
+  auto result = original_zygote.Insert(std::move(linker));
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  EXPECT_EQ(result->main_entry(), entry());
+  EXPECT_EQ(result->main_stack_size(), stack_size());
+
+  // The += operator allows for splicing that cannot fail, since the DecodedPtr
+  // references just transfer from the other zygote.
+  original_zygote += ld::RemoteZygote<ld::RemoteZygoteVmo::kDecodedPtr>{};
+
+  // Run the prototype process to completion.  It will have changed its segment
+  // contents, but they should not be shared with later runs.
+  EXPECT_EQ(Run(), kReturnValue);
+  ExpectLog("");
+
+  // Move into a zygote that owns only zx::vmo and not DecodedPtr.  Splicing
+  // into this from the zygote that owns DecodedPtr instead can fail.
+  ld::RemoteZygote zygote;
+  auto splice = zygote.Splice(std::move(original_zygote));
+  EXPECT_TRUE(splice.is_ok()) << splice.status_string();
+
+  // The += operator allows for splicing that cannot fail, since the other
+  // object already owns zx::vmo handles directly and they just transfer.
+  zygote += ld::RemoteZygote{};
+
+  for (int i = 1; i <= kZygoteCount; ++i) {
+    // Make a new process.
+    ASSERT_NO_FATAL_FAILURE(Init()) << "zygote child " << i << " of " << kZygoteCount;
+
+    // Load it up from the zygote.
+    EXPECT_TRUE(zygote.Load(diag, root_vmar().borrow()))
+        << "zygote child " << i << " of " << kZygoteCount;
+
+    // Run it to completion.  It would go wrong or return the wrong value if
+    // its segments had been written by an earlier run.
+    EXPECT_EQ(Run(), kReturnValue) << "zygote child " << i << " of " << kZygoteCount;
+    ExpectLog("");
+  }
+
+  // Start a new process for the secondary session test.
+  ASSERT_NO_FATAL_FAILURE(Init()) << "secondary";
+
+  // First the new process gets loaded up from the zygote like the others.
+  EXPECT_TRUE(zygote.Load(diag, root_vmar().borrow())) << "secondary";
+
+  // Fetch the secondary domain's root module.  It's built and packaged as an
+  // executable since it has an entry point that acts like one.
+  constexpr ZygoteLinker::Soname kSecondaryName{"zygote-secondary"};
+  zx::vmo secondary_vmo;
+  ASSERT_NO_FATAL_FAILURE(secondary_vmo = GetExecutableVmo(kSecondaryName.str()));
+  EXPECT_TRUE(secondary_vmo);
+  Linker::Module::DecodedPtr secondary =
+      Linker::Module::Decoded::Create(diag, std::move(secondary_vmo), kPageSize);
+
+  // Now start the secondary session.  The secondary_init_modules list
+  // collected above still corresponds to where the zygote loaded things.
+  ZygoteLinker secondary_linker{abi_stub};
+  secondary_init_modules.emplace_back(
+      ZygoteLinker::RootModule(std::move(secondary), kSecondaryName));
+  ASSERT_NO_FATAL_FAILURE(Needed({"libzygote-dep.so"}));
+  auto secondary_init_result =
+      secondary_linker.Init(diag, std::move(secondary_init_modules), get_dep);
+  ASSERT_TRUE(secondary_init_result);
+
+  EXPECT_TRUE(secondary_linker.Allocate(diag, root_vmar().borrow()));
+  ASSERT_TRUE(secondary_linker.Relocate(diag));
+  ASSERT_TRUE(secondary_linker.Load(diag));
+
+  // This process will start at the secondary module's entry point rather than
+  // the original executable's.  The set_vdso_base() call above is still in
+  // force, since that has not changed since the original session.
+  set_entry(secondary_linker.main_entry());
+  set_stack_size(secondary_linker.main_stack_size());
+
+  // The prototype secondary process is ready to start.
+  secondary_linker.Commit();
+
+  // Consume the secondary_linker object in the existing zygote, so now it will
+  // load both the original and secondary modules into each new process.
+  auto secondary_result = zygote.Insert(std::move(secondary_linker));
+  ASSERT_TRUE(secondary_result.is_ok()) << secondary_result.status_string();
+  EXPECT_EQ(secondary_result->main_entry(), entry());
+  EXPECT_EQ(secondary_result->main_stack_size(), stack_size());
+
+  // Run the prototype secondary process to completion.
+  EXPECT_EQ(Run(), kSecondaryReturnValue);
+  ExpectLog("");
+
+  // Test the combined zygote behaves like the secondary prototype over again.
+  for (int i = 1; i <= kZygoteCount; ++i) {
+    ASSERT_NO_FATAL_FAILURE(Init()) << "secondary zygote child " << i << " of " << kZygoteCount;
+
+    EXPECT_TRUE(zygote.Load(diag, root_vmar().borrow()))
+        << "secondary zygote child " << i << " of " << kZygoteCount;
+
+    EXPECT_EQ(Run(), kSecondaryReturnValue)
+        << "secondary zygote child " << i << " of " << kZygoteCount;
+    ExpectLog("");
+  }
 }
 
 TEST_F(LdRemoteTests, RemoteAbiStub) {

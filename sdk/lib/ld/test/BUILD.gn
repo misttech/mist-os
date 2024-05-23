@@ -37,10 +37,7 @@ test("ld-unittests") {
     deps += [ ":load-tests" ]
   }
   if (is_fuchsia) {
-    sources += [
-      "mock-loader-service-tests.cc",
-      "remote-tests.cc",
-    ]
+    sources += [ "mock-loader-service-tests.cc" ]
   }
 }
 
@@ -118,6 +115,7 @@ source_set("load-tests") {
       "ld-startup-in-process-tests-zircon.h",
       "ld-startup-spawn-process-tests-zircon.cc",
       "ld-startup-spawn-process-tests-zircon.h",
+      "remote-tests.cc",
     ]
     deps += [
       "..:ld-stub.basic",
