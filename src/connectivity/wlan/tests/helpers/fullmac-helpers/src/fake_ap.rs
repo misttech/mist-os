@@ -230,11 +230,11 @@ async fn get_eapol_frame_from_test_realm(
     fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
 ) -> Vec<u8> {
     let frame_data = assert_variant!(fullmac_req_stream.next().await,
-    fidl_fullmac::WlanFullmacImplBridgeRequest::EapolTx { payload, responder } => {
-        responder
-            .send()
-            .expect("Failed to respond to EapolTx");
-        payload.data.unwrap()
+        fidl_fullmac::WlanFullmacImplBridgeRequest::EapolTx { payload, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to EapolTx");
+            payload.data.unwrap()
     });
 
     fullmac_ifc_proxy
@@ -257,11 +257,11 @@ async fn get_sae_frame_from_test_realm(
     fullmac_req_stream: &mut RecordedRequestStream,
 ) -> fidl_mlme::SaeFrame {
     let fullmac_sae_frame = assert_variant!(fullmac_req_stream.next().await,
-    fidl_fullmac::WlanFullmacImplBridgeRequest::SaeFrameTx { frame, responder } => {
-        responder
-            .send()
-            .expect("Failed to respond to SaeFrameTx");
-        frame
+        fidl_fullmac::WlanFullmacImplBridgeRequest::SaeFrameTx { frame, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to SaeFrameTx");
+            frame
     });
 
     fidl_mlme::SaeFrame {
