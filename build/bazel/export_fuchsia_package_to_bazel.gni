@@ -77,7 +77,7 @@ template("export_fuchsia_package_to_bazel") {
   bazel_input_resource(target_name) {
     forward_variables_from(invoker,
                            [
-                             "gn_target_names",
+                             "gn_targets_name",
                              "deps",
                              "testonly",
                              "visibility",
