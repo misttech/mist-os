@@ -56,7 +56,7 @@ zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_
   fs::DirentFiller df(data, len);
   zx_status_t r = 0;
   if (cookie->n < kDotId) {
-    uint64_t ino = fio::wire::kInoUnknown;
+    uint64_t ino = fio::kInoUnknown;
     if ((r = df.Next(".", VTYPE_TO_DTYPE(V_TYPE_DIR), ino)) != ZX_OK) {
       *out_actual = df.BytesFilled();
       return r;
@@ -74,7 +74,8 @@ zx_status_t PseudoDir::Readdir(VdirCookie* cookie, void* data, size_t len, size_
     if (!attr.is_ok()) {
       continue;
     }
-    if (df.Next(it->name(), VTYPE_TO_DTYPE(*attr->mode), *attr->id) != ZX_OK) {
+    if (df.Next(it->name(), VTYPE_TO_DTYPE(attr->mode.value_or(0)),
+                attr->id.value_or(fio::kInoUnknown)) != ZX_OK) {
       *out_actual = df.BytesFilled();
       return ZX_OK;
     }
