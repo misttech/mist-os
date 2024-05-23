@@ -25,17 +25,6 @@ archives.
 
 From //build/images/args.gni:120
 
-### additional_boards
-
-Additional boards (such as vendor boards) that are to be added to the build
-graph, and built when all boards for a given architecture are built.  These
-boards MUST be valid in the configured default_toolchain, and be for the
-current 'target_cpu'.
-
-**Current value (from the default):** `[]`
-
-From //boards/BUILD.gn:13
-
 ### additional_boot_args
 
 List of arguments to add to /boot/config/additional_boot_args.
@@ -167,6 +156,15 @@ injected that way can override that option's setting in this list.
 **Current value (from the default):** `["detect_stack_use_after_return=1", "quarantine_size_mb=32"]`
 
 From //build/config/sanitizers/sanitizer_default_options.gni:16
+
+### assembly_board_configs
+
+Platform builders should populate this list in their product.gni file.
+The result will be built and uploaded to CIPD by infra.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:136
 
 ### assembly_generate_fvm_fastboot
 
