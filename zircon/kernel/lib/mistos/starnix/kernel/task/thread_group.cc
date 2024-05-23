@@ -40,13 +40,12 @@ fbl::RefPtr<ThreadGroup> ThreadGroup::New(fbl::RefPtr<Kernel> kernel, zx::proces
                                           pid_t leader, fbl::RefPtr<ProcessGroup> process_group) {
   fbl::AllocChecker ac;
   fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(
-      new (&ac) ThreadGroup(kernel, std::move(process), leader, parent, process_group));
+      new (&ac) ThreadGroup(kernel, ktl::move(process), leader, parent, process_group));
   ASSERT(ac.check());
 
   if (parent.has_value()) {
     //  parent.value()->mutable_state_->children().insert()
   }
-
   return ktl::move(thread_group);
 }
 
@@ -58,6 +57,9 @@ ThreadGroup::ThreadGroup(fbl::RefPtr<Kernel> _kernel, zx::process _process, pid_
                          ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
                          fbl::RefPtr<ProcessGroup> process_group)
     : kernel(ktl::move(_kernel)), process(ktl::move(_process)), leader(_leader) {
+  if (parent.has_value()) {
+    *limits.Lock() = *parent.value()->limits.Lock();
+  }
   *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, parent, process_group));
 }
 
