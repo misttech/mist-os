@@ -193,11 +193,10 @@ def fuchsia_structured_config_values(
     Args:
       name: Target name. Required.
       cm_label: Target that generates the component manifest. Required.
-
-      One and only one of the following are required:
-        values_source: The JSON5 file containing the concrete values for the generated file.
-        values: a starlark dictionary containing literal values for the generated file.
-
+      values_source: The JSON5 file containing the concrete values for the generated file.
+        This must not be set if using `values`.
+      values: a starlark dictionary containing literal values for the generated file.
+        This must not be set if using `values_source`.
       component_name: The basename of the component manifest within the package's meta/ dir.
       cvf_output_name: The name of the cvf file that is being produced.
     """

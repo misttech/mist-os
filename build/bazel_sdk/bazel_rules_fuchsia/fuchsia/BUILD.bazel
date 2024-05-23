@@ -4,12 +4,54 @@
 
 # Public Fuchsia rules.
 
-load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "fuchsia_api_level")
+load("//fuchsia/private:fuchsia_api_level.bzl", "fuchsia_api_level")
 
-# We need to export the top level bzl files for documentation generation.
-exports_files(
-    ["licenses.bzl"],
-    visibility = ["//visibility:public"],
+package(default_visibility = ["//visibility:public"])
+
+# Specifies all of the starlark files in this repo
+filegroup(
+    name = "bzl_srcs",
+    srcs = [
+        # These are the top level public API that users should import.
+        # Do not use a glob here to avoid adding public files that we do not
+        # want to expose.
+        "assembly.bzl",
+        "clang.bzl",
+        "deps.bzl",
+        "defs.bzl",
+        "products.bzl",
+        "licenses.bzl",
+        "workflows.bzl",
+
+        # These are the fuchsia specific files that are loaded by the top level
+        # files.
+        "//:bzl_srcs",
+        "//common:bzl_srcs",
+        "//fuchsia/constraints/platforms:bzl_srcs",
+        "//fuchsia/private:bzl_srcs",
+        "//fuchsia/private/assembly:bzl_srcs",
+        "//fuchsia/private/licenses:bzl_srcs",
+        "//fuchsia/private/workflows:bzl_srcs",
+        "//fuchsia/workspace:bzl_srcs",
+        "//fuchsia/workspace/clang_templates:bzl_srcs",
+        "//fuchsia/workspace/sdk_templates:bzl_srcs",
+
+        # External libraries that get loaded by our rules
+        "@bazel_skylib//lib:paths",
+        "@bazel_skylib//lib:selects",
+        "@bazel_skylib//rules:select_file",
+        "@rules_license//rules_gathering:standard_package",
+        "@rules_license//rules:standard_package",
+
+        # We cannot depend on @bazel_tools//tools:bzl_srcs since it will pull in
+        # rules_java which we do not want to depend on. Depend on the specific
+        # files instead of the filegroup for bazel_tools
+        "@bazel_tools//tools/build_defs/cc:action_names.bzl",
+        "@bazel_tools//tools/cpp:toolchain_utils.bzl",
+        "@bazel_tools//tools/build_defs/repo:cache.bzl",
+        "@bazel_tools//tools/build_defs/repo:http.bzl",
+        "@bazel_tools//tools/build_defs/repo:utils.bzl",
+    ],
 )
 
 # Specifies the API level to use when building a package. A user can set this
@@ -20,7 +62,6 @@ fuchsia_api_level(
     name = "fuchsia_api_level",
     # LINT.ThenChange(private/fuchsia_api_level.bzl)
     build_setting_default = "",
-    visibility = ["//visibility:public"],
 )
 
 fuchsia_api_level(
@@ -28,11 +69,9 @@ fuchsia_api_level(
     name = "repository_default_fuchsia_api_level",
     # LINT.ThenChange(private/fuchsia_transition.bzl)
     build_setting_default = "",
-    visibility = ["//visibility:public"],
 )
 
 # Toolchain type for the Fuchsia toolchain.
 toolchain_type(
     name = "toolchain",
-    visibility = ["//visibility:public"],
 )

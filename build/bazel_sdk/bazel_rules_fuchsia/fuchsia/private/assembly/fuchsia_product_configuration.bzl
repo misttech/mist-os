@@ -251,7 +251,6 @@ def fuchsia_product_configuration(
 
     Args:
         name: Name of the rule.
-        TODO(https://fxbug.dev/42073826): Point to document instead of Rust definition
         product_config_json: product assembly json config, as a starlark dictionary.
             Format of this JSON config can be found in this Rust definitions:
                //src/lib/assembly/config_schema/src/assembly_config.rs
@@ -270,6 +269,8 @@ def fuchsia_product_configuration(
             All assembly json inputs are supported, except for product.packages
             and product.base_drivers, which must be
             specified through the following args.
+
+            TODO(https://fxbug.dev/42073826): Point to document instead of Rust definition
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.

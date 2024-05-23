@@ -5,7 +5,6 @@
 package bazel_docgen
 
 import (
-	"log"
 	"sort"
 
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
@@ -38,10 +37,9 @@ func newTocEntry(title string, filename string, docType int) tocEntry {
 	}
 }
 
-func checkDuplicateName(name string, entries map[string]tocEntry) {
-	if _, ok := entries[name]; ok {
-		log.Fatalln("Detected multiple entries with the same name: ", name)
-	}
+func checkDuplicateName(name string, entries map[string]tocEntry) bool {
+	_, ok := entries[name]
+	return ok
 }
 
 func filterEntries(entries []tocEntry, docType int) []tocEntry {
@@ -68,7 +66,9 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 		// Render all of our rules
 		for _, rule := range moduleInfo.GetRuleInfo() {
 			fileName := "rule_" + rule.RuleName + ".md"
-			checkDuplicateName(fileName, entries)
+			if checkDuplicateName(fileName, entries) {
+				continue
+			}
 			if err := renderer.RenderRuleInfo(rule, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}

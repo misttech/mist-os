@@ -16,21 +16,6 @@ def fuchsia_cpu_filter_dict(cpu_map, valid_cpus, common = None):
     This function returns a dictionary that only contains keys that match
     a specific set of cpu names.
 
-    Args:
-      cpu_map: A dictionary mapping Fuchsia cpu names to { key -> value }
-          dictionaries. If the cpu name is listed in `valid_cpus`, then all
-          entries this dictionary will be added to the result, othewise
-          they will be ignored.
-
-      valid_cpus: A list of Fuchsia cpu names used to filter cpu_map.
-
-      common: If not None, a dictionary whose items will be added
-          unconditionally to the final result.
-
-    Returns:
-      A select() value whose dictionary has been built by filtering the content
-      of cpu_map with only content for cpu names in valid_cpus.
-
     Examples:
 
           _cpu_map = {
@@ -49,6 +34,21 @@ def fuchsia_cpu_filter_dict(cpu_map, valid_cpus, common = None):
 
           fuchsia_cpu_filter_dict(_cpu_map, ["riscv64"])
             => { }
+
+    Args:
+      cpu_map: A dictionary mapping Fuchsia cpu names to { key -> value }
+          dictionaries. If the cpu name is listed in `valid_cpus`, then all
+          entries this dictionary will be added to the result, othewise
+          they will be ignored.
+
+      valid_cpus: A list of Fuchsia cpu names used to filter cpu_map.
+
+      common: If not None, a dictionary whose items will be added
+          unconditionally to the final result.
+
+    Returns:
+      A select() value whose dictionary has been built by filtering the content
+      of cpu_map with only content for cpu names in valid_cpus.
     """
     final_dict = {}
     for cpu in valid_cpus:

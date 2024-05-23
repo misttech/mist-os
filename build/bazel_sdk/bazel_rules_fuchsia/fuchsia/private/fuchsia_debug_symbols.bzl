@@ -4,7 +4,6 @@
 
 """Utilities for extracting, creating, and manipulating debug symbols."""
 
-load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load(
     ":providers.bzl",
     "FuchsiaCollectedUnstrippedBinariesInfo",
@@ -13,6 +12,45 @@ load(
     "FuchsiaUnstrippedBinaryInfo",
 )
 load(":utils.bzl", "flatten", "make_resource_struct")
+
+#TODO(b/341799247) The logic for find_cc_toolchain is copied from
+#https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/bazel_rules_cc/cc/find_cc_toolchain.bzl;l=56;drc=13d212d39bbc415fd971138396cfd99320e04517
+#
+# We need to do this because we are currently using an older version of rules_cc
+# that is not compatible with our current version of bazel. Once we roll rules_cc
+# we can go back to using the method defined there.
+CC_TOOLCHAIN_TYPE = "@bazel_tools//tools/cpp:toolchain_type"
+
+def find_cc_toolchain(ctx):
+    """
+Returns the current `CcToolchainInfo`.
+
+    Args:
+      ctx: The rule context for which to find a toolchain.
+
+    Returns:
+      A CcToolchainInfo.
+    """
+
+    # Check the incompatible flag for toolchain resolution.
+    if hasattr(cc_common, "is_cc_toolchain_resolution_enabled_do_not_use") and cc_common.is_cc_toolchain_resolution_enabled_do_not_use(ctx = ctx):
+        if not CC_TOOLCHAIN_TYPE in ctx.toolchains:
+            fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
+        toolchain_info = ctx.toolchains[CC_TOOLCHAIN_TYPE]
+        if toolchain_info == None:
+            # No cpp toolchain was found, so report an error.
+            fail("Unable to find a CC toolchain using toolchain resolution. Target: %s, Platform: %s, Exec platform: %s" %
+                 (ctx.label, ctx.fragments.platform.platform, ctx.fragments.platform.host_platform))
+        if hasattr(toolchain_info, "cc_provider_in_toolchain") and hasattr(toolchain_info, "cc"):
+            return toolchain_info.cc
+        return toolchain_info
+
+    # Fall back to the legacy implicit attribute lookup.
+    if hasattr(ctx.attr, "_cc_toolchain"):
+        return ctx.attr._cc_toolchain[cc_common.CcToolchainInfo]
+
+    # We didn't find anything.
+    fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
 
 FUCHSIA_DEBUG_SYMBOLS_ATTRS = {
     "_elf_strip_tool": attr.label(

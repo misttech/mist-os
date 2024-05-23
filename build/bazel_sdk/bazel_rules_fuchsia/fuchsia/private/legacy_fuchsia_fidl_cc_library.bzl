@@ -173,14 +173,15 @@ def _fidl_cc_library(name, library, binding_level, deps = [], tags = [], **kwarg
 def fuchsia_fidl_hlcpp_library(name, library, deps = [], tags = [], **kwargs):
     """Generates HLCPP cc_library() for the given fidl_library.
 
-    DEPRECATED: use fuchsia_fidl_library instead.
-
     Args:
       name: Target name. Required.
       library: fidl_library() target to generate the language bindings for. Required.
       deps: Additional dependencies.
       tags: Optional tags.
       **kwargs: Remaining args.
+
+    Deprecated:
+      use fuchsia_fidl_library instead.
     """
     _fidl_cc_library(
         tags = tags,
@@ -194,14 +195,15 @@ def fuchsia_fidl_hlcpp_library(name, library, deps = [], tags = [], **kwargs):
 def fuchsia_fidl_llcpp_library(name, library, deps = [], tags = [], **kwargs):
     """Generates LLCPP cc_library() for the given fidl_library.
 
-    DEPRECATED: use fuchsia_fidl_library instead.
-
     Args:
       name: Target name. Required.
       library: fidl_library() target to generate the language bindings for. Required.
       deps: Additional dependencies.
       tags: Optional tags.
       **kwargs: Remaining args.
+
+    Deprecated:
+      use fuchsia_fidl_library instead.
     """
     _fidl_cc_library(
         tags = tags,

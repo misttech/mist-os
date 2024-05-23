@@ -30,18 +30,18 @@ load(":utils.bzl", "fuchsia_cpu_from_ctx", "label_name", "make_resource_struct",
 _FUCHSIA_OS_PLATFORM = "@platforms//os:fuchsia"
 
 def get_driver_component_manifests(package):
-    """ Returns a list of the manifest paths for drivers in the package
+    """Returns a list of the manifest paths for drivers in the package
 
     Args:
-        - package: the package to parse
+        package: the package to parse
     """
     return [entry.dest for entry in package[FuchsiaPackageInfo].packaged_components if entry.component_info.is_driver]
 
 def get_component_manifests(package):
-    """ Returns a list of the manifest paths for all components in the package
+    """Returns a list of the manifest paths for all components in the package
 
     Args:
-        - package: the package to parse
+        package: the package to parse.
     """
     return [entry.dest for entry in package[FuchsiaPackageInfo].packaged_components]
 

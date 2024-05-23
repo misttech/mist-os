@@ -10,8 +10,40 @@ extract_bazel_doc_textproto("licenses") {
   bazel_target = "//build/bazel/bazel_sdk/docs:licenses"
 }
 
+extract_bazel_doc_textproto("clang") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:clang"
+}
+
+extract_bazel_doc_textproto("assembly") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:assembly"
+}
+
+extract_bazel_doc_textproto("deps") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:deps"
+}
+
+extract_bazel_doc_textproto("defs") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:defs"
+}
+
+extract_bazel_doc_textproto("products") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:products"
+}
+
+extract_bazel_doc_textproto("workflows") {
+  bazel_target = "//build/bazel/bazel_sdk/docs:workflows"
+}
+
 bazel_docgen("docs") {
   docset_name = "bazel_sdk"
-  textproto_targets = [ ":licenses" ]
+  textproto_targets = [
+    ":assembly",
+    ":clang",
+    ":defs",
+    ":deps",
+    ":licenses",
+    ":products",
+    ":workflows",
+  ]
   reference_repo_path = "sdk/bazel_sdk"
 }
