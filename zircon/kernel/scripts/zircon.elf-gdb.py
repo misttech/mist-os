@@ -1021,8 +1021,24 @@ def _identify_offset_to_reload(pc):
             break
 
     if found == False:
-        print("Error: Failed to find the KASLR relocation from the $pc")
-        return False
+        default_offset = 0x10000000
+        target = kernel_relocated_base + default_offset
+        print(
+            "Failed to find relocation address from scanning.\n"
+            "Attempting to find relocation base address at default offset of 0x%08x (tgt %016x)"
+            % (default_offset, target)
+        )
+        value = _read_pointer(target)
+        expected = base_address + default_offset
+
+        if (value is None) or (expected != value):
+            print("Error: Failed to find the KASLR relocation from the $pc")
+            return False
+
+        print(
+            "Found it!  Kernel appears to have been relocated to 0x%016x"
+            % (value,)
+        )
 
     return _offset_symbols_and_breakpoints(target)
 
