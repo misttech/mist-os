@@ -44,12 +44,12 @@ cc_library(
         "template_driver.h",
     ],
     deps = [
+        "//sdk/lib/driver/compat/cpp",
         "@fuchsia_sdk//bind/fuchsia.test:fuchsia.test_cc",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_logging_cpp",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//pkg/driver_compat",
     ],
 )
 

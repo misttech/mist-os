@@ -52,6 +52,8 @@ fuchsia_cc_driver(
     ],
     output_name = "aml-usb-phy",
     deps = [
+        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "//zircon/system/ulib/ddk-platform-defs",
@@ -66,10 +68,8 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
-        "@internal_sdk//pkg/driver_compat",
     ],
 )
 
@@ -118,6 +118,8 @@ fuchsia_cc_test(
         "_ALL_SOURCE",
     ],
     deps = [
+        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+        "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "//zircon/system/ulib/ddk-platform-defs",
@@ -135,10 +137,8 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
-        "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/fake-mmio-reg",
         "@internal_sdk//pkg/mock-registers",
     ],

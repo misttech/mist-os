@@ -49,6 +49,7 @@ fuchsia_cc_driver(
     output_name = "aml-sdmmc",
     deps = [
         ":aml-sdmmc-config",
+        "//sdk/lib/driver/compat/cpp",
         "//sdk/lib/driver/power/cpp",
         "//src/devices/block/lib/sdio",
         "//src/devices/block/lib/sdmmc",
@@ -72,7 +73,6 @@ fuchsia_cc_driver(
         "@internal_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
         "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-        "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/zircon-internal",
     ],
 )

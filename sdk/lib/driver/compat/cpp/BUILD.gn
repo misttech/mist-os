@@ -9,19 +9,21 @@ import("//build/test.gni")
 sdk_source_set("cpp") {
   category = "internal"
   sdk_name = "driver_compat"
-  include_base = "//sdk"
+  include_base = "include"
   sources = [
     "banjo_client.cc",
-    "banjo_client.h",
-    "banjo_server.h",
-    "compat.h",
     "connect.cc",
-    "connect.h",
     "device_server.cc",
-    "device_server.h",
-    "metadata.h",
     "service_offers.cc",
-    "service_offers.h",
+  ]
+  public = [
+    "include/lib/driver/compat/cpp/banjo_client.h",
+    "include/lib/driver/compat/cpp/banjo_server.h",
+    "include/lib/driver/compat/cpp/compat.h",
+    "include/lib/driver/compat/cpp/connect.h",
+    "include/lib/driver/compat/cpp/device_server.h",
+    "include/lib/driver/compat/cpp/metadata.h",
+    "include/lib/driver/compat/cpp/service_offers.h",
   ]
 
   public_deps = [
@@ -38,11 +40,9 @@ sdk_source_set("cpp") {
 sdk_source_set("logging") {
   category = "internal"
   sdk_name = "driver_compat_logging"
-  include_base = "//sdk"
-  sources = [
-    "logging.cc",
-    "logging.h",
-  ]
+  include_base = "include"
+  sources = [ "logging.cc" ]
+  public = [ "include/lib/driver/compat/cpp/logging.h" ]
   public_deps = [ "//sdk/lib/driver/logging/cpp" ]
 }
 

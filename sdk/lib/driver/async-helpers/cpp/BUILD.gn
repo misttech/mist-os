@@ -14,13 +14,15 @@ group("tests") {
 sdk_source_set("cpp") {
   category = "internal"
   sdk_name = "driver_async_helpers"
-  include_base = "//sdk"
+  include_base = "include"
   public_configs = [ "//sdk/config" ]
   sources = [
     "async_task.cc",
-    "async_task.h",
     "task_group.cc",
-    "task_group.h",
+  ]
+  public = [
+    "include/lib/driver/async-helpers/cpp/async_task.h",
+    "include/lib/driver/async-helpers/cpp/task_group.h",
   ]
   public_deps = [
     "//sdk/lib/driver/runtime:driver_runtime_cpp",

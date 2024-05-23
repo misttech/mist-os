@@ -51,6 +51,7 @@ fuchsia_cc_driver(
     ],
     output_name = "aml-g12-composite",
     deps = [
+        "//sdk/lib/driver/compat/cpp",
         "//sdk/lib/driver/power/cpp",
         "//src/devices/lib/amlogic",
         "//zircon/system/ulib/ddk-platform-defs",
@@ -64,7 +65,6 @@ fuchsia_cc_driver(
         "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
         "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
         "@internal_sdk//fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-        "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/memory_barriers",
     ],
 )
@@ -109,6 +109,7 @@ fuchsia_cc_test(
         "--hwasan-globals=0",
     ],
     deps = [
+        "//sdk/lib/driver/compat/cpp",
         "//sdk/lib/driver/power/cpp",
         "//src/devices/lib/amlogic",
         "//zircon/system/ulib/ddk-platform-defs",
@@ -132,7 +133,6 @@ fuchsia_cc_test(
         "@internal_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
         "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
         "@internal_sdk//fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-        "@internal_sdk//pkg/driver_compat",
         "@internal_sdk//pkg/fbl",
         "@internal_sdk//pkg/fzl",
         "@internal_sdk//pkg/memory_barriers",
