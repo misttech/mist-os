@@ -27,9 +27,7 @@ class DeviceServer {
   // `device` must outlive `DeviceServer`.
   DeviceServer(DeviceInterface& device, async_dispatcher_t* dispatcher);
 
-  void ConnectToController(fidl::ServerEnd<fuchsia_device::Controller> server_end);
-  void ConnectToDeviceFidl(zx::channel channel);
-  void ServeMultiplexed(zx::channel channel, bool include_controller);
+  void ServeDeviceFidl(zx::channel channel);
 
   // Asynchronously close all connections and call `callback` when all connections have completed
   // their teardown. Must not be called with `callback != nullptr` while a previous `callback` is
@@ -37,25 +35,21 @@ class DeviceServer {
   void CloseAllConnections(fit::callback<void()> callback);
 
  private:
-  void Serve(zx::channel channel, fidl::internal::IncomingMessageDispatcher* impl);
-
   class MessageDispatcher : public fidl::internal::IncomingMessageDispatcher {
    public:
-    MessageDispatcher(DeviceServer& parent, bool multiplex_controller);
+    explicit MessageDispatcher(DeviceServer& parent);
 
    private:
     void dispatch_message(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn,
                           fidl::internal::MessageStorageViewBase* storage_view) override;
 
     DeviceServer& parent_;
-    const bool multiplex_controller_;
   };
 
   DeviceInterface& controller_;
   async_dispatcher_t* const dispatcher_;
 
-  MessageDispatcher device_{*this, false};
-  MessageDispatcher device_and_controller_{*this, true};
+  MessageDispatcher device_{*this};
 
   // Note: this protocol is a lie with respect to the bindings below; some of them speak the stated
   // protocol, some speak the device-specific protocol, others speak a mix of protocols multiplexed

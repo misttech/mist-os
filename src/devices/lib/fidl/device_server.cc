@@ -10,30 +10,12 @@
 #include <lib/syslog/global.h>
 #include <zircon/errors.h>
 
-#include <string_view>
-
 #include <ddktl/fidl.h>
 
 namespace devfs_fidl {
 
 DeviceServer::DeviceServer(DeviceInterface& device, async_dispatcher_t* dispatcher)
     : controller_(device), dispatcher_(dispatcher) {}
-
-void DeviceServer::ConnectToController(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  Serve(server_end.TakeChannel(), &controller_);
-}
-
-void DeviceServer::ConnectToDeviceFidl(zx::channel channel) { Serve(std::move(channel), &device_); }
-
-void DeviceServer::ServeMultiplexed(zx::channel channel, bool include_controller) {
-  MessageDispatcher* message_dispatcher = [this, include_controller]() {
-    if (include_controller) {
-      return &device_and_controller_;
-    }
-    return &device_;
-  }();
-  Serve(std::move(channel), message_dispatcher);
-}
 
 void DeviceServer::CloseAllConnections(fit::callback<void()> callback) {
   async::PostTask(dispatcher_, [this, callback = std::move(callback)]() mutable {
@@ -52,34 +34,34 @@ void DeviceServer::CloseAllConnections(fit::callback<void()> callback) {
   });
 }
 
-void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDispatcher* impl) {
+void DeviceServer::ServeDeviceFidl(zx::channel channel) {
   fidl::ServerEnd<TypeErasedProtocol> server_end(std::move(channel));
-  async::PostTask(dispatcher_, [this, server_end = std::move(server_end), impl]() mutable {
-    const zx_handle_t key = server_end.channel().get();
-    const auto binding =
-        fidl::ServerBindingRef<TypeErasedProtocol>{fidl::internal::BindServerTypeErased(
-            dispatcher_, fidl::internal::MakeAnyTransport(server_end.TakeHandle()), impl,
-            fidl::internal::ThreadingPolicy::kCreateAndTeardownFromDispatcherThread,
-            [this, key](fidl::internal::IncomingMessageDispatcher*, fidl::UnbindInfo,
-                        fidl::internal::AnyTransport) {
-              DeviceServer& self = *this;
-              size_t erased = self.bindings_.erase(key);
-              ZX_ASSERT_MSG(erased == 1, "erased=%zu", erased);
-              if (self.bindings_.empty()) {
-                if (std::optional callback = std::exchange(self.callback_, {});
-                    callback.has_value()) {
-                  callback.value()();
-                }
-              }
-            })};
+  async::PostTask(
+      dispatcher_, [this, server_end = std::move(server_end), impl = &device_]() mutable {
+        const zx_handle_t key = server_end.channel().get();
+        const auto binding =
+            fidl::ServerBindingRef<TypeErasedProtocol>{fidl::internal::BindServerTypeErased(
+                dispatcher_, fidl::internal::MakeAnyTransport(server_end.TakeHandle()), impl,
+                fidl::internal::ThreadingPolicy::kCreateAndTeardownFromDispatcherThread,
+                [this, key](fidl::internal::IncomingMessageDispatcher*, fidl::UnbindInfo,
+                            fidl::internal::AnyTransport) {
+                  DeviceServer& self = *this;
+                  size_t erased = self.bindings_.erase(key);
+                  ZX_ASSERT_MSG(erased == 1, "erased=%zu", erased);
+                  if (self.bindings_.empty()) {
+                    if (std::optional callback = std::exchange(self.callback_, {});
+                        callback.has_value()) {
+                      callback.value()();
+                    }
+                  }
+                })};
 
-    auto [it, inserted] = bindings_.try_emplace(key, binding);
-    ZX_ASSERT_MSG(inserted, "handle=%d", key);
-  });
+        auto [it, inserted] = bindings_.try_emplace(key, binding);
+        ZX_ASSERT_MSG(inserted, "handle=%d", key);
+      });
 }
 
-DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_controller)
-    : parent_(parent), multiplex_controller_(multiplex_controller) {}
+DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent) : parent_(parent) {}
 
 namespace {
 
@@ -134,12 +116,6 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     return;
   }
 
-  if (multiplex_controller_) {
-    if (TryDispatch(&parent_.controller_, msg, txn) == fidl::DispatchResult::kFound) {
-      return;
-    }
-  }
-
   if (!msg.ok()) {
     // Mimic fidl::internal::TryDispatch.
     txn->InternalError(fidl::UnbindInfo{msg}, fidl::ErrorOrigin::kReceive);
@@ -168,8 +144,7 @@ void DeviceServer::MessageDispatcher::dispatch_message(
       message.append(error.FormatDescription());
       message.append(
           "\n"
-          "It is possible that this message relied on deprecated FIDL multiplexing.\n"
-          "For more information see https://fuchsia.dev/fuchsia-src/contribute/open_projects/drivers/fidl_multiplexing");
+          "It is possible that this message assumed the wrong fidl protocol.");
       parent_.controller_.LogError(message.c_str());
     }
   }();

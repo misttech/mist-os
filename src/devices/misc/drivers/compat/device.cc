@@ -166,7 +166,7 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
                std::optional<Device*> parent, std::shared_ptr<fdf::Logger> logger,
                async_dispatcher_t* dispatcher)
     : devfs_connector_([this](fidl::ServerEnd<fuchsia_device::Controller> controller) {
-        devfs_server_.ServeMultiplexed(controller.TakeChannel(), false);
+        devfs_server_.ServeDeviceFidl(controller.TakeChannel());
       }),
       devfs_controller_connector_([this](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
         dev_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
@@ -1039,7 +1039,7 @@ bool Device::IsUnbound() { return pending_removal_; }
 
 void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                                  ConnectToDeviceFidlCompleter::Sync& completer) {
-  devfs_server_.ConnectToDeviceFidl(std::move(request->server));
+  devfs_server_.ServeDeviceFidl(std::move(request->server));
 }
 
 void Device::ConnectToController(ConnectToControllerRequestView request,
