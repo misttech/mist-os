@@ -367,8 +367,9 @@ TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
 
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token(std::move(token_client_end));
 
+  const char kAlphabetString[] = "abcdefghijklmnopqrstuvwxyz";
   EXPECT_OK(token->SetDebugClientInfo("bad", 6));
-  EXPECT_OK(allocator->SetDebugClientInfo("a", 5));
+  EXPECT_OK(allocator->SetDebugClientInfo(kAlphabetString, 5));
 
   auto [collection_client_end, collection_server_end] =
       fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
@@ -386,7 +387,8 @@ TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
         auto collection_views = logical_collection->collection_views();
         if (collection_views.size() == 1) {
           const auto& collection = collection_views.front();
-          if (collection->node_properties().client_debug_info().name == "a") {
+          if (collection->node_properties().client_debug_info().name.find(kAlphabetString) !=
+              std::string::npos) {
             EXPECT_EQ(5u, collection->node_properties().client_debug_info().id);
             found_collection = true;
           }

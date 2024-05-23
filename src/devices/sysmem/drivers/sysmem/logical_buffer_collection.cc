@@ -2711,12 +2711,13 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
   FIELD_DEFAULT_MAX(constraints, max_size_bytes);
   FIELD_DEFAULT_FALSE(constraints, physically_contiguous_required);
   FIELD_DEFAULT_FALSE(constraints, secure_required);
-  // The CPU domain is supported by default.
-  FIELD_DEFAULT(constraints, cpu_domain_supported, true);
-  // If !usage.cpu, then participant doesn't care what domain, so indicate support
-  // for RAM and inaccessible domains in that case.  This only takes effect if the participant
-  // didn't explicitly specify a value for these fields.
-  FIELD_DEFAULT(constraints, ram_domain_supported, !*buffer_usage.cpu());
+  // The CPU domain is supported by default, unless secure_required.
+  FIELD_DEFAULT(constraints, cpu_domain_supported, !*constraints.secure_required());
+  // If !usage.cpu, then participant doesn't care what domain, so indicate support for RAM and
+  // inaccessible domains in that case, unless secure_required. This only takes effect if the
+  // participant didn't explicitly specify a value for these fields.
+  FIELD_DEFAULT(constraints, ram_domain_supported,
+                !*constraints.secure_required() && !*buffer_usage.cpu());
   FIELD_DEFAULT(constraints, inaccessible_domain_supported, !*buffer_usage.cpu());
   if (stage != CheckSanitizeStage::kAggregated) {
     if (constraints.permitted_heaps().has_value() && constraints.permitted_heaps()->empty()) {
@@ -4245,6 +4246,14 @@ std::optional<NodeProperties*> LogicalBufferCollection::FindNodePropertiesByNode
     }                                                                                            \
   } while (0)
 
+#define LOG_UINT32_BITS_FIELD(location, indent, prefix, field_name)                              \
+  do {                                                                                           \
+    if ((prefix).field_name().has_value()) {                                                     \
+      LogClientInfo(location, node_properties, "%*s*%s.%s(): 0x%x", indent.num_spaces(), "",     \
+                    #prefix, #field_name, sysmem::fidl_underlying_cast(*(prefix).field_name())); \
+    }                                                                                            \
+  } while (0)
+
 #define LOG_UINT64_FIELD(location, indent, prefix, field_name)                                     \
   do {                                                                                             \
     if ((prefix).field_name().has_value()) {                                                       \
@@ -4289,6 +4298,15 @@ void LogicalBufferCollection::LogConstraints(
     auto indent = indent_tracker.Nested();
 
     const fuchsia_sysmem2::BufferCollectionConstraints& c = constraints;
+
+    if (constraints.usage().has_value()) {
+      const auto& usage = *c.usage();
+      LOG_UINT32_BITS_FIELD(FROM_HERE, indent, usage, none);
+      LOG_UINT32_BITS_FIELD(FROM_HERE, indent, usage, cpu);
+      LOG_UINT32_BITS_FIELD(FROM_HERE, indent, usage, vulkan);
+      LOG_UINT32_BITS_FIELD(FROM_HERE, indent, usage, display);
+      LOG_UINT32_BITS_FIELD(FROM_HERE, indent, usage, video);
+    }
 
     LOG_UINT32_FIELD(FROM_HERE, indent, c, min_buffer_count);
     LOG_UINT32_FIELD(FROM_HERE, indent, c, max_buffer_count);
