@@ -57,7 +57,9 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
@@ -73,6 +75,7 @@ source_set("lib") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/trace",
   ]
 

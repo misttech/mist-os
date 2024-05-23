@@ -6,7 +6,7 @@
 #define SRC_CAMERA_BIN_CAMERA_GYM_STREAM_CYCLER_H_
 
 #include <fuchsia/camera3/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
@@ -25,10 +25,10 @@ class StreamCycler {
  public:
   ~StreamCycler();
   static fpromise::result<std::unique_ptr<StreamCycler>, zx_status_t> Create(
-      fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem::AllocatorHandle allocator,
+      fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem2::AllocatorHandle allocator,
       async_dispatcher_t* dispatcher, bool manual_mode);
-  using AddCollectionHandler = fit::function<uint32_t(fuchsia::sysmem::BufferCollectionTokenHandle,
-                                                      fuchsia::sysmem::ImageFormat_2, std::string)>;
+  using AddCollectionHandler = fit::function<uint32_t(fuchsia::sysmem2::BufferCollectionTokenHandle,
+                                                      fuchsia::images2::ImageFormat, std::string)>;
   using RemoveCollectionHandler = fit::function<void(uint32_t)>;
   using ShowBufferHandler =
       fit::function<void(uint32_t, uint32_t, zx::eventpair*, std::optional<fuchsia::math::RectF>)>;
@@ -115,7 +115,7 @@ class StreamCycler {
   async_dispatcher_t* dispatcher_;
   async_dispatcher_t* controller_dispatcher_;
   fuchsia::camera3::DeviceWatcherPtr watcher_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   fuchsia::camera3::DevicePtr device_;
   std::vector<fuchsia::camera3::Configuration2> configurations_;
 
@@ -144,12 +144,12 @@ class StreamCycler {
   // stream_infos_ uses the same index as the corresponding stream index in configurations_.
   struct StreamInfo {
     fuchsia::camera3::StreamPtr stream;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info;
+    fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
     std::optional<uint32_t> add_collection_handler_returned_value;
     std::optional<uint32_t>
         source_highlight;  // Stream on which to highlight this stream's crop region.
     std::optional<fuchsia::math::RectF> highlight;
-    fuchsia::sysmem::ImageFormat_2 image_format;
+    fuchsia::images2::ImageFormat image_format;
     zx::time last_received;  // Last timestamp this stream received a frame.
   };
   std::map<uint32_t, StreamInfo> stream_infos_;

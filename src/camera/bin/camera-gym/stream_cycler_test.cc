@@ -6,8 +6,8 @@
 #include <fuchsia/camera/gym/cpp/fidl.h>
 #include <fuchsia/camera3/cpp/fidl.h>
 #include <fuchsia/camera3/cpp/fidl_test_base.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl_test_base.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl_test_base.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
@@ -36,10 +36,10 @@ using AddStreamCommand = fuchsia::camera::gym::AddStreamCommand;
 using SetCropCommand = fuchsia::camera::gym::SetCropCommand;
 using SetResolutionCommand = fuchsia::camera::gym::SetResolutionCommand;
 
-using BufferCollectionToken = fuchsia::sysmem::BufferCollectionToken;
-using BufferCollectionTokenHandle = fuchsia::sysmem::BufferCollectionTokenHandle;
+using BufferCollectionToken = fuchsia::sysmem2::BufferCollectionToken;
+using BufferCollectionTokenHandle = fuchsia::sysmem2::BufferCollectionTokenHandle;
 
-using AllocatorRequest = fidl::InterfaceRequest<fuchsia::sysmem::Allocator>;
+using AllocatorRequest = fidl::InterfaceRequest<fuchsia::sysmem2::Allocator>;
 using BufferCollectionTokenRequest = fidl::InterfaceRequest<BufferCollectionToken>;
 using DeviceRequest = fidl::InterfaceRequest<fuchsia::camera3::Device>;
 using DeviceWatcherRequest = fidl::InterfaceRequest<fuchsia::camera3::DeviceWatcher>;
@@ -101,7 +101,7 @@ void NotImplemented(const std::string& name) { ZX_ASSERT(false); }
 // the timestamp of the last call.
 //
 // All Xxx objects are owned and managed by a corresponding XxxServ object.
-class FakeAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
+class FakeAllocator : public fuchsia::sysmem2::testing::Allocator_TestBase {
  public:
   explicit FakeAllocator(FakeAllocatorServ* owner) : owner_(owner) {}
   void NotImplemented_(const std::string& name) override { NotImplemented(name); }
@@ -110,7 +110,8 @@ class FakeAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
   FakeAllocatorServ* owner() { return owner_; }
 
   // FIDL API
-  void AllocateSharedCollection(BufferCollectionTokenRequest token_request) override;
+  void AllocateSharedCollection(
+      ::fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest request) override;
 
   // Stats/Counters
   CallStat& allocate_shared_collection_stat() { return allocate_shared_collection_stat_; }
@@ -121,7 +122,7 @@ class FakeAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
 };
 
 // Supports multiple FakeBufferCollectionToken.
-class FakeBufferCollectionToken : public fuchsia::sysmem::testing::BufferCollectionToken_TestBase {
+class FakeBufferCollectionToken : public fuchsia::sysmem2::testing::BufferCollectionToken_TestBase {
  public:
   explicit FakeBufferCollectionToken(FakeBufferCollectionTokenServ* owner) : owner_(owner) {}
   void NotImplemented_(const std::string& name) override { NotImplemented(name); }
@@ -130,7 +131,7 @@ class FakeBufferCollectionToken : public fuchsia::sysmem::testing::BufferCollect
   FakeBufferCollectionTokenServ* owner() { return owner_; }
 
   // FIDL API
-  void Duplicate(uint32_t mask, BufferCollectionTokenRequest request) override;
+  void Duplicate(::fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest request) override;
   void Sync(SyncCallback callback) override;
 
   // Stats/Counters
@@ -217,7 +218,7 @@ class FakeStream : public fuchsia::camera3::testing::Stream_TestBase {
   void GetProperties(GetPropertiesCallback callback) override;
   void SetCropRegion(std::unique_ptr<fuchsia::math::RectF> region) override;
   void WatchCropRegion(WatchCropRegionCallback callback) override;
-  void SetBufferCollection(BufferCollectionTokenHandle token) override;
+  void SetBufferCollection(fuchsia::sysmem::BufferCollectionTokenHandle token) override;
   void WatchBufferCollection(WatchBufferCollectionCallback callback) override;
   void GetNextFrame2(GetNextFrame2Callback callback) override;
 
@@ -274,7 +275,7 @@ class FakeAllocatorServ {
 
  private:
   FakeAllocator* impl_;
-  fidl::Binding<fuchsia::sysmem::Allocator>* binding_;
+  fidl::Binding<fuchsia::sysmem2::Allocator>* binding_;
   sys::ComponentContext* context_;
 
   AllocateSharedCollectionHandler allocate_shared_collection_handler_;
@@ -403,12 +404,14 @@ class FakeStreamServ {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-void FakeAllocator::AllocateSharedCollection(BufferCollectionTokenRequest token_request) {
+void FakeAllocator::AllocateSharedCollection(
+    ::fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest request) {
   allocate_shared_collection_stat().Enter();
-  owner()->OnAllocateSharedCollection(std::move(token_request));
+  owner()->OnAllocateSharedCollection(std::move(*request.mutable_token_request()));
 }
 
-void FakeBufferCollectionToken::Duplicate(uint32_t mask, BufferCollectionTokenRequest request) {
+void FakeBufferCollectionToken::Duplicate(
+    ::fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest request) {
   duplicate_stat().Enter();
 }
 
@@ -416,7 +419,8 @@ void FakeBufferCollectionToken::Sync(SyncCallback callback) {
   sync_stat().Enter();
   if (owner()->sync_remaining() > 0) {
     owner()->dec_sync_remaining();
-    callback();
+    callback(
+        fuchsia::sysmem2::Node_Sync_Result::WithResponse(::fuchsia::sysmem2::Node_Sync_Response{}));
   }
 }
 
@@ -472,7 +476,7 @@ void FakeStream::WatchCropRegion(WatchCropRegionCallback callback) {
   watch_crop_region_stat().Enter();
 }
 
-void FakeStream::SetBufferCollection(BufferCollectionTokenHandle token) {
+void FakeStream::SetBufferCollection(fuchsia::sysmem::BufferCollectionTokenHandle token_v1) {
   set_buffer_collection_stat().Enter();
 }
 
@@ -482,7 +486,7 @@ void FakeStream::WatchBufferCollection(WatchBufferCollectionCallback callback) {
     owner()->dec_watch_buffer_collection_remaining();
     EXPECT_GT(token_handle_provider()->Size(), 0U);
     auto token_handle = token_handle_provider()->Get();
-    callback(std::move(token_handle));
+    callback(fuchsia::sysmem::BufferCollectionTokenHandle(token_handle.TakeChannel()));
   }
 }
 
@@ -493,8 +497,8 @@ void FakeStream::GetNextFrame2(GetNextFrame2Callback callback) { get_next_frame_
 FakeAllocatorServ::FakeAllocatorServ(sys::ComponentContext* context) {
   context_ = context;
   impl_ = new FakeAllocator(this);
-  binding_ = new fidl::Binding<fuchsia::sysmem::Allocator>(impl_);
-  fidl::InterfaceRequestHandler<fuchsia::sysmem::Allocator> handler =
+  binding_ = new fidl::Binding<fuchsia::sysmem2::Allocator>(impl_);
+  fidl::InterfaceRequestHandler<fuchsia::sysmem2::Allocator> handler =
       [&](AllocatorRequest request) { binding_->Bind(std::move(request)); };
   context_->outgoing()->AddPublicService(std::move(handler));
 }
@@ -617,10 +621,10 @@ class StreamCyclerTest : public gtest::TestLoopFixture {
 
   // Fake StreamCycler handler stubs.
   uint32_t OnAddCollection(BufferCollectionTokenHandle token,
-                           fuchsia::sysmem::ImageFormat_2 image_format, std::string description) {
+                           fuchsia::images2::ImageFormat image_format, std::string description) {
     on_add_collection_stat().Enter();
-    set_on_add_collection_width(static_cast<float>(image_format.coded_width));
-    set_on_add_collection_height(static_cast<float>(image_format.coded_height));
+    set_on_add_collection_width(static_cast<float>(image_format.size().width));
+    set_on_add_collection_height(static_cast<float>(image_format.size().height));
     return 0;
   }
   void OnRemoveCollection(uint32_t id) {
@@ -648,7 +652,7 @@ class StreamCyclerTest : public gtest::TestLoopFixture {
   std::unique_ptr<StreamCycler> CreateStreamCycler(bool manual_mode) {
     fuchsia::camera3::DeviceWatcherHandle device_watcher;
     context_provider().ConnectToPublicService(device_watcher.NewRequest());
-    fuchsia::sysmem::AllocatorHandle allocator;
+    fuchsia::sysmem2::AllocatorHandle allocator;
     context_provider().ConnectToPublicService(allocator.NewRequest());
     auto cycler_result = StreamCycler::Create(std::move(device_watcher), std::move(allocator),
                                               dispatcher(), manual_mode);

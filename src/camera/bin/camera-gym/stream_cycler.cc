@@ -4,9 +4,11 @@
 
 #include "src/camera/bin/camera-gym/stream_cycler.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
 #include <zircon/types.h>
@@ -54,7 +56,7 @@ StreamCycler::StreamCycler(async_dispatcher_t* dispatcher, bool manual_mode)
 StreamCycler::~StreamCycler() = default;
 
 fpromise::result<std::unique_ptr<StreamCycler>, zx_status_t> StreamCycler::Create(
-    fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem::AllocatorHandle allocator,
+    fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem2::AllocatorHandle allocator,
     async_dispatcher_t* dispatcher, bool manual_mode) {
   auto cycler = std::unique_ptr<StreamCycler>(new StreamCycler(dispatcher, manual_mode));
 
@@ -172,7 +174,11 @@ void StreamCycler::ConnectToAllStreams() {
 void StreamCycler::ConnectToStream(uint32_t config_index, uint32_t stream_index) {
   ZX_ASSERT(configurations_.size() > config_index);
   ZX_ASSERT(configurations_[config_index].streams().size() > stream_index);
-  auto image_format = configurations_[config_index].streams()[stream_index].image_format();
+  auto v1_image_format = configurations_[config_index].streams()[stream_index].image_format();
+  auto v2_image_format_result =
+      sysmem::V2CopyFromV1ImageFormat(fidl::HLCPPToNatural(std::move(v1_image_format)));
+  ZX_ASSERT(v2_image_format_result.is_ok());
+  auto image_format = fidl::NaturalToHLCPP(std::move(v2_image_format_result.value()));
 
   // Connect to specific stream
   StreamInfo new_stream_info;
@@ -188,41 +194,51 @@ void StreamCycler::ConnectToStream(uint32_t config_index, uint32_t stream_index)
       [this, stream_index](zx_status_t status) { DisconnectStream(stream_index); });
 
   // Allocate buffer collection
-  fuchsia::sysmem::BufferCollectionTokenPtr token_orig;
-  allocator_->AllocateSharedCollection(token_orig.NewRequest());
+  fuchsia::sysmem2::BufferCollectionTokenPtr token_orig;
 
-  stream->SetBufferCollection(std::move(token_orig));
-  stream->WatchBufferCollection([this, image_format, config_index, stream_index,
-                                 &stream](fuchsia::sysmem::BufferCollectionTokenHandle token_back) {
-    ZX_ASSERT(image_format.coded_width > 0);  // image_format must be reasonable.
-    ZX_ASSERT(image_format.coded_height > 0);
-    ZX_ASSERT(image_format.bytes_per_row > 0);
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(token_orig.NewRequest());
+  allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
 
-    auto& stream_info = stream_infos_[stream_index];
-    if (add_collection_handler_) {
-      std::ostringstream oss;
-      oss << "c" << config_index << "s" << stream_index << ".data";
-      stream_info.add_collection_handler_returned_value =
-          add_collection_handler_(std::move(token_back), image_format, oss.str());
-    } else {
-      token_back.BindSync()->Close();
-    }
+  stream->SetBufferCollection(
+      fuchsia::sysmem::BufferCollectionTokenHandle(token_orig.Unbind().TakeChannel()));
+  stream->WatchBufferCollection(
+      [this, image_format = std::move(image_format), config_index, stream_index,
+       &stream](fuchsia::sysmem::BufferCollectionTokenHandle token_back_v1) mutable {
+        auto token_back_v2 =
+            fuchsia::sysmem2::BufferCollectionTokenHandle(token_back_v1.TakeChannel());
+        // image_format must be reasonable.
+        ZX_ASSERT(image_format.has_size());
+        ZX_ASSERT(image_format.size().width > 0);
+        ZX_ASSERT(image_format.size().height > 0);
+        ZX_ASSERT(image_format.has_bytes_per_row());
+        ZX_ASSERT(image_format.bytes_per_row() > 0);
 
-    // Initialize the current image format and the current coded size.
-    stream_info.image_format = image_format;
-    if (manual_mode_) {
-      // If manual mode, offer a "ConnectToStream is done" indication to command sequencer.
-      CommandSuccessNotify();
-    }
+        auto& stream_info = stream_infos_[stream_index];
+        if (add_collection_handler_) {
+          std::ostringstream oss;
+          oss << "c" << config_index << "s" << stream_index << ".data";
+          stream_info.add_collection_handler_returned_value = add_collection_handler_(
+              std::move(token_back_v2), fidl::Clone(image_format), oss.str());
+        } else {
+          token_back_v2.BindSync()->Release();
+        }
 
-    // Begin watch dog deadline fresh for this stream.
-    ResetStreamWatchdog(stream_index);
+        // Initialize the current image format and the current coded size.
+        stream_info.image_format = std::move(image_format);
+        if (manual_mode_) {
+          // If manual mode, offer a "ConnectToStream is done" indication to command sequencer.
+          CommandSuccessNotify();
+        }
 
-    // Kick start the stream
-    stream->GetNextFrame2([this, stream_index](fuchsia::camera3::FrameInfo2 frame_info) {
-      OnNextFrame(stream_index, std::move(frame_info));
-    });
-  });
+        // Begin watch dog deadline fresh for this stream.
+        ResetStreamWatchdog(stream_index);
+
+        // Kick start the stream
+        stream->GetNextFrame2([this, stream_index](fuchsia::camera3::FrameInfo2 frame_info) {
+          OnNextFrame(stream_index, std::move(frame_info));
+        });
+      });
 
   device_->ConnectToStream(stream_index, std::move(stream_request));
 }
