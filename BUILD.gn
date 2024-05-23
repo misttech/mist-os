@@ -130,6 +130,10 @@ declare_args() {
   # Extra idk_archive() labels to be uploaded to the artifacts store. This is an
   # extension mechanism for IDK bits outside of the main repository.
   sdk_archive_labels = []
+
+  # Platform builders should populate this list in their product.gni file.
+  # The result will be built and uploaded to CIPD by infra.
+  assembly_board_configs = []
 }
 
 if (host_os == "mac") {
@@ -468,7 +472,7 @@ build_api_module("binaries") {
 build_api_module("boards") {
   testonly = true
   data_keys = [ "board_configs" ]
-  deps = [ "//boards" ]
+  deps = assembly_board_configs
 }
 
 # Lists the board input bundles that are defined in this build.

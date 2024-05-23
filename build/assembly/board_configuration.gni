@@ -361,6 +361,7 @@ template("board_configuration") {
         {
           label =
               get_label_info(":${labels.main_target}", "label_with_toolchain")
+          name = labels.main_target
           outdir = rebase_path(files.board_configuration_dir, root_build_dir)
         },
       ]
