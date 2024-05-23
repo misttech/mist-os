@@ -362,7 +362,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
 
-  // pub fn snapshot_to<L>
+  fit::result<Errno> snapshot_to(fbl::RefPtr<MemoryManager>& target) const;
 
   // fn snapshot_vmo
 

@@ -821,6 +821,11 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
   return fit::ok(brk.current);
 }
 
+fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target) const {
+  // return fit::error(errno(1));
+  return fit::ok();
+}
+
 fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
   LTRACE;
   // The previous mapping should be dropped only after the lock to state is released to
