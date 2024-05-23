@@ -4,8 +4,11 @@
 
 #include "src/camera/drivers/controller/pipeline_manager.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -29,7 +32,7 @@
 namespace camera {
 
 PipelineManager::PipelineManager(async_dispatcher_t* dispatcher,
-                                 fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+                                 fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
                                  const ddk::IspProtocolClient& isp,
                                  const ddk::GdcProtocolClient& gdc,
                                  const ddk::Ge2dProtocolClient& ge2d,
@@ -268,18 +271,21 @@ void PipelineManager::Prune() {
   SetPipelineChanging(false);
 }
 
-std::vector<fuchsia::sysmem::BufferCollectionConstraints> PipelineManager::GatherOutputConstraints(
+std::vector<fuchsia::sysmem2::BufferCollectionConstraints> PipelineManager::GatherOutputConstraints(
     const camera::InternalConfigNode& node) {
-  std::vector<fuchsia::sysmem::BufferCollectionConstraints> constraints;
+  std::vector<fuchsia::sysmem2::BufferCollectionConstraints> constraints;
   if (node.output_constraints) {
-    constraints.push_back(*node.output_constraints);
+    constraints.push_back(fidl::Clone(*node.output_constraints));
   }
   for (const auto& child : node.child_nodes) {
     if (child.input_constraints) {
-      constraints.push_back(*child.input_constraints);
+      constraints.push_back(fidl::Clone(*child.input_constraints));
     }
     if (!child.output_constraints) {
-      constraints += GatherOutputConstraints(child);
+      auto child_output_constraints = GatherOutputConstraints(child);
+      for (auto& child_constraints : child_output_constraints) {
+        constraints.emplace_back(std::move(child_constraints));
+      }
     }
   }
   return constraints;
@@ -294,10 +300,10 @@ std::string PipelineManager::Dump(bool log, cpp20::source_location location) con
     ss << "    buffers: ";
     if (node.output_buffers) {
       auto& buffers = node.output_buffers->buffers;
-      ss << "[" << buffers.buffer_count << "] "
-         << (buffers.settings.buffer_settings.size_bytes / 1024) << " KiB ("
-         << buffers.settings.image_format_constraints.min_coded_width << "x"
-         << buffers.settings.image_format_constraints.min_coded_height << ")\n";
+      ss << "[" << buffers.buffers().size() << "] "
+         << (buffers.settings().buffer_settings().size_bytes() / 1024) << " KiB ("
+         << buffers.settings().image_format_constraints().min_size().width << "x"
+         << buffers.settings().image_format_constraints().min_size().height << ")\n";
     } else {
       ss << "<none>\n";
     }
@@ -335,7 +341,7 @@ bool PipelineManager::CreateFGNode(const StreamCreationData& info, const std::ve
 #endif
   ZX_ASSERT(!graph_.Contains(path));
   auto path_icnodes = GetPathICNodes(info.roots, path);
-  auto icself = path_icnodes.back().get();
+  auto& icself = path_icnodes.back().get();
   FrameGraph::Node fgself{.pulldown{.interval = FramerateToInterval(icself.output_frame_rate)}};
 
   ProcessNode::BufferAttachments attachments{};
@@ -526,7 +532,17 @@ void PipelineManager::GetImageFormats(const std::vector<uint8_t>& origin,
                                       fuchsia::camera2::Stream::GetImageFormatsCallback callback) {
   auto path_icnodes = GetPathICNodes(current_roots_, origin);
   auto& icnode = path_icnodes.back().get();
-  callback({icnode.image_formats.begin(), icnode.image_formats.end()});
+
+  std::vector<::fuchsia::sysmem::ImageFormat_2> v1_image_formats;
+  for (auto& v2_image_format : icnode.image_formats) {
+    auto v2_image_format_natural = fidl::HLCPPToNatural(fidl::Clone(v2_image_format));
+    auto v1_image_format_result = sysmem::V1CopyFromV2ImageFormat(v2_image_format_natural);
+    ZX_ASSERT(v1_image_format_result.is_ok());
+    auto v1_image_format_hlcpp = fidl::NaturalToHLCPP(std::move(v1_image_format_result.value()));
+    v1_image_formats.emplace_back(std::move(v1_image_format_hlcpp));
+  }
+
+  callback(std::move(v1_image_formats));
 }
 
 void PipelineManager::GetBuffers(const std::vector<uint8_t>& origin,
@@ -545,12 +561,17 @@ void PipelineManager::GetBuffers(const std::vector<uint8_t>& origin,
   auto& fgnode = graph_.nodes.at(local_path);
   auto& input_buffer_collection = fgnode.output_buffers->ptr;
   ZX_ASSERT(input_buffer_collection);
-  fuchsia::sysmem::BufferCollectionTokenHandle token;
-  input_buffer_collection->AttachToken(ZX_RIGHT_SAME_RIGHTS, token.NewRequest());
-  input_buffer_collection->Sync(
-      [callback = std::move(callback), token = std::move(token)]() mutable {
-        callback(std::move(token));
-      });
+  fuchsia::sysmem2::BufferCollectionTokenHandle token;
+
+  fuchsia::sysmem2::BufferCollectionAttachTokenRequest attach_token_request;
+  attach_token_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  attach_token_request.set_token_request(token.NewRequest());
+  input_buffer_collection->AttachToken(std::move(attach_token_request));
+
+  input_buffer_collection->Sync([callback = std::move(callback), token = std::move(token)](
+                                    fuchsia::sysmem2::Node_Sync_Result sync_result) mutable {
+    callback(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
+  });
 }
 
 bool PipelineManager::FrameGraph::Contains(const Node::Path& path) const {

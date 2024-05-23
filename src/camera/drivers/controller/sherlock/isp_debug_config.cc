@@ -15,11 +15,11 @@ namespace camera {
  *****************************
  */
 
-static std::vector<fuchsia::sysmem::ImageFormat_2> FRDebugStreamImageFormats() {
-  return {
-      camera::StreamConstraints::MakeImageFormat(kFRStreamWidth, kFRStreamHeight,
-                                                 kStreamPixelFormat),
-  };
+static std::vector<fuchsia::images2::ImageFormat> FRDebugStreamImageFormats() {
+  std::vector<fuchsia::images2::ImageFormat> result;
+  result.emplace_back(camera::StreamConstraints::MakeImageFormat(kFRStreamWidth, kFRStreamHeight,
+                                                                 kStreamPixelFormat));
+  return result;
 }
 
 static fuchsia::camera2::hal::StreamConfig FRDebugStreamConfig() {
@@ -32,11 +32,11 @@ static fuchsia::camera2::hal::StreamConfig FRDebugStreamConfig() {
   return stream.ConvertToStreamConfig();
 }
 
-static std::vector<fuchsia::sysmem::ImageFormat_2> DSDebugStreamImageFormats() {
-  return {
-      camera::StreamConstraints::MakeImageFormat(kDSStreamWidth, kDSStreamHeight,
-                                                 kStreamPixelFormat),
-  };
+static std::vector<fuchsia::images2::ImageFormat> DSDebugStreamImageFormats() {
+  std::vector<fuchsia::images2::ImageFormat> result;
+  result.emplace_back(camera::StreamConstraints::MakeImageFormat(kDSStreamWidth, kDSStreamHeight,
+                                                                 kStreamPixelFormat));
+  return result;
 }
 
 static fuchsia::camera2::hal::StreamConfig DSDebugStreamConfig() {
@@ -67,101 +67,83 @@ fuchsia::camera2::hal::Config DebugConfig() {
  */
 
 static InternalConfigNode OutputFRStream() {
-  return {
-      .type = kOutputStream,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kFRStreamFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .image_formats = FRDebugStreamImageFormats(),
+  InternalConfigNode result;
+  result.type = kOutputStream, result.output_frame_rate = {
+                                   .frames_per_sec_numerator = kFRStreamFrameRate,
+                                   .frames_per_sec_denominator = 1,
+                               };
+  result.supported_streams = {
+      {
+          .type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
   };
+  result.image_formats = FRDebugStreamImageFormats();
+  return result;
 }
 
 InternalConfigNode DebugConfigFullRes() {
-  return {
-      .type = kInputStream,
-      // For node type |kInputStream| we will be ignoring the
-      // frame rate divisor.
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kFRStreamFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .input_stream_type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION,
-      .supported_streams =
-          {
-              {
-                  .type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .child_nodes =
-          {
-              {
-                  OutputFRStream(),
-              },
-          },
-      .image_formats = FRDebugStreamImageFormats(),
+  InternalConfigNode result;
+
+  result.type = kInputStream;
+  // For node type |kInputStream| we will be ignoring the
+  // frame rate divisor.
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kFRStreamFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.input_stream_type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION;
+  result.supported_streams = {
+      {
+          .type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.child_nodes = MakeVec(OutputFRStream());
+  result.image_formats = FRDebugStreamImageFormats();
+  return result;
 }
 
 static InternalConfigNode OutputDSStream() {
-  return {
-      .type = kOutputStream,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kDSStreamFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = fuchsia::camera2::CameraStreamType::DOWNSCALED_RESOLUTION,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .image_formats = DSDebugStreamImageFormats(),
+  InternalConfigNode result;
+  result.type = kOutputStream;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kDSStreamFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.supported_streams = {
+      {
+          .type = fuchsia::camera2::CameraStreamType::DOWNSCALED_RESOLUTION,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.image_formats = DSDebugStreamImageFormats();
+  return result;
 }
 
 InternalConfigNode DebugConfigDownScaledRes() {
-  return {
-      .type = kInputStream,
-      // For node type |kInputStream| we will be ignoring the
-      // frame rate divisor.
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kFRStreamFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .input_stream_type = fuchsia::camera2::CameraStreamType::DOWNSCALED_RESOLUTION,
-      .supported_streams =
-          {
-              {
-                  .type = fuchsia::camera2::CameraStreamType::DOWNSCALED_RESOLUTION,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .child_nodes =
-          {
-              {
-                  OutputDSStream(),
-              },
-          },
-      .image_formats = DSDebugStreamImageFormats(),
+  InternalConfigNode result;
+  result.type = kInputStream;
+  // For node type |kInputStream| we will be ignoring the
+  // frame rate divisor.
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kFRStreamFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.input_stream_type = fuchsia::camera2::CameraStreamType::DOWNSCALED_RESOLUTION;
+  result.supported_streams = {
+      {
+          .type = fuchsia::camera2::CameraStreamType::DOWNSCALED_RESOLUTION,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.child_nodes = MakeVec(OutputDSStream());
+  result.image_formats = DSDebugStreamImageFormats();
+  return result;
 }
 
 }  // namespace camera

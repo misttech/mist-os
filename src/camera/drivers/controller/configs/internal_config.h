@@ -30,26 +30,58 @@ enum Ge2DConfig {
   GE2D_COUNT = 2,
 };
 struct GdcInfo {
-  std::vector<GdcConfig> config_type;
+  std::vector<GdcConfig> config_type{};
 };
 
 struct WatermarkInfo {
-  const char* filename;
-  fuchsia::sysmem::ImageFormat_2 image_format;
-  uint32_t loc_x;
-  uint32_t loc_y;
+  WatermarkInfo() = default;
+  WatermarkInfo(const WatermarkInfo& to_copy) {
+    filename = to_copy.filename;
+    image_format = fidl::Clone(to_copy.image_format);
+    loc_x = to_copy.loc_x;
+    loc_y = to_copy.loc_y;
+  }
+  WatermarkInfo& operator=(const WatermarkInfo& to_copy) {
+    filename = to_copy.filename;
+    image_format = fidl::Clone(to_copy.image_format);
+    loc_x = to_copy.loc_x;
+    loc_y = to_copy.loc_y;
+    return *this;
+  }
+  WatermarkInfo(WatermarkInfo&& to_move) = default;
+  WatermarkInfo& operator=(WatermarkInfo&& to_move) = default;
+
+  const char* filename{};
+  fuchsia::images2::ImageFormat image_format{};
+  uint32_t loc_x{};
+  uint32_t loc_y{};
 };
 
 struct StreamInfo {
-  fuchsia::camera2::CameraStreamType type;
-  bool supports_dynamic_resolution;
-  bool supports_crop_region;
+  fuchsia::camera2::CameraStreamType type{};
+  bool supports_dynamic_resolution{};
+  bool supports_crop_region{};
 };
 
 struct Ge2DInfo {
-  Ge2DConfig config_type;
-  std::vector<WatermarkInfo> watermark;
-  resize_info resize;
+  Ge2DInfo() = default;
+  Ge2DInfo(const Ge2DInfo& to_copy) {
+    config_type = to_copy.config_type;
+    watermark = to_copy.watermark;
+    resize = to_copy.resize;
+  }
+  Ge2DInfo& operator=(const Ge2DInfo& to_copy) {
+    config_type = to_copy.config_type;
+    watermark = to_copy.watermark;
+    resize = to_copy.resize;
+    return *this;
+  }
+  Ge2DInfo(Ge2DInfo&& to_move) = default;
+  Ge2DInfo& operator=(Ge2DInfo&& to_move) = default;
+
+  Ge2DConfig config_type{};
+  std::vector<WatermarkInfo> watermark{};
+  resize_info resize{};
 };
 
 enum NodeType {
@@ -60,33 +92,70 @@ enum NodeType {
   kPassthrough,
 };
 struct InternalConfigNode {
+  InternalConfigNode() = default;
+  InternalConfigNode(const InternalConfigNode& to_copy) {
+    type = to_copy.type;
+    output_frame_rate = to_copy.output_frame_rate;
+    input_stream_type = to_copy.input_stream_type;
+    supported_streams = to_copy.supported_streams;
+    child_nodes = to_copy.child_nodes;
+    ge2d_info = to_copy.ge2d_info;
+    gdc_info = to_copy.gdc_info;
+    if (to_copy.input_constraints.has_value()) {
+      input_constraints = fidl::Clone(*to_copy.input_constraints);
+    }
+    if (to_copy.output_constraints.has_value()) {
+      output_constraints = fidl::Clone(*to_copy.output_constraints);
+    }
+    image_formats = fidl::Clone(to_copy.image_formats);
+  }
+  InternalConfigNode& operator=(const InternalConfigNode& to_copy) {
+    type = to_copy.type;
+    output_frame_rate = to_copy.output_frame_rate;
+    input_stream_type = to_copy.input_stream_type;
+    supported_streams = to_copy.supported_streams;
+    child_nodes = to_copy.child_nodes;
+    ge2d_info = to_copy.ge2d_info;
+    gdc_info = to_copy.gdc_info;
+    if (to_copy.input_constraints.has_value()) {
+      input_constraints = fidl::Clone(*to_copy.input_constraints);
+    }
+    if (to_copy.output_constraints.has_value()) {
+      output_constraints = fidl::Clone(*to_copy.output_constraints);
+    }
+    image_formats = fidl::Clone(to_copy.image_formats);
+    return *this;
+  }
+  InternalConfigNode(InternalConfigNode&& to_move) = default;
+  InternalConfigNode& operator=(InternalConfigNode&& to_move) = default;
+
   // To identify the type of the node this is.
-  NodeType type;
+  NodeType type{};
   // To identify the input frame rate at this node.
-  fuchsia::camera2::FrameRate output_frame_rate;
+  fuchsia::camera2::FrameRate output_frame_rate{};
   // This is only valid for Input Stream Type to differentiate
   // between ISP FR/DS/Scalar streams.
-  fuchsia::camera2::CameraStreamType input_stream_type;
+  fuchsia::camera2::CameraStreamType input_stream_type{};
   // Types of |stream_types| supported by this node.
-  std::vector<StreamInfo> supported_streams;
+  std::vector<StreamInfo> supported_streams{};
   // Child nodes
-  std::vector<InternalConfigNode> child_nodes;
+  std::vector<InternalConfigNode> child_nodes{};
   // HWAccelerator Info if applicable.
-  Ge2DInfo ge2d_info;
-  GdcInfo gdc_info;
+  Ge2DInfo ge2d_info{};
+  GdcInfo gdc_info{};
   // Specifies constraints for the node's attachments. Input constraints are required for all nodes
   // except Input nodes. If specified, output constraints indicate the node owns a buffer collection
   // and populates it by processing content from the input collection. Otherwise, the node only uses
   // the input collection, and does not have a collection of its own.
-  std::optional<fuchsia::sysmem::BufferCollectionConstraints> input_constraints;
-  std::optional<fuchsia::sysmem::BufferCollectionConstraints> output_constraints;
+  std::optional<fuchsia::sysmem2::BufferCollectionConstraints> input_constraints{};
+  std::optional<fuchsia::sysmem2::BufferCollectionConstraints> output_constraints{};
   // Image formats supported
-  std::vector<fuchsia::sysmem::ImageFormat_2> image_formats;
+  std::vector<fuchsia::images2::ImageFormat> image_formats{};
 };
 
 struct FrameRateRange {
-  fuchsia::camera2::FrameRate min;
-  fuchsia::camera2::FrameRate max;
+  fuchsia::camera2::FrameRate min{};
+  fuchsia::camera2::FrameRate max{};
 };
 
 struct InternalConfigInfo {
@@ -94,16 +163,16 @@ struct InternalConfigInfo {
   // These streams are high level streams which are coming in from
   // the ISP and not the output streams which are provided to the clients.
   // That information is part of this |InternalConfigNode| in |supported_streams|
-  std::vector<InternalConfigNode> streams_info;
+  std::vector<InternalConfigNode> streams_info{};
   // The frame rate range supported by this configuration.
-  FrameRateRange frame_rate_range;
+  FrameRateRange frame_rate_range{};
 };
 
 struct InternalConfigs {
   // List of all the configurations supported on a particular platform
   // Order of the configuration needs to match with the external configuration
   // data.
-  std::vector<InternalConfigInfo> configs_info;
+  std::vector<InternalConfigInfo> configs_info{};
 };
 
 }  // namespace camera

@@ -4,9 +4,12 @@
 
 #include "src/camera/drivers/controller/input_node.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/isp/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -39,10 +42,9 @@ fpromise::result<std::unique_ptr<InputNode>, zx_status_t> InputNode::Create(
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
 
-  auto image_format = ConvertToWireType(inode.image_formats[0]);
-
   buffer_collection_info_2 temp_buffer_collection = sysmem::fidl_to_banjo(pnode->OutputBuffers());
-  image_format_2_t temp_image_format = sysmem::fidl_to_banjo(image_format);
+  image_format_2_t temp_image_format =
+      sysmem::fidl_to_banjo(ConvertV2ToV1WireType(inode.image_formats[0]));
   output_stream_protocol_t isp_stream_protocol{};
   auto status = isp.CreateOutputStream(
       &temp_buffer_collection, &temp_image_format,

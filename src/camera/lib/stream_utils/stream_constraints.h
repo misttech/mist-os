@@ -7,7 +7,7 @@
 
 #include <fuchsia/camera2/cpp/fidl.h>
 #include <fuchsia/camera2/hal/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 
 #include <vector>
 
@@ -20,8 +20,8 @@ namespace camera {
 //
 // For each stream config, specify the stream type, and add image formats:
 // StreamConstraints stream(fuchsia::camera2::CameraStreamType::MONITORING);
-// stream.AddImageFormat(640, 512, fuchsia::sysmem::PixelFormatType::NV12);
-// stream.AddImageFormat(896, 1600, fuchsia::sysmem::PixelFormatType::NV12);
+// stream.AddImageFormat(640, 512, fuchsia::images2::PixelFormat::NV12);
+// stream.AddImageFormat(896, 1600, fuchsia::images2::PixelFormat::NV12);
 // configs[0].stream_configs.push_back(stream.ConvertToStreamConfig());
 //
 // NOTE: The default settings for stream configs is below
@@ -36,7 +36,7 @@ struct StreamConstraints {
   StreamConstraints() {}
   StreamConstraints(fuchsia::camera2::CameraStreamType type) : stream_type_(type) {}
 
-  void AddImageFormat(uint32_t width, uint32_t height, fuchsia::sysmem::PixelFormatType format,
+  void AddImageFormat(uint32_t width, uint32_t height, fuchsia::images2::PixelFormat format,
                       uint32_t original_width = 0, uint32_t original_height = 0);
 
   void set_contiguous(bool flag) { contiguous_ = flag; }
@@ -48,14 +48,14 @@ struct StreamConstraints {
   }
   void set_min_buffer_count(uint32_t min_buffer_count) { min_buffer_count_ = min_buffer_count; }
 
-  static fuchsia::sysmem::ImageFormat_2 MakeImageFormat(uint32_t width, uint32_t height,
-                                                        fuchsia::sysmem::PixelFormatType format,
-                                                        uint32_t original_width = 0,
-                                                        uint32_t original_height = 0);
+  static fuchsia::images2::ImageFormat MakeImageFormat(uint32_t width, uint32_t height,
+                                                       fuchsia::images2::PixelFormat format,
+                                                       uint32_t original_width = 0,
+                                                       uint32_t original_height = 0);
 
   void set_frames_per_second(uint32_t frames_per_second) { frames_per_second_ = frames_per_second; }
 
-  fuchsia::sysmem::BufferCollectionConstraints MakeBufferCollectionConstraints() const;
+  fuchsia::sysmem2::BufferCollectionConstraints MakeBufferCollectionConstraints() const;
 
   // Converts the data in this struct into a StreamConfig.
   fuchsia::camera2::hal::StreamConfig ConvertToStreamConfig();
@@ -66,7 +66,7 @@ struct StreamConstraints {
   uint32_t min_buffer_count_ = 0;
   uint32_t frames_per_second_ = 30;
   bool contiguous_ = false;
-  std::vector<fuchsia::sysmem::ImageFormat_2> formats_;
+  std::vector<fuchsia::images2::ImageFormat> formats_;
   fuchsia::camera2::CameraStreamType stream_type_ = {};
 };
 

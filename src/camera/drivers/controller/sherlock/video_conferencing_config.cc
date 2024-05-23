@@ -4,6 +4,9 @@
 
 #include "src/camera/drivers/controller/sherlock/video_conferencing_config.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <lib/sysmem-version/sysmem-version.h>
+
 // This file contains static information for the Video conferencing configuration.
 // There are two streams in one configuration.
 // FR --> (30fps) GDC1 --> (5fps) GDC2 --> ML(640x512)
@@ -13,15 +16,21 @@
 
 namespace camera {
 
+fuchsia::sysmem2::BufferCollectionConstraints V2CopyFromV1BufferCollectionConstraints(
+    const fuchsia::sysmem::BufferCollectionConstraints& v1) {
+  auto v1_natural = fidl::HLCPPToNatural(fidl::Clone(v1));
+  auto v2_natural_result = sysmem::V2CopyFromV1BufferCollectionConstraints(&v1_natural);
+  ZX_ASSERT(v2_natural_result.is_ok());
+  return fidl::NaturalToHLCPP(std::move(v2_natural_result.value()));
+}
+
 /**********************************
  *  ML Video FR parameters        *
  **********************************
  */
 
-static std::vector<fuchsia::sysmem::ImageFormat_2> MLFRImageFormats() {
-  return {
-      StreamConstraints::MakeImageFormat(kMlFRWidth, kMlFRHeight, kFramePixelFormat),
-  };
+static std::vector<fuchsia::images2::ImageFormat> MLFRImageFormats() {
+  return MakeVec(StreamConstraints::MakeImageFormat(kMlFRWidth, kMlFRHeight, kFramePixelFormat));
 }
 
 static fuchsia::camera2::hal::StreamConfig MLVideoFRConfig(bool extended_fov) {
@@ -44,12 +53,11 @@ static fuchsia::camera2::hal::StreamConfig MLVideoFRConfig(bool extended_fov) {
  ******************************************
  */
 
-static std::vector<fuchsia::sysmem::ImageFormat_2> VideoImageFormats() {
-  return {
+static std::vector<fuchsia::images2::ImageFormat> VideoImageFormats() {
+  return MakeVec(
       StreamConstraints::MakeImageFormat(kVideoWidth, kVideoHeight, kFramePixelFormat),
       StreamConstraints::MakeImageFormat(kVideoWidth1, kVideoHeight1, kFramePixelFormat),
-      StreamConstraints::MakeImageFormat(kVideoWidth2, kVideoHeight2, kFramePixelFormat),
-  };
+      StreamConstraints::MakeImageFormat(kVideoWidth2, kVideoHeight2, kFramePixelFormat));
 }
 
 static fuchsia::camera2::hal::StreamConfig VideoConfig(bool extended_fov) {
@@ -84,56 +92,50 @@ fuchsia::camera2::hal::Config VideoConferencingConfig(bool extended_fov) {
 // ================== INTERNAL CONFIGURATION ======================== //
 
 static InternalConfigNode OutputMLFR(bool extended_fov) {
-  return {
-      .type = kOutputStream,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kMlFRFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = extended_fov
-                              ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kMlStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .input_constraints = CopyConstraintsWithOverrides(
-          VideoConferencingConfig(extended_fov).stream_configs[0].constraints,
-          {.min_buffer_count_for_camping = 0}),
-      .image_formats = MLFRImageFormats(),
+  InternalConfigNode result;
+  result.type = kOutputStream;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kMlFRFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.supported_streams = {
+      {
+          .type = extended_fov ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kMlStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.input_constraints = CopyConstraintsWithOverrides(
+      VideoConferencingConfig(extended_fov).stream_configs[0].constraints,
+      {.min_buffer_count_for_camping = 0});
+  result.image_formats = MLFRImageFormats();
+  return result;
 }
 
 static InternalConfigNode OutputVideoConferencing(bool extended_fov) {
-  return {
-      .type = kOutputStream,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kVideoThrottledOutputFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = extended_fov
-                              ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kVideoStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .input_constraints = CopyConstraintsWithOverrides(
-          VideoConferencingConfig(extended_fov).stream_configs[1].constraints,
-          {.min_buffer_count_for_camping = 0}),
-      .image_formats = VideoImageFormats(),
+  InternalConfigNode result;
+  result.type = kOutputStream;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kVideoThrottledOutputFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.supported_streams = {
+      {
+          .type = extended_fov ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kVideoStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.input_constraints = CopyConstraintsWithOverrides(
+      VideoConferencingConfig(extended_fov).stream_configs[1].constraints,
+      {.min_buffer_count_for_camping = 0});
+  result.image_formats = VideoImageFormats();
+  return result;
 }
 
-fuchsia::sysmem::BufferCollectionConstraints GdcVideo2Constraints() {
+fuchsia::sysmem2::BufferCollectionConstraints GdcVideo2Constraints() {
   StreamConstraints stream_constraints;
   stream_constraints.set_bytes_per_row_divisor(kGdcBytesPerRowDivisor);
   stream_constraints.set_contiguous(true);
@@ -143,43 +145,35 @@ fuchsia::sysmem::BufferCollectionConstraints GdcVideo2Constraints() {
 }
 
 static InternalConfigNode GdcVideo2(bool extended_fov) {
-  return {
-      .type = kGdc,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kMlFRFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = extended_fov
-                              ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kMlStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .child_nodes =
-          {
-              {
-                  OutputMLFR(extended_fov),
-              },
-          },
-      .gdc_info =
-          {
-              .config_type =
-                  {
-                      GdcConfig::VIDEO_CONFERENCE_ML,
-                  },
-          },
-      .input_constraints = GdcVideo2Constraints(),
-      .output_constraints = MLVideoFRConfig(extended_fov).constraints,
-      .image_formats = MLFRImageFormats(),
+  InternalConfigNode result;
+  result.type = kGdc;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kMlFRFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.supported_streams = {
+      {
+          .type = extended_fov ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kMlStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.child_nodes = MakeVec(OutputMLFR(extended_fov));
+  result.gdc_info = {
+      .config_type =
+          {
+              GdcConfig::VIDEO_CONFERENCE_ML,
+          },
+  };
+  result.input_constraints = GdcVideo2Constraints();
+  result.output_constraints =
+      V2CopyFromV1BufferCollectionConstraints(MLVideoFRConfig(extended_fov).constraints);
+  result.image_formats = MLFRImageFormats();
+  return result;
 }
 
-fuchsia::sysmem::BufferCollectionConstraints Ge2dConstraints() {
+fuchsia::sysmem2::BufferCollectionConstraints Ge2dConstraints() {
   StreamConstraints stream_constraints;
   stream_constraints.set_bytes_per_row_divisor(kGe2dBytesPerRowDivisor);
   stream_constraints.set_contiguous(true);
@@ -189,51 +183,44 @@ fuchsia::sysmem::BufferCollectionConstraints Ge2dConstraints() {
 }
 
 static InternalConfigNode Ge2d(bool extended_fov) {
-  return {
-      .type = kGe2d,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kVideoThrottledOutputFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = extended_fov
-                              ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kVideoStreamType,
-                  .supports_dynamic_resolution = true,
-                  .supports_crop_region = true,
-              },
-          },
-      .child_nodes =
-          {
-              {
-                  OutputVideoConferencing(extended_fov),
-              },
-          },
-      .ge2d_info =
-          {
-              .config_type = Ge2DConfig::GE2D_RESIZE,
-              .resize =
-                  {
-                      .crop =
-                          {
-                              .x = 0,
-                              .y = 0,
-                              .width = kGdcFRWidth,
-                              .height = kGdcFRHeight,
-                          },
-                      .output_rotation = GE2D_ROTATION_ROTATION_0,
-                  },
-          },
-      .input_constraints = Ge2dConstraints(),
-      .output_constraints = VideoConfig(extended_fov).constraints,
-      .image_formats = VideoImageFormats(),
+  InternalConfigNode result;
+  result.type = kGe2d;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kVideoThrottledOutputFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.supported_streams = {
+      {
+          .type = extended_fov ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kVideoStreamType,
+          .supports_dynamic_resolution = true,
+          .supports_crop_region = true,
+      },
+  };
+  result.child_nodes = MakeVec(OutputVideoConferencing(extended_fov));
+  result.ge2d_info = [] {
+    Ge2DInfo result;
+    result.config_type = Ge2DConfig::GE2D_RESIZE;
+    result.resize = {
+        .crop =
+            {
+                .x = 0,
+                .y = 0,
+                .width = kGdcFRWidth,
+                .height = kGdcFRHeight,
+            },
+        .output_rotation = GE2D_ROTATION_ROTATION_0,
+    };
+    return result;
+  }();
+  result.input_constraints = Ge2dConstraints();
+  result.output_constraints =
+      V2CopyFromV1BufferCollectionConstraints(VideoConfig(extended_fov).constraints);
+  result.image_formats = VideoImageFormats();
+  return result;
 }
 
-fuchsia::sysmem::BufferCollectionConstraints GdcVideo1InputConstraints() {
+fuchsia::sysmem2::BufferCollectionConstraints GdcVideo1InputConstraints() {
   StreamConstraints stream_constraints;
   stream_constraints.set_bytes_per_row_divisor(kGdcBytesPerRowDivisor);
   stream_constraints.set_contiguous(true);
@@ -242,7 +229,7 @@ fuchsia::sysmem::BufferCollectionConstraints GdcVideo1InputConstraints() {
   return stream_constraints.MakeBufferCollectionConstraints();
 }
 
-fuchsia::sysmem::BufferCollectionConstraints GdcVideo1OutputConstraints() {
+fuchsia::sysmem2::BufferCollectionConstraints GdcVideo1OutputConstraints() {
   StreamConstraints stream_constraints;
   stream_constraints.set_bytes_per_row_divisor(kGdcBytesPerRowDivisor);
   stream_constraints.set_contiguous(true);
@@ -251,66 +238,53 @@ fuchsia::sysmem::BufferCollectionConstraints GdcVideo1OutputConstraints() {
   return stream_constraints.MakeBufferCollectionConstraints();
 }
 
-static std::vector<fuchsia::sysmem::ImageFormat_2> GdcVideo1ImageFormats() {
-  return {
-      StreamConstraints::MakeImageFormat(kGdcFRWidth, kGdcFRHeight, kFramePixelFormat),
-  };
+static std::vector<fuchsia::images2::ImageFormat> GdcVideo1ImageFormats() {
+  return MakeVec(StreamConstraints::MakeImageFormat(kGdcFRWidth, kGdcFRHeight, kFramePixelFormat));
 }
 
 static InternalConfigNode GdcVideo1(bool extended_fov) {
+  InternalConfigNode result;
+
   auto gdc_config = GdcConfig::VIDEO_CONFERENCE;
   if (extended_fov) {
     gdc_config = GdcConfig::VIDEO_CONFERENCE_EXTENDED_FOV;
   }
 
-  return {
-      .type = kGdc,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kVideoThrottledOutputFrameRate,
-              .frames_per_sec_denominator = 1,
-          },
-      .supported_streams =
-          {
-              {
-                  .type = extended_fov
-                              ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kMlStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-
-              },
-              {
-                  .type = extended_fov
-                              ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kVideoStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          },
-      .child_nodes =
-          {
-              {
-                  GdcVideo2(extended_fov),
-              },
-              {
-                  Ge2d(extended_fov),
-              },
-          },
-      .gdc_info =
-          {
-              .config_type =
-                  {
-                      gdc_config,
-                  },
-          },
-      .input_constraints = GdcVideo1InputConstraints(),
-      .output_constraints = GdcVideo1OutputConstraints(),
-      .image_formats = GdcVideo1ImageFormats(),
+  result.type = kGdc;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kVideoThrottledOutputFrameRate,
+      .frames_per_sec_denominator = 1,
   };
+  result.supported_streams = {
+      {
+          .type = extended_fov ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kMlStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+
+      },
+      {
+          .type = extended_fov ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kVideoStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.child_nodes = MakeVec(GdcVideo2(extended_fov), Ge2d(extended_fov));
+  result.gdc_info = {
+      .config_type =
+          {
+              gdc_config,
+          },
+  };
+  result.input_constraints = GdcVideo1InputConstraints();
+  result.output_constraints = GdcVideo1OutputConstraints();
+  result.image_formats = GdcVideo1ImageFormats();
+
+  return result;
 }
 
-fuchsia::sysmem::BufferCollectionConstraints VideoConfigFullResConstraints() {
+fuchsia::sysmem2::BufferCollectionConstraints VideoConfigFullResConstraints() {
   StreamConstraints stream_constraints;
   stream_constraints.set_bytes_per_row_divisor(kIspBytesPerRowDivisor);
   stream_constraints.set_contiguous(true);
@@ -319,48 +293,36 @@ fuchsia::sysmem::BufferCollectionConstraints VideoConfigFullResConstraints() {
   return stream_constraints.MakeBufferCollectionConstraints();
 }
 
-static std::vector<fuchsia::sysmem::ImageFormat_2> IspImageFormats() {
-  return {
-      StreamConstraints::MakeImageFormat(kIspFRWidth, kIspFRHeight, kFramePixelFormat),
-  };
+static std::vector<fuchsia::images2::ImageFormat> IspImageFormats() {
+  return MakeVec(StreamConstraints::MakeImageFormat(kIspFRWidth, kIspFRHeight, kFramePixelFormat));
 }
 
 InternalConfigNode VideoConfigFullRes(bool extended_fov) {
-  return {
-      .type = kInputStream,
-      .output_frame_rate =
-          {
-              .frames_per_sec_numerator = kSensorMaxFramesPerSecond,
-              .frames_per_sec_denominator = 1,
-          },
-      .input_stream_type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION,
-      .supported_streams =
-          {
-              {
-                  .type = extended_fov
-                              ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kMlStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-              {
-                  .type = extended_fov
-                              ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
-                              : kVideoStreamType,
-                  .supports_dynamic_resolution = false,
-                  .supports_crop_region = false,
-              },
-          }  // namespace camera
-      ,
-      .child_nodes =
-          {
-              {
-                  GdcVideo1(extended_fov),
-              },
-          },
-      .output_constraints = VideoConfigFullResConstraints(),
-      .image_formats = IspImageFormats(),
+  InternalConfigNode result;
+  result.type = kInputStream;
+  result.output_frame_rate = {
+      .frames_per_sec_numerator = kSensorMaxFramesPerSecond,
+      .frames_per_sec_denominator = 1,
   };
+  result.input_stream_type = fuchsia::camera2::CameraStreamType::FULL_RESOLUTION;
+  result.supported_streams = {
+      {
+          .type = extended_fov ? kMlStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kMlStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+      {
+          .type = extended_fov ? kVideoStreamType | fuchsia::camera2::CameraStreamType::EXTENDED_FOV
+                               : kVideoStreamType,
+          .supports_dynamic_resolution = false,
+          .supports_crop_region = false,
+      },
+  };
+  result.child_nodes = MakeVec(GdcVideo1(extended_fov));
+  result.output_constraints = VideoConfigFullResConstraints();
+  result.image_formats = IspImageFormats();
+  return result;
 }
 
 }  // namespace camera

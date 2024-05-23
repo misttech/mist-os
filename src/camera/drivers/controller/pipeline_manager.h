@@ -50,7 +50,7 @@ namespace camera {
 class PipelineManager {
  public:
   PipelineManager(async_dispatcher_t* dispatcher,
-                  fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+                  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
                   const ddk::IspProtocolClient& isp, const ddk::GdcProtocolClient& gdc,
                   const ddk::Ge2dProtocolClient& ge2d, LoadFirmwareCallback load_firmware);
   ~PipelineManager();
@@ -87,7 +87,7 @@ class PipelineManager {
   // This method returns the set of constraints that apply to the specified node's output
   // collection. It reflects the node's own output constraints, and all downstream input
   // constraints, including those further downstream of "in-place" children.
-  std::vector<fuchsia::sysmem::BufferCollectionConstraints> GatherOutputConstraints(
+  std::vector<fuchsia::sysmem2::BufferCollectionConstraints> GatherOutputConstraints(
       const camera::InternalConfigNode& node);
 
   // Produces a text representation of the current state of the pipeline, optionally adding it to

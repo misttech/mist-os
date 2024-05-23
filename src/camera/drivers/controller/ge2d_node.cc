@@ -4,8 +4,11 @@
 
 #include "src/camera/drivers/controller/ge2d_node.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -36,29 +39,27 @@ fpromise::result<std::unique_ptr<Ge2dNode>, zx_status_t> Ge2dNode::Create(
   auto node = std::make_unique<camera::Ge2dNode>(dispatcher, attachments, std::move(frame_callback),
                                                  ge2d, internal_ge2d_node);
 
-  const fuchsia::sysmem::BufferCollectionInfo_2& input_buffer_collection = node->InputBuffers();
-  const fuchsia::sysmem::BufferCollectionInfo_2& output_buffer_collection =
+  const fuchsia::sysmem2::BufferCollectionInfo& input_buffer_collection = node->InputBuffers();
+  const fuchsia::sysmem2::BufferCollectionInfo& output_buffer_collection =
       node->in_place_ ? node->InputBuffers() : node->OutputBuffers();
-  ZX_ASSERT(output_buffer_collection.settings.has_image_format_constraints);
+  ZX_ASSERT(output_buffer_collection.settings().has_image_format_constraints());
   fuchsia_sysmem::wire::ImageFormatConstraints output_buffer_constraints =
-      ConvertToWireType(output_buffer_collection.settings.image_format_constraints);
-  ZX_ASSERT(input_buffer_collection.settings.has_image_format_constraints);
+      ConvertV2ToV1WireType(output_buffer_collection.settings().image_format_constraints());
+  ZX_ASSERT(input_buffer_collection.settings().has_image_format_constraints());
   fuchsia_sysmem::wire::ImageFormatConstraints input_buffer_constraints =
-      ConvertToWireType(input_buffer_collection.settings.image_format_constraints);
+      ConvertV2ToV1WireType(input_buffer_collection.settings().image_format_constraints());
 
   std::vector<image_format_2_t> output_image_formats_wire;
   output_image_formats_wire.reserve(internal_ge2d_node.image_formats.size());
   for (auto& format : internal_ge2d_node.image_formats) {
     output_image_formats_wire.push_back(sysmem::fidl_to_banjo(GetImageFormatFromConstraints(
-        output_buffer_constraints, format.coded_width, format.coded_height))
-
-    );
+        output_buffer_constraints, format.size().width, format.size().height)));
   }
 
   std::vector<image_format_2_t> input_image_formats_wire;
   for (auto& format : node->InputFormats()) {
     input_image_formats_wire.push_back(sysmem::fidl_to_banjo(GetImageFormatFromConstraints(
-        input_buffer_constraints, format.coded_width, format.coded_height)));
+        input_buffer_constraints, format.size().width, format.size().height)));
   }
 
   // Initialize the GE2D to get a unique task index.
@@ -80,7 +81,7 @@ fpromise::result<std::unique_ptr<Ge2dNode>, zx_status_t> Ge2dNode::Create(
     }
     case Ge2DConfig::GE2D_WATERMARK: {
       std::vector<zx::vmo> watermark_vmos;
-      for (auto watermark : internal_ge2d_node.ge2d_info.watermark) {
+      for (auto& watermark : internal_ge2d_node.ge2d_info.watermark) {
         auto result = load_firmware(watermark.filename);
         if (result.is_error()) {
           zxlogf(ERROR, "Failed to load the watermark image");
@@ -96,7 +97,7 @@ fpromise::result<std::unique_ptr<Ge2dNode>, zx_status_t> Ge2dNode::Create(
             .loc_x = internal_ge2d_node.ge2d_info.watermark[i].loc_x,
             .loc_y = internal_ge2d_node.ge2d_info.watermark[i].loc_y,
             .wm_image_format = sysmem::fidl_to_banjo(
-                ConvertToWireType(internal_ge2d_node.ge2d_info.watermark[i].image_format)),
+                ConvertV2ToV1WireType(internal_ge2d_node.ge2d_info.watermark[i].image_format)),
         };
         info.watermark_vmo = watermark_vmos[i].release();
         constexpr float kGlobalAlpha = 200.f / 255;
@@ -240,13 +241,13 @@ zx_status_t Ge2dNode::SetCropRect(float x_min, float y_min, float x_max, float y
 
   auto& input_image_format = InputFormats().at(0);
   auto normalized_x_min = safemath::checked_cast<uint32_t>(
-      x_min * safemath::checked_cast<float>(input_image_format.coded_width) + 0.5f);
+      x_min * safemath::checked_cast<float>(input_image_format.size().width) + 0.5f);
   auto normalized_y_min = safemath::checked_cast<uint32_t>(
-      y_min * safemath::checked_cast<float>(input_image_format.coded_height) + 0.5f);
+      y_min * safemath::checked_cast<float>(input_image_format.size().height) + 0.5f);
   auto normalized_x_max = safemath::checked_cast<uint32_t>(
-      x_max * safemath::checked_cast<float>(input_image_format.coded_width) + 0.5f);
+      x_max * safemath::checked_cast<float>(input_image_format.size().width) + 0.5f);
   auto normalized_y_max = safemath::checked_cast<uint32_t>(
-      y_max * safemath::checked_cast<float>(input_image_format.coded_height) + 0.5f);
+      y_max * safemath::checked_cast<float>(input_image_format.size().height) + 0.5f);
 
   auto width = normalized_x_max - normalized_x_min;
   auto height = normalized_y_max - normalized_y_min;

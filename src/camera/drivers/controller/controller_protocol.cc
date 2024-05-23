@@ -14,7 +14,7 @@
 namespace camera {
 
 ControllerImpl::ControllerImpl(async_dispatcher_t* dispatcher,
-                               fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator,
+                               fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
                                const ddk::IspProtocolClient& isp, const ddk::GdcProtocolClient& gdc,
                                const ddk::Ge2dProtocolClient& ge2d,
                                LoadFirmwareCallback load_firmware)

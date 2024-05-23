@@ -6,7 +6,7 @@
 #define SRC_CAMERA_DRIVERS_CONTROLLER_SHERLOCK_VIDEO_CONFERENCING_CONFIG_H_
 
 #include <fuchsia/camera2/hal/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/images2/cpp/fidl.h>
 
 #include <vector>
 
@@ -25,8 +25,7 @@ namespace camera {
 
 namespace {
 
-constexpr fuchsia::sysmem::PixelFormatType kFramePixelFormat =
-    fuchsia::sysmem::PixelFormatType::NV12;
+constexpr fuchsia::images2::PixelFormat kFramePixelFormat = fuchsia::images2::PixelFormat::NV12;
 
 // Pipeline-wide Parameters
 // Each processing node has access to an input collection, an output collection, or both. For each
