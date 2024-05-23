@@ -13,6 +13,14 @@ use crate::errors::IntoExitCode;
 pub(crate) struct TargetInfo {
     pub(crate) nodename: String,
     pub(crate) addresses: Vec<TargetAddr>,
+    pub(crate) mode: TargetMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) enum TargetMode {
+    Fastboot,
+    #[default]
+    Product,
 }
 
 impl std::fmt::Display for TargetInfo {
