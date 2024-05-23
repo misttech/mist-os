@@ -4,6 +4,14 @@
 {
     actions: [
         {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/339692009): Support HDRINCL raw sockets.
+                "RawHDRINCL.SendAndReceive",
+                "RawHDRINCL.SendAndReceiveDifferentAddress",
+            ],
+        },
+        {
             type: "expect_failure",
             matchers: [
                 // Not-yet-supported socket options on raw packet sockets.
@@ -31,7 +39,6 @@
                 "AllInetTests/RawSocketTest.FailShutdownWithoutConnect/*",
                 "AllInetTests/RawSocketTest.GetPeerName/*",
                 "AllInetTests/RawSocketTest.MultipleSocketReceive/*",
-                "AllInetTests/RawSocketTest.PollNotReadableInitially/*",
                 "AllInetTests/RawSocketTest.PollTriggeredOnWrite/*",
                 "AllInetTests/RawSocketTest.RecvBufLimits/*",
                 "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
@@ -54,10 +61,7 @@
                 "RawHDRINCL.BindToLocalhost",
                 "RawHDRINCL.ConnectToLoopback",
                 "RawHDRINCL.FailShutdownWithoutConnect",
-                "RawHDRINCL.NotReadable",
                 "RawHDRINCL.NotReadableAfterWrite",
-                "RawHDRINCL.SendAndReceive",
-                "RawHDRINCL.SendAndReceiveDifferentAddress",
                 "RawHDRINCL.SendAndReceiveIPHdrIncl",
                 "RawHDRINCL.SendWithoutConnectFails",
                 "RawHDRINCL.WriteTooSmall",
@@ -87,7 +91,6 @@
                 "RawSocketTest.ReceiveTOS",
                 "RawSocketTest.ReceiveTTL",
                 "RawSocketTest.SetIPv6ChecksumError_MultipleOf2",
-                "RawSocketTest.UnboundReceive",
             ],
         },
     ],

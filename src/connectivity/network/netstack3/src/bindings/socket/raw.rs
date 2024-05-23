@@ -4,26 +4,40 @@
 
 use std::ops::ControlFlow;
 
-use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fidl::{
+    encoding::Decode as _,
+    endpoints::{ProtocolMarker, RequestStream},
+};
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::{
+    ip::{Ip, Ipv4, Ipv6},
+    SpecifiedAddr,
+};
 use netstack3_core::{
-    device::DeviceId,
+    device::{DeviceId, WeakDeviceId},
     ip::{
         RawIpSocketId, RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
     },
+    socket::StrictlyZonedAddr,
+    sync::Mutex,
     IpExt,
 };
+use packet_formats::ip::IpPacket as _;
 use tracing::error;
 use zerocopy::ByteSlice;
 use zx::{HandleBased, Peered};
 
 use crate::bindings::{
-    util::{RemoveResourceResultExt, TryFromFidl},
+    socket::{
+        queue::{BodyLen, MessageQueue},
+        IpSockAddrExt, SockAddr,
+    },
+    util::{AllowBindingIdFromWeak, RemoveResourceResultExt, TryFromFidl, TryIntoFidlWithContext},
     BindingsCtx, Ctx,
 };
 
@@ -33,24 +47,68 @@ use super::{
 };
 
 impl RawIpSocketsBindingsTypes for BindingsCtx {
-    // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
-    type RawIpSocketState<I: Ip> = SocketState;
+    type RawIpSocketState<I: Ip> = SocketState<I>;
 }
 
 impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for BindingsCtx {
     fn receive_packet<B: ByteSlice>(
         &self,
-        _socket: &RawIpSocketId<I, Self>,
-        _packet: &I::Packet<B>,
-        _device: &DeviceId<Self>,
+        socket: &RawIpSocketId<I, Self>,
+        packet: &I::Packet<B>,
+        device: &DeviceId<Self>,
     ) {
-        // TODO(https://fxbug.dev/42175797): Support raw IP sockets in bindings.
+        socket.external_state().enqueue_rx_packet::<B>(packet, device.downgrade())
     }
 }
 
 /// The Core held state of a raw IP socket.
 #[derive(Debug)]
-pub struct SocketState {}
+pub struct SocketState<I: Ip> {
+    /// The received IP packets for the socket.
+    rx_queue: Mutex<MessageQueue<ReceivedIpPacket<I>>>,
+}
+
+impl<I: IpExt> SocketState<I> {
+    fn new(event: zx::EventPair) -> Self {
+        SocketState { rx_queue: Mutex::new(MessageQueue::new(event)) }
+    }
+
+    fn enqueue_rx_packet<B: ByteSlice>(
+        &self,
+        packet: &I::Packet<B>,
+        device: WeakDeviceId<BindingsCtx>,
+    ) {
+        self.rx_queue.lock().receive(ReceivedIpPacket::new::<B>(packet, device))
+    }
+
+    fn dequeue_rx_packet(&self) -> Option<ReceivedIpPacket<I>> {
+        self.rx_queue.lock().pop()
+    }
+}
+
+/// A received IP Packet.
+#[derive(Debug)]
+struct ReceivedIpPacket<I: Ip> {
+    /// The packet bytes, including the header and body.
+    data: Vec<u8>,
+    /// The source IP address of the packet.
+    src_addr: I::Addr,
+    /// The device on which the packet was received.
+    device: WeakDeviceId<BindingsCtx>,
+}
+
+impl<I: IpExt> ReceivedIpPacket<I> {
+    fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId<BindingsCtx>) -> Self {
+        ReceivedIpPacket { src_addr: packet.src_ip(), data: packet.to_vec(), device }
+    }
+}
+
+impl<I: Ip> BodyLen for ReceivedIpPacket<I> {
+    fn body_len(&self) -> usize {
+        let Self { data, src_addr: _, device: _ } = self;
+        data.len()
+    }
+}
 
 /// The worker held state of a raw IP socket.
 #[derive(Debug)]
@@ -73,8 +131,8 @@ impl<I: IpExt> SocketWorkerState<I> {
             Ok(()) => (),
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         };
-        let id = ctx.api().raw_ip_socket().create(proto, SocketState {});
 
+        let id = ctx.api().raw_ip_socket().create(proto, SocketState::new(local_event));
         SocketWorkerState { peer_event, id }
     }
 }
@@ -86,7 +144,7 @@ impl CloseResponder for fpraw::SocketCloseResponder {
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-impl<I: IpExt> SocketWorkerHandler for SocketWorkerState<I> {
+impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
     type Request = fpraw::SocketRequest;
 
     type RequestStream = fpraw::SocketRequestStream;
@@ -109,7 +167,7 @@ impl<I: IpExt> SocketWorkerHandler for SocketWorkerState<I> {
     async fn close(self, ctx: &mut Ctx) {
         let SocketWorkerState { peer_event: _, id } = self;
         let weak = id.downgrade();
-        let SocketState {} = ctx
+        let SocketState { rx_queue: _ } = ctx
             .api()
             .raw_ip_socket()
             .close(id)
@@ -146,9 +204,10 @@ struct RequestHandler<'a, I: IpExt> {
     data: &'a mut SocketWorkerState<I>,
 }
 
-impl<'a, I: IpExt> RequestHandler<'a, I> {
-    fn describe(self) -> fpraw::SocketDescribeResponse {
-        let Self { ctx: _ctx, data: SocketWorkerState { peer_event, id: _ } } = self;
+impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
+    fn describe(
+        SocketWorkerState { peer_event, id: _ }: &SocketWorkerState<I>,
+    ) -> fpraw::SocketDescribeResponse {
         let peer = peer_event
             .duplicate_handle(
                 // The client only needs to be able to receive signals so don't
@@ -164,6 +223,7 @@ impl<'a, I: IpExt> RequestHandler<'a, I> {
         request: fpraw::SocketRequest,
     ) -> std::ops::ControlFlow<fpraw::SocketCloseResponder, Option<fpraw::SocketRequestStream>>
     {
+        let Self { ctx, data } = self;
         match request {
             fpraw::SocketRequest::Clone2 { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
@@ -172,7 +232,7 @@ impl<'a, I: IpExt> RequestHandler<'a, I> {
             }
             fpraw::SocketRequest::Describe { responder } => {
                 responder
-                    .send(self.describe())
+                    .send(Self::describe(data))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fpraw::SocketRequest::Close { responder } => return ControlFlow::Break(responder),
@@ -406,12 +466,20 @@ impl<'a, I: IpExt> RequestHandler<'a, I> {
                 respond_not_supported!("raw::GetOriginalDestination", responder)
             }
             fpraw::SocketRequest::RecvMsg {
-                want_addr: _,
-                data_len: _,
-                want_control: _,
-                flags: _,
+                want_addr,
+                data_len,
+                want_control,
+                flags,
                 responder,
-            } => respond_not_supported!("raw::RecvMsg", responder),
+            } => {
+                let result = maybe_log_error!(
+                    "recvmsg",
+                    handle_recvmsg(ctx, data, want_addr, data_len, want_control, flags)
+                );
+                responder
+                    .send(result.as_ref().map(RecvMsgResponse::borrowed).map_err(|e| *e))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+            }
             fpraw::SocketRequest::SendMsg { addr: _, data: _, control: _, flags: _, responder } => {
                 respond_not_supported!("raw::SendMsg", responder)
             }
@@ -518,6 +586,70 @@ fn handle_create_socket(
         }
     }
     Ok(client)
+}
+
+/// The response for a successful call to `recvmsg`.
+struct RecvMsgResponse {
+    src_addr: Option<fnet::SocketAddress>,
+    data: Vec<u8>,
+    control: fposix_socket::NetworkSocketRecvControlData,
+    truncated_bytes: u32,
+}
+
+impl RecvMsgResponse {
+    /// Provide a form compatible with [`fpraw::SocketRecvMsgResponder`].
+    fn borrowed(
+        &self,
+    ) -> (Option<&fnet::SocketAddress>, &[u8], &fposix_socket::NetworkSocketRecvControlData, u32)
+    {
+        let RecvMsgResponse { src_addr, data, control, truncated_bytes } = self;
+        (src_addr.as_ref(), data.as_ref(), &control, *truncated_bytes)
+    }
+}
+
+/// Handler for a [`fpraw::SocketRequest::RecvMsg`] request.
+fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
+    ctx: &Ctx,
+    socket: &SocketWorkerState<I>,
+    want_addr: bool,
+    max_len: u32,
+    want_control: bool,
+    flags: fposix_socket::RecvMsgFlags,
+) -> Result<RecvMsgResponse, fposix::Errno> {
+    // TODO(https://fxbug.dev/42175797): Support control data & flags.
+    let _want_control = want_control;
+    let _flags = flags;
+
+    let ReceivedIpPacket { mut data, src_addr, device } =
+        socket.id.external_state().dequeue_rx_packet().ok_or(fposix::Errno::Eagain)?;
+    let data_len: usize = max_len.try_into().unwrap_or(usize::MAX);
+    let truncated_bytes: u32 = data.len().saturating_sub(data_len).try_into().unwrap_or(u32::MAX);
+    data.truncate(data_len);
+
+    let src_addr = want_addr.then(|| {
+        let src_addr = SpecifiedAddr::new(src_addr).map(|addr| {
+            StrictlyZonedAddr::new_with_zone(addr, || {
+                // Opt into infallible conversion to a `BindingId`. We don't
+                // care if the device this packet was received on has since been
+                // removed.
+                AllowBindingIdFromWeak(device)
+                    .try_into_fidl_with_ctx(ctx.bindings_ctx())
+                    .unwrap_or_else(|never| match never {})
+            })
+            .into_inner()
+        });
+        // NB: raw IP sockets always set the source port to 0, since they
+        // operate at the network layer.
+        const RAW_IP_PORT_NUM: u16 = 0;
+        I::SocketAddress::new(src_addr, RAW_IP_PORT_NUM).into_sock_addr()
+    });
+
+    Ok(RecvMsgResponse {
+        src_addr,
+        data,
+        control: fposix_socket::NetworkSocketRecvControlData::new_empty(),
+        truncated_bytes,
+    })
 }
 
 impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {
