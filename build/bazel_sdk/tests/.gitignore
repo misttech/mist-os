@@ -4,3 +4,4 @@ bazel-*
 .versions/
 tools/.versions/
 tools/bazel
+MODULE.bazel.lock
