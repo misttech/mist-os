@@ -11,17 +11,18 @@
 #include <lib/mistos/starnix/kernel/task/forward.h>
 #include <zircon/types.h>
 
-#include <optional>
-
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
+#include <ktl/optional.h>
 
 namespace starnix {
 
 // TODO (Herrera) make parent  /*parent: Option<ThreadGroupWriteGuard<'_>>,*/
-fit::result<zx_status_t, TaskInfo> create_zircon_process(
-    fbl::RefPtr<Kernel> kernel, std::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t pid,
-    fbl::RefPtr<ProcessGroup> process_group, const fbl::String& name);
+fit::result<Errno, TaskInfo> create_zircon_process(fbl::RefPtr<Kernel> kernel,
+                                                   ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                                                   pid_t pid,
+                                                   fbl::RefPtr<ProcessGroup> process_group,
+                                                   const fbl::String& name);
 
 /// NOTE: We keep the name from Rust/Starnix but it is not creating a shared process now.
 /// Creates a process that shares half its address space with this process.
@@ -33,7 +34,7 @@ fit::result<zx_status_t, TaskInfo> create_zircon_process(
 /// Wraps the
 /// [zx_process_create_shared](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create_shared.md)
 /// syscall.
-fit::result<zx_status_t, std::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
+fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
                                                                          const fbl::String& name);
 
 using PreRun = std::function<fit::result<Errno>(CurrentTask& init_task)>;

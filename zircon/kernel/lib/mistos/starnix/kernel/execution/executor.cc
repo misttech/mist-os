@@ -38,27 +38,32 @@
 
 namespace starnix {
 
-fit::result<zx_status_t, TaskInfo> create_zircon_process(
-    fbl::RefPtr<Kernel> kernel, std::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t pid,
-    fbl::RefPtr<ProcessGroup> process_group, const fbl::String& name) {
+fit::result<Errno, TaskInfo> create_zircon_process(fbl::RefPtr<Kernel> kernel,
+                                                   ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                                                   pid_t pid,
+                                                   fbl::RefPtr<ProcessGroup> process_group,
+                                                   const fbl::String& name) {
   LTRACE;
-  auto result = create_shared(0, name);
-  if (result.is_error()) {
-    return result.take_error();
+  auto shared_or_errorr = create_shared(0, name).map_error(
+      [](auto status) { return errno(from_status_like_fdio(status)); });
+  if (shared_or_errorr.is_error()) {
+    return shared_or_errorr.take_error();
   }
-  auto [process, root_vmar] = std::move(result.value());
 
-  auto new_result = MemoryManager::New(ktl::move(root_vmar));
-  if (new_result.is_error()) {
-    return fit::error(from_status_like_fdio(result.error_value()));
+  auto [process, root_vmar] = ktl::move(shared_or_errorr.value());
+
+  auto mm_or_error = MemoryManager::New(ktl::move(root_vmar)).map_error([](auto status) {
+    return errno(from_status_like_fdio(status));
+  });
+  if (mm_or_error.is_error()) {
+    return mm_or_error.take_error();
   }
-  fbl::RefPtr<MemoryManager> memory_manager = new_result.value();
 
   auto thread_group = ThreadGroup::New(kernel, ktl::move(process), parent, pid, process_group);
-  return fit::ok(TaskInfo{{}, thread_group, memory_manager});
+  return fit::ok(TaskInfo{{}, thread_group, *mm_or_error});
 }
 
-fit::result<zx_status_t, std::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
+fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
                                                                          const fbl::String& name) {
   LTRACE;
   zx::process process;
@@ -69,7 +74,7 @@ fit::result<zx_status_t, std::pair<zx::process, zx::vmar>> create_shared(uint32_
     return fit::error(status);
   }
 
-  return fit::ok(std::make_pair(std::move(process), std::move(vmar)));
+  return fit::ok(ktl::pair(ktl::move(process), ktl::move(vmar)));
 }
 
 fit::result<zx_status_t, zx::thread> create_thread(const zx::process& parent,
@@ -83,7 +88,7 @@ fit::result<zx_status_t, zx::thread> create_thread(const zx::process& parent,
     return fit::error(status);
   }
 
-  return fit::ok(std::move(thread));
+  return fit::ok(ktl::move(thread));
 }
 
 // Runs the `current_task` to completion.
@@ -169,7 +174,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRun pre_run,
         }
         return fit::ok();
       },
-      std::move(task_complete));
+      ktl::move(task_complete));
 }
 
 void execute_task(TaskBuilder task_builder, PreRun pre_run,
@@ -192,7 +197,7 @@ void execute_task(TaskBuilder task_builder, PreRun pre_run,
   struct ThreadArgs {
     TaskBuilder task_builder;
     PreRun pre_run;
-  } args = {task_builder, std::move(pre_run)};
+  } args = {task_builder, ktl::move(pre_run)};
 
   Thread* t = Thread::Create(
       "user-thread",
