@@ -10,6 +10,7 @@ zx_library("starnix_uapi") {
     "errors.cc",
     "file_mode.cc",
     "math.cc",
+    "signals.cc",
     "user_address.cc",
     "vfs.cc",
   ]
