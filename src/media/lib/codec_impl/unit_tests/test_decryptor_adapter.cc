@@ -49,24 +49,24 @@ auto CreateDecryptorParams(bool is_secure) {
 
 auto CreateStreamBufferPartialSettings(
     const fuchsia::media::StreamBufferConstraints& constraints,
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
   fuchsia::media::StreamBufferPartialSettings settings;
   settings.set_buffer_lifetime_ordinal(kBufferLifetimeOrdinal)
       .set_buffer_constraints_version_ordinal(kBufferConstraintsVersionOrdinal)
-      .set_sysmem_token(std::move(token));
+      .set_sysmem_token(
+          fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
   return settings;
 }
 
 auto CreateBufferCollectionConstraints(uint32_t cpu_usage) {
-  fuchsia::sysmem::BufferCollectionConstraints collection_constraints;
+  fuchsia::sysmem2::BufferCollectionConstraints collection_constraints;
 
-  collection_constraints.usage.cpu = cpu_usage;
-  collection_constraints.min_buffer_count_for_camping = 1;
-  collection_constraints.has_buffer_memory_constraints = true;
-  collection_constraints.buffer_memory_constraints.min_size_bytes = kInputPacketSize;
+  collection_constraints.mutable_usage()->set_cpu(cpu_usage);
+  collection_constraints.set_min_buffer_count_for_camping(1);
+  collection_constraints.mutable_buffer_memory_constraints()->set_min_size_bytes(kInputPacketSize);
 
   // Secure buffers not allowed for test keys
-  EXPECT_FALSE(collection_constraints.buffer_memory_constraints.secure_required);
+  EXPECT_FALSE(collection_constraints.buffer_memory_constraints().has_secure_required());
 
   return collection_constraints;
 }
@@ -168,7 +168,9 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   DecryptorAdapterTest()
       : context_(sys::ComponentContext::Create()), random_device_(), prng_(random_device_()) {
     EXPECT_EQ(ZX_OK, context_->svc()->Connect(allocator_.NewRequest()));
-    allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+    allocator_->SetDebugClientInfo(std::move(fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest{}
+                                                 .set_name(fsl::GetCurrentProcessName())
+                                                 .set_id(fsl::GetCurrentProcessKoid())));
 
     PopulateInputData();
 
@@ -196,10 +198,10 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   ~DecryptorAdapterTest() {
     // Cleanly terminate BufferCollection view to avoid errors as the test halts.
     if (input_collection_.is_bound()) {
-      input_collection_->Close();
+      input_collection_->Release();
     }
     if (output_collection_.is_bound()) {
-      output_collection_->Close();
+      output_collection_->Release();
     }
   }
 
@@ -230,13 +232,14 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
     auto settings = BindBufferCollection(
         input_collection_, fuchsia::sysmem::cpuUsageWrite | fuchsia::sysmem::cpuUsageWriteOften,
         ic);
-    input_collection_->WaitForBuffersAllocated(
-        [this](zx_status_t status, fuchsia::sysmem::BufferCollectionInfo_2 info) {
-          ASSERT_EQ(status, ZX_OK);
-          input_buffer_info_ = std::move(info);
+    input_collection_->WaitForAllBuffersAllocated(
+        [this](fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) {
+          ASSERT_TRUE(result.is_response());
+          input_buffer_info_ = std::move(*result.response().mutable_buffer_collection_info());
         });
 
-    input_collection_->Sync([this, settings = std::move(settings)]() mutable {
+    input_collection_->Sync([this, settings = std::move(settings)](
+                                fuchsia::sysmem2::Node_Sync_Result sync_result) mutable {
       decryptor_->SetInputBufferPartialSettings(std::move(settings));
     });
 
@@ -247,14 +250,15 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
     auto settings = BindBufferCollection(
         output_collection_, fuchsia::sysmem::cpuUsageRead | fuchsia::sysmem::cpuUsageReadOften,
         oc.buffer_constraints());
-    output_collection_->WaitForBuffersAllocated(
-        [this](zx_status_t status, fuchsia::sysmem::BufferCollectionInfo_2 info) {
-          if (status == ZX_OK) {
-            output_buffer_info_ = std::move(info);
+    output_collection_->WaitForAllBuffersAllocated(
+        [this](fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) {
+          if (result.is_response()) {
+            output_buffer_info_ = std::move(*result.response().mutable_buffer_collection_info());
           }
         });
 
-    output_collection_->Sync([this, settings = std::move(settings)]() mutable {
+    output_collection_->Sync([this, settings = std::move(settings)](
+                                 fuchsia::sysmem2::Node_Sync_Result sync_result) mutable {
       decryptor_->SetOutputBufferPartialSettings(std::move(settings));
       decryptor_->CompleteOutputBufferPartialSettings(kBufferLifetimeOrdinal);
     });
@@ -305,16 +309,25 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   }
 
   fuchsia::media::StreamBufferPartialSettings BindBufferCollection(
-      fuchsia::sysmem::BufferCollectionPtr& collection, uint32_t cpu_usage,
+      fuchsia::sysmem2::BufferCollectionPtr& collection, uint32_t cpu_usage,
       const fuchsia::media::StreamBufferConstraints& constraints) {
-    fuchsia::sysmem::BufferCollectionTokenPtr client_token;
-    allocator_->AllocateSharedCollection(client_token.NewRequest());
+    fuchsia::sysmem2::BufferCollectionTokenPtr client_token;
+    allocator_->AllocateSharedCollection(
+        std::move(fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest{}.set_token_request(
+            client_token.NewRequest())));
 
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> decryptor_token;
-    client_token->Duplicate(std::numeric_limits<uint32_t>::max(), decryptor_token.NewRequest());
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> decryptor_token;
+    client_token->Duplicate(std::move(fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest{}
+                                          .set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS)
+                                          .set_token_request(decryptor_token.NewRequest())));
 
-    allocator_->BindSharedCollection(client_token.Unbind(), collection.NewRequest());
-    collection->SetConstraints(true, CreateBufferCollectionConstraints(cpu_usage));
+    allocator_->BindSharedCollection(
+        std::move(fuchsia::sysmem2::AllocatorBindSharedCollectionRequest{}
+                      .set_token(client_token.Unbind())
+                      .set_buffer_collection_request(collection.NewRequest())));
+    collection->SetConstraints(
+        std::move(fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{}.set_constraints(
+            CreateBufferCollectionConstraints(cpu_usage))));
 
     return CreateStreamBufferPartialSettings(constraints, std::move(decryptor_token));
   }
@@ -326,8 +339,8 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
     uint32_t buffer_index;
     AllocatePacket(&packet_index, &buffer_index);
 
-    auto& vmo = input_buffer_info_->buffers[buffer_index].vmo;
-    uint64_t offset = input_buffer_info_->buffers[buffer_index].vmo_usable_start;
+    const auto& vmo = input_buffer_info_->buffers()[buffer_index].vmo();
+    uint64_t offset = input_buffer_info_->buffers()[buffer_index].vmo_usable_start();
     size_t size = data.size();
 
     // Since test code, no particular reason to bother with mapping.
@@ -355,12 +368,12 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
     uint32_t offset = packet.start_offset();
     uint32_t size = packet.valid_length_bytes();
 
-    EXPECT_TRUE(buffer_index < output_buffer_info_->buffer_count);
+    EXPECT_TRUE(buffer_index < output_buffer_info_->buffers().size());
 
-    const auto& buffer = output_buffer_info_->buffers[buffer_index];
+    const auto& buffer = output_buffer_info_->buffers()[buffer_index];
 
     data.resize(size);
-    auto status = buffer.vmo.read(data.data(), offset, size);
+    auto status = buffer.vmo().read(data.data(), offset, size);
     EXPECT_EQ(status, ZX_OK);
 
     return data;
@@ -371,7 +384,7 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   void ConfigureInputPackets() {
     ASSERT_TRUE(input_buffer_info_);
 
-    auto buffer_count = input_buffer_info_->buffer_count;
+    auto buffer_count = input_buffer_info_->buffers().size();
     std::vector<uint32_t> buffers;
     std::vector<uint32_t> packets;
     for (uint32_t i = 0; i < buffer_count; i++) {
@@ -429,7 +442,7 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   std::unique_ptr<sys::ComponentContext> context_;
   inspect::Inspector inspector_;
   fuchsia::media::StreamProcessorPtr decryptor_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   std::unique_ptr<CodecImpl> codec_impl_;
   DecryptorAdapterT* decryptor_adapter_;
 
@@ -444,11 +457,11 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   bool end_of_stream_reached_ = false;
   DataSet::const_iterator input_iter_;
 
-  fuchsia::sysmem::BufferCollectionPtr input_collection_;
-  fuchsia::sysmem::BufferCollectionPtr output_collection_;
+  fuchsia::sysmem2::BufferCollectionPtr input_collection_;
+  fuchsia::sysmem2::BufferCollectionPtr output_collection_;
 
-  std::optional<fuchsia::sysmem::BufferCollectionInfo_2> input_buffer_info_;
-  std::optional<fuchsia::sysmem::BufferCollectionInfo_2> output_buffer_info_;
+  std::optional<fuchsia::sysmem2::BufferCollectionInfo> input_buffer_info_;
+  std::optional<fuchsia::sysmem2::BufferCollectionInfo> output_buffer_info_;
 
   std::optional<fuchsia::media::StreamError> stream_error_;
   std::optional<zx_status_t> sysmem_error_;
@@ -488,7 +501,7 @@ TEST_F(ClearDecryptorAdapterTest, ClearTextDecrypt) {
   PumpInput();
 
   RunLoopUntil([this]() {
-    return end_of_stream_reached_ && free_packets_.size() == input_buffer_info_->buffer_count;
+    return end_of_stream_reached_ && free_packets_.size() == input_buffer_info_->buffers().size();
   });
 
   AssertNoChannelErrors();
@@ -502,7 +515,7 @@ TEST_F(ClearDecryptorAdapterTest, ClearTextDecrypt) {
   EXPECT_EQ(output_data_, input_data_);
 
   // Check that all input packets were returned
-  EXPECT_EQ(free_packets_.size(), input_buffer_info_->buffer_count);
+  EXPECT_EQ(free_packets_.size(), input_buffer_info_->buffers().size());
 }
 
 TEST_F(ClearDecryptorAdapterTest, NoKeys) {
@@ -523,7 +536,8 @@ TEST_F(ClearDecryptorAdapterTest, NoKeys) {
   PumpInput();
 
   RunLoopUntil([this]() {
-    return stream_error_.has_value() && free_packets_.size() == input_buffer_info_->buffer_count;
+    return stream_error_.has_value() &&
+           free_packets_.size() == input_buffer_info_->buffers().size();
   });
 
   AssertNoChannelErrors();
@@ -532,7 +546,7 @@ TEST_F(ClearDecryptorAdapterTest, NoKeys) {
   EXPECT_EQ(*stream_error_, fuchsia::media::StreamError::DECRYPTOR_NO_KEY);
 
   // Check that all input packets were returned
-  EXPECT_EQ(free_packets_.size(), input_buffer_info_->buffer_count);
+  EXPECT_EQ(free_packets_.size(), input_buffer_info_->buffers().size());
 
   // Check that no input packets were successfully completed.
   EXPECT_EQ(successful_packet_count_, 0u);
@@ -601,15 +615,21 @@ TEST_F(ClearDecryptorAdapterTest, DecryptorClosesBuffersCleanly) {
   AssertNoChannelErrors();
 
   // If the below fail, the collections have failed.
-  std::optional<zx_status_t> input_status;
-  std::optional<zx_status_t> output_status;
+  std::optional<bool> input_result;
+  std::optional<zx_status_t> output_result;
   EXPECT_TRUE(input_collection_.is_bound());
   EXPECT_TRUE(output_collection_.is_bound());
-  input_collection_->CheckBuffersAllocated([&input_status](zx_status_t s) { input_status = s; });
-  output_collection_->CheckBuffersAllocated([&output_status](zx_status_t s) { output_status = s; });
-  RunLoopUntil([&]() { return input_status.has_value() && output_status.has_value(); });
-  EXPECT_EQ(*input_status, ZX_OK);
-  EXPECT_EQ(*output_status, ZX_OK);
+  input_collection_->CheckAllBuffersAllocated(
+      [&input_result](fuchsia::sysmem2::BufferCollection_CheckAllBuffersAllocated_Result result) {
+        input_result = result.is_response();
+      });
+  output_collection_->CheckAllBuffersAllocated(
+      [&output_result](fuchsia::sysmem2::BufferCollection_CheckAllBuffersAllocated_Result result) {
+        output_result = result.is_response();
+      });
+  RunLoopUntil([&]() { return input_result.has_value() && output_result.has_value(); });
+  EXPECT_TRUE(*input_result);
+  EXPECT_TRUE(*output_result);
   AssertNoChannelErrors();
   EXPECT_FALSE(stream_error_.has_value());
 
@@ -703,9 +723,9 @@ TEST_F(SecureDecryptorAdapterTest, FailsToAcquireSecureBuffers) {
 
   PumpInput();
 
-  // TODO(https://fxbug.dev/42086427): Once there is a Sysmem fake that allows us to control behavior, we could
-  // force it to give us back "secure" buffers that aren't really secure and go through more of the
-  // flow.
+  // TODO(https://fxbug.dev/42086427): Once there is a Sysmem fake that allows us to control
+  // behavior, we could force it to give us back "secure" buffers that aren't really secure and go
+  // through more of the flow.
   RunLoopUntil(
       [this]() { return decryptor_error_.has_value() && output_collection_error_.has_value(); });
 
