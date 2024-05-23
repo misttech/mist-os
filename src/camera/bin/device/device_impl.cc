@@ -4,9 +4,12 @@
 
 #include "src/camera/bin/device/device_impl.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -68,7 +71,7 @@ fpromise::promise<std::vector<ConfigPtr>, zx_status_t> FetchConfigs(
 }  // namespace
 
 DeviceImpl::DeviceImpl(async_dispatcher_t* dispatcher, fpromise::executor& executor,
-                       fuchsia::sysmem::AllocatorHandle allocator, zx::event bad_state_event)
+                       fuchsia::sysmem2::AllocatorHandle allocator, zx::event bad_state_event)
     : dispatcher_(dispatcher),
       executor_(executor),
       sysmem_allocator_(std::move(allocator)),
@@ -79,7 +82,7 @@ DeviceImpl::~DeviceImpl() = default;
 
 fpromise::promise<std::unique_ptr<DeviceImpl>, zx_status_t> DeviceImpl::Create(
     async_dispatcher_t* dispatcher, fpromise::executor& executor,
-    fuchsia::camera2::hal::ControllerHandle controller, fuchsia::sysmem::AllocatorHandle allocator,
+    fuchsia::camera2::hal::ControllerHandle controller, fuchsia::sysmem2::AllocatorHandle allocator,
     fuchsia::ui::policy::DeviceListenerRegistryHandle registry, zx::event bad_state_event) {
   auto device = std::make_unique<DeviceImpl>(dispatcher, executor, std::move(allocator),
                                              std::move(bad_state_event));
@@ -278,7 +281,7 @@ void DeviceImpl::ConnectToStream(uint32_t index,
   };
 
   auto on_buffers_requested = [this, index](
-                                  fuchsia::sysmem::BufferCollectionTokenHandle token,
+                                  fuchsia::sysmem2::BufferCollectionTokenHandle token,
                                   fit::function<void(uint32_t)> max_camping_buffers_callback) {
     OnBuffersRequested(index, std::move(token), std::move(max_camping_buffers_callback));
   };
@@ -353,7 +356,7 @@ void DeviceImpl::OnStreamRequested(uint32_t index,
 }
 
 void DeviceImpl::OnBuffersRequested(uint32_t index,
-                                    fuchsia::sysmem::BufferCollectionTokenHandle token,
+                                    fuchsia::sysmem2::BufferCollectionTokenHandle token,
                                     fit::function<void(uint32_t)> max_camping_buffers_callback) {
   // Assign friendly names to each buffer for debugging and profiling.
   const std::string friendly_name =
@@ -377,21 +380,29 @@ void DeviceImpl::OnBuffersRequested(uint32_t index,
         deallocation_events_.push_back(std::move(buffer_collection_lifetime.deallocation_complete));
 
         // Inform the stream of the maximum number of buffers it may hand out.
-        uint32_t max_camping_buffers = buffers.buffer_count - controller_camping_buffers;
+        uint32_t max_camping_buffers =
+            static_cast<uint32_t>(buffers.buffers().size()) - controller_camping_buffers;
         FX_LOGS(INFO) << friendly_name << ": collection resolved: at most " << max_camping_buffers
-                      << " of " << buffers.buffer_count
+                      << " of " << buffers.buffers().size()
                       << " buffers will be made available to clients concurrently";
         max_camping_buffers_callback(max_camping_buffers);
       };
 
-  executor_.schedule_task(
-      sysmem_allocator_
-          .BindSharedCollection(
-              std::move(token),
-              configs_[current_configuration_index_].stream_configs[index].constraints,
-              "camera_" + friendly_name)
-          .then(std::move(allocation_complete))
-          .wrap_with(streams_[index]->Scope()));
+  auto v1_hlcpp_constraints_clone =
+      configs_[current_configuration_index_].stream_configs[index].constraints;
+  auto v1_natural_constraints = fidl::HLCPPToNatural(std::move(v1_hlcpp_constraints_clone));
+  auto v2_natural_constraints_result =
+      sysmem::V2CopyFromV1BufferCollectionConstraints(&v1_natural_constraints);
+  ZX_ASSERT(v2_natural_constraints_result.is_ok());
+  auto v2_hlcpp_constraints =
+      fidl::NaturalToHLCPP(std::move(v2_natural_constraints_result.value()));
+
+  executor_.schedule_task(sysmem_allocator_
+                              .BindSharedCollection(std::move(token),
+                                                    std::move(v2_hlcpp_constraints),
+                                                    "camera_" + friendly_name)
+                              .then(std::move(allocation_complete))
+                              .wrap_with(streams_[index]->Scope()));
 }
 
 void DeviceImpl::OnEvent(fuchsia::ui::input::MediaButtonsEvent event,

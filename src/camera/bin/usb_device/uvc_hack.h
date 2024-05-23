@@ -20,7 +20,9 @@ constexpr uint32_t kUvcHackFrameRateNumerator = 10000000;
 constexpr uint32_t kUvcHackFrameRateDenominator = 333333;
 
 // Client-facing side (NV12)
+constexpr auto kUvcHackClientPixelFormat = fuchsia::images2::PixelFormat::NV12;
 constexpr auto kUvcHackClientPixelFormatType = fuchsia::sysmem::PixelFormatType::NV12;
+constexpr auto kUvcHackClientColorSpace = fuchsia::images2::ColorSpace::REC709;
 constexpr auto kUvcHackClientColorSpaceType = fuchsia::sysmem::ColorSpaceType::REC709;
 
 constexpr uint32_t kUvcHackClientCodedWidth = kUvcHackWidth;
@@ -45,7 +47,9 @@ constexpr uint32_t kUvcHackClientMinBufferCount = 16;
 constexpr uint32_t kUvcHackClientMaxBufferCount = 16;
 
 // Driver-facing side (YUY2)
+constexpr auto kUvcHackDriverPixelFormat = fuchsia::images2::PixelFormat::YUY2;
 constexpr auto kUvcHackDriverPixelFormatType = fuchsia::sysmem::PixelFormatType::YUY2;
+constexpr auto kUvcHackDriverColorSpace = fuchsia::images2::ColorSpace::REC709;
 constexpr auto kUvcHackDriverColorSpaceType = fuchsia::sysmem::ColorSpaceType::REC709;
 
 constexpr uint32_t kUvcHackDriverWidth = kUvcHackWidth;
@@ -54,9 +58,9 @@ constexpr uint32_t kUvcHackDriverBytesPerRow = kUvcHackWidth * 2;
 constexpr uint32_t kUvcHackDriverLayers = 1;
 
 void UvcHackGetClientBufferImageFormatConstraints(
-    fuchsia::sysmem::ImageFormatConstraints* image_format_constraints);
+    fuchsia::sysmem2::ImageFormatConstraints* image_format_constraints);
 void UvcHackGetClientBufferCollectionConstraints(
-    fuchsia::sysmem::BufferCollectionConstraints* buffer_collection_constraints);
+    fuchsia::sysmem2::BufferCollectionConstraints* buffer_collection_constraints);
 void UvcHackGetClientStreamProperties(fuchsia::camera3::StreamProperties* stream_properties);
 void UvcHackGetClientStreamProperties2(fuchsia::camera3::StreamProperties2* stream_properties);
 

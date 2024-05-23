@@ -59,7 +59,7 @@ void StreamImpl::Client::MaybeSendFrame() {
 }
 
 void StreamImpl::Client::ReceiveBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
   TRACE_DURATION("camera", "StreamImpl::Client::ReceiveBufferCollection");
   buffers_.Set(std::move(token));
 }
@@ -71,9 +71,9 @@ void StreamImpl::Client::ReceiveResolution(fuchsia::math::Size coded_size) {
 
 void StreamImpl::Client::ReceiveCropRegion(std::unique_ptr<fuchsia::math::RectF> region) {
   TRACE_DURATION("camera", "StreamImpl::Client::ReceiveCropRegion");
-  // TODO(https://fxbug.dev/42128338): Because unique_ptr is non-copyable, the hanging get helper assumes all
-  // values are never the same as previous values. In this case, however, back-to-back null regions
-  // or identical regions should not be sent twice.
+  // TODO(https://fxbug.dev/42128338): Because unique_ptr is non-copyable, the hanging get helper
+  // assumes all values are never the same as previous values. In this case, however, back-to-back
+  // null regions or identical regions should not be sent twice.
   crop_region_.Set(std::move(region));
 }
 
@@ -146,7 +146,8 @@ void StreamImpl::Client::WatchResolution(WatchResolutionCallback callback) {
 }
 
 void StreamImpl::Client::SetBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_param) {
+  fuchsia::sysmem2::BufferCollectionTokenHandle token(token_param.TakeChannel());
   TRACE_DURATION("camera", "StreamImpl::Client::SetBufferCollection");
   FX_LOGS(INFO) << log_prefix_ << "called SetBufferCollection(koid = " << GetRelatedKoid(token)
                 << ")";
@@ -156,7 +157,10 @@ void StreamImpl::Client::SetBufferCollection(
 void StreamImpl::Client::WatchBufferCollection(WatchBufferCollectionCallback callback) {
   TRACE_DURATION("camera", "StreamImpl::Client::WatchBufferCollection");
   FX_LOGS(INFO) << log_prefix_ << "called WatchBufferCollection()";
-  if (buffers_.Get(std::move(callback))) {
+  if (buffers_.Get(
+          [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
+            callback(fuchsia::sysmem::BufferCollectionTokenHandle(token.TakeChannel()));
+          })) {
     CloseConnection(ZX_ERR_BAD_STATE);
   }
 }

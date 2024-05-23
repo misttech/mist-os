@@ -33,7 +33,7 @@ class StreamImpl {
   using StreamRequestedCallback =
       fit::function<void(fidl::InterfaceRequest<fuchsia::camera2::Stream>, uint32_t)>;
   // Called by the stream when it has received a buffer token from the legacy stream.
-  using BuffersRequestedCallback = fit::function<void(fuchsia::sysmem::BufferCollectionTokenHandle,
+  using BuffersRequestedCallback = fit::function<void(fuchsia::sysmem2::BufferCollectionTokenHandle,
                                                       fit::function<void(uint32_t)>)>;
 
   StreamImpl(
@@ -67,7 +67,7 @@ class StreamImpl {
 
   // Renegotiate buffers or opt out of buffer renegotiation for the client with the given id.
   void SetBufferCollection(
-      uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle);
+      uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_handle);
 
   // Change the resolution of the stream.
   void SetResolution(uint64_t id, fuchsia::math::Size coded_size);
@@ -99,7 +99,7 @@ class StreamImpl {
     void CloseConnection(zx_status_t status);
 
     // Add the given token to the client's token queue.
-    void ReceiveBufferCollection(fuchsia::sysmem::BufferCollectionTokenHandle token);
+    void ReceiveBufferCollection(fuchsia::sysmem2::BufferCollectionTokenHandle token);
 
     // Update the client's resolution.
     void ReceiveResolution(fuchsia::math::Size coded_size);
@@ -149,7 +149,7 @@ class StreamImpl {
     } frame_logging_state_;
     uint64_t id_;
     fidl::Binding<fuchsia::camera3::Stream> binding_;
-    HangingGetHelper<fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>> buffers_;
+    HangingGetHelper<fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>> buffers_;
     HangingGetHelper<fuchsia::math::Size,
                      fit::function<bool(fuchsia::math::Size, fuchsia::math::Size)>>
         resolution_;

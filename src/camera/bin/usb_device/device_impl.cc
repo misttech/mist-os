@@ -37,12 +37,12 @@ using fpromise::make_promise;
 
 using fuchsia::camera::FrameRate;
 
-using fuchsia::sysmem::BufferCollectionInfo;
+using fuchsia::sysmem2::BufferCollectionInfo;
 
 }  // namespace
 
 DeviceImpl::DeviceImpl(async_dispatcher_t* dispatcher, fuchsia::camera::ControlSyncPtr control,
-                       fuchsia::sysmem::AllocatorPtr allocator, zx::event bad_state_event)
+                       fuchsia::sysmem2::AllocatorPtr allocator, zx::event bad_state_event)
     : ActorBase(dispatcher, scope_),
       stream_dispatcher_(dispatcher),
       control_(std::move(control)),
@@ -56,7 +56,7 @@ DeviceImpl::~DeviceImpl() = default;
 // hard-coded stream properties.
 promise<std::unique_ptr<DeviceImpl>, zx_status_t> DeviceImpl::Create(
     async_dispatcher_t* dispatcher, fuchsia::camera::ControlSyncPtr control,
-    fuchsia::sysmem::AllocatorPtr allocator, zx::event bad_state_event) {
+    fuchsia::sysmem2::AllocatorPtr allocator, zx::event bad_state_event) {
   auto device = std::make_unique<DeviceImpl>(dispatcher, std::move(control), std::move(allocator),
                                              std::move(bad_state_event));
 
@@ -159,8 +159,8 @@ promise<void> DeviceImpl::ConnectToStream(
     }
 
     StreamImpl::StreamRequestedCallback on_stream_requested =
-        [this, index](BufferCollectionInfo buffer_collection_info, FrameRate frame_rate,
-                      fidl::InterfaceRequest<fuchsia::camera::Stream> request,
+        [this, index](fuchsia::sysmem::BufferCollectionInfo buffer_collection_info,
+                      FrameRate frame_rate, fidl::InterfaceRequest<fuchsia::camera::Stream> request,
                       zx::eventpair driver_token) {
           bridge<void> bridge;
           Schedule(OnStreamRequested(index, std::move(buffer_collection_info),
@@ -189,12 +189,15 @@ promise<void> DeviceImpl::ConnectToStream(
         "c" + std::to_string(current_configuration_index_) + "s" + std::to_string(index);
 
     StreamImpl::AllocatorBindSharedCollectionCallback allocator_bind_shared_collection =
-        [this](fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle,
-               fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request) {
+        [this](fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_handle,
+               fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection> request) {
           bridge<void> bridge;
           Schedule([this, token_handle = std::move(token_handle), request = std::move(request),
                     completer = std::move(bridge.completer)]() mutable {
-            allocator_->BindSharedCollection(std::move(token_handle), std::move(request));
+            fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+            bind_shared_request.set_token(std::move(token_handle));
+            bind_shared_request.set_buffer_collection_request(std::move(request));
+            allocator_->BindSharedCollection(std::move(bind_shared_request));
             completer.complete_ok();
           });
           return bridge.consumer.promise();
@@ -242,11 +245,10 @@ static inline bool IsDeallocationComplete(
 // This call back function is invoked when the client asks to connect to a camera stream. The call
 // back to DeviceImpl is necessary because the control connection is maintained in DeviceImpl.
 // Therefore, the call to CreateStream originates here.
-promise<void> DeviceImpl::OnStreamRequested(uint32_t index,
-                                            BufferCollectionInfo buffer_collection_info,
-                                            FrameRate frame_rate,
-                                            fidl::InterfaceRequest<fuchsia::camera::Stream> request,
-                                            zx::eventpair driver_token) {
+promise<void> DeviceImpl::OnStreamRequested(
+    uint32_t index, fuchsia::sysmem::BufferCollectionInfo buffer_collection_info,
+    FrameRate frame_rate, fidl::InterfaceRequest<fuchsia::camera::Stream> request,
+    zx::eventpair driver_token) {
   auto connect = make_promise([this, buffer_collection_info = std::move(buffer_collection_info),
                                frame_rate = std::move(frame_rate), request = std::move(request),
                                driver_token = std::move(driver_token)]() mutable {

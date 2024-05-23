@@ -37,11 +37,11 @@ class DeviceImpl final : public fuchsia::ui::policy::MediaButtonsListener {
   static fpromise::promise<std::unique_ptr<DeviceImpl>, zx_status_t> Create(
       async_dispatcher_t* dispatcher, fpromise::executor& executor,
       fuchsia::camera2::hal::ControllerHandle controller,
-      fuchsia::sysmem::AllocatorHandle allocator,
+      fuchsia::sysmem2::AllocatorHandle allocator,
       fuchsia::ui::policy::DeviceListenerRegistryHandle registry, zx::event bad_state_event);
 
   DeviceImpl(async_dispatcher_t* dispatcher, fpromise::executor& executor,
-             fuchsia::sysmem::AllocatorHandle allocator, zx::event bad_state_event);
+             fuchsia::sysmem2::AllocatorHandle allocator, zx::event bad_state_event);
   ~DeviceImpl() override;
 
   // Returns a service handler for use with a service directory.
@@ -86,7 +86,7 @@ class DeviceImpl final : public fuchsia::ui::policy::MediaButtonsListener {
                          uint32_t format_index);
 
   // Called by a stream when it has received a buffer token from the legacy stream.
-  void OnBuffersRequested(uint32_t index, fuchsia::sysmem::BufferCollectionTokenHandle token,
+  void OnBuffersRequested(uint32_t index, fuchsia::sysmem2::BufferCollectionTokenHandle token,
                           fit::function<void(uint32_t)> max_camping_buffers_callback);
 
   // |fuchsia::ui::policy::MediaButtonsListener|
@@ -144,7 +144,6 @@ class DeviceImpl final : public fuchsia::ui::policy::MediaButtonsListener {
   SysmemAllocator sysmem_allocator_;
   zx::event bad_state_event_;
   fuchsia::camera2::hal::ControllerPtr controller_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
   fuchsia::ui::policy::DeviceListenerRegistryPtr registry_;
   fidl::Binding<fuchsia::ui::policy::MediaButtonsListener> button_listener_binding_;
   fuchsia::camera2::DeviceInfo device_info_;

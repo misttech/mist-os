@@ -4,12 +4,14 @@
 
 #include "src/camera/drivers/usb_video/usb_video_stream.h"
 
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/defer.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/vmar.h>
 #include <stdlib.h>

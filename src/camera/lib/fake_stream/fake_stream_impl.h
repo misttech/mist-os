@@ -24,7 +24,7 @@ class FakeStreamImpl final : public FakeStream, public fuchsia::camera3::Stream 
   ~FakeStreamImpl() override;
   static fpromise::result<std::unique_ptr<FakeStreamImpl>, zx_status_t> Create(
       fuchsia::camera3::StreamProperties properties,
-      fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>)>
+      fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)>
           on_set_buffer_collection);
   fidl::InterfaceRequestHandler<fuchsia::camera3::Stream> GetHandler() override;
   void AddFrame(fuchsia::camera3::FrameInfo info) override;
@@ -51,9 +51,9 @@ class FakeStreamImpl final : public FakeStream, public fuchsia::camera3::Stream 
   async::Loop loop_;
   fidl::BindingSet<fuchsia::camera3::Stream> bindings_;
   fuchsia::camera3::StreamProperties properties_;
-  fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>)>
+  fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)>
       on_set_buffer_collection_;
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_;
   WatchBufferCollectionCallback token_request_;
   std::queue<fuchsia::camera3::FrameInfo> frames_;
   GetNextFrameCallback frame_request_;

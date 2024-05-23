@@ -68,7 +68,7 @@ static constexpr std::array<fuchsia::sysmem::ImageFormat_2, 3> kFakeImageFormats
 
 class FakeLegacyStreamImpl : public FakeLegacyStream, public fuchsia::camera2::Stream {
  public:
-  FakeLegacyStreamImpl(fuchsia::sysmem::AllocatorPtr& allocator)
+  FakeLegacyStreamImpl(fuchsia::sysmem2::AllocatorPtr& allocator)
       : binding_(this), allocator_(allocator) {}
 
   void CheckSameThread() {
@@ -195,9 +195,13 @@ class FakeLegacyStreamImpl : public FakeLegacyStream, public fuchsia::camera2::S
   }
 
   void GetBuffers(GetBuffersCallback callback) override {
-    fuchsia::sysmem::BufferCollectionTokenHandle token;
-    allocator_->AllocateSharedCollection(token.NewRequest());
-    callback(std::move(token));
+    fuchsia::sysmem2::BufferCollectionTokenHandle token;
+
+    fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+    allocate_shared_request.set_token_request(token.NewRequest());
+    allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
+
+    callback(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
   }
 
   fidl::Binding<fuchsia::camera2::Stream> binding_;
@@ -208,14 +212,14 @@ class FakeLegacyStreamImpl : public FakeLegacyStream, public fuchsia::camera2::S
   std::stringstream client_error_explanation_;
   std::tuple<float, float, float, float> region_of_interest_{0.0f, 0.0f, 1.0f, 1.0f};
   uint32_t image_format_ = 0;
-  fuchsia::sysmem::AllocatorPtr& allocator_;
+  fuchsia::sysmem2::AllocatorPtr& allocator_;
 
   friend class FakeLegacyStream;
 };
 
 fpromise::result<std::unique_ptr<FakeLegacyStream>, zx_status_t> FakeLegacyStream::Create(
     fidl::InterfaceRequest<fuchsia::camera2::Stream> request,
-    fuchsia::sysmem::AllocatorPtr& allocator, uint32_t format_index,
+    fuchsia::sysmem2::AllocatorPtr& allocator, uint32_t format_index,
 
     async_dispatcher_t* dispatcher) {
   auto impl = std::make_unique<FakeLegacyStreamImpl>(allocator);

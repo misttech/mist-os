@@ -4,7 +4,7 @@
 
 #include "src/camera/bin/device/sysmem_allocator.h"
 
-#include <fuchsia/sysmem/cpp/fidl_test_base.h>
+#include <fuchsia/sysmem2/cpp/fidl_test_base.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fidl/cpp/binding.h>
 
@@ -13,67 +13,68 @@
 namespace camera {
 namespace {
 
-class FakeBufferCollection : public fuchsia::sysmem::testing::BufferCollection_TestBase {
+class FakeBufferCollection : public fuchsia::sysmem2::testing::BufferCollection_TestBase {
  public:
-  FakeBufferCollection(fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request)
+  FakeBufferCollection(fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollection> request)
       : binding_{this, std::move(request)} {}
 
   void PeerClose() { binding_.Unbind(); }
-  void CompleteBufferAllocation(zx_status_t status,
-                                fuchsia::sysmem::BufferCollectionInfo_2 collection) {
+  void CompleteBufferAllocation(
+      fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) {
     ASSERT_TRUE(allocated_callback_);
-    allocated_callback_(status, std::move(collection));
+    allocated_callback_(std::move(result));
     allocated_callback_ = nullptr;
   }
 
  private:
-  // |fuchsia::sysmem::BufferCollection|
-  void Close() override { binding_.Close(ZX_OK); }
-  void SetName(uint32_t priority, std::string name) override {}
-  void SetConstraints(bool has_constraints,
-                      fuchsia::sysmem::BufferCollectionConstraints constraints) override {}
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCallback callback) override {
+  // |fuchsia::sysmem2::BufferCollection|
+  void Release() override { binding_.Close(ZX_OK); }
+  void SetName(fuchsia::sysmem2::NodeSetNameRequest request) override {}
+  void SetConstraints(fuchsia::sysmem2::BufferCollectionSetConstraintsRequest request) override {}
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCallback callback) override {
     allocated_callback_ = std::move(callback);
   }
 
-  void AttachLifetimeTracking(zx::eventpair server_end, uint32_t buffers_remaining) override {
-    lifetime_tracking_ = std::move(server_end);
+  void AttachLifetimeTracking(
+      fuchsia::sysmem2::BufferCollectionAttachLifetimeTrackingRequest request) override {
+    lifetime_tracking_ = std::move(*request.mutable_server_end());
   }
 
   void NotImplemented_(const std::string& name) override {
     FAIL() << "Not Implemented BufferCollection." << name;
   }
 
-  fidl::Binding<fuchsia::sysmem::BufferCollection> binding_;
-  WaitForBuffersAllocatedCallback allocated_callback_;
+  fidl::Binding<fuchsia::sysmem2::BufferCollection> binding_;
+  WaitForAllBuffersAllocatedCallback allocated_callback_;
   zx::eventpair lifetime_tracking_;
 };
 
-class FakeAllocator : public fuchsia::sysmem::testing::Allocator_TestBase {
+class FakeAllocator : public fuchsia::sysmem2::testing::Allocator_TestBase {
  public:
-  fuchsia::sysmem::AllocatorHandle NewBinding() { return binding_.NewBinding(); }
+  fuchsia::sysmem2::AllocatorHandle NewBinding() { return binding_.NewBinding(); }
 
   const std::vector<std::unique_ptr<FakeBufferCollection>>& bound_collections() const {
     return collections_;
   }
 
  private:
-  // |fuchsia::sysmem::Allocator|
+  // |fuchsia::sysmem2::Allocator|
   void AllocateNonSharedCollection(
-      fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request) override {
-    collections_.emplace_back(std::make_unique<FakeBufferCollection>(std::move(request)));
+      fuchsia::sysmem2::AllocatorAllocateNonSharedCollectionRequest request) override {
+    collections_.emplace_back(
+        std::make_unique<FakeBufferCollection>(std::move(*request.mutable_collection_request())));
   }
   void BindSharedCollection(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token,
-      fidl::InterfaceRequest<fuchsia::sysmem::BufferCollection> request) override {
-    collections_.emplace_back(std::make_unique<FakeBufferCollection>(std::move(request)));
+      fuchsia::sysmem2::AllocatorBindSharedCollectionRequest request) override {
+    collections_.emplace_back(std::make_unique<FakeBufferCollection>(
+        std::move(*request.mutable_buffer_collection_request())));
   }
 
   void NotImplemented_(const std::string& name) override {
     FAIL() << "Not Implemented Allocator." << name;
   }
 
-  fidl::Binding<fuchsia::sysmem::Allocator> binding_{this};
+  fidl::Binding<fuchsia::sysmem2::Allocator> binding_{this};
   std::vector<std::unique_ptr<FakeBufferCollection>> collections_;
 };
 
@@ -91,7 +92,7 @@ class SysmemAllocatorTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(SysmemAllocatorTest, BindSharedCollection) {
-  fuchsia::sysmem::BufferCollectionTokenHandle token;
+  fuchsia::sysmem2::BufferCollectionTokenHandle token;
   auto request = token.NewRequest();
   fpromise::result<BufferCollectionWithLifetime, zx_status_t> result;
   executor_.schedule_task(
@@ -103,8 +104,11 @@ TEST_F(SysmemAllocatorTest, BindSharedCollection) {
 
   // Now we should have the shared buffer collection.
   ASSERT_EQ(1u, sysmem_allocator_.bound_collections().size());
-  last_bound_collection()->CompleteBufferAllocation(ZX_OK,
-                                                    fuchsia::sysmem::BufferCollectionInfo_2{});
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Response wait_response;
+  wait_response.set_buffer_collection_info(fuchsia::sysmem2::BufferCollectionInfo{});
+  wait_result.set_response(std::move(wait_response));
+  last_bound_collection()->CompleteBufferAllocation(std::move(wait_result));
   RunLoopUntilIdle();
   EXPECT_TRUE(result.is_ok());
 }

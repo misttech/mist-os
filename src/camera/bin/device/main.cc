@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Connect to required environment services.
-  fuchsia::sysmem::AllocatorHandle allocator;
+  fuchsia::sysmem2::AllocatorHandle allocator;
   auto status = context->svc()->Connect(allocator.NewRequest());
   if (status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "Failed to request allocator service.";

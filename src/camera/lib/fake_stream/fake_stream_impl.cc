@@ -15,7 +15,7 @@ namespace camera {
 
 fpromise::result<std::unique_ptr<FakeStream>, zx_status_t> FakeStream::Create(
     fuchsia::camera3::StreamProperties properties,
-    fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>)>
+    fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)>
         on_set_buffer_collection) {
   auto result = FakeStreamImpl::Create(std::move(properties), std::move(on_set_buffer_collection));
   if (result.is_error()) {
@@ -52,7 +52,7 @@ static zx_status_t Validate(const fuchsia::camera3::StreamProperties& properties
 
 fpromise::result<std::unique_ptr<FakeStreamImpl>, zx_status_t> FakeStreamImpl::Create(
     fuchsia::camera3::StreamProperties properties,
-    fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>)>
+    fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)>
         on_set_buffer_collection) {
   auto stream = std::make_unique<FakeStreamImpl>();
 
@@ -114,19 +114,25 @@ void FakeStreamImpl::WatchResolution(WatchResolutionCallback callback) {
 }
 
 void FakeStreamImpl::SetBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_param) {
+  fuchsia::sysmem2::BufferCollectionTokenHandle token(token_param.TakeChannel());
+
   if (!token) {
     on_set_buffer_collection_(nullptr);
     return;
   }
 
   auto token_protocol = token.BindSync();
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> client_token;
-  token_protocol->Duplicate(ZX_RIGHT_SAME_RIGHTS, client_token.NewRequest());
-  token_protocol->Sync();
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> client_token;
+  fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+  dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+  dup_request.set_token_request(client_token.NewRequest());
+  token_protocol->Duplicate(std::move(dup_request));
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  token_protocol->Sync(&sync_result);
 
   if (token_request_) {
-    token_request_(std::move(client_token));
+    token_request_(fuchsia::sysmem::BufferCollectionTokenHandle(client_token.TakeChannel()));
     token_request_ = nullptr;
   } else {
     token_ = std::move(client_token);
@@ -141,7 +147,7 @@ void FakeStreamImpl::WatchBufferCollection(WatchBufferCollectionCallback callbac
   }
 
   if (token_) {
-    callback(std::move(token_));
+    callback(fuchsia::sysmem::BufferCollectionTokenHandle(std::move(token_).TakeChannel()));
     token_ = nullptr;
     return;
   }

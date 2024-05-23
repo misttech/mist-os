@@ -6,7 +6,7 @@
 #define SRC_CAMERA_LIB_VIRTUAL_CAMERA_VIRTUAL_CAMERA_H_
 
 #include <fuchsia/camera3/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 
 namespace camera {
@@ -18,7 +18,7 @@ class VirtualCamera {
 
   // Create a virtual camera using the provided sysmem allocator service handle.
   static fpromise::result<std::unique_ptr<VirtualCamera>, zx_status_t> Create(
-      fidl::InterfaceHandle<fuchsia::sysmem::Allocator> allocator);
+      fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> allocator);
 
   // Returns a request handler for the Device interface.
   virtual fidl::InterfaceRequestHandler<fuchsia::camera3::Device> GetHandler() = 0;

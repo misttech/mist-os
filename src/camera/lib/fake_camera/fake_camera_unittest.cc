@@ -87,7 +87,7 @@ TEST_F(FakeCameraTest, SetBufferCollectionInvokesCallback) {
   bool callback_invoked = false;
   auto stream_result = camera::FakeStream::Create(
       std::move(properties),
-      [&](fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+      [&](fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
         callback_invoked = true;
       });
   ASSERT_TRUE(stream_result.is_ok());

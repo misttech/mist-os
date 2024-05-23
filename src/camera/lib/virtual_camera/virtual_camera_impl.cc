@@ -4,11 +4,15 @@
 
 #include "src/camera/lib/virtual_camera/virtual_camera_impl.h"
 
+#include <fidl/fuchsia.images2/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fuchsia/math/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
@@ -23,7 +27,7 @@
 namespace camera {
 
 fpromise::result<std::unique_ptr<VirtualCamera>, zx_status_t> VirtualCamera::Create(
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> allocator) {
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> allocator) {
   auto result = VirtualCameraImpl::Create(std::move(allocator));
   if (result.is_error()) {
     return fpromise::error(result.error());
@@ -48,22 +52,36 @@ static fuchsia::camera3::StreamProperties DefaultStreamProperties() {
           .supports_crop_region = false};
 }
 
-static fuchsia::sysmem::BufferCollectionConstraints DefaultBufferConstraints() {
-  return {.usage = {.cpu = fuchsia::sysmem::cpuUsageWrite},
-          .min_buffer_count = 4,
-          .has_buffer_memory_constraints = true,
-          .buffer_memory_constraints{.ram_domain_supported = true},
-          .image_format_constraints_count = 1,
-          .image_format_constraints = {{{
-              .pixel_format = DefaultStreamProperties().image_format.pixel_format,
-              .color_spaces_count = 1,
-              .color_space = {DefaultStreamProperties().image_format.color_space},
-              .min_coded_width = DefaultStreamProperties().image_format.coded_width,
-              .max_coded_width = DefaultStreamProperties().image_format.coded_width,
-              .min_coded_height = DefaultStreamProperties().image_format.coded_height,
-              .max_coded_height = DefaultStreamProperties().image_format.coded_height,
-              .coded_width_divisor = 128,
-          }}}};
+static fuchsia::images2::ImageFormat DefaultImageFormat() {
+  fuchsia::images2::ImageFormat image_format;
+  auto stream_properties = DefaultStreamProperties();
+  auto& v1_image_format = stream_properties.image_format;
+  auto v2_pixel_format =
+      sysmem::V2CopyFromV1PixelFormatType(fidl::HLCPPToNatural(v1_image_format.pixel_format.type));
+  image_format.set_pixel_format(fidl::NaturalToHLCPP(v2_pixel_format));
+  image_format.set_size(fuchsia::math::SizeU{.width = v1_image_format.coded_width,
+                                             .height = v1_image_format.coded_height});
+  auto v2_color_space =
+      sysmem::V2CopyFromV1ColorSpace(fidl::HLCPPToNatural(v1_image_format.color_space));
+  image_format.set_color_space(fidl::NaturalToHLCPP(v2_color_space));
+  return image_format;
+}
+
+static fuchsia::sysmem2::BufferCollectionConstraints DefaultBufferConstraints() {
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
+  auto image_format = DefaultImageFormat();
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
+  constraints.set_min_buffer_count(4);
+  constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
+  auto& ifc = constraints.mutable_image_format_constraints()->emplace_back();
+  ifc.set_pixel_format(image_format.pixel_format());
+  ifc.set_min_size(fuchsia::math::SizeU{.width = image_format.size().width,
+                                        .height = image_format.size().height});
+  ifc.set_max_size(fuchsia::math::SizeU{.width = image_format.size().width,
+                                        .height = image_format.size().height});
+  ifc.mutable_color_spaces()->emplace_back(image_format.color_space());
+  ifc.set_size_alignment(fuchsia::math::SizeU{.width = 128, .height = 1});
+  return constraints;
 }
 
 constexpr uint32_t kEmbeddedMetadataMagic = 0x5643414D;  // "VCAM"
@@ -103,7 +121,7 @@ static size_t Extract(const char* data, T& value, size_t total_buffer_size) {
 }
 
 fpromise::result<std::unique_ptr<VirtualCamera>, zx_status_t> VirtualCameraImpl::Create(
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> allocator) {
+    fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> allocator) {
   auto camera = std::make_unique<VirtualCameraImpl>();
 
   ZX_ASSERT(camera->allocator_.Bind(std::move(allocator), camera->loop_.dispatcher()) == ZX_OK);
@@ -111,8 +129,11 @@ fpromise::result<std::unique_ptr<VirtualCamera>, zx_status_t> VirtualCameraImpl:
     FX_PLOGS(ERROR, status) << "fuchsia.sysmem.Allocator server disconnected.";
     camera->camera_ = nullptr;
   });
-  camera->allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(),
-                                         fsl::GetCurrentProcessKoid());
+
+  fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.set_name(fsl::GetCurrentProcessName());
+  set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+  camera->allocator_->SetDebugClientInfo(std::move(set_debug_request));
 
   auto stream_result =
       FakeStream::Create(DefaultStreamProperties(),
@@ -153,7 +174,7 @@ fidl::InterfaceRequestHandler<fuchsia::camera3::Device> VirtualCameraImpl::GetHa
 
 fpromise::result<void, std::string> VirtualCameraImpl::CheckFrame(
     const void* data, size_t size, const fuchsia::camera3::FrameInfo& info) {
-  if (size != buffers_->settings.buffer_settings.size_bytes) {
+  if (size != buffers_->settings().buffer_settings().size_bytes()) {
     return fpromise::error("Data size does not match buffer size.");
   }
 
@@ -208,32 +229,47 @@ void VirtualCameraImpl::OnDestruction() {
 }
 
 void VirtualCameraImpl::OnSetBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
   buffers_ = std::nullopt;
   while (!free_buffers_.empty()) {
     free_buffers_.pop();
   }
 
-  fuchsia::sysmem::BufferCollectionPtr collection;
-  allocator_->BindSharedCollection(std::move(token), collection.NewRequest(loop_.dispatcher()));
+  fuchsia::sysmem2::BufferCollectionPtr collection;
+  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.set_token(std::move(token));
+  bind_shared_request.set_buffer_collection_request(collection.NewRequest(loop_.dispatcher()));
+  allocator_->BindSharedCollection(std::move(bind_shared_request));
   collection.set_error_handler([this](zx_status_t status) {
     FX_PLOGS(ERROR, status) << "BufferCollection server disconnected.";
     camera_ = nullptr;
   });
   constexpr uint32_t kNamePriority = 1;
-  collection->SetName(kNamePriority, "VirtualCameraOutput");
-  collection->SetConstraints(true, DefaultBufferConstraints());
-  collection->WaitForBuffersAllocated(
-      [this, collection = std::move(collection)](zx_status_t status,
-                                                 fuchsia::sysmem::BufferCollectionInfo_2 buffers) {
-        collection->Close();
-        if (status != ZX_OK) {
-          FX_PLOGS(ERROR, status) << "Failed to allocate buffers.";
+  fuchsia::sysmem2::NodeSetNameRequest set_name_request;
+  set_name_request.set_priority(kNamePriority);
+  set_name_request.set_name("VirtualCameraOutput");
+  collection->SetName(std::move(set_name_request));
+  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.set_constraints(DefaultBufferConstraints());
+  collection->SetConstraints(std::move(set_constraints_request));
+  collection->WaitForAllBuffersAllocated(
+      [this, collection = std::move(collection)](
+          fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) {
+        collection->Release();
+        if (result.is_framework_err()) {
+          FX_PLOGS(ERROR, fidl::ToUnderlying(result.framework_err()))
+              << "Failed to allocate buffers (framework err).";
           camera_ = nullptr;
           return;
         }
-        buffers_ = std::move(buffers);
-        for (uint32_t i = 0; i < buffers_->buffer_count; ++i) {
+        if (result.is_err()) {
+          FX_PLOGS(ERROR, static_cast<uint32_t>(result.err()))
+              << "Failed to allocate buffers (sysmem2.Error).";
+          camera_ = nullptr;
+          return;
+        }
+        buffers_ = std::move(*result.response().mutable_buffer_collection_info());
+        for (uint32_t i = 0; i < buffers_->buffers().size(); ++i) {
           free_buffers_.push(i);
         }
       });
@@ -252,7 +288,7 @@ void VirtualCameraImpl::FrameTick() {
     return;
   }
 
-  if (free_buffers_.size() == DefaultBufferConstraints().min_buffer_count_for_camping) {
+  if (free_buffers_.size() == 0) {
     return;
   }
 
@@ -285,12 +321,13 @@ void VirtualCameraImpl::FrameTick() {
 }
 
 void VirtualCameraImpl::FillFrame(uint32_t buffer_index) {
-  auto& buffer = buffers_->buffers[buffer_index];
+  auto& buffer = buffers_->buffers()[buffer_index];
 
   fzl::VmoMapper mapper;
-  const size_t map_size = buffers_->settings.buffer_settings.size_bytes - buffer.vmo_usable_start;
-  zx_status_t status =
-      mapper.Map(buffer.vmo, buffer.vmo_usable_start, map_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+  const size_t map_size =
+      buffers_->settings().buffer_settings().size_bytes() - buffer.vmo_usable_start();
+  zx_status_t status = mapper.Map(buffer.vmo(), buffer.vmo_usable_start(), map_size,
+                                  ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to map buffer.";
     return;
@@ -328,13 +365,13 @@ void VirtualCameraImpl::FillFrame(uint32_t buffer_index) {
 }
 
 void VirtualCameraImpl::EmbedMetadata(const fuchsia::camera3::FrameInfo& info) {
-  auto& buffer = buffers_->buffers[info.buffer_index];
+  auto& buffer = buffers_->buffers()[info.buffer_index];
 
   fzl::VmoMapper mapper;
-  auto buffer_size = buffers_->settings.buffer_settings.size_bytes;
-  const size_t map_size = buffer_size - buffer.vmo_usable_start;
-  zx_status_t status =
-      mapper.Map(buffer.vmo, buffer.vmo_usable_start, map_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+  auto buffer_size = buffers_->settings().buffer_settings().size_bytes();
+  const size_t map_size = buffer_size - buffer.vmo_usable_start();
+  zx_status_t status = mapper.Map(buffer.vmo(), buffer.vmo_usable_start(), map_size,
+                                  ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to map buffer.";
     return;
