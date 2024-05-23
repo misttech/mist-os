@@ -11,8 +11,8 @@ use fuchsia_async::Duration;
 use futures::channel::oneshot::{channel, Sender};
 use usb_bulk::AsyncInterface;
 use usb_fastboot_discovery::{
-    find_serial_numbers, open_interface_with_serial, FastbootEvent, FastbootEventHandler,
-    FastbootUsbLiveTester, FastbootUsbWatcher, UnversionedFastbootUsbTester,
+    find_serial_numbers, open_interface_with_serial, wait_for_live, FastbootEvent,
+    FastbootEventHandler, FastbootUsbLiveTester, FastbootUsbWatcher, UnversionedFastbootUsbTester,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -116,7 +116,6 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
             // This tester will not attempt to talk to the USB devices to extract version info, it
             // only inspects the USB interface
             UnversionedFastbootUsbTester {},
-            StrictGetVarFastbootUsbLiveTester { serial: self.serial.clone() },
             Duration::from_secs(1),
         );
 
@@ -125,6 +124,14 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
         })?;
 
         drop(watcher);
+
+        let mut tester = StrictGetVarFastbootUsbLiveTester { serial: self.serial.clone() };
+        tracing::debug!(
+            "Rediscovered device with serial {}. Waiting for it to be live",
+            self.serial,
+        );
+        wait_for_live(self.serial.as_str(), &mut tester, Duration::from_millis(500)).await;
+
         Ok(())
     }
 }
