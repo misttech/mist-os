@@ -32,6 +32,7 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
   }
 
   zx_status_t ChangeSagState(test_sagcontrol::SystemActivityGovernorState state) {
+    std::cout << "Setting SAG state: " << FidlString(state) << std::endl;
     auto set_result = fidl::Call(sag_control_state_client_end_)->Set(state);
     if (!set_result.is_ok()) {
       std::cout << "Failed to set SAG state: " << set_result.error_value() << std::endl;
@@ -47,12 +48,19 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
                 << FidlString(get_result.value()) << std::endl;
       zx::nanosleep(zx::deadline_after(zx::sec(1)));
     }
+    std::cout << "SAG state change complete." << std::endl;
     return ZX_OK;
   }
 
   void MatchInspectData(diagnostics::reader::ArchiveReader& reader, const std::string& moniker,
                         const std::vector<std::string>& inspect_path,
                         std::variant<bool, uint64_t> value) {
+    std::cout << "Matching inspect data for moniker = " << moniker << ", path = ";
+    for (const auto& path : inspect_path) {
+      std::cout << "[" << path << "]";
+    }
+    std::cout << std::endl;
+
     bool match = false;
     do {
       auto result = RunPromise(reader.SnapshotInspectUntilPresent({moniker}));
@@ -60,16 +68,29 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
       for (const auto& datum : data) {
         if (datum.moniker() == moniker) {
           bool* bool_value = std::get_if<bool>(&value);
-          if (bool_value != nullptr && datum.GetByPath(inspect_path).GetBool() == *bool_value) {
-            match = true;
-            break;
+          if (bool_value != nullptr) {
+            bool actual_value = datum.GetByPath(inspect_path).GetBool();
+            if (actual_value == *bool_value) {
+              match = true;
+              std::cout << "Got expected value " << *bool_value << std::endl;
+              break;
+            } else {
+              std::cout << "Expected value " << *bool_value << ", but got " << actual_value
+                        << ". Taking another snapshot." << std::endl;
+            }
           }
 
           uint64_t* uint64_value = std::get_if<uint64_t>(&value);
-          if (uint64_value != nullptr &&
-              datum.GetByPath(inspect_path).GetUint64() == *uint64_value) {
-            match = true;
-            break;
+          if (uint64_value != nullptr) {
+            uint64_t actual_value = datum.GetByPath(inspect_path).GetUint64();
+            if (actual_value == *uint64_value) {
+              match = true;
+              std::cout << "Got expected value " << *uint64_value << std::endl;
+              break;
+            } else {
+              std::cout << "Expected value " << *uint64_value << ", but got " << actual_value
+                        << ". Taking another snapshot." << std::endl;
+            }
           }
         }
       }
@@ -79,27 +100,35 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
   zx::result<std::string> GetPowerElementId(diagnostics::reader::ArchiveReader& reader,
                                             const std::string& pb_moniker,
                                             const std::string& power_element_name) {
-    auto result = RunPromise(reader.SnapshotInspectUntilPresent({pb_moniker}));
-    auto data = result.take_value();
-    for (const auto& datum : data) {
-      if (datum.moniker() == pb_moniker && datum.payload().has_value()) {
-        auto topology = datum.payload().value()->GetByPath(
-            {"broker", "topology", "fuchsia.inspect.Graph", "topology"});
-        if (topology == nullptr) {
-          return zx::error(ZX_ERR_BAD_STATE);
-        }
-        for (const auto& child : topology->children()) {
-          auto name = datum
-                          .GetByPath({"root", "broker", "topology", "fuchsia.inspect.Graph",
-                                      "topology", child.name(), "meta", "name"})
-                          .GetString();
-          if (name == power_element_name) {
-            return zx::ok(child.name());
+    std::cout << "Searching for power element with name '" << power_element_name
+              << "' in Power Broker's topology listing." << std::endl;
+    while (true) {
+      auto result = RunPromise(reader.SnapshotInspectUntilPresent({pb_moniker}));
+      auto data = result.take_value();
+      for (const auto& datum : data) {
+        if (datum.moniker() == pb_moniker && datum.payload().has_value()) {
+          auto topology = datum.payload().value()->GetByPath(
+              {"broker", "topology", "fuchsia.inspect.Graph", "topology"});
+          if (topology == nullptr) {
+            std::cout << "No topology listing in Power Broker's inspect data. ";
+            break;
           }
+          for (const auto& child : topology->children()) {
+            auto name = datum
+                            .GetByPath({"root", "broker", "topology", "fuchsia.inspect.Graph",
+                                        "topology", child.name(), "meta", "name"})
+                            .GetString();
+            if (name == power_element_name) {
+              std::cout << "Power element '" << power_element_name << "' has ID '" << child.name()
+                        << "'." << std::endl;
+              return zx::ok(child.name());
+            }
+          }
+          std::cout << "Did not find power element in Power Broker's topology listing. ";
         }
       }
+      std::cout << "Taking another snapshot." << std::endl;
     }
-    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
  private:
