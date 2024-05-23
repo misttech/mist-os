@@ -31,7 +31,7 @@ use {
         resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage},
     },
     async_trait::async_trait,
-    cm_moniker::{IncarnationId, InstancedMoniker},
+    cm_moniker::IncarnationId,
     cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::{Name, Url},
     cm_util::TaskGroup,
@@ -232,15 +232,17 @@ pub struct ComponentInstance {
     pub on_terminate: fdecl::OnTerminate,
     /// The parent instance. Either a component instance or component manager's instance.
     pub parent: WeakExtendedInstance,
-    /// The instanced moniker of this instance.
-    pub instanced_moniker: InstancedMoniker,
-    /// The partial moniker of this instance.
+    /// The moniker of this instance.
     pub moniker: Moniker,
     /// The hooks scoped to this instance.
     pub hooks: Arc<Hooks>,
     /// Whether to persist isolated storage data of this component instance after it has been
     /// destroyed.
     pub persistent_storage: bool,
+
+    /// The component's incarnation id. This is used to distinguish different instances of a
+    /// dynamic component that share the same moniker.
+    incarnation_id: IncarnationId,
 
     /// Configuration overrides provided by the parent component.
     config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
@@ -272,7 +274,8 @@ impl ComponentInstance {
     ) -> Arc<Self> {
         Self::new(
             Arc::new(environment),
-            InstancedMoniker::root(),
+            Moniker::root(),
+            0,
             component_url,
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,
@@ -289,7 +292,8 @@ impl ComponentInstance {
     // TODO(https://fxbug.dev/42077692) convert this to a builder API
     pub async fn new(
         environment: Arc<Environment>,
-        instanced_moniker: InstancedMoniker,
+        moniker: Moniker,
+        incarnation_id: IncarnationId,
         component_url: Url,
         startup: fdecl::StartupMode,
         on_terminate: fdecl::OnTerminate,
@@ -299,11 +303,10 @@ impl ComponentInstance {
         hooks: Arc<Hooks>,
         persistent_storage: bool,
     ) -> Arc<Self> {
-        let moniker = instanced_moniker.without_instance_ids();
         let self_ = Arc::new(Self {
             environment,
-            instanced_moniker,
             moniker,
+            incarnation_id,
             component_url,
             startup,
             on_terminate,
@@ -1110,11 +1113,7 @@ impl ComponentInstance {
     }
 
     pub fn incarnation_id(&self) -> IncarnationId {
-        match self.instanced_moniker().leaf() {
-            Some(m) => m.instance(),
-            // Assign 0 to the root component instance
-            None => 0,
-        }
+        self.incarnation_id
     }
 
     pub fn instance_id(&self) -> Option<&InstanceId> {
@@ -1299,10 +1298,6 @@ impl DirectoryEntryAsync for ComponentInstance {
 impl ComponentInstanceInterface for ComponentInstance {
     type TopInstance = ComponentManagerInstance;
 
-    fn instanced_moniker(&self) -> &InstancedMoniker {
-        &self.instanced_moniker
-    }
-
     fn moniker(&self) -> &Moniker {
         &self.moniker
     }
@@ -1351,7 +1346,7 @@ impl std::fmt::Debug for ComponentInstance {
         f.debug_struct("ComponentInstance")
             .field("component_url", &self.component_url)
             .field("startup", &self.startup)
-            .field("moniker", &self.instanced_moniker)
+            .field("moniker", &self.moniker)
             .finish()
     }
 }
@@ -2091,7 +2086,8 @@ pub mod tests {
     async fn new_component() -> Arc<ComponentInstance> {
         ComponentInstance::new(
             Arc::new(Environment::empty()),
-            InstancedMoniker::root(),
+            Moniker::root(),
+            0,
             "fuchsia-pkg://fuchsia.com/foo#at_root.cm".parse().unwrap(),
             fdecl::StartupMode::Lazy,
             fdecl::OnTerminate::None,

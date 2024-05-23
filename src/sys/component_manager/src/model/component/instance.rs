@@ -49,7 +49,7 @@ use {
     cm_fidl_validator::error::DeclType,
     cm_fidl_validator::error::Error as ValidatorError,
     cm_logger::scoped::ScopedLogger,
-    cm_moniker::{IncarnationId, InstancedChildName},
+    cm_moniker::IncarnationId,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
@@ -863,7 +863,7 @@ impl ResolvedInstanceState {
             collection,
         )?;
 
-        let child_moniker =
+        let child_name =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
         if !dynamic_offers.is_empty() {
@@ -877,14 +877,13 @@ impl ResolvedInstanceState {
             );
         }
 
-        if self.get_child(&child_moniker).is_some() {
+        if self.get_child(&child_name).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
                 moniker: component.moniker().clone(),
-                child: child_moniker,
+                child: child_name,
             });
         }
-        // TODO(https://fxbug.dev/42059793): next_dynamic_instance_id should be per-collection.
-        let instance_id = match collection {
+        let incarnation_id = match collection {
             Some(_) => {
                 let id = self.next_dynamic_instance_id;
                 self.next_dynamic_instance_id += 1;
@@ -892,10 +891,10 @@ impl ResolvedInstanceState {
             }
             None => 0,
         };
-        let instanced_moniker = InstancedChildName::from_child_moniker(&child_moniker, instance_id);
         let child = ComponentInstance::new(
             self.environment_for_child(component, child, collection.clone()),
-            component.instanced_moniker.child(instanced_moniker),
+            component.moniker.child(child_name.clone()),
+            incarnation_id,
             child.url.clone(),
             child.startup,
             child.on_terminate.unwrap_or(fdecl::OnTerminate::None),
@@ -906,7 +905,7 @@ impl ResolvedInstanceState {
             component.persistent_storage_for_child(collection),
         )
         .await;
-        self.children.insert(child_moniker, child.clone());
+        self.children.insert(child_name, child.clone());
 
         self.dynamic_offers.extend(dynamic_offers.into_iter());
         self.dynamic_capabilities.extend(dynamic_capabilities.into_iter());

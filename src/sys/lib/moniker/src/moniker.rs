@@ -11,8 +11,8 @@ use {
     std::{fmt, hash::Hash},
 };
 
-/// MonikerBase is the common trait for both InstancedMoniker
-/// and Moniker concrete types.
+/// MonikerBase is the parent trait for Moniker. It will be combined with Moniker in a future
+/// change.
 ///
 /// MonikerBase describes the identity of a component instance in terms of its path
 /// relative to the root of the component instance tree.

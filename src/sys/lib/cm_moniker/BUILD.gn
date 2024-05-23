@@ -15,11 +15,6 @@ rustc_library("cm_moniker") {
   visibility = [
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_moniker/*",
-
-    # TODO(https://fxbug.dev/42174305): Have StorageAdminRequest pass a non-InstancedMoniker.
-    "//src/sys/lib/routing/*",
-    "//src/sys/test_manager/*",
-    "//tools/lib/cm_fidl_analyzer/*",
   ]
 
   deps = [

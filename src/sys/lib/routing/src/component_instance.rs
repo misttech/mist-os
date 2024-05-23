@@ -11,7 +11,6 @@ use {
         resolving::{ComponentAddress, ComponentResolutionContext},
     },
     async_trait::async_trait,
-    cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
     cm_types::{Name, Url},
     derivative::Derivative,
@@ -35,9 +34,6 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     /// Returns this `ComponentInstanceInterface`'s child moniker, if it is
     /// not the root instance.
     fn child_moniker(&self) -> Option<&ChildName>;
-
-    /// Returns this `ComponentInstanceInterface`'s instanced moniker
-    fn instanced_moniker(&self) -> &InstancedMoniker;
 
     /// Returns this `ComponentInstanceInterface`'s moniker.
     fn moniker(&self) -> &Moniker;
@@ -315,10 +311,6 @@ pub mod tests {
         type TopInstance = TestTopInstance;
 
         fn child_moniker(&self) -> Option<&ChildName> {
-            todo!()
-        }
-
-        fn instanced_moniker(&self) -> &InstancedMoniker {
             todo!()
         }
 

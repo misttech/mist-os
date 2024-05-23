@@ -44,8 +44,8 @@ struct AbsolutePath {
 /// Mutable event stream state, guarded by a mutex in the
 /// EventStreamProvider which allows for mutation.
 struct StreamState {
-    /// A mapping from a component instance's InstancedMoniker, to the set of
-    /// event streams and their corresponding paths in the component instance's out directory.
+    /// A mapping from a component instance's moniker to the set of event streams and their
+    /// corresponding paths in the component instance's out directory.
     streams: HashMap<ExtendedMoniker, Vec<EventStreamAttachment>>,
 
     /// Looks up subscriptions per component over a component's lifetime.

@@ -11,7 +11,6 @@ use {
         ChildPolicyAllowlists, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
         JobPolicyAllowlists, SecurityPolicy,
     },
-    cm_moniker::InstancedMoniker,
     cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource},
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl,
@@ -66,8 +65,8 @@ pub trait GlobalPolicyCheckerTest<C>
 where
     C: ComponentInstanceInterface,
 {
-    // Creates a `ComponentInstanceInterface` with the given `InstancedMoniker`.
-    async fn make_component(&self, instanced_moniker: InstancedMoniker) -> Arc<C>;
+    // Creates a `ComponentInstanceInterface` with the given `Moniker`.
+    async fn make_component(&self, moniker: Moniker) -> Arc<C>;
 
     // Tests `GlobalPolicyChecker::can_route_capability()` for framework capability sources.
     async fn global_policy_checker_can_route_capability_framework_cap(&self) -> Result<(), Error> {
