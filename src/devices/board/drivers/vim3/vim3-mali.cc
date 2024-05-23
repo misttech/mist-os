@@ -94,8 +94,7 @@ fuchsia_hardware_power::PowerElementConfiguration hardware_power_config() {
 
   fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
       .child_level = kPowerLevelOn,
-      .parent_level =
-          static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kActive),
   }};
   fuchsia_hardware_power::PowerDependency passive_on_exec_state_wake_handling = {{
       .child = kPowerElementName,
