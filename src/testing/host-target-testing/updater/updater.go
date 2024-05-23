@@ -259,7 +259,7 @@ func updateCheckNow(
 
 	cmd := []string{"/bin/update", "wait-for-commit"}
 	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
-		logger.Warningf(ctx, "update wait-for-commit failed: %v", err)
+		logger.Warningf(ctx, "update wait-for-commit after OTA attempt failed: %v", err)
 	}
 
 	logger.Infof(ctx, "OTA completed in %s", time.Now().Sub(startTime))
