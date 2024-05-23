@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::pin::Pin;
-
+use crate::LogError;
 use async_stream::stream;
 use diagnostics_data::LogsData;
 use futures_util::{AsyncReadExt, Stream, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::pin::Pin;
 use thiserror::Error;
 
 /// Read buffer size. Sufficiently large to store a large number
@@ -152,6 +152,9 @@ pub enum JsonDeserializeError {
         #[from]
         error: std::io::Error,
     },
+    /// Log error
+    #[error(transparent)]
+    LogError(#[from] LogError),
     /// End of stream has been reached
     #[error("No more data")]
     NoMoreData,

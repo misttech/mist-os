@@ -6,6 +6,7 @@ use crate::transactional_symbolizer::ReadError;
 use ffx_config::api::ConfigError;
 use fidl_fuchsia_developer_ffx::{OpenTargetError, TargetConnectionError};
 use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
+use log_command::log_formatter::FormatterError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -18,6 +19,8 @@ pub enum LogError {
     IdentifyHostError { error: IdentifyHostError },
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
+    #[error(transparent)]
+    FormatterError(#[from] FormatterError),
     #[error(transparent)]
     ConfigError(#[from] ConfigError),
     #[error(transparent)]
@@ -56,6 +59,7 @@ impl From<log_command::LogError> for LogError {
             FfxError(err) => Self::UnknownError(err.into()),
             Utf8Error(err) => Self::UnknownError(err.into()),
             FidlError(err) => Self::UnknownError(err.into()),
+            FormatterError(err) => Self::FormatterError(err),
         }
     }
 }
@@ -82,6 +86,7 @@ impl From<LogError> for fho::Error {
             ConfigError(err) => fho::Error::Unexpected(err.into()),
             SymbolizerError(err) => fho::Error::Unexpected(err.into()),
             DaemonRetriesDisabled => fho::Error::Unexpected(value.into()),
+            FormatterError(error) => fho::Error::Unexpected(error.into()),
         }
     }
 }

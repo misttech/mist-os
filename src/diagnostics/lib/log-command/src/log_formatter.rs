@@ -5,7 +5,7 @@
 use crate::{
     filter::LogFilterCriteria,
     log_socket_stream::{JsonDeserializeError, LogsDataStream},
-    DetailedDateTime, LogCommand, TimeFormat,
+    DetailedDateTime, LogCommand, LogError, LogProcessingResult, TimeFormat,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -105,7 +105,7 @@ pub async fn dump_logs_from_socket<F, S>(
     socket: fuchsia_async::Socket,
     formatter: &mut F,
     symbolizer: &S,
-) -> Result<(), JsonDeserializeError>
+) -> Result<LogProcessingResult, JsonDeserializeError>
 where
     F: LogFormatter + BootTimeAccessor,
     S: Symbolize + ?Sized,
@@ -122,13 +122,16 @@ where
             Either::Left(Some(log)) => {
                 symbolize_pending.push(handle_value(log, boot_ts, symbolizer));
             }
-            Either::Right(Some(Some(symbolized))) => {
-                formatter.push_log(symbolized).await?;
-            }
+            Either::Right(Some(Some(symbolized))) => match formatter.push_log(symbolized).await? {
+                LogProcessingResult::Exit => {
+                    return Ok(LogProcessingResult::Exit);
+                }
+                LogProcessingResult::Continue => {}
+            },
             _ => {}
         }
     }
-    Ok(())
+    Ok(LogProcessingResult::Continue)
 }
 
 pub trait BootTimeAccessor {
@@ -221,17 +224,17 @@ impl<W> LogFormatter for DefaultLogFormatter<W>
 where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
-    async fn push_log(&mut self, log_entry: LogEntry) -> Result<()> {
+    async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError> {
         if self.filter_by_timestamp(&log_entry, self.options.since.as_ref(), |a, b| a <= b) {
-            return Ok(());
+            return Ok(LogProcessingResult::Continue);
         }
 
         if self.filter_by_timestamp(&log_entry, self.options.until.as_ref(), |a, b| a >= b) {
-            return Ok(());
+            return Ok(LogProcessingResult::Exit);
         }
 
         if !self.filters.matches(&log_entry) {
-            return Ok(());
+            return Ok(LogProcessingResult::Continue);
         }
         match self.options.display {
             Some(text_options) => {
@@ -243,11 +246,11 @@ where
                 match log_entry {
                     _ => {}
                 }
-                self.writer.item(&log_entry)?;
+                self.writer.item(&log_entry).map_err(|err| LogError::UnknownError(err.into()))?;
             }
         };
 
-        Ok(())
+        Ok(LogProcessingResult::Continue)
     }
 }
 
@@ -406,7 +409,7 @@ impl Symbolize for NoOpSymbolizer {
 #[async_trait(?Send)]
 pub trait LogFormatter {
     /// Formats a log entry and writes it to the output.
-    async fn push_log(&mut self, log_entry: LogEntry) -> anyhow::Result<()>;
+    async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError>;
 }
 
 #[cfg(test)]
@@ -441,9 +444,9 @@ mod test {
 
     #[async_trait(?Send)]
     impl LogFormatter for FakeFormatter {
-        async fn push_log(&mut self, log_entry: LogEntry) -> anyhow::Result<()> {
+        async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError> {
             self.logs.push(log_entry);
-            Ok(())
+            Ok(LogProcessingResult::Continue)
         }
     }
 
@@ -656,13 +659,15 @@ mod test {
             )
             .expect("failed to write target log");
         drop(sender);
-        dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver),
-            &mut formatter,
-            &symbolizer,
-        )
-        .await
-        .unwrap();
+        assert_matches!(
+            dump_logs_from_socket(
+                fuchsia_async::Socket::from_socket(receiver),
+                &mut formatter,
+                &symbolizer,
+            )
+            .await,
+            Ok(LogProcessingResult::Exit)
+        );
         assert_eq!(
             buffers.stdout.into_string(),
             "[00000.000000][1][2][ffx] INFO: Hello world 3!\n"
@@ -715,13 +720,15 @@ mod test {
             .write(serde_json::to_string(&logs).unwrap().as_bytes())
             .expect("failed to write target log");
         drop(sender);
-        dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver),
-            &mut formatter,
-            &symbolizer,
-        )
-        .await
-        .unwrap();
+        assert_matches!(
+            dump_logs_from_socket(
+                fuchsia_async::Socket::from_socket(receiver),
+                &mut formatter,
+                &symbolizer,
+            )
+            .await,
+            Ok(LogProcessingResult::Exit)
+        );
         assert_eq!(
             buffers.stdout.into_string(),
             "[1970-01-01 00:00:00.000][1][2][ffx] INFO: Hello world 1!\n"

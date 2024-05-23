@@ -11,6 +11,7 @@ use diagnostics_data::Severity;
 use errors::{ffx_bail, FfxError};
 use fidl_fuchsia_diagnostics::{LogInterestSelector, LogSettingsProxy};
 use fidl_fuchsia_sys2::RealmQueryProxy;
+use log_formatter::FormatterError;
 use moniker::Moniker;
 use selectors::{sanitize_moniker_for_selectors, SelectorExt};
 use std::{
@@ -333,6 +334,15 @@ impl Default for LogCommand {
     }
 }
 
+/// Result returned from processing logs
+#[derive(PartialEq, Debug)]
+pub enum LogProcessingResult {
+    /// The caller should exit
+    Exit,
+    /// The caller should continue processing logs
+    Continue,
+}
+
 impl FromStr for SymbolizeMode {
     type Err = anyhow::Error;
 
@@ -365,6 +375,8 @@ pub enum LogError {
     Utf8Error(#[from] FromUtf8Error),
     #[error(transparent)]
     FidlError(#[from] fidl::Error),
+    #[error(transparent)]
+    FormatterError(#[from] FormatterError),
 }
 
 /// Trait used to get available instances given a moniker query.

@@ -16,7 +16,7 @@ use log_command::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         Symbolize, WriterContainer,
     },
-    InstanceGetter, LogSubCommand, WatchCommand,
+    InstanceGetter, LogProcessingResult, LogSubCommand, WatchCommand,
 };
 use std::io::Write;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
@@ -315,7 +315,7 @@ where
         )
         .await?;
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
-        let maybe_err = dump_logs_from_socket(
+        let result = dump_logs_from_socket(
             connection.log_socket,
             &mut formatter,
             symbolizer_channel.as_ref(),
@@ -324,8 +324,14 @@ where
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
             break;
         }
-        if let Err(value) = maybe_err {
-            writeln!(formatter.writer().stderr(), "{value}")?;
+        match result {
+            Ok(LogProcessingResult::Exit) => {
+                break;
+            }
+            Ok(LogProcessingResult::Continue) => {}
+            Err(value) => {
+                writeln!(formatter.writer().stderr(), "{value}")?;
+            }
         }
     }
     Ok(())
