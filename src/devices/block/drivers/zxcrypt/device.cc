@@ -237,12 +237,11 @@ zx_status_t Device::BlockVolumeQuerySlices(const uint64_t* start_list, size_t st
   }
   ZX_DEBUG_ASSERT(start_count <= MAX_SLICE_QUERY_REQUESTS);
 
-  uint64_t modified_list[start_count];
-  memcpy(modified_list, start_list, start_count);
+  std::vector<uint64_t> modified_list(start_count);
   for (size_t i = 0; i < start_count; i++) {
     modified_list[i] = start_list[i] + info_.reserved_slices;
   }
-  return info_.volume_protocol.QuerySlices(modified_list, start_count, out_responses_list,
+  return info_.volume_protocol.QuerySlices(modified_list.data(), start_count, out_responses_list,
                                            responses_count, out_responses_actual);
 }
 
