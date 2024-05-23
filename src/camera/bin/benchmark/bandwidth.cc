@@ -21,7 +21,7 @@ static fit::function<void(zx_status_t)> MakeErrorHandler(
   };
 }
 
-Bandwidth::Bandwidth(fuchsia::sysmem::AllocatorHandle sysmem_allocator,
+Bandwidth::Bandwidth(fuchsia::sysmem2::AllocatorHandle sysmem_allocator,
                      fuchsia::camera3::DeviceWatcherHandle camera_device_watcher,
                      fuchsia::hardware::ram::metrics::DeviceHandle metrics_device,
                      async_dispatcher_t* dispatcher)
@@ -126,20 +126,32 @@ void Bandwidth::ConnectSequential(uint32_t stream_index) {
     return;
   }
   camera_device_->ConnectToStream(stream_index, streams_[stream_index].ptr.NewRequest(dispatcher_));
-  sysmem_allocator_->AllocateSharedCollection(streams_[stream_index].token.NewRequest());
-  streams_[stream_index].ptr->SetBufferCollection(std::move(streams_[stream_index].token));
+
+  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.set_token_request(streams_[stream_index].token.NewRequest());
+  sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
+
+  streams_[stream_index].ptr->SetBufferCollection(fuchsia::sysmem::BufferCollectionTokenHandle(
+      std::move(streams_[stream_index].token).Unbind().TakeChannel()));
   streams_[stream_index].ptr->WatchBufferCollection(
-      [this, stream_index](fuchsia::sysmem::BufferCollectionTokenHandle token) {
-        sysmem_allocator_->BindSharedCollection(
-            std::move(token), streams_[stream_index].collection.NewRequest(dispatcher_));
-        streams_[stream_index].collection->SetConstraints(
-            true, {.usage{.none = fuchsia::sysmem::noneUsage},
-                   .min_buffer_count_for_camping = 2,
-                   .has_buffer_memory_constraints = true,
-                   .buffer_memory_constraints{.ram_domain_supported = true}});
-        streams_[stream_index].collection->WaitForBuffersAllocated(
-            [this, stream_index](zx_status_t status,
-                                 fuchsia::sysmem::BufferCollectionInfo_2 buffers) {
+      [this, stream_index](fuchsia::sysmem::BufferCollectionTokenHandle token_v1) {
+        auto token_v2 = fuchsia::sysmem2::BufferCollectionTokenHandle(token_v1.TakeChannel());
+        fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+        bind_shared_request.set_token(std::move(token_v2));
+        bind_shared_request.set_buffer_collection_request(
+            streams_[stream_index].collection.NewRequest(dispatcher_));
+        sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
+
+        fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+        auto& constraints = *set_constraints_request.mutable_constraints();
+        constraints.mutable_usage()->set_none(fuchsia::sysmem2::NONE_USAGE);
+        constraints.set_min_buffer_count_for_camping(2);
+        constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
+        streams_[stream_index].collection->SetConstraints(std::move(set_constraints_request));
+
+        streams_[stream_index].collection->WaitForAllBuffersAllocated(
+            [this, stream_index](
+                fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result result) {
               streams_[stream_index].ptr->GetNextFrame(
                   streams_[stream_index].frame_callback.share());
               ConnectSequential(stream_index + 1);
