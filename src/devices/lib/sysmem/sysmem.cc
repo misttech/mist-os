@@ -4,6 +4,10 @@
 
 #include "src/devices/lib/sysmem/sysmem.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
+#include <lib/sysmem-version/sysmem-version.h>
+
 namespace sysmem {
 
 fuchsia_sysmem::wire::PixelFormat banjo_to_fidl(const pixel_format_t& source) {
@@ -128,6 +132,34 @@ buffer_collection_info_2_t fidl_to_banjo(const fuchsia::sysmem::BufferCollection
     destination.buffers[i].vmo_usable_start = source.buffers[i].vmo_usable_start;
   }
   return destination;
+}
+
+buffer_collection_info_2_t fidl_to_banjo(const fuchsia::sysmem2::BufferCollectionInfo& source) {
+  // we don't actually use the dup'ed vmo handles for anything (see below)
+  auto v1_result =
+      sysmem::V1MoveFromV2BufferCollectionInfo(fidl::HLCPPToNatural(fidl::Clone(source)));
+  ZX_ASSERT(v1_result.is_ok());
+  auto v1_natural = std::move(v1_result.value());
+  auto v1 = fidl::NaturalToHLCPP(std::move(v1_natural));
+
+  // the semantics of fidl_to_banjo are that the source handle values are directly placed in the
+  // returned buffer_collection_info_2_t
+  for (uint32_t i = 0; i < v1.buffer_count; ++i) {
+    // we temporarily let v1 believe it owns the lifetimes of the vmos, even though source actually
+    // owns the lifetimes of the vmos - this also closes the un-needed vmo handles dup'ed above
+    v1.buffers[i].vmo.reset(source.buffers()[i].vmo().get());
+  }
+  // result gets raw zx_handle_t values from source
+  auto result = fidl_to_banjo(v1);
+  // the lifetimes of the vmos are actually owned by source not v1, so release v1's vmo handles and
+  // intentionally ignore the released handle value as they're still owned by source; this ends the
+  // lifetime shenanigans, aside from the fact that fidl_to_banjo is returning a banjo struct with
+  // handle lifetimes controlled by source, but ... it's a banjo struct, so ... it is what it is.
+  for (uint32_t i = 0; i < v1.buffer_count; ++i) {
+    (void)v1.buffers[i].vmo.release();
+  }
+
+  return result;
 }
 
 }  // namespace sysmem
