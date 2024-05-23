@@ -70,7 +70,6 @@ rustc_library("lib") {
     "//src/lib/fuchsia-sync",
     "//src/lib/fuchsia-url",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/sys/lib/cm_moniker",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/mem_util",

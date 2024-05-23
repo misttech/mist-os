@@ -16,14 +16,13 @@ use {
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
         error::RoutingError, RouteRequest,
     },
-    cm_moniker::InstancedMoniker,
     cm_types::RelativePath,
     component_id_index::InstanceId,
     derivative::Derivative,
     errors::{ModelError, StorageError},
     fidl::endpoints,
     fidl_fuchsia_io as fio,
-    moniker::MonikerBase,
+    moniker::{Moniker, MonikerBase},
     std::{path::PathBuf, sync::Arc},
     vfs::{directory::entry::OpenRequest, ToObjectRequest},
 };
@@ -56,9 +55,9 @@ pub struct BackingDirectoryInfo {
     /// it doesn't exist but won't create backing_directory_subdir.
     pub storage_subdir: RelativePath,
 
-    /// The moniker of the component that defines the storage capability, with instance ids. This
-    /// is used for generating moniker-based storage paths.
-    pub storage_source_moniker: InstancedMoniker,
+    /// The moniker of the component that defines the storage capability. This is used for
+    /// generating moniker-based storage paths.
+    pub storage_source_moniker: Moniker,
 }
 
 impl PartialEq for BackingDirectoryInfo {
@@ -115,10 +114,7 @@ async fn open_storage_root(
         .await
         .map_err(|e| {
             ModelError::from(StorageError::open_root(
-                storage_source_info
-                    .storage_provider
-                    .as_ref()
-                    .map(|r| r.instanced_moniker().clone()),
+                storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
                 storage_source_info.backing_directory_path.clone(),
                 e,
             ))
@@ -171,7 +167,7 @@ pub async fn route_backing_directory(
         backing_directory_path: dir_source_path,
         backing_directory_subdir: dir_subdir,
         storage_subdir: storage_decl.subdir.clone(),
-        storage_source_moniker: storage_component.instanced_moniker().clone(),
+        storage_source_moniker: storage_component.moniker().clone(),
     })
 }
 
@@ -180,22 +176,13 @@ pub async fn route_backing_directory(
 /// it is based on the provided moniker.
 pub async fn open_isolated_storage(
     storage_source_info: &BackingDirectoryInfo,
-    persistent_storage: bool,
-    moniker: InstancedMoniker,
+    moniker: Moniker,
     instance_id: Option<&InstanceId>,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let root_dir = open_storage_root(storage_source_info).await?;
     let storage_path = match instance_id {
         Some(id) => generate_instance_id_based_storage_path(id),
-        // if persistent_storage is `true`, generate a moniker-based storage path that ignores
-        // instance ids.
-        None => {
-            if persistent_storage {
-                generate_moniker_based_storage_path(&moniker.with_zero_value_instance_ids())
-            } else {
-                generate_moniker_based_storage_path(&moniker)
-            }
-        }
+        None => generate_moniker_based_storage_path(&moniker),
     };
 
     fuchsia_fs::directory::create_directory_recursive(
@@ -206,7 +193,7 @@ pub async fn open_isolated_storage(
     .await
     .map_err(|e| {
         ModelError::from(StorageError::open(
-            storage_source_info.storage_provider.as_ref().map(|r| r.instanced_moniker().clone()),
+            storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
             storage_source_info.backing_directory_path.clone(),
             moniker.clone(),
             instance_id.cloned(),
@@ -232,7 +219,7 @@ pub async fn open_isolated_storage_by_id(
     .await
     .map_err(|e| {
         ModelError::from(StorageError::open_by_id(
-            storage_source_info.storage_provider.as_ref().map(|r| r.instanced_moniker().clone()),
+            storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
             storage_source_info.backing_directory_path.clone(),
             instance_id.clone(),
             e,
@@ -246,8 +233,7 @@ pub async fn open_isolated_storage_by_id(
 /// component is still alive, that component's storage handle will start returning errors.
 pub async fn delete_isolated_storage(
     storage_source_info: BackingDirectoryInfo,
-    persistent_storage: bool,
-    moniker: InstancedMoniker,
+    moniker: Moniker,
     instance_id: Option<&InstanceId>,
 ) -> Result<(), ModelError> {
     let root_dir = open_storage_root(&storage_source_info).await?;
@@ -273,10 +259,7 @@ pub async fn delete_isolated_storage(
             fuchsia_fs::directory::open_directory_no_describe(&root_dir, parent_path_str, FLAGS)
                 .map_err(|e| {
                     StorageError::open(
-                        storage_source_info
-                            .storage_provider
-                            .as_ref()
-                            .map(|r| r.instanced_moniker().clone()),
+                        storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
                         storage_source_info.backing_directory_path.clone(),
                         moniker.clone(),
                         None,
@@ -286,11 +269,7 @@ pub async fn delete_isolated_storage(
         };
         (dir, file_name)
     } else {
-        let storage_path = if persistent_storage {
-            generate_moniker_based_storage_path(&moniker.with_zero_value_instance_ids())
-        } else {
-            generate_moniker_based_storage_path(&moniker)
-        };
+        let storage_path = generate_moniker_based_storage_path(&moniker);
         // We want to strip off the "data" portion of the path, and then one more level to get to the
         // directory holding the target component's storage.
         let storage_path_parent = storage_path
@@ -313,10 +292,7 @@ pub async fn delete_isolated_storage(
             )
             .map_err(|e| {
                 StorageError::open(
-                    storage_source_info
-                        .storage_provider
-                        .as_ref()
-                        .map(|r| r.instanced_moniker().clone()),
+                    storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
                     storage_source_info.backing_directory_path.clone(),
                     moniker.clone(),
                     None,
@@ -334,7 +310,7 @@ pub async fn delete_isolated_storage(
     // prior run.
     fuchsia_fs::directory::remove_dir_recursive(&dir, &name).await.map_err(|e| {
         StorageError::remove(
-            storage_source_info.storage_provider.as_ref().map(|r| r.instanced_moniker().clone()),
+            storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
             storage_source_info.backing_directory_path.clone(),
             moniker.clone(),
             instance_id.cloned(),
@@ -370,17 +346,20 @@ pub async fn delete_isolated_storage(
 /// When `d` attempts to access `/my_cache` the framework creates the sub-directory
 /// `b:0/children/c:0/children/d:0/data` in the directory used by `a` to declare storage
 /// capabilities.  Then, the framework gives 'd' access to this new directory.
-fn generate_moniker_based_storage_path(moniker: &InstancedMoniker) -> PathBuf {
+///
+/// Note the ":0" suffix is for backwards compatibility and has no independent meaning (it used to
+/// indicate a unique instance id).
+fn generate_moniker_based_storage_path(moniker: &Moniker) -> PathBuf {
     assert!(
         !moniker.path().is_empty(),
         "storage capability appears to have been exposed or used by its source"
     );
 
     let mut path = moniker.path().iter();
-    let mut dir_path = vec![path.next().unwrap().to_string()];
+    let mut dir_path = vec![format!("{}:0", path.next().unwrap())];
     while let Some(p) = path.next() {
         dir_path.push("children".to_string());
-        dir_path.push(p.to_string());
+        dir_path.push(format!("{p}:0"));
     }
 
     // Storage capabilities used to have a hardcoded set of types, which would be appended
@@ -412,7 +391,6 @@ mod tests {
         cm_rust::*,
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
-        moniker::Moniker,
         rand::{distributions::Alphanumeric, Rng},
     };
 
@@ -446,7 +424,7 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
 
         // Open.
         let dir = open_isolated_storage(
@@ -455,9 +433,8 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: Default::default(),
                 storage_subdir: Default::default(),
-                storage_source_moniker: InstancedMoniker::root(),
+                storage_source_moniker: Moniker::root(),
             },
-            false,
             moniker.clone(),
             None,
         )
@@ -474,9 +451,8 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: Default::default(),
                 storage_subdir: Default::default(),
-                storage_source_moniker: InstancedMoniker::root(),
+                storage_source_moniker: Moniker::root(),
             },
-            false,
             moniker.clone(),
             None,
         )
@@ -485,16 +461,15 @@ mod tests {
         assert_eq!(test_helpers::list_directory(&dir).await, vec!["file".to_string()]);
 
         // Open another component's storage.
-        let moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1", "e:0"]).unwrap();
+        let moniker = Moniker::try_from(vec!["c", "coll:d", "e"]).unwrap();
         let dir = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: Default::default(),
                 storage_subdir: Default::default(),
-                storage_source_moniker: InstancedMoniker::root(),
+                storage_source_moniker: Moniker::root(),
             },
-            false,
             moniker.clone(),
             None,
         )
@@ -535,7 +510,7 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
 
         // open the storage directory using instance ID.
         let instance_id = InstanceId::new_random(&mut rand::thread_rng());
@@ -545,9 +520,8 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: Default::default(),
                 storage_subdir: Default::default(),
-                storage_source_moniker: InstancedMoniker::root(),
+                storage_source_moniker: Moniker::root(),
             },
-            false,
             moniker.clone(),
             Some(&instance_id),
         )
@@ -581,9 +555,8 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: Default::default(),
                 storage_subdir: Default::default(),
-                storage_source_moniker: InstancedMoniker::root(),
+                storage_source_moniker: Moniker::root(),
             },
-            false,
             moniker.clone(),
             Some(&instance_id),
         )
@@ -608,16 +581,15 @@ mod tests {
         test.start_instance_and_wait_start(&Moniker::root()).await.unwrap();
 
         // Try to open the storage. We expect an error.
-        let moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
         let res = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&test.model.root())),
                 backing_directory_path: "/data".parse().unwrap(),
                 backing_directory_subdir: Default::default(),
                 storage_subdir: Default::default(),
-                storage_source_moniker: InstancedMoniker::root(),
+                storage_source_moniker: Moniker::root(),
             },
-            false,
             moniker.clone(),
             None,
         )
@@ -655,9 +627,9 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let storage_moniker = InstancedMoniker::try_from(vec!["c:0"]).unwrap();
-        let parent_moniker = InstancedMoniker::try_from(vec!["c:0"]).unwrap();
-        let child_moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let storage_moniker = Moniker::try_from(vec!["c"]).unwrap();
+        let parent_moniker = Moniker::try_from(vec!["c"]).unwrap();
+        let child_moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
 
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
@@ -668,7 +640,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
-            false,
             child_moniker.clone(),
             None,
         )
@@ -687,7 +658,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
-            false,
             parent_moniker.clone(),
             None,
         )
@@ -706,7 +676,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
-            false,
             child_moniker.clone(),
             None,
         )
@@ -722,7 +691,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
-            false,
             parent_moniker.clone(),
             None,
         )
@@ -745,7 +713,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: storage_moniker.clone(),
             },
-            false,
             child_moniker.clone(),
             None,
         )
@@ -787,10 +754,10 @@ mod tests {
             .root()
             .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
-            .expect("failed to find component for b:0");
+            .expect("failed to find component for b");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
-        let parent_moniker = InstancedMoniker::try_from(vec!["c:0"]).unwrap();
-        let child_moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
+        let parent_moniker = Moniker::try_from(vec!["c"]).unwrap();
+        let child_moniker = Moniker::try_from(vec!["c", "coll:d"]).unwrap();
         let instance_id = InstanceId::new_random(&mut rand::thread_rng());
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
@@ -801,7 +768,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: parent_moniker.clone(),
             },
-            false,
             child_moniker.clone(),
             Some(&instance_id),
         )
@@ -829,7 +795,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: parent_moniker.clone(),
             },
-            false,
             child_moniker.clone(),
             Some(&instance_id),
         )
@@ -850,7 +815,6 @@ mod tests {
                 storage_subdir: Default::default(),
                 storage_source_moniker: parent_moniker.clone(),
             },
-            false,
             child_moniker,
             Some(&instance_id),
         )
@@ -867,9 +831,9 @@ mod tests {
     #[fuchsia::test]
     fn generate_moniker_based_storage_path_test() {
         for (moniker, expected_output) in vec![
-            (vec!["a:1"].try_into().unwrap(), "a:1/data"),
-            (vec!["a:1", "b:2"].try_into().unwrap(), "a:1/children/b:2/data"),
-            (vec!["a:1", "b:2", "c:3"].try_into().unwrap(), "a:1/children/b:2/children/c:3/data"),
+            (vec!["a"].try_into().unwrap(), "a:0/data"),
+            (vec!["a", "b"].try_into().unwrap(), "a:0/children/b:0/data"),
+            (vec!["a", "b", "c"].try_into().unwrap(), "a:0/children/b:0/children/c:0/data"),
         ] {
             assert_eq!(
                 generate_moniker_based_storage_path(&moniker),

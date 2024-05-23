@@ -26,7 +26,6 @@ use {
         AllowlistEntry, CapabilityAllowlistKey, ChildPolicyAllowlists,
         DebugCapabilityAllowlistEntry, DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
     },
-    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_types::{Name, Url},
     component_id_index::InstanceId,
@@ -428,7 +427,7 @@ impl RoutingTest {
     pub async fn list_directory_in_storage(
         &self,
         subdir: Option<&str>,
-        relation: InstancedMoniker,
+        relation: Moniker,
         instance_id: Option<&InstanceId>,
         relative_path: &str,
     ) -> Vec<String> {
@@ -640,8 +639,8 @@ impl RoutingTestModel for RoutingTest {
     type C = ComponentInstance;
 
     async fn check_use(&self, moniker: Moniker, check: CheckUse) {
-        let (component, component_name) = self
-            .start_and_get_instance(&moniker, StartReason::Eager, true)
+        let component_name = self
+            .start_instance_and_wait_start(&moniker)
             .await
             .unwrap_or_else(|e| panic!("start instance failed for `{}`: {:?}", moniker, e));
         let component_resolved_url = Self::resolved_url(&component_name);
@@ -726,7 +725,6 @@ impl RoutingTestModel for RoutingTest {
                         .expect("failed to open /tmp");
                         let res = capability_util::check_file_in_storage(
                             storage_subdir,
-                            component.persistent_storage,
                             moniker,
                             instance_id.as_ref(),
                             &tmp_proxy,
@@ -739,7 +737,6 @@ impl RoutingTestModel for RoutingTest {
                         // Check for the file in the test's isolated test directory
                         let res = capability_util::check_file_in_storage(
                             storage_subdir,
-                            component.persistent_storage,
                             moniker,
                             instance_id.as_ref(),
                             &self.test_dir_proxy,
@@ -768,7 +765,7 @@ impl RoutingTestModel for RoutingTest {
                     | fio::OpenFlags::CREATE
                     | fio::OpenFlags::DIRECTORY;
                 let moniker_string = format!("{}", storage_relation);
-                let component_moniker = moniker.concat(&storage_relation.without_instance_ids());
+                let component_moniker = moniker.concat(&storage_relation);
                 let instance_id =
                     self.model.root().component_id_index().id_for_moniker(&component_moniker);
                 storage_admin_proxy
@@ -801,7 +798,6 @@ impl RoutingTestModel for RoutingTest {
                     };
                     capability_util::check_file_in_storage(
                         storage_subdir.clone(),
-                        component.persistent_storage,
                         storage_relation.clone(),
                         instance_id.clone(),
                         &storage_dir,
@@ -815,7 +811,6 @@ impl RoutingTestModel for RoutingTest {
                         .expect("error encountered while deleting component storage");
                     capability_util::confirm_storage_is_deleted_for_component(
                         storage_subdir,
-                        component.persistent_storage,
                         storage_relation,
                         instance_id,
                         &storage_dir,
@@ -1124,13 +1119,10 @@ pub mod capability_util {
 
     pub async fn check_file_in_storage(
         storage_subdir: Option<String>,
-        persistent_storage: bool,
-        relation: InstancedMoniker,
+        relation: Moniker,
         instance_id: Option<&InstanceId>,
         test_dir_proxy: &fio::DirectoryProxy,
     ) -> Result<(), anyhow::Error> {
-        let relation =
-            if persistent_storage { relation.with_zero_value_instance_ids() } else { relation };
         let mut dir_path = generate_storage_path(storage_subdir, &relation, instance_id);
         dir_path.push("hippos");
         let file_proxy = fuchsia_fs::directory::open_file(
@@ -1147,13 +1139,10 @@ pub mod capability_util {
 
     pub async fn confirm_storage_is_deleted_for_component(
         storage_subdir: Option<String>,
-        persistent_storage: bool,
-        relation: InstancedMoniker,
+        relation: Moniker,
         instance_id: Option<&InstanceId>,
         test_dir_proxy: &fio::DirectoryProxy,
     ) {
-        let relation =
-            if persistent_storage { relation.with_zero_value_instance_ids() } else { relation };
         let dir_path = generate_storage_path(storage_subdir, &relation, instance_id);
         let res = fuchsia_fs::directory::open_directory(
             &test_dir_proxy,

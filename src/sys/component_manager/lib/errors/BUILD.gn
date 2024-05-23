@@ -19,7 +19,6 @@ rustc_library("errors") {
     "//src/sys/component_manager/lib/serve_processargs",
     "//src/sys/lib/cm_config",
     "//src/sys/lib/cm_fidl_validator",
-    "//src/sys/lib/cm_moniker",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/component_id_index",

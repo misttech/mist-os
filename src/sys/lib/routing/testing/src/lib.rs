@@ -18,7 +18,6 @@ use {
         AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
         DebugCapabilityAllowlistEntry, DebugCapabilityKey,
     },
-    cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
     cm_types::Name,
@@ -131,7 +130,7 @@ pub enum CheckUse {
         path: cm_types::Path,
         // The moniker from the storage declaration to the use declaration. Only
         // used if `expected_res` is Ok.
-        storage_relation: Option<InstancedMoniker>,
+        storage_relation: Option<Moniker>,
         // The backing directory for this storage is in component manager's namespace, not the
         // test's isolated test directory.
         from_cm_namespace: bool,
@@ -140,7 +139,7 @@ pub enum CheckUse {
     },
     StorageAdmin {
         // The moniker from the storage declaration to the use declaration.
-        storage_relation: InstancedMoniker,
+        storage_relation: Moniker,
         // The backing directory for this storage is in component manager's namespace, not the
         // test's isolated test directory.
         from_cm_namespace: bool,
@@ -169,7 +168,7 @@ impl CheckUse {
 // This function should reproduce the logic of `crate::storage::generate_storage_path`.
 pub fn generate_storage_path(
     subdir: Option<String>,
-    moniker: &InstancedMoniker,
+    moniker: &Moniker,
     instance_id: Option<&InstanceId>,
 ) -> PathBuf {
     if let Some(id) = instance_id {
@@ -181,19 +180,17 @@ pub fn generate_storage_path(
         dir_path.push(subdir);
     }
     if let Some(p) = path.next() {
-        dir_path.push(p.to_string());
+        dir_path.push(format!("{p}:0"));
     }
     while let Some(p) = path.next() {
         dir_path.push("children".to_string());
-        dir_path.push(p.to_string());
+        dir_path.push(format!("{p}:0"));
     }
 
     // Storage capabilities used to have a hardcoded set of types, which would be appended
     // here. To maintain compatibility with the old paths (and thus not lose data when this was
     // migrated) we append "data" here. This works because this is the only type of storage
     // that was actually used in the wild.
-    //
-    // This is only temporary, until the storage instance id migration changes this layout.
     dir_path.push("data".to_string());
     dir_path.into_iter().collect()
 }

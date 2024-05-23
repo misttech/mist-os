@@ -6,7 +6,6 @@ mod tests {
     use {
         crate::routing::RoutingTestBuilderForAnalyzer,
         cm_fidl_analyzer::route::VerifyRouteResult,
-        cm_moniker::InstancedMoniker,
         cm_rust::{CapabilityDecl, CapabilityTypeName, OfferSource, StorageDirectorySource},
         cm_rust_testing::*,
         component_id_index::InstanceId,
@@ -210,7 +209,7 @@ mod tests {
                 Moniker::parse_str("consumer").unwrap(),
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(InstancedMoniker::try_from(vec!["consumer:0"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(vec!["consumer"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
