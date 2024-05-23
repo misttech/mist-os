@@ -11,14 +11,13 @@
 
 #include <fbl/intrusive_hash_table.h>
 #include <ktl/array.h>
+#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
 
-// clang-format off
-#include <linux/resource.h>
 #include <linux/fs.h>
 #include <linux/mqueue.h>
-// clang-format on
+#include <linux/resource.h>
 
 namespace starnix_uapi {
 
@@ -170,8 +169,21 @@ class ResourceLimits {
       ZX_ASSERT(ac.check());
       hashable->key_ = resouce;
       hashable->value_ = limit;
-      values_.insert(std::move(hashable));
+      values_.insert(ktl::move(hashable));
     }
+  }
+
+  ResourceLimits& operator=(const ResourceLimits& other) {
+    // Manually insert each element from the original to the copy
+    for (const auto& pair : other.values_) {
+      fbl::AllocChecker ac;
+      ktl::unique_ptr<Hashable> hashable(new (&ac) Hashable{});
+      ZX_ASSERT(ac.check());
+      hashable->key_ = pair.key_;
+      hashable->value_ = pair.value_;
+      values_.insert_or_replace(ktl::move(hashable));
+    }
+    return *this;
   }
 
   rlimit get(Resource resource) const {
