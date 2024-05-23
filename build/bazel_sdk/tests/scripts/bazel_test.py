@@ -109,14 +109,14 @@ def _run_command(
       a subprocess.CompletedProcess value.
     """
     args = [str(a) for a in cmd_args]
-
     if _VERBOSE:
         print("RUN_COMMAND: %s" % _generate_command_string(args, **kwargs))
 
     ret = subprocess.run(args, **kwargs)
+
     if ret.returncode != 0 and check_failure:
         print(
-            "FAILED COMMAND: %s" + _generate_command_string(args, **kwargs),
+            "FAILED COMMAND: %s" % _generate_command_string(args, **kwargs),
             file=sys.stderr,
         )
         if ret.stderr:
@@ -444,6 +444,11 @@ def main() -> int:
         "--clean", action="store_true", help="Force clean build."
     )
     parser.add_argument(
+        "--command",
+        default="test",
+        help="Override bazel command, default is 'test'. Use -- to pass extra arguments.",
+    )
+    parser.add_argument(
         "--test_target",
         default="//:tests",
         help="Which target to invoke with `bazel test` (default is '//:tests')",
@@ -668,9 +673,30 @@ def main() -> int:
         "prebuilt_clang", clang_version_file
     )
 
+    # These argument remove verbose output from Bazel, used in queries.
+    bazel_quiet_args = [
+        "--noshow_loading_progress",
+        "--noshow_progress",
+        "--ui_event_filters=-info",
+    ]
+
+    # The list of command-line options that appear between the 'bazel' binary path
+    # and the bazel command (such as "test", "query", or "build").
+    bazel_startup_args = [str(bazel)]
+
+    # The list of command-line options that appear after the bazel command, and
+    # are shared by all commands.
+    bazel_common_args = []
+
+    # The list of command-line options that are only used for commands that perform
+    # analysis (e.g. "cquery", "aquery", "build", "run" and "test", but not "query")
+    bazel_config_args = []
+
+    # Command line arguments for the 'test' command only.
+    bazel_test_args = []
+
     # These options must appear before the Bazel command
-    bazel_startup_args = [
-        str(bazel),
+    bazel_startup_args += [
         # Disable parsing of $HOME/.bazelrc to avoid unwanted side-effects.
         "--nohome_rc",
     ]
@@ -696,7 +722,7 @@ def main() -> int:
         # Get output base from Bazel directly.
         output_base = Path(
             _get_command_output_lines(
-                [bazel, "info", "output_base"], cwd=workspace_dir
+                bazel_startup_args + ["info", "output_base"], cwd=workspace_dir
             )[0]
         )
 
@@ -706,8 +732,7 @@ def main() -> int:
         output_base=output_base,
     )
 
-    # These options must appear after the Bazel command.
-    bazel_common_args = [
+    bazel_common_args += [
         # Prevent all downloads through a downloader configuration file.
         # Note that --experimental_repository_disable_download does not
         # seem to work at all.
@@ -730,15 +755,8 @@ def main() -> int:
     # will use the Fuchsia checkout's versions of these external dependencies.
     bazel_common_args += bazel_repo_map.get_repository_overrides_flags()
 
-    # These argument remove verbose output from Bazel, used in queries.
-    bazel_quiet_args = [
-        "--noshow_loading_progress",
-        "--noshow_progress",
-        "--ui_event_filters=-info",
-    ]
-
     # These options must appear for commands that act on the configure graph (i.e. all except `bazel query`
-    bazel_config_args = bazel_common_args + [
+    bazel_config_args += [
         # TODO: b/321637402 - Enable platform-based toolchain resolution in
         # these tests.
         "--incompatible_enable_cc_toolchain_resolution=false",
@@ -765,10 +783,10 @@ def main() -> int:
 
     # Forward additional --config's, intended for `bazel test`.
     # These configs should not affect the build graph.
-    bazel_test_args = [
+    bazel_config_args += [
         f"--config={cfg}" for cfg in _flatten_comma_list(args.bazel_config)
     ]
-    bazel_test_args += [
+    bazel_config_args += [
         # In case of build or test errors, provide more details about the failed
         # command. See https://fxbug.dev/325346878
         "--verbose_failures",
@@ -792,18 +810,18 @@ def main() -> int:
         ("resultstore_infra", "BAZEL_resultstore_socket_path", "--bes_proxy"),
         ("remote", "BAZEL_rbe_socket_path", "--remote_proxy"),
     ):
-        if f"--config={config_arg}" in bazel_test_args:
+        if f"--config={config_arg}" in bazel_config_args:
             env_value = os.environ.get(env_var)
             if env_value:
-                bazel_test_args += [f"{bazel_flag}=unix://{env_value}"]
+                bazel_config_args += [f"{bazel_flag}=unix://{env_value}"]
 
-    bazel_test_args += build_metadata_flags()
+    bazel_config_args += build_metadata_flags()
 
     if args.bazel_build_events_log_json:
         args.bazel_build_events_log_json.parent.mkdir(
             parents=True, exist_ok=True
         )
-        bazel_test_args += [
+        bazel_config_args += [
             "--build_event_json_file=%s"
             % args.bazel_build_events_log_json.resolve()
         ]
@@ -813,7 +831,7 @@ def main() -> int:
     # Same as --config=exec_log from template.bazelrc
     if args.bazel_exec_log_compact:
         args.bazel_exec_log_compact.parent.mkdir(parents=True, exist_ok=True)
-        bazel_test_args += [
+        bazel_config_args += [
             "--experimental_execution_log_compact_file=%s"
             % args.bazel_exec_log_compact.resolve(),
             "--remote_build_event_upload=all",
@@ -822,7 +840,9 @@ def main() -> int:
     if args.clean:
         # Perform clean build
         ret = _run_command(
-            bazel_startup_args + ["clean", "--expunge"], cwd=workspace_dir
+            bazel_startup_args + ["clean", "--expunge"],
+            check_failure=False,
+            cwd=workspace_dir,
         )
         if ret.returncode != 0:
             return _print_error(
@@ -872,33 +892,32 @@ def main() -> int:
 
     query_target = f"set({args.test_target})"
 
-    test_command = (
-        bazel_startup_args
-        + ["test"]
-        + bazel_config_args
-        + bazel_test_args
-        + [args.test_target]
-        + extra_args
-    )
-    ret = _run_command(
-        test_command,
-        env=os.environ | bazel_env,
-        cwd=workspace_dir,
-    )
+    command_kwargs = {"env": os.environ | bazel_env, "cwd": workspace_dir}
+
+    command_args = []
+
+    if args.command == "info":
+        command_args = bazel_start_args + ["info"] + extra_args
+
+    elif args.command == "query":
+        command_args = (
+            bazel_startup_args + ["query"] + bazel_common_args + extra_args
+        )
+    else:
+        command_args = (
+            bazel_startup_args
+            + [args.command]
+            + bazel_common_args
+            + bazel_config_args
+            + bazel_test_args
+            + ([args.test_target] if args.command == "test" else [])
+            + extra_args
+        )
 
     # If the test failed, exit early with a non-zero error code, (but don't
     # raise an exception, because the stack trace printed by that will just be
     # noise in the failure output.
-    if ret.returncode != 0:
-        print(
-            "command: "
-            + _generate_command_string(
-                test_command, env=bazel_env, cwd=workspace_dir
-            ),
-            file=sys.stderr,
-        )
-        print(f"from working dir: {workspace_dir}")
-        return ret.returncode
+    _run_command(command_args, check_failure=True, **command_kwargs)
 
     if args.stamp_file:
         with open(args.stamp_file, "w") as f:
