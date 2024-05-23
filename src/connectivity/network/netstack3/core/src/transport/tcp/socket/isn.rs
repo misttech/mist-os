@@ -6,7 +6,7 @@
 
 use core::hash::{Hash, Hasher};
 
-use rand::RngCore;
+use rand::Rng;
 use siphasher::sip128::SipHasher24;
 
 use crate::{transport::tcp::seqnum::SeqNum, Instant};
@@ -26,9 +26,9 @@ pub struct IsnGenerator<Instant> {
 }
 
 impl<I: Instant> IsnGenerator<I> {
-    pub(crate) fn new(now: I, rng: &mut impl RngCore) -> Self {
+    pub(crate) fn new(now: I, rng: &mut impl Rng) -> Self {
         let mut secret = [0; 16];
-        rng.fill_bytes(&mut secret);
+        rng.fill(&mut secret[..]);
         Self { secret, timestamp: now }
     }
 

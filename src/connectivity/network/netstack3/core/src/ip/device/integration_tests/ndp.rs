@@ -37,7 +37,7 @@ use packet_formats::{
     testutil::{parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame},
     utils::NonZeroDuration,
 };
-use rand::RngCore;
+use rand::Rng;
 use tracing::trace;
 use zerocopy::ByteSlice;
 
@@ -1695,7 +1695,7 @@ fn single_static_and_temporary<
 /// Enables temporary addressing with the provided parameters.
 ///
 /// `rng` is used to initialize the key that is used to generate new addresses.
-fn enable_temporary_addresses<R: RngCore>(
+fn enable_temporary_addresses<R: Rng>(
     config: &mut SlaacConfiguration,
     mut rng: R,
     max_valid_lifetime: NonZeroDuration,
@@ -1884,7 +1884,7 @@ fn test_host_generate_temporary_slaac_address(
         [],
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
-        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().next_u64()),
+        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().gen()),
         &slaac_config.temporary_address_configuration.unwrap().secret_key,
     );
     let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3082,7 +3082,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
         [],
         // Clone the RNG so we can see what the next value (which will be
         // used to generate the temporary address) will be.
-        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().next_u64()),
+        OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().gen()),
         &secret_key,
     );
     let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];

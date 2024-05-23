@@ -8,7 +8,7 @@ use core::fmt::{self, Debug};
 
 use hmac::Mac as _;
 use net_types::ip::{Ipv6Addr, Subnet};
-use rand::RngCore;
+use rand::Rng;
 
 /// The length in bytes of the `secret_key` argument to
 /// [`generate_opaque_interface_identifier`].
@@ -24,9 +24,9 @@ impl StableIidSecret {
     pub const ALL_ONES: Self = Self([1u8; STABLE_IID_SECRET_KEY_BYTES]);
 
     /// Creates a new random secret with the provided `rng`.
-    pub fn new_random<R: RngCore>(rng: &mut R) -> Self {
+    pub fn new_random<R: Rng>(rng: &mut R) -> Self {
         let mut bytes = [0u8; STABLE_IID_SECRET_KEY_BYTES];
-        rng.fill_bytes(&mut bytes);
+        rng.fill(&mut bytes[..]);
         Self(bytes)
     }
 }

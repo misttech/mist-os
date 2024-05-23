@@ -9,7 +9,7 @@
 
 use core::{hash::Hash, marker::PhantomData, ops::RangeInclusive};
 
-use rand::RngCore;
+use rand::Rng;
 
 /// A port number.
 // NB: `PortNumber` could be a trait, but given the expected use of the
@@ -42,7 +42,7 @@ pub trait PortAllocImpl {
     type PortAvailableArg;
 
     /// Returns a random ephemeral port in `EPHEMERAL_RANGE`
-    fn rand_ephemeral<R: RngCore>(rng: &mut R) -> EphemeralPort<Self> {
+    fn rand_ephemeral<R: Rng>(rng: &mut R) -> EphemeralPort<Self> {
         EphemeralPort::new_random(rng)
     }
 
@@ -76,9 +76,8 @@ pub struct EphemeralPort<I: PortAllocImpl + ?Sized> {
 
 impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
     /// Creates a new `EphemeralPort` with a port chosen randomly in `range`.
-    pub fn new_random<R: RngCore>(rng: &mut R) -> Self {
-        let num_ephemeral = u32::from(I::EPHEMERAL_RANGE.end() - I::EPHEMERAL_RANGE.start()) + 1;
-        let port = I::EPHEMERAL_RANGE.start() + ((rng.next_u32() % num_ephemeral) as PortNumber);
+    pub fn new_random<R: Rng>(rng: &mut R) -> Self {
+        let port = rng.gen_range(I::EPHEMERAL_RANGE);
         Self { port, _marker: PhantomData }
     }
 
@@ -101,7 +100,7 @@ impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
 /// Implements the [algorithm 1] as described in RFC 6056.
 ///
 /// [algorithm 1]: https://datatracker.ietf.org/doc/html/rfc6056#section-3.3.1
-pub fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: RngCore>(
+pub fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: Rng>(
     rng: &mut R,
     id: &I::Id,
     state: &I,

@@ -23,7 +23,7 @@ use packet_formats::{
     icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
     utils::NonZeroDuration,
 };
-use rand::RngCore;
+use rand::Rng;
 
 use crate::{
     counters::Counter,
@@ -185,7 +185,7 @@ pub(crate) struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBi
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<I, D, BT> {
-    pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
+    pub(crate) fn new(now: BT::Instant, rng: &mut impl Rng) -> Self {
         Self {
             isn_generator: IsnGenerator::new(now, rng),
             sockets: Sockets::new(),

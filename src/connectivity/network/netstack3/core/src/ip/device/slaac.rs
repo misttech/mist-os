@@ -18,7 +18,7 @@ use net_types::{
     Witness as _,
 };
 use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
-use rand::{distributions::Uniform, Rng as _, RngCore};
+use rand::{distributions::Uniform, Rng};
 use tracing::{debug, error, trace};
 
 use crate::{
@@ -1085,7 +1085,7 @@ fn regen_advance(
 /// DESYNC_FACTOR exists that is greater than or equal to 0.
 ///
 /// [RFC 8981 Section 3.8]: http://tools.ietf.org/html/rfc8981#section-3.8
-fn desync_factor<R: RngCore>(
+fn desync_factor<R: Rng>(
     rng: &mut R,
     temp_preferred_lifetime: NonZeroDuration,
     regen_advance: NonZeroDuration,
@@ -1435,7 +1435,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                 }
             };
 
-            let per_attempt_random_seed = bindings_ctx.rng().next_u64();
+            let per_attempt_random_seed: u64 = bindings_ctx.rng().gen();
 
             // Per RFC 8981 Section 3.4.4:
             //    When creating a temporary address, DESYNC_FACTOR MUST be computed
@@ -2564,8 +2564,7 @@ mod tests {
                           creation_time,
                           config_greater_than_ra_desync_factor_offset| {
             let valid_until = creation_time + Duration::from_secs(expected_vl_addr.into());
-            let addr_sub =
-                generate_global_temporary_address(&SUBNET, &IID, rng.next_u64(), &SECRET_KEY);
+            let addr_sub = generate_global_temporary_address(&SUBNET, &IID, rng.gen(), &SECRET_KEY);
             let desync_factor =
                 desync_factor(rng, NonZeroDuration::new(pl_config).unwrap(), regen_advance)
                     .unwrap();
