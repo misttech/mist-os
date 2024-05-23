@@ -2,37 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fault_test.h"
+#ifndef SRC_STARNIX_TESTS_SYSCALLS_CPP_FAULT_TEST_SUITE_H_
+#define SRC_STARNIX_TESTS_SYSCALLS_CPP_FAULT_TEST_SUITE_H_
 
 #include <fcntl.h>
 #include <sys/uio.h>
 
 #include <gtest/gtest.h>
 
-void* FaultTest::faulting_ptr_ = nullptr;
-
-void FaultTest::SetUpTestSuite() {
-  faulting_ptr_ = mmap(nullptr, kFaultingSize_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(faulting_ptr_, MAP_FAILED);
-}
-
-void FaultTest::TearDownTestSuite() {
-  faulting_ptr_ = mmap(nullptr, kFaultingSize_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(faulting_ptr_, MAP_FAILED);
-}
-
-void FaultFileTest::SetUp() {
-  auto f = GetParam();
-  ASSERT_TRUE(fd_ = fbl::unique_fd(f())) << strerror(errno);
-}
-
-void FaultFileTest::TearDown() { fd_.reset(); }
-
-void FaultFileTest::SetFdNonBlocking() {
-  int flags = fcntl(fd().get(), F_GETFL, 0);
-  ASSERT_GE(flags, 0) << strerror(errno);
-  ASSERT_EQ(fcntl(fd().get(), F_SETFL, flags | O_NONBLOCK), 0) << strerror(errno);
-}
+#include "fault_test.h"
 
 TEST_P(FaultFileTest, Write) {
   ASSERT_EQ(write(fd().get(), faulting_ptr_, kFaultingSize_), -1);
@@ -121,3 +99,5 @@ TEST_P(FaultFileTest, WriteV) {
   char recv_buf[sizeof(write_buf)];
   EXPECT_EQ(read(fd().get(), recv_buf, sizeof(recv_buf)), 0);
 }
+
+#endif  // SRC_STARNIX_TESTS_SYSCALLS_CPP_FAULT_TEST_SUITE_H_
