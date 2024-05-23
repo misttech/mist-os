@@ -797,7 +797,10 @@ async def _console_event_loop(
                             f"Default flags loaded from {load_config.path}:",
                             style=flags.style,
                         ),
-                        statusinfo.dim(f"{str(load_config.command_line)}\n"),
+                        statusinfo.dim(
+                            f"{str(load_config.command_line)}\n",
+                            style=flags.style,
+                        ),
                     ]
                 )
 
