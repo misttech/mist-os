@@ -2,6 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetAddr;
+use anyhow::{anyhow, bail, Result};
+use manual_targets::watcher::{ManualTargetEvent, ManualTargetState};
+use std::fmt;
+use std::fmt::Display;
+use usb_fastboot_discovery::FastbootEvent;
+// TODO(colnnelson): Long term it would be nice to have this be pulled into the mDNS library
+// so that it can speak our language. Or even have the mdns library not export FIDL structs
+// but rather some other well-defined type
+use fidl_fuchsia_developer_ffx as ffx;
+
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum FastbootConnectionState {
@@ -77,7 +88,9 @@ pub enum TargetEvent {
     Removed(TargetHandle),
 }
 
-fn target_event_from_mdns_event(event: ffx::MdnsEventType) -> Option<Result<TargetEvent>> {
+pub(crate) fn target_event_from_mdns_event(
+    event: ffx::MdnsEventType,
+) -> Option<Result<TargetEvent>> {
     match event {
         ffx::MdnsEventType::SocketBound(_) => {
             // Unsupported
@@ -220,5 +233,322 @@ impl From<ManualTargetEvent> for TargetEvent {
                 TargetEvent::Removed(handle)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use addr::TargetAddr;
+    use manual_targets::watcher::ManualTarget;
+    use pretty_assertions::assert_eq;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
+    use std::str::FromStr;
+
+    #[test]
+    fn test_from_fastbootevent_for_targetevent() -> Result<()> {
+        {
+            let f = FastbootEvent::Lost("1234".to_string());
+            let t = TargetEvent::from(f);
+            assert_eq!(
+                t,
+                TargetEvent::Removed(TargetHandle {
+                    node_name: Some("".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "1234".to_string(),
+                        connection_state: FastbootConnectionState::Usb,
+                    }),
+                })
+            );
+        }
+
+        {
+            let f = FastbootEvent::Discovered("1234".to_string());
+            let t = TargetEvent::from(f);
+            assert_eq!(
+                t,
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "1234".to_string(),
+                        connection_state: FastbootConnectionState::Usb,
+                    }),
+                })
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_from_targetinfo_for_targethandle() -> Result<()> {
+        {
+            let info: ffx::TargetInfo = Default::default();
+            assert!(TargetHandle::try_from(info).is_err());
+        }
+        {
+            let info = ffx::TargetInfo { nodename: Some("foo".to_string()), ..Default::default() };
+            assert!(TargetHandle::try_from(info).is_err());
+        }
+        {
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(TargetHandle::try_from(info).is_err());
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            assert_eq!(
+                TargetHandle::try_from(info)?,
+                TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(vec![addr])
+                }
+            );
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                fastboot_interface: Some(ffx::FastbootInterface::Udp),
+                ..Default::default()
+            };
+            assert_eq!(
+                TargetHandle::try_from(info)?,
+                TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "".to_string(),
+                        connection_state: FastbootConnectionState::Udp(vec![addr])
+                    })
+                }
+            );
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                fastboot_interface: Some(ffx::FastbootInterface::Tcp),
+                ..Default::default()
+            };
+            assert_eq!(
+                TargetHandle::try_from(info)?,
+                TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "".to_string(),
+                        connection_state: FastbootConnectionState::Tcp(vec![addr])
+                    })
+                }
+            );
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                fastboot_interface: Some(ffx::FastbootInterface::Usb),
+                ..Default::default()
+            };
+            assert_eq!(
+                TargetHandle::try_from(info)?,
+                TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "".to_string(),
+                        connection_state: FastbootConnectionState::Usb
+                    })
+                }
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_mdnseventtype_for_targetevent() -> Result<()> {
+        {
+            //SocketBound is not supported
+            let mdns_event = ffx::MdnsEventType::SocketBound(Default::default());
+            assert!(TargetEvent::try_from(mdns_event).is_err());
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let mdns_event = ffx::MdnsEventType::TargetFound(info);
+            assert_eq!(
+                TargetEvent::try_from(mdns_event)?,
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(vec![addr])
+                })
+            );
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let mdns_event = ffx::MdnsEventType::TargetRediscovered(info);
+            assert_eq!(
+                TargetEvent::try_from(mdns_event)?,
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(vec![addr])
+                })
+            );
+        }
+        {
+            let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let addr = TargetAddr::from(socket);
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let mdns_event = ffx::MdnsEventType::TargetExpired(info);
+            assert_eq!(
+                TargetEvent::try_from(mdns_event)?,
+                TargetEvent::Removed(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(vec![addr])
+                })
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_emulatoreventtype_for_targetevent() -> Result<()> {
+        let addr = TargetAddr::from_str("127.0.0.1:8080")?;
+        {
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let emulator_event = emulator_instance::EmulatorTargetAction::Add(info);
+            assert_eq!(
+                TargetEvent::try_from(emulator_event)?,
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(vec![addr])
+                })
+            );
+        }
+        {
+            let addr_info: ffx::TargetAddrInfo = addr.into();
+            let info = ffx::TargetInfo {
+                nodename: Some("foo".to_string()),
+                addresses: Some(vec![addr_info]),
+                ..Default::default()
+            };
+            let emulator_event = emulator_instance::EmulatorTargetAction::Remove(info);
+            assert_eq!(
+                TargetEvent::try_from(emulator_event)?,
+                TargetEvent::Removed(TargetHandle {
+                    node_name: Some("foo".to_string()),
+                    state: TargetState::Product(vec![addr])
+                })
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_manual_target_event_for_target_event() -> Result<()> {
+        {
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Discovered(
+                ManualTarget::new(addr, lifetime),
+                ManualTargetState::Product,
+            );
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("127.0.0.1:8080".to_string()),
+                    state: TargetState::Product(vec![addr.into()]),
+                })
+            );
+        }
+        {
+            let addr = SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+                8023,
+                0,
+                0,
+            ));
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Discovered(
+                ManualTarget::new(addr, lifetime),
+                ManualTargetState::Product,
+            );
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("[::1]:8023".to_string()),
+                    state: TargetState::Product(vec![addr.into()]),
+                })
+            );
+        }
+        {
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Discovered(
+                ManualTarget::new(addr, lifetime),
+                ManualTargetState::Fastboot,
+            );
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Added(TargetHandle {
+                    node_name: Some("127.0.0.1:8080".to_string()),
+                    state: TargetState::Fastboot(FastbootTargetState {
+                        serial_number: "".to_string(),
+                        connection_state: FastbootConnectionState::Tcp(vec![addr.into()])
+                    }),
+                })
+            );
+        }
+        {
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            let lifetime = None;
+            let manual_target_event = ManualTargetEvent::Lost(ManualTarget::new(addr, lifetime));
+            assert_eq!(
+                TargetEvent::from(manual_target_event),
+                TargetEvent::Removed(TargetHandle {
+                    node_name: Some("127.0.0.1:8080".to_string()),
+                    state: TargetState::Unknown,
+                })
+            );
+        }
+        Ok(())
     }
 }

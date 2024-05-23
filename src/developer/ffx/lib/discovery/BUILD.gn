@@ -37,6 +37,7 @@ if (is_host) {
 
     sources = [
       "src/emulator_watcher.rs",
+      "src/events.rs",
       "src/lib.rs",
     ]
   }
