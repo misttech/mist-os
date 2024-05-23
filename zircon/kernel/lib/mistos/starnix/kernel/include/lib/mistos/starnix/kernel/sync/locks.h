@@ -7,6 +7,7 @@
 
 #include <zircon/compiler.h>
 
+#include <fbl/ref_counted.h>
 #include <kernel/brwlock.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
@@ -17,7 +18,7 @@ template <typename Data>
 class MutexGuard;
 
 template <typename Data>
-class StarnixMutex {
+class StarnixMutex : public fbl::RefCounted<StarnixMutex<Data>> {
  public:
   StarnixMutex() = default;
   explicit StarnixMutex(Data&& data) : data_(data) {}
