@@ -76,10 +76,12 @@ fn calculate_5g_bonus(rssi: i16) -> i16 {
     max(MAX_5G_PREFERENCE_BOOST - max(RSSI_CUTOFF_5G_PREFERENCE - rssi, 0) * 2, 0)
 }
 
-pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
-    let ewma_rssi_velocity = data.ewma_rssi_velocity.get();
+pub fn score_current_connection_signal_data(
+    data: EwmaSignalData,
+    rssi_velocity: impl Into<f64> + std::cmp::PartialOrd<f64>,
+) -> u8 {
     let rssi_velocity_score = match data.ewma_rssi.get() {
-        r if r <= -81.0 => match ewma_rssi_velocity {
+        r if r <= -81.0 => match rssi_velocity {
             v if v < -2.7 => 0,
             v if v < -1.8 => 0,
             v if v < -0.9 => 0,
@@ -88,7 +90,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 18,
             _ => 10,
         },
-        r if r <= -76.0 => match ewma_rssi_velocity {
+        r if r <= -76.0 => match rssi_velocity {
             v if v < -2.7 => 0,
             v if v < -1.8 => 0,
             v if v < -0.9 => 0,
@@ -97,7 +99,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 25,
             _ => 15,
         },
-        r if r <= -71.0 => match ewma_rssi_velocity {
+        r if r <= -71.0 => match rssi_velocity {
             v if v < -2.7 => 0,
             v if v < -1.8 => 5,
             v if v < -0.9 => 15,
@@ -106,7 +108,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 38,
             _ => 4,
         },
-        r if r <= -66.0 => match ewma_rssi_velocity {
+        r if r <= -66.0 => match rssi_velocity {
             v if v < -2.7 => 10,
             v if v < -1.8 => 18,
             v if v < -0.9 => 30,
@@ -115,7 +117,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 50,
             _ => 38,
         },
-        r if r <= -61.0 => match ewma_rssi_velocity {
+        r if r <= -61.0 => match rssi_velocity {
             v if v < -2.7 => 20,
             v if v < -1.8 => 30,
             v if v < -0.9 => 45,
@@ -124,7 +126,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 60,
             _ => 55,
         },
-        r if r <= -56.0 => match ewma_rssi_velocity {
+        r if r <= -56.0 => match rssi_velocity {
             v if v < -2.7 => 40,
             v if v < -1.8 => 50,
             v if v < -0.9 => 63,
@@ -133,7 +135,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 70,
             _ => 65,
         },
-        r if r <= -51.0 => match ewma_rssi_velocity {
+        r if r <= -51.0 => match rssi_velocity {
             v if v < -2.7 => 55,
             v if v < -1.8 => 65,
             v if v < -0.9 => 75,
@@ -142,7 +144,7 @@ pub fn score_current_connection_signal_data(data: EwmaSignalData) -> u8 {
             v if v <= 2.7 => 80,
             _ => 75,
         },
-        _ => match ewma_rssi_velocity {
+        _ => match rssi_velocity {
             v if v < -2.7 => 60,
             v if v < -1.8 => 70,
             v if v < -0.9 => 80,
@@ -173,7 +175,6 @@ mod test {
     use {
         super::*,
         crate::{
-            client::connection_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
             config_management::{ConnectFailure, FailureReason, PastConnectionData},
             util::testing::{
                 generate_channel, generate_random_bss, generate_random_saved_network_data,
@@ -367,85 +368,66 @@ mod test {
     // any scoring algorithm implementation.
     #[fuchsia::test]
     fn high_rssi_scores_higher_than_low_rssi() {
-        let strong_clear_signal = EwmaSignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let weak_clear_signal = EwmaSignalData::new(-85, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let strong_clear_signal = EwmaSignalData::new(-50, 35, 10);
+        let weak_clear_signal = EwmaSignalData::new(-85, 35, 10);
         assert_gt!(
-            score_current_connection_signal_data(strong_clear_signal),
-            score_current_connection_signal_data(weak_clear_signal)
+            score_current_connection_signal_data(strong_clear_signal, 0.0),
+            score_current_connection_signal_data(weak_clear_signal, 0.0)
         );
 
-        let strong_noisy_signal = EwmaSignalData::new(-50, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let weak_noisy_signal = EwmaSignalData::new(-85, 55, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let strong_noisy_signal = EwmaSignalData::new(-50, 5, 10);
+        let weak_noisy_signal = EwmaSignalData::new(-85, 55, 10);
         assert_gt!(
-            score_current_connection_signal_data(strong_noisy_signal),
-            score_current_connection_signal_data(weak_noisy_signal)
+            score_current_connection_signal_data(strong_noisy_signal, 0.0),
+            score_current_connection_signal_data(weak_noisy_signal, 0.0)
         );
     }
 
     #[fuchsia::test]
     fn high_snr_scores_higher_than_low_snr() {
-        let strong_clear_signal = EwmaSignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let strong_noisy_signal = EwmaSignalData::new(-50, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let strong_clear_signal = EwmaSignalData::new(-50, 35, 10);
+        let strong_noisy_signal = EwmaSignalData::new(-50, 5, 10);
         assert_gt!(
-            score_current_connection_signal_data(strong_clear_signal),
-            score_current_connection_signal_data(strong_noisy_signal)
+            score_current_connection_signal_data(strong_clear_signal, 0.0),
+            score_current_connection_signal_data(strong_noisy_signal, 0.0)
         );
 
-        let weak_clear_signal = EwmaSignalData::new(-85, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let weak_noisy_signal = EwmaSignalData::new(-85, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
+        let weak_clear_signal = EwmaSignalData::new(-85, 35, 10);
+        let weak_noisy_signal = EwmaSignalData::new(-85, 5, 10);
         assert_gt!(
-            score_current_connection_signal_data(weak_clear_signal),
-            score_current_connection_signal_data(weak_noisy_signal)
+            score_current_connection_signal_data(weak_clear_signal, 0.0),
+            score_current_connection_signal_data(weak_noisy_signal, 0.0)
         );
     }
 
     #[fuchsia::test]
     fn positive_velocity_scores_higher_than_negative_velocity() {
-        let mut improving_signal = EwmaSignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3.0);
-        let mut degrading_signal = EwmaSignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        degrading_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3.0);
+        let signal = EwmaSignalData::new(-50, 35, 10);
         assert_gt!(
-            score_current_connection_signal_data(improving_signal),
-            score_current_connection_signal_data(degrading_signal)
+            score_current_connection_signal_data(signal, 3.0),
+            score_current_connection_signal_data(signal, -3.0)
         );
     }
 
     #[fuchsia::test]
     fn stable_high_rssi_scores_higher_than_volatile_high_rssi() {
-        let strong_stable_signal = EwmaSignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        let mut strong_improving_signal = strong_stable_signal;
-        strong_improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3.0);
-
+        let strong_signal = EwmaSignalData::new(-50, 35, 10);
         assert_gt!(
-            score_current_connection_signal_data(strong_stable_signal),
-            score_current_connection_signal_data(strong_improving_signal)
+            score_current_connection_signal_data(strong_signal, 0.0),
+            score_current_connection_signal_data(strong_signal, 3.0)
         );
-
-        let mut strong_degrading_signal = strong_stable_signal;
-        strong_degrading_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3.0);
-
         assert_gt!(
-            score_current_connection_signal_data(strong_stable_signal),
-            score_current_connection_signal_data(strong_degrading_signal)
+            score_current_connection_signal_data(strong_signal, 0.0),
+            score_current_connection_signal_data(strong_signal, -3.0)
         );
     }
 
     #[fuchsia::test]
     fn improving_weak_rssi_scores_higher_than_stable_weak_rssi() {
-        let mut weak_improving_signal =
-            EwmaSignalData::new(-85, 10, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-        weak_improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3.0);
-        let weak_stable_signal = EwmaSignalData::new(-85, 10, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
-
+        let weak_signal = EwmaSignalData::new(-85, 10, 10);
         assert_gt!(
-            score_current_connection_signal_data(weak_improving_signal),
-            score_current_connection_signal_data(weak_stable_signal)
+            score_current_connection_signal_data(weak_signal, 3.0),
+            score_current_connection_signal_data(weak_signal, 0.0)
         );
     }
 

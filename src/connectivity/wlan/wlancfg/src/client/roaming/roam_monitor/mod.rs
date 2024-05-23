@@ -62,16 +62,19 @@ impl RoamMonitorApi for RoamMonitor {
         stats: fidl_internal::SignalReportIndication,
     ) -> Result<u8, anyhow::Error> {
         self.connection_data.signal_data.update_with_new_measurement(stats.rssi_dbm, stats.snr_db);
+        // Update velocity using the smoothed RSSI, to reduce noise.
+        self.connection_data.rssi_velocity.update(self.connection_data.signal_data.ewma_rssi.get());
 
         // Send RSSI and RSSI velocity metrics
         self.telemetry_sender.send(TelemetryEvent::OnSignalReport {
             ind: stats,
-            rssi_velocity: self.connection_data.signal_data.ewma_rssi_velocity.get(),
+            rssi_velocity: self.connection_data.rssi_velocity.get(),
         });
 
         // Evaluate current BSS, and determine if roaming future should be triggered.
         let (roam_reasons, bss_score) = check_signal_thresholds(
             self.connection_data.signal_data,
+            self.connection_data.rssi_velocity.get(),
             self.connection_data.currently_fulfilled_connection.target.bss.channel,
         );
         if !roam_reasons.is_empty() {
@@ -119,6 +122,7 @@ impl RoamMonitorApi for RoamMonitor {
 // Return roam reasons if the signal measurements fall below given thresholds.
 fn check_signal_thresholds(
     signal_data: EwmaSignalData,
+    rssi_velocity: impl Into<f64> + std::cmp::PartialOrd<f64>,
     channel: types::WlanChan,
 ) -> (Vec<RoamReason>, u8) {
     let mut roam_reasons = vec![];
@@ -134,7 +138,8 @@ fn check_signal_thresholds(
         roam_reasons.push(RoamReason::SnrBelowThreshold)
     }
 
-    let signal_score = scoring_functions::score_current_connection_signal_data(signal_data);
+    let signal_score =
+        scoring_functions::score_current_connection_signal_data(signal_data, rssi_velocity);
     return (roam_reasons, signal_score);
 }
 
@@ -143,8 +148,8 @@ mod test {
     use {
         super::*,
         crate::{
-            client::connection_selection::{EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR},
-            util::testing::generate_connect_selection,
+            client::connection_selection::EWMA_SMOOTHING_FACTOR,
+            util::{pseudo_energy::RssiVelocity, testing::generate_connect_selection},
         },
         fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async::TestExecutor,
@@ -159,8 +164,8 @@ mod test {
                 LOCAL_ROAM_THRESHOLD_RSSI_2G - 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_2G - 1.0,
                 EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
             ),
+            0.0,
             channel::Channel::new(11, channel::Cbw::Cbw20),
         );
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
@@ -171,8 +176,8 @@ mod test {
                 LOCAL_ROAM_THRESHOLD_RSSI_2G + 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_2G + 1.0,
                 EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
             ),
+            0.0,
             channel::Channel::new(11, channel::Cbw::Cbw20),
         );
         assert!(roam_reasons.is_empty());
@@ -185,8 +190,8 @@ mod test {
                 LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_5G - 1.0,
                 EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
             ),
+            0.0,
             channel::Channel::new(36, channel::Cbw::Cbw80),
         );
         assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
@@ -197,8 +202,8 @@ mod test {
                 LOCAL_ROAM_THRESHOLD_RSSI_5G + 1.0,
                 LOCAL_ROAM_THRESHOLD_SNR_5G + 1.0,
                 EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
             ),
+            0.0,
             channel::Channel::new(36, channel::Cbw::Cbw80),
         );
         assert!(roam_reasons.is_empty());
@@ -241,15 +246,11 @@ mod test {
         let init_rssi = -75;
         let init_snr = 15;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let mut signal_data = EwmaSignalData::new(
-            init_rssi,
-            init_snr,
-            EWMA_SMOOTHING_FACTOR,
-            EWMA_VELOCITY_SMOOTHING_FACTOR,
-        );
+        let mut signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
+            rssi_velocity: RssiVelocity::new(0.0),
             roam_decision_data: roam_data,
         };
 
@@ -297,16 +298,12 @@ mod test {
         let init_rssi = -70;
         let init_snr = 20;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let signal_data = EwmaSignalData::new(
-            init_rssi,
-            init_snr,
-            EWMA_SMOOTHING_FACTOR,
-            EWMA_VELOCITY_SMOOTHING_FACTOR,
-        );
+        let signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
 
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
+            rssi_velocity: RssiVelocity::new(0.0),
             roam_decision_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(
@@ -360,15 +357,11 @@ mod test {
         let init_rssi = -80;
         let init_snr = 10;
         let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
-        let signal_data = EwmaSignalData::new(
-            init_rssi,
-            init_snr,
-            EWMA_SMOOTHING_FACTOR,
-            EWMA_VELOCITY_SMOOTHING_FACTOR,
-        );
+        let signal_data = EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR);
         let connection_data = ConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
+            rssi_velocity: RssiVelocity::new(0.0),
             roam_decision_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(

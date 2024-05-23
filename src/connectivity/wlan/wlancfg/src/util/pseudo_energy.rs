@@ -36,6 +36,29 @@ impl EwmaPseudoDecibel {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EwmaSignalData {
+    pub ewma_rssi: EwmaPseudoDecibel,
+    pub ewma_snr: EwmaPseudoDecibel,
+}
+
+impl EwmaSignalData {
+    pub fn new(
+        initial_rssi: impl Into<f64>,
+        initial_snr: impl Into<f64>,
+        ewma_weight: usize,
+    ) -> Self {
+        Self {
+            ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
+            ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
+        }
+    }
+    pub fn update_with_new_measurement(&mut self, rssi: impl Into<f64>, snr: impl Into<f64>) {
+        self.ewma_rssi.update_average(rssi);
+        self.ewma_snr.update_average(snr);
+    }
+}
+
 /// Calculates the rate of change across a vector of dB measurements by determining
 /// the slope of the line of best fit using least squares regression. Return is technically
 /// dB(f64)/t where t is the unit of time used in the vector. Returns error if integer overflows.
@@ -80,43 +103,6 @@ fn calculate_raw_velocity(samples: Vec<f64>) -> Result<f64, Error> {
 
 // Struct for tracking the exponentially weighted moving average (EWMA) signal measurements.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct EwmaSignalData {
-    pub ewma_rssi: EwmaPseudoDecibel,
-    pub ewma_snr: EwmaPseudoDecibel,
-    pub ewma_rssi_velocity: EwmaPseudoDecibel,
-}
-
-impl EwmaSignalData {
-    pub fn new(
-        initial_rssi: impl Into<f64>,
-        initial_snr: impl Into<f64>,
-        ewma_weight: usize,
-        ewma_velocity_weight: usize,
-    ) -> Self {
-        Self {
-            ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
-            ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
-            ewma_rssi_velocity: EwmaPseudoDecibel::new(ewma_velocity_weight, 0.0),
-        }
-    }
-    pub fn update_with_new_measurement(&mut self, rssi: impl Into<f64>, snr: impl Into<f64>) {
-        let prev_rssi = self.ewma_rssi.get();
-        self.ewma_rssi.update_average(rssi);
-        self.ewma_snr.update_average(snr);
-
-        match calculate_raw_velocity(vec![prev_rssi, self.ewma_rssi.get()]) {
-            Ok(velocity) => {
-                self.ewma_rssi_velocity.update_average(velocity);
-            }
-            Err(e) => {
-                error!("Failed to calculate SignalData velocity: {:?}", e);
-            }
-        }
-    }
-}
-
-// Struct for tracking the rate-of-change of RSSI.
-#[derive(Clone, Copy, PartialEq)]
 pub struct RssiVelocity {
     curr_velocity: f64,
     prev_rssi: f64,
@@ -238,13 +224,12 @@ mod tests {
 
     #[fuchsia::test]
     fn test_update_with_new_measurements() {
-        let mut signal_data = EwmaSignalData::new(-40, 30, 10, 3);
+        let mut signal_data = EwmaSignalData::new(-40, 30, 10);
         signal_data.update_with_new_measurement(-60, 15);
         assert_lt!(signal_data.ewma_rssi.get(), -40.0);
         assert_gt!(signal_data.ewma_rssi.get(), -60.0);
         assert_lt!(signal_data.ewma_snr.get(), 30.0);
         assert_gt!(signal_data.ewma_snr.get(), 15.0);
-        assert_lt!(signal_data.ewma_rssi_velocity.get(), 0.0);
     }
 
     #[fuchsia::test]
