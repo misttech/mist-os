@@ -6,16 +6,14 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_CONTEXT_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_CONTEXT_H_
 
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/forward.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 
 #include <fbl/ref_ptr.h>
-#include <kernel/mutex.h>
 
 namespace starnix {
-
-using namespace starnix_uapi;
 
 // The mutable state for an FsContext.
 //
@@ -40,29 +38,35 @@ struct FsContextState {
 };
 
 class FsContext : public fbl::RefCounted<FsContext> {
+ private:
+  /// The mutable state for this FsContext.
+  mutable RwLock<FsContextState> state_;
+
  public:
+  /// impl FsContext
+
+  /// Create an FsContext for the given namespace.
+  ///
+  /// The root and cwd of the FsContext are initialized to the root of the
+  /// namespace.
   static fbl::RefPtr<FsContext> New(FileSystemHandle root);
 
   fbl::RefPtr<FsContext> fork() const;
 
-  // Returns a reference to the current working directory.
+  /// Returns a reference to the current working directory.
   NamespaceNode cwd() const;
 
-  // Returns the root.
+  /// Returns the root.
   NamespaceNode root() const;
 
   FileMode umask() const;
 
-  FileMode apply_umask(FileMode mode) const;
+  FileMode apply_umask(starnix_uapi::FileMode mode) const;
 
-  FileMode set_umask(FileMode mode) const;
+  FileMode set_umask(starnix_uapi::FileMode mode) const;
 
  private:
   FsContext(FsContextState state);
-
-  // The mutable state for this FsContext.
-  mutable DECLARE_MUTEX(FsContext) fs_state_rw_lock_;
-  FsContextState state_ TA_GUARDED(fs_state_rw_lock_);
 };
 
 }  // namespace starnix

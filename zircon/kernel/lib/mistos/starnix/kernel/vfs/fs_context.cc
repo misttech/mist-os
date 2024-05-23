@@ -19,35 +19,32 @@
 namespace starnix {
 
 NamespaceNode FsContext::cwd() const {
-  Guard<Mutex> lock(&fs_state_rw_lock_);
-  return state_.cwd;
+  auto state = state_.Read();
+  return state->cwd;
 }
 
 NamespaceNode FsContext::root() const {
-  Guard<Mutex> lock(&fs_state_rw_lock_);
-  return state_.root;
+  auto state = state_.Read();
+  return state->root;
 }
 
-FileMode FsContext::umask() const {
-  Guard<Mutex> lock(&fs_state_rw_lock_);
-  return state_.umask;
-}
+FileMode FsContext::umask() const { return state_.Read()->umask; }
 
 FileMode FsContext::apply_umask(FileMode mode) const {
-  Guard<Mutex> lock(&fs_state_rw_lock_);
-  return mode & !state_.umask;
+  auto umask = state_.Read()->umask;
+  return mode & !umask;
 }
 
 FileMode FsContext::set_umask(FileMode umask) const {
-  Guard<Mutex> lock(&fs_state_rw_lock_);
-  auto old_umask = state_.umask;
+  auto state = state_.Write();
+  auto old_umask = state->umask;
 
   // umask() sets the calling process's file mode creation mask
   // (umask) to mask & 0o777 (i.e., only the file permission bits of
   // mask are used), and returns the previous value of the mask.
   //
   // See <https://man7.org/linux/man-pages/man2/umask.2.html>
-  //state_.umask = umask & FileMode::from_bits(0777);
+  state->umask = umask & FileMode::from_bits(0777);
 
   return old_umask;
 }
@@ -58,13 +55,23 @@ fbl::RefPtr<FsContext> FsContext::New(FileSystemHandle root) {
 
   fbl::AllocChecker ac;
   auto handle =
-      fbl::AdoptRef(new (&ac) FsContext({ns, root_, std::move(root_), FileMode::DEFAULT_UMASK}));
+      fbl::AdoptRef(new (&ac) FsContext({ns, root_, ktl::move(root_), FileMode::DEFAULT_UMASK}));
   ZX_ASSERT(ac.check());
   return handle;
 }
 
-FsContext::FsContext(FsContextState state) : state_(std::move(state)) {}
+FsContext::FsContext(FsContextState state) : state_(ktl::move(state)) {}
 
-fbl::RefPtr<FsContext> FsContext::fork() const { return fbl::RefPtr<FsContext>(); }
+fbl::RefPtr<FsContext> FsContext::fork() const {
+  // A child process created via fork(2) inherits its parent's umask.
+  // The umask is left unchanged by execve(2).
+  //
+  // See <https://man7.org/linux/man-pages/man2/umask.2.html>
+
+  fbl::AllocChecker ac;
+  auto handle = fbl::AdoptRef(new (&ac) FsContext(*state_.Read()));
+  ZX_ASSERT(ac.check());
+  return handle;
+}
 
 }  // namespace starnix
