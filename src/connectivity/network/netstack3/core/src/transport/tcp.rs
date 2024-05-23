@@ -90,10 +90,10 @@ pub enum ConnectionError {
     TimedOut,
 }
 
-impl From<IcmpErrorCode> for Option<ConnectionError> {
+impl ConnectionError {
     // Notes: the following mappings are guided by the packetimpact test here:
     // https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go;drc=611e6e1247a0691f5fd198f411c68b3bc79d90af
-    fn from(err: IcmpErrorCode) -> Self {
+    fn try_from_icmp_error(err: IcmpErrorCode) -> Option<Self> {
         match err {
             IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code)) => match code {
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable => {

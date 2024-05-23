@@ -2823,7 +2823,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         err: IcmpErrorCode,
         seq: SeqNum,
     ) -> Option<ConnectionError> {
-        let err = Option::<ConnectionError>::from(err)?;
+        let err = ConnectionError::try_from_icmp_error(err)?;
         // We consider the following RFC quotes when implementing this function.
         // Per RFC 5927 Section 4.1:
         //  Many TCP implementations have incorporated a validation check such
