@@ -1374,7 +1374,6 @@ assembly_input_bundle("core_realm_development_access") {
           component_name = "core"
           shards = [
             "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
-            "//src/developer/meta/default-laboratory-env.core_shard.cml",
             "//src/developer/remote-control/meta/laboratory.core_shard.cml",
             "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
             "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
