@@ -142,9 +142,9 @@ enum class TaskStateCode {
 };
 
 class TaskPersistentInfoState;
-using TaskPersistentInfo = StarnixMutex<fbl::RefPtr<TaskPersistentInfoState>>;
+using TaskPersistentInfo = fbl::RefPtr<StarnixMutex<TaskPersistentInfoState>>;
 
-class TaskPersistentInfoState : public fbl::RefCounted<TaskPersistentInfoState> {
+class TaskPersistentInfoState {
  private:
   /// Immutable information about the task
   pid_t tid_;
@@ -271,7 +271,7 @@ class Task : public fbl::RefCountedUpgradeable<Task> {
   // which process a wait can target.
   // Contains the command line, the task credentials and the exit signal.
   // See `TaskPersistentInfo` for more information.
-  mutable TaskPersistentInfo persistent_info;
+  TaskPersistentInfo persistent_info;
 
   /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
   /// It allows the calling task to block until the fork has been completed. Only populated
@@ -317,7 +317,7 @@ class Task : public fbl::RefCountedUpgradeable<Task> {
     return files.add_with_flags(*this, file, flags);
   }
 
-  Credentials creds() const { return (*persistent_info.Lock())->creds(); }
+  Credentials creds() const { return (persistent_info->Lock())->creds(); }
 
   /*
     pub fn exit_signal(&self) -> Option<Signal> {
@@ -368,15 +368,14 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
   }
 
   // WAVL-tree Index
-  uint GetKey() const { return (*info_.Lock())->tid(); }
+  uint GetKey() const { return (info_->Lock())->tid(); }
 
  private:
-  TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info) : weak_(ktl::move(weak)) {
-    *info_.Lock() = fbl::RefPtr<TaskPersistentInfoState>(info.Lock()->get());
-  }
+  TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info)
+      : weak_(ktl::move(weak)), info_(info) {}
 
   util::WeakPtr<Task> weak_;
-  mutable TaskPersistentInfo info_;
+  TaskPersistentInfo info_;
 };
 
 }  // namespace starnix

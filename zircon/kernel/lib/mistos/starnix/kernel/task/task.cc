@@ -27,10 +27,10 @@ TaskPersistentInfo TaskPersistentInfoState::New(
     pid_t tid, pid_t pid, fbl::String command,
     Credentials creds /*, exit_signal: Option<Signal>*/) {
   fbl::AllocChecker ac;
-  auto state = fbl::AdoptRef(new (&ac) TaskPersistentInfoState(tid, pid, command, creds));
+  auto info = fbl::AdoptRef(new (&ac) StarnixMutex<TaskPersistentInfoState>(
+      TaskPersistentInfoState(tid, pid, command, creds)));
   ASSERT(ac.check());
-
-  return TaskPersistentInfo(ktl::move(state));
+  return info;
 }
 
 fbl::RefPtr<Task> Task::New(pid_t id, const fbl::String& command,
@@ -43,8 +43,7 @@ fbl::RefPtr<Task> Task::New(pid_t id, const fbl::String& command,
   ASSERT(ac.check());
 
   pid_t pid = thread_group->leader;
-  task->persistent_info.Lock()->reset(
-      TaskPersistentInfoState::New(id, pid, command, creds).Lock()->get());
+  task->persistent_info = TaskPersistentInfoState::New(id, pid, command, creds);
 
   return ktl::move(task);
 }  // namespace starnix
