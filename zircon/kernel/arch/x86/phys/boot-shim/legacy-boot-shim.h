@@ -23,7 +23,7 @@
 // Must be defined by each legacy shim.
 extern const char* kLegacyShimName;
 
-class TrampolineBoot;
+class BootZbi;
 
 using LegacyBootShimBase = boot_shim::BootShim<  //
     boot_shim::PoolMemConfigItem,                //
@@ -47,16 +47,16 @@ class LegacyBootShim : public LegacyBootShimBase {
 
   InputZbi& input_zbi() { return input_zbi_; }
 
-  bool Load(TrampolineBoot& boot);
+  bool Load(BootZbi& boot);
 
  private:
   using SerialNumber = boot_shim::TestSerialNumberItem;
 
-  bool StandardLoad(TrampolineBoot& boot);
+  bool StandardLoad(BootZbi& boot);
 
   // This gets first crack before StandardLoad.
   // If it returns false then StandardLoad  is done.
-  bool BootQuirksLoad(TrampolineBoot& boot);
+  bool BootQuirksLoad(BootZbi& boot);
 
   // Helper for BootQuirksLoad to recognize an apparently valid bootable ZBI
   // (or a simply empty one, which can get the standard error path).

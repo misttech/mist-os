@@ -100,9 +100,9 @@ if (toolchain_environment == "kernel.phys32" ||
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:acpi",
       "//zircon/kernel/phys:address-space",
+      "//zircon/kernel/phys:boot-zbi",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:symbolize",
-      "//zircon/kernel/phys:trampoline-boot",
       "//zircon/kernel/phys/lib/boot-shim",
       "//zircon/system/ulib/hwreg",
     ]

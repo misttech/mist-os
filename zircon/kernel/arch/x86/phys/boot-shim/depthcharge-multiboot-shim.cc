@@ -89,7 +89,7 @@ uint32_t FixPixelFormat(uint32_t format) {
   }
 }
 
-bool AppendDepthChargeItems(LegacyBootShim& shim, TrampolineBoot::Zbi& zbi,
+bool AppendDepthChargeItems(LegacyBootShim& shim, BootZbi::Zbi& zbi,
                             LegacyBootShim::InputZbi::iterator kernel_item) {
   auto append = [&shim, &zbi](const zbi_header_t& header, auto payload) {
     return shim.Check("Failed to append boot loader items to data ZBI",
@@ -127,7 +127,7 @@ bool AppendDepthChargeItems(LegacyBootShim& shim, TrampolineBoot::Zbi& zbi,
 
 // The old depthcharge code prepends its items before the kernel rather than
 // appending them as the protocol requires.
-bool LoadDepthchargeZbi(LegacyBootShim& shim, TrampolineBoot& boot) {
+bool LoadDepthchargeZbi(LegacyBootShim& shim, BootZbi& boot) {
   auto& input_zbi = shim.input_zbi();
   auto kernel_item = input_zbi.find(arch::kZbiBootKernelType);
   if (shim.Check("ZBI Iteration error.", input_zbi.take_error()); kernel_item == input_zbi.end()) {
@@ -172,7 +172,7 @@ void LegacyBootSetUartConsole(const uart::all::Driver& uart) {
   GetUartDriver().Visit([](auto&& driver) { driver.SetLineControl(); });
 }
 
-bool LegacyBootShim::BootQuirksLoad(TrampolineBoot& boot) {
+bool LegacyBootShim::BootQuirksLoad(BootZbi& boot) {
   return !IsProperZbi() && LoadDepthchargeZbi(*this, boot);
 }
 

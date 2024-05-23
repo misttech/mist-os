@@ -18,10 +18,10 @@
 #include <ktl/optional.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
+#include <phys/boot-zbi.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
-#include <phys/trampoline-boot.h>
 #include <phys/uart.h>
 
 #include "stdout.h"
@@ -52,7 +52,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   memalloc::Pool& memory = Allocation::GetPool();
   shim.InitMemConfig(memory);
 
-  TrampolineBoot boot;
+  BootZbi boot;
   if (shim.Load(boot)) {
     memory.PrintMemoryRanges(symbolize.name());
     boot.Log();
@@ -62,14 +62,12 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   abort();
 }
 
-bool LegacyBootShim::Load(TrampolineBoot& boot) {
-  return BootQuirksLoad(boot) || StandardLoad(boot);
-}
+bool LegacyBootShim::Load(BootZbi& boot) { return BootQuirksLoad(boot) || StandardLoad(boot); }
 
 // This is overridden in the special bug-compatibility shim.
-[[gnu::weak]] bool LegacyBootShim::BootQuirksLoad(TrampolineBoot& boot) { return false; }
+[[gnu::weak]] bool LegacyBootShim::BootQuirksLoad(BootZbi& boot) { return false; }
 
-bool LegacyBootShim::StandardLoad(TrampolineBoot& boot) {
+bool LegacyBootShim::StandardLoad(BootZbi& boot) {
   return Check("Not a bootable ZBI", boot.Init(input_zbi())) &&
          Check("Failed to load ZBI", boot.Load(static_cast<uint32_t>(size_bytes()))) &&
          Check("Failed to append boot loader items to data ZBI", AppendItems(boot.DataZbi()));
