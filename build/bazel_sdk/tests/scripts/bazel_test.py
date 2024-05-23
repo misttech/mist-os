@@ -23,7 +23,17 @@ import shlex
 import sys
 import subprocess
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 _HAS_FX = None
 
@@ -34,9 +44,9 @@ _VERBOSE = False
 StrOrPath = Union[str, Path]
 
 
-def _force_symlink(target_path: Path, link_path: Path):
+def _force_symlink(target_path: Path, link_path: Path) -> None:
     link_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path = os.path.relpath(target_path, link_path.parent)
+    target_path = Path(os.path.relpath(target_path, link_path.parent))
     try:
         link_path.symlink_to(target_path)
     except OSError as e:
@@ -47,17 +57,12 @@ def _force_symlink(target_path: Path, link_path: Path):
             raise
 
 
-def _generate_command_string(
-    args: Sequence[StrOrPath],
-    env: Optional[Dict[str, str]] = None,
-    cwd: Optional[Path] = None,
-) -> str:
+def _generate_command_string(args: Sequence[StrOrPath], **kwargs: Any) -> str:
     """Generate a string that prints a command to be run.
 
     Args:
       args: a list of string or Path items corresponding to the command.
-      env: optional dictionary for extra environment variables.
-      cwd: optional Path for command's working directory.
+      **kwargs: extra subprocess.run() extra arguments.
 
     Returns:
       A string that can be printed to a terminal showing the command to
@@ -66,14 +71,17 @@ def _generate_command_string(
     output = ""
     margin = ""
     wrap_command = False
+    cwd = kwargs.get("cwd")
     if cwd:
         margin = "  "
         output = f"(\n{margin}cd {cwd} &&\n"
         wrap_command = True
 
+    env = kwargs.get("env")
     if env:
         for key, value in sorted(env.items()):
-            output += "%s%s=%s \\\n" % (margin, key, shlex.quote(value))
+            if os.environ.get(key, None) != value:
+                output += "%s%s=%s \\\n" % (margin, key, shlex.quote(value))
 
     for a in args:
         output += "%s%s \\\n" % (margin, shlex.quote(str(a)))
@@ -86,32 +94,63 @@ def _generate_command_string(
 
 def _run_command(
     cmd_args: Sequence[StrOrPath],
-    env: Optional[Dict[str, str]] = None,
-    cwd: Optional[Path] = None,
-) -> subprocess.CompletedProcess:
+    check_failure: bool = True,
+    **kwargs: Any,
+) -> "subprocess.CompletedProcess[str]":
     """Run a given command.
 
     Args:
-      args: a list of string or Path items corresponding to the command.
-      env: optional dictionary for extra environment variables.
-      cwd: optional Path for command's working directory.
+      cmd_args: a list of string or Path items corresponding to the command.
+      check_failure: set to False to ignore command failures. Otherwise the default
+        if to print the command's stderr, then raising an exception.
+      **kwargs: extra subprocess.run() named arguments.
 
     Returns:
       a subprocess.CompletedProcess value.
     """
     args = [str(a) for a in cmd_args]
+
     if _VERBOSE:
+        print("RUN_COMMAND: %s" % _generate_command_string(args, **kwargs))
+
+    ret = subprocess.run(args, **kwargs)
+    if ret.returncode != 0 and check_failure:
         print(
-            "RUN_COMMAND: %s"
-            % _generate_command_string(cmd_args, env=env, cwd=cwd)
+            "FAILED COMMAND: %s" + _generate_command_string(args, **kwargs),
+            file=sys.stderr,
         )
+        if ret.stderr:
+            print("ERROR: %s" % ret.stderr, file=sys.stderr)
+        ret.check_returncode()
 
-    if env:
-        new_env = os.environ.copy()
-        new_env.update(env)
-        env = new_env
+    return ret
 
-    return subprocess.run(args, cwd=cwd, env=env)
+
+def _get_command_output_lines(
+    args: Sequence[StrOrPath],
+    extra_env: Optional[Dict[str, str]] = None,
+    **kwargs: Any,
+) -> Sequence[str]:
+    """Run a given command, then return its standard output as text lines.
+
+    Args:
+        args: a list of string or Path items corresponding to the command.
+        extra_env: a dictionary of optional extra environment variable definitions.
+        **kwargs: extra subprocess.run() named arguments.
+    Returns:
+        A sequence of strings, each one corresponding to one line of the output
+        (line terminators are not included).
+    """
+    if extra_env:
+        env = kwargs.get("env")
+        if env is None:
+            env = os.environ.copy()
+        kwargs["env"] = env | extra_env
+
+    ret = _run_command(
+        args, capture_output=True, text=True, check_failure=True, **kwargs
+    )
+    return ret.stdout.splitlines()
 
 
 def _print_error(msg: str) -> int:
@@ -158,7 +197,7 @@ def _find_fuchsia_build_dir(fuchsia_source_dir: Path) -> Optional[Path]:
         return fuchsia_source_dir / f.read().strip()
 
 
-def _relative_path(path: Path):
+def _relative_path(path: Path) -> Path:
     return Path(os.path.relpath(path))
 
 
@@ -237,7 +276,120 @@ def build_metadata_flags() -> Sequence[str]:
     return result_flags
 
 
-def main():
+class BazelRepositoryMap(object):
+    IGNORED_REPO = Path("IGNORED")
+
+    def __init__(
+        self, fuchsia_source_dir: Path, workspace_dir: Path, output_base: Path
+    ):
+        self._fuchsia_source_dir = fuchsia_source_dir
+        self._workspace_dir = workspace_dir
+        self._output_base = output_base
+
+        # These repository overrides are passed to the Bazel invocation.
+        self._overrides: Dict[str, Path] = {
+            "bazel_skylib": fuchsia_source_dir / "third_party/bazel_skylib",
+            "com_google_googletest": fuchsia_source_dir
+            / "third_party/googletest/src",
+            "rules_cc": fuchsia_source_dir / "third_party/bazel_rules_cc",
+            "rules_python": fuchsia_source_dir
+            / "third_party/bazel_rules_python",
+            "rules_license": fuchsia_source_dir
+            / "third_party/bazel_rules_license",
+            "platforms": fuchsia_source_dir / "third_party/bazel_platforms",
+            "rules_java": fuchsia_source_dir
+            / "build/bazel/local_repositories/rules_java",
+            "remote_coverage_tools": fuchsia_source_dir
+            / "build/bazel/local_repositories/remote_coverage_tools",
+        }
+
+        # These repository overrides are used when converting Bazel labels to actual paths.
+        # NOTE: Mapping labels to repository inputs is considerably simpler than
+        # //build/bazel/scripts/bazel_action.py because there are way less edge
+        # cases to consider and because ignoring @prebuilt_python and
+        # @fuchsia_clang entirely is safe, since these are already populated
+        # by the GN build_fuchsia_sdk_repository target which is an input
+        # dependency for running this script.
+        self._internal_overrides = self._overrides | {
+            "fuchsia_sdk_common": fuchsia_source_dir
+            / "build/bazel_sdk/bazel_rules_fuchsia/common",
+            "fuchsia_sdk": fuchsia_source_dir
+            / "build/bazel_sdk/bazel_rules_fuchsia",
+            "prebuilt_python": self.IGNORED_REPO,
+            "fuchsia_clang": self.IGNORED_REPO,
+            "bazel_tools": self.IGNORED_REPO,
+            "local_config_cc": self.IGNORED_REPO,
+        }
+
+    def get_repository_overrides_flags(self) -> Sequence[str]:
+        """Return a sequence command-line flags for overriding Bazel external repositories."""
+        return [
+            f"--override_repository={name}={path}"
+            for name, path in self._overrides.items()
+        ]
+
+    def resolve_bazel_path(self, bazel_path: str) -> Optional[Path]:
+        """Convert a Bazel path label to a real Path or None if it should be ignored."""
+        if bazel_path.startswith("//"):
+            target_path = bazel_path[2:]
+            repo_dir = self._workspace_dir
+            repo_name = ""
+        elif bazel_path.startswith("@"):
+            repo_name, sep, target_path = bazel_path.partition("//")
+            assert (
+                sep
+            ), f"Build file path has invalid repository root: {bazel_path}"
+            repo_name = repo_name[1:]
+            _repo_dir = self._internal_overrides.get(repo_name, None)
+            assert _repo_dir, (
+                f"Unknown repository name in build file path: {bazel_path}\n"
+                + f"Please modify {__file__} to handle it!"
+            )
+            repo_dir = _repo_dir
+            if repo_dir == self.IGNORED_REPO:
+                return None
+        else:
+            assert False, f"Invalid build file path: {bazel_path}"
+
+        package_dir, colon, target_name = target_path.partition(":")
+        if colon == ":":
+            if package_dir:
+                target_path = f"{package_dir}/{target_name}"
+            else:
+                target_path = target_name
+        else:
+            target_path = package_dir + "/" + os.path.basename(package_dir)
+
+        final_path = repo_dir / target_path
+        if final_path.exists():
+            return final_path
+
+        # Sometimes the path will point to a non-existent file, for example
+        #
+        #   @fuchsia_sdk//:api_version.bzl
+        #     corresponds to a file generated by the repository rule that
+        #     generates the @fuchsia_sdk repository.
+        #
+        #   //build/bazel_sdk/bazel_rules_fuchsia/api_version.bzl does
+        #     not exist.
+        #
+        #   $OUTPUT_BASE/external/fuchsia/api_version.bzl is the actual
+        #     location of that file.
+        #
+        if repo_name:
+            external_repo_dir = self._output_base / "external" / repo_name
+            final_path = external_repo_dir / target_path
+            if final_path.exists():
+                return final_path.resolve()
+
+        # This should not happen, but print an error message pointing to this
+        # script in case it really does!
+        assert (
+            False
+        ), f"Unknown input label, please update {__file__} to handle it: {bazel_path}"
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -356,11 +508,12 @@ def main():
     if args.fuchsia_source_dir:
         fuchsia_source_dir = Path(args.fuchsia_source_dir)
     else:
-        fuchsia_source_dir = _find_fuchsia_source_dir_from(Path(__file__))
-        if not fuchsia_source_dir:
+        _fuchsia_source_dir = _find_fuchsia_source_dir_from(Path(__file__))
+        if not _fuchsia_source_dir:
             return _print_error(
                 "Cannot find Fuchsia source directory, please use --fuchsia_source_dir=DIR"
             )
+        fuchsia_source_dir = _fuchsia_source_dir
 
     if not fuchsia_source_dir.exists():
         return _print_error(
@@ -379,11 +532,12 @@ def main():
                 f"Fuchsia IDK directory does not exist: {fuchsia_idk_directory}"
             )
     else:
-        fuchsia_build_dir = _find_fuchsia_build_dir(fuchsia_source_dir)
-        if not fuchsia_build_dir:
+        _fuchsia_build_dir = _find_fuchsia_build_dir(fuchsia_source_dir)
+        if not _fuchsia_build_dir:
             return _print_error(
                 "Cannot auto-detect Fuchsia build directory, use --fuchsia_build_dir=DIR"
             )
+        fuchsia_build_dir = _fuchsia_build_dir
         has_fuchsia_build_dir = True
 
     if has_fuchsia_build_dir:
@@ -482,7 +636,7 @@ def main():
     # Bazel will track changes to these files properly, as repository rules
     # cannot track changes to files outside the workspace :-(
 
-    def setup_version_file(name: str, source_path: Path) -> str:
+    def setup_version_file(name: str, source_path: Path) -> Optional[str]:
         if not source_path.exists():
             return None
 
@@ -491,12 +645,12 @@ def main():
         return dst_path
 
     python_prebuilt_dir = (
-        fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag
+        fuchsia_source_dir / f"prebuilt/third_party/python3/{host_tag}"
     )
     python_version_file = args.prebuilt_python_version_file
     if not python_version_file:
         python_version_file = (
-            python_prebuilt_dir / ".versions" / "cpython3.cipd_version"
+            python_prebuilt_dir / ".versions/cpython3.cipd_version"
         )
 
     workspace_python_version_file = setup_version_file(
@@ -507,12 +661,7 @@ def main():
     if not clang_version_file:
         clang_version_file = (
             fuchsia_source_dir
-            / "prebuilt"
-            / "third_party"
-            / "clang"
-            / host_tag
-            / ".versions"
-            / "clang.cipd_version"
+            / f"prebuilt/third_party/clang/{host_tag}/.versions/clang.cipd_version"
         )
 
     workspace_clang_version_file = setup_version_file(
@@ -546,38 +695,16 @@ def main():
     else:
         # Get output base from Bazel directly.
         output_base = Path(
-            subprocess.check_output(
-                [bazel, "info", "output_base"], text=True, cwd=workspace_dir
-            ).strip()
+            _get_command_output_lines(
+                [bazel, "info", "output_base"], cwd=workspace_dir
+            )[0]
         )
 
-    # A map of repository override paths, required to prevent any downloads
-    # during build and query operations.
-    repo_override_map = {
-        "bazel_skylib": fuchsia_source_dir / "third_party" / "bazel_skylib",
-        "com_google_googletest": fuchsia_source_dir
-        / "third_party"
-        / "googletest"
-        / "src",
-        "rules_cc": fuchsia_source_dir / "third_party" / "bazel_rules_cc",
-        "rules_python": fuchsia_source_dir
-        / "third_party"
-        / "bazel_rules_python",
-        "rules_license": fuchsia_source_dir
-        / "third_party"
-        / "bazel_rules_license",
-        "platforms": fuchsia_source_dir / "third_party" / "bazel_platforms",
-        "rules_java": fuchsia_source_dir
-        / "build"
-        / "bazel"
-        / "local_repositories"
-        / "rules_java",
-        "remote_coverage_tools": fuchsia_source_dir
-        / "build"
-        / "bazel"
-        / "local_repositories"
-        / "remote_coverage_tools",
-    }
+    bazel_repo_map = BazelRepositoryMap(
+        fuchsia_source_dir=fuchsia_source_dir,
+        workspace_dir=workspace_dir,
+        output_base=output_base,
+    )
 
     # These options must appear after the Bazel command.
     bazel_common_args = [
@@ -601,10 +728,7 @@ def main():
     # This allows the original WORKSPACE.bazel to work out-of-tree by
     # download repositories as usual, while running the test suite in-tree
     # will use the Fuchsia checkout's versions of these external dependencies.
-    bazel_common_args += [
-        f"--override_repository={name}={path}"
-        for name, path in repo_override_map.items()
-    ]
+    bazel_common_args += bazel_repo_map.get_repository_overrides_flags()
 
     # These argument remove verbose output from Bazel, used in queries.
     bazel_quiet_args = [
@@ -707,8 +831,6 @@ def main():
 
     PATH = os.environ["PATH"]
 
-    IGNORED_REPO = Path("IGNORED")
-
     bazel_env = {
         # An undocumented, but widely used, environment variable that tells Bazel to
         # not auto-detect the host C++ installation. This makes workspace setup faster
@@ -748,203 +870,7 @@ def main():
     if "USER" not in os.environ:
         bazel_env["USER"] = "unused-bazel-build-user"
 
-    # NOTE: Mapping labels to repository inputs is considerably simpler than
-    # //build/bazel/scripts/bazel_action.py because there are way less edge
-    # cases to consider and because ignoring @prebuilt_python and
-    # @fuchsia_clang entirely is safe, since these are already populated
-    # by the GN build_fuchsia_sdk_repository target which is an input
-    # dependency for running this script.
-    repo_map = repo_override_map.copy()
-    repo_map.update(
-        {
-            "fuchsia_sdk_common": fuchsia_source_dir
-            / "build"
-            / "bazel_sdk"
-            / "bazel_rules_fuchsia"
-            / "common",
-            "fuchsia_sdk": fuchsia_source_dir
-            / "build"
-            / "bazel_sdk"
-            / "bazel_rules_fuchsia",
-            "prebuilt_python": IGNORED_REPO,
-            "fuchsia_clang": IGNORED_REPO,
-            "bazel_tools": IGNORED_REPO,
-            "local_config_cc": IGNORED_REPO,
-        }
-    )
-
-    def decompose_bazel_label(label: str) -> Tuple[str, str, str]:
-        """Decompose a Bazel label into repo_name, package_path, target_name."""
-        if build_file.startswith("//"):
-            target_path = build_file[2:]
-            repo_name = ""
-        elif build_file.startswith("@"):
-            pos = build_file.find("//", 1)
-            assert (
-                pos > 0
-            ), f"build file path has invalid repository root: {build_file}"
-            repo_name = build_file[1:pos]
-            target_path = build_file[pos + 2 :]
-
-            repo_dir = repo_map.get(repo_name, None)
-            assert repo_dir, (
-                f"Unknown repository name in build file path: {build_file}\n"
-                + f"Please modify {__file__} to handle it!"
-            )
-            # A special value of IGNORED means build files from this repository should
-            # be ignored.
-            if str(repo_dir) == "IGNORED":
-                return None
-        else:
-            assert False, f"Invalid build file path: {build_file}"
-
-        package_dir, colon, target_name = target_path.partition(":")
-        if colon == ":":
-            if package_dir:
-                target_path = f"{package_dir}/{target_name}"
-            else:
-                target_path = target_name
-        else:
-            target_path = package_dir + "/" + os.path.basename(package_dir)
-
-    def resolve_build_file(build_file: str) -> Optional[Path]:
-        """Convert a build file path to a real Path or None if it should be ignored."""
-        if build_file.startswith("//"):
-            target_path = build_file[2:]
-            repo_dir = workspace_dir
-            repo_name = False
-        elif build_file.startswith("@"):
-            pos = build_file.find("//", 1)
-            assert (
-                pos > 0
-            ), f"build file path has invalid repository root: {build_file}"
-            repo_name = build_file[1:pos]
-            target_path = build_file[pos + 2 :]
-
-            repo_dir = repo_map.get(repo_name, None)
-            assert repo_dir, (
-                f"Unknown repository name in build file path: {build_file}\n"
-                + f"Please modify {__file__} to handle it!"
-            )
-            # A special value of IGNORED means build files from this repository should
-            # be ignored.
-            if str(repo_dir) == "IGNORED":
-                return None
-        else:
-            assert False, f"Invalid build file path: {build_file}"
-
-        package_dir, colon, target_name = target_path.partition(":")
-        if colon == ":":
-            if package_dir:
-                target_path = f"{package_dir}/{target_name}"
-            else:
-                target_path = target_name
-        else:
-            target_path = package_dir + "/" + os.path.basename(package_dir)
-
-        final_path = repo_dir / target_path
-        if final_path.exists():
-            return final_path
-
-        # Sometimes the path will point to a non-existent file, for example
-        #
-        #   @fuchsia_sdk//:api_version.bzl
-        #     corresponds to a file generated by the repository rule that
-        #     generates the @fuchsia_sdk repository.
-        #
-        #   //build/bazel_sdk/bazel_rules_fuchsia/api_version.bzl does
-        #     not exist.
-        #
-        #   $OUTPUT_BASE/external/fuchsia/api_version.bzl is the actual
-        #     location of that file.
-        #
-        if repo_name:
-            external_repo_dir = output_base / "external" / repo_name
-            final_path = external_repo_dir / target_path
-            if final_path.exists():
-                return final_path.resolve()
-
-        # This should not happen, but print an error message pointing to this
-        # script in case it really does!
-        assert (
-            False
-        ), f"Unknown input label, please update {__file__} to handle it: {build_file}"
-
     query_target = f"set({args.test_target})"
-
-    def find_build_files():
-        # Perform a query to retrieve all build files.
-        query_env = os.environ.copy()
-        query_env.update(bazel_env)
-        query_args = (
-            bazel_startup_args
-            + ["query"]
-            + bazel_common_args
-            + bazel_quiet_args
-            + ["buildfiles(deps(%s))" % query_target]
-        )
-        ret = subprocess.run(
-            query_args,
-            capture_output=True,
-            text=True,
-            cwd=workspace_dir,
-            env=query_env,
-        )
-        ret.check_returncode()
-        build_files = ret.stdout.splitlines()
-        result = set()
-        for b in build_files:
-            resolved = resolve_build_file(b)
-            if resolved:
-                result.add(resolved)
-
-        return result
-
-    def find_source_files():
-        # Perform a cquery to find all input source files.
-        cquery_env = os.environ.copy()
-        cquery_env.update(bazel_env)
-        cquery_args = (
-            bazel_startup_args
-            + ["cquery"]
-            + bazel_config_args
-            + bazel_quiet_args
-            + [
-                "--output=label",
-                'kind("source file", deps(%s))' % query_target,
-            ]
-        )
-        ret = subprocess.run(
-            cquery_args,
-            capture_output=True,
-            text=True,
-            cwd=workspace_dir,
-            env=cquery_env,
-        )
-        if ret.returncode != 0:
-            print(
-                "command: "
-                + _generate_command_string(
-                    cquery_args, env=cquery_env, cwd=workspace_dir
-                ),
-                file=sys.stderr,
-            )
-            print("ERROR: " + ret.stderr, file=sys.stderr)
-            ret.check_returncode()
-        source_files = set()
-        for l in ret.stdout.splitlines():
-            path, space, label = l.partition(" ")
-            assert (
-                space == " " and label == "(null)"
-            ), f"Invalid source file line: {l}"
-            resolved = resolve_build_file(path)
-            if not resolved:
-                continue
-            # If the file is a symlink, find its real location
-            resolved = resolved.resolve()
-            source_files.add(resolved)
-
-        return source_files
 
     test_command = (
         bazel_startup_args
@@ -956,7 +882,7 @@ def main():
     )
     ret = _run_command(
         test_command,
-        env=bazel_env,
+        env=os.environ | bazel_env,
         cwd=workspace_dir,
     )
 
@@ -979,9 +905,65 @@ def main():
             f.write("")
 
     if args.depfile:
+
+        def find_build_files() -> Set[Path]:
+            # Perform a query to retrieve all build files.
+            build_files = _get_command_output_lines(
+                args=(
+                    bazel_startup_args
+                    + ["query"]
+                    + bazel_common_args
+                    + bazel_quiet_args
+                    + ["buildfiles(deps(%s))" % query_target]
+                ),
+                extra_env=bazel_env,
+                cwd=workspace_dir,
+            )
+            result = set()
+            for b in build_files:
+                resolved = bazel_repo_map.resolve_bazel_path(b)
+                if resolved:
+                    result.add(resolved)
+
+            return result
+
+        def find_source_files() -> Set[Path]:
+            # Perform a cquery to find all input source files.
+            lines = _get_command_output_lines(
+                args=(
+                    bazel_startup_args
+                    + ["cquery"]
+                    + bazel_common_args
+                    + bazel_config_args
+                    + bazel_quiet_args
+                    + [
+                        "--output=label",
+                        'kind("source file", deps(%s))' % query_target,
+                    ]
+                ),
+                extra_env=bazel_env,
+                cwd=workspace_dir,
+            )
+            source_files = set()
+            for l in lines:
+                path, space, label = l.partition(" ")
+                assert (
+                    space == " " and label == "(null)"
+                ), f"Invalid source file line: {l}"
+                resolved = bazel_repo_map.resolve_bazel_path(path)
+                if not resolved:
+                    continue
+                # If the file is a symlink, find its real location
+                resolved = resolved.resolve()
+                source_files.add(resolved)
+
+            return source_files
+
         outputs = [args.stamp_file]
-        implicit_inputs = find_build_files() | find_source_files()
-        implicit_inputs = [_relative_path(p) for p in implicit_inputs]
+        implicit_inputs = [
+            _relative_path(p)
+            for p in (find_build_files() | find_source_files())
+        ]
         with open(args.depfile, "w") as f:
             f.write(
                 "%s: %s\n"
