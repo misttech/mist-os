@@ -23,17 +23,8 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             }
         }
 
-        match (&media_config.audio, media_config.audio_device_registry_enabled) {
-            (None, false) => {}
-            (None, true) => {
-                builder.platform_bundle("audio_device_registry");
-            }
-            (Some(_), true) => {
-                anyhow::bail!(
-                    "Do not use both media.audio and media.audio_device_registry_enabled"
-                );
-            }
-            (Some(AudioConfig::FullStack(config)), false) => {
+        match &media_config.audio {
+            Some(AudioConfig::FullStack(config)) => {
                 builder.platform_bundle("audio_core_routing");
                 if !context.board_info.provides_feature("fuchsia::custom_audio_core") {
                     builder.platform_bundle("audio_core");
@@ -43,9 +34,10 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
                 }
                 builder.platform_bundle("soundplayer");
             }
-            (Some(AudioConfig::PartialStack), false) => {
+            Some(AudioConfig::PartialStack) => {
                 builder.platform_bundle("audio_device_registry");
             }
+            None => {}
         }
 
         if media_config.camera.enabled {
