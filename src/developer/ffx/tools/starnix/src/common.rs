@@ -4,6 +4,7 @@
 
 use anyhow::{bail, Context, Result};
 use component_debug::cli;
+use fho::Connector;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container::{ControllerMarker, ControllerProxy};
 use lazy_static::lazy_static;
@@ -57,6 +58,18 @@ async fn find_moniker(
         return Ok(moniker);
     }
     find_session_container(&rcs_proxy).await
+}
+
+pub async fn connect_to_rcs(
+    rcs_connector: &Connector<rc::RemoteControlProxy>,
+) -> Result<rc::RemoteControlProxy> {
+    rcs_connector
+        .try_connect(|target| {
+            eprintln!("Waiting for {target:?}...");
+            Ok(())
+        })
+        .await
+        .context("connecting to RCS")
 }
 
 pub async fn connect_to_contoller(

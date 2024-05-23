@@ -4,11 +4,11 @@
 
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
-use fho::{daemon_protocol, Error, FfxMain, FfxTool, Result, SimpleWriter};
-use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
+use fho::{Connector, Error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
 pub mod common;
+use common::connect_to_rcs;
 
 mod adb;
 mod console;
@@ -38,10 +38,7 @@ pub struct StarnixTool {
     #[command]
     cmd: StarnixCommand,
 
-    #[with(daemon_protocol())]
-    target_collection: TargetCollectionProxy,
-
-    rcs_proxy: rc::RemoteControlProxy,
+    rcs_connector: Connector<rc::RemoteControlProxy>,
 }
 
 #[async_trait(?Send)]
@@ -50,24 +47,26 @@ impl FfxMain for StarnixTool {
     async fn main(self, writer: Self::Writer) -> Result<()> {
         match &self.cmd.subcommand {
             StarnixSubCommand::Adb(command) => {
-                adb::starnix_adb(command, &self.rcs_proxy, &self.target_collection, writer)
+                adb::starnix_adb(command, &self.rcs_connector, writer)
                     .await
                     .map_err(|e| Error::User(e))
             }
             #[cfg(feature = "enable_console_tool")]
             StarnixSubCommand::Console(command) => {
-                console::starnix_console(command, &self.rcs_proxy, writer)
-                    .await
-                    .map_err(|e| Error::User(e))
+                let rcs = connect_to_rcs(&self.rcs_connector).await?;
+                console::starnix_console(command, &rcs, writer).await.map_err(|e| Error::User(e))
             }
             StarnixSubCommand::Vmo(command) => {
-                vmo::starnix_vmo(command, &self.rcs_proxy, writer).await.map_err(|e| Error::User(e))
+                let rcs = connect_to_rcs(&self.rcs_connector).await?;
+                vmo::starnix_vmo(command, &rcs, writer).await.map_err(|e| Error::User(e))
             }
             StarnixSubCommand::Suspend(command) => {
-                suspend::starnix_suspend(command, &self.rcs_proxy, writer).await
+                let rcs = connect_to_rcs(&self.rcs_connector).await?;
+                suspend::starnix_suspend(command, &rcs, writer).await
             }
             StarnixSubCommand::Resume(command) => {
-                suspend::starnix_resume(command, &self.rcs_proxy, writer).await
+                let rcs = connect_to_rcs(&self.rcs_connector).await?;
+                suspend::starnix_resume(command, &rcs, writer).await
             }
         }
     }
