@@ -37,7 +37,7 @@ class NetworkDevice : public fdf::DriverBase,
                 fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   ~NetworkDevice() override;
 
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;

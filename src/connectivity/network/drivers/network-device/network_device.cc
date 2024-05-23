@@ -36,51 +36,60 @@ NetworkDevice::~NetworkDevice() {
   }
 }
 
-zx::result<> NetworkDevice::Start() {
-  zx::result dispatchers = OwnedDeviceInterfaceDispatchers::Create();
-  if (dispatchers.is_error()) {
-    FDF_LOG(ERROR, "failed to create owned dispatchers: %s", dispatchers.status_string());
-    return dispatchers.take_error();
+void NetworkDevice::Start(fdf::StartCompleter completer) {
+  zx::result<> result = [&]() -> zx::result<> {
+    zx::result dispatchers = OwnedDeviceInterfaceDispatchers::Create();
+    if (dispatchers.is_error()) {
+      FDF_LOG(ERROR, "failed to create owned dispatchers: %s", dispatchers.status_string());
+      return dispatchers.take_error();
+    }
+    dispatchers_ = std::move(dispatchers.value());
+
+    zx::result<std::unique_ptr<NetworkDeviceImplBinder>> binder = CreateImplBinder();
+    if (binder.is_error()) {
+      FDF_LOG(ERROR, "failed to create network device binder: %s", binder.status_string());
+      return binder.take_error();
+    }
+
+    zx::result device =
+        NetworkDeviceInterface::Create(dispatchers_->Unowned(), std::move(binder.value()));
+    if (device.is_error()) {
+      FDF_LOG(ERROR, "failed to create inner device %s", device.status_string());
+      return device.take_error();
+    }
+    device_ = std::move(device.value());
+
+    // Create a devfs connector and child node for netcfg to discover and connect to.
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      FDF_LOG(ERROR, "failed to bind devfs connector: %s", connector.status_string());
+      return connector.take_error();
+    }
+
+    fuchsia_driver_framework::DevfsAddArgs devfs_args;
+    devfs_args.connector(std::move(connector.value()))
+        .class_name(kDevFsClassName)
+        .connector_supports(fuchsia_device_fs::ConnectionType::kController);
+
+    // Use AddOwnedChild to prevent other drivers from binding to the node. The node only exists for
+    // netcfg to discover and connect to, no other drivers are involved.
+    zx::result child = AddOwnedChild(kDevFsChildNodeName, devfs_args);
+    if (child.is_error()) {
+      FDF_LOG(ERROR, "failed to add child node: %s", child.status_string());
+      return child.take_error();
+    }
+
+    child_node_.Bind(std::move(child->node_));
+    return zx::ok();
+  }();
+
+  if (result.is_error() && device_) {
+    // Start failed but got to the point where the device was created. We must tear it down.
+    // PrepareStop will not be called if Start fails.
+    device_->Teardown([result, completer = std::move(completer)]() mutable { completer(result); });
+  } else {
+    completer(result);
   }
-  dispatchers_ = std::move(dispatchers.value());
-
-  zx::result<std::unique_ptr<NetworkDeviceImplBinder>> binder = CreateImplBinder();
-  if (binder.is_error()) {
-    FDF_LOG(ERROR, "failed to create network device binder: %s", binder.status_string());
-    return binder.take_error();
-  }
-
-  zx::result device =
-      NetworkDeviceInterface::Create(dispatchers_->Unowned(), std::move(binder.value()));
-  if (device.is_error()) {
-    FDF_LOG(ERROR, "failed to create inner device %s", device.status_string());
-    return device.take_error();
-  }
-  device_ = std::move(device.value());
-
-  // Create a devfs connector and child node for netcfg to discover and connect to.
-  zx::result connector = devfs_connector_.Bind(dispatcher());
-  if (connector.is_error()) {
-    FDF_LOG(ERROR, "failed to bind devfs connector: %s", connector.status_string());
-    return connector.take_error();
-  }
-
-  fuchsia_driver_framework::DevfsAddArgs devfs_args;
-  devfs_args.connector(std::move(connector.value()))
-      .class_name(kDevFsClassName)
-      .connector_supports(fuchsia_device_fs::ConnectionType::kController);
-
-  // Use AddOwnedChild to prevent other drivers from binding to the node. The node only exists for
-  // netcfg to discover and connect to, no other drivers are involved.
-  zx::result child = AddOwnedChild(kDevFsChildNodeName, devfs_args);
-  if (child.is_error()) {
-    FDF_LOG(ERROR, "failed to add child node: %s", child.status_string());
-    return child.take_error();
-  }
-
-  child_node_.Bind(std::move(child->node_));
-
-  return zx::ok();
 }
 
 void NetworkDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
