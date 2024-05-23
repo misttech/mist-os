@@ -21,7 +21,12 @@ class FakeCameraTest : public gtest::RealLoopFixture {
  protected:
   virtual void SetUp() override {
     context_->svc()->Connect(allocator_.NewRequest());
-    allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+
+    fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.set_name(fsl::GetCurrentProcessName());
+    set_debug_request.set_id(fsl::GetCurrentProcessKoid());
+    allocator_->SetDebugClientInfo(std::move(set_debug_request));
+
     allocator_.set_error_handler(MakeErrorHandler("Sysmem Allocator"));
   }
 
@@ -44,7 +49,7 @@ class FakeCameraTest : public gtest::RealLoopFixture {
   }
 
   std::unique_ptr<sys::ComponentContext> context_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
 };
 
 TEST_F(FakeCameraTest, InvalidArgs) {
@@ -106,15 +111,20 @@ TEST_F(FakeCameraTest, SetBufferCollectionInvokesCallback) {
   fuchsia::camera3::StreamPtr stream_protocol;
   SetFailOnError(stream_protocol, "Stream");
   camera->GetHandler()(device_protocol.NewRequest());
-  fuchsia::sysmem::BufferCollectionTokenPtr token;
+  fuchsia::sysmem2::BufferCollectionTokenPtr token;
   SetFailOnError(token, "Token");
   device_protocol->GetConfigurations(
       [&](std::vector<fuchsia::camera3::Configuration> configurations) {
         ASSERT_FALSE(configurations.empty());
         ASSERT_FALSE(configurations[0].streams.empty());
         device_protocol->ConnectToStream(0, stream_protocol.NewRequest());
-        allocator_->AllocateSharedCollection(token.NewRequest());
-        stream_protocol->SetBufferCollection(std::move(token));
+
+        fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+        allocate_shared_request.set_token_request(token.NewRequest());
+        allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
+
+        stream_protocol->SetBufferCollection(
+            fuchsia::sysmem::BufferCollectionTokenHandle(token.Unbind().TakeChannel()));
       });
   RunLoopUntil([&]() { return HasFailure() || callback_invoked; });
 }
