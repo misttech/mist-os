@@ -15,8 +15,8 @@ use {
         model::{
             actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
             component::{
-                Component, ComponentInstance, Package, StartReason, WeakComponentInstance,
-                WeakExtendedInstance,
+                Component, ComponentInstance, IncarnationId, Package, StartReason,
+                WeakComponentInstance, WeakExtendedInstance,
             },
             context::ModelContext,
             environment::Environment,
@@ -49,7 +49,6 @@ use {
     cm_fidl_validator::error::DeclType,
     cm_fidl_validator::error::Error as ValidatorError,
     cm_logger::scoped::ScopedLogger,
-    cm_moniker::IncarnationId,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,

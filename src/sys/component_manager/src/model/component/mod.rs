@@ -31,7 +31,6 @@ use {
         resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage},
     },
     async_trait::async_trait,
-    cm_moniker::IncarnationId,
     cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::{Name, Url},
     cm_util::TaskGroup,
@@ -77,6 +76,8 @@ use {
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
 pub type ExtendedInstance = ExtendedInstanceInterface<ComponentInstance>;
 pub type WeakExtendedInstance = WeakExtendedInstanceInterface<ComponentInstance>;
+
+pub type IncarnationId = u64;
 
 /// Describes the reason a component instance is being requested to start.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
