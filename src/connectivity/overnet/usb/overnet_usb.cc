@@ -106,7 +106,7 @@ zx::result<> OvernetUsb::Start() {
 
   fdf::DevfsAddArgs devfs;
   devfs.connector(std::move(connector.value()));
-  devfs.class_name("overnet_usb");
+  devfs.class_name("overnet-usb");
 
   fdf::NodeAddArgs args;
   args.devfs_args(std::move(devfs));
