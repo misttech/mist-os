@@ -39,12 +39,6 @@ create_kernel_task_and_unlocked_with_fs_and_selinux(
   return {ktl::move(kernel), testing::AutoReleasableTask::From(init_task.value())};
 }
 
-ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-create_kernel_task_and_unlocked() {
-  return create_kernel_task_and_unlocked_with_fs_and_selinux(
-      [](const fbl::RefPtr<Kernel>& kernel) -> FileSystemHandle { return TmpFs::new_fs(kernel); });
-}
-
 }  // namespace
 
 namespace starnix::testing {
@@ -65,6 +59,12 @@ FileSystemHandle create_pkgfs(const fbl::RefPtr<Kernel>& kernel) {
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_pkgfs() {
   return create_kernel_task_and_unlocked_with_fs_and_selinux(create_pkgfs);
+}
+
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+create_kernel_task_and_unlocked() {
+  return create_kernel_task_and_unlocked_with_fs_and_selinux(
+      [](const fbl::RefPtr<Kernel>& kernel) -> FileSystemHandle { return TmpFs::new_fs(kernel); });
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
