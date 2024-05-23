@@ -17,11 +17,11 @@ class CameraClient {
  public:
   ~CameraClient();
   static fpromise::result<std::unique_ptr<CameraClient>, zx_status_t> Create(
-      fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem::AllocatorHandle allocator,
+      fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem2::AllocatorHandle allocator,
       bool list_configs, uint32_t config_index, uint32_t stream_index);
   using AddCollectionHandler =
-      fit::function<uint32_t(fuchsia::sysmem::BufferCollectionTokenHandle,
-                             fuchsia::sysmem::ImageFormat_2, fuchsia::camera3::FrameRate)>;
+      fit::function<uint32_t(fuchsia::sysmem2::BufferCollectionTokenHandle,
+                             fuchsia::images2::ImageFormat, fuchsia::camera3::FrameRate)>;
   using RemoveCollectionHandler = fit::function<void(uint32_t)>;
   using ShowBufferHandler = fit::function<void(uint32_t, uint32_t, zx::eventpair)>;
   using MuteStateHandler = fit::function<void(bool)>;
@@ -40,7 +40,7 @@ class CameraClient {
   void DumpConfigs();
 
   fuchsia::camera3::DeviceWatcherPtr watcher_;
-  fuchsia::sysmem::AllocatorPtr allocator_;
+  fuchsia::sysmem2::AllocatorPtr allocator_;
   fuchsia::camera3::DevicePtr device_;
   std::vector<fuchsia::camera3::Configuration> configurations_;
   AddCollectionHandler add_collection_handler_;
@@ -55,7 +55,7 @@ class CameraClient {
   // stream_infos_ uses the same index as the corresponding stream index in configurations_.
   struct StreamInfo {
     fuchsia::camera3::StreamPtr stream;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info;
+    fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
     uint32_t add_collection_handler_returned_value;
   };
   std::map<uint32_t, StreamInfo> stream_infos_;

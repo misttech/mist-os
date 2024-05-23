@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire_types.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -13,6 +12,7 @@
 #include <lib/media/codec_impl/fourcc.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +23,8 @@
 #include <random>
 #include <set>
 #include <thread>
+
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
 
 #include "src/media/codec/examples/use_media_decoder/use_video_decoder.h"
 #include "src/media/codec/examples/use_media_decoder/util.h"
@@ -191,43 +193,39 @@ bool is_board_with_amlogic_secure() {
   return false;
 }
 
-zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_service() {
-  auto client_end = component::Connect<fuchsia_sysmem::Allocator>();
+zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_service() {
+  auto client_end = component::Connect<fuchsia_sysmem2::Allocator>();
   ZX_ASSERT(client_end.is_ok());
   if (!client_end.is_ok()) {
     return zx::error(client_end.status_value());
   }
-  fidl::WireSyncClient allocator{std::move(client_end.value())};
-  auto result = allocator->SetDebugClientInfo(
-      fidl::StringView::FromExternal("use_h264_and_vp9_decoders_and_pcmm_stress_test"), 0u);
-  ZX_ASSERT(result.ok());
+  fidl::SyncClient allocator{std::move(client_end.value())};
+  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.name() = "use_h264_and_vp9_decoders_and_pcmm_stress_test";
+  set_debug_request.id() = 0u;
+  auto result = allocator->SetDebugClientInfo(std::move(set_debug_request));
+  ZX_ASSERT(result.is_ok());
   return zx::ok(std::move(allocator));
 }
 
 void set_picky_protected_constraints(
-    fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection,
-    uint32_t exact_buffer_size) {
+    fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection, uint32_t exact_buffer_size) {
   ZX_ASSERT(exact_buffer_size % zx_system_get_page_size() == 0);
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-  constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageHwDecoder;
-  constraints.min_buffer_count_for_camping = 1;
-  constraints.has_buffer_memory_constraints = true;
-  constraints.buffer_memory_constraints = fuchsia_sysmem::wire::BufferMemoryConstraints{
-      .min_size_bytes = exact_buffer_size,
-      // Allow a max that's just large enough to accommodate the size implied
-      // by the min frame size and PixelFormat.
-      .max_size_bytes = exact_buffer_size,
-      .physically_contiguous_required = true,
-      .secure_required = true,
-      .ram_domain_supported = false,
-      .cpu_domain_supported = false,
-      .inaccessible_domain_supported = true,
-      .heap_permitted_count = 1,
-      .heap_permitted = {fuchsia_sysmem::wire::HeapType::kAmlogicSecure},
-  };
-  constraints.image_format_constraints_count = 0;
-  auto result = collection->SetConstraints(true, std::move(constraints));
-  ZX_ASSERT(result.ok());
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  auto& constraints = set_constraints_request.constraints().emplace();
+  constraints.usage().emplace().video() = fuchsia_sysmem2::kVideoUsageHwDecoder;
+  constraints.min_buffer_count_for_camping() = 1;
+  auto& bmc = constraints.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = exact_buffer_size;
+  // Allow a max that's just large enough to accommodate the size implied
+  // by the min frame size and PixelFormat.
+  bmc.max_size_bytes() = exact_buffer_size, bmc.physically_contiguous_required() = true,
+  bmc.secure_required() = true, bmc.ram_domain_supported() = false,
+  bmc.cpu_domain_supported() = false, bmc.inaccessible_domain_supported() = true,
+  bmc.permitted_heaps().emplace().emplace_back(
+      sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0));
+  auto result = collection->SetConstraints(std::move(set_constraints_request));
+  ZX_ASSERT(result.is_ok());
 }
 
 // stress protected contiguous memory management
@@ -244,26 +242,30 @@ void stress_pcmm(std::vector<zx::vmo>& vmos, std::mutex& vmos_lock,
   do {
     now = zx::clock::get_monotonic();
     auto [collection_client, collection_server] =
-        fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
-    auto allocate_result = allocator->AllocateNonSharedCollection(std::move(collection_server));
-    ZX_ASSERT(allocate_result.ok());
-    fidl::WireSyncClient collection{std::move(collection_client)};
+        fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+    fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest allocate_non_share_request;
+    allocate_non_share_request.collection_request() = std::move(collection_server);
+    auto allocate_result =
+        allocator->AllocateNonSharedCollection(std::move(allocate_non_share_request));
+    ZX_ASSERT(allocate_result.is_ok());
+    fidl::SyncClient collection{std::move(collection_client)};
     auto sync_result = collection->Sync();
-    ZX_ASSERT(sync_result.ok());
+    ZX_ASSERT(sync_result.is_ok());
     uint32_t chunk_count = get_random() % (kMaxChunksPerBuffer - 1) + 1;
     uint32_t buffer_size = chunk_count * kAllocationChunkSize;
     set_picky_protected_constraints(collection, buffer_size);
-    auto wait_result = collection->WaitForBuffersAllocated();
-    ZX_ASSERT(wait_result.ok());
+    auto wait_result = collection->WaitForAllBuffersAllocated();
+    ZX_ASSERT(wait_result.is_ok());
     uint32_t which_vmo = get_random() % kMaxVmos;
     // Keep the VMO for a while.  The VMO space won't be reclaimed until this handle closes, despite
     // us dropping the collection channel every time through this loop.
     {  // scope lock
       std::lock_guard<std::mutex> lock(vmos_lock);
-      vmos[which_vmo] = std::move(wait_result->buffer_collection_info.buffers[0].vmo);
+      vmos[which_vmo] =
+          std::move(wait_result->buffer_collection_info()->buffers()->at(0).vmo().value());
     }
     // Potentially avoid some sysmem log output by doing a clean Close().
-    auto close_result = collection->Close();
-    ZX_ASSERT(close_result.ok());
+    auto close_result = collection->Release();
+    ZX_ASSERT(close_result.is_ok());
   } while (now < done_time);
 }

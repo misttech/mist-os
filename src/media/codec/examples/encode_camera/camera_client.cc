@@ -4,7 +4,10 @@
 
 #include "src/media/codec/examples/encode_camera/camera_client.h"
 
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/hlcpp_conversion.h>
 #include <lib/async-loop/default.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/types.h>
 
 #include <iostream>
@@ -30,7 +33,7 @@ CameraClient::CameraClient(bool list_configs, uint32_t config_index, uint32_t st
 CameraClient::~CameraClient() {}
 
 fpromise::result<std::unique_ptr<CameraClient>, zx_status_t> CameraClient::Create(
-    fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem::AllocatorHandle allocator,
+    fuchsia::camera3::DeviceWatcherHandle watcher, fuchsia::sysmem2::AllocatorHandle allocator,
     bool list_configs, uint32_t config_index, uint32_t stream_index) {
   auto cycler =
       std::unique_ptr<CameraClient>(new CameraClient(list_configs, config_index, stream_index));
@@ -118,6 +121,12 @@ void CameraClient::ConnectToStream(uint32_t config_index, uint32_t stream_index)
   ZX_ASSERT(configurations_.size() > config_index);
   ZX_ASSERT(configurations_[config_index].streams.size() > stream_index);
   auto image_format = configurations_[config_index].streams[stream_index].image_format;
+
+  auto v1_natural_image_format = fidl::HLCPPToNatural(fidl::Clone(image_format));
+  auto v2_natural_image_format_result = sysmem::V2CopyFromV1ImageFormat(v1_natural_image_format);
+  ZX_ASSERT(v2_natural_image_format_result.is_ok());
+  auto v2_image_format = fidl::NaturalToHLCPP(std::move(v2_natural_image_format_result.value()));
+
   auto frame_rate = configurations_[config_index].streams[stream_index].frame_rate;
 
   // Connect to specific stream
@@ -127,23 +136,29 @@ void CameraClient::ConnectToStream(uint32_t config_index, uint32_t stream_index)
   auto stream_request = stream.NewRequest();
 
   // Allocate buffer collection
-  fuchsia::sysmem::BufferCollectionTokenHandle token_orig;
-  allocator_->AllocateSharedCollection(token_orig.NewRequest());
-  stream->SetBufferCollection(std::move(token_orig));
-  stream->WatchBufferCollection([this, image_format, stream_index, frame_rate,
-                                 &stream](fuchsia::sysmem::BufferCollectionTokenHandle token_back) {
-    if (add_collection_handler_) {
-      auto& stream_info = stream_infos_[stream_index];
-      stream_info.add_collection_handler_returned_value =
-          add_collection_handler_(std::move(token_back), image_format, frame_rate);
-    } else {
-      token_back.BindSync()->Close();
-    }
-    // Kick start the stream
-    stream->GetNextFrame([this](fuchsia::camera3::FrameInfo frame_info) {
-      OnNextFrame(stream_index_, std::move(frame_info));
-    });
-  });
+  fuchsia::sysmem2::BufferCollectionTokenHandle token_orig;
+  allocator_->AllocateSharedCollection(
+      std::move(fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest{}.set_token_request(
+          token_orig.NewRequest())));
+  stream->SetBufferCollection(
+      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token_orig.TakeChannel()));
+  stream->WatchBufferCollection(
+      [this, v2_image_format = std::move(v2_image_format), stream_index, frame_rate,
+       &stream](fuchsia::sysmem::BufferCollectionTokenHandle token_back) mutable {
+        if (add_collection_handler_) {
+          auto& stream_info = stream_infos_[stream_index];
+          stream_info.add_collection_handler_returned_value = add_collection_handler_(
+              fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
+                  token_back.TakeChannel()),
+              std::move(v2_image_format), frame_rate);
+        } else {
+          token_back.BindSync()->Close();
+        }
+        // Kick start the stream
+        stream->GetNextFrame([this](fuchsia::camera3::FrameInfo frame_info) {
+          OnNextFrame(stream_index_, std::move(frame_info));
+        });
+      });
 
   device_->ConnectToStream(stream_index, std::move(stream_request));
 }

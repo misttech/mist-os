@@ -115,7 +115,7 @@ std::unique_ptr<uint8_t[]> make_AudioSpecificConfig_from_ADTS_header(
 //     be set.
 // out_md - SHA256_DIGEST_LENGTH bytes long
 void use_aac_decoder(async::Loop* main_loop, fuchsia::mediacodec::CodecFactoryHandle codec_factory,
-                     fuchsia::sysmem::AllocatorHandle sysmem, const std::string& input_adts_file,
+                     fuchsia::sysmem2::AllocatorHandle sysmem, const std::string& input_adts_file,
                      const std::string& output_wav_file, uint8_t* out_md) {
   memset(out_md, 0, SHA256_DIGEST_LENGTH);
 

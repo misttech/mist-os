@@ -60,8 +60,8 @@ TEST(DecoderTest, AacDecoder) {
   fuchsia::mediacodec::CodecFactoryPtr codec_factory;
   component_context->svc()->Connect(codec_factory.NewRequest(main_loop.dispatcher()));
 
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem;
-  component_context->svc()->Connect<fuchsia::sysmem::Allocator>(sysmem.NewRequest());
+  fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem;
+  component_context->svc()->Connect<fuchsia::sysmem2::Allocator>(sysmem.NewRequest());
 
   uint8_t md[SHA256_DIGEST_LENGTH];
   use_aac_decoder(&main_loop, std::move(codec_factory), std::move(sysmem), kInputFilePath, "", md);
