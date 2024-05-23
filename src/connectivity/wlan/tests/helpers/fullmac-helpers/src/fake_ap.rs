@@ -5,13 +5,16 @@
 use {
     crate::recorded_request_stream::RecordedRequestStream,
     fidl_fuchsia_wlan_common_security as fidl_wlan_security,
-    fidl_fuchsia_wlan_fullmac as fidl_fullmac,
+    fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_mlme::EapolResultCode,
     ieee80211::MacAddr,
     std::sync::{Arc, Mutex},
     wlan_common::{
         assert_variant, bss,
-        ie::rsn::{cipher::CIPHER_CCMP_128, rsne},
+        ie::rsn::{
+            cipher::{CIPHER_BIP_CMAC_128, CIPHER_CCMP_128},
+            rsne,
+        },
     },
     wlan_rsn::{
         rsna::{SecAssocUpdate, UpdateSink},
@@ -56,6 +59,90 @@ pub fn create_wpa2_authenticator(
         advertised_protection_info,
     )
     .expect("Failed to create authenticator")
+}
+
+/// Creates a WPA3 authenticator based on the given parameters.
+pub fn create_wpa3_authenticator(
+    client_mac_addr: MacAddr,
+    bss_description: &bss::BssDescription,
+    credentials: fidl_wlan_security::WpaCredentials,
+) -> Authenticator {
+    assert_eq!(bss_description.protection(), bss::Protection::Wpa3Personal);
+
+    // It's assumed that advertised and supplicant protections are the same.
+    let advertised_protection_info = get_protection_info(bss_description);
+    let supplicant_protection_info = get_protection_info(bss_description);
+
+    let password =
+        assert_variant!(credentials, fidl_wlan_security::WpaCredentials::Passphrase(p) => p);
+
+    let nonce_rdr = wlan_rsn::nonce::NonceReader::new(&bss_description.bssid.clone().into())
+        .expect("creating nonce reader");
+    let gtk_provider =
+        wlan_rsn::GtkProvider::new(CIPHER_CCMP_128, 1, 0).expect("creating gtk provider");
+    let igtk_provider =
+        wlan_rsn::IgtkProvider::new(CIPHER_BIP_CMAC_128).expect("error creating IgtkProvider");
+
+    Authenticator::new_wpa3(
+        nonce_rdr,
+        Arc::new(Mutex::new(gtk_provider)),
+        Arc::new(Mutex::new(igtk_provider)),
+        bss_description.ssid.clone(),
+        password,
+        client_mac_addr,
+        supplicant_protection_info.clone(),
+        bss_description.bssid.into(),
+        advertised_protection_info,
+    )
+    .expect("Failed to create authenticator")
+}
+
+// Uses |fullmac_req_stream| and |fullmac_ifc_proxy| to perform an SAE exchange as a WPA3
+// authenticator.
+//
+// This assumes that the user has already sent an `SaeHandshakeInd` to the test realm, and the test
+// realm is ready to send the first SAE commit frame to the authenticator.
+//
+// Returns the EAPOL key frame that will be used as the first frame in the EAPOL handshake.
+// When this function returns, the user can expect that:
+//  - |authenticator| is ready to be initiated and used in an EAPOL handshake.
+//  - |fullmac_req_stream| has a pending `SaeHandshakeResp` request.
+//
+// Panics if the handshake fails for any reason.
+pub async fn handle_sae_exchange(
+    authenticator: &mut Authenticator,
+    fullmac_req_stream: &mut RecordedRequestStream,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+) -> UpdateSink {
+    let mut update_sink = UpdateSink::new();
+
+    // Handle supplicant confirm
+    let supplicant_commit_frame = get_sae_frame_from_test_realm(fullmac_req_stream).await;
+    authenticator
+        .on_sae_frame_rx(&mut update_sink, supplicant_commit_frame)
+        .expect("Failed to send SAE commit frame to authenticator");
+
+    // Authenticator produces the commit and confirm frame at the same time
+    // after receiving the supplicant commit.
+    let authenticator_commit_frame = assert_variant!(
+        &update_sink[0], SecAssocUpdate::TxSaeFrame(frame) => frame.clone());
+    let authenticator_confirm_frame = assert_variant!(
+        &update_sink[1], SecAssocUpdate::TxSaeFrame(frame) => frame.clone());
+    update_sink.clear();
+
+    // Send the authenticator commit frame
+    send_sae_frame_to_test_realm(authenticator_commit_frame, fullmac_ifc_proxy).await;
+
+    // Handle supplicant confirm frame
+    let supplicant_confirm_frame = get_sae_frame_from_test_realm(fullmac_req_stream).await;
+    authenticator
+        .on_sae_frame_rx(&mut update_sink, supplicant_confirm_frame)
+        .expect("Failed to send SAE confirm frame to authenticator");
+
+    // Send the authenticator confirm frame
+    send_sae_frame_to_test_realm(authenticator_confirm_frame, fullmac_ifc_proxy).await;
+
+    update_sink
 }
 
 /// Uses |fullmac_req_stream| and |fullmac_ifc_proxy| to perform an EAPOL handshake as an
@@ -164,4 +251,38 @@ async fn get_eapol_frame_from_test_realm(
 fn get_protection_info(bss_description: &bss::BssDescription) -> wlan_rsn::ProtectionInfo {
     let (_, rsne) = rsne::from_bytes(bss_description.rsne().unwrap()).expect("Could not get RSNE");
     wlan_rsn::ProtectionInfo::Rsne(rsne)
+}
+
+async fn get_sae_frame_from_test_realm(
+    fullmac_req_stream: &mut RecordedRequestStream,
+) -> fidl_mlme::SaeFrame {
+    let fullmac_sae_frame = assert_variant!(fullmac_req_stream.next().await,
+    fidl_fullmac::WlanFullmacImplBridgeRequest::SaeFrameTx { frame, responder } => {
+        responder
+            .send()
+            .expect("Failed to respond to SaeFrameTx");
+        frame
+    });
+
+    fidl_mlme::SaeFrame {
+        peer_sta_address: fullmac_sae_frame.peer_sta_address,
+        status_code: fullmac_sae_frame.status_code,
+        seq_num: fullmac_sae_frame.seq_num,
+        sae_fields: fullmac_sae_frame.sae_fields,
+    }
+}
+
+async fn send_sae_frame_to_test_realm(
+    frame: fidl_mlme::SaeFrame,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+) {
+    fullmac_ifc_proxy
+        .sae_frame_rx(&fidl_fullmac::WlanFullmacSaeFrame {
+            peer_sta_address: frame.peer_sta_address,
+            status_code: frame.status_code,
+            seq_num: frame.seq_num,
+            sae_fields: frame.sae_fields.clone(),
+        })
+        .await
+        .expect("Could not send authenticator SAE commit frame");
 }

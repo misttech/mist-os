@@ -35,6 +35,13 @@ lazy_static! {
     )
     .try_into()
     .expect("Could not convert BSS description from FIDL");
+    pub static ref COMPATIBLE_WPA3_BSS: bss::BssDescription = fake_fidl_bss_description!(
+        protection => FakeProtectionCfg::Wpa3,
+        channel: wlan_common::channel::Channel::new(1, wlan_common::channel::Cbw::Cbw20),
+        rates: vec![2, 4, 11],
+    )
+    .try_into()
+    .expect("Could not convert BSS description from FIDL");
 }
 
 /// Creates and starts fullmac driver using |testcontroller_proxy|.

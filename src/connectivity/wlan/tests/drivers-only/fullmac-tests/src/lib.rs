@@ -12,7 +12,7 @@ use {
     fullmac_helpers::{
         config::{default_fullmac_query_info, FullmacDriverConfig},
         recorded_request_stream::{FullmacRequest, RecordedRequestStream},
-        COMPATIBLE_OPEN_BSS, COMPATIBLE_WPA2_BSS,
+        COMPATIBLE_OPEN_BSS, COMPATIBLE_WPA2_BSS, COMPATIBLE_WPA3_BSS,
     },
     futures::StreamExt,
     ieee80211::{MacAddr, MacAddrBytes},
@@ -20,7 +20,7 @@ use {
     wlan_common::{assert_variant, random_fidl_bss_description},
     wlan_rsn::{
         key::{exchange::Key, Tk},
-        rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink},
+        rsna::{AuthStatus, SecAssocStatus, SecAssocUpdate, UpdateSink},
     },
 };
 
@@ -665,6 +665,264 @@ async fn test_wpa2_connect_request_success() {
 }
 
 #[fuchsia::test]
+async fn test_wpa3_connect_success() {
+    let (mut fullmac_driver, generic_sme_proxy) =
+        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
+            ..Default::default()
+        })
+        .await;
+    let client_sme_proxy = sme_helpers::get_client_sme(&generic_sme_proxy).await;
+
+    let credentials = fidl_wlan_security::WpaCredentials::Passphrase(vec![8, 7, 6, 5, 4, 3, 2, 1]);
+
+    let client_fut = async {
+        let (connect_txn, connect_txn_server) =
+            fidl::endpoints::create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+        let mut connect_txn_event_stream = connect_txn.take_event_stream();
+
+        let connect_req = fidl_sme::ConnectRequest {
+            ssid: COMPATIBLE_WPA3_BSS.ssid.clone().into(),
+            bss_description: COMPATIBLE_WPA3_BSS.clone().into(),
+            multiple_bss_candidates: false,
+            authentication: fidl_wlan_security::Authentication {
+                protocol: fidl_wlan_security::Protocol::Wpa3Personal,
+                credentials: Some(Box::new(fidl_wlan_security::Credentials::Wpa(
+                    credentials.clone(),
+                ))),
+            },
+            // Note: this field has no effect for fullmac drivers.
+            deprecated_scan_type: fidl_common::ScanType::Passive,
+        };
+
+        client_sme_proxy
+            .connect(&connect_req, Some(connect_txn_server))
+            .expect("Connect FIDL error.");
+
+        let connect_txn_event = connect_txn_event_stream
+            .next()
+            .await
+            .expect("Connect event stream FIDL error")
+            .expect("Connect txn returned error");
+
+        // Returns the Connect result code.
+        assert_variant!(connect_txn_event,
+            fidl_sme::ConnectTransactionEvent::OnConnectResult { result } => {
+                result
+            }
+        )
+    };
+
+    let driver_fut = async {
+        assert_variant!(fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::Connect { payload: _, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to Connect");
+        });
+
+        let mut authenticator = fullmac_helpers::fake_ap::create_wpa3_authenticator(
+            MacAddr::from(fullmac_driver.sta_addr()),
+            &COMPATIBLE_WPA3_BSS,
+            credentials.clone(),
+        );
+
+        // Kick off SAE handshake by sending SaeHandshakeInd
+        fullmac_driver
+            .ifc_proxy
+            .sae_handshake_ind(&fidl_fullmac::WlanFullmacSaeHandshakeInd {
+                peer_sta_address: COMPATIBLE_WPA3_BSS.bssid.to_array(),
+            })
+            .await
+            .expect("Could not send SaeHandshakeInd");
+
+        // Note: SAE exchange must occur before sending ConnectConfirm
+        let initial_eapol_frame = {
+            let update_sink = fullmac_helpers::fake_ap::handle_sae_exchange(
+                &mut authenticator,
+                &mut fullmac_driver.request_stream,
+                &fullmac_driver.ifc_proxy,
+            )
+            .await;
+
+            assert!(update_sink.contains(&SecAssocUpdate::SaeAuthStatus(AuthStatus::Success)));
+            assert!(update_sink.contains(&SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)));
+
+            // Get initial EAPOL frame from update_sink
+            update_sink
+                .iter()
+                .find_map(|u| match u {
+                    SecAssocUpdate::TxEapolKeyFrame { frame, .. } => Some(frame.clone()),
+                    _ => None,
+                })
+                .unwrap()
+        };
+
+        let mut update_sink = UpdateSink::new();
+        authenticator.initiate(&mut update_sink).expect("Could not initiate authenticator");
+        assert_eq!(update_sink.len(), 0);
+
+        assert_variant!(fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::SaeHandshakeResp { resp: _, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to SaeHandshakeResp");
+        });
+
+        fullmac_driver
+            .ifc_proxy
+            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
+                peer_sta_address: COMPATIBLE_WPA3_BSS.bssid.to_array(),
+                result_code: fidl_ieee80211::StatusCode::Success,
+                association_id: 0,
+                association_ies: vec![],
+            })
+            .await
+            .expect("Failed to send ConnectConf");
+
+        let update_sink = fullmac_helpers::fake_ap::handle_fourway_eapol_handshake(
+            &mut authenticator,
+            initial_eapol_frame,
+            COMPATIBLE_WPA3_BSS.bssid.to_array(),
+            fullmac_driver.sta_addr(),
+            &mut fullmac_driver.request_stream,
+            &fullmac_driver.ifc_proxy,
+        )
+        .await;
+
+        // Expect PTK, GTK, and IGTK
+        for _ in 0..3 {
+            assert_variant!(fullmac_driver.request_stream.next().await,
+            fidl_fullmac::WlanFullmacImplBridgeRequest::SetKeysReq { req, responder } => {
+                responder.send(&fidl_fullmac::WlanFullmacSetKeysResp {
+                    num_keys: req.num_keys,
+                    statuslist: [zx::sys::ZX_OK; fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize],
+                }).expect("Failed to respond to SetKeys");
+            });
+        }
+
+        assert_variant!(fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: _, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to OnLinkStateChanged");
+        });
+
+        update_sink
+    };
+
+    let (connect_result, auth_update_sink) = futures::join!(client_fut, driver_fut);
+    assert_eq!(connect_result.code, fidl_ieee80211::StatusCode::Success);
+
+    // TODO(https://fxbug.dev/337074689): This is checked field by field because WEP key is initialized to some default
+    // value determined by Banjo -> FIDL conversion code in wlanif. Instead of checking against
+    // that default value, we ignore it in the test.
+    let driver_connect_req = assert_variant!(&fullmac_driver.request_stream.history()[0], FullmacRequest::Connect(req) => req.clone());
+    assert_eq!(driver_connect_req.selected_bss.unwrap(), COMPATIBLE_WPA3_BSS.clone().into());
+    assert_eq!(driver_connect_req.security_ie.unwrap(), COMPATIBLE_WPA3_BSS.rsne().unwrap());
+    assert_eq!(driver_connect_req.connect_failure_timeout.unwrap(), 60);
+    assert_eq!(driver_connect_req.auth_type.unwrap(), fidl_fullmac::WlanAuthType::Sae);
+
+    // TODO(https://fxbug.dev/337074689): Check that these are None instead of empty vectors.
+    assert_eq!(driver_connect_req.sae_password.unwrap(), vec![]);
+
+    let sae_commit = assert_variant!(&fullmac_driver.request_stream.history()[1], FullmacRequest::SaeFrameTx(req) => req);
+    assert_eq!(sae_commit.peer_sta_address, COMPATIBLE_WPA3_BSS.bssid.to_array());
+    assert_eq!(sae_commit.status_code, fidl_ieee80211::StatusCode::Success);
+    assert_eq!(sae_commit.seq_num, 1);
+
+    let sae_confirm = assert_variant!(&fullmac_driver.request_stream.history()[2], FullmacRequest::SaeFrameTx(req) => req);
+    assert_eq!(sae_confirm.peer_sta_address, COMPATIBLE_WPA3_BSS.bssid.to_array());
+    assert_eq!(sae_confirm.status_code, fidl_ieee80211::StatusCode::Success);
+    assert_eq!(sae_confirm.seq_num, 2);
+
+    assert_eq!(
+        fullmac_driver.request_stream.history()[3],
+        FullmacRequest::SaeHandshakeResp(fidl_fullmac::WlanFullmacSaeHandshakeResp {
+            peer_sta_address: fullmac_driver.sta_addr(),
+            status_code: fidl_ieee80211::StatusCode::Success,
+        })
+    );
+
+    let eapol_tx1 = assert_variant!(&fullmac_driver.request_stream.history()[4], FullmacRequest::EapolTx(req) => req);
+    assert_eq!(eapol_tx1.src_addr.unwrap(), fullmac_driver.sta_addr());
+    assert_eq!(eapol_tx1.dst_addr.unwrap(), COMPATIBLE_WPA2_BSS.bssid.to_array());
+
+    let eapol_tx2 = assert_variant!(&fullmac_driver.request_stream.history()[5], FullmacRequest::EapolTx(req) => req);
+    assert_eq!(eapol_tx2.src_addr.unwrap(), fullmac_driver.sta_addr());
+    assert_eq!(eapol_tx2.dst_addr.unwrap(), COMPATIBLE_WPA2_BSS.bssid.to_array());
+
+    // Check that PTK received by driver matches the authenticator's PTK
+    let driver_ptk_req = assert_variant!(&fullmac_driver.request_stream.history()[6], FullmacRequest::SetKeysReq(req) => req.clone());
+    assert_eq!(driver_ptk_req.num_keys, 1);
+    let driver_ptk = &driver_ptk_req.keylist[0];
+    let auth_ptk =
+        assert_variant!(&auth_update_sink[0], SecAssocUpdate::Key(Key::Ptk(ptk)) => ptk.clone());
+
+    assert_eq!(
+        driver_ptk,
+        &fidl_common::WlanKeyConfig {
+            key_type: Some(fidl_common::WlanKeyType::Pairwise),
+            key_idx: Some(0),
+            peer_addr: Some(COMPATIBLE_WPA2_BSS.bssid.to_array()),
+            protection: Some(fidl_common::WlanProtection::RxTx),
+            cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
+            cipher_oui: Some(auth_ptk.cipher.oui.into()),
+            key: Some(auth_ptk.tk().to_vec()),
+            rsc: Some(0),
+            ..Default::default()
+        }
+    );
+
+    // Check that GTK received by driver matches the authenticator's GTK
+    let driver_gtk_req = assert_variant!(&fullmac_driver.request_stream.history()[7], FullmacRequest::SetKeysReq(req) => req);
+    assert_eq!(driver_gtk_req.num_keys, 1);
+    let driver_gtk = &driver_gtk_req.keylist[0];
+    let auth_gtk =
+        assert_variant!(&auth_update_sink[1], SecAssocUpdate::Key(Key::Gtk(gtk)) => gtk.clone());
+
+    assert_eq!(
+        driver_gtk,
+        &fidl_common::WlanKeyConfig {
+            key_type: Some(fidl_common::WlanKeyType::Group),
+            key_idx: Some(auth_gtk.key_id()),
+            peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),
+            protection: Some(fidl_common::WlanProtection::RxTx),
+            cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
+            cipher_oui: Some(auth_gtk.cipher().oui.into()),
+            key: Some(auth_gtk.tk().to_vec()),
+            rsc: Some(auth_gtk.key_rsc()),
+            ..Default::default()
+        }
+    );
+
+    // Check that IGTK received by driver matches the authenticator's IGTK
+    let driver_igtk_req = assert_variant!(&fullmac_driver.request_stream.history()[8], FullmacRequest::SetKeysReq(req) => req);
+    let driver_igtk = &driver_igtk_req.keylist[0];
+    let auth_igtk =
+        assert_variant!(&auth_update_sink[2], SecAssocUpdate::Key(Key::Igtk(igtk)) => igtk.clone());
+
+    assert_eq!(
+        driver_igtk,
+        &fidl_common::WlanKeyConfig {
+            key_type: Some(fidl_common::WlanKeyType::Igtk),
+            key_idx: Some(auth_igtk.key_id.try_into().unwrap()),
+            peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),
+            protection: Some(fidl_common::WlanProtection::RxTx),
+            cipher_type: Some(fidl_ieee80211::CipherSuiteType::BipCmac128),
+            cipher_oui: Some(auth_igtk.cipher.oui.into()),
+            key: Some(auth_igtk.tk().to_vec()),
+            rsc: Some(0),
+            ..Default::default()
+        }
+    );
+
+    assert_eq!(
+        fullmac_driver.request_stream.history()[9],
+        FullmacRequest::OnLinkStateChanged(true)
+    );
+}
+
+#[fuchsia::test]
 async fn test_sme_disconnect() {
     let (client_sme_proxy, mut connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
         setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
@@ -772,19 +1030,21 @@ async fn test_remote_disassoc_then_reconnect() {
         .await
         .expect("Could not send DissasocInd");
 
-    assert_variant!(fullmac_driver.request_stream.next().await,
-    fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: false, responder } => {
-        responder
-            .send()
-            .expect("Failed to respond to OnLinkStateChanged");
+    assert_variant!(
+        fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: false, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to OnLinkStateChanged");
     });
 
-    assert_variant!(fullmac_driver.request_stream.next().await,
-    fidl_fullmac::WlanFullmacImplBridgeRequest::Reconnect { payload, responder } => {
-        responder
-            .send()
-            .expect("Failed to respond to Reconnect");
-        assert_eq!(payload.peer_sta_address.unwrap(), COMPATIBLE_OPEN_BSS.bssid.to_array());
+    assert_variant!(
+        fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::Reconnect { payload, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to Reconnect");
+            assert_eq!(payload.peer_sta_address.unwrap(), COMPATIBLE_OPEN_BSS.bssid.to_array());
     });
 
     assert_variant!(
@@ -811,11 +1071,12 @@ async fn test_remote_disassoc_then_reconnect() {
         .await
         .expect("Failed to send ConnectConf");
 
-    assert_variant!(fullmac_driver.request_stream.next().await,
-    fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: true, responder } => {
-        responder
-            .send()
-            .expect("Failed to respond to OnLinkStateChanged");
+    assert_variant!(
+        fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::OnLinkStateChanged { online: true, responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to OnLinkStateChanged");
     });
 
     assert_variant!(

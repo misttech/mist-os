@@ -61,9 +61,9 @@ pub fn default_security_support() -> fidl_common::SecuritySupport {
     fidl_common::SecuritySupport {
         sae: fidl_common::SaeFeature {
             driver_handler_supported: false,
-            sme_handler_supported: false,
+            sme_handler_supported: true,
         },
-        mfp: fidl_common::MfpFeature { supported: false },
+        mfp: fidl_common::MfpFeature { supported: true },
     }
 }
 

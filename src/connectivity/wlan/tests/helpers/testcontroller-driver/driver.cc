@@ -101,8 +101,16 @@ class WlanFullmacImplIfcToDriverBridge
   void OnPmkAvailable(OnPmkAvailableRequest& request,
                       OnPmkAvailableCompleter::Sync& completer) override {}
   void SaeHandshakeInd(SaeHandshakeIndRequest& request,
-                       SaeHandshakeIndCompleter::Sync& completer) override {}
-  void SaeFrameRx(SaeFrameRxRequest& request, SaeFrameRxCompleter::Sync& completer) override {}
+                       SaeHandshakeIndCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->SaeHandshakeInd(request).Then(
+        ForwardResult<WlanFullmacImplIfc::SaeHandshakeInd>(completer.ToAsync()));
+  }
+  void SaeFrameRx(SaeFrameRxRequest& request, SaeFrameRxCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->SaeFrameRx(request).Then(
+        ForwardResult<WlanFullmacImplIfc::SaeFrameRx>(completer.ToAsync()));
+  }
   void OnWmmStatusResp(OnWmmStatusRespRequest& request,
                        OnWmmStatusRespCompleter::Sync& completer) override {}
 
@@ -227,8 +235,16 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
   void SetMulticastPromisc(SetMulticastPromiscRequest& request,
                            SetMulticastPromiscCompleter::Sync& completer) override {}
   void SaeHandshakeResp(SaeHandshakeRespRequest& request,
-                        SaeHandshakeRespCompleter::Sync& completer) override {}
-  void SaeFrameTx(SaeFrameTxRequest& request, SaeFrameTxCompleter::Sync& completer) override {}
+                        SaeHandshakeRespCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->SaeHandshakeResp(request).Then(
+        ForwardResult<WlanFullmacImplBridge::SaeHandshakeResp>(completer.ToAsync()));
+  }
+  void SaeFrameTx(SaeFrameTxRequest& request, SaeFrameTxCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->SaeFrameTx(request).Then(
+        ForwardResult<WlanFullmacImplBridge::SaeFrameTx>(completer.ToAsync()));
+  }
   void WmmStatusReq(WmmStatusReqCompleter::Sync& completer) override {}
   void OnLinkStateChanged(OnLinkStateChangedRequest& request,
                           OnLinkStateChangedCompleter::Sync& completer) override {
