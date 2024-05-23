@@ -24,10 +24,7 @@ use crate::{
         TimerContext, TracingContext,
     },
     counters::Counter,
-    device::{
-        link::{LinkDevice, LinkUnicastAddress},
-        DeviceIdContext, FrameDestination, WeakDeviceIdentifier,
-    },
+    device::{link::LinkDevice, DeviceIdContext, FrameDestination, WeakDeviceIdentifier},
     ip::device::nud::{
         self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
         NudBindingsTypes, NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState,
@@ -35,32 +32,12 @@ use crate::{
     },
 };
 
-// NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
-// sub-trait of `L: LinkDevice` where `L::Address: HType`? Unfortunately, rustc
-// is still pretty bad at reasoning about where clauses. In a (never published)
-// earlier version of this code, I tried that approach. Even simple function
-// signatures like `fn foo<D: ArpDevice, P: PType, C, SC: ArpContext<D, P, C>>()` were
-// too much for rustc to handle. Even without trying to actually use the
-// associated `Address` type, that function signature alone would cause rustc to
-// complain that it wasn't guaranteed that `D::Address: HType`.
-//
-// Doing it this way instead sidesteps the problem by taking the `where` clause
-// out of the definition of `ArpDevice`. It's still present in the blanket impl,
-// but rustc seems OK with that.
-
 /// A link device whose addressing scheme is supported by ARP.
 ///
 /// `ArpDevice` is implemented for all `L: LinkDevice where L::Address: HType`.
-pub trait ArpDevice: LinkDevice<Address = Self::HType> {
-    type HType: HType + LinkUnicastAddress + core::fmt::Debug;
-}
+pub trait ArpDevice: LinkDevice<Address: HType> {}
 
-impl<L: LinkDevice> ArpDevice for L
-where
-    L::Address: HType + LinkUnicastAddress,
-{
-    type HType = L::Address;
-}
+impl<L: LinkDevice<Address: HType>> ArpDevice for L {}
 
 /// The identifier for timer events in the ARP layer.
 pub(crate) type ArpTimerId<L, D> = NudTimerId<Ipv4, L, D>;
@@ -71,7 +48,7 @@ pub struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
     /// The ID of the ARP device.
     pub(super) device_id: DeviceId,
     /// The destination hardware address.
-    pub(super) dst_addr: D::HType,
+    pub(super) dst_addr: D::Address,
 }
 
 /// Counters for the ARP layer.
@@ -106,7 +83,7 @@ pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceI
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        dst_link_address: D::HType,
+        dst_link_address: D::Address,
         body: S,
     ) -> Result<(), S>
     where
@@ -189,7 +166,7 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-    ) -> UnicastAddr<D::HType>;
+    ) -> UnicastAddr<D::Address>;
 
     /// Calls the function with a mutable reference to ARP state and the ARP
     /// configuration context.
@@ -287,7 +264,7 @@ impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         bindings_ctx: &mut BC,
-        dst_mac: D::HType,
+        dst_mac: D::Address,
         body: S,
     ) -> Result<(), S>
     where
@@ -346,7 +323,7 @@ fn handle_packet<
 ) {
     core_ctx.increment(|counters| &counters.rx_packets);
     // TODO(wesleyac) Add support for probe.
-    let packet = match buffer.parse::<ArpPacket<_, D::HType, Ipv4Addr>>() {
+    let packet = match buffer.parse::<ArpPacket<_, D::Address, Ipv4Addr>>() {
         Ok(packet) => packet,
         Err(err) => {
             // If parse failed, it's because either the packet was malformed, or
@@ -570,7 +547,7 @@ fn send_arp_request<
 ) {
     if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(bindings_ctx, device_id) {
         let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
-        let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
+        let dst_addr = remote_link_addr.unwrap_or(D::Address::BROADCAST);
         core_ctx.increment(|counters| &counters.tx_requests);
         debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
         SendFrameContext::send_frame(
