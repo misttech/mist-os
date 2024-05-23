@@ -13,6 +13,9 @@
 #include <iostream>
 #include <random>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
+
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace {
@@ -44,7 +47,7 @@ constexpr uint32_t kMaxExpectedBufferCount = 18;
 }  // namespace
 
 CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
-                         fuchsia::sysmem::AllocatorHandle sysmem)
+                         fuchsia::sysmem2::AllocatorHandle sysmem)
     : loop_(loop), dispatcher_(loop_->dispatcher()), loop_thread_(loop_thread) {
   // Only one request is ever created, so we create it in the constructor to
   // avoid needing any manual enforcement that we only do this once.
@@ -59,7 +62,9 @@ CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
     ZX_ASSERT(bind_status == ZX_OK);
     sysmem_.set_error_handler(
         [](zx_status_t status) { FX_PLOGS(FATAL, status) << "sysmem_ failed - unexpected"; });
-    sysmem_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+    sysmem_->SetDebugClientInfo(std::move(fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest{}
+                                              .set_name(fsl::GetCurrentProcessName())
+                                              .set_id(fsl::GetCurrentProcessKoid())));
 
     codec_ = codec_handle.Bind();
     codec_->EnableOnStreamFailed();
@@ -94,6 +99,22 @@ CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
     codec_.events().OnOutputPacket = fit::bind_member<&CodecClient::OnOutputPacket>(this);
     codec_.events().OnOutputEndOfStream = fit::bind_member<&CodecClient::OnOutputEndOfStream>(this);
   });
+}
+
+CodecClient::CodecClient(async::Loop* loop, thrd_t loop_thread,
+                         fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem1_param)
+    : CodecClient(loop, loop_thread, [sysmem1_param = std::move(sysmem1_param)]() mutable {
+        auto sysmem1 = sysmem1_param.BindSync();
+        fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem2;
+        ZX_ASSERT(ZX_OK == sysmem1->ConnectToSysmem2Allocator(sysmem2.NewRequest()));
+        return sysmem2;
+      }()) {
+  FX_LOGS(WARNING)
+      << "#########################################################################################";
+  FX_LOGS(WARNING)
+      << "CodecClient::CodecClient(sysmem1) is deprecated; please pass a sysmem2 allocator instead.";
+  FX_LOGS(WARNING)
+      << "#########################################################################################";
 }
 
 CodecClient::~CodecClient() { Stop(); }
@@ -165,7 +186,7 @@ void CodecClient::Start() {
   // FIDL thread to send any FIDL message.
 
   uint32_t input_packet_count;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
   if (!ConfigurePortBufferCollection(false, kInputBufferLifetimeOrdinal,
                                      input_constraints_->buffer_constraints_version_ordinal(),
                                      &input_packet_count, &input_buffer_collection_,
@@ -175,13 +196,13 @@ void CodecClient::Start() {
 
   ZX_ASSERT(input_free_packet_bits_.empty());
   input_free_packet_bits_.resize(input_packet_count, true);
-  all_input_buffers_.reserve(buffer_collection_info.buffer_count);
-  for (uint32_t i = 0; i < buffer_collection_info.buffer_count; i++) {
+  all_input_buffers_.reserve(buffer_collection_info.buffers().size());
+  for (uint32_t i = 0; i < buffer_collection_info.buffers().size(); i++) {
     std::unique_ptr<CodecBuffer> local_buffer = CodecBuffer::CreateFromVmo(
-        i, std::move(buffer_collection_info.buffers[i].vmo),
-        static_cast<uint32_t>(buffer_collection_info.buffers[i].vmo_usable_start),
-        buffer_collection_info.settings.buffer_settings.size_bytes, true,
-        buffer_collection_info.settings.buffer_settings.is_physically_contiguous);
+        i, std::move(*buffer_collection_info.mutable_buffers()->at(i).mutable_vmo()),
+        static_cast<uint32_t>(buffer_collection_info.mutable_buffers()->at(i).vmo_usable_start()),
+        static_cast<uint32_t>(buffer_collection_info.settings().buffer_settings().size_bytes()),
+        true, buffer_collection_info.settings().buffer_settings().is_physically_contiguous());
     if (!local_buffer) {
       FX_LOGS(FATAL) << "CodecBuffer::CreateFromVmo() failed";
     }
@@ -202,8 +223,8 @@ void CodecClient::Start() {
     input_free_packet_list_.push_back(i);
   }
   input_packet_index_to_buffer_index_.resize(input_packet_count);
-  input_free_buffer_list_.reserve(buffer_collection_info.buffer_count);
-  for (uint32_t i = 0; i < buffer_collection_info.buffer_count; ++i) {
+  input_free_buffer_list_.reserve(buffer_collection_info.buffers().size());
+  for (uint32_t i = 0; i < buffer_collection_info.buffers().size(); ++i) {
     input_free_buffer_list_.push_back(i);
   }
 
@@ -217,18 +238,20 @@ void CodecClient::Start() {
 }
 
 bool CodecClient::CreateAndSyncBufferCollection(
-    fuchsia::sysmem::BufferCollectionSyncPtr* out_buffer_collection,
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>* out_codec_sysmem_token) {
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> codec_sysmem_token;
+    fuchsia::sysmem2::BufferCollectionSyncPtr* out_buffer_collection,
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>* out_codec_sysmem_token) {
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> codec_sysmem_token;
 
   // Create client_token which will get converted into out_buffer_collection.
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr client_token;
-  fidl::InterfaceRequest<fuchsia::sysmem::BufferCollectionToken> client_token_request =
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr client_token;
+  fidl::InterfaceRequest<fuchsia::sysmem2::BufferCollectionToken> client_token_request =
       client_token.NewRequest();
 
   // Create codec_sysmem_token that'll get returned via out_codec_sysmem_token.
-  client_token->Duplicate(std::numeric_limits<uint32_t>::max(), codec_sysmem_token.NewRequest());
+  client_token->Duplicate(std::move(fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest{}
+                                        .set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS)
+                                        .set_token_request(codec_sysmem_token.NewRequest())));
 
   // client_token gets converted into a buffer_collection.
   //
@@ -240,21 +263,27 @@ bool CodecClient::CreateAndSyncBufferCollection(
     if (!sysmem_) {
       return;
     }
-    sysmem_->AllocateSharedCollection(std::move(client_token_request));
+    sysmem_->AllocateSharedCollection(
+        std::move(fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest{}.set_token_request(
+            std::move(client_token_request))));
     // codec_sysmem_token will be known to sysmem by the time client_token
     // closure is seen by sysmem, which in turn is before
     // buffer_collection_request will be hooked up, which is why
     // buffer_collection->Sync() completion below is enough to prove that
     // sysmem knows about codec_sysmem_token before codec_sysmem_token is
     // sent to the codec.
-    sysmem_->BindSharedCollection(std::move(client_token), std::move(buffer_collection_request));
+    sysmem_->BindSharedCollection(
+        std::move(fuchsia::sysmem2::AllocatorBindSharedCollectionRequest{}
+                      .set_token(std::move(client_token))
+                      .set_buffer_collection_request(std::move(buffer_collection_request))));
   });
 
   // After Sync() completes its round trip, we know that sysmem knows about
   // codec_sysmem_token (causally), which is important because we'll shortly
   // send codec_sysmem_token to the codec which will use codec_sysmem_token via
   // a different sysmem channel.
-  zx_status_t sync_status = buffer_collection->Sync();
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  zx_status_t sync_status = buffer_collection->Sync(&sync_result);
   if (sync_status != ZX_OK) {
     FX_PLOGS(FATAL, sync_status) << "buffer_collection->Sync() failed";
   }
@@ -265,34 +294,40 @@ bool CodecClient::CreateAndSyncBufferCollection(
 }
 
 bool CodecClient::WaitForSysmemBuffersAllocated(
-    bool is_output, fuchsia::sysmem::BufferCollectionSyncPtr* buffer_collection_param,
-    fuchsia::sysmem::BufferCollectionInfo_2* out_buffer_collection_info) {
+    bool is_output, fuchsia::sysmem2::BufferCollectionSyncPtr* buffer_collection_param,
+    fuchsia::sysmem2::BufferCollectionInfo* out_buffer_collection_info) {
   // The style guide doesn't like non-const &, but the code in this method is
   // easier to read with a non-const &, so treat it that way within this method.
-  fuchsia::sysmem::BufferCollectionSyncPtr& buffer_collection = *buffer_collection_param;
-  fuchsia::sysmem::BufferCollectionInfo_2 result_buffer_collection_info;
+  fuchsia::sysmem2::BufferCollectionSyncPtr& buffer_collection = *buffer_collection_param;
 
   // It's not permitted to send input data until the client knows that sysmem
   // is done allocating.  It's not required that the client know that the
   // codec knows that sysmem is done allocating though - the server will
   // verify that sysmem is done by communicating with sysmem directly as
   // needed.
-  zx_status_t allocate_status;
-  zx_status_t call_status =
-      buffer_collection->WaitForBuffersAllocated(&allocate_status, &result_buffer_collection_info);
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  zx_status_t call_status = buffer_collection->WaitForAllBuffersAllocated(&wait_result);
   if (call_status != ZX_OK) {
     FX_PLOGS(ERROR, call_status) << "WaitForBuffersAllocated returned failure";
     return false;
   }
-  if (allocate_status != ZX_OK) {
-    FX_PLOGS(ERROR, allocate_status) << "WaitForBuffersAllocated allocation failed";
+  if (wait_result.is_framework_err()) {
+    FX_PLOGS(ERROR, fidl::ToUnderlying(wait_result.framework_err()))
+        << "WaitForBuffersAllocated allocation failed (framework_err)";
     return false;
   }
+  if (wait_result.is_err()) {
+    FX_PLOGS(ERROR, static_cast<uint32_t>(wait_result.err()))
+        << "WaitForBuffersAllocated allocation failed (err)";
+    return false;
+  }
+  auto result_buffer_collection_info =
+      std::move(*wait_result.response().mutable_buffer_collection_info());
 
   // This is a little noisy, but it can be useful to see how many buffers are being used.  Make sure
   // it doesn't show up on stderr though.
   std::cout << "WaitForSysmemBuffersAllocated() done - is_output: " << is_output
-            << " buffer_count: " << result_buffer_collection_info.buffer_count << std::endl;
+            << " buffer_count: " << result_buffer_collection_info.buffers().size() << std::endl;
 
   *out_buffer_collection_info = std::move(result_buffer_collection_info);
   return true;
@@ -672,7 +707,7 @@ std::unique_ptr<CodecOutput> CodecClient::BlockingGetEmittedOutput() {
         snapped_constraints->buffer_constraints();
 
     uint32_t packet_count;
-    fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info;
+    fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
     if (!ConfigurePortBufferCollection(true, new_output_buffer_lifetime_ordinal,
                                        buffer_constraints.buffer_constraints_version_ordinal(),
                                        &packet_count, &output_buffer_collection_,
@@ -687,10 +722,10 @@ std::unique_ptr<CodecOutput> CodecClient::BlockingGetEmittedOutput() {
       all_output_buffers_.reserve(packet_count);
       for (uint32_t i = 0; i < packet_count; i++) {
         std::unique_ptr<CodecBuffer> buffer = CodecBuffer::CreateFromVmo(
-            i, std::move(buffer_collection_info.buffers[i].vmo),
-            static_cast<uint32_t>(buffer_collection_info.buffers[i].vmo_usable_start),
-            buffer_collection_info.settings.buffer_settings.size_bytes, true,
-            buffer_collection_info.settings.buffer_settings.is_physically_contiguous);
+            i, std::move(*buffer_collection_info.mutable_buffers()->at(i).mutable_vmo()),
+            static_cast<uint32_t>(buffer_collection_info.buffers()[i].vmo_usable_start()),
+            static_cast<uint32_t>(buffer_collection_info.settings().buffer_settings().size_bytes()),
+            true, buffer_collection_info.settings().buffer_settings().is_physically_contiguous());
         if (!buffer) {
           FX_LOGS(FATAL) << "CodecBuffer::Allocate() failed (output)";
         }
@@ -767,99 +802,98 @@ std::unique_ptr<CodecOutput> CodecClient::BlockingGetEmittedOutput() {
 bool CodecClient::ConfigurePortBufferCollection(
     bool is_output, uint64_t new_buffer_lifetime_ordinal,
     uint64_t buffer_constraints_version_ordinal, uint32_t* out_packet_count,
-    fuchsia::sysmem::BufferCollectionPtr* out_buffer_collection,
-    fuchsia::sysmem::BufferCollectionInfo_2* out_buffer_collection_info) {
+    fuchsia::sysmem2::BufferCollectionPtr* out_buffer_collection,
+    fuchsia::sysmem2::BufferCollectionInfo* out_buffer_collection_info) {
   fuchsia::media::StreamBufferPartialSettings settings;
   settings.set_buffer_lifetime_ordinal(new_buffer_lifetime_ordinal);
   settings.set_buffer_constraints_version_ordinal(buffer_constraints_version_ordinal);
 
-  fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
-  fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> codec_sysmem_token;
+  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
+  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> codec_sysmem_token;
   if (!CreateAndSyncBufferCollection(&buffer_collection, &codec_sysmem_token)) {
     FX_LOGS(FATAL) << "CreateAndSyncBufferCollection failed (output)";
     return false;
   }
 
-  settings.set_sysmem_token(std::move(codec_sysmem_token));
+  settings.set_sysmem_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+      codec_sysmem_token.TakeChannel()));
 
-  fuchsia::sysmem::BufferCollectionConstraints constraints;
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
   // TODO(https://fxbug.dev/42098793): Hardcoded to read/write to allow direct Vulkan import on
   // UMA platforms.
   if (!is_output && is_input_secure_) {
-    constraints.usage.video = fuchsia::sysmem::videoUsageDecryptorOutput;
+    constraints.mutable_usage()->set_video(fuchsia::sysmem2::VIDEO_USAGE_DECRYPTOR_OUTPUT);
   } else if (is_output && is_output_secure_) {
     // Only used if kVerifySecureOutput is used in test.
-    constraints.usage.cpu =
-        fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
+    constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN |
+                                         fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
   } else {
-    constraints.usage.cpu =
-        fuchsia::sysmem::cpuUsageReadOften | fuchsia::sysmem::cpuUsageWriteOften;
+    constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ_OFTEN |
+                                         fuchsia::sysmem2::CPU_USAGE_WRITE_OFTEN);
   }
 
   // TODO(dustingreen): Make this more flexible once we're more flexible on
   // frame_count on output of decoder.
   if (is_output) {
-    constraints.min_buffer_count_for_camping = kMinInputBufferCountForCamping;
+    constraints.set_min_buffer_count_for_camping(kMinInputBufferCountForCamping);
   } else {
-    constraints.min_buffer_count_for_camping = kMinOutputBufferCountForCamping;
+    constraints.set_min_buffer_count_for_camping(kMinOutputBufferCountForCamping);
   }
-  ZX_DEBUG_ASSERT(constraints.min_buffer_count_for_dedicated_slack == 0);
-  ZX_DEBUG_ASSERT(constraints.min_buffer_count_for_shared_slack == 0);
+  ZX_DEBUG_ASSERT(!constraints.has_min_buffer_count_for_dedicated_slack());
+  ZX_DEBUG_ASSERT(!constraints.has_min_buffer_count_for_shared_slack());
 
-  // 0 is treated as 0xFFFFFFFF.
-  ZX_DEBUG_ASSERT(constraints.max_buffer_count == 0);
+  // un-set is treated as 0xFFFFFFFF.
+  ZX_DEBUG_ASSERT(!constraints.has_max_buffer_count());
 
-  constraints.has_buffer_memory_constraints = true;
+  auto& bmc = *constraints.mutable_buffer_memory_constraints();
   // Sysmem has a built-in min_size_bytes of 1, so no need to really constrain
   // min_size_bytes here, unless output, in which case setting a min_size_bytes
   // allows for seamless video frame dimension changes.  If the client code says
   // 0 that's fine.
   //
-  // Similar for min_buffer_count, but min of 0 means 0 / no constraint in that case.
-  ZX_DEBUG_ASSERT(constraints.buffer_memory_constraints.min_size_bytes == 0);
-  ZX_DEBUG_ASSERT(constraints.min_buffer_count == 0);
+  // Similar for min_buffer_count, but un-set means 0 / no constraint in that case.
+  ZX_DEBUG_ASSERT(!bmc.has_min_size_bytes());
+  ZX_DEBUG_ASSERT(!constraints.has_min_buffer_count());
   if (is_output) {
-    constraints.buffer_memory_constraints.min_size_bytes = min_output_buffer_size_;
-    constraints.min_buffer_count = min_output_buffer_count_;
+    bmc.set_min_size_bytes(min_output_buffer_size_);
+    constraints.set_min_buffer_count(min_output_buffer_count_);
   } else {
-    constraints.buffer_memory_constraints.min_size_bytes = min_input_buffer_size_;
+    bmc.set_min_size_bytes(min_input_buffer_size_);
   }
-  constraints.buffer_memory_constraints.max_size_bytes = std::numeric_limits<uint32_t>::max();
-  constraints.buffer_memory_constraints.physically_contiguous_required = false;
-  constraints.buffer_memory_constraints.secure_required = false;
+  bmc.set_max_size_bytes(std::numeric_limits<uint32_t>::max());
+  bmc.set_physically_contiguous_required(false);
+  bmc.set_secure_required(false);
   if (is_output && is_output_secure_) {
-    constraints.buffer_memory_constraints.inaccessible_domain_supported = true;
+    bmc.set_inaccessible_domain_supported(true);
   } else if (!is_output && is_input_secure_) {
-    constraints.buffer_memory_constraints.cpu_domain_supported = false;
-    constraints.buffer_memory_constraints.ram_domain_supported = false;
-    constraints.buffer_memory_constraints.inaccessible_domain_supported = true;
-    constraints.buffer_memory_constraints.secure_required = true;
-    constraints.buffer_memory_constraints.heap_permitted_count = 1;
-    constraints.buffer_memory_constraints.heap_permitted[0] =
-        fuchsia::sysmem::HeapType::AMLOGIC_SECURE_VDEC;
+    bmc.set_cpu_domain_supported(false);
+    bmc.set_ram_domain_supported(false);
+    bmc.set_inaccessible_domain_supported(true);
+    bmc.set_secure_required(true);
+    bmc.mutable_permitted_heaps()->emplace_back(std::move(
+        fuchsia::sysmem2::Heap{}
+            .set_heap_type(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC)
+            .set_id(0)));
   } else {
-    ZX_DEBUG_ASSERT(!constraints.buffer_memory_constraints.inaccessible_domain_supported);
-    ZX_DEBUG_ASSERT(constraints.buffer_memory_constraints.cpu_domain_supported);
+    ZX_DEBUG_ASSERT(!bmc.has_inaccessible_domain_supported());
+    bmc.set_cpu_domain_supported(true);
   }
 
-  ZX_DEBUG_ASSERT(!constraints.buffer_memory_constraints.ram_domain_supported);
+  ZX_DEBUG_ASSERT(!bmc.has_ram_domain_supported() || !bmc.ram_domain_supported());
 
   if (is_output_tiled_) {
-    constraints.image_format_constraints_count = 1;
-    auto& image_format = constraints.image_format_constraints[0];
-    image_format.color_spaces_count = 1;
-    image_format.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
-    image_format.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
-    image_format.pixel_format.has_format_modifier = true;
-    image_format.pixel_format.format_modifier.value =
-        fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED;
+    auto& image_format = constraints.mutable_image_format_constraints()->emplace_back();
+    image_format.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::REC709);
+    image_format.set_pixel_format(fuchsia::images2::PixelFormat::NV12);
+    image_format.set_pixel_format_modifier(
+        fuchsia::images2::PixelFormatModifier::INTEL_I915_Y_TILED);
   } else {
     // Despite being a consumer of output uncompressed video frames (when decoding
     // video and is_output), for now we intentionally don't constrain to the
     // PixelFormatType(s) that we can consume, and instead fail later if we get
     // something unexpected on output. That's just easier than plumbing
     // PixelFormatType(s) to here for now.
-    ZX_DEBUG_ASSERT(constraints.image_format_constraints_count == 0);
+    ZX_DEBUG_ASSERT(!constraints.has_image_format_constraints());
   }
 
   PostToFidlThread([this, is_output, settings = std::move(settings)]() mutable {
@@ -873,9 +907,11 @@ bool CodecClient::ConfigurePortBufferCollection(
     }
   });
 
-  buffer_collection->SetConstraints(true, std::move(constraints));
+  buffer_collection->SetConstraints(
+      std::move(fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{}.set_constraints(
+          std::move(constraints))));
 
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info;
+  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
   // This borrows buffer_collection during
   // the call.
   if (!WaitForSysmemBuffersAllocated(is_output, &buffer_collection, &buffer_collection_info)) {
@@ -886,11 +922,11 @@ bool CodecClient::ConfigurePortBufferCollection(
   if (!in_lax_mode_) {
     // We don't expect normal cases to go above kMaxExpectedBufferCount, but if
     // min_output_buffer_count_ forces higher buffer counts, that's fine.
-    ZX_ASSERT(buffer_collection_info.buffer_count <= kMaxExpectedBufferCount ||
+    ZX_ASSERT(buffer_collection_info.buffers().size() <= kMaxExpectedBufferCount ||
               min_output_buffer_count_ > kMaxExpectedBufferCount);
   }
 
-  fuchsia::sysmem::BufferCollectionPtr buffer_collection_ptr;
+  fuchsia::sysmem2::BufferCollectionPtr buffer_collection_ptr;
 
   // For the Bind() we probably don't strictly need to be on FIDL thread, so do
   // the Bind() here.  This does mean we need to set the error handler before
@@ -909,7 +945,7 @@ bool CodecClient::ConfigurePortBufferCollection(
     return false;
   }
 
-  *out_packet_count = buffer_collection_info.buffer_count;
+  *out_packet_count = static_cast<uint32_t>(buffer_collection_info.buffers().size());
   *out_buffer_collection = std::move(buffer_collection_ptr);
   *out_buffer_collection_info = std::move(buffer_collection_info);
   return true;

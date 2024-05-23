@@ -47,6 +47,8 @@ class CodecClient {
   // messages using that loop's single thread, as ProxyController doesn't have
   // a lock_ in it.
   CodecClient(async::Loop* loop, thrd_t loop_thread,
+              fidl::InterfaceHandle<fuchsia::sysmem2::Allocator> sysmem);
+  CodecClient(async::Loop* loop, thrd_t loop_thread,
               fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem);
   ~CodecClient();
 
@@ -147,18 +149,18 @@ class CodecClient {
   void TrackOutputStreamLifetimeOrdinal(uint64_t output_stream_lifetime_ordinal);
 
   bool CreateAndSyncBufferCollection(
-      fuchsia::sysmem::BufferCollectionSyncPtr* out_buffer_collection,
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>* out_codec_sysmem_token);
+      fuchsia::sysmem2::BufferCollectionSyncPtr* out_buffer_collection,
+      fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>* out_codec_sysmem_token);
 
   bool WaitForSysmemBuffersAllocated(
-      bool is_output, fuchsia::sysmem::BufferCollectionSyncPtr* buffer_collection_param,
-      fuchsia::sysmem::BufferCollectionInfo_2* out_buffer_collection_info);
+      bool is_output, fuchsia::sysmem2::BufferCollectionSyncPtr* buffer_collection_param,
+      fuchsia::sysmem2::BufferCollectionInfo* out_buffer_collection_info);
 
   bool ConfigurePortBufferCollection(
       bool is_output, uint64_t new_buffer_lifetime_ordinal,
       uint64_t buffer_constraints_version_ordinal, uint32_t* out_packet_count,
-      fuchsia::sysmem::BufferCollectionPtr* out_buffer_collection,
-      fuchsia::sysmem::BufferCollectionInfo_2* out_buffer_collection_info);
+      fuchsia::sysmem2::BufferCollectionPtr* out_buffer_collection,
+      fuchsia::sysmem2::BufferCollectionInfo* out_buffer_collection_info);
 
   //
   // Events:
@@ -211,10 +213,10 @@ class CodecClient {
   // requests give back a !is_valid() request.
   fidl::InterfaceRequest<fuchsia::media::StreamProcessor> temp_codec_request_;
 
-  fuchsia::sysmem::AllocatorPtr sysmem_;
+  fuchsia::sysmem2::AllocatorPtr sysmem_;
 
-  fuchsia::sysmem::BufferCollectionPtr input_buffer_collection_;
-  fuchsia::sysmem::BufferCollectionPtr output_buffer_collection_;
+  fuchsia::sysmem2::BufferCollectionPtr input_buffer_collection_;
+  fuchsia::sysmem2::BufferCollectionPtr output_buffer_collection_;
 
   // We're use unique_ptr<> here only for it's optional-ness.
   std::unique_ptr<fuchsia::media::StreamBufferConstraints> input_constraints_;
