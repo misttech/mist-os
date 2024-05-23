@@ -181,7 +181,7 @@
 				};
 				on-level {
 					level = <1>;
-					level-dependencies = <&sag_execution_handling 2>;
+					level-dependencies = <&sag_execution_active 2>;
 					level-transition-table {
 						transition-to-off {
 							target-level = <0>;

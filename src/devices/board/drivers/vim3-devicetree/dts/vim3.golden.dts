@@ -743,7 +743,7 @@
 
 							on-level {
 								level = <0x01>;
-								level-dependencies = <0x2b 0x02>;
+								level-dependencies = <0x0d 0x02>;
 
 								level-transition-table {
 
