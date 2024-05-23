@@ -98,12 +98,10 @@ def _compact_python_runtime_impl(repo_ctx):
     for file in python_binpath.readdir():
         filename = file.basename
 
-        # Use the versioned pip3 file name, since this one is
-        # always only followed by a version number. Using `python3.` instead
-        # might return a version of '3.8-config' instead, which would
-        # require additional parsing logic that is not needed here.
-        if filename.startswith("pip3."):
-            python_version = filename[3:]  # remove 'pip' prefix: pip3.8 -> 3.8
+        # Use the versioned python3 file name, but takes care of ignoring
+        # suffixes such as the one in `python3.XX-config`.
+        if filename.startswith("python3."):
+            python_version, _, suffix = filename[6:].partition("-")
             break
 
     if not python_version:
