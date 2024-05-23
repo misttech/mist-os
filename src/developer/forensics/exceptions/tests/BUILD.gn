@@ -127,6 +127,21 @@ executable("process_launch_failure_unittest_exe") {
   ]
 }
 
+executable("wake_lease_unittest_exe") {
+  testonly = true
+
+  sources = [ "wake_lease_unittest.cc" ]
+
+  deps = [
+    "//src/developer/forensics/exceptions/handler:lib",
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//src/developer/forensics/testing:unit_test_fixture",
+    "//src/developer/forensics/testing/stubs:power_broker",
+    "//src/developer/forensics/testing/stubs:system_activity_governor",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 executable("stub_exception_handler_exe") {
   testonly = true
 
@@ -215,6 +230,13 @@ fuchsia_component("process_launch_failure_unittest") {
   ]
 }
 
+fuchsia_unittest_component("wake_lease_unittest") {
+  deps = [
+    ":wake_lease_unittest_exe",
+    "//src/sys/test_runners/gtest:death_test",
+  ]
+}
+
 ###############################################################################
 # PACKAGES
 ###############################################################################
@@ -223,11 +245,12 @@ fuchsia_test_package("exception-broker-tests") {
     ":exception_broker_config_test",
     ":exception_broker_unittest",
     ":process_launch_failure_unittest",
+    ":wake_lease_unittest",
   ]
 
   test_specs = {
     log_settings = {
-      max_severity = "ERROR"
+      max_severity = "FATAL"
     }
   }
 }
