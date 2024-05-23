@@ -4,6 +4,7 @@
 
 #include "vulkan_extension_test.h"
 
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 
 #include <cstddef>
@@ -14,9 +15,9 @@
 #include "src/lib/fsl/handles/object_info.h"
 
 constexpr vk::SysmemColorSpaceFUCHSIA kDefaultRgbColorSpace(
-    static_cast<uint32_t>(fuchsia::sysmem::ColorSpaceType::SRGB));
+    static_cast<uint32_t>(fuchsia::images2::ColorSpace::SRGB));
 constexpr vk::SysmemColorSpaceFUCHSIA kDefaultYuvColorSpace(
-    static_cast<uint32_t>(fuchsia::sysmem::ColorSpaceType::REC709));
+    static_cast<uint32_t>(fuchsia::images2::ColorSpace::REC709));
 
 vk::ImageFormatConstraintsInfoFUCHSIA GetDefaultImageFormatConstraintsInfo(bool yuv) {
   return vk::ImageFormatConstraintsInfoFUCHSIA()
@@ -55,18 +56,14 @@ vk::ImageFormatConstraintsInfoFUCHSIA GetDefaultYuvImageFormatConstraintsInfo() 
   return GetDefaultImageFormatConstraintsInfo(true);
 }
 
-fuchsia::sysmem::ImageFormatConstraints GetDefaultSysmemImageFormatConstraints() {
-  fuchsia::sysmem::ImageFormatConstraints bgra_image_constraints;
-  bgra_image_constraints.required_min_coded_width = 1024;
-  bgra_image_constraints.required_min_coded_height = 1024;
-  bgra_image_constraints.required_max_coded_width = 1024;
-  bgra_image_constraints.required_max_coded_height = 1024;
-  bgra_image_constraints.max_coded_width = 8192;
-  bgra_image_constraints.max_coded_height = 8192;
-  bgra_image_constraints.max_bytes_per_row = 0xffffffff;
-  bgra_image_constraints.pixel_format = {fuchsia::sysmem::PixelFormatType::BGRA32, false, {}};
-  bgra_image_constraints.color_spaces_count = 1;
-  bgra_image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
+fuchsia::sysmem2::ImageFormatConstraints GetDefaultSysmemImageFormatConstraints() {
+  fuchsia::sysmem2::ImageFormatConstraints bgra_image_constraints;
+  bgra_image_constraints.set_required_min_size(fuchsia::math::SizeU{.width = 1024, .height = 1024});
+  bgra_image_constraints.set_required_max_size(fuchsia::math::SizeU{.width = 1024, .height = 1024});
+  bgra_image_constraints.set_max_size(fuchsia::math::SizeU{.width = 8192, .height = 8192});
+  bgra_image_constraints.set_max_bytes_per_row(0xffffffff);
+  bgra_image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  bgra_image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
   return bgra_image_constraints;
 }
 
@@ -147,31 +144,40 @@ bool VulkanExtensionTest::InitVulkan() {
 }
 
 bool VulkanExtensionTest::InitSysmemAllocator() {
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem.Allocator",
+  zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                             sysmem_allocator_.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
     RTN_MSG(false, "Fdio_service_connect failed: %d\n", status);
   }
-  sysmem_allocator_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+  sysmem_allocator_->SetDebugClientInfo(
+      std::move(fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest{}
+                    .set_name(fsl::GetCurrentProcessName())
+                    .set_id(fsl::GetCurrentProcessKoid())));
   return true;
 }
 
-std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr>
+std::vector<fuchsia::sysmem2::BufferCollectionTokenSyncPtr>
 VulkanExtensionTest::MakeSharedCollection(uint32_t token_count) {
-  std::vector<fuchsia::sysmem::BufferCollectionTokenSyncPtr> tokens;
-  fuchsia::sysmem::BufferCollectionTokenSyncPtr token1;
-  zx_status_t status = sysmem_allocator_->AllocateSharedCollection(token1.NewRequest());
+  std::vector<fuchsia::sysmem2::BufferCollectionTokenSyncPtr> tokens;
+  fuchsia::sysmem2::BufferCollectionTokenSyncPtr token1;
+  zx_status_t status = sysmem_allocator_->AllocateSharedCollection(
+      std::move(fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest{}.set_token_request(
+          token1.NewRequest())));
   EXPECT_EQ(status, ZX_OK);
-  token1->SetName(1u, ::testing::UnitTest::GetInstance()->current_test_info()->name());
+  token1->SetName(std::move(fuchsia::sysmem2::NodeSetNameRequest{}.set_priority(1u).set_name(
+      ::testing::UnitTest::GetInstance()->current_test_info()->name())));
 
   for (uint32_t i = 1; i < token_count; ++i) {
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr tokenN;
-    status = token1->Duplicate(std::numeric_limits<uint32_t>::max(), tokenN.NewRequest());
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr tokenN;
+    status = token1->Duplicate(std::move(fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest{}
+                                             .set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS)
+                                             .set_token_request(tokenN.NewRequest())));
     EXPECT_EQ(status, ZX_OK);
     tokens.push_back(std::move(tokenN));
   }
 
-  status = token1->Sync();
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+  status = token1->Sync(&sync_result);
   EXPECT_EQ(ZX_OK, status);
   tokens.push_back(std::move(token1));
   return tokens;
@@ -268,26 +274,30 @@ void VulkanExtensionTest::ValidateBufferProperties(const VkMemoryRequirements &r
   *memory_type_out = memory_type;
 }
 
-fuchsia::sysmem::BufferCollectionInfo_2 VulkanExtensionTest::AllocateSysmemCollection(
-    std::optional<fuchsia::sysmem::BufferCollectionConstraints> constraints,
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
-  fuchsia::sysmem::BufferCollectionSyncPtr sysmem_collection;
-  zx_status_t status =
-      sysmem_allocator_->BindSharedCollection(std::move(token), sysmem_collection.NewRequest());
+fuchsia::sysmem2::BufferCollectionInfo VulkanExtensionTest::AllocateSysmemCollection(
+    std::optional<fuchsia::sysmem2::BufferCollectionConstraints> constraints,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token) {
+  fuchsia::sysmem2::BufferCollectionSyncPtr sysmem_collection;
+  zx_status_t status = sysmem_allocator_->BindSharedCollection(
+      std::move(fuchsia::sysmem2::AllocatorBindSharedCollectionRequest{}
+                    .set_token(std::move(token))
+                    .set_buffer_collection_request(sysmem_collection.NewRequest())));
   EXPECT_EQ(status, ZX_OK);
   if (constraints) {
-    EXPECT_EQ(ZX_OK, sysmem_collection->SetConstraints(true, *constraints));
+    EXPECT_EQ(ZX_OK, sysmem_collection->SetConstraints(std::move(
+                         fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{}.set_constraints(
+                             std::move(*constraints)))));
+    constraints.reset();
   } else {
     EXPECT_EQ(ZX_OK, sysmem_collection->SetConstraints(
-                         false, fuchsia::sysmem::BufferCollectionConstraints()));
+                         fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{}));
   }
 
-  zx_status_t allocation_status;
-  fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
-  EXPECT_EQ(ZX_OK, sysmem_collection->WaitForBuffersAllocated(&allocation_status,
-                                                              &buffer_collection_info));
-  EXPECT_EQ(ZX_OK, allocation_status);
-  EXPECT_EQ(ZX_OK, sysmem_collection->Close());
+  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
+  EXPECT_EQ(ZX_OK, sysmem_collection->WaitForAllBuffersAllocated(&wait_result));
+  EXPECT_TRUE(wait_result.is_response());
+  auto buffer_collection_info = std::move(*wait_result.response().mutable_buffer_collection_info());
+  EXPECT_EQ(ZX_OK, sysmem_collection->Release());
   return buffer_collection_info;
 }
 
@@ -349,7 +359,7 @@ std::optional<uint32_t> VulkanExtensionTest::InitializeDirectImageMemory(
 }
 
 VulkanExtensionTest::UniqueBufferCollection VulkanExtensionTest::CreateVkBufferCollectionForImage(
-    fuchsia::sysmem::BufferCollectionTokenSyncPtr token,
+    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
     const vk::ImageFormatConstraintsInfoFUCHSIA constraints,
     vk::ImageConstraintsInfoFlagsFUCHSIA flags) {
   vk::BufferCollectionCreateInfoFUCHSIA import_info(token.Unbind().TakeChannel().release());
@@ -374,7 +384,7 @@ VulkanExtensionTest::UniqueBufferCollection VulkanExtensionTest::CreateVkBufferC
 bool VulkanExtensionTest::Exec(
     VkFormat format, uint32_t width, uint32_t height, bool linear,
     bool repeat_constraints_as_non_protected,
-    const std::vector<fuchsia::sysmem::ImageFormatConstraints> &format_constraints) {
+    const std::vector<fuchsia::sysmem2::ImageFormatConstraints> &format_constraints) {
   EXPECT_NE(format, VK_FORMAT_UNDEFINED);
 
   auto [local_token, vulkan_token, non_protected_token] = MakeSharedCollection<3>();
@@ -393,8 +403,8 @@ bool VulkanExtensionTest::Exec(
         std::move(non_protected_token), constraints,
         vk::ImageConstraintsInfoFlagBitsFUCHSIA::eProtectedOptional);
   } else {
-    // Close the token to prevent sysmem from waiting on it.
-    non_protected_token->Close();
+    // Release the token to prevent sysmem from waiting on it.
+    non_protected_token->Release();
     non_protected_token = {};
   }
 
@@ -405,23 +415,24 @@ bool VulkanExtensionTest::Exec(
   UniqueBufferCollection collection =
       CreateVkBufferCollectionForImage(std::move(vulkan_token), constraints);
 
-  std::optional<fuchsia::sysmem::BufferCollectionConstraints> constraints_option;
+  std::optional<fuchsia::sysmem2::BufferCollectionConstraints> constraints_option;
   if (!format_constraints.empty()) {
-    fuchsia::sysmem::BufferCollectionConstraints constraints;
+    fuchsia::sysmem2::BufferCollectionConstraints constraints;
     // Use the other connection to specify the actual desired format and size,
     // which should be compatible with what the vulkan driver can use.
-    constraints.usage.vulkan = fuchsia::sysmem::vulkanUsageTransferDst;
+    constraints.mutable_usage()->set_vulkan(fuchsia::sysmem2::VULKAN_IMAGE_USAGE_TRANSFER_DST);
     // Try multiple format modifiers.
-    constraints.image_format_constraints_count = static_cast<uint32_t>(format_constraints.size());
-    for (uint32_t i = 0; i < constraints.image_format_constraints_count; i++) {
-      constraints.image_format_constraints[i] = format_constraints[i];
+    for (uint32_t i = 0; i < format_constraints.size(); i++) {
+      constraints.mutable_image_format_constraints()->emplace_back(
+          fidl::Clone(format_constraints[i]));
     }
-    constraints_option = constraints;
+    constraints_option = std::move(constraints);
   }
   auto buffer_collection_info =
-      AllocateSysmemCollection(constraints_option, std::move(local_token));
+      AllocateSysmemCollection(std::move(constraints_option), std::move(local_token));
+  constraints_option.reset();
 
-  EXPECT_EQ(1u, buffer_collection_info.buffer_count);
+  EXPECT_EQ(1u, buffer_collection_info.buffers().size());
 
   if (!InitializeDirectImage(*collection, image_create_info)) {
     ADD_FAILURE() << "InitializeDirectImage() failed";
@@ -605,29 +616,38 @@ void VulkanExtensionTest::CheckLinearImage(vk::DeviceMemory memory, bool is_cohe
 }
 
 // Return the byte offset of a pixel in an image.
-size_t GetImageByteOffset(size_t x, size_t y, const fuchsia::sysmem::BufferCollectionInfo_2 &info,
+size_t GetImageByteOffset(size_t x, size_t y, const fuchsia::sysmem2::BufferCollectionInfo &info,
                           size_t width, size_t height) {
-  ZX_DEBUG_ASSERT(info.settings.has_image_format_constraints);
-  auto &image_format_constraints = info.settings.image_format_constraints;
+  ZX_DEBUG_ASSERT(info.settings().has_image_format_constraints());
+  auto &image_format_constraints = info.settings().image_format_constraints();
   constexpr uint32_t kBytesPerPixel = 4;
-  if (image_format_constraints.pixel_format.format_modifier.value ==
-      fuchsia::sysmem::FORMAT_MODIFIER_LINEAR) {
-    size_t bytes_per_row =
-        fbl::round_up(std::max(width * kBytesPerPixel,
-                               static_cast<size_t>(image_format_constraints.min_bytes_per_row)),
-                      image_format_constraints.bytes_per_row_divisor);
+  if (image_format_constraints.pixel_format_modifier() ==
+      fuchsia::images2::PixelFormatModifier::LINEAR) {
+    size_t bytes_per_row = fbl::round_up(
+        std::max(width * kBytesPerPixel,
+                 static_cast<size_t>(image_format_constraints.has_min_bytes_per_row()
+                                         ? image_format_constraints.min_bytes_per_row()
+                                         : 0)),
+        image_format_constraints.has_bytes_per_row_divisor()
+            ? image_format_constraints.bytes_per_row_divisor()
+            : 1);
     return y * bytes_per_row + x * kBytesPerPixel;
   } else {
-    ZX_DEBUG_ASSERT(image_format_constraints.pixel_format.format_modifier.value ==
-                    fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED);
+    ZX_DEBUG_ASSERT(image_format_constraints.pixel_format_modifier() ==
+                    fuchsia::images2::PixelFormatModifier::INTEL_I915_Y_TILED);
     constexpr uint32_t kTileWidthBytes = 128u;
     constexpr uint32_t kTileHeight = 32u;
     constexpr uint32_t kTileSizeBytes = kTileWidthBytes * kTileHeight;
     // Including padding.
     size_t width_in_tiles =
-        fbl::round_up(std::max(width * kBytesPerPixel,
-                               static_cast<size_t>(image_format_constraints.min_bytes_per_row)),
-                      image_format_constraints.bytes_per_row_divisor) /
+        fbl::round_up(
+            std::max(width * kBytesPerPixel,
+                     static_cast<size_t>(image_format_constraints.has_min_bytes_per_row()
+                                             ? image_format_constraints.min_bytes_per_row()
+                                             : 0)),
+            image_format_constraints.has_bytes_per_row_divisor()
+                ? image_format_constraints.bytes_per_row_divisor()
+                : 1) /
         kTileWidthBytes;
 
     size_t x_in_bytes = x * kBytesPerPixel;
@@ -648,7 +668,7 @@ size_t GetImageByteOffset(size_t x, size_t y, const fuchsia::sysmem::BufferColle
 
 // Check that entire 4 byte-per-pixel image is filled with a pattern.
 void CheckImageFill(size_t width, size_t height, void *addr,
-                    const fuchsia::sysmem::BufferCollectionInfo_2 &info, uint32_t fill) {
+                    const fuchsia::sysmem2::BufferCollectionInfo &info, uint32_t fill) {
   uint32_t error_count = 0;
   constexpr uint32_t kMaxErrors = 10;
   for (size_t y = 0; y < height; y++) {
