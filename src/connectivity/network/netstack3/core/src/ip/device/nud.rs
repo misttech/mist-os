@@ -1645,9 +1645,7 @@ pub trait LinkResolutionNotifier<D: LinkDevice>: Debug + Sized + Send {
 }
 
 /// The execution context for NUD for a link device.
-pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::DeviceId>>:
-    DeviceIdContext<D>
-{
+pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsTypes<D>>: DeviceIdContext<D> {
     type ConfigCtx<'a>: NudConfigContext<I>;
 
     type SenderCtx<'a>: NudSenderContext<I, D, BC, DeviceId = Self::DeviceId>;
@@ -1689,6 +1687,78 @@ pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::De
         lookup_addr: SpecifiedAddr<I::Addr>,
         remote_link_addr: Option<D::Address>,
     );
+}
+
+/// A marker trait to enable the blanket impl of [`NudContext`] for types
+/// implementing [`DelegateNudContext`].
+pub trait UseDelegateNudContext {}
+
+/// Enables a blanket implementation of [`NudContext`] via delegate that can
+/// wrap a mutable reference of `Self`.
+///
+/// The `UseDelegateNudContext` requirement here is steering users to to the
+/// right thing to enable the blanket implementation.
+pub trait DelegateNudContext<I: Ip>: UseDelegateNudContext {
+    /// The delegate that implements [`NudContext`].
+    type Delegate: ref_cast::RefCast<From = Self>;
+    /// Wraps self into a mutable delegate reference.
+    fn wrap(&mut self) -> &mut Self::Delegate {
+        <Self::Delegate as ref_cast::RefCast>::ref_cast_mut(self)
+    }
+}
+
+impl<I, D, BC, CC> NudContext<I, D, BC> for CC
+where
+    I: Ip,
+    D: LinkDevice,
+    BC: NudBindingsTypes<D>,
+    CC: DelegateNudContext<I, Delegate: NudContext<I, D, BC, DeviceId = CC::DeviceId>>
+        // This seems redundant with `DelegateNudContext` but it is required to
+        // get the compiler happy.
+        + UseDelegateNudContext
+        + DeviceIdContext<D>,
+{
+    type ConfigCtx<'a> = <CC::Delegate as NudContext<I, D, BC>>::ConfigCtx<'a>;
+    type SenderCtx<'a> = <CC::Delegate as NudContext<I, D, BC>>::SenderCtx<'a>;
+    fn with_nud_state_mut_and_sender_ctx<
+        O,
+        F: FnOnce(&mut NudState<I, D, BC>, &mut Self::SenderCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.wrap().with_nud_state_mut_and_sender_ctx(device_id, cb)
+    }
+
+    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<I, D, BC>, &mut Self::ConfigCtx<'_>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.wrap().with_nud_state_mut(device_id, cb)
+    }
+    fn with_nud_state<O, F: FnOnce(&NudState<I, D, BC>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.wrap().with_nud_state(device_id, cb)
+    }
+    fn send_neighbor_solicitation(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        lookup_addr: SpecifiedAddr<I::Addr>,
+        remote_link_addr: Option<D::Address>,
+    ) {
+        self.wrap().send_neighbor_solicitation(
+            bindings_ctx,
+            device_id,
+            lookup_addr,
+            remote_link_addr,
+        )
+    }
 }
 
 /// IP extension trait to support [`NudIcmpContext`].
@@ -1841,7 +1911,7 @@ pub trait NudConfigContext<I: Ip> {
 
 /// The execution context for NUD for a link device that allows sending IP
 /// packets to specific neighbors.
-pub trait NudSenderContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::DeviceId>>:
+pub trait NudSenderContext<I: Ip, D: LinkDevice, BC>:
     NudConfigContext<I> + DeviceIdContext<D>
 {
     /// Send an IP frame to the neighbor with the specified link address.

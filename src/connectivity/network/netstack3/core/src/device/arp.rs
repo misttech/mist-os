@@ -16,6 +16,7 @@ use packet_formats::{
     arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType},
     utils::NonZeroDuration,
 };
+use ref_cast::RefCast;
 use tracing::{debug, trace, warn};
 
 use crate::{
@@ -134,7 +135,9 @@ impl<
 
 /// An execution context for the ARP protocol.
 pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
-    DeviceIdContext<D> + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
+    DeviceIdContext<D>
+    + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
+    + CounterContext<ArpCounters>
 {
     type ConfigCtx<'a>: ArpConfigContext;
 
@@ -195,26 +198,41 @@ pub trait ArpConfigContext {
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O;
 }
 
-impl<
-        D: ArpDevice,
-        BC: ArpBindingsContext<D, CC::DeviceId>,
-        CC: ArpContext<D, BC> + CounterContext<ArpCounters>,
-    > NudContext<Ipv4, D, BC> for CC
-{
-    type ConfigCtx<'a> = <CC as ArpContext<D, BC>>::ConfigCtx<'a>;
+/// Provides a [`NudContext`] IPv4 implementation for a core context that
+/// implements [`ArpContext`].
+#[derive(RefCast)]
+#[repr(transparent)]
+pub struct ArpNudCtx<CC>(CC);
 
-    type SenderCtx<'a> = <CC as ArpContext<D, BC>>::ArpSenderCtx<'a>;
+impl<D, CC> DeviceIdContext<D> for ArpNudCtx<CC>
+where
+    D: ArpDevice,
+    CC: DeviceIdContext<D>,
+{
+    type DeviceId = CC::DeviceId;
+    type WeakDeviceId = CC::WeakDeviceId;
+}
+
+impl<D, CC, BC> NudContext<Ipv4, D, BC> for ArpNudCtx<CC>
+where
+    D: ArpDevice,
+    BC: ArpBindingsContext<D, CC::DeviceId>,
+    CC: ArpContext<D, BC>,
+{
+    type ConfigCtx<'a> = ArpNudCtx<CC::ConfigCtx<'a>>;
+    type SenderCtx<'a> = ArpNudCtx<CC::ArpSenderCtx<'a>>;
 
     fn with_nud_state_mut_and_sender_ctx<
         O,
         F: FnOnce(&mut NudState<Ipv4, D, BC>, &mut Self::SenderCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &CC::DeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, core_ctx| {
-            cb(nud, core_ctx)
+        let Self(core_ctx) = self;
+        core_ctx.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, core_ctx| {
+            cb(nud, ArpNudCtx::ref_cast_mut(core_ctx))
         })
     }
 
@@ -223,10 +241,13 @@ impl<
         F: FnOnce(&mut NudState<Ipv4, D, BC>, &mut Self::ConfigCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &CC::DeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut(device_id, |ArpState { nud }, core_ctx| cb(nud, core_ctx))
+        let Self(core_ctx) = self;
+        core_ctx.with_arp_state_mut(device_id, |ArpState { nud }, core_ctx| {
+            cb(nud, ArpNudCtx::ref_cast_mut(core_ctx))
+        })
     }
 
     fn with_nud_state<O, F: FnOnce(&NudState<Ipv4, D, BC>) -> O>(
@@ -234,32 +255,36 @@ impl<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state(device_id, |ArpState { nud }| cb(nud))
+        let Self(core_ctx) = self;
+        core_ctx.with_arp_state(device_id, |ArpState { nud }| cb(nud))
     }
 
     fn send_neighbor_solicitation(
         &mut self,
         bindings_ctx: &mut BC,
-        device_id: &CC::DeviceId,
-        lookup_addr: SpecifiedAddr<Ipv4Addr>,
-        remote_link_addr: Option<D::Address>,
+        device_id: &Self::DeviceId,
+        lookup_addr: SpecifiedAddr<<Ipv4 as net_types::ip::Ip>::Addr>,
+        remote_link_addr: Option<<D as LinkDevice>::Address>,
     ) {
-        send_arp_request(self, bindings_ctx, device_id, lookup_addr.get(), remote_link_addr)
+        let Self(core_ctx) = self;
+        send_arp_request(core_ctx, bindings_ctx, device_id, lookup_addr.get(), remote_link_addr)
     }
 }
 
-impl<CC: ArpConfigContext> NudConfigContext<Ipv4> for CC {
+impl<CC: ArpConfigContext> NudConfigContext<Ipv4> for ArpNudCtx<CC> {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
-        self.retransmit_timeout()
+        let Self(core_ctx) = self;
+        core_ctx.retransmit_timeout()
     }
 
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
-        ArpConfigContext::with_nud_user_config(self, cb)
+        let Self(core_ctx) = self;
+        core_ctx.with_nud_user_config(cb)
     }
 }
 
 impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext<D, BC>>
-    NudSenderContext<Ipv4, D, BC> for CC
+    NudSenderContext<Ipv4, D, BC> for ArpNudCtx<CC>
 {
     fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
@@ -271,7 +296,8 @@ impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        ArpSenderContext::send_ip_packet_to_neighbor_link_addr(self, bindings_ctx, dst_mac, body)
+        let Self(core_ctx) = self;
+        core_ctx.send_ip_packet_to_neighbor_link_addr(bindings_ctx, dst_mac, body)
     }
 }
 
@@ -634,7 +660,8 @@ mod tests {
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
             },
-            DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
+            DelegateNudContext, DynamicNeighborState, NudCounters, NudIcmpContext, Reachable,
+            Stale, UseDelegateNudContext,
         },
         socket::SocketIpAddr,
         testutil::assert_empty,
@@ -804,6 +831,11 @@ mod tests {
             let FakeArpCtx { arp_state, config, .. } = &mut self.state;
             cb(arp_state, config)
         }
+    }
+
+    impl UseDelegateNudContext for FakeCoreCtxImpl {}
+    impl DelegateNudContext<Ipv4> for FakeCoreCtxImpl {
+        type Delegate = ArpNudCtx<Self>;
     }
 
     impl NudIcmpContext<Ipv4, EthernetLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {

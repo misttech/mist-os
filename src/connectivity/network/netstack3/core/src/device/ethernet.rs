@@ -915,13 +915,16 @@ mod tests {
     use crate::{
         context::{testutil::FakeInstant, CounterContext, CtxPair},
         device::{
-            arp::{ArpConfigContext, ArpContext, ArpCounters, ArpSenderContext},
+            arp::{ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext},
             queue::tx::{TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext},
             socket::{Frame, ParseSentFrameError, SentFrame},
             testutil::{FakeDeviceId, FakeWeakDeviceId},
             DeviceSendFrameError,
         },
-        ip::device::nud::{self, api::NeighborApi, DynamicNeighborUpdateSource},
+        ip::device::nud::{
+            self, api::NeighborApi, DelegateNudContext, DynamicNeighborUpdateSource,
+            UseDelegateNudContext,
+        },
         testutil::{IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4},
     };
 
@@ -1218,6 +1221,11 @@ mod tests {
         ) -> O {
             cb(&mut self.arp_state)
         }
+    }
+
+    impl UseDelegateNudContext for FakeCoreCtx {}
+    impl DelegateNudContext<Ipv4> for FakeCoreCtx {
+        type Delegate = ArpNudCtx<Self>;
     }
 
     impl ArpConfigContext for FakeInnerCtx {

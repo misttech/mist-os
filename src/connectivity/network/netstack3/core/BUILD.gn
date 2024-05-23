@@ -152,6 +152,7 @@ rustc_library_with_features("netstack3-core") {
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:smallvec",
