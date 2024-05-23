@@ -210,15 +210,24 @@ impl FileSystemOps for FuseFs {
     fn rename(
         &self,
         _fs: &FileSystem,
-        _current_task: &CurrentTask,
-        _old_parent: &FsNodeHandle,
-        _old_name: &FsStr,
-        _new_parent: &FsNodeHandle,
-        _new_name: &FsStr,
+        current_task: &CurrentTask,
+        old_parent: &FsNodeHandle,
+        old_name: &FsStr,
+        new_parent: &FsNodeHandle,
+        new_name: &FsStr,
         _renamed: &FsNodeHandle,
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
-        error!(ENOTSUP)
+        self.connection.lock().execute_operation(
+            current_task,
+            old_parent.node_id,
+            FuseOperation::Rename {
+                old_name: old_name.to_owned(),
+                new_dir: new_parent.node_id,
+                new_name: new_name.to_owned(),
+            },
+        )?;
+        Ok(())
     }
 
     fn generate_node_ids(&self) -> bool {
@@ -1929,6 +1938,7 @@ enum RunningOperationKind {
         dir: bool,
     },
     RemoveXAttr,
+    Rename,
     Seek,
     SetAttr,
     SetXAttr,
@@ -1983,6 +1993,7 @@ impl RunningOperationKind {
                 }
             }
             Self::RemoveXAttr => uapi::fuse_opcode_FUSE_REMOVEXATTR,
+            Self::Rename => uapi::fuse_opcode_FUSE_RENAME2,
             Self::Seek => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr => uapi::fuse_opcode_FUSE_SETATTR,
             Self::SetXAttr => uapi::fuse_opcode_FUSE_SETXATTR,
@@ -2070,6 +2081,7 @@ impl RunningOperationKind {
             Self::Flush
             | Self::Release { .. }
             | Self::RemoveXAttr
+            | Self::Rename
             | Self::SetXAttr
             | Self::Unlink => Ok(FuseResponse::None),
             Self::Statfs => {
@@ -2190,6 +2202,11 @@ enum FuseOperation {
     RemoveXAttr {
         /// Name of the attribute
         name: FsString,
+    },
+    Rename {
+        old_name: FsString,
+        new_dir: u64,
+        new_name: FsString,
     },
     Seek(uapi::fuse_lseek_in),
     SetAttr(uapi::fuse_setattr_in),
@@ -2329,6 +2346,12 @@ impl FuseOperation {
                 data.write_all(message.as_bytes())
             }
             Self::RemoveXAttr { name } => Self::write_null_terminated(data, name),
+            Self::Rename { old_name, new_dir, new_name } => {
+                Ok(data.write_all(
+                    uapi::fuse_rename2_in { newdir: *new_dir, flags: 0, padding: 0 }.as_bytes(),
+                )? + Self::write_null_terminated(data, old_name)?
+                    + Self::write_null_terminated(data, new_name)?)
+            }
             Self::Seek(seek_in) => data.write_all(seek_in.as_bytes()),
             Self::SetAttr(setattr_in) => data.write_all(setattr_in.as_bytes()),
             Self::SetXAttr { setxattr_in, is_ext, name, value } => {
@@ -2397,6 +2420,7 @@ impl FuseOperation {
             Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
             Self::ReleaseDir(_) => uapi::fuse_opcode_FUSE_RELEASEDIR,
             Self::RemoveXAttr { .. } => uapi::fuse_opcode_FUSE_REMOVEXATTR,
+            Self::Rename { .. } => uapi::fuse_opcode_FUSE_RENAME2,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
             Self::SetXAttr { .. } => uapi::fuse_opcode_FUSE_SETXATTR,
@@ -2438,6 +2462,7 @@ impl FuseOperation {
             Self::Release(_) => RunningOperationKind::Release { dir: false },
             Self::ReleaseDir(_) => RunningOperationKind::Release { dir: true },
             Self::RemoveXAttr { .. } => RunningOperationKind::RemoveXAttr,
+            Self::Rename { .. } => RunningOperationKind::Rename,
             Self::Seek(_) => RunningOperationKind::Seek,
             Self::SetAttr(_) => RunningOperationKind::SetAttr,
             Self::SetXAttr { .. } => RunningOperationKind::SetXAttr,
