@@ -59,6 +59,7 @@ group("test") {
     "//src/graphics/benchmarks",
     "//src/lib/diagnostics:benchmarks",
     "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
+    "//src/performance/trace_bench:benchmarks",
     "//src/starnix:benchmarks",
     "//src/storage/benchmarks/fuchsia:benchmarks",
     "//src/storage/benchmarks/starnix:benchmarks",
