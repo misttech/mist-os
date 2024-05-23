@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::emulator_watcher::EmulatorWatcher;
 use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use bitflags::bitflags;
-use emulator_instance::EmulatorInstances;
-use fuchsia_async::Task;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::Stream;
 use manual_targets::watcher::{
     recommended_watcher as manual_recommended_watcher, ManualTargetEvent, ManualTargetState,
@@ -25,6 +24,8 @@ use usb_fastboot_discovery::{
 // so that it can speak our language. Or even have the mdns library not export FIDL structs
 // but rather some other well-defined type
 use fidl_fuchsia_developer_ffx as ffx;
+
+mod emulator_watcher;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -99,41 +100,6 @@ pub enum TargetEvent {
     Added(TargetHandle),
     /// Indicates a Target has been lost.
     Removed(TargetHandle),
-}
-
-struct EmulatorWatcher {
-    // Task for the drain loop
-    drain_task: Option<Task<()>>,
-}
-
-impl EmulatorWatcher {
-    fn new(instance_root: PathBuf, sender: UnboundedSender<Result<TargetEvent>>) -> Result<Self> {
-        let emu_instances = EmulatorInstances::new(instance_root.clone());
-        let existing = emulator_instance::get_all_targets(&emu_instances)?;
-        for i in existing {
-            let handle = i.try_into();
-            if let Ok(h) = handle {
-                let _ = sender.unbounded_send(Ok(TargetEvent::Added(h)));
-            }
-        }
-        let mut res = Self { drain_task: None };
-
-        // Emulator (and therefore notify thread) lifetime should last as long as the task,
-        // because it is moved into the loop
-        let mut watcher = emulator_instance::start_emulator_watching(instance_root.clone())?;
-        let task = Task::local(async move {
-            loop {
-                if let Some(act) = watcher.emulator_target_detected().await {
-                    let event = act.try_into();
-                    if let Ok(e) = event {
-                        let _ = sender.unbounded_send(Ok(e));
-                    }
-                }
-            }
-        });
-        res.drain_task.replace(task);
-        Ok(res)
-    }
 }
 
 #[allow(dead_code)]

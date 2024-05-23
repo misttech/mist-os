@@ -35,7 +35,10 @@ if (is_host) {
       "//third_party/rust_crates:tempfile",
     ]
 
-    sources = [ "src/lib.rs" ]
+    sources = [
+      "src/emulator_watcher.rs",
+      "src/lib.rs",
+    ]
   }
 
   group("discovery") {
