@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <zircon/compiler.h>
+#include "src/stdlib/_Exit.h"
+
 #include <zircon/sanitizer.h>
 #include <zircon/syscalls.h>
 
+#include "src/__support/common.h"
+#include "src/unistd/_exit.h"
+
+namespace LIBC_NAMESPACE {
 namespace {
 
 [[noreturn]] void Exit(int status) noexcept {
@@ -28,6 +31,8 @@ namespace {
 // for the same effect as the alias, but we can't use the alias
 // (unless we resort to assembly, but this seems cleaner).
 
-__EXPORT _Noreturn void _Exit(int status) { Exit(status); }
+LLVM_LIBC_FUNCTION(void, _Exit, (int status)) { Exit(status); }
 
-__EXPORT _Noreturn void _exit(int status) { Exit(status); }
+LLVM_LIBC_FUNCTION(void, _exit, (int status)) { Exit(status); }
+
+}  // namespace LIBC_NAMESPACE

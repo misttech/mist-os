@@ -48,7 +48,6 @@ group("components") {
 group("legacy-components") {
   visibility = [ ":*" ]
   deps = [
-    ":exit",
     "sanitizers",
     "setjmp",
     "stubs",
@@ -366,15 +365,6 @@ if (zircon_toolchain == false) {
       ldflags = [ "-Wl,-z,rela" ]
     }
   }
-}
-
-source_set("exit") {
-  sources = [ "_Exit.cc" ]
-  deps = [
-    ":headers",
-    "//src/zircon/lib/zircon",
-    "//zircon/system/public",
-  ]
 }
 
 if (zircon_toolchain == false) {
