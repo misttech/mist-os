@@ -21,6 +21,7 @@ static_library("lib") {
     "component_manager.h",
     "debug_agent.cc",
     "debug_agent.h",
+    "debug_agent_observer.h",
     "debug_registers.h",
     "debugged_process.cc",
     "debugged_process.h",

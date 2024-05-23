@@ -13,6 +13,7 @@
 
 #include "gtest/gtest_prod.h"
 #include "src/developer/debug/debug_agent/breakpoint.h"
+#include "src/developer/debug/debug_agent/debug_agent_observer.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
 #include "src/developer/debug/debug_agent/job_exception_observer.h"
@@ -26,6 +27,7 @@
 #include "src/developer/debug/shared/stream_buffer.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
+#include "src/lib/fxl/observer_list.h"
 
 namespace debug_agent {
 
@@ -96,8 +98,12 @@ class DebugAgent : public RemoteAPI,
   template <typename NotifyType>
   void SendNotification(const NotifyType& notify) {
     std::vector<char> serialized = debug_ipc::Serialize(notify, ipc_version_);
-    if (!serialized.empty())
+    if (is_connected() && !serialized.empty())
       buffered_stream_->stream().Write(std::move(serialized));
+
+    for (auto observer : observers_) {
+      observer.OnNotification(notify);
+    }
   }
 
   // RemoteAPI implementation.
@@ -111,6 +117,9 @@ class DebugAgent : public RemoteAPI,
   // Implements |LogBackend|.
   void WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,
                 std::string log) override;
+
+  void AddObserver(DebugAgentObserver* observer) { observers_.AddObserver(observer); }
+  void RemoveObserver(DebugAgentObserver* observer) { observers_.RemoveObserver(observer); }
 
  private:
   FRIEND_TEST(DebugAgentTests, Kill);
@@ -157,6 +166,7 @@ class DebugAgent : public RemoteAPI,
 
   std::unique_ptr<debug::BufferedStream> buffered_stream_;
 
+  fxl::ObserverList<DebugAgentObserver> observers_;
   uint32_t ipc_version_ = 0;
 
   std::unique_ptr<JobHandle> root_job_;
