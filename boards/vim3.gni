@@ -22,6 +22,8 @@
 # by default.
 # Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
 
+import("//build/devicetree/args.gni")
+
 has_board = true
 target_cpu = "arm64"
 
