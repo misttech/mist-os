@@ -112,7 +112,11 @@ class WlanFullmacImplIfcToDriverBridge
         ForwardResult<WlanFullmacImplIfc::SaeFrameRx>(completer.ToAsync()));
   }
   void OnWmmStatusResp(OnWmmStatusRespRequest& request,
-                       OnWmmStatusRespCompleter::Sync& completer) override {}
+                       OnWmmStatusRespCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->OnWmmStatusResp(request).Then(
+        ForwardResult<WlanFullmacImplIfc::OnWmmStatusResp>(completer.ToAsync()));
+  }
 
  private:
   fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> binding_;
@@ -245,7 +249,11 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
     bridge_client_->SaeFrameTx(request).Then(
         ForwardResult<WlanFullmacImplBridge::SaeFrameTx>(completer.ToAsync()));
   }
-  void WmmStatusReq(WmmStatusReqCompleter::Sync& completer) override {}
+  void WmmStatusReq(WmmStatusReqCompleter::Sync& completer) override {
+    WLAN_TRACE_DURATION();
+    bridge_client_->WmmStatusReq().Then(
+        ForwardResult<WlanFullmacImplBridge::WmmStatusReq>(completer.ToAsync()));
+  }
   void OnLinkStateChanged(OnLinkStateChangedRequest& request,
                           OnLinkStateChangedCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();

@@ -1138,3 +1138,63 @@ async fn test_signal_report() {
         );
     }
 }
+#[fuchsia::test]
+async fn test_wmm_status() {
+    let (client_sme_proxy, _connect_txn_event_stream, mut fullmac_driver, _generic_sme_proxy) =
+        setup_connected_to_open_bss(FullmacDriverConfig { ..Default::default() }).await;
+
+    let gen_random_wmm_ac_params = || -> fidl_common::WlanWmmAccessCategoryParameters {
+        fidl_common::WlanWmmAccessCategoryParameters {
+            ecw_min: rand::thread_rng().gen(),
+            ecw_max: rand::thread_rng().gen(),
+            aifsn: rand::thread_rng().gen(),
+            txop_limit: rand::thread_rng().gen(),
+            acm: rand::thread_rng().gen(),
+        }
+    };
+
+    let wmm_params = fidl_common::WlanWmmParameters {
+        apsd: rand::thread_rng().gen(),
+        ac_be_params: gen_random_wmm_ac_params(),
+        ac_bk_params: gen_random_wmm_ac_params(),
+        ac_vi_params: gen_random_wmm_ac_params(),
+        ac_vo_params: gen_random_wmm_ac_params(),
+    };
+
+    let client_fut = client_sme_proxy.wmm_status();
+    let driver_fut = async {
+        assert_variant!(fullmac_driver.request_stream.next().await,
+        fidl_fullmac::WlanFullmacImplBridgeRequest::WmmStatusReq { responder } => {
+            responder
+                .send()
+                .expect("Failed to respond to WmmStatusReq");
+        });
+
+        fullmac_driver
+            .ifc_proxy
+            .on_wmm_status_resp(zx::sys::ZX_OK, &wmm_params)
+            .await
+            .expect("Could not send OnWmmStatusResp");
+    };
+
+    let (sme_wmm_status, _) = futures::join!(client_fut, driver_fut);
+    let sme_wmm_status = sme_wmm_status
+        .expect("FIDL error on WMM status")
+        .expect("ClientSme returned error on WMM status");
+
+    let wmm_ac_params_eq = |common: &fidl_common::WlanWmmAccessCategoryParameters,
+                            internal: &fidl_internal::WmmAcParams|
+     -> bool {
+        common.ecw_min == internal.ecw_min
+            && common.ecw_max == internal.ecw_max
+            && common.aifsn == internal.aifsn
+            && common.txop_limit == internal.txop_limit
+            && common.acm == internal.acm
+    };
+
+    assert_eq!(sme_wmm_status.apsd, wmm_params.apsd);
+    assert!(wmm_ac_params_eq(&wmm_params.ac_be_params, &sme_wmm_status.ac_be_params));
+    assert!(wmm_ac_params_eq(&wmm_params.ac_bk_params, &sme_wmm_status.ac_bk_params));
+    assert!(wmm_ac_params_eq(&wmm_params.ac_vi_params, &sme_wmm_status.ac_vi_params));
+    assert!(wmm_ac_params_eq(&wmm_params.ac_vo_params, &sme_wmm_status.ac_vo_params));
+}
