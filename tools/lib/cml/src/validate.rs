@@ -449,52 +449,13 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         use_: &'a Use,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/340632445): Many of these checks are similar, unify them
-
-        // Ensure that services used from self are defined in `services`.
-        if let Some(service) = use_.service.as_ref() {
-            for service in service {
-                if use_.from == Some(UseFromRef::Self_) && !self.all_services.contains(service) {
-                    return Err(Error::validate(format!(
-                        "Service \"{}\" is used from self, so it must be declared as a \
-                       \"service\" in \"capabilities\"",
-                        service
-                    )));
-                }
-            }
-        }
-
-        // Ensure that protocols used from self are defined in `capabilities`.
-        if let Some(protocol) = use_.protocol.as_ref() {
-            for protocol in protocol {
-                if use_.from == Some(UseFromRef::Self_) && !self.all_protocols.contains(protocol) {
-                    return Err(Error::validate(format!(
-                        "Protocol \"{}\" is used from self, so it must be declared as a \
-                            \"protocol\" in \"capabilities\"",
-                        protocol
-                    )));
-                }
-            }
-        }
-
-        // Ensure that directories used from self are defined in `capabilities`.
-        if let Some(directory) = use_.directory.as_ref() {
-            if use_.from == Some(UseFromRef::Self_) && !self.all_directories.contains(directory) {
-                return Err(Error::validate(format!(
-                           "Directory \"{}\" is used from self, so it must be declared as a \"directory\" in \"capabilities\"",
-                           directory
-                       )));
-            }
-        }
-
-        // Ensure that configs used from self are defined in `configs`.
-        if let Some(config) = use_.config.as_ref() {
-            if use_.from == Some(UseFromRef::Self_) && !self.all_configs.contains(config) {
-                return Err(Error::validate(format!(
-                    "Config \"{config}\" is used from self, so it must be declared as a \
-                       \"config\" in \"capabilities\""
-                )));
-            }
+        for checker in [
+            self.service_from_self_checker(use_),
+            self.protocol_from_self_checker(use_),
+            self.directory_from_self_checker(use_),
+            self.config_from_self_checker(use_),
+        ] {
+            checker.validate("used")?;
         }
 
         if use_.from == Some(UseFromRef::Debug) && use_.protocol.is_none() {
@@ -662,7 +623,17 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         expose: &'a Expose,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/340632445): Many of these checks are similar, unify them
+        for checker in [
+            self.service_from_self_checker(expose),
+            self.protocol_from_self_checker(expose),
+            self.directory_from_self_checker(expose),
+            self.runner_from_self_checker(expose),
+            self.resolver_from_self_checker(expose),
+            self.dictionary_from_self_checker(expose),
+            self.config_from_self_checker(expose),
+        ] {
+            checker.validate("exposed")?;
+        }
 
         // Ensure that if the expose target is framework, the source target is self always.
         if expose.to == Some(ExposeToRef::Framework) {
@@ -671,48 +642,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 OneOrMany::Many(vec) if vec.iter().all(|from| *from == ExposeFromRef::Self_) => {}
                 _ => {
                     return Err(Error::validate("Expose to framework can only be done from self."))
-                }
-            }
-        }
-
-        // Ensure that services exposed from self are defined in `capabilities`.
-        if let Some(service) = expose.service.as_ref() {
-            for service in service {
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_services.contains(service) {
-                        return Err(Error::validate(format!(
-                       "Service \"{}\" is exposed from self, so it must be declared as a \"service\" in \"capabilities\"",
-                       service
-                   )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that protocols exposed from self are defined in `capabilities`.
-        if let Some(protocol) = expose.protocol.as_ref() {
-            for protocol in protocol {
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_protocols.contains(protocol) {
-                        return Err(Error::validate(format!(
-                           "Protocol \"{}\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\"",
-                           protocol
-                       )));
-                    }
-                }
-            }
-        }
-
-        if let Some(directory) = expose.directory.as_ref() {
-            for directory in directory {
-                // Ensure that directories exposed from self are defined in `capabilities`.
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_directories.contains(directory) {
-                        return Err(Error::validate(format!(
-                           "Directory \"{}\" is exposed from self, so it must be declared as a \"directory\" in \"capabilities\"",
-                           directory
-                       )));
-                    }
                 }
             }
         }
@@ -736,59 +665,8 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
-        // Ensure that runners exposed from self are defined in `capabilities`.
-        if let Some(runner) = expose.runner.as_ref() {
-            for runner in runner {
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_runners.contains(runner) {
-                        return Err(Error::validate(format!(
-                        "Runner \"{}\" is exposed from self, so it must be declared as a \"runner\" in \"capabilities\"",
-                        runner
-                    )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that resolvers exposed from self are defined in `capabilities`.
-        if let Some(resolver) = expose.resolver.as_ref() {
-            for resolver in resolver {
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_resolvers.contains(resolver) {
-                        return Err(Error::validate(format!(
-                       "Resolver \"{}\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\"", resolver
-                   )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that dictionaries exposed from self are defined in `capabilities`.
-        if let Some(dictionary) = expose.dictionary.as_ref() {
+        if matches!(expose.dictionary, Some(_)) {
             self.features.check(Feature::Dictionaries)?;
-            for dictionary in dictionary {
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_dictionaries.contains_key(dictionary) {
-                        return Err(Error::validate(format!(
-                       "Dictionary \"{}\" is exposed from self, so it must be declared as a \"dictionary\" in \"capabilities\"", dictionary
-                   )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that configs offered from self are defined in `configs`.
-        if let Some(config) = expose.config.as_ref() {
-            for config in config {
-                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
-                    if !self.all_configs.contains(config) {
-                        return Err(Error::validate(format!(
-                            "Config \"{config}\" is exposed from self, so it must be declared as a \
-                            \"config\" in \"capabilities\"",
-                        )));
-                    }
-                }
-            }
         }
 
         if let Some(event_stream) = &expose.event_stream {
@@ -872,36 +750,19 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         used_ids: &mut HashMap<Name, HashMap<String, CapabilityId<'a>>>,
         protocols_offered_to_all: &[&'a Offer],
     ) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/340632445): Many of these checks are similar, unify them
-
-        // Ensure that services offered from self are defined in `services`.
-        if let Some(service) = offer.service.as_ref() {
-            for service in service {
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_services.contains(service) {
-                        return Err(Error::validate(format!(
-                            "Service \"{}\" is offered from self, so it must be declared as a \
-                       \"service\" in \"capabilities\"",
-                            service
-                        )));
-                    }
-                }
-            }
+        for checker in [
+            self.service_from_self_checker(offer),
+            self.protocol_from_self_checker(offer),
+            self.directory_from_self_checker(offer),
+            self.storage_from_self_checker(offer),
+            self.runner_from_self_checker(offer),
+            self.resolver_from_self_checker(offer),
+            self.dictionary_from_self_checker(offer),
+            self.config_from_self_checker(offer),
+        ] {
+            checker.validate("offered")?;
         }
 
-        // Ensure that protocols offered from self are defined in `capabilities`.
-        if let Some(protocol) = offer.protocol.as_ref() {
-            for protocol in protocol {
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_protocols.contains(protocol) {
-                        return Err(Error::validate(format!(
-                           "Protocol \"{}\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\"",
-                           protocol
-                       )));
-                    }
-                }
-            }
-        }
         if let Some(stream) = offer.event_stream.as_ref() {
             if stream.iter().len() > 1 && offer.r#as.is_some() {
                 return Err(Error::validate(format!("as cannot be used with multiple events")));
@@ -918,20 +779,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
-        if let Some(directory) = offer.directory.as_ref() {
-            for directory in directory {
-                // Ensure that directories offered from self are defined in `capabilities`.
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_directories.contains(directory) {
-                        return Err(Error::validate(format!(
-                           "Directory \"{}\" is offered from self, so it must be declared as a \"directory\" in \"capabilities\"",
-                           directory
-                       )));
-                    }
-                }
-            }
-        }
-
         // Ensure directory rights are valid.
         if let Some(_) = offer.directory.as_ref() {
             if offer.from.iter().any(|r| *r == OfferFromRef::Self_) || offer.rights.is_some() {
@@ -941,82 +788,17 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
-        // Ensure that storage offered from self are defined in `capabilities`.
         if let Some(storage) = offer.storage.as_ref() {
             for storage in storage {
                 if offer.from.iter().any(|r| r.is_named()) {
                     return Err(Error::validate(format!(
                     "Storage \"{}\" is offered from a child, but storage capabilities cannot be exposed", storage)));
                 }
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_storages.contains_key(storage) {
-                        return Err(Error::validate(format!(
-                       "Storage \"{}\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\"",
-                       storage
-                   )));
-                    }
-                }
             }
         }
 
-        // Ensure that runners offered from self are defined in `runners`.
-        if let Some(runner) = offer.runner.as_ref() {
-            for runner in runner {
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_runners.contains(runner) {
-                        return Err(Error::validate(format!(
-                            "Runner \"{}\" is offered from self, so it must be declared as a \
-                       \"runner\" in \"capabilities\"",
-                            runner
-                        )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that resolvers offered from self are defined in `resolvers`.
-        if let Some(resolver) = offer.resolver.as_ref() {
-            for resolver in resolver {
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_resolvers.contains(resolver) {
-                        return Err(Error::validate(format!(
-                            "Resolver \"{}\" is offered from self, so it must be declared as a \
-                       \"resolver\" in \"capabilities\"",
-                            resolver
-                        )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that dictionaries offered from self are defined in `dictionaries`.
-        if let Some(dictionary) = offer.dictionary.as_ref() {
+        if matches!(offer.dictionary, Some(_)) {
             self.features.check(Feature::Dictionaries)?;
-            for dictionary in dictionary {
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_dictionaries.contains_key(dictionary) {
-                        return Err(Error::validate(format!(
-                            "Dictionary \"{}\" is offered from self, so it must be declared as a \
-                       \"dictionary\" in \"capabilities\"",
-                            dictionary
-                        )));
-                    }
-                }
-            }
-        }
-
-        // Ensure that configs offered from self are defined in `configs`.
-        if let Some(config) = offer.config.as_ref() {
-            for config in config {
-                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_configs.contains(config) {
-                        return Err(Error::validate(format!(
-                            "Config \"{config}\" is offered from self, so it must be declared as a \
-                            \"config\" in \"capabilities\""
-                        )));
-                    }
-                }
-            }
         }
 
         for ref_ in offer.from.iter() {
@@ -1732,18 +1514,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
         if let Some(debug_capabilities) = &environment.debug {
             for debug in debug_capabilities {
-                if let Some(protocol) = debug.protocol.as_ref() {
-                    for protocol in protocol.iter() {
-                        if debug.from == OfferFromRef::Self_
-                            && !self.all_protocols.contains(protocol)
-                        {
-                            return Err(Error::validate(format!(
-                                   "Protocol \"{}\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\"",
-                                   protocol
-                               )));
-                        }
-                    }
-                }
+                self.protocol_from_self_checker(debug).validate("registered as debug")?;
                 self.validate_from_clause("debug", debug, &None, &None)?;
                 // Ensure there are no cycles, such as a debug capability in an environment being
                 // assigned to the child which is providing the capability.
@@ -1755,6 +1526,153 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
         Ok(())
+    }
+
+    fn service_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.service(),
+            from: input.from_(),
+            container: &self.all_services,
+            typename: "service",
+        }
+    }
+
+    fn protocol_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.protocol(),
+            from: input.from_(),
+            container: &self.all_protocols,
+            typename: "protocol",
+        }
+    }
+
+    fn directory_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.directory(),
+            from: input.from_(),
+            container: &self.all_directories,
+            typename: "directory",
+        }
+    }
+
+    fn storage_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.storage(),
+            from: input.from_(),
+            container: &self.all_storages,
+            typename: "storage",
+        }
+    }
+
+    fn runner_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.runner(),
+            from: input.from_(),
+            container: &self.all_runners,
+            typename: "runner",
+        }
+    }
+
+    fn resolver_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.resolver(),
+            from: input.from_(),
+            container: &self.all_resolvers,
+            typename: "resolver",
+        }
+    }
+
+    fn dictionary_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.dictionary(),
+            from: input.from_(),
+            container: &self.all_dictionaries,
+            typename: "dictionary",
+        }
+    }
+
+    fn config_from_self_checker<'b>(
+        &'b self,
+        input: &'b (impl CapabilityClause + FromClause),
+    ) -> RouteFromSelfChecker<'b> {
+        RouteFromSelfChecker {
+            capability_name: input.config(),
+            from: input.from_(),
+            container: &self.all_configs,
+            typename: "config",
+        }
+    }
+}
+
+/// Helper type that assists with validating declarations of `{use, offer, expose} from self`.
+struct RouteFromSelfChecker<'a> {
+    /// The value of the capability property (protocol, service, etc.)
+    capability_name: Option<OneOrMany<&'a Name>>,
+
+    /// The value of `from`.
+    from: OneOrMany<AnyRef<'a>>,
+
+    /// A [Container] which is used to check for the existence of a capability definition.
+    container: &'a dyn Container,
+
+    /// The string name for the capability's type.
+    typename: &'static str,
+}
+
+impl<'a> RouteFromSelfChecker<'a> {
+    fn validate(self, operand: &'static str) -> Result<(), Error> {
+        let Self { capability_name, from, container, typename } = self;
+        if let Some(capability) = capability_name {
+            for capability in capability {
+                if from.iter().any(|r| *r == AnyRef::Self_) && !container.contains(capability) {
+                    return Err(Error::validate(format!(
+                        "{typename} \"{capability}\" is {operand} from self, so it must be \
+                        declared as a \"{typename}\" in \"capabilities\"",
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// [Container] provides a capability type agnostic trait to check for the existence of a
+/// capability definition of a particular type. This is useful for writing common validation
+/// functions.
+trait Container {
+    fn contains(&self, key: &Name) -> bool;
+}
+
+impl<'a> Container for HashSet<&'a Name> {
+    fn contains(&self, key: &Name) -> bool {
+        self.contains(key)
+    }
+}
+
+impl<'a, T> Container for HashMap<&'a Name, T> {
+    fn contains(&self, key: &Name) -> bool {
+        self.contains_key(key)
     }
 }
 
@@ -2939,7 +2857,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Protocol \"foo_protocol\" is used from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "protocol \"foo_protocol\" is used from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_use_directory_from_self_missing(
             json!({
@@ -2950,7 +2868,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Directory \"foo_directory\" is used from self, so it must be declared as a \"directory\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"foo_directory\" is used from self, so it must be declared as a \"directory\" in \"capabilities\""
         ),
         test_cml_use_service_from_self_missing(
             json!({
@@ -2961,7 +2879,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Service \"foo_service\" is used from self, so it must be declared as a \"service\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "service \"foo_service\" is used from self, so it must be declared as a \"service\" in \"capabilities\""
         ),
         test_cml_use_config_from_self_missing(
             json!({
@@ -2972,7 +2890,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Config \"foo_config\" is used from self, so it must be declared as a \"config\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "config \"foo_config\" is used from self, so it must be declared as a \"config\" in \"capabilities\""
         ),
         test_cml_use_event_stream_duplicate(
             json!({
@@ -3649,7 +3567,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Protocol \"pkg_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "protocol \"pkg_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_expose_protocol_from_self_missing_multiple(
             json!({
@@ -3660,7 +3578,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Protocol \"foo_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "protocol \"foo_protocol\" is exposed from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_expose_directory_from_self_missing(
             json!({
@@ -3671,7 +3589,18 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Directory \"pkg_directory\" is exposed from self, so it must be declared as a \"directory\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"pkg_directory\" is exposed from self, so it must be declared as a \"directory\" in \"capabilities\""
+        ),
+        test_cml_expose_service_from_self_missing(
+            json!({
+                "expose": [
+                    {
+                        "service": "pkg_service",
+                        "from": "self",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "service \"pkg_service\" is exposed from self, so it must be declared as a \"service\" in \"capabilities\""
         ),
         test_cml_expose_runner_from_self_missing(
             json!({
@@ -3682,7 +3611,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Runner \"dart\" is exposed from self, so it must be declared as a \"runner\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "runner \"dart\" is exposed from self, so it must be declared as a \"runner\" in \"capabilities\""
         ),
         test_cml_expose_resolver_from_self_missing(
             json!({
@@ -3693,7 +3622,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Resolver \"pkg_resolver\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "resolver \"pkg_resolver\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\""
         ),
         test_cml_expose_from_dictionary_invalid(
             json!({
@@ -4493,6 +4422,24 @@ mod tests {
             }),
             Ok(())
         ),
+        test_cml_offer_service_from_self_missing(
+            json!({
+                "offer": [
+                    {
+                        "service": "pkg_service",
+                        "from": "self",
+                        "to": [ "#modular" ],
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "modular",
+                        "url": "fuchsia-pkg://fuchsia.com/modular#meta/modular.cm"
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "service \"pkg_service\" is offered from self, so it must be declared as a \"service\" in \"capabilities\""
+        ),
         test_cml_offer_protocol_from_self_missing(
             json!({
                 "offer": [
@@ -4509,7 +4456,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Protocol \"pkg_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "protocol \"pkg_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_offer_protocol_from_self_missing_multiple(
             json!({
@@ -4527,7 +4474,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Protocol \"foo_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "protocol \"foo_protocol\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_offer_directory_from_self_missing(
             json!({
@@ -4545,7 +4492,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Directory \"pkg_directory\" is offered from self, so it must be declared as a \"directory\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "directory \"pkg_directory\" is offered from self, so it must be declared as a \"directory\" in \"capabilities\""
         ),
         test_cml_offer_runner_from_self_missing(
             json!({
@@ -4563,7 +4510,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Runner \"dart\" is offered from self, so it must be declared as a \"runner\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "runner \"dart\" is offered from self, so it must be declared as a \"runner\" in \"capabilities\""
         ),
         test_cml_offer_resolver_from_self_missing(
             json!({
@@ -4581,7 +4528,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Resolver \"pkg_resolver\" is offered from self, so it must be declared as a \"resolver\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "resolver \"pkg_resolver\" is offered from self, so it must be declared as a \"resolver\" in \"capabilities\""
         ),
         test_cml_offer_storage_from_self_missing(
             json!({
@@ -4599,7 +4546,7 @@ mod tests {
                         },
                     ],
                 }),
-            Err(Error::Validate { err, .. }) if &err == "Storage \"cache\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "storage \"cache\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\""
         ),
         test_cml_offer_dependency_on_wrong_type(
             json!({
@@ -4979,7 +4926,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { err, .. }) if &err == "Protocol \"fuchsia.logger.Log2\" is offered from self, so it must be declared as a \"protocol\" in \"capabilities\""
+            Err(Error::Validate { err, .. }) if &err == "protocol \"fuchsia.logger.Log2\" is registered as debug from self, so it must be declared as a \"protocol\" in \"capabilities\""
         ),
         test_cml_environment_invalid_from_child(
             json!({
@@ -6535,24 +6482,6 @@ mod tests {
             }),
             Ok(())
         ),
-        test_cml_offer_service_from_self_missing(
-            json!({
-                "offer": [
-                    {
-                        "service": "pkg_service",
-                        "from": "self",
-                        "to": [ "#modular" ],
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "modular",
-                        "url": "fuchsia-pkg://fuchsia.com/modular#meta/modular.cm"
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Service \"pkg_service\" is offered from self, so it must be declared as a \"service\" in \"capabilities\""
-        ),
         test_cml_validate_expose_service(
             json!(
                 {
@@ -6649,17 +6578,6 @@ mod tests {
                 }
             ),
             Ok(())
-        ),
-        test_cml_expose_service_from_self_missing(
-            json!({
-                "expose": [
-                    {
-                        "service": "pkg_service",
-                        "from": "self",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Service \"pkg_service\" is exposed from self, so it must be declared as a \"service\" in \"capabilities\""
         ),
         test_cml_service(
             json!({

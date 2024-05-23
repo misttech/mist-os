@@ -3900,6 +3900,17 @@ impl PathClause for Use {
     }
 }
 
+impl FromClause for Use {
+    fn from_(&self) -> OneOrMany<AnyRef<'_>> {
+        let one = match &self.from {
+            Some(from) => AnyRef::from(from),
+            // Default for `use`.
+            None => AnyRef::Parent,
+        };
+        OneOrMany::One(one)
+    }
+}
+
 impl FromClause for Expose {
     fn from_(&self) -> OneOrMany<AnyRef<'_>> {
         one_or_many_from_impl(&self.from)
