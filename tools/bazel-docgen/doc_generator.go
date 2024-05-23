@@ -5,6 +5,7 @@
 package bazel_docgen
 
 import (
+	"path/filepath"
 	"sort"
 
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
@@ -29,10 +30,10 @@ type tocEntry struct {
 	docType  int
 }
 
-func newTocEntry(title string, filename string, docType int) tocEntry {
+func newTocEntry(title string, filename string, docType int, mkPathFn func(string) string) tocEntry {
 	return tocEntry{
 		Title:   title,
-		Path:    "/" + filename,
+		Path:    mkPathFn(filename),
 		docType: docType,
 	}
 }
@@ -56,8 +57,12 @@ func filterEntries(entries []tocEntry, docType int) []tocEntry {
 	return filteredEntries
 }
 
-func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider FileProvider) {
+func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider FileProvider, basePath string) {
 	fileProvider.Open()
+
+	mkPathFn := func(s string) string {
+		return filepath.Join("/", basePath, s)
+	}
 
 	entries := make(map[string]tocEntry)
 
@@ -72,7 +77,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderRuleInfo(rule, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(rule.RuleName, fileName, docTypeRule)
+			entries[fileName] = newTocEntry(rule.RuleName, fileName, docTypeRule, mkPathFn)
 		}
 
 		// Render all of our providers
@@ -82,7 +87,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderProviderInfo(provider, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(provider.ProviderName, fileName, docTypeProvider)
+			entries[fileName] = newTocEntry(provider.ProviderName, fileName, docTypeProvider, mkPathFn)
 		}
 
 		// Render all of our starlark functions
@@ -92,7 +97,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderStarlarkFunctionInfo(funcInfo, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(funcInfo.FunctionName, fileName, docTypeStarlarkFunction)
+			entries[fileName] = newTocEntry(funcInfo.FunctionName, fileName, docTypeStarlarkFunction, mkPathFn)
 		}
 
 		// Render all of our rules
@@ -102,7 +107,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderRepositoryRuleInfo(repoRule, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(repoRule.RuleName, fileName, docTypeRepositoryRule)
+			entries[fileName] = newTocEntry(repoRule.RuleName, fileName, docTypeRepositoryRule, mkPathFn)
 		}
 	}
 
@@ -114,7 +119,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 	toc := []tocEntry{
 		{
 			Title: "Overview",
-			Path:  "/README.md",
+			Path:  mkPathFn("README.md"),
 		},
 		{
 			Heading: "API",
@@ -140,6 +145,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			},
 		},
 	}
+
 	// Make our table of contents
 	if yamlData, err := yaml.Marshal(&map[string]interface{}{"toc": toc}); err == nil {
 		tocWriter := fileProvider.NewFile("_toc.yaml")

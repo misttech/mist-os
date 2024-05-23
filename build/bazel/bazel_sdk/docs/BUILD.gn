@@ -46,4 +46,5 @@ bazel_docgen("docs") {
     ":workflows",
   ]
   reference_repo_path = "sdk/bazel_sdk"
+  docsite_base_path = "reference/bazel_sdk"
 }
