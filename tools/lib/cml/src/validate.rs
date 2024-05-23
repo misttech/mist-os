@@ -59,6 +59,7 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a Name>,
     all_resolvers: HashSet<&'a Name>,
     all_dictionaries: HashMap<&'a Name, Option<&'a DictionaryRef>>,
+    all_configs: HashSet<&'a Name>,
     all_environment_names: HashSet<&'a Name>,
     all_capability_names: HashSet<&'a Name>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
@@ -92,6 +93,7 @@ impl<'a> ValidationContext<'a> {
             all_runners: HashSet::new(),
             all_resolvers: HashSet::new(),
             all_dictionaries: HashMap::new(),
+            all_configs: HashSet::new(),
             all_environment_names: HashSet::new(),
             all_capability_names: HashSet::new(),
             strong_dependencies: DirectedGraph::new(),
@@ -141,6 +143,7 @@ impl<'a> ValidationContext<'a> {
         self.all_runners = self.document.all_runner_names().into_iter().collect();
         self.all_resolvers = self.document.all_resolver_names().into_iter().collect();
         self.all_dictionaries = self.document.all_dictionaries_with_sources().into_iter().collect();
+        self.all_configs = self.document.all_config_names().into_iter().collect();
         self.all_environment_names = self.document.all_environment_names().into_iter().collect();
         self.all_capability_names = self.document.all_capability_names();
 
@@ -446,6 +449,54 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         use_: &'a Use,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
+        // TODO(https://fxbug.dev/340632445): Many of these checks are similar, unify them
+
+        // Ensure that services used from self are defined in `services`.
+        if let Some(service) = use_.service.as_ref() {
+            for service in service {
+                if use_.from == Some(UseFromRef::Self_) && !self.all_services.contains(service) {
+                    return Err(Error::validate(format!(
+                        "Service \"{}\" is used from self, so it must be declared as a \
+                       \"service\" in \"capabilities\"",
+                        service
+                    )));
+                }
+            }
+        }
+
+        // Ensure that protocols used from self are defined in `capabilities`.
+        if let Some(protocol) = use_.protocol.as_ref() {
+            for protocol in protocol {
+                if use_.from == Some(UseFromRef::Self_) && !self.all_protocols.contains(protocol) {
+                    return Err(Error::validate(format!(
+                        "Protocol \"{}\" is used from self, so it must be declared as a \
+                            \"protocol\" in \"capabilities\"",
+                        protocol
+                    )));
+                }
+            }
+        }
+
+        // Ensure that directories used from self are defined in `capabilities`.
+        if let Some(directory) = use_.directory.as_ref() {
+            if use_.from == Some(UseFromRef::Self_) && !self.all_directories.contains(directory) {
+                return Err(Error::validate(format!(
+                           "Directory \"{}\" is used from self, so it must be declared as a \"directory\" in \"capabilities\"",
+                           directory
+                       )));
+            }
+        }
+
+        // Ensure that configs used from self are defined in `configs`.
+        if let Some(config) = use_.config.as_ref() {
+            if use_.from == Some(UseFromRef::Self_) && !self.all_configs.contains(config) {
+                return Err(Error::validate(format!(
+                    "Config \"{config}\" is used from self, so it must be declared as a \
+                       \"config\" in \"capabilities\""
+                )));
+            }
+        }
+
         if use_.from == Some(UseFromRef::Debug) && use_.protocol.is_none() {
             return Err(Error::validate("only \"protocol\" supports source from \"debug\""));
         }
@@ -485,12 +536,6 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
         if let Some(config) = use_.config.as_ref() {
-            if use_.from == Some(UseFromRef::Self_) && !self.all_capability_names.contains(config) {
-                return Err(Error::validate(format!(
-                    "Using config capability {} from self, but capability does not exist",
-                    config
-                )));
-            }
             if use_.key == None {
                 return Err(Error::validate(format!("Config '{}' missing field 'key'", config)));
             }
@@ -617,7 +662,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         expose: &'a Expose,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
-        // TODO: Many of these checks are similar, see if we can unify them
+        // TODO(https://fxbug.dev/340632445): Many of these checks are similar, unify them
 
         // Ensure that if the expose target is framework, the source target is self always.
         if expose.to == Some(ExposeToRef::Framework) {
@@ -732,6 +777,20 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
+        // Ensure that configs offered from self are defined in `configs`.
+        if let Some(config) = expose.config.as_ref() {
+            for config in config {
+                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
+                    if !self.all_configs.contains(config) {
+                        return Err(Error::validate(format!(
+                            "Config \"{config}\" is exposed from self, so it must be declared as a \
+                            \"config\" in \"capabilities\"",
+                        )));
+                    }
+                }
+            }
+        }
+
         if let Some(event_stream) = &expose.event_stream {
             if event_stream.iter().len() > 1 && expose.r#as.is_some() {
                 return Err(Error::validate(format!(
@@ -813,7 +872,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         used_ids: &mut HashMap<Name, HashMap<String, CapabilityId<'a>>>,
         protocols_offered_to_all: &[&'a Offer],
     ) -> Result<(), Error> {
-        // TODO: Many of these checks are repititious, see if we can unify them
+        // TODO(https://fxbug.dev/340632445): Many of these checks are similar, unify them
 
         // Ensure that services offered from self are defined in `services`.
         if let Some(service) = offer.service.as_ref() {
@@ -940,6 +999,20 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                             "Dictionary \"{}\" is offered from self, so it must be declared as a \
                        \"dictionary\" in \"capabilities\"",
                             dictionary
+                        )));
+                    }
+                }
+            }
+        }
+
+        // Ensure that configs offered from self are defined in `configs`.
+        if let Some(config) = offer.config.as_ref() {
+            for config in config {
+                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
+                    if !self.all_configs.contains(config) {
+                        return Err(Error::validate(format!(
+                            "Config \"{config}\" is offered from self, so it must be declared as a \
+                            \"config\" in \"capabilities\""
                         )));
                     }
                 }
@@ -2808,6 +2881,98 @@ mod tests {
                 ]
             }),
             Err(Error::Validate { err, .. }) if &err == "event_stream scope invalid_component did not match a component or collection in this .cml file."
+        ),
+
+        test_cml_use_from_self(
+            json!({
+                "use": [
+                    {
+                        "protocol": [ "bar_protocol", "baz_protocol" ],
+                        "from": "self",
+                    },
+                    {
+                        "directory": "foo_directory",
+                        "from": "self",
+                        "path": "/dir",
+                        "rights": [ "r*" ],
+                    },
+                    {
+                        "service": "foo_service",
+                        "from": "self",
+                    },
+                    {
+                        "config": "foo_config",
+                        "type": "bool",
+                        "key": "k",
+                        "from": "self",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "protocol": "bar_protocol",
+                    },
+                    {
+                        "protocol": "baz_protocol",
+                    },
+                    {
+                        "directory": "foo_directory",
+                        "path": "/dir",
+                        "rights": [ "r*" ],
+                    },
+                    {
+                        "service": "foo_service",
+                    },
+                    {
+                        "config": "foo_config",
+                        "type": "bool",
+                    },
+                ]
+            }),
+            Ok(())
+        ),
+        test_cml_use_protocol_from_self_missing(
+            json!({
+                "use": [
+                    {
+                        "protocol": "foo_protocol",
+                        "from": "self",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "Protocol \"foo_protocol\" is used from self, so it must be declared as a \"protocol\" in \"capabilities\""
+        ),
+        test_cml_use_directory_from_self_missing(
+            json!({
+                "use": [
+                    {
+                        "directory": "foo_directory",
+                        "from": "self",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "Directory \"foo_directory\" is used from self, so it must be declared as a \"directory\" in \"capabilities\""
+        ),
+        test_cml_use_service_from_self_missing(
+            json!({
+                "use": [
+                    {
+                        "service": "foo_service",
+                        "from": "self",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "Service \"foo_service\" is used from self, so it must be declared as a \"service\" in \"capabilities\""
+        ),
+        test_cml_use_config_from_self_missing(
+            json!({
+                "use": [
+                    {
+                        "config": "foo_config",
+                        "from": "self",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "Config \"foo_config\" is used from self, so it must be declared as a \"config\" in \"capabilities\""
         ),
         test_cml_use_event_stream_duplicate(
             json!({

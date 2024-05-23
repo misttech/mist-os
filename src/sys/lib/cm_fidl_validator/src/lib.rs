@@ -712,6 +712,7 @@ impl<'a> ValidationContext<'a> {
                 let decl = DeclType::UseService;
                 self.validate_use_fields(
                     decl,
+                    Self::service_checker,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     get_source_dictionary!(u),
@@ -727,6 +728,7 @@ impl<'a> ValidationContext<'a> {
                 let decl = DeclType::UseProtocol;
                 self.validate_use_fields(
                     decl,
+                    Self::protocol_checker,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     get_source_dictionary!(u),
@@ -742,6 +744,7 @@ impl<'a> ValidationContext<'a> {
                 let decl = DeclType::UseDirectory;
                 self.validate_use_fields(
                     decl,
+                    Self::directory_checker,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     get_source_dictionary!(u),
@@ -770,6 +773,7 @@ impl<'a> ValidationContext<'a> {
                     Some(fdecl::DependencyType::Strong);
                 self.validate_use_fields(
                     DeclType::UseStorage,
+                    Self::storage_checker,
                     SOURCE.as_ref(),
                     u.source_name.as_ref(),
                     None,
@@ -784,6 +788,7 @@ impl<'a> ValidationContext<'a> {
                 let decl = DeclType::UseEventStream;
                 self.validate_use_fields(
                     decl,
+                    Self::event_stream_checker,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     None,
@@ -832,6 +837,7 @@ impl<'a> ValidationContext<'a> {
                 let decl = DeclType::UseRunner;
                 self.validate_use_fields(
                     decl,
+                    Self::runner_checker,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     get_source_dictionary!(u),
@@ -847,6 +853,7 @@ impl<'a> ValidationContext<'a> {
                 let decl = DeclType::UseConfiguration;
                 self.validate_use_fields(
                     decl,
+                    Self::config_checker,
                     u.source.as_ref(),
                     u.source_name.as_ref(),
                     None,
@@ -996,6 +1003,10 @@ impl<'a> ValidationContext<'a> {
     fn validate_use_fields(
         &mut self,
         decl: DeclType,
+        // This takes a callback that returns a [Container], instead of the &[Container] directly,
+        // to avoid a borrow checker error that would occur from a simultaneous borrow on
+        // &mut self.
+        capability_checker: impl Fn(&Self) -> &dyn Container,
         source: Option<&'a fdecl::Ref>,
         source_name: Option<&'a String>,
         source_dictionary: Option<&'a String>,
@@ -1031,6 +1042,12 @@ impl<'a> ValidationContext<'a> {
                 self.errors.push(Error::invalid_field(decl, "dependency_type"));
             }
             _ => {}
+        }
+
+        if let (Some(fdecl::Ref::Self_(_)), Some(name)) = (source, source_name) {
+            if !(capability_checker)(self).contains(name) && source_dictionary.is_none() {
+                self.errors.push(Error::invalid_capability(decl, "source", name));
+            }
         }
     }
 
@@ -2745,6 +2762,19 @@ impl<'a> ValidationContext<'a> {
     fn storage_checker(&self) -> &dyn Container {
         &self.all_storages
     }
+    fn event_stream_checker(&self) -> &dyn Container {
+        // Components can't define their own event streams. If someone tries to route an event
+        // stream from Self it should generate some other error. So just return `true` to bypass
+        // the logic.
+        struct AlwaysTrueContainer {}
+        impl Container for AlwaysTrueContainer {
+            fn contains(&self, _key: &str) -> bool {
+                true
+            }
+        }
+        static CONTAINER: AlwaysTrueContainer = AlwaysTrueContainer {};
+        &CONTAINER
+    }
 }
 
 #[cfg(test)]
@@ -3667,6 +3697,65 @@ mod tests {
                 Error::invalid_child(DeclType::UseService, "source", "no-such-child"),
                 Error::invalid_child(DeclType::UseDirectory, "source", "no-such-child"),
                 Error::invalid_child(DeclType::UseRunner, "source", "no-such-child"),
+            ])),
+        },
+        test_validate_uses_invalid_capability_from_self => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.uses = Some(vec![
+                    fdecl::Use::Service(fdecl::UseService {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeService".into()),
+                        target_path: Some("/svc/foo".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::Protocol(fdecl::UseProtocol {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("fuchsia.some.library.SomeProtocol".into()),
+                        target_path: Some("/svc/bar".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::Directory(fdecl::UseDirectory {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("dir".into()),
+                        target_path: Some("/assets".into()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        rights: Some(fio::Operations::CONNECT),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_elf".into()),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        source_name: Some("source_config".into()),
+                        target_name: Some("config".into()),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: Some(Vec::new()),
+                            constraints: Vec::new(),
+                        }),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::invalid_capability(
+                    DeclType::UseService,
+                    "source",
+                    "fuchsia.some.library.SomeService"),
+                Error::invalid_capability(
+                    DeclType::UseProtocol,
+                    "source",
+                    "fuchsia.some.library.SomeProtocol"),
+                Error::invalid_capability(DeclType::UseDirectory, "source", "dir"),
+                Error::invalid_capability(DeclType::UseRunner, "source", "source_elf"),
+                Error::invalid_capability(DeclType::UseConfiguration, "source", "source_config"),
             ])),
         },
         test_validate_use_from_child_offer_to_child_strong_cycle => {

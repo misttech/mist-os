@@ -1986,6 +1986,13 @@ impl Document {
         }
     }
 
+    pub fn all_config_names(&self) -> Vec<&Name> {
+        self.capabilities
+            .as_ref()
+            .map(|c| c.iter().filter_map(|c| c.config.as_ref()).collect())
+            .unwrap_or_else(|| vec![])
+    }
+
     pub fn all_environment_names(&self) -> Vec<&Name> {
         self.environments
             .as_ref()

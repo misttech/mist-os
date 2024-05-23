@@ -2972,6 +2972,7 @@ mod tests {
                     { "runner": "usain", "from": "parent", },
                 ],
                 "capabilities": [
+                    { "protocol": "fuchsia.sys2.Echo" },
                     {
                         "config": "fuchsia.config.Config",
                         "type": "bool",
@@ -3139,7 +3140,7 @@ mod tests {
                         ..Default::default()
                     }),
                 ]),
-                collections:Some(vec![
+                collections: Some(vec![
                     fdecl::Collection{
                         name:Some("modular".to_string()),
                         durability:Some(fdecl::Durability::Transient),
@@ -3147,6 +3148,11 @@ mod tests {
                     },
                 ]),
                 capabilities: Some(vec![
+                    fdecl::Capability::Protocol(fdecl::Protocol {
+                        name: Some("fuchsia.sys2.Echo".to_string()),
+                        source_path: Some("/svc/fuchsia.sys2.Echo".to_string()),
+                        ..Default::default()
+                    }),
                     fdecl::Capability::Config(fdecl::Configuration {
                         name: Some("fuchsia.config.Config".to_string()),
                         value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
