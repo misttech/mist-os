@@ -19,6 +19,7 @@ executable("display-test") {
     "//src/graphics/display/testing/client-utils",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
