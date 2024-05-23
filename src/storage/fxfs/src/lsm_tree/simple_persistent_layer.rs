@@ -57,7 +57,7 @@ use {
     static_assertions::const_assert,
     std::{
         cmp::Ordering,
-        io::Read,
+        io::{Read, Write},
         marker::PhantomData,
         ops::Bound,
         sync::{Arc, Mutex},
@@ -591,19 +591,13 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
     pub async fn new(mut writer: W, block_size: u64) -> Result<Self, Error> {
         ensure!(block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
         let layer_info = LayerInfo { block_size, key_value_version: LATEST_VERSION };
-        let mut buf: Vec<u8> = vec![0u8; block_size as usize];
-        let len;
-        {
-            let mut cursor = std::io::Cursor::new(&mut buf);
-            layer_info.serialize_with_version(&mut cursor)?;
-            len = cursor.position();
-        }
-        writer.write_bytes(&buf[..len as usize]).await?;
-        writer.skip(block_size - len).await?;
+        let mut cursor = std::io::Cursor::new(vec![0u8; block_size as usize]);
+        layer_info.serialize_with_version(&mut cursor)?;
+        writer.write_bytes(cursor.get_ref()).await?;
         Ok(SimplePersistentLayerWriter {
             writer,
             block_size,
-            buf: vec![0; BLOCK_HEADER_SIZE],
+            buf: Vec::new(),
             item_count: 0,
             block_offsets: Vec::new(),
             block_keys: Vec::new(),
@@ -612,34 +606,26 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
         })
     }
 
-    async fn write_some(&mut self, len: usize) -> Result<(), Error> {
+    /// Writes 'buf[..len]' out as a block.
+    ///
+    /// Blocks are fixed size, consisting of a 16-bit item count, data, zero padding
+    /// and seek table at the end.
+    async fn write_block(&mut self, len: usize) -> Result<(), Error> {
         if self.item_count == 0 {
             return Ok(());
         }
-        LittleEndian::write_u16(&mut self.buf[0..BLOCK_HEADER_SIZE], self.item_count);
-        self.writer.write_bytes(&self.buf[..len]).await?;
-        // Leave a gap and write the seek table to the end.
-        self.writer
-            .skip(
-                self.block_size
-                    - len as u64
-                    - (self.block_offsets.len() * BLOCK_SEEK_ENTRY_SIZE) as u64,
-            )
-            .await?;
-        // Write the seek table overwriting the buffer. It must be smaller, entries are 2 bytes each
-        // and items are always at least 10,
-        let mut pointer = 0;
-        for offset in &self.block_offsets {
-            LittleEndian::write_u16(
-                &mut self.buf[pointer..pointer + BLOCK_SEEK_ENTRY_SIZE],
-                *offset,
-            );
-            pointer += BLOCK_SEEK_ENTRY_SIZE;
+        let seek_table_size = self.block_offsets.len() * BLOCK_SEEK_ENTRY_SIZE;
+        assert!(seek_table_size + len + std::mem::size_of::<u16>() <= self.block_size as usize);
+        let mut cursor = std::io::Cursor::new(vec![0u8; self.block_size as usize]);
+        cursor.write_u16::<LittleEndian>(self.item_count)?;
+        cursor.write_all(self.buf.drain(..len).as_ref())?;
+        cursor.set_position(self.block_size - seek_table_size as u64);
+        // Write the seek table. Entries are 2 bytes each and items are always at least 10.
+        for &offset in &self.block_offsets {
+            cursor.write_u16::<LittleEndian>(offset)?;
         }
-        self.writer.write_bytes(&self.buf[..pointer]).await?;
+        self.writer.write_bytes(cursor.get_ref()).await?;
         debug!(item_count = self.item_count, byte_count = len, "wrote items");
-        // Leave space to prepend the next header.
-        self.buf.drain(..len - BLOCK_HEADER_SIZE);
         self.item_count = 0;
         self.block_offsets.clear();
         Ok(())
@@ -672,13 +658,13 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
         let mut added_offset = false;
         // Never record the first item. The offset is always the same.
         if self.item_count > 0 {
-            self.block_offsets.push(u16::try_from(len).unwrap());
+            self.block_offsets.push(u16::try_from(len + BLOCK_HEADER_SIZE).unwrap());
             added_offset = true;
         }
 
         // If writing the item took us over a block, flush the bytes in the buffer prior to this
         // item.
-        if self.buf.len() + (self.block_offsets.len() * BLOCK_SEEK_ENTRY_SIZE)
+        if BLOCK_HEADER_SIZE + self.buf.len() + (self.block_offsets.len() * BLOCK_SEEK_ENTRY_SIZE)
             > self.block_size as usize - 1
         {
             if added_offset {
@@ -686,7 +672,7 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
                 // on the next block and have a known offset there.
                 self.block_offsets.pop();
             }
-            self.write_some(len).await?;
+            self.write_block(len).await?;
 
             // Note that this will not insert an entry for the first data block.
             self.block_keys.push(item.key.get_leading_u64());
@@ -697,7 +683,7 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
     }
 
     async fn flush(&mut self) -> Result<(), Error> {
-        self.write_some(self.buf.len()).await?;
+        self.write_block(self.buf.len()).await?;
         self.write_seek_table().await?;
         self.writer.complete().await
     }

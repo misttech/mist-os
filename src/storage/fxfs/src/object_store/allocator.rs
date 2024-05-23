@@ -874,9 +874,12 @@ impl Allocator {
                 tree::reservation_amount_from_layer_size(total_size),
             );
         }
-        // Build free extent structure from disk.
+        // Build free extent structure from disk. For now, we expect disks to have *some* free
+        // space at all times. This may change if we ever support mounting of read-only
+        // redistributable filesystem images.
         if !self.rebuild_strategy().await.context("Build free extents")? {
-            tracing::info!("Device contains no free space.");
+            tracing::error!("Device contains no free space.");
+            return Err(FxfsError::Inconsistent).context("Device appears to contain no free space");
         }
 
         assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);

@@ -2495,3 +2495,96 @@ async fn test_empty_volume() {
         .await
         .expect("Fsck should succeed");
 }
+
+#[fuchsia::test]
+async fn test_full_disk() {
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        let root_store = fs.root_store();
+        let device = fs.device();
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let layer_handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
+        transaction.commit().await.expect("commit failed");
+
+        // Now write out our 'fill the disk' allocation.
+        {
+            let mut writer = SimplePersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
+                Writer::new(&layer_handle).await,
+                fs.block_size(),
+            )
+            .await
+            .expect("writer new");
+            let end = round_down(
+                TEST_DEVICE_BLOCK_SIZE as u64 * TEST_DEVICE_BLOCK_COUNT,
+                fs.block_size(),
+            );
+            let item = Item::new(
+                AllocatorKey { device_range: 0..end },
+                AllocatorValue::Abs { count: 2, owner_object_id: 9 },
+            );
+            writer.write(item.as_item_ref()).await.expect("write failed");
+            writer.flush().await.expect("flush failed");
+        }
+        // Discard the mutable layer which contains mutations associated with the write itself.
+        fs.allocator()
+            .tree()
+            .set_mutable_layer(crate::lsm_tree::skip_list_layer::SkipListLayer::new(1024));
+
+        fs.sync(SyncOptions { flush_device: true, ..Default::default() }).await.expect("sync");
+
+        let layer_handle_object_id = layer_handle.object_id();
+        let allocator_info = fs.allocator().info();
+        let mut allocator_info_vec = vec![];
+        allocator_info.serialize_with_version(&mut allocator_info_vec).expect("serialize failed");
+        allocator_info_vec.resize(4096, 0);
+        let mut buf = device.allocate_buffer(allocator_info_vec.len()).await;
+        buf.as_mut_slice().copy_from_slice(&allocator_info_vec[..]);
+
+        let handle = ObjectStore::open_object(
+            &root_store,
+            fs.allocator().object_id(),
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("open allocator handle failed");
+        handle.overwrite(0, buf.as_mut(), true).await.expect("overwrite failed");
+
+        // Add "layer_handle" to the layer stack for the allocator but be careful not to
+        // allocate anything in the process.
+        let mut allocator_info = fs.allocator().info();
+        allocator_info.layers.push(layer_handle_object_id);
+        let mut allocator_info_vec = vec![];
+        allocator_info.serialize_with_version(&mut allocator_info_vec).expect("serialize failed");
+        allocator_info_vec.resize(4096 * 4, 0);
+        let mut buf = device.allocate_buffer(allocator_info_vec.len()).await;
+        buf.as_mut_slice().copy_from_slice(&allocator_info_vec[..]);
+
+        let handle = ObjectStore::open_object(
+            &root_store,
+            fs.allocator().object_id(),
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("open allocator handle failed");
+        handle.overwrite(0, buf.as_mut(), true).await.expect("overwrite failed");
+    }
+
+    test.remount().await.expect_err("Remount succeeded");
+}
