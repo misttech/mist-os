@@ -67,6 +67,7 @@ cc_library(
     ],
     deps = [
         "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/common:uuid_string_util",
         "//src/connectivity/bluetooth/core/bt-host/gap",
         "//src/connectivity/bluetooth/core/bt-host/gatt",
         "//src/connectivity/bluetooth/core/bt-host/sdp",

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_package.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/fuzz.gni")
@@ -31,7 +32,6 @@ source_set("sources") {
     ":bt_host_config",
     ":stack",
     "fidl",
-    "//sdk/banjo/fuchsia.hardware.bt.vendor:fuchsia.hardware.bt.vendor_banjo_cpp",
     "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
@@ -106,6 +106,10 @@ fuchsia_package("bt-host") {
     ":component",
     ":default_config_values",
   ]
+}
+
+bazel_fuchsia_package("bt-host-bazel") {
+  package_name = "bt-host"
 }
 
 group("stack") {

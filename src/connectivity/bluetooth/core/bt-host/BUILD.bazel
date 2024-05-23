@@ -2,7 +2,115 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_binary",
+    "fuchsia_component",
+    "fuchsia_component_manifest",
+    "fuchsia_package",
+    "fuchsia_structured_config_cpp_elf_lib",
+    "fuchsia_structured_config_values",
+)
+
 package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "stack",
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host/att",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/controllers",
+        "//src/connectivity/bluetooth/core/bt-host/gap",
+        "//src/connectivity/bluetooth/core/bt-host/gatt",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "//src/connectivity/bluetooth/core/bt-host/hci-spec",
+        "//src/connectivity/bluetooth/core/bt-host/iso",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap",
+        "//src/connectivity/bluetooth/core/bt-host/sco",
+        "//src/connectivity/bluetooth/core/bt-host/sdp",
+        "//src/connectivity/bluetooth/core/bt-host/sm",
+        "//src/connectivity/bluetooth/core/bt-host/socket",
+        "//src/connectivity/bluetooth/core/bt-host/transport",
+    ],
+)
+
+cc_library(
+    name = "sources",
+    srcs = [
+        "host.cc",
+        "util.cc",
+    ],
+    hdrs = [
+        "host.h",
+        "util.h",
+    ],
+    deps = [
+        ":bt_host_config",
+        ":stack",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/controllers",
+        "//src/connectivity/bluetooth/core/bt-host/fidl",
+        "//src/connectivity/bluetooth/core/bt-host/gap",
+        "//src/connectivity/bluetooth/core/bt-host/gatt",
+        "//src/connectivity/bluetooth/lib/fidl",
+        "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
+        "//third_party/pigweed/backends/pw_random:zircon_random_generator",
+        "@fuchsia_sdk//fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+        "@fuchsia_sdk//pkg/async-loop-cpp",
+        "@fuchsia_sdk//pkg/async-loop-default",
+        "@fuchsia_sdk//pkg/fit",
+        "@fuchsia_sdk//pkg/inspect",
+        "@fuchsia_sdk//pkg/sys_cpp",
+        "@fuchsia_sdk//pkg/trace",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
+        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_hlcpp",
+        "@internal_sdk//pkg/device-watcher",
+    ],
+)
+
+fuchsia_cc_binary(
+    name = "bt_host_bin",
+    srcs = ["main.cc"],
+    deps = [
+        ":sources",
+        "//third_party/pigweed/backends/pw_log:syslog",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/bt-host.cml",
+    component_name = "bt-host",
+)
+
+fuchsia_structured_config_cpp_elf_lib(
+    name = "bt_host_config",
+    cm_label = ":manifest",
+)
+
+fuchsia_structured_config_values(
+    name = "default_config_values",
+    cm_label = ":manifest",
+    values = {
+        "device_path": "/dev/class/bt-hci/000",
+    },
+)
+
+fuchsia_component(
+    name = "component",
+    component_name = "bt-host",
+    manifest = ":manifest",
+    deps = [":bt_host_bin"],
+)
+
+fuchsia_package(
+    name = "bt-host",
+    package_name = "bt-host",
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    resources = [":default_config_values"],
+)
 
 cc_library(
     name = "config",
@@ -242,25 +350,5 @@ cc_library(
     ],
     includes = [
         "public",
-    ],
-)
-
-cc_library(
-    name = "stack",
-    deps = [
-        "//src/connectivity/bluetooth/core/bt-host/att",
-        "//src/connectivity/bluetooth/core/bt-host/common",
-        "//src/connectivity/bluetooth/core/bt-host/controllers",
-        "//src/connectivity/bluetooth/core/bt-host/gap",
-        "//src/connectivity/bluetooth/core/bt-host/gatt",
-        "//src/connectivity/bluetooth/core/bt-host/hci",
-        "//src/connectivity/bluetooth/core/bt-host/hci-spec",
-        "//src/connectivity/bluetooth/core/bt-host/iso",
-        "//src/connectivity/bluetooth/core/bt-host/l2cap",
-        "//src/connectivity/bluetooth/core/bt-host/sco",
-        "//src/connectivity/bluetooth/core/bt-host/sdp",
-        "//src/connectivity/bluetooth/core/bt-host/sm",
-        "//src/connectivity/bluetooth/core/bt-host/socket",
-        "//src/connectivity/bluetooth/core/bt-host/transport",
     ],
 )

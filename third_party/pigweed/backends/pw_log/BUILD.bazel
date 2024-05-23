@@ -36,7 +36,7 @@ cc_library(
     srcs = ["log_syslog.cc"],
     deps = [
         ":pw_log",
-        "//sdk/lib/syslog/cpp",
+        "@internal_sdk//pkg/syslog_cpp",
     ],
 )
 

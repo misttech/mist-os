@@ -135,7 +135,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
     void set_request_handle(bt::gap::Adapter::BrEdr::ScoRequestHandle handle) {
       request_handle_ = std::move(handle);
-    };
+    }
 
     void set_connection(bt::sco::ScoConnection::WeakPtr connection) {
       connection_ = std::move(connection);

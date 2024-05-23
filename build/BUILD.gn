@@ -152,6 +152,8 @@ group("non_hermetic_deps") {
   # GN rule, which has unspecified outputs.
   # bt-host tests will be migrated out-of-tree.
   visibility += [
+    "//src/connectivity/bluetooth/core/bt-host:bt-host-bazel",
+    "//src/connectivity/bluetooth/core/bt-host:bt-host-bazel.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/att:test_pkg",
     "//src/connectivity/bluetooth/core/bt-host/att:test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/common:test_pkg",

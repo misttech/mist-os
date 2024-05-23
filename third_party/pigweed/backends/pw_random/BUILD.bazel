@@ -1,0 +1,16 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "zircon_random_generator",
+    hdrs = [
+        "zircon_random_generator.h",
+    ],
+    deps = [
+        "@pigweed//pw_random",
+    ],
+)
+
