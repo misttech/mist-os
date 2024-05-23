@@ -61,6 +61,8 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
   PowerConfiguration response;
   response.element_control_client = std::move(result_add_element->element_control_channel());
   response.lessor_client = std::move(description.lessor_client_.value());
+  response.current_level_client = std::move(*description.current_level_client_);
+  response.required_level_client = std::move(*description.required_level_client_);
   return zx::ok(std::move(response));
 }
 
@@ -116,6 +118,8 @@ zx::result<> AmlHrtimer::Start() {
 
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control;
   fidl::SyncClient<fuchsia_power_broker::Lessor> lessor;
+  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level;
+  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level;
   zx::result<PowerConfiguration> power_configuration = GetPowerConfiguration(pdev);
   if (power_configuration.is_error()) {
     FDF_LOG(INFO, "Could not get power configuration: %s, continue without it",
@@ -123,12 +127,15 @@ zx::result<> AmlHrtimer::Start() {
   } else {
     element_control.emplace(std::move(power_configuration->element_control_client));
     lessor.Bind(std::move(std::move(power_configuration->lessor_client)));
+    current_level.Bind(std::move(power_configuration->current_level_client));
+    required_level.Bind(std::move(power_configuration->required_level_client), dispatcher());
   }
 
   server_ = std::make_unique<hrtimer::AmlHrtimerServer>(
       dispatcher(), std::move(*mmio_buffer), std::move(element_control), std::move(lessor),
-      std::move(irqs[0]), std::move(irqs[1]), std::move(irqs[2]), std::move(irqs[3]),
-      std::move(irqs[4]), std::move(irqs[5]), std::move(irqs[6]), std::move(irqs[7]));
+      std::move(current_level), std::move(required_level), std::move(irqs[0]), std::move(irqs[1]),
+      std::move(irqs[2]), std::move(irqs[3]), std::move(irqs[4]), std::move(irqs[5]),
+      std::move(irqs[6]), std::move(irqs[7]));
 
   auto result_dev = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_hrtimer::Device>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

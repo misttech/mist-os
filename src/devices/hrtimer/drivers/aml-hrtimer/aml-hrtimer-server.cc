@@ -12,13 +12,19 @@ namespace hrtimer {
 AmlHrtimerServer::AmlHrtimerServer(
     async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
     std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
-    fidl::SyncClient<fuchsia_power_broker::Lessor> lease, zx::interrupt irq_a, zx::interrupt irq_b,
-    zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f, zx::interrupt irq_g,
-    zx::interrupt irq_h, zx::interrupt irq_i)
-    : element_control_(std::move(element_control)) {
+    fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
+    fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
+    fidl::Client<fuchsia_power_broker::RequiredLevel> required_level, zx::interrupt irq_a,
+    zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
+    zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i)
+    : element_control_(std::move(element_control)),
+      current_level_(std::move(current_level)),
+      required_level_(std::move(required_level))
+
+{
   mmio_.emplace(std::move(mmio));
   dispatcher_ = dispatcher;
-  wake_handling_lessor_ = std::move(lease);
+  wake_handling_lessor_ = std::move(lessor);
 
   timers_[0].irq_handler.set_object(irq_a.get());
   timers_[1].irq_handler.set_object(irq_b.get());
@@ -39,6 +45,47 @@ AmlHrtimerServer::AmlHrtimerServer(
   timers_[6].irq = std::move(irq_g);
   timers_[7].irq = std::move(irq_h);
   timers_[8].irq = std::move(irq_i);
+
+  // Don't monitor RequiredLevel if we don't have an element in the topology.
+  if (element_control_) {
+    WatchRequiredLevel();
+  }
+}
+
+// We Watch the RequiredLevel continuously such that our aml-hrtimer-wake power element goes indeed
+// to the level requested by Power Broker because of our call to Update the CurrentLevel.
+// We don't change any hardware status based on this since we only use this power element to prevent
+// suspension.
+// Note we continue to Watch RequiredLevel after we pass to our clients ElementControl channel
+// handles we get when requesting leases. This is because our clients are not the owners of the
+// level and hence can't monitor it as we do here.
+void AmlHrtimerServer::WatchRequiredLevel() {
+  required_level_->Watch().Then(
+      [this](fidl::Result<fuchsia_power_broker::RequiredLevel::Watch>& result) {
+        if (result.is_error()) {
+          // TODO(https://fxbug.dev/342125175): Consider a different strategy to handle errors
+          // when interacting with the power framework.
+          // Do not log canceled cases; these happen frequently in certain test cases.
+          if (!result.error_value().is_framework_error() ||
+              result.error_value().framework_error().status() != ZX_ERR_CANCELED) {
+            FDF_LOG(ERROR, "Power RequiredLevel call failed: %s. Stop monitoring required level",
+                    result.error_value().FormatDescription().c_str());
+          }
+          element_control_.reset();  // Something is wrong, we stop supporting power management.
+          return;
+        }
+        FDF_LOG(DEBUG, "RequiredLevel : %u", static_cast<uint8_t>(result->required_level()));
+        auto result_current = current_level_->Update(result->required_level());
+        if (result_current.is_error()) {
+          // TODO(https://fxbug.dev/342125175): Consider a different strategy to handle errors
+          // when interacting with the power framework.
+          FDF_LOG(ERROR, "Power CurrentLevel call failed: %s. Stop monitoring required level",
+                  result_current.error_value().FormatDescription().c_str());
+          element_control_.reset();  // Something is wrong, we stop supporting power management.
+          return;
+        }
+        WatchRequiredLevel();
+      });
 }
 
 void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base,
@@ -57,31 +104,30 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
     auto start_result = parent.StartHardware(timer_index);
     if (start_result.is_error()) {
       FDF_LOG(ERROR, "Could not restart the hardware for timer index: %zu", timer_index);
-      if (wait_completer) {
-        wait_completer->Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
-        wait_completer.reset();
+      if (power_enabled_wait_completer) {
+        power_enabled_wait_completer->Reply(
+            zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+        power_enabled_wait_completer.reset();
       }
     }
   } else {
-    if (wait_completer) {
+    if (power_enabled_wait_completer) {
       // Before we ack the irq we take a lease to prevent the system from suspending while we
       // notify any clients.
       // The lease is passed to the completer or dropped as we exit this scope which guarantees the
       // waiting client was notified before the system suspended.
-      auto result_lease = parent.wake_handling_lessor_->Lease(kWakeHandlingLeaseOn);
+      auto lease_control = parent.LeaseWakeHandling();
       // We don't exit on error conditions since we need to potentially signal an event and ack the
       // irq regardless.
-      if (result_lease.is_error()) {
-        FDF_LOG(ERROR, "Lease returned error: %s",
-                result_lease.error_value().FormatDescription().c_str());
-        wait_completer->Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+      if (lease_control.is_error()) {
+        power_enabled_wait_completer->Reply(
+            zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
       } else {
-        fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse response = {
-            {.keep_alive = std::move(result_lease->lease_control())},
-        };
-        wait_completer->Reply(zx::ok(std::move(response)));
+        power_enabled_wait_completer->Reply(
+            zx::ok(fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse{
+                {.keep_alive = std::move(*lease_control)}}));
       }
-      wait_completer.reset();
+      power_enabled_wait_completer.reset();
     }
 
     if (event) {
@@ -94,16 +140,48 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
   }
 }
 
+// To get the lease on WakeHandling satisfied, we WatchStatus on the LeaseControl protocol.
+// This method is called only if we have a power_enabled_wait_completer, i.e. we have determined
+// that we support power management.
+zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>>
+AmlHrtimerServer::LeaseWakeHandling() {
+  if (!element_control_) {
+    FDF_LOG(ERROR, "Power management not functional");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  auto result_lease = wake_handling_lessor_->Lease(kWakeHandlingLeaseOn);
+  if (result_lease.is_error()) {
+    FDF_LOG(ERROR, "Power Lease call returned error: %s",
+            result_lease.error_value().FormatDescription().c_str());
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  fuchsia_power_broker::LeaseStatus lease_status = fuchsia_power_broker::LeaseStatus::kUnknown;
+  fidl::SyncClient<fuchsia_power_broker::LeaseControl> lease_control(
+      std::move(result_lease->lease_control()));
+  do {
+    auto result = lease_control->WatchStatus(lease_status);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Power WatchStatus returned error: %s",
+              result.error_value().FormatDescription().c_str());
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+    lease_status = result->status();
+  } while (lease_status != fuchsia_power_broker::LeaseStatus::kSatisfied);
+  return zx::ok(lease_control.TakeClientEnd());
+}
+
 void AmlHrtimerServer::ShutDown() {
   for (auto& i : timers_properties_) {
     size_t timer_index = TimerIndexFromId(i.id);
     if (timers_[timer_index].irq.is_valid()) {
       timers_[timer_index].irq_handler.Cancel();
     }
-    if (timers_[timer_index].wait_completer) {
-      timers_[timer_index].wait_completer->Reply(
+    if (timers_[timer_index].power_enabled_wait_completer) {
+      timers_[timer_index].power_enabled_wait_completer->Reply(
           zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
-      timers_[timer_index].wait_completer.reset();
+      timers_[timer_index].power_enabled_wait_completer.reset();
     }
   }
 }
@@ -216,10 +294,10 @@ void AmlHrtimerServer::Stop(StopRequest& request, StopCompleter::Sync& completer
   if (timers_[timer_index].irq.is_valid()) {
     timers_[timer_index].irq_handler.Cancel();
   }
-  if (timers_[timer_index].wait_completer) {
-    timers_[timer_index].wait_completer->Reply(
+  if (timers_[timer_index].power_enabled_wait_completer) {
+    timers_[timer_index].power_enabled_wait_completer->Reply(
         zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
-    timers_[timer_index].wait_completer.reset();
+    timers_[timer_index].power_enabled_wait_completer.reset();
   }
   completer.Reply(zx::ok());
 }
@@ -260,8 +338,14 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs));
     return;
   }
-  // Only support wait if we can return a lease.
-  if (!element_control_ || !timers_properties_[timer_index].supports_notifications) {
+  // Fail power enabled StartAndWait if power management is not functional.
+  if (!element_control_) {
+    FDF_LOG(ERROR, "Power management not functional. StartAndWait failed for timer id: %lu",
+            request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+    return;
+  }
+  if (!timers_properties_[timer_index].supports_notifications) {
     FDF_LOG(ERROR, "Notifications not supported for timer id: %lu", request.id());
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
     return;
@@ -271,7 +355,7 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInternalError));
     return;
   }
-  if (timers_[timer_index].wait_completer.has_value()) {
+  if (timers_[timer_index].power_enabled_wait_completer.has_value()) {
     FDF_LOG(ERROR, "Invalid state for wait, already waiting for timer id: %lu", request.id());
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
     return;
@@ -288,7 +372,7 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
     completer.Reply(zx::error(start_result.error_value()));
     return;
   }
-  timers_[timer_index].wait_completer.emplace(completer.ToAsync());
+  timers_[timer_index].power_enabled_wait_completer.emplace(completer.ToAsync());
   zx_status_t status = timers_[timer_index].irq_handler.Begin(dispatcher_);
   if (status == ZX_ERR_ALREADY_EXISTS) {
     FDF_LOG(WARNING, "IRQ handler already started for timer id: %lu", request.id());

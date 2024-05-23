@@ -18,6 +18,8 @@ static constexpr char kDeviceName[] = "aml-hrtimer";
 struct PowerConfiguration {
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client;
   fidl::ClientEnd<fuchsia_power_broker::Lessor> lessor_client;
+  fidl::ClientEnd<fuchsia_power_broker::CurrentLevel> current_level_client;
+  fidl::ClientEnd<fuchsia_power_broker::RequiredLevel> required_level_client;
 };
 
 class AmlHrtimer : public fdf::DriverBase {
