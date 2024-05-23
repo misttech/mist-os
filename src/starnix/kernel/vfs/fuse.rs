@@ -47,7 +47,7 @@ use std::{
         Arc, Weak,
     },
 };
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, IntoBytes, NoCell};
 
 const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
 const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
@@ -161,7 +161,7 @@ pub fn new_fuse_fs(
         state.connect();
         state.execute_operation(
             current_task,
-            &fuse_node,
+            fuse_node.nodeid,
             FuseOperation::Init { fs: Arc::downgrade(&fs) },
         )?;
     }
@@ -227,8 +227,11 @@ impl FileSystemOps for FuseFs {
 
     fn statfs(&self, fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
         let node = FuseNode::from_node(&fs.root().node);
-        let response =
-            self.connection.lock().execute_operation(current_task, node, FuseOperation::Statfs)?;
+        let response = self.connection.lock().execute_operation(
+            current_task,
+            node.nodeid,
+            FuseOperation::Statfs,
+        )?;
         let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
             statfs_out
         } else {
@@ -528,8 +531,11 @@ impl FuseNode {
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let response =
-            self.connection.lock().execute_operation(current_task, self, FuseOperation::GetAttr)?;
+        let response = self.connection.lock().execute_operation(
+            current_task,
+            self.nodeid,
+            FuseOperation::GetAttr,
+        )?;
         let uapi::fuse_attr_out { attr_valid, attr_valid_nsec, attr, .. } =
             if let FuseResponse::Attr(attr) = response {
                 attr
@@ -584,13 +590,8 @@ impl FuseNode {
         current_task: &CurrentTask,
         node: &FsNode,
         name: &FsStr,
-        response: FuseResponse,
+        entry: &uapi::fuse_entry_out,
     ) -> Result<FsNodeHandle, Errno> {
-        let entry = if let FuseResponse::Entry(entry) = response {
-            entry
-        } else {
-            return error!(EINVAL);
-        };
         if entry.nodeid == 0 {
             return error!(ENOENT);
         }
@@ -639,13 +640,17 @@ impl FuseFileObject {
 impl FileOps for FuseFileObject {
     fn close(&self, file: &FileObject, current_task: &CurrentTask) {
         let node = Self::get_fuse_node(file);
-        let mode = file.node().info().mode;
+        let is_dir = file.node().is_dir();
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
-            node,
-            FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
+            node.nodeid,
+            if is_dir {
+                FuseOperation::ReleaseDir(self.open_out)
+            } else {
+                FuseOperation::Release(self.open_out)
+            },
         ) {
-            log_error!("Error when relasing fh: {e:?}");
+            log_error!("Error when releasing fh: {e:?}");
         }
     }
 
@@ -653,7 +658,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
-            node,
+            node.nodeid,
             FuseOperation::Flush(self.open_out),
         ) {
             log_error!("Error when flushing fh: {e:?}");
@@ -675,7 +680,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
-            node,
+            node.nodeid,
             FuseOperation::Read(uapi::fuse_read_in {
                 fh: self.open_out.fh,
                 offset: offset.try_into().map_err(|_| errno!(EINVAL))?,
@@ -706,7 +711,7 @@ impl FileOps for FuseFileObject {
         let content = data.peek_all()?;
         let response = self.connection.lock().execute_operation(
             current_task,
-            node,
+            node.nodeid,
             FuseOperation::Write {
                 write_in: uapi::fuse_write_in {
                     fh: self.open_out.fh,
@@ -744,7 +749,7 @@ impl FileOps for FuseFileObject {
             let node = Self::get_fuse_node(file);
             let response = self.connection.lock().execute_operation(
                 current_task,
-                node,
+                node.nodeid,
                 FuseOperation::Seek(uapi::fuse_lseek_in {
                     fh: self.open_out.fh,
                     offset: target.offset().try_into().map_err(|_| errno!(EINVAL))?,
@@ -793,7 +798,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
-            node,
+            node.nodeid,
             FuseOperation::Poll(uapi::fuse_poll_in {
                 fh: self.open_out.fh,
                 kh: 0,
@@ -844,7 +849,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         let response = state.execute_operation(
             current_task,
-            node,
+            node.nodeid,
             FuseOperation::Readdir {
                 read_in: uapi::fuse_read_in {
                     fh: self.open_out.fh,
@@ -869,12 +874,9 @@ impl FileOps for FuseFileObject {
             if let Some(entry) = entry {
                 // nodeid == 0 means the server doesn't want to send entry info.
                 if entry.nodeid != 0 {
-                    if let Err(e) = node.fs_node_from_entry(
-                        current_task,
-                        file.node(),
-                        name.as_ref(),
-                        FuseResponse::Entry(entry),
-                    ) {
+                    if let Err(e) =
+                        node.fs_node_from_entry(current_task, file.node(), name.as_ref(), &entry)
+                    {
                         log_error!("Unable to prefill entry: {e:?}");
                     }
                 }
@@ -951,7 +953,7 @@ impl DirEntryOps for FuseDirEntry {
         let name = dir_entry.local_name();
         let response = parent.connection.lock().execute_operation(
             current_task,
-            parent,
+            parent.nodeid,
             FuseOperation::Lookup { name },
         )?;
         let FuseResponse::Entry(uapi::fuse_entry_out {
@@ -1024,7 +1026,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 // fs. Seems like `chroot` also triggers a `FUSE_ACCESS` request on Linux.
                 let response = self.connection.lock().execute_operation(
                     current_task,
-                    self,
+                    self.nodeid,
                     FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
                 )?;
 
@@ -1060,7 +1062,7 @@ impl FsNodeOps for Arc<FuseNode> {
         let mode = node.info().mode;
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::Open { flags, mode },
         )?;
         let open_out = if let FuseResponse::Open(open_out) = response {
@@ -1079,10 +1081,10 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<FsNodeHandle, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
     }
 
     fn mknod(
@@ -1095,20 +1097,73 @@ impl FsNodeOps for Arc<FuseNode> {
         dev: DeviceType,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let response = self.connection.lock().execute_operation(
-            current_task,
-            self,
-            FuseOperation::Mknod {
-                mknod_in: uapi::fuse_mknod_in {
-                    mode: mode.bits(),
-                    rdev: dev.bits() as u32,
-                    umask: current_task.fs().umask().bits(),
-                    padding: 0,
-                },
-                name: name.to_owned(),
-            },
-        )?;
-        self.fs_node_from_entry(current_task, node, name, response)
+        let get_entry = || {
+            let umask = current_task.fs().umask().bits();
+            let mut connection = self.connection.lock();
+
+            if dev == DeviceType::NONE && !connection.no_create {
+                match connection.execute_operation(
+                    current_task,
+                    self.nodeid,
+                    FuseOperation::Create(
+                        uapi::fuse_create_in {
+                            flags: OpenFlags::CREAT.bits(),
+                            mode: mode.bits(),
+                            umask,
+                            open_flags: 0,
+                        },
+                        name.to_owned(),
+                    ),
+                ) {
+                    Ok(response) => {
+                        let FuseResponse::Create(response) = response else {
+                            return error!(EINVAL);
+                        };
+
+                        // It is unfortunate that we have to immediately release the file (only for
+                        // it to typically be reopened a short time later), but it will be a little
+                        // tricky to fix this properly, and there are Fuse implementations that rely
+                        // on us using create rather than mknod to create regular files.  We will
+                        // have to tackle this if it shows up as a performance issue.
+                        if let Err(e) = connection.execute_operation(
+                            current_task,
+                            response.entry.nodeid,
+                            FuseOperation::Release(response.open),
+                        ) {
+                            log_error!("Error when releasing fh: {e:?}");
+                        }
+
+                        return Ok(response.entry);
+                    }
+                    Err(e) if e == ENOSYS => {
+                        connection.no_create = true;
+                        // Fall through to use mknod below.
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+
+            connection
+                .execute_operation(
+                    current_task,
+                    self.nodeid,
+                    FuseOperation::Mknod {
+                        mknod_in: uapi::fuse_mknod_in {
+                            mode: mode.bits(),
+                            rdev: dev.bits() as u32,
+                            umask,
+                            padding: 0,
+                        },
+                        name: name.to_owned(),
+                    },
+                )?
+                .entry()
+                .copied()
+                .ok_or(errno!(EINVAL))
+        };
+
+        let entry = get_entry()?;
+        self.fs_node_from_entry(current_task, node, name, &entry)
     }
 
     fn mkdir(
@@ -1122,7 +1177,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<FsNodeHandle, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::Mkdir {
                 mkdir_in: uapi::fuse_mkdir_in {
                     mode: mode.bits(),
@@ -1131,7 +1186,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
     }
 
     fn create_symlink(
@@ -1145,16 +1200,16 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<FsNodeHandle, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::Readlink,
         )?;
         let read_out = if let FuseResponse::Read(read_out) = response {
@@ -1178,7 +1233,7 @@ impl FsNodeOps for Arc<FuseNode> {
             .lock()
             .execute_operation(
                 current_task,
-                self,
+                self.nodeid,
                 FuseOperation::Link {
                     link_in: uapi::fuse_link_in { oldnodeid: child_node.nodeid },
                     name: name.to_owned(),
@@ -1197,7 +1252,11 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<(), Errno> {
         self.connection
             .lock()
-            .execute_operation(current_task, self, FuseOperation::Unlink { name: name.to_owned() })
+            .execute_operation(
+                current_task,
+                self.nodeid,
+                FuseOperation::Unlink { name: name.to_owned() },
+            )
             .map(|_| ())
     }
 
@@ -1218,7 +1277,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
             let response = self.connection.lock().execute_operation(
                 current_task,
-                self,
+                self.nodeid,
                 FuseOperation::SetAttr(attributes),
             )?;
             let uapi::fuse_attr_out { attr_valid, attr_valid_nsec, attr, .. } =
@@ -1268,7 +1327,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<ValueOrSize<FsString>, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::GetXAttr {
                 getxattr_in: uapi::fuse_getxattr_in {
                     size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
@@ -1296,7 +1355,7 @@ impl FsNodeOps for Arc<FuseNode> {
         let configuration = state.get_configuration(current_task)?;
         state.execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::SetXAttr {
                 setxattr_in: uapi::fuse_setxattr_in {
                     size: value.len().try_into().map_err(|_| errno!(EINVAL))?,
@@ -1320,7 +1379,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<(), Errno> {
         self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::RemoveXAttr { name: name.to_owned() },
         )?;
         Ok(())
@@ -1334,7 +1393,7 @@ impl FsNodeOps for Arc<FuseNode> {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self,
+            self.nodeid,
             FuseOperation::ListXAttr(uapi::fuse_getxattr_in {
                 size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
                 padding: 0,
@@ -1362,7 +1421,7 @@ impl FsNodeOps for Arc<FuseNode> {
         if nlookup > 0 {
             state.execute_operation(
                 current_task,
-                self,
+                self.nodeid,
                 FuseOperation::Forget(uapi::fuse_forget_in { nlookup }),
             )?;
         };
@@ -1457,6 +1516,9 @@ struct FuseMutableState {
 
     /// The state of the different operations, to allow short-circuiting the userspace process.
     operations_state: OperationsState,
+
+    /// If true, then the create operation is not supported in which case mknod will be used.
+    no_create: bool,
 }
 
 impl<'a> FuseMutableStateGuard<'a> {
@@ -1500,7 +1562,7 @@ impl<'a> FuseMutableStateGuard<'a> {
     fn execute_operation(
         &mut self,
         current_task: &CurrentTask,
-        node: &FuseNode,
+        nodeid: u64,
         operation: FuseOperation,
     ) -> Result<FuseResponse, Errno> {
         // Block until we have a valid configuration to make sure that the FUSE
@@ -1515,12 +1577,12 @@ impl<'a> FuseMutableStateGuard<'a> {
             return result.clone();
         }
         if !operation.has_response() {
-            self.queue_operation(current_task, node, operation, None)?;
+            self.queue_operation(current_task, nodeid, operation, None)?;
             return Ok(FuseResponse::None);
         }
         let waiter = Waiter::new();
         let is_async = operation.is_async();
-        let unique_id = self.queue_operation(current_task, node, operation, Some(&waiter))?;
+        let unique_id = self.queue_operation(current_task, nodeid, operation, Some(&waiter))?;
         if is_async {
             return Ok(FuseResponse::None);
         }
@@ -1535,7 +1597,7 @@ impl<'a> FuseMutableStateGuard<'a> {
                     // If interrupted by another process, send an interrupt command to the server
                     // the first time, then wait unconditionally.
                     if first_loop {
-                        self.interrupt(current_task, node, unique_id)?;
+                        self.interrupt(current_task, nodeid, unique_id)?;
                         first_loop = false;
                     }
                 }
@@ -1594,7 +1656,7 @@ impl FuseMutableState {
     fn queue_operation(
         &mut self,
         current_task: &CurrentTask,
-        node: &FuseNode,
+        nodeid: u64,
         operation: FuseOperation,
         waiter: Option<&Waiter>,
     ) -> Result<u64, Errno> {
@@ -1603,7 +1665,7 @@ impl FuseMutableState {
             return error!(ECONNABORTED);
         }
         self.last_unique_id += 1;
-        let message = FuseKernelMessage::new(self.last_unique_id, current_task, node, operation)?;
+        let message = FuseKernelMessage::new(self.last_unique_id, current_task, nodeid, operation)?;
         if let Some(waiter) = waiter {
             self.waiters.wait_async_value(waiter, self.last_unique_id);
         }
@@ -1624,7 +1686,7 @@ impl FuseMutableState {
     fn interrupt(
         &mut self,
         current_task: &CurrentTask,
-        node: &FuseNode,
+        nodeid: u64,
         unique_id: u64,
     ) -> Result<(), Errno> {
         debug_assert!(self.operations.contains_key(&unique_id));
@@ -1643,7 +1705,7 @@ impl FuseMutableState {
             // Nothing to do, the operation has been cancelled before being sent.
             return error!(EINTR);
         }
-        self.queue_operation(current_task, node, FuseOperation::Interrupt { unique_id }, None)
+        self.queue_operation(current_task, nodeid, FuseOperation::Interrupt { unique_id }, None)
             .map(|_| ())
     }
 
@@ -1787,7 +1849,7 @@ impl FuseKernelMessage {
     fn new(
         unique: u64,
         current_task: &CurrentTask,
-        node: &FuseNode,
+        nodeid: u64,
         operation: FuseOperation,
     ) -> Result<Self, Errno> {
         let creds = current_task.creds();
@@ -1797,7 +1859,7 @@ impl FuseKernelMessage {
                     .map_err(|_| errno!(EINVAL))?,
                 opcode: operation.opcode(),
                 unique,
-                nodeid: node.nodeid,
+                nodeid,
                 uid: creds.uid,
                 gid: creds.gid,
                 pid: current_task.get_tid() as u32,
@@ -1832,6 +1894,7 @@ bitflags::bitflags! {
 #[derive(Clone, Debug)]
 enum RunningOperationKind {
     Access,
+    Create,
     Flush,
     Forget,
     GetAttr,
@@ -1883,6 +1946,7 @@ impl RunningOperationKind {
     fn opcode(&self) -> u32 {
         match self {
             Self::Access => uapi::fuse_opcode_FUSE_ACCESS,
+            Self::Create => uapi::fuse_opcode_FUSE_CREATE,
             Self::Flush => uapi::fuse_opcode_FUSE_FLUSH,
             Self::Forget => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
@@ -1939,6 +2003,9 @@ impl RunningOperationKind {
     fn parse_response(&self, buffer: Vec<u8>) -> Result<FuseResponse, Errno> {
         match self {
             Self::Access => Ok(FuseResponse::Access(Ok(()))),
+            Self::Create { .. } => {
+                Ok(FuseResponse::Create(Self::to_response::<CreateResponse>(&buffer)))
+            }
             Self::GetAttr | Self::SetAttr => {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
@@ -2066,6 +2133,7 @@ enum FuseOperation {
     Access {
         mask: u32,
     },
+    Create(uapi::fuse_create_in, FsString),
     Flush(uapi::fuse_open_out),
     Forget(uapi::fuse_forget_in),
     GetAttr,
@@ -2117,11 +2185,8 @@ enum FuseOperation {
         use_readdirplus: bool,
     },
     Readlink,
-    Release {
-        flags: OpenFlags,
-        mode: FileMode,
-        open_out: uapi::fuse_open_out,
-    },
+    Release(uapi::fuse_open_out),
+    ReleaseDir(uapi::fuse_open_out),
     RemoveXAttr {
         /// Name of the attribute
         name: FsString,
@@ -2160,6 +2225,7 @@ enum FuseOperation {
 enum FuseResponse {
     Access(Result<(), Errno>),
     Attr(uapi::fuse_attr_out),
+    Create(CreateResponse),
     Entry(uapi::fuse_entry_out),
     GetXAttr(ValueOrSize<FsString>),
     Init(uapi::fuse_init_out),
@@ -2176,12 +2242,32 @@ enum FuseResponse {
     None,
 }
 
+impl FuseResponse {
+    fn entry(&self) -> Option<&uapi::fuse_entry_out> {
+        if let Self::Entry(entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, FromBytes, FromZeroes, IntoBytes, NoCell)]
+pub struct CreateResponse {
+    entry: uapi::fuse_entry_out,
+    open: uapi::fuse_open_out,
+}
+
 impl FuseOperation {
     fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         match self {
             Self::Access { mask } => {
                 let message = uapi::fuse_access_in { mask: *mask, padding: 0 };
                 data.write_all(message.as_bytes())
+            }
+            Self::Create(create_in, name) => {
+                Ok(data.write_all(create_in.as_bytes())? + Self::write_null_terminated(data, name)?)
             }
             Self::Flush(open_in) => {
                 let message =
@@ -2233,7 +2319,7 @@ impl FuseOperation {
             Self::Read(read_in) | Self::Readdir { read_in, .. } => {
                 data.write_all(read_in.as_bytes())
             }
-            Self::Release { open_out, .. } => {
+            Self::Release(open_out) | Self::ReleaseDir(open_out) => {
                 let message = uapi::fuse_release_in {
                     fh: open_out.fh,
                     flags: 0,
@@ -2279,6 +2365,7 @@ impl FuseOperation {
     fn opcode(&self) -> u32 {
         match self {
             Self::Access { .. } => uapi::fuse_opcode_FUSE_ACCESS,
+            Self::Create { .. } => uapi::fuse_opcode_FUSE_CREATE,
             Self::Flush(_) => uapi::fuse_opcode_FUSE_FLUSH,
             Self::Forget(_) => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
@@ -2307,13 +2394,8 @@ impl FuseOperation {
                 }
             }
             Self::Readlink => uapi::fuse_opcode_FUSE_READLINK,
-            Self::Release { flags, mode, .. } => {
-                if mode.is_dir() || flags.contains(OpenFlags::DIRECTORY) {
-                    uapi::fuse_opcode_FUSE_RELEASEDIR
-                } else {
-                    uapi::fuse_opcode_FUSE_RELEASE
-                }
-            }
+            Self::Release(_) => uapi::fuse_opcode_FUSE_RELEASE,
+            Self::ReleaseDir(_) => uapi::fuse_opcode_FUSE_RELEASEDIR,
             Self::RemoveXAttr { .. } => uapi::fuse_opcode_FUSE_REMOVEXATTR,
             Self::Seek(_) => uapi::fuse_opcode_FUSE_LSEEK,
             Self::SetAttr(_) => uapi::fuse_opcode_FUSE_SETATTR,
@@ -2328,6 +2410,7 @@ impl FuseOperation {
     fn as_running(&self) -> RunningOperationKind {
         match self {
             Self::Access { .. } => RunningOperationKind::Access,
+            Self::Create { .. } => RunningOperationKind::Create,
             Self::Flush(_) => RunningOperationKind::Flush,
             Self::Forget(_) => RunningOperationKind::Forget,
             Self::GetAttr => RunningOperationKind::GetAttr,
@@ -2352,9 +2435,8 @@ impl FuseOperation {
                 RunningOperationKind::Readdir { use_readdirplus: *use_readdirplus }
             }
             Self::Readlink => RunningOperationKind::Readlink,
-            Self::Release { flags, mode, .. } => RunningOperationKind::Release {
-                dir: mode.is_dir() || flags.contains(OpenFlags::DIRECTORY),
-            },
+            Self::Release(_) => RunningOperationKind::Release { dir: false },
+            Self::ReleaseDir(_) => RunningOperationKind::Release { dir: true },
             Self::RemoveXAttr { .. } => RunningOperationKind::RemoveXAttr,
             Self::Seek(_) => RunningOperationKind::Seek,
             Self::SetAttr(_) => RunningOperationKind::SetAttr,

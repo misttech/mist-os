@@ -378,6 +378,13 @@ class FuseServer {
         OK_OR_RETURN(HandleAccess(node, in_header, &access_in));
         break;
       }
+      case FUSE_CREATE: {
+        struct fuse_create_in create_in = {};
+        memcpy(&create_in, in_payload, sizeof(create_in));
+        OK_OR_RETURN(HandleCreate(node, in_header, &create_in,
+                                  reinterpret_cast<const char*>(in_payload) + sizeof(create_in)));
+        break;
+      }
       case FUSE_GETATTR: {
         struct fuse_getattr_in getattr_in = {};
         memcpy(&getattr_in, in_payload, sizeof(getattr_in));
@@ -490,6 +497,27 @@ class FuseServer {
     fuse_entry_out entry_out;
     node->PopulateEntry(entry_out);
     return WriteStructResponse(in_header, entry_out);
+  }
+
+  virtual testing::AssertionResult HandleCreate(const std::shared_ptr<Node>& dir_node,
+                                                const struct fuse_in_header& in_header,
+                                                const struct fuse_create_in* create_in,
+                                                const char* name) {
+    const std::shared_ptr dir = std::dynamic_pointer_cast<Directory>(dir_node);
+    if (!dir) {
+      return WriteDataFreeResponse(in_header, -ENOTDIR);
+    }
+
+    std::shared_ptr<File> node = fs_.AddFileAt(dir, std::string(name));
+
+    struct response {
+      fuse_entry_out entry_out;
+      fuse_open_out open_out;
+    } response = {};
+    node->PopulateEntry(response.entry_out);
+    response.open_out.fh = GetNextFileHandle();
+
+    return WriteStructResponse(in_header, response);
   }
 
   virtual testing::AssertionResult HandleMkdir(const std::shared_ptr<Node>& dir_node,
