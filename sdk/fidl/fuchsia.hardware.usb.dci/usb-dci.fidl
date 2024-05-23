@@ -10,53 +10,50 @@ using fuchsia.hardware.usb.endpoint;
 
 // References:
 //   usb20 - Universal Serial Bus Specification rev. 2.0
-
-
-// TODO(b/339276455) Make protocol open/flexible.
 @discoverable
-closed protocol UsbDci {
+open protocol UsbDci {
     /// Connects to endpoint. Returns
     ///  * ZX_ERR_NOT_FOUND: if endpoint address does not exist.
     ///  * ZX_ERR_ALREADY_BOUND: if the endpoint is already bound.
-    strict ConnectToEndpoint(resource struct {
+    flexible ConnectToEndpoint(resource struct {
         ep_addr uint8;
         ep server_end:fuchsia.hardware.usb.endpoint.Endpoint;
     }) -> () error zx.Status;
 
     /// Bind the interface as given by the child node.
-    strict SetInterface(resource struct {
+    flexible SetInterface(resource struct {
         interface client_end:UsbDciInterface;
     }) -> () error zx.Status;
 
     /// Configure and endpoint with the given configuration.
     ///
     /// See usb20 9.6.6
-    strict ConfigureEndpoint(struct {
+    flexible ConfigureEndpoint(struct {
         ep_descriptor fuchsia.hardware.usb.descriptor.UsbEndpointDescriptor;
         ss_comp_descriptor fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
     }) -> () error zx.Status;
 
     /// Disable the given endpoint.
-    strict DisableEndpoint(struct {
+    flexible DisableEndpoint(struct {
         ep_address uint8;
     }) -> () error zx.Status;
 
     /// Set stall condition for the given endpoint.
     ///
     /// See usb20 8.5.3.4
-    strict EndpointSetStall(struct {
+    flexible EndpointSetStall(struct {
         ep_address uint8;
     }) -> () error zx.Status;
 
     /// Clear stall condition for the given endpoint.
     ///
     /// See usb32 8.5.3.4
-    strict EndpointClearStall(struct {
+    flexible EndpointClearStall(struct {
         ep_address uint8;
     }) -> () error zx.Status;
 
     /// Cancel all pending transactions for the given endpoint.
-    strict CancelAll(struct {
+    flexible CancelAll(struct {
         ep_address uint8;
     }) -> () error zx.Status;
 };
@@ -64,11 +61,11 @@ closed protocol UsbDci {
 /// Interface for parent (typically DCI driver) to call into its child
 /// (currently usb-peripheral driver). UsbDci::Use SetInterface() to bind
 /// client_end in the parent driver.
-closed protocol UsbDciInterface {
+open protocol UsbDciInterface {
     /// Dispatch a control transaction.
     ///
     /// See usb20 8.5.3 and 9.6
-    strict Control(struct {
+    flexible Control(struct {
         setup fuchsia.hardware.usb.descriptor.UsbSetup;
         write vector<uint8>:MAX;
     }) -> (struct {
@@ -76,12 +73,12 @@ closed protocol UsbDciInterface {
     }) error zx.Status;
 
     /// Inform driver of current port connection state.
-    strict SetConnected(struct {
+    flexible SetConnected(struct {
         is_connected bool;
     }) -> () error zx.Status;
 
     /// Inform driver of current bus speed.
-    strict SetSpeed(struct {
+    flexible SetSpeed(struct {
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
     }) -> () error zx.Status;
 };

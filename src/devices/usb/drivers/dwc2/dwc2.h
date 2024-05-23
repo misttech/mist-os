@@ -85,6 +85,11 @@ class Dwc2 : public Dwc2Type,
 
   void CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) override;
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
   // Allows tests to configure a fake interrupt.
   void SetInterrupt(zx::interrupt irq) { irq_ = std::move(irq); }
 
