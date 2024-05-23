@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
@@ -37,9 +36,7 @@
 
 namespace aml_sdmmc {
 
-class AmlSdmmc : public fdf::DriverBase,
-                 public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc>,
-                 public fidl::Server<fuchsia_hardware_power::PowerTokenProvider> {
+class AmlSdmmc : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
  public:
   // Note: This name can't be changed without migrating users in other repos.
   static constexpr char kDriverName[] = "aml-sd-emmc";
@@ -102,12 +99,6 @@ class AmlSdmmc : public fdf::DriverBase,
                      UnregisterVmoCompleter::Sync& completer) override;
   void Request(RequestRequestView request, fdf::Arena& arena,
                RequestCompleter::Sync& completer) override;
-
-  // fuchsia_hardware_power::PowerTokenProvider implementation
-  void GetToken(GetTokenCompleter::Sync& completer) override;
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_power::PowerTokenProvider> md,
-      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   zx_status_t SuspendPower() TA_REQ(lock_);
   zx_status_t ResumePower() TA_REQ(lock_);
@@ -336,13 +327,16 @@ class AmlSdmmc : public fdf::DriverBase,
   std::vector<std::variant<SdmmcRequestInfo, SdmmcTaskInfo>> delayed_requests_;
   uint32_t clk_div_saved_ = 0;
 
-  fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
+  // TODO(b/309152899): Export these to children drivers via the PowerTokenProvider protocol.
+  std::vector<zx::event> active_power_dep_tokens_;
+  std::vector<zx::event> passive_power_dep_tokens_;
+
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_end_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
 
-  fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
-      wake_on_request_element_control_client_;
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> wake_on_request_element_control_client_end_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
@@ -362,8 +356,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-
-  fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings_;
 
   compat::SyncInitializedDeviceServer compat_server_;
 

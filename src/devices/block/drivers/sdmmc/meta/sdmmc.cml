@@ -32,7 +32,6 @@
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
-        { service: "fuchsia.hardware.power.PowerTokenService" },
         { service: "fuchsia.hardware.sdmmc.SdmmcService" },
     ],
     expose: [

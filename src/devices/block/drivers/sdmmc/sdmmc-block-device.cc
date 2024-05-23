@@ -400,10 +400,12 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
+    active_power_dep_tokens_.push_back(std::move(description.active_token_));
+    passive_power_dep_tokens_.push_back(std::move(description.passive_token_));
+
     if (config.element().name().get() == kHardwarePowerElementName) {
-      hardware_power_element_control_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(result.value().element_control_channel()));
+      hardware_power_element_control_client_end_ =
+          std::move(result.value().element_control_channel());
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =
@@ -413,9 +415,8 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
           std::move(description.required_level_client_.value()),
           parent_->driver_async_dispatcher());
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_element_control_client_ =
-          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(result.value().element_control_channel()));
+      wake_on_request_element_control_client_end_ =
+          std::move(result.value().element_control_channel());
       wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       wake_on_request_current_level_client_ =
@@ -430,53 +431,6 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
                std::string(config.element().name().get()).c_str());
       return zx::error(ZX_ERR_BAD_STATE);
     }
-  }
-
-  // Add dependency on parent driver's power element.
-  auto power_token_provider =
-      parent_->driver_incoming()
-          ->Connect<fuchsia_hardware_power::PowerTokenService::TokenProvider>();
-  if (power_token_provider.is_error() || !power_token_provider->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to power token provider: %s",
-             power_token_provider.status_string());
-    return power_token_provider.take_error();
-  }
-
-  auto get_token = fidl::WireCall(power_token_provider.value())->GetToken();
-  if (!get_token.ok()) {
-    FDF_LOGL(ERROR, logger(), "Call to GetToken failed: %s", get_token.status_string());
-    return zx::error(get_token.status());
-  } else if (get_token->is_error()) {
-    FDF_LOGL(ERROR, logger(), "GetToken returned failure: %s",
-             zx_status_get_string(get_token->error_value()));
-    return zx::error(get_token->error_value());
-  }
-
-  auto add_dep = hardware_power_element_control_client_->AddDependency(
-      fuchsia_power_broker::DependencyType::kActive, kPowerLevelOn,
-      std::move(get_token.value()->handle), kPowerLevelOn);
-  if (!add_dep.ok()) {
-    FDF_LOGL(ERROR, logger(), "Call to AddDependency failed: %s", add_dep.status_string());
-    return zx::error(add_dep.status());
-  } else if (add_dep->is_error()) {
-    switch (add_dep->error_value()) {
-      case fuchsia_power_broker::ModifyDependencyError::kAlreadyExists:
-        FDF_LOGL(ERROR, logger(), "AddDependency returned already exists error.");
-        break;
-      case fuchsia_power_broker::ModifyDependencyError::kInvalid:
-        FDF_LOGL(ERROR, logger(), "AddDependency returned invalid error.");
-        break;
-      case fuchsia_power_broker::ModifyDependencyError::kNotAuthorized:
-        FDF_LOGL(ERROR, logger(), "AddDependency returned not authorized error.");
-        break;
-      case fuchsia_power_broker::ModifyDependencyError::kNotFound:
-        FDF_LOGL(ERROR, logger(), "AddDependency returned not found error.");
-        break;
-      default:
-        FDF_LOGL(ERROR, logger(), "AddDependency returned unknown error.");
-        break;
-    }
-    return zx::error(ZX_ERR_INTERNAL);
   }
 
   // The lease request on the hardware power element remains persistent throughout the lifetime
