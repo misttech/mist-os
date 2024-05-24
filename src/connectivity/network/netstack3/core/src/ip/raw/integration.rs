@@ -8,6 +8,7 @@
 use lock_order::{lock::LockLevelFor, relation::LockBefore, wrap::LockedWrapperApi};
 
 use crate::{
+    device::WeakDeviceId,
     ip::raw::{
         RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext,
         RawIpSocketState, RawIpSocketStateContext, RawIpSocketsIpExt,
@@ -15,24 +16,28 @@ use crate::{
     lock_ordering, BindingsTypes, CoreCtx,
 };
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
         I: RawIpSocketsIpExt,
         BT: BindingsTypes,
         L: LockBefore<lock_ordering::RawIpSocketState<I>>,
     > RawIpSocketStateContext<I, BT> for CoreCtx<'_, BT, L>
 {
-    fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I>) -> O>(
+    fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I, Self::WeakDeviceId>) -> O>(
         &mut self,
-        id: &RawIpSocketId<I, BT>,
+        id: &RawIpSocketId<I, Self::WeakDeviceId, BT>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(id.state());
         let guard = locked.read_lock_with::<lock_ordering::RawIpSocketState<I>, _>(|c| c.right());
         cb(&guard)
     }
-    fn with_locked_state_mut<O, F: FnOnce(&mut RawIpSocketLockedState<I>) -> O>(
+    fn with_locked_state_mut<
+        O,
+        F: FnOnce(&mut RawIpSocketLockedState<I, Self::WeakDeviceId>) -> O,
+    >(
         &mut self,
-        id: &RawIpSocketId<I, BT>,
+        id: &RawIpSocketId<I, Self::WeakDeviceId, BT>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(id.state());
@@ -46,18 +51,24 @@ impl<
 impl<I: RawIpSocketsIpExt, BT: BindingsTypes, L: LockBefore<lock_ordering::AllRawIpSockets<I>>>
     RawIpSocketMapContext<I, BT> for CoreCtx<'_, BT, L>
 {
-    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O {
+    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
         let sockets = self.read_lock::<lock_ordering::AllRawIpSockets<I>>();
         cb(&sockets)
     }
-    fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O {
+    fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
         let mut sockets = self.write_lock::<lock_ordering::AllRawIpSockets<I>>();
         cb(&mut sockets)
     }
 }
 
-impl<I: RawIpSocketsIpExt, BT: BindingsTypes> LockLevelFor<RawIpSocketState<I, BT>>
-    for lock_ordering::RawIpSocketState<I>
+impl<I: RawIpSocketsIpExt, BT: BindingsTypes>
+    LockLevelFor<RawIpSocketState<I, WeakDeviceId<BT>, BT>> for lock_ordering::RawIpSocketState<I>
 {
-    type Data = RawIpSocketLockedState<I>;
+    type Data = RawIpSocketLockedState<I, WeakDeviceId<BT>>;
 }

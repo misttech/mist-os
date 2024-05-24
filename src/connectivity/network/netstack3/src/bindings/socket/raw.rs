@@ -19,10 +19,7 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
-    ip::{
-        RawIpSocketId, RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-    },
+    ip::{RawIpSocketProtocol, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
     socket::StrictlyZonedAddr,
     sync::Mutex,
     IpExt,
@@ -46,16 +43,20 @@ use super::{
     SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
 };
 
+type DeviceId = netstack3_core::device::DeviceId<BindingsCtx>;
+type WeakDeviceId = netstack3_core::device::WeakDeviceId<BindingsCtx>;
+type RawIpSocketId<I> = netstack3_core::ip::RawIpSocketId<I, WeakDeviceId, BindingsCtx>;
+
 impl RawIpSocketsBindingsTypes for BindingsCtx {
     type RawIpSocketState<I: Ip> = SocketState<I>;
 }
 
-impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for BindingsCtx {
+impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
     fn receive_packet<B: ByteSlice>(
         &self,
-        socket: &RawIpSocketId<I, Self>,
+        socket: &RawIpSocketId<I>,
         packet: &I::Packet<B>,
-        device: &DeviceId<Self>,
+        device: &DeviceId,
     ) {
         socket.external_state().enqueue_rx_packet::<B>(packet, device.downgrade())
     }
@@ -73,11 +74,7 @@ impl<I: IpExt> SocketState<I> {
         SocketState { rx_queue: Mutex::new(MessageQueue::new(event)) }
     }
 
-    fn enqueue_rx_packet<B: ByteSlice>(
-        &self,
-        packet: &I::Packet<B>,
-        device: WeakDeviceId<BindingsCtx>,
-    ) {
+    fn enqueue_rx_packet<B: ByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
         self.rx_queue.lock().receive(ReceivedIpPacket::new::<B>(packet, device))
     }
 
@@ -94,11 +91,11 @@ struct ReceivedIpPacket<I: Ip> {
     /// The source IP address of the packet.
     src_addr: I::Addr,
     /// The device on which the packet was received.
-    device: WeakDeviceId<BindingsCtx>,
+    device: WeakDeviceId,
 }
 
 impl<I: IpExt> ReceivedIpPacket<I> {
-    fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId<BindingsCtx>) -> Self {
+    fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
         ReceivedIpPacket { src_addr: packet.src_ip(), data: packet.to_vec(), device }
     }
 }
@@ -116,7 +113,7 @@ struct SocketWorkerState<I: IpExt> {
     /// The event to hand off for [`fpraw::SocketRequest::Describe`].
     peer_event: zx::EventPair,
     /// The identifier for the [`netstack3_core`] socket resource.
-    id: RawIpSocketId<I, BindingsCtx>,
+    id: RawIpSocketId<I>,
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -200,10 +197,11 @@ macro_rules! maybe_log_error {
 }
 
 struct RequestHandler<'a, I: IpExt> {
-    ctx: &'a Ctx,
+    ctx: &'a mut Ctx,
     data: &'a mut SocketWorkerState<I>,
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
     fn describe(
         SocketWorkerState { peer_event, id: _ }: &SocketWorkerState<I>,
@@ -299,11 +297,17 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetAcceptConn { responder } => {
                 respond_not_supported!("raw::GetAcceptConn", responder)
             }
-            fpraw::SocketRequest::SetBindToDevice { value: _, responder } => {
-                respond_not_supported!("raw::SetBindToDevice", responder)
-            }
+            fpraw::SocketRequest::SetBindToDevice { value, responder } => responder
+                .send(maybe_log_error!(
+                    "set_bindtodevice",
+                    handle_set_device::<I>(ctx, data, value)
+                ))
+                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fpraw::SocketRequest::GetBindToDevice { responder } => {
-                respond_not_supported!("raw::GetBindToDevice", responder)
+                let name = handle_get_device(ctx, data);
+                responder
+                    .send(Ok(name.as_deref().unwrap_or("")))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fpraw::SocketRequest::SetBindToInterfaceIndex { value: _, responder } => {
                 respond_not_supported!("raw::SetBindToInterfaceIndex", responder)
@@ -650,6 +654,35 @@ fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
         control: fposix_socket::NetworkSocketRecvControlData::new_empty(),
         truncated_bytes,
     })
+}
+
+/// Handler for a [`fpraw::SocketRequest::SetBindToDevice`] request.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_set_device<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    device_name: String,
+) -> Result<(), fposix::Errno> {
+    let device = if device_name.is_empty() {
+        None
+    } else {
+        Some(
+            ctx.bindings_ctx()
+                .devices
+                .get_device_by_name(device_name.as_str())
+                .ok_or(fposix::Errno::Enodev)?,
+        )
+    };
+    let _old_dev: Option<WeakDeviceId> =
+        ctx.api().raw_ip_socket().set_device(&socket.id, device.as_ref());
+    Ok(())
+}
+
+/// Handler for a [`fpraw::SocketRequest::GetBindToDevice`] request.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_device<I: IpExt>(ctx: &mut Ctx, socket: &SocketWorkerState<I>) -> Option<String> {
+    let device = ctx.api().raw_ip_socket().get_device(&socket.id);
+    device.map(|core_id| core_id.bindings_id().name.clone())
 }
 
 impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {

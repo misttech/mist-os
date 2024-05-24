@@ -692,8 +692,8 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     type Data = ForwardingTable<I, DeviceId<BT>>;
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<RawIpSocketMap<I, BT>>
-    for StackState<BT>
+impl<I: IpLayerIpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<RawIpSocketMap<I, WeakDeviceId<BT>, BT>> for StackState<BT>
 {
     type Inner = IpStateInner<I, DeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
@@ -704,7 +704,7 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<RawIpSocketM
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::AllRawIpSockets<I>
 {
-    type Data = RawIpSocketMap<I, BT>;
+    type Data = RawIpSocketMap<I, WeakDeviceId<BT>, BT>;
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>

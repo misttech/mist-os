@@ -1138,8 +1138,8 @@ impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     }
 }
 
-impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<IpPacketFragmentCache<I, BT>>
-    for IpStateInner<I, D, BT>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<IpPacketFragmentCache<I, BT>> for IpStateInner<I, D, BT>
 {
     type Lock = Mutex<IpPacketFragmentCache<I, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
@@ -1147,8 +1147,8 @@ impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<IpPacketFra
     }
 }
 
-impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<PmtuCache<I, BT>>
-    for IpStateInner<I, D, BT>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<PmtuCache<I, BT>> for IpStateInner<I, D, BT>
 {
     type Lock = Mutex<PmtuCache<I, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
@@ -1156,8 +1156,8 @@ impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<PmtuCache<I
     }
 }
 
-impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<ForwardingTable<I, D>>
-    for IpStateInner<I, D, BT>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<ForwardingTable<I, D>> for IpStateInner<I, D, BT>
 {
     type Lock = RwLock<ForwardingTable<I, D>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
@@ -1165,17 +1165,17 @@ impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<ForwardingT
     }
 }
 
-impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<RawIpSocketMap<I, BT>>
-    for IpStateInner<I, D, BT>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<RawIpSocketMap<I, D::Weak, BT>> for IpStateInner<I, D, BT>
 {
-    type Lock = RwLock<RawIpSocketMap<I, BT>>;
+    type Lock = RwLock<RawIpSocketMap<I, D::Weak, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.raw_sockets)
     }
 }
 
-impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<filter::State<I, BT>>
-    for IpStateInner<I, D, BT>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<filter::State<I, BT>> for IpStateInner<I, D, BT>
 {
     type Lock = RwLock<filter::State<I, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
@@ -1295,16 +1295,16 @@ impl<BT> IpStateBindingsTypes for BT where
 /// The inner state for the IP layer for IP version `I`.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
-    table: RwLock<ForwardingTable<I, DeviceId>>,
+pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> {
+    table: RwLock<ForwardingTable<I, D>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
-    raw_sockets: RwLock<RawIpSocketMap<I, BT>>,
+    raw_sockets: RwLock<RawIpSocketMap<I, D::Weak, BT>>,
     filter: RwLock<filter::State<I, BT>>,
 }
 
-impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, DeviceId, BT> {
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpStateInner<I, D, BT> {
     /// Gets the IP counters.
     pub fn counters(&self) -> &IpCounters<I> {
         &self.counters
@@ -1318,13 +1318,13 @@ impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, Device
 
     /// Provides direct access to the forwarding table.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn table(&self) -> &RwLock<ForwardingTable<I, DeviceId>> {
+    pub fn table(&self) -> &RwLock<ForwardingTable<I, D>> {
         &self.table
     }
 }
 
-impl<I: IpLayerIpExt, DeviceId, BC: TimerContext + IpStateBindingsTypes>
-    IpStateInner<I, DeviceId, BC>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: TimerContext + IpStateBindingsTypes>
+    IpStateInner<I, D, BC>
 {
     /// Creates a new inner IP layer state.
     pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {

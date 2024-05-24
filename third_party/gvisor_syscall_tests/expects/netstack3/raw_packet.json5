@@ -28,7 +28,6 @@
                 "AllInetTests/RawSocketTest.BindConnectSendAndReceive/*",
                 "AllInetTests/RawSocketTest.BindSendAndReceive/*",
                 "AllInetTests/RawSocketTest.BindThenGetSockName/*",
-                "AllInetTests/RawSocketTest.BindToDevice/*",
                 "AllInetTests/RawSocketTest.BindToInvalid/*",
                 "AllInetTests/RawSocketTest.BindToLocalhost/*",
                 "AllInetTests/RawSocketTest.BindToWildcard/*",

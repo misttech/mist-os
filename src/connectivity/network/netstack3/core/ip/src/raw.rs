@@ -11,7 +11,7 @@ use net_types::ip::{Ip, IpVersionMarker};
 use netstack3_base::{
     sync::{PrimaryRc, StrongRc, WeakRc},
     AnyDevice, ContextPair, DeviceIdContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
-    RemoveResourceResultWithContext,
+    RemoveResourceResultWithContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 use packet_formats::ip::{IpExt as PacketIpExt, IpPacket, IpProtoExt};
 use tracing::debug;
@@ -36,13 +36,13 @@ pub trait RawIpSocketsBindingsTypes {
 }
 
 /// Functionality provided by bindings used in the raw IP socket implementation.
-pub trait RawIpSocketsBindingsContext<I: RawIpSocketsIpExt, D>:
+pub trait RawIpSocketsBindingsContext<I: RawIpSocketsIpExt, D: StrongDeviceIdentifier>:
     RawIpSocketsBindingsTypes + Sized
 {
     /// Called for each received IP packet that matches the provided socket.
     fn receive_packet<B: ByteSlice>(
         &self,
-        socket: &RawIpSocketId<I, Self>,
+        socket: &RawIpSocketId<I, D::Weak, Self>,
         packet: &I::Packet<B>,
         device: &D,
     );
@@ -65,7 +65,8 @@ impl<I: RawIpSocketsIpExt, C> RawIpSocketApi<I, C>
 where
     C: ContextPair,
     C::BindingsContext: RawIpSocketsBindingsTypes + ReferenceNotifiers + 'static,
-    C::CoreContext: RawIpSocketMapContext<I, C::BindingsContext>,
+    C::CoreContext: RawIpSocketMapContext<I, C::BindingsContext>
+        + RawIpSocketStateContext<I, C::BindingsContext>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self { ctx, _ip_mark } = self;
@@ -104,17 +105,44 @@ where
 
         C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(
             primary,
-            |state: RawIpSocketState<I, C::BindingsContext>| state.into_external_state(),
+            |state: RawIpSocketState<I, _, C::BindingsContext>| state.into_external_state(),
         )
+    }
+
+    /// Sets the socket's bound device, returning the original value.
+    pub fn set_device(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        device: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        let device = device.map(|strong| strong.downgrade());
+        // TODO(https://fxbug.dev/342579393): Verify the device is compatible
+        // with the socket's bound address.
+        // TODO(https://fxbug.dev/342577389): Verify the device is compatible
+        // with the socket's peer address.
+        self.core_ctx()
+            .with_locked_state_mut(id, |state| core::mem::replace(&mut state.bound_device, device))
+    }
+
+    /// Gets the socket's bound device,
+    pub fn get_device(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+    ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        self.core_ctx().with_locked_state(id, |state| state.bound_device.clone())
     }
 }
 
 /// The owner of socket state.
-struct PrimaryRawIpSocketId<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>(
-    PrimaryRc<RawIpSocketState<I, BT>>,
-);
+struct PrimaryRawIpSocketId<
+    I: RawIpSocketsIpExt,
+    D: WeakDeviceIdentifier,
+    BT: RawIpSocketsBindingsTypes,
+>(PrimaryRc<RawIpSocketState<I, D, BT>>);
 
-impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for PrimaryRawIpSocketId<I, BT> {
+impl<I: RawIpSocketsIpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
+    for PrimaryRawIpSocketId<I, D, BT>
+{
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("RawIpSocketId").field(&PrimaryRc::debug_id(rc)).finish()
@@ -124,11 +152,15 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for PrimaryRawIp
 /// Reference to the state of a live socket.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
-pub struct RawIpSocketId<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>(
-    StrongRc<RawIpSocketState<I, BT>>,
-);
+pub struct RawIpSocketId<
+    I: RawIpSocketsIpExt,
+    D: WeakDeviceIdentifier,
+    BT: RawIpSocketsBindingsTypes,
+>(StrongRc<RawIpSocketState<I, D, BT>>);
 
-impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, BT> {
+impl<I: RawIpSocketsIpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>
+    RawIpSocketId<I, D, BT>
+{
     /// Return the bindings state associated with this socket.
     pub fn external_state(&self) -> &BT::RawIpSocketState<I> {
         let RawIpSocketId(strong_rc) = self;
@@ -140,19 +172,21 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, BT> {
         strong_rc.protocol()
     }
     /// Downgrades this ID to a weak reference.
-    pub fn downgrade(&self) -> WeakRawIpSocketId<I, BT> {
+    pub fn downgrade(&self) -> WeakRawIpSocketId<I, D, BT> {
         let Self(rc) = self;
         WeakRawIpSocketId(StrongRc::downgrade(rc))
     }
 
     /// Gets the socket state.
-    pub fn state(&self) -> &RawIpSocketState<I, BT> {
+    pub fn state(&self) -> &RawIpSocketState<I, D, BT> {
         let RawIpSocketId(strong_rc) = self;
         &*strong_rc
     }
 }
 
-impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for RawIpSocketId<I, BT> {
+impl<I: RawIpSocketsIpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
+    for RawIpSocketId<I, D, BT>
+{
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("RawIpSocketId").field(&StrongRc::debug_id(rc)).finish()
@@ -160,11 +194,15 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for RawIpSocketI
 }
 
 /// A weak reference to a raw IP socket.
-pub struct WeakRawIpSocketId<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>(
-    WeakRc<RawIpSocketState<I, BT>>,
-);
+pub struct WeakRawIpSocketId<
+    I: RawIpSocketsIpExt,
+    D: WeakDeviceIdentifier,
+    BT: RawIpSocketsBindingsTypes,
+>(WeakRc<RawIpSocketState<I, D, BT>>);
 
-impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for WeakRawIpSocketId<I, BT> {
+impl<I: RawIpSocketsIpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
+    for WeakRawIpSocketId<I, D, BT>
+{
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("WeakRawIpSocketId").field(&WeakRc::debug_id(rc)).finish()
@@ -172,27 +210,34 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> Debug for WeakRawIpSoc
 }
 
 /// An alias for [`RawIpSocketId`] in [`RawIpSocketApi`], for brevity.
-type RawIpApiSocketId<I, C> = RawIpSocketId<I, <C as ContextPair>::BindingsContext>;
+type RawIpApiSocketId<I, C> = RawIpSocketId<
+    I,
+    <<C as ContextPair>::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+    <C as ContextPair>::BindingsContext,
+>;
 
 /// Provides access to the [`RawIpSocketLockedState`] for a raw IP socket.
 ///
 /// Implementations must ensure a proper lock ordering is adhered to.
-// TODO(https://fxbug.dev/42175797): Use this trait to access socket state.
-#[allow(dead_code)]
-pub trait RawIpSocketStateContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> {
+pub trait RawIpSocketStateContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
     /// Calls the callback with an immutable reference to the socket's locked
     /// state.
-    fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I>) -> O>(
+    fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I, Self::WeakDeviceId>) -> O>(
         &mut self,
-        id: &RawIpSocketId<I, BT>,
+        id: &RawIpSocketId<I, Self::WeakDeviceId, BT>,
         cb: F,
     ) -> O;
 
     /// Calls the callback with a mutable reference to the socket's locked
     /// state.
-    fn with_locked_state_mut<O, F: FnOnce(&mut RawIpSocketLockedState<I>) -> O>(
+    fn with_locked_state_mut<
+        O,
+        F: FnOnce(&mut RawIpSocketLockedState<I, Self::WeakDeviceId>) -> O,
+    >(
         &mut self,
-        id: &RawIpSocketId<I, BT>,
+        id: &RawIpSocketId<I, Self::WeakDeviceId, BT>,
         cb: F,
     ) -> O;
 }
@@ -202,7 +247,11 @@ pub trait RawIpSocketStateContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindings
 /// Implementations must ensure a proper lock ordering is adhered to.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct RawIpSocketMap<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> {
+pub struct RawIpSocketMap<
+    I: RawIpSocketsIpExt,
+    D: WeakDeviceIdentifier,
+    BT: RawIpSocketsBindingsTypes,
+> {
     /// All sockets installed in the system.
     ///
     /// This is a nested collection, with the outer `BTreeMap` indexable by the
@@ -215,12 +264,14 @@ pub struct RawIpSocketMap<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> {
     /// which is *in* the set).
     sockets: BTreeMap<
         RawIpSocketProtocol<I>,
-        HashMap<RawIpSocketId<I, BT>, PrimaryRawIpSocketId<I, BT>>,
+        HashMap<RawIpSocketId<I, D, BT>, PrimaryRawIpSocketId<I, D, BT>>,
     >,
 }
 
-impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketMap<I, BT> {
-    fn insert(&mut self, socket: PrimaryRawIpSocketId<I, BT>) -> RawIpSocketId<I, BT> {
+impl<I: RawIpSocketsIpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>
+    RawIpSocketMap<I, D, BT>
+{
+    fn insert(&mut self, socket: PrimaryRawIpSocketId<I, D, BT>) -> RawIpSocketId<I, D, BT> {
         let RawIpSocketMap { sockets } = self;
         let PrimaryRawIpSocketId(primary) = &socket;
         let strong = RawIpSocketId(PrimaryRc::clone_strong(primary));
@@ -234,7 +285,7 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketMap<I, BT> 
         strong
     }
 
-    fn remove(&mut self, socket: RawIpSocketId<I, BT>) -> PrimaryRawIpSocketId<I, BT> {
+    fn remove(&mut self, socket: RawIpSocketId<I, D, BT>) -> PrimaryRawIpSocketId<I, D, BT> {
         // NB: This function asserts on the presence of `protocol` in the
         // outer map, and the `socket` in the inner map.  The strong ID is
         // witness to the liveness of socket.
@@ -250,7 +301,7 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketMap<I, BT> 
                 // NB: If this was the last socket for this protocol, remove
                 // the entry from the outer `BTreeMap`.
                 if map.is_empty() {
-                    let _: HashMap<RawIpSocketId<I, BT>, PrimaryRawIpSocketId<I, BT>> =
+                    let _: HashMap<RawIpSocketId<I, D, BT>, PrimaryRawIpSocketId<I, D, BT>> =
                         entry.remove();
                 }
                 primary
@@ -261,18 +312,26 @@ impl<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> RawIpSocketMap<I, BT> 
     fn iter_sockets_for_protocol(
         &self,
         protocol: &RawIpSocketProtocol<I>,
-    ) -> impl Iterator<Item = &RawIpSocketId<I, BT>> {
+    ) -> impl Iterator<Item = &RawIpSocketId<I, D, BT>> {
         let RawIpSocketMap { sockets } = self;
         sockets.get(protocol).map(|sockets| sockets.keys()).into_iter().flatten()
     }
 }
 
 /// A type that provides access to the `RawIpSocketMap` used by the system.
-pub trait RawIpSocketMapContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes> {
+pub trait RawIpSocketMapContext<I: RawIpSocketsIpExt, BT: RawIpSocketsBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
     /// Calls the callback with an immutable reference to the socket map.
-    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O;
+    fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
     /// Calls the callback with a mutable reference to the socket map.
-    fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, BT>) -> O>(&mut self, cb: F) -> O;
+    fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, Self::WeakDeviceId, BT>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
 }
 
 /// A type that provides the raw IP socket functionality required by core.
@@ -290,7 +349,7 @@ impl<I, BC, CC> RawIpSocketHandler<I, BC> for CC
 where
     I: RawIpSocketsIpExt,
     BC: RawIpSocketsBindingsContext<I, CC::DeviceId>,
-    CC: RawIpSocketMapContext<I, BC> + DeviceIdContext<AnyDevice>,
+    CC: RawIpSocketMapContext<I, BC>,
 {
     fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
         &mut self,
@@ -332,7 +391,7 @@ mod test {
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
     use netstack3_base::{
         sync::{DynDebugReferences, Mutex},
-        testutil::{FakeStrongDeviceId, MultipleDevicesId},
+        testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ContextProvider, CtxPair,
     };
     use packet::{InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
@@ -360,7 +419,7 @@ mod test {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeCoreCtx<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> {
-        socket_map: RawIpSocketMap<I, FakeBindingsCtx<D>>,
+        socket_map: RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>,
     }
 
     impl<D: FakeStrongDeviceId> RawIpSocketsBindingsTypes for FakeBindingsCtx<D> {
@@ -372,7 +431,7 @@ mod test {
     {
         fn receive_packet<B: ByteSlice>(
             &self,
-            socket: &RawIpSocketId<I, Self>,
+            socket: &RawIpSocketId<I, D::Weak, Self>,
             packet: &I::Packet<B>,
             device: &D,
         ) {
@@ -382,16 +441,43 @@ mod test {
         }
     }
 
+    impl<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> RawIpSocketStateContext<I, FakeBindingsCtx<D>>
+        for FakeCoreCtx<I, D>
+    {
+        fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I, D::Weak>) -> O>(
+            &mut self,
+            id: &RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
+            cb: F,
+        ) -> O {
+            let RawIpSocketId(state_rc) = id;
+            let guard = state_rc.locked_state().read();
+            cb(&guard)
+        }
+
+        fn with_locked_state_mut<O, F: FnOnce(&mut RawIpSocketLockedState<I, D::Weak>) -> O>(
+            &mut self,
+            id: &RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
+            cb: F,
+        ) -> O {
+            let RawIpSocketId(state_rc) = id;
+            let mut guard = state_rc.locked_state().write();
+            cb(&mut guard)
+        }
+    }
+
     impl<I: RawIpSocketsIpExt, D: FakeStrongDeviceId> RawIpSocketMapContext<I, FakeBindingsCtx<D>>
         for FakeCoreCtx<I, D>
     {
-        fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, FakeBindingsCtx<D>>) -> O>(
+        fn with_socket_map<O, F: FnOnce(&RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
             cb(&self.socket_map)
         }
-        fn with_socket_map_mut<O, F: FnOnce(&mut RawIpSocketMap<I, FakeBindingsCtx<D>>) -> O>(
+        fn with_socket_map_mut<
+            O,
+            F: FnOnce(&mut RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>) -> O,
+        >(
             &mut self,
             cb: F,
         ) -> O {
@@ -460,6 +546,23 @@ mod test {
         let mut api = new_raw_ip_socket_api::<I, MultipleDevicesId>();
         let sock = api.create(RawIpSocketProtocol::new(proto.into()), Default::default());
         let FakeExternalSocketState { received_packets: _ } = api.close(sock).into_removed();
+    }
+
+    #[ip_test]
+    fn set_device<I: Ip + RawIpSocketsIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I, MultipleDevicesId>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        assert_eq!(api.get_device(&sock), None);
+        assert_eq!(api.set_device(&sock, Some(&MultipleDevicesId::A)), None);
+        assert_eq!(api.get_device(&sock), Some(FakeWeakDeviceId(MultipleDevicesId::A)));
+        assert_eq!(
+            api.set_device(&sock, Some(&MultipleDevicesId::B)),
+            Some(FakeWeakDeviceId(MultipleDevicesId::A))
+        );
+        assert_eq!(api.get_device(&sock), Some(FakeWeakDeviceId(MultipleDevicesId::B)));
+        assert_eq!(api.set_device(&sock, None), Some(FakeWeakDeviceId(MultipleDevicesId::B)));
+        assert_eq!(api.get_device(&sock), None);
     }
 
     #[ip_test]
