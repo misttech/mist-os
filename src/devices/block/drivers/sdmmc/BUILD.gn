@@ -34,6 +34,7 @@ common_deps = [
   "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/driver/compat/cpp",
   "//sdk/lib/driver/component/cpp:cpp",
+  "//sdk/lib/driver/devfs/cpp",
   "//sdk/lib/driver/power/cpp",
   "//sdk/lib/driver/runtime:driver_runtime",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
