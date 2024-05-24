@@ -78,13 +78,29 @@ type FfxResolver struct {
 }
 
 // NewFffResolver constructs a new `FfxResolver` for the specific nodename.
-func NewFfxResolver(ctx context.Context, ffx *ffx.FFXTool, nodeName string) (*FfxResolver, error) {
+func NewFfxResolver(
+	ctx context.Context,
+	ffxTool *ffx.FFXTool,
+	nodeName string,
+) (*FfxResolver, error) {
 	if nodeName == "" {
-		entries, err := ffx.TargetList(ctx)
+		var entries []ffx.TargetEntry
+		var err error
+		for i := 0; i < 10; i++ {
+			entries, err = ffxTool.TargetList(ctx)
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to list devices: %w", err)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list devices: %w", err)
+			}
+
+			if len(entries) > 0 {
+				break
+			}
+
+			logger.Infof(ctx, "no devices found, retrying")
+			time.Sleep(5 * time.Second)
 		}
+
 		if len(entries) == 0 {
 			return nil, fmt.Errorf("no devices found")
 		}
@@ -97,7 +113,7 @@ func NewFfxResolver(ctx context.Context, ffx *ffx.FFXTool, nodeName string) (*Ff
 	}
 
 	return &FfxResolver{
-		ffx:      ffx,
+		ffx:      ffxTool,
 		nodeName: nodeName,
 	}, nil
 }
