@@ -65,6 +65,7 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "nand",                // ram-nand-test
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/ddk-lifecycle-test.cm",  // ddk-lifecycle-test
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/fvm.cm",  // paver-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///fvm#meta/fvm.cm",
          "No_class_name_but_driver_url_is_unbound",  // blobfs-ramdisk-test, and so many others
      }},
     {"GetTopologicalPath", {kAllowAllUses}},
