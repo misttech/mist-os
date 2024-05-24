@@ -11,6 +11,9 @@
 //! is evolved in order to enforce that it is updated along with the FIDL
 //! library itself.
 
+#[cfg(target_os = "fuchsia")]
+pub mod sync;
+
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -1497,21 +1500,54 @@ impl Controller {
 
     pub async fn push_changes(&mut self, changes: Vec<Change>) -> Result<(), PushChangesError> {
         let fidl_changes = changes.iter().cloned().map(Into::into).collect::<Vec<_>>();
-        match self
+        let result = self
             .controller
             .push_changes(&fidl_changes)
             .await
-            .map_err(PushChangesError::CallMethod)?
-        {
-            fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}) => Ok(()),
-            fnet_filter::ChangeValidationResult::TooManyChanges(fnet_filter::Empty {}) => {
-                Err(PushChangesError::TooManyChanges)
-            }
-            fnet_filter::ChangeValidationResult::ErrorOnChange(results) => {
-                let errors: Result<_, PushChangesError> = changes.iter().zip(results).try_fold(
-                    Vec::new(),
-                    |mut errors, (change, result)| {
-                        match result {
+            .map_err(PushChangesError::CallMethod)?;
+        handle_change_validation_result(result, &changes)?;
+        // Maintain a client-side copy of the pending changes we've pushed to
+        // the server in order to provide better error messages if a commit
+        // fails.
+        self.pending_changes.extend(changes);
+        Ok(())
+    }
+
+    async fn commit_with_options(
+        &mut self,
+        options: fnet_filter::CommitOptions,
+    ) -> Result<(), CommitError> {
+        let committed_changes = std::mem::take(&mut self.pending_changes);
+        let result = self.controller.commit(options).await.map_err(CommitError::CallMethod)?;
+        handle_commit_result(result, committed_changes)
+    }
+
+    pub async fn commit(&mut self) -> Result<(), CommitError> {
+        self.commit_with_options(fnet_filter::CommitOptions::default()).await
+    }
+
+    pub async fn commit_idempotent(&mut self) -> Result<(), CommitError> {
+        self.commit_with_options(fnet_filter::CommitOptions {
+            idempotent: Some(true),
+            __source_breaking: SourceBreaking,
+        })
+        .await
+    }
+}
+
+pub(crate) fn handle_change_validation_result(
+    change_validation_result: fnet_filter::ChangeValidationResult,
+    changes: &Vec<Change>,
+) -> Result<(), PushChangesError> {
+    match change_validation_result {
+        fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}) => Ok(()),
+        fnet_filter::ChangeValidationResult::TooManyChanges(fnet_filter::Empty {}) => {
+            Err(PushChangesError::TooManyChanges)
+        }
+        fnet_filter::ChangeValidationResult::ErrorOnChange(results) => {
+            let errors: Result<_, PushChangesError> =
+                changes.iter().zip(results).try_fold(Vec::new(), |mut errors, (change, result)| {
+                    match result {
                         fnet_filter::ChangeValidationError::Ok
                         | fnet_filter::ChangeValidationError::NotReached => Ok(errors),
                         error @ (fnet_filter::ChangeValidationError::MissingRequiredField
@@ -1533,86 +1569,66 @@ impl Controller {
                             .into())
                         }
                     }
-                    },
-                );
-                Err(PushChangesError::ErrorOnChange(errors?))
-            }
-            fnet_filter::ChangeValidationResult::__SourceBreaking { .. } => {
-                Err(FidlConversionError::UnknownUnionVariant(type_names::CHANGE_VALIDATION_RESULT)
-                    .into())
-            }
-        }?;
-        // Maintain a client-side copy of the pending changes we've pushed to
-        // the server in order to provide better error messages if a commit
-        // fails.
-        self.pending_changes.extend(changes);
-        Ok(())
-    }
-
-    async fn commit_with_options(
-        &mut self,
-        options: fnet_filter::CommitOptions,
-    ) -> Result<(), CommitError> {
-        let committed_changes = std::mem::take(&mut self.pending_changes);
-        match self.controller.commit(options).await.map_err(CommitError::CallMethod)? {
-            fnet_filter::CommitResult::Ok(fnet_filter::Empty {}) => Ok(()),
-            fnet_filter::CommitResult::RuleWithInvalidMatcher(rule_id) => {
-                Err(CommitError::RuleWithInvalidMatcher(rule_id.into()))
-            }
-            fnet_filter::CommitResult::RuleWithInvalidAction(rule_id) => {
-                Err(CommitError::RuleWithInvalidAction(rule_id.into()))
-            }
-            fnet_filter::CommitResult::TransparentProxyWithInvalidMatcher(rule_id) => {
-                Err(CommitError::TransparentProxyWithInvalidMatcher(rule_id.into()))
-            }
-            fnet_filter::CommitResult::RedirectWithInvalidMatcher(rule_id) => {
-                Err(CommitError::RedirectWithInvalidMatcher(rule_id.into()))
-            }
-            fnet_filter::CommitResult::CyclicalRoutineGraph(routine_id) => {
-                Err(CommitError::CyclicalRoutineGraph(routine_id.into()))
-            }
-            fnet_filter::CommitResult::ErrorOnChange(results) => {
-                let errors: Result<_, CommitError> = committed_changes
-                    .into_iter()
-                    .zip(results)
-                    .try_fold(Vec::new(), |mut errors, (change, result)| match result {
-                        fnet_filter::CommitError::Ok | fnet_filter::CommitError::NotReached => {
-                            Ok(errors)
-                        }
-                        error @ (fnet_filter::CommitError::NamespaceNotFound
-                        | fnet_filter::CommitError::RoutineNotFound
-                        | fnet_filter::CommitError::RuleNotFound
-                        | fnet_filter::CommitError::AlreadyExists
-                        | fnet_filter::CommitError::TargetRoutineIsInstalled) => {
-                            let error = error
-                                .try_into()
-                                .expect("`Ok` and `NotReached` are handled in another arm");
-                            errors.push((change, error));
-                            Ok(errors)
-                        }
-                        fnet_filter::CommitError::__SourceBreaking { .. } => {
-                            Err(FidlConversionError::UnknownUnionVariant(type_names::COMMIT_ERROR)
-                                .into())
-                        }
-                    });
-                Err(CommitError::ErrorOnChange(errors?))
-            }
-            fnet_filter::CommitResult::__SourceBreaking { .. } => {
-                Err(FidlConversionError::UnknownUnionVariant(type_names::COMMIT_RESULT).into())
-            }
+                });
+            Err(PushChangesError::ErrorOnChange(errors?))
+        }
+        fnet_filter::ChangeValidationResult::__SourceBreaking { .. } => {
+            Err(FidlConversionError::UnknownUnionVariant(type_names::CHANGE_VALIDATION_RESULT)
+                .into())
         }
     }
+}
 
-    pub async fn commit(&mut self) -> Result<(), CommitError> {
-        self.commit_with_options(fnet_filter::CommitOptions::default()).await
-    }
-
-    pub async fn commit_idempotent(&mut self) -> Result<(), CommitError> {
-        self.commit_with_options(fnet_filter::CommitOptions {
-            idempotent: Some(true),
-            __source_breaking: SourceBreaking,
-        })
-        .await
+pub(crate) fn handle_commit_result(
+    commit_result: fnet_filter::CommitResult,
+    committed_changes: Vec<Change>,
+) -> Result<(), CommitError> {
+    match commit_result {
+        fnet_filter::CommitResult::Ok(fnet_filter::Empty {}) => Ok(()),
+        fnet_filter::CommitResult::RuleWithInvalidMatcher(rule_id) => {
+            Err(CommitError::RuleWithInvalidMatcher(rule_id.into()))
+        }
+        fnet_filter::CommitResult::RuleWithInvalidAction(rule_id) => {
+            Err(CommitError::RuleWithInvalidAction(rule_id.into()))
+        }
+        fnet_filter::CommitResult::TransparentProxyWithInvalidMatcher(rule_id) => {
+            Err(CommitError::TransparentProxyWithInvalidMatcher(rule_id.into()))
+        }
+        fnet_filter::CommitResult::RedirectWithInvalidMatcher(rule_id) => {
+            Err(CommitError::RedirectWithInvalidMatcher(rule_id.into()))
+        }
+        fnet_filter::CommitResult::CyclicalRoutineGraph(routine_id) => {
+            Err(CommitError::CyclicalRoutineGraph(routine_id.into()))
+        }
+        fnet_filter::CommitResult::ErrorOnChange(results) => {
+            let errors: Result<_, CommitError> = committed_changes
+                .into_iter()
+                .zip(results)
+                .try_fold(Vec::new(), |mut errors, (change, result)| match result {
+                    fnet_filter::CommitError::Ok | fnet_filter::CommitError::NotReached => {
+                        Ok(errors)
+                    }
+                    error @ (fnet_filter::CommitError::NamespaceNotFound
+                    | fnet_filter::CommitError::RoutineNotFound
+                    | fnet_filter::CommitError::RuleNotFound
+                    | fnet_filter::CommitError::AlreadyExists
+                    | fnet_filter::CommitError::TargetRoutineIsInstalled) => {
+                        let error = error
+                            .try_into()
+                            .expect("`Ok` and `NotReached` are handled in another arm");
+                        errors.push((change, error));
+                        Ok(errors)
+                    }
+                    fnet_filter::CommitError::__SourceBreaking { .. } => {
+                        Err(FidlConversionError::UnknownUnionVariant(type_names::COMMIT_ERROR)
+                            .into())
+                    }
+                });
+            Err(CommitError::ErrorOnChange(errors?))
+        }
+        fnet_filter::CommitResult::__SourceBreaking { .. } => {
+            Err(FidlConversionError::UnknownUnionVariant(type_names::COMMIT_RESULT).into())
+        }
     }
 }
 
@@ -2068,15 +2084,40 @@ mod tests {
         ControllerId(String::from("test-controller-b"))
     }
 
-    fn test_resource_id() -> ResourceId {
+    pub(crate) fn test_resource_id() -> ResourceId {
         ResourceId::Namespace(NamespaceId(String::from("test-namespace")))
     }
 
-    fn test_resource() -> Resource {
+    pub(crate) fn test_resource() -> Resource {
         Resource::Namespace(Namespace {
             id: NamespaceId(String::from("test-namespace")),
             domain: Domain::AllIp,
         })
+    }
+
+    pub(crate) fn invalid_resource() -> Resource {
+        Resource::Rule(Rule {
+            id: RuleId {
+                routine: RoutineId {
+                    namespace: NamespaceId(String::from("namespace")),
+                    name: String::from("routine"),
+                },
+                index: 0,
+            },
+            matchers: Matchers {
+                transport_protocol: Some(TransportProtocolMatcher::Tcp {
+                    #[allow(clippy::reversed_empty_ranges)]
+                    src_port: Some(PortMatcher { range: u16::MAX..=0, invert: false }),
+                    dst_port: None,
+                }),
+                ..Default::default()
+            },
+            action: Action::Drop,
+        })
+    }
+
+    pub(crate) fn unknown_resource_id() -> ResourceId {
+        ResourceId::Namespace(NamespaceId(String::from("does-not-exist")))
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -2391,30 +2432,53 @@ mod tests {
         assert!(state.is_empty());
     }
 
+    pub(crate) async fn handle_open_controller(
+        mut request_stream: fnet_filter::ControlRequestStream,
+    ) -> fnet_filter::NamespaceControllerRequestStream {
+        let (id, request, _control_handle) = request_stream
+            .next()
+            .await
+            .expect("client should open controller")
+            .expect("request should not error")
+            .into_open_controller()
+            .expect("client should open controller");
+        let (stream, control_handle) = request.into_stream_and_control_handle().unwrap();
+        control_handle.send_on_id_assigned(&id).expect("send assigned ID");
+
+        stream
+    }
+
+    pub(crate) async fn handle_push_changes(
+        stream: &mut fnet_filter::NamespaceControllerRequestStream,
+        push_changes_result: fnet_filter::ChangeValidationResult,
+    ) {
+        let (_changes, responder) = stream
+            .next()
+            .await
+            .expect("client should push changes")
+            .expect("request should not error")
+            .into_push_changes()
+            .expect("client should push changes");
+        responder.send(push_changes_result).expect("send empty batch");
+    }
+
+    pub(crate) async fn handle_commit(
+        stream: &mut fnet_filter::NamespaceControllerRequestStream,
+        commit_result: fnet_filter::CommitResult,
+    ) {
+        let (_options, responder) = stream
+            .next()
+            .await
+            .expect("client should commit")
+            .expect("request should not error")
+            .into_commit()
+            .expect("client should commit");
+        responder.send(commit_result).expect("send commit result");
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn controller_push_changes_reports_invalid_change() {
-        fn invalid_resource() -> Resource {
-            Resource::Rule(Rule {
-                id: RuleId {
-                    routine: RoutineId {
-                        namespace: NamespaceId(String::from("namespace")),
-                        name: String::from("routine"),
-                    },
-                    index: 0,
-                },
-                matchers: Matchers {
-                    transport_protocol: Some(TransportProtocolMatcher::Tcp {
-                        #[allow(clippy::reversed_empty_ranges)]
-                        src_port: Some(PortMatcher { range: u16::MAX..=0, invert: false }),
-                        dst_port: None,
-                    }),
-                    ..Default::default()
-                },
-                action: Action::Drop,
-            })
-        }
-
-        let (control, mut request_stream) =
+        let (control, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
         let push_invalid_change = async {
             let mut controller = Controller::new(&control, &ControllerId(String::from("test")))
@@ -2435,41 +2499,26 @@ mod tests {
                 )]
             );
         };
+
         let handle_controller = async {
-            let (id, request, _control_handle) = request_stream
-                .next()
-                .await
-                .expect("client should open controller")
-                .expect("request should not error")
-                .into_open_controller()
-                .expect("client should open controller");
-            let (mut stream, control_handle) = request.into_stream_and_control_handle().unwrap();
-            control_handle.send_on_id_assigned(&id).expect("send assigned ID");
-            let (_changes, responder) = stream
-                .next()
-                .await
-                .expect("client should push changes")
-                .expect("request should not error")
-                .into_push_changes()
-                .expect("client should push changes");
-            responder
-                .send(fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
+            let mut stream = handle_open_controller(request_stream).await;
+            handle_push_changes(
+                &mut stream,
+                fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
                     fnet_filter::ChangeValidationError::Ok,
                     fnet_filter::ChangeValidationError::InvalidPortMatcher,
                     fnet_filter::ChangeValidationError::NotReached,
-                ]))
-                .expect("send change validation result");
+                ]),
+            )
+            .await;
         };
+
         let ((), ()) = futures::future::join(push_invalid_change, handle_controller).await;
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn controller_commit_reports_invalid_change() {
-        fn unknown_resource_id() -> ResourceId {
-            ResourceId::Namespace(NamespaceId(String::from("does-not-exist")))
-        }
-
-        let (control, mut request_stream) =
+        let (control, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fnet_filter::ControlMarker>().unwrap();
         let commit_invalid_change = async {
             let mut controller = Controller::new(&control, &ControllerId(String::from("test")))
@@ -2493,39 +2542,21 @@ mod tests {
             );
         };
         let handle_controller = async {
-            let (id, request, _control_handle) = request_stream
-                .next()
-                .await
-                .expect("client should open controller")
-                .expect("request should not error")
-                .into_open_controller()
-                .expect("client should open controller");
-            let (mut stream, control_handle) = request.into_stream_and_control_handle().unwrap();
-            control_handle.send_on_id_assigned(&id).expect("send assigned ID");
-            let (_changes, responder) = stream
-                .next()
-                .await
-                .expect("client should push changes")
-                .expect("request should not error")
-                .into_push_changes()
-                .expect("client should push changes");
-            responder
-                .send(fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}))
-                .expect("send empty batch");
-            let (_options, responder) = stream
-                .next()
-                .await
-                .expect("client should commit")
-                .expect("request should not error")
-                .into_commit()
-                .expect("client should commit");
-            responder
-                .send(fnet_filter::CommitResult::ErrorOnChange(vec![
+            let mut stream = handle_open_controller(request_stream).await;
+            handle_push_changes(
+                &mut stream,
+                fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}),
+            )
+            .await;
+            handle_commit(
+                &mut stream,
+                fnet_filter::CommitResult::ErrorOnChange(vec![
                     fnet_filter::CommitError::Ok,
                     fnet_filter::CommitError::NamespaceNotFound,
                     fnet_filter::CommitError::Ok,
-                ]))
-                .expect("send commit result");
+                ]),
+            )
+            .await;
         };
         let ((), ()) = futures::future::join(commit_invalid_change, handle_controller).await;
     }
