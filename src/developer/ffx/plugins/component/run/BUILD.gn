@@ -17,6 +17,7 @@ if (is_host) {
       "//src/developer/ffx/plugins/log:ffx_log",
       "//src/developer/ffx/plugins/log:ffx_log_args",
       "//src/diagnostics/lib/log-command",
+      "//src/sys/lib/cm_rust",
       "//src/sys/lib/component_debug",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",

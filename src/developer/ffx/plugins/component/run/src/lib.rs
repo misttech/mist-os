@@ -38,7 +38,7 @@ async fn cmd_impl(
         &args.config,
     )
     .await
-    .context("resolving config overridese")?;
+    .context("resolving config overrides")?;
 
     // All errors from component_debug library are user-visible.
     run_cmd(
@@ -55,7 +55,17 @@ async fn cmd_impl(
 
     // Run `doctor` on the new component to expose any routing problems.
     let route_validator = connect_to_route_validator(&rcs_proxy).await?;
-    let route_report = validate_routes(&route_validator, &args.moniker.clone()).await?;
+    let mut route_report = validate_routes(&route_validator, &args.moniker.clone()).await?;
+    // Broken routes are expected in case of transitional routes. Do not report those.
+    route_report.retain(|r| match r.availability {
+        Some(availability) => match availability {
+            cm_rust::Availability::Transitional => false,
+            cm_rust::Availability::Required
+            | cm_rust::Availability::Optional
+            | cm_rust::Availability::SameAsTarget => true,
+        },
+        None => true,
+    });
     // If any of the RouteReport objects indicate an error, output the full report.
     if route_report.iter().any(|r| r.error_summary.is_some()) {
         write!(&mut writer, "\n\n")?;

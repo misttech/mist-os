@@ -19,7 +19,8 @@ use {
     cm_rust::{ExposeDecl, SourceName, UseDecl},
     cm_types::Name,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::{future::join_all, TryStreamExt},
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
@@ -375,13 +376,20 @@ async fn validate_uses(
         let capability = Some(use_.source_name().to_string());
         let decl_type = Some(fsys::DeclType::Use);
         let route_request = RouteRequest::from(use_);
+        let availability = route_request.availability().map(fdecl::Availability::from);
         let error = if let Err(e) = route_request.route(&instance).await {
             Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
         } else {
             None
         };
 
-        reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
+        reports.push(fsys::RouteReport {
+            capability,
+            decl_type,
+            error,
+            availability,
+            ..Default::default()
+        })
     }
     reports
 }
@@ -397,13 +405,20 @@ async fn validate_exposes(
         let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);
         let route_request = RouteRequest::from(e);
+        let availability = route_request.availability().map(fdecl::Availability::from);
         let error = if let Err(e) = route_request.route(instance).await {
             Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
         } else {
             None
         };
 
-        reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
+        reports.push(fsys::RouteReport {
+            capability,
+            decl_type,
+            error,
+            availability,
+            ..Default::default()
+        })
     }
     reports
 }

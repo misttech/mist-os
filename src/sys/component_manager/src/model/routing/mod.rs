@@ -192,7 +192,7 @@ pub async fn report_routing_failure(
 ) {
     target
         .with_logger_as_default(|| {
-            let availability = request.target_use_availability().unwrap_or(Availability::Required);
+            let availability = request.availability().unwrap_or(Availability::Required);
             match availability {
                 Availability::Required => {
                     // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`

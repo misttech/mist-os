@@ -28,6 +28,9 @@ pub struct RouteReport {
 
     /// If Some, indicates a routing error for this route.
     pub error_summary: Option<String>,
+
+    /// The requested level of availability of the capability.
+    pub availability: Option<cm_rust::Availability>,
 }
 
 impl TryFrom<fsys::RouteReport> for RouteReport {
@@ -36,8 +39,10 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
     fn try_from(report: fsys::RouteReport) -> Result<Self> {
         let decl_type = report.decl_type.ok_or(format_err!("missing decl type"))?.try_into()?;
         let capability = report.capability.ok_or(format_err!("missing capability name"))?;
+        let availability: Option<cm_rust::Availability> =
+            report.availability.map(cm_rust::Availability::from);
         let error_summary = if let Some(error) = report.error { error.summary } else { None };
-        Ok(RouteReport { decl_type, capability, error_summary })
+        Ok(RouteReport { decl_type, capability, error_summary, availability })
     }
 }
 

@@ -38,9 +38,9 @@ use {
     cm_rust::{
         Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
         ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-        ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
+        ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon,
+        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
+        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
         RegistrationSource, ResolverRegistration, RunnerRegistration, SourceName, StorageDecl,
         StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl,
         UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
@@ -162,9 +162,8 @@ impl From<Vec<&ExposeDecl>> for RouteRequest {
 }
 
 impl RouteRequest {
-    /// Returns the availability of the RouteRequest if it is a `use` capability declaration
-    /// and supports availability.
-    pub fn target_use_availability(&self) -> Option<Availability> {
+    /// Returns the availability of the RouteRequest if supported.
+    pub fn availability(&self) -> Option<Availability> {
         use crate::RouteRequest::*;
         match self {
             UseDirectory(UseDirectoryDecl { availability, .. })
@@ -174,23 +173,22 @@ impl RouteRequest {
             | UseConfig(UseConfigurationDecl { availability, .. })
             | UseStorage(UseStorageDecl { availability, .. }) => Some(*availability),
 
-            OfferRunner(_)
-            | OfferResolver(_)
-            | ExposeDirectory(_)
-            | ExposeProtocol(_)
-            | ExposeService(_)
-            | ExposeRunner(_)
-            | ExposeResolver(_)
-            | ExposeConfig(_)
-            | Resolver(_)
-            | StorageBackingDirectory(_)
-            | UseRunner(_)
-            | OfferDirectory(_)
-            | OfferEventStream(_)
-            | OfferProtocol(_)
-            | OfferConfig(_)
-            | OfferStorage(_)
-            | OfferService(_) => None,
+            ExposeDirectory(decl) => Some(*decl.availability()),
+            ExposeProtocol(decl) => Some(*decl.availability()),
+            ExposeService(decl) => Some(*decl.availability()),
+            ExposeRunner(decl) => Some(*decl.availability()),
+            ExposeResolver(decl) => Some(*decl.availability()),
+            ExposeConfig(decl) => Some(*decl.availability()),
+
+            OfferRunner(decl) => Some(*decl.availability()),
+            OfferResolver(decl) => Some(*decl.availability()),
+            OfferDirectory(decl) => Some(*decl.availability()),
+            OfferEventStream(decl) => Some(*decl.availability()),
+            OfferProtocol(decl) => Some(*decl.availability()),
+            OfferConfig(decl) => Some(*decl.availability()),
+            OfferStorage(decl) => Some(*decl.availability()),
+
+            OfferService(_) | Resolver(_) | StorageBackingDirectory(_) | UseRunner(_) => None,
         }
     }
 }
