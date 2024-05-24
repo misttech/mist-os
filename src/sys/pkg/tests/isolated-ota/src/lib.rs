@@ -622,10 +622,6 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::ReadDirents { max_bytes: _, responder } => {
                 responder.send(zx::Status::IO.into_raw(), &[]).context("failing readdirents")?
             }
-            fio::DirectoryRequest::Enumerate { options, iterator, control_handle: _ } => {
-                let _ = iterator;
-                todo!("https://fxbug.dev/42157659: options={:?}", options);
-            }
             fio::DirectoryRequest::Rewind { responder } => {
                 responder.send(zx::Status::IO.into_raw()).context("failing rewind")?
             }

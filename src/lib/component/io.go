@@ -372,12 +372,6 @@ func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Direct
 	return io.Directory2UnlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (dirState *directoryState) Enumerate(ctx fidl.Context, options io.DirectoryEnumerateOptions, req io.DirectoryIteratorWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/42157659): implement.
-	_ = req.Close()
-	return nil
-}
-
 func (*directoryState) CreateSymlink(fidl.Context, string, []uint8, io.SymlinkWithCtxInterfaceRequest) (io.Directory2CreateSymlinkResult, error) {
 	return io.Directory2CreateSymlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }

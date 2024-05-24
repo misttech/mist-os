@@ -99,10 +99,6 @@ class DirectoryConnection final : public Connection,
     fidl::ServerEnd<fuchsia_io::Node>(std::move(request->object_request))
         .Close(ZX_ERR_NOT_SUPPORTED);
   }
-  void Enumerate(fuchsia_io::wire::Directory2EnumerateRequest* request,
-                 EnumerateCompleter::Sync& completer) final {
-    request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
-  }
 #if __Fuchsia_API_level__ >= 18
   void CreateSymlink(fuchsia_io::wire::Directory2CreateSymlinkRequest* request,
                      CreateSymlinkCompleter::Sync& completer) final {

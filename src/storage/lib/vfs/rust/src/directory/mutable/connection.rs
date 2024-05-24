@@ -98,7 +98,6 @@ impl MutableConnection {
             | fio::DirectoryRequest::Clone { .. }
             | fio::DirectoryRequest::Close { .. }
             | fio::DirectoryRequest::GetConnectionInfo { .. }
-            | fio::DirectoryRequest::Enumerate { .. }
             | fio::DirectoryRequest::GetAttr { .. }
             | fio::DirectoryRequest::GetAttributes { .. }
             | fio::DirectoryRequest::GetFlags { .. }
