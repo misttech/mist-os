@@ -1,0 +1,24 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//zircon/system/ulib/c/libc.gni")
+
+# This is linked into the legacy libc.so to satisfy references from the old
+# musl integrated dynamic linker code.
+group("musl-glue") {
+  deps = [
+    ":musl-glue.basic",
+    "//zircon/third_party/ulib/musl/src/thread:tls_get_addr",
+  ]
+}
+
+# These things are called too early in startup to use the compiler ABI.
+libc_source_set("musl-glue.basic") {
+  basic_abi = true
+  sources = [ "_dl_phdr_report_globals.cc" ]
+  deps = [
+    "//src/lib/elfldltl",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
+}

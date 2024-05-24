@@ -9,7 +9,6 @@ source_set("thread") {
   ]
   sources = [
     "__timedwait.c",
-    "__tls_get_addr.c",
     "__wait.c",
     "allocate.c",
     "call_once.c",
@@ -40,4 +39,10 @@ source_set("thread") {
 
   # This is needed by allocate.c for "hwasan-stubs.h".
   include_dirs = [ "//zircon/system/ulib/c/sanitizers" ]
+}
+
+source_set("tls_get_addr") {
+  sources = [ "__tls_get_addr.c" ]
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  configs -= [ "//build/config:symbol_visibility_hidden" ]
 }

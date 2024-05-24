@@ -344,6 +344,7 @@ if (zircon_toolchain == false) {
     deps = [
       ":components",
       ":legacy-components",
+      "ld:musl-glue",
       "//zircon/third_party/ulib/musl:legacy-impl",
     ]
 

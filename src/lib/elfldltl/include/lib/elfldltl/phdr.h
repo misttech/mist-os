@@ -607,6 +607,50 @@ constexpr auto MakePhdrLoadObserver(typename Elf::size_type page_size,
   return Obs(page_size, vaddr_start, vaddr_size, std::forward<T>(callback));
 }
 
+// Given a set of phdrs, call the callback as `bool(size_t vaddr, size_t
+// memsz)` to cover all the writable segment data described by PT_LOAD
+// segments, excluding the RELRO region.  Returns false as soon as the first
+// callback returns false, or else returns true.
+template <class Phdr, typename T>
+constexpr bool OnPhdrWritableSegments(cpp20::span<const Phdr> phdrs, T&& callback) {
+  using size_type = decltype(phdrs.front().memsz());
+  static_assert(std::is_invocable_r_v<bool, T, size_type, size_type>);
+
+  // First find the RELRO region, if any.  It will be excluded.
+  const Phdr* relro = nullptr;
+  for (const Phdr& phdr : phdrs) {
+    if (phdr.type == elfldltl::ElfPhdrType::kRelro) {
+      relro = &phdr;
+      break;
+    }
+  }
+
+  for (const Phdr& phdr : phdrs) {
+    if (phdr.type == elfldltl::ElfPhdrType::kLoad && (phdr.flags & Phdr::kWrite)) {
+      // This is a writable segment.
+      size_type start = phdr.vaddr;
+      size_type end = start + phdr.memsz;
+
+      if (relro && relro->vaddr >= start && relro->vaddr <= end) {
+        // If this segment contains the RELRO region, exclude that leading
+        // range of the segment.  With LLD behavior, that's the entire segment
+        // because RELRO gets a separate aligned segment.  With GNU behavior,
+        // it's just a leading portion of the main writable segment.  LLD uses
+        // a page-rounded p_memsz for PT_GNU_RELRO (with the actual size in
+        // p_filesz) unlike GNU linkers (where p_memsz == p_filesz), so p_vaddr
+        // + p_memsz might actually be past end.
+        start = std::min(end, relro->vaddr + relro->memsz);
+      }
+
+      if (end > start && !callback(start, end - start)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 }  // namespace elfldltl
 
 #endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
