@@ -35,5 +35,12 @@
             from: "self",
             to: [ "#starnix_test_runners" ],
         },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: [ "#starnix_test_runners" ],
+            subdir: "kernel",
+        },
     ],
 }

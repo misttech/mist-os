@@ -26,6 +26,11 @@
             path: "/data",
         },
         {
+            directory: "boot-kernel",
+            rights: [ "r*" ],
+            path: "/boot/kernel",
+        },
+        {
             protocol: [ "fuchsia.process.Launcher" ],
         },
     ],

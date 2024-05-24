@@ -59,6 +59,11 @@
             from: "#trace_manager",
             to: "#kernel",
         },
+        {
+            directory: "boot-kernel",
+            from: "parent",
+            to: "#kernel",
+        },
     ],
     environments: [
         {

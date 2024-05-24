@@ -42,6 +42,11 @@
             to: [ "#kernel" ],
         },
         {
+            directory: "boot-kernel",
+            from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
             protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

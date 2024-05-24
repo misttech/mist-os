@@ -132,6 +132,11 @@
             to: [ "#kernel" ],
         },
         {
+            directory: "boot-kernel",
+            from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [

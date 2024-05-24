@@ -22,6 +22,11 @@
             storage: "tmp",
             path: "/tmp",
         },
+        {
+            directory: "boot-kernel",
+            rights: [ "r*" ],
+            path: "/boot/kernel",
+        },
     ],
     expose: [
         {

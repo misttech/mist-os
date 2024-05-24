@@ -54,7 +54,7 @@ fuchsia_test_component("integration_test") {
     ":bin",
     ":pipe_writer",
   ]
-  test_type = "system"
+  test_type = "starnix"
 }
 
 fuchsia_test_package("starnix_self_profile_test") {

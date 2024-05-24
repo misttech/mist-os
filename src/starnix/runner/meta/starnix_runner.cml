@@ -119,6 +119,11 @@
             to: "#playground",
         },
         {
+            directory: "boot-kernel",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
             directory: "dev-gpu",
             from: "parent",
             to: [ "#kernels" ],

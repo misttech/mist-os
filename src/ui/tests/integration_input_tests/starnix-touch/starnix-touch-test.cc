@@ -36,6 +36,7 @@ namespace {
 
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
+using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Route;
 using component_testing::Storage;
@@ -269,6 +270,16 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
         {.capabilities = {Proto<fuchsia_kernel::VmexResource>(), Proto<fuchsia_sysmem::Allocator>(),
                           Proto<fuchsia_sysmem2::Allocator>(),
                           Proto<fuchsia_tracing_provider::Registry>()},
+         .source = ParentRef(),
+         .targets = {ChildRef{kDebianRealm}}},
+
+        {.capabilities =
+             {
+                 Directory{
+                     .name = "boot-kernel",
+                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                 },
+             },
          .source = ParentRef(),
          .targets = {ChildRef{kDebianRealm}}},
 

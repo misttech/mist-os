@@ -78,5 +78,5 @@ fuchsia_unittest_package("starnix-input-tests") {
       max_severity = "ERROR"
     }
   }
-  test_type = "system"
+  test_type = "starnix"
 }

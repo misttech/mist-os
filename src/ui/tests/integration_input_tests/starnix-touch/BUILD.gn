@@ -50,7 +50,7 @@ fuchsia_test_component("starnix-touch-test-component") {
   testonly = true
   manifest = "meta/starnix-touch-test.cml"
   deps = [ ":starnix-touch-test-bin" ]
-  test_type = "system"
+  test_type = "starnix"
 }
 
 ###

@@ -63,6 +63,13 @@
             rights: [ "r*" ],
         },
         {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: [ "#starnix-tests" ],
+            subdir: "kernel",
+        },
+        {
             // TODO(https://fxbug.dev/304290346): In an ideal world, we would
             // mock bluetooth hardware in tests.
             directory: "dev-class",

@@ -104,6 +104,13 @@
             to: [ "#starnix_runner" ],
         },
         {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: [ "#starnix_runner" ],
+            subdir: "kernel",
+        },
+        {
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",

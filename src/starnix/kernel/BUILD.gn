@@ -776,7 +776,7 @@ fuchsia_unittest_package("starnix-tests") {
       max_severity = "ERROR"
     }
   }
-  test_type = "system"
+  test_type = "starnix"
 }
 
 fuchsia_unittest_package("starnix_kernel_bin-tests") {
@@ -793,6 +793,7 @@ fuchsia_unittest_package("starnix_kernel_runner-tests") {
       max_severity = "ERROR"
     }
   }
+  test_type = "starnix"
 }
 
 fuchsia_unittest_package("starnix_lifecycle-tests") {
