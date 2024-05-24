@@ -117,4 +117,37 @@ TEST_F(DriverRunnerDeathTest, AllowlistCausesBindToFail) {
   ASSERT_DEATH(TryBind(banned_controller_, test_loop()), "Undeclared DEVFS_USAGE detected");
 }
 
+void TryScheduleUnbind(fidl::WireClient<fuchsia_device::Controller>& controller,
+                       async::TestLoop& loop) {
+  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
+  controller->ScheduleUnbind().Then(
+      [](fidl::WireUnownedResult<fuchsia_device::Controller::ScheduleUnbind>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+      });
+  ASSERT_TRUE(loop.RunUntilIdle());
+}
+
+TEST_F(DriverRunnerDeathTest, AllowlistCausesScheduleUnbindToFail) {
+  TryScheduleUnbind(allowed_controller_, test_loop());
+
+  ASSERT_DEATH(TryScheduleUnbind(banned_controller_, test_loop()),
+               "Undeclared DEVFS_USAGE detected");
+}
+
+void TryUnbindChildren(fidl::WireClient<fuchsia_device::Controller>& controller,
+                       async::TestLoop& loop) {
+  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
+  controller->UnbindChildren().Then(
+      [](fidl::WireUnownedResult<fuchsia_device::Controller::UnbindChildren>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+      });
+  ASSERT_TRUE(loop.RunUntilIdle());
+}
+
+TEST_F(DriverRunnerDeathTest, AllowlistCausesUnbindChildrenToFail) {
+  TryUnbindChildren(allowed_controller_, test_loop());
+
+  ASSERT_DEATH(TryUnbindChildren(banned_controller_, test_loop()),
+               "Undeclared DEVFS_USAGE detected");
+}
 }  // namespace driver_runner
