@@ -10,6 +10,7 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/symbols/symbols.h>
 
 extern bool g_driver_stopped;
 
@@ -99,6 +100,13 @@ class TestDriver : public fdf::DriverBase,
   fidl::WireClient<fuchsia_driver_framework::NodeController> child_controller_;
 
   std::optional<fdf::SynchronizedDispatcher> not_shutdown_manually_dispatcher_;
+};
+
+class StartFailTestDriver : public TestDriver {
+ public:
+  using TestDriver::TestDriver;
+  static DriverRegistration GetDriverRegistration();
+  void Start(fdf::StartCompleter completer) override;
 };
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_TESTS_TEST_DRIVER_H_

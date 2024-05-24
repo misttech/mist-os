@@ -271,3 +271,21 @@ TEST_F(FixtureBasedTestAddChild, AddChild) {
   driver()->CreateChildNodeSync();
   EXPECT_TRUE(driver()->sync_added_child());
 }
+
+// Fixture config for testing start failure scenarios.
+class FailStartFixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = false;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = StartFailTestDriver;
+  using EnvironmentType = fdf_testing::MinimalEnvironment;
+};
+
+class FixtureBasedTestFailStart : public fdf_testing::DriverTestFixture<FailStartFixtureConfig> {};
+
+TEST_F(FixtureBasedTestFailStart, FailStart) {
+  auto start_result = StartDriver();
+  EXPECT_EQ(ZX_ERR_INTERNAL, start_result.status_value());
+}
