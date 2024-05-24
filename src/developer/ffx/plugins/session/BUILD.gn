@@ -11,6 +11,7 @@ ffx_plugin("ffx_session") {
   with_unit_tests = true
   plugin_deps = [
     "add:ffx_session_add",
+    "drop-power-lease:ffx_session_drop_power_lease",
     "launch:ffx_session_launch",
     "remove:ffx_session_remove",
     "restart:ffx_session_restart",
@@ -27,6 +28,7 @@ group("tests") {
   deps = [
     ":ffx_session_tests",
     "add:ffx_session_add_tests",
+    "drop-power-lease:ffx_session_drop_power_lease_tests",
     "launch:ffx_session_launch_tests",
     "remove:ffx_session_remove_tests",
     "restart:ffx_session_restart_tests",

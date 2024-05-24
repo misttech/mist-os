@@ -15,6 +15,7 @@ use {
     futures::{StreamExt, TryFutureExt, TryStreamExt},
     std::sync::{Arc, Mutex},
     tracing::{error, warn},
+    zx::HandleBased,
 };
 
 /// Maximum number of concurrent connections to the protocols served by SessionManager.
@@ -469,7 +470,7 @@ impl SessionManager {
             match request {
                 fpower::HandoffRequest::Take { responder } => {
                     let result = self.handle_handoff_take_request().await;
-                    let _ = responder.send(result);
+                    let _ = responder.send(result.map(|lease| lease.into_channel().into_handle()));
                 }
                 fpower::HandoffRequest::_UnknownMethod { ordinal, .. } => {
                     warn!(%ordinal, "Lifecycle received an unknown method")

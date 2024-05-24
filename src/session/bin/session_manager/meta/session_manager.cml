@@ -557,6 +557,7 @@
             protocol: [
                 "fuchsia.session.Launcher",
                 "fuchsia.session.Lifecycle",
+                "fuchsia.session.power.Handoff",
                 "fuchsia.session.Restarter",
             ],
             from: "self",
