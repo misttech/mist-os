@@ -150,7 +150,7 @@ class Dispatcher : private fbl::RefCountedUpgradeable<Dispatcher>,
   // If |trigger_mode| is set to Edge, the signal state is not checked
   // on entry and the observer is only triggered if a signal subsequently
   // becomes active.
-  zx_status_t AddObserver(SignalObserver* observer, const Handle* handle, zx_signals_t signals,
+  zx_status_t AddObserver(SignalObserver* observer, const void* handle, zx_signals_t signals,
                           TriggerMode trigger_mode = TriggerMode::Level);
 
   // Remove an observer.
@@ -171,14 +171,14 @@ class Dispatcher : private fbl::RefCountedUpgradeable<Dispatcher>,
   // Should be called when a handle to this dispatcher is being destroyed.
   //
   // May only be called when |is_waitable| reports true.
-  void Cancel(const Handle* handle);
+  void Cancel(const void* handle);
 
   // Like Cancel() but issued via zx_port_cancel().
   //
   // Returns true if an observer was canceled.
   //
   // May only be called when |is_waitable| reports true.
-  bool CancelByKey(const Handle* handle, const void* port, uint64_t key);
+  bool CancelByKey(const void* handle, const void* port, uint64_t key);
 
   // Interface for derived classes.
 

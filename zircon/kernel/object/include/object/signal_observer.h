@@ -54,7 +54,7 @@ class SignalObserver : public fbl::DoublyLinkedListable<SignalObserver*> {
   // Dispatcher state, guarded by Dispatcher's lock.
   friend class Dispatcher;
   zx_signals_t triggering_signals_;
-  const Handle* handle_;
+  const void* handle_;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_SIGNAL_OBSERVER_H_
