@@ -150,6 +150,14 @@ fn connect_to_device() -> Result<(fadb::DeviceSynchronousProxy, AdbHandle), Errn
             .map_err(|_| errno!(EINVAL))?
             .map_err(|_| errno!(EINVAL))?;
 
+        loop {
+            let fadb::UsbAdbImpl_Event::OnStatusChanged { status } =
+                adb_proxy.wait_for_event(zx::Time::INFINITE).expect("failed to wait for event");
+            if status == fadb::StatusFlags::ONLINE {
+                break;
+            }
+        }
+
         return Ok((device_proxy, Arc::new(adb_proxy)));
     }
     error!(EBUSY)
