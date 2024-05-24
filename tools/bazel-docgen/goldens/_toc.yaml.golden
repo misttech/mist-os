@@ -1,8 +1,8 @@
 toc:
 - title: Overview
   path: /some/path/README.md
-- heading: API
-- section:
+- title: API
+  section:
   - title: Rules
     section:
     - title: example_rule

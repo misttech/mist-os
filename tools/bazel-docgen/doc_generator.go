@@ -122,9 +122,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			Path:  mkPathFn("README.md"),
 		},
 		{
-			Heading: "API",
-		},
-		{
+			Title: "API",
 			Sections: []tocEntry{
 				{
 					Title:    "Rules",
