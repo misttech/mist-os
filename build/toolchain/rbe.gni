@@ -16,10 +16,22 @@ rbe_common_tools = [
 rewrapper_config_file = "//build/rbe/fuchsia-rewrapper.cfg"
 reproxy_config_file = "//build/rbe/fuchsia-reproxy.cfg"
 
+declare_args() {
+  ############################
+  ### General RBE controls ###
+  ############################
+
+  # Additional reproxy configuration files.
+  # These are effectively concatenated with the main `reproxy_config_file`
+  # in order of appearance.  Settings in later files in this list take
+  # precedence over those earlier in the list.
+  rbe_extra_reproxy_configs = []
+}
+
 rbe_common_configs = [
-  rewrapper_config_file,
-  reproxy_config_file,
-]
+                       rewrapper_config_file,
+                       reproxy_config_file,
+                     ] + rbe_extra_reproxy_configs
 
 # Toolchain-agnostic RBE scripts and configuration.
 # This is used by both the shell and Python implementations.
@@ -62,9 +74,9 @@ prebuilt_tool_remote_wrapper = "//build/rbe/prebuilt_tool_remote_wrapper.py"
 
 rbe_dlwrap = "//build/rbe/dlwrap.py"
 rbe_dlwrap_inputs = [
-  "//prebuilt/proprietary/third_party/reclient/${_host_platform}/remotetool",
-  reproxy_config_file,
-]
+                      "//prebuilt/proprietary/third_party/reclient/${_host_platform}/remotetool",
+                      reproxy_config_file,
+                    ] + rbe_extra_reproxy_configs
 
 declare_args() {
   #########################

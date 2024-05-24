@@ -1359,6 +1359,13 @@ group("rbe_config.metadata") {
         path = reproxy_config_file
       },
     ]
+    foreach(p, rbe_extra_reproxy_configs) {
+      rbe_config += [
+        {
+          path = p
+        },
+      ]
+    }
   }
 }
 

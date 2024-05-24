@@ -3,6 +3,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 #
+# This script is a general purpose wrapper that automatically
+# starts and stops 'reproxy' (re-client) around the wrapped command.
+# Common uses of this include:
+#   * Wrapping around build/ninja invocations that issue commands
+#     that use 'rewrapper' (re-client).
+#   * Wrapping around manual commands involving 'rewrapper'.
+#
 # See usage().
 
 set -e
@@ -24,7 +31,7 @@ project_root="$default_project_root"
 project_root_rel="$(relpath . "$project_root")"
 
 # defaults
-readonly config="$script_dir"/fuchsia-reproxy.cfg
+readonly default_config="$script_dir"/fuchsia-reproxy.cfg
 
 readonly PREBUILT_SUBDIR="$PREBUILT_OS"-"$PREBUILT_ARCH"
 
@@ -35,6 +42,8 @@ reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$
 
 # Configuration for RBE metrics and logs collection.
 readonly fx_build_metrics_config="$project_root_rel"/.fx-build-metrics-config
+
+readonly jq="$project_root/prebuilt/third_party/jq/"$PREBUILT_SUBDIR"/bin/jq"
 
 usage() {
   cat <<EOF
@@ -49,7 +58,7 @@ example:
   $script -- ninja
 
 options:
-  --cfg FILE: reclient config for reproxy
+  --cfg FILE: reclient config for reproxy (default: $default_config)
   --bindir DIR: location of reproxy tools
   -t: print additional timestamps for measuring overhead.
   -v | --verbose: print events verbosely
@@ -64,6 +73,7 @@ environment variables:
 EOF
 }
 
+config="$default_config"
 verbose=0
 print_times=0
 bootstrap_options=()
@@ -185,6 +195,9 @@ mkdir -p "$_RBE_cache_dir"
 }
 
 # These environment variables take precedence over those found in --cfg.
+# These values are all dynamic and are short-lived, so it is better
+# to pass them as environment variable than to write them out to
+# an auxiliary config file.
 bootstrap_env=(
   env
   TMPDIR="$reproxy_tmpdir"
@@ -282,6 +295,30 @@ function cleanup() {
   rm -rf "$reproxy_tmpdir"
 }
 
+# Honor additional reproxy configs from the current build dir.
+bootstrap_reproxy_cfg="$reproxy_cfg"
+rbe_config_json="$project_root/$build_subdir/rbe_config.json"
+if [[ -r "$rbe_config_json" ]]
+then
+  all_proxy_cfgs=($("$jq" '.[] | .path' < "$rbe_config_json" | sed -e 's|"\(.*\)"|\1|'))
+  [[ "$verbose" != 1 ]] || {
+    echo "all reproxy cfgs (${#all_proxy_cfgs[@]}): '${all_proxy_cfgs[@]}'"
+  }
+  if [[ "${#all_proxy_cfgs[@]}" -gt 1 ]]
+  then
+    # Concatenate all reproxy configs to a new file.
+    # The first config is $reproxy_config.
+    # Paths listed in $rbe_config_json are relative to the build output
+    # directory.  Adjust the paths so they can be referenced here.
+    proxy_cfg_abspaths=("${all_proxy_cfgs[@]/#/$project_root/$build_subdir/}")
+    bootstrap_reproxy_cfg="$project_root/$build_subdir/joint_reproxy.cfg"
+    cat "${proxy_cfg_abspaths[@]}" > "$bootstrap_reproxy_cfg"
+    [[ "$verbose" != 1 ]] || {
+      echo "concatenated reproxy cfg: $bootstrap_reproxy_cfg"
+    }
+  fi
+fi
+
 # Startup reproxy.
 # Use the same config for bootstrap as for reproxy.
 # This also checks for authentication, and prompts the user to
@@ -290,7 +327,7 @@ _timetrace "Bootstrapping reproxy"
 "${bootstrap_env[@]}" \
   "$bootstrap" \
   --re_proxy="$reproxy" \
-  --cfg="$reproxy_cfg" \
+  --cfg="$bootstrap_reproxy_cfg" \
   "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout
 [[ "$verbose" != 1 ]] || {
   cat "$reproxy_logdir"/bootstrap.stdout
