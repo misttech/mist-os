@@ -168,7 +168,7 @@ group("chacha20") {
 }
 
 group("chrono") {
-  public_deps = [ ":chrono-v0_4_19" ]
+  public_deps = [ ":chrono-v0_4_34" ]
 }
 
 group("chrono-english") {
@@ -1462,6 +1462,51 @@ rust_library("aho-corasick-v0_7_18") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":aho-corasick-v0_7_18.license" ]
+}
+
+rust_library("android_system_properties-v0_1_5") {
+  crate_name = "android_system_properties"
+  crate_root =
+      "//third_party/rust_crates/empty/android_system_properties/src/lib.rs"
+  output_name = "android_system_properties-fb55b1f486b3c828"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=fb55b1f486b3c828",
+    "-Cextra-filename=-fb55b1f486b3c828",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("android-tzdata-v0_1_1") {
+  crate_name = "android_tzdata"
+  crate_root = "//third_party/rust_crates/empty/android-tzdata/src/lib.rs"
+  output_name = "android_tzdata-a1a30826099c6222"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=a1a30826099c6222",
+    "-Cextra-filename=-a1a30826099c6222",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
 license("ansi_term-v0_12_1.license") {
@@ -2956,48 +3001,61 @@ rust_library("chacha20-v0_9_1") {
   applicable_licenses = [ ":chacha20-v0_9_1.license" ]
 }
 
-license("chrono-v0_4_19.license") {
+license("chrono-v0_4_34.license") {
   public_package_name = "chrono"
   license_files =
-      [ "//third_party/rust_crates/vendor/chrono-0.4.19/LICENSE.txt" ]
+      [ "//third_party/rust_crates/vendor/chrono-0.4.34/LICENSE.txt" ]
 }
 
-rust_library("chrono-v0_4_19") {
+rust_library("chrono-v0_4_34") {
   crate_name = "chrono"
-  crate_root = "//third_party/rust_crates/vendor/chrono-0.4.19/src/lib.rs"
-  output_name = "chrono-5f4599162f3bf073"
+  crate_root = "//third_party/rust_crates/vendor/chrono-0.4.34/src/lib.rs"
+  output_name = "chrono-6cd08b71ee20ad6f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":libc-v0_2_149" ]
-  deps += [ ":num-integer-v0_1_44" ]
   deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":serde-v1_0_147" ]
-  deps += [ ":time-v0_1_45" ]
+  if (current_cpu == "wasm32" && !(false || false)) {
+    deps += [ ":js-sys-v0_3_68" ]
+    deps += [ ":wasm-bindgen-v0_2_91" ]
+  }
   if (false) {
-    deps += [ ":winapi-v0_3_9" ]
+    deps += [ ":android-tzdata-v0_1_1" ]
+  }
+  if (true) {
+    deps += [ ":iana-time-zone-v0_1_60" ]
+  }
+  if (false) {
+    deps += [ ":windows-targets-v0_52_0" ]
   }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=5f4599162f3bf073",
-    "-Cextra-filename=-5f4599162f3bf073",
+    "--edition=2021",
+    "-Cmetadata=6cd08b71ee20ad6f",
+    "-Cextra-filename=-6cd08b71ee20ad6f",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"android-tzdata\"",
     "--cfg=feature=\"clock\"",
     "--cfg=feature=\"default\"",
-    "--cfg=feature=\"libc\"",
+    "--cfg=feature=\"iana-time-zone\"",
+    "--cfg=feature=\"js-sys\"",
+    "--cfg=feature=\"now\"",
     "--cfg=feature=\"oldtime\"",
     "--cfg=feature=\"serde\"",
     "--cfg=feature=\"std\"",
-    "--cfg=feature=\"time\"",
+    "--cfg=feature=\"wasm-bindgen\"",
+    "--cfg=feature=\"wasmbind\"",
     "--cfg=feature=\"winapi\"",
+    "--cfg=feature=\"windows-targets\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":chrono-v0_4_19.license" ]
+  applicable_licenses = [ ":chrono-v0_4_34.license" ]
 }
 
 license("chrono-english-v0_1_7.license") {
@@ -3014,7 +3072,7 @@ rust_library("chrono-english-v0_1_7") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":scanlex-v0_1_4" ]
 
   rustenv = []
@@ -5174,7 +5232,7 @@ rust_library("fatfs-v0_3_6") {
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":bitflags-v1_3_2" ]
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":log-v0_4_20" ]
 
   rustenv = []
@@ -6869,6 +6927,76 @@ rust_library("hyper-rustls-v0_22_1") {
   applicable_licenses = [ ":hyper-rustls-v0_22_1.license" ]
 }
 
+license("iana-time-zone-v0_1_60.license") {
+  public_package_name = "iana_time_zone"
+  license_files = [
+    "//third_party/rust_crates/vendor/iana-time-zone-0.1.60/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/iana-time-zone-0.1.60/LICENSE-MIT",
+  ]
+}
+
+rust_library("iana-time-zone-v0_1_60") {
+  crate_name = "iana_time_zone"
+  crate_root =
+      "//third_party/rust_crates/vendor/iana-time-zone-0.1.60/src/lib.rs"
+  output_name = "iana_time_zone-967aad457d7ea2f5"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  if (current_os == "mac" || false) {
+    deps += [ ":core-foundation-sys-v0_8_3" ]
+  }
+  if (current_cpu == "wasm32") {
+    deps += [ ":js-sys-v0_3_68" ]
+    deps += [ ":wasm-bindgen-v0_2_91" ]
+  }
+  if (false) {
+    deps += [ ":android_system_properties-v0_1_5" ]
+  }
+  if (false) {
+    deps += [ ":iana-time-zone-haiku-v0_1_2" ]
+  }
+  if (false) {
+    deps += [ ":windows-core-v0_52_0" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=967aad457d7ea2f5",
+    "-Cextra-filename=-967aad457d7ea2f5",
+    "--cfg=feature=\"fallback\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":iana-time-zone-v0_1_60.license" ]
+}
+
+rust_library("iana-time-zone-haiku-v0_1_2") {
+  crate_name = "iana_time_zone_haiku"
+  crate_root = "//third_party/rust_crates/empty/iana-time-zone-haiku/src/lib.rs"
+  output_name = "iana_time_zone_haiku-bdd654178d2587ab"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=bdd654178d2587ab",
+    "-Cextra-filename=-bdd654178d2587ab",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
 license("ident_case-v1_0_1.license") {
   public_package_name = "ident_case"
   license_files =
@@ -7396,6 +7524,28 @@ rust_library("itoa-v1_0_5") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":itoa-v1_0_5.license" ]
+}
+
+rust_library("js-sys-v0_3_68") {
+  crate_name = "js_sys"
+  crate_root = "//third_party/rust_crates/empty/js-sys/src/lib.rs"
+  output_name = "js_sys-36060ea082782507"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=36060ea082782507",
+    "-Cextra-filename=-36060ea082782507",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
 license("json5format-v0_2_6.license") {
@@ -9282,7 +9432,7 @@ rust_library("omaha_client-v0_1_0") {
 
   deps = []
   deps += [ ":anyhow-v1_0_75" ]
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":ecdsa-v0_14_8" ]
   deps += [ ":elliptic-curve-v0_12_3" ]
   deps += [ ":futures-v0_3_19" ]
@@ -13278,7 +13428,7 @@ rust_library("schemars-v0_8_10") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":dyn-clone-v1_0_5" ]
   deps += [ ":indexmap-v1_9_2" ]
   deps += [ ":schemars_derive-v0_8_10($host_toolchain)" ]
@@ -14299,7 +14449,7 @@ rust_library("simplelog-v0_10_2") {
 
   deps = []
   deps += [ ":termcolor-v1_1_2" ]
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":log-v0_4_20" ]
 
   rustenv = []
@@ -15637,43 +15787,6 @@ rust_library("thread_local-v1_1_7") {
   applicable_licenses = [ ":thread_local-v1_1_7.license" ]
 }
 
-license("time-v0_1_45.license") {
-  public_package_name = "time"
-  license_files = [
-    "//third_party/rust_crates/vendor/time-0.1.45/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/time-0.1.45/LICENSE-MIT",
-  ]
-}
-
-rust_library("time-v0_1_45") {
-  crate_name = "time"
-  crate_root = "//third_party/rust_crates/vendor/time-0.1.45/src/lib.rs"
-  output_name = "time-f522c386f3cdd455"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":libc-v0_2_149" ]
-  if (false) {
-    deps += [ ":wasi-v0_10_0+wasi-snapshot-preview1" ]
-  }
-  if (false) {
-    deps += [ ":winapi-v0_3_9" ]
-  }
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=f522c386f3cdd455",
-    "-Cextra-filename=-f522c386f3cdd455",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":time-v0_1_45.license" ]
-}
-
 license("tinyjson-v2_5_0.license") {
   public_package_name = "tinyjson"
   license_files =
@@ -15940,7 +16053,7 @@ rust_library("toml_edit-v0_2_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":combine-v4_6_2" ]
   deps += [ ":linked-hash-map-v0_5_3" ]
 
@@ -16411,7 +16524,7 @@ rust_library("tuf-v0_3_0-beta11") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":data-encoding-v2_3_2" ]
   deps += [ ":derp-v0_0_14" ]
   deps += [ ":futures-io-v0_3_19" ]
@@ -17355,7 +17468,7 @@ rust_library("valico-v2_4_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":chrono-v0_4_34" ]
   deps += [ ":jsonway-v2_0_0" ]
   deps += [ ":phf-v0_7_24" ]
   deps += [ ":publicsuffix-v1_5_4" ]
@@ -17650,28 +17763,6 @@ rust_library("want-v0_3_0") {
   applicable_licenses = [ ":want-v0_3_0.license" ]
 }
 
-rust_library("wasi-v0_10_0+wasi-snapshot-preview1") {
-  crate_name = "wasi"
-  crate_root = "//third_party/rust_crates/empty/wasi-0.10.0+wasi-snapshot-preview1/src/lib.rs"
-  output_name = "wasi-d00fdc79325e5e1d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=d00fdc79325e5e1d",
-    "-Cextra-filename=-d00fdc79325e5e1d",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
-}
-
 rust_library("wasi-v0_11_0+wasi-snapshot-preview1") {
   crate_name = "wasi"
   crate_root = "//third_party/rust_crates/empty/wasi-0.11.0+wasi-snapshot-preview1/src/lib.rs"
@@ -17687,6 +17778,28 @@ rust_library("wasi-v0_11_0+wasi-snapshot-preview1") {
     "--edition=2015",
     "-Cmetadata=b8a75a95bc9b1a8a",
     "-Cextra-filename=-b8a75a95bc9b1a8a",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("wasm-bindgen-v0_2_91") {
+  crate_name = "wasm_bindgen"
+  crate_root = "//third_party/rust_crates/empty/wasm-bindgen/src/lib.rs"
+  output_name = "wasm_bindgen-1791c19da3a2573e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=1791c19da3a2573e",
+    "-Cextra-filename=-1791c19da3a2573e",
   ]
 
   visibility = [ ":*" ]
@@ -17835,7 +17948,6 @@ rust_library("winapi-v0_3_9") {
     "--cfg=feature=\"minwindef\"",
     "--cfg=feature=\"mstcpip\"",
     "--cfg=feature=\"mswsock\"",
-    "--cfg=feature=\"ntdef\"",
     "--cfg=feature=\"ntsecapi\"",
     "--cfg=feature=\"ntstatus\"",
     "--cfg=feature=\"processenv\"",
@@ -17908,6 +18020,28 @@ rust_library("windows-v0_48_0") {
     "--cfg=feature=\"Win32_System_Diagnostics_Debug\"",
     "--cfg=feature=\"Win32_System_Memory\"",
     "--cfg=feature=\"Win32_System_SystemInformation\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("windows-core-v0_52_0") {
+  crate_name = "windows_core"
+  crate_root = "//third_party/rust_crates/empty/windows-core/src/lib.rs"
+  output_name = "windows_core-fe71282da1ff9567"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=fe71282da1ff9567",
+    "-Cextra-filename=-fe71282da1ff9567",
   ]
 
   visibility = [ ":*" ]
@@ -18000,7 +18134,8 @@ rust_library("windows-sys-v0_48_0") {
 
 rust_library("windows-targets-v0_48_5") {
   crate_name = "windows_targets"
-  crate_root = "//third_party/rust_crates/empty/windows-targets/src/lib.rs"
+  crate_root =
+      "//third_party/rust_crates/empty/windows-targets-0.48.5/src/lib.rs"
   output_name = "windows_targets-b310ace0c4c0e58e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
@@ -18013,6 +18148,29 @@ rust_library("windows-targets-v0_48_5") {
     "--edition=2015",
     "-Cmetadata=b310ace0c4c0e58e",
     "-Cextra-filename=-b310ace0c4c0e58e",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("windows-targets-v0_52_0") {
+  crate_name = "windows_targets"
+  crate_root =
+      "//third_party/rust_crates/empty/windows-targets-0.52.0/src/lib.rs"
+  output_name = "windows_targets-2ab0b8a168fc804"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=2ab0b8a168fc804",
+    "-Cextra-filename=-2ab0b8a168fc804",
   ]
 
   visibility = [ ":*" ]

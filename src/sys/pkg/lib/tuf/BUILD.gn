@@ -82,6 +82,10 @@ rustc_test("tuf_lib_test") {
 
     # TODO(https://fxbug.dev/326330182): warn for dead code once that is fixed in the TUF crate
     "-Adead_code",
+
+    # TODO(https://fxbug.dev/328271672): warn for deprecated code once TUF crate is updated
+    "-Adeprecated",
+
     "--cap-lints=allow",
   ]
 }

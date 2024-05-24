@@ -12,7 +12,7 @@ use {
 /// Returns the equivalent of the given DOS time as ns past the unix epoch.
 pub fn dos_to_unix_time(dos_time: DateTime) -> u64 {
     let datetime = chrono::DateTime::<Local>::from(dos_time);
-    datetime.timestamp_nanos() as u64
+    datetime.timestamp_nanos_opt().unwrap() as u64
 }
 
 /// Returns the given unix timestamp in ns as a FAT-compatible DateTime.

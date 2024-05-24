@@ -731,8 +731,8 @@ ffx log --force-select.
         let res = parse_time(date_string).unwrap();
         assert_eq!(res.is_now, false);
         assert_eq!(
-            res.date(),
-            parse_date_string(date_string, Local::now(), Dialect::Us).unwrap().date()
+            res.date_naive(),
+            parse_date_string(date_string, Local::now(), Dialect::Us).unwrap().date_naive()
         );
     }
 }

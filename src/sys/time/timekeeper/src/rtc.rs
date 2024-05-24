@@ -125,18 +125,23 @@ impl RtcImpl {
 }
 
 fn fidl_time_to_zx_time(fidl_time: frtc::Time) -> Result<zx::Time> {
-    let chrono = Utc
-        .ymd_opt(fidl_time.year as i32, fidl_time.month as u32, fidl_time.day as u32)
-        .and_hms_opt(fidl_time.hours as u32, fidl_time.minutes as u32, fidl_time.seconds as u32);
+    let chrono = Utc.with_ymd_and_hms(
+        fidl_time.year as i32,
+        fidl_time.month as u32,
+        fidl_time.day as u32,
+        fidl_time.hours as u32,
+        fidl_time.minutes as u32,
+        fidl_time.seconds as u32,
+    );
     match chrono {
-        LocalResult::Single(t) => Ok(zx::Time::from_nanos(t.timestamp_nanos())),
+        LocalResult::Single(t) => Ok(zx::Time::from_nanos(t.timestamp_nanos_opt().unwrap())),
         _ => Err(anyhow!("Invalid RTC time: {:?}", fidl_time)),
     }
 }
 
 fn zx_time_to_fidl_time(zx_time: zx::Time) -> frtc::Time {
     let nanos = zx::Time::into_nanos(zx_time);
-    let chrono = Utc.timestamp(nanos / NANOS_PER_SECOND, 0);
+    let chrono = Utc.timestamp_opt(nanos / NANOS_PER_SECOND, 0).unwrap();
     frtc::Time {
         year: chrono.year() as u16,
         month: chrono.month() as u8,

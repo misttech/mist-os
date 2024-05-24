@@ -383,7 +383,7 @@ async fn get_client<'a>(
     // with missing metadata since we'll create it when we publish to the
     // repository. We'll allow any expired metadata since we're going to be
     // generating new versions.
-    match client.update_with_start_time(&Utc.timestamp(0, 0)).await {
+    match client.update_with_start_time(&Utc.timestamp_opt(0, 0).unwrap()).await {
         Ok(_) | Err(RepoError::Tuf(TufError::MetadataNotFound { .. })) => Ok(Some(client)),
         Err(err) => Err(err.into()),
     }
@@ -774,7 +774,7 @@ mod tests {
         // not allow `0` for a version, so tuf::RepoBuilder will fall back to normal versioning if
         // we have a unix timestamp of 0, so we'll use a non-zero time.
         let time_version = 100u32;
-        let now = Utc.timestamp(time_version as i64, 0);
+        let now = Utc.timestamp_opt(time_version as i64, 0).unwrap();
 
         test_utils::make_empty_pm_repo_dir(repo_path);
 
@@ -1103,7 +1103,7 @@ mod tests {
         let repo_keys = RepoKeys::from_dir(keys_dir.as_std_path()).unwrap();
 
         RepoBuilder::create(&pm_repo, &repo_keys)
-            .current_time(Utc.timestamp(0, 0))
+            .current_time(Utc.timestamp_opt(0, 0).unwrap())
             .commit()
             .await
             .unwrap();

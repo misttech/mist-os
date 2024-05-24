@@ -40,10 +40,12 @@ pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
                 .await?;
                 let properties = handle.get_properties().await?;
                 let size = properties.data_attribute_size;
-                let mtime = Utc.timestamp(
-                    properties.modification_time.secs as i64,
-                    properties.modification_time.nanos,
-                );
+                let mtime = Utc
+                    .timestamp_opt(
+                        properties.modification_time.secs as i64,
+                        properties.modification_time.nanos,
+                    )
+                    .unwrap();
                 println!(
                     "-rwx------    1 nobody   nogroup    {:>8} {:>12} {}",
                     size,
@@ -52,7 +54,7 @@ pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
                 );
             }
             ObjectDescriptor::Directory => {
-                let mtime = Utc.timestamp(0, 0);
+                let mtime = Utc.timestamp_opt(0, 0).unwrap();
                 println!(
                     "d---------    1 nobody   nogroup           0 {:>12} {}",
                     mtime.format(DATE_FMT),

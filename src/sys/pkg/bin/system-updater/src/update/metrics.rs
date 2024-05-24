@@ -190,9 +190,7 @@ mod tests {
 
     #[test]
     fn hour_of_day_returns_hour_of_day() {
-        let date = Utc.ymd(1971, 1, 1);
-
-        assert_eq!(hour_of_day(date.and_hms(4, 0, 0).into()), 4);
-        assert_eq!(hour_of_day(date.and_hms(23, 0, 0).into()), 23);
+        assert_eq!(hour_of_day(Utc.with_ymd_and_hms(1971, 1, 1, 4, 0, 0).unwrap().into()), 4);
+        assert_eq!(hour_of_day(Utc.with_ymd_and_hms(1971, 1, 1, 23, 0, 0).unwrap().into()), 23);
     }
 }

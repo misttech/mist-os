@@ -686,7 +686,9 @@ async fn maintenance_mock_server(
 }
 
 fn from_rfc2822(date: &str) -> zx::Time {
-    zx::Time::from_nanos(chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos())
+    zx::Time::from_nanos(
+        chrono::DateTime::parse_from_rfc2822(date).unwrap().timestamp_nanos_opt().unwrap(),
+    )
 }
 
 lazy_static! {
@@ -728,9 +730,16 @@ fn zx_time_to_rtc_time(zx_time: zx::Time) -> fidl_fuchsia_hardware_rtc::Time {
 
 pub fn rtc_time_to_zx_time(rtc_time: fidl_fuchsia_hardware_rtc::Time) -> zx::Time {
     let date = chrono::Utc
-        .ymd(rtc_time.year as i32, rtc_time.month as u32, rtc_time.day as u32)
-        .and_hms(rtc_time.hours as u32, rtc_time.minutes as u32, rtc_time.seconds as u32);
-    zx::Time::from_nanos(date.timestamp_nanos())
+        .with_ymd_and_hms(
+            rtc_time.year as i32,
+            rtc_time.month as u32,
+            rtc_time.day as u32,
+            rtc_time.hours as u32,
+            rtc_time.minutes as u32,
+            rtc_time.seconds as u32,
+        )
+        .unwrap();
+    zx::Time::from_nanos(date.timestamp_nanos_opt().unwrap())
 }
 
 /// Create a stream of MetricEvents from a proxy.

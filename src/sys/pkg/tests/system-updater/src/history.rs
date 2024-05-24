@@ -83,7 +83,8 @@ fn strip_attempt_ids(mut value: serde_json::Value) -> serde_json::Value {
 /// Given a parsed update history value, verify each attempt contains a 'start' time that's later
 /// than 01/01/2020, and return the object with those fields removed.
 fn strip_start_time(mut value: serde_json::Value) -> serde_json::Value {
-    let min_start_time = Utc.ymd(2020, 1, 1).and_hms(0, 0, 0).timestamp_nanos() as u64;
+    let min_start_time =
+        Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap().timestamp_nanos_opt().unwrap() as u64;
     value
         .as_object_mut()
         .expect("top level is object")

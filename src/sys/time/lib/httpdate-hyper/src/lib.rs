@@ -434,7 +434,7 @@ mod test {
     #[fuchsia::test]
     async fn test_bad_timezone() {
         let set_time = (*CERT_NOT_BEFORE + chrono::Duration::days(1))
-            .with_timezone(&chrono::FixedOffset::east(1 * 60 * 60));
+            .with_timezone(&chrono::FixedOffset::east_opt(1 * 60 * 60).unwrap());
         let open_port = serve_fake(set_time.clone());
 
         let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TLS_SERVER_ROOTS);

@@ -106,7 +106,7 @@ pub fn format_version_info<O: Offset + Display>(
 
     let hash = info.commit_hash.as_deref().unwrap_or(UNKNOWN_BUILD_HASH);
     let timestamp_str = match info.commit_timestamp {
-        Some(t) => tz.timestamp(t as i64, 0).to_rfc2822(),
+        Some(t) => tz.timestamp_opt(t as i64, 0).unwrap().to_rfc2822(),
         None => String::from("(unknown commit time)"),
     };
 

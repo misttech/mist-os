@@ -870,7 +870,12 @@ ffx log --force-select.
                 moniker: "ffx".into(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(
-                    parse_time("1980-01-01T00:00:03").unwrap().time.naive_utc().timestamp_nanos(),
+                    parse_time("1980-01-01T00:00:03")
+                        .unwrap()
+                        .time
+                        .naive_utc()
+                        .timestamp_nanos_opt()
+                        .unwrap(),
                 ),
             })
             .set_pid(1)
@@ -952,7 +957,12 @@ ffx log --force-select.
                 moniker: "ffx".into(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(
-                    parse_time("1980-01-01T00:00:03").unwrap().time.naive_utc().timestamp_nanos(),
+                    parse_time("1980-01-01T00:00:03")
+                        .unwrap()
+                        .time
+                        .naive_utc()
+                        .timestamp_nanos_opt()
+                        .unwrap(),
                 ),
             })
             .set_pid(1)
@@ -1047,7 +1057,8 @@ ffx log --force-select.
                             .unwrap()
                             .time
                             .naive_utc()
-                            .timestamp_nanos(),
+                            .timestamp_nanos_opt()
+                            .unwrap(),
                     ),
                 })
                 .set_pid(1)
@@ -1063,7 +1074,8 @@ ffx log --force-select.
                             .unwrap()
                             .time
                             .naive_utc()
-                            .timestamp_nanos(),
+                            .timestamp_nanos_opt()
+                            .unwrap(),
                     ),
                 })
                 .set_pid(1)
@@ -1079,7 +1091,8 @@ ffx log --force-select.
                             .unwrap()
                             .time
                             .naive_utc()
-                            .timestamp_nanos(),
+                            .timestamp_nanos_opt()
+                            .unwrap(),
                     ),
                 })
                 .set_pid(1)
@@ -1242,7 +1255,7 @@ ffx log --force-select.
             test_buffers.stdout.into_string(),
             format!(
                 "[{}][ffx] INFO: Hello world!\u{1b}[m\n",
-                Local.timestamp(0, 1).format(TIMESTAMP_FORMAT)
+                Local.timestamp_opt(0, 1).unwrap().format(TIMESTAMP_FORMAT)
             )
         );
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));

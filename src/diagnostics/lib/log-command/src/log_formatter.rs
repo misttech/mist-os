@@ -163,7 +163,7 @@ impl DeviceOrLocalTimestamp {
         rtc.as_ref()
             .filter(|value| !value.is_now)
             .map(|value| DeviceOrLocalTimestamp {
-                timestamp: Timestamp::from(value.naive_utc().timestamp_nanos()),
+                timestamp: Timestamp::from(value.naive_utc().timestamp_nanos_opt().unwrap()),
                 is_monotonic: false,
             })
             .or_else(|| {

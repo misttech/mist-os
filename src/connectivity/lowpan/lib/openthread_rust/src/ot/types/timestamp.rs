@@ -125,11 +125,8 @@ impl Timestamp {
 
     /// Returns the timestamp as an instance of `chrono::naive::NaiveDateTime`.
     pub fn to_naive_date_time(&self) -> chrono::naive::NaiveDateTime {
-        let duration = self.to_duration_since_epoch();
-        chrono::naive::NaiveDateTime::from_timestamp(
-            duration.as_secs().try_into().unwrap(),
-            duration.subsec_nanos(),
-        )
+        chrono::naive::NaiveDateTime::from_timestamp_micros(self.as_micros().try_into().unwrap())
+            .expect("time to be within range")
     }
 }
 

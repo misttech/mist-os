@@ -1097,7 +1097,7 @@ impl<'a> TargetUpdateFilter<'a> {
                         _ => target_addrs.contains(&TargetAddrEntry::new(
                             (*addr).into(),
                             // NOTE: The following fields do not matter for address lookups
-                            chrono::MIN_DATETIME,
+                            chrono::DateTime::<Utc>::MIN_UTC,
                             TargetAddrStatus::ssh(),
                         )),
                     }
@@ -1166,7 +1166,10 @@ mod tests {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
         let query = nodename.clone().into();
-        let t = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
+        let t = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
         tc.merge_insert(t.clone());
         expect_no_enabled_target(&tc, &query);
         assert_eq!(expect_target(&tc, &query), t);
@@ -1179,7 +1182,10 @@ mod tests {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
         let query = nodename.clone().into();
-        let t = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
+        let t = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
         tc.merge_insert(t.clone());
         assert_eq!(expect_target(&tc, &query), t);
         expect_no_target(&tc, &"oihaoih".into())
@@ -1189,7 +1195,10 @@ mod tests {
     async fn test_target_merge_evict_old_addresses() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("schplew");
-        let t = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
+        let t = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
         let a1 = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
         let a2 = IpAddr::V6(Ipv6Addr::new(
             0xfe80, 0xcafe, 0xf00d, 0xf000, 0xb412, 0xb455, 0x1337, 0xfeed,
@@ -1197,24 +1206,25 @@ mod tests {
         let a3 = IpAddr::V6(Ipv6Addr::new(0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1));
         let tae1 = TargetAddrEntry {
             addr: TargetAddr::new(a1, 1, 0),
-            timestamp: Utc.ymd(2014, 10, 31).and_hms(9, 10, 12),
+            timestamp: Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
             status: TargetAddrStatus::ssh(),
         };
         let tae2 = TargetAddrEntry {
             addr: TargetAddr::new(a2, 1, 0),
-            timestamp: Utc.ymd(2014, 10, 31).and_hms(9, 10, 12),
+            timestamp: Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
             status: TargetAddrStatus::ssh(),
         };
         let tae3 = TargetAddrEntry {
             addr: TargetAddr::new(a3, 1, 0),
-            timestamp: Utc.ymd(2014, 10, 31).and_hms(9, 10, 12),
+            timestamp: Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
             status: TargetAddrStatus::ssh().manually_added(),
         };
         t.addrs.borrow_mut().insert(tae1);
         t.addrs.borrow_mut().insert(tae2);
         t.addrs.borrow_mut().insert(tae3);
         tc.merge_insert(t.clone());
-        let t2 = Target::new_with_time(&nodename, Utc.ymd(2014, 11, 2).and_hms(13, 2, 1));
+        let t2 =
+            Target::new_with_time(&nodename, Utc.with_ymd_and_hms(2014, 11, 2, 13, 2, 1).unwrap());
         let a1 = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10));
         t2.addrs_insert(TargetAddr::new(a1.clone(), 1, 0));
         let merged_target = tc.merge_insert(t2);
@@ -1228,8 +1238,12 @@ mod tests {
     async fn test_target_collection_merge() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("bananas");
-        let t1 = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
-        let t2 = Target::new_with_time(&nodename, Utc.ymd(2014, 11, 2).and_hms(13, 2, 1));
+        let t1 = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
+        let t2 =
+            Target::new_with_time(&nodename, Utc.with_ymd_and_hms(2014, 11, 2, 13, 2, 1).unwrap());
         let a1 = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
         let a2 = IpAddr::V6(Ipv6Addr::new(
             0xfe80, 0x0000, 0x0000, 0x0000, 0xb412, 0xb455, 0x1337, 0xfeed,
@@ -1239,14 +1253,20 @@ mod tests {
         tc.merge_insert(t2);
         let merged_target = tc.merge_insert(t1);
         assert_eq!(merged_target.addrs().len(), 2);
-        assert_eq!(*merged_target.last_response.borrow(), Utc.ymd(2014, 11, 2).and_hms(13, 2, 1));
+        assert_eq!(
+            *merged_target.last_response.borrow(),
+            Utc.with_ymd_and_hms(2014, 11, 2, 13, 2, 1).unwrap()
+        );
         assert!(merged_target.addrs().contains(&TargetAddr::new(a1, 1, 0)));
         assert!(merged_target.addrs().contains(&TargetAddr::new(a2, 1, 0)));
 
         // Insert another instance of the a2 address, but with a missing
         // scope_id, and ensure that the new address does not affect the address
         // collection.
-        let t3 = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
+        let t3 = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
         t3.addrs_insert(TargetAddr::new(a2.clone(), 0, 0));
         let merged_target = tc.merge_insert(t3);
         let addrs = merged_target.addrs();
@@ -1255,7 +1275,10 @@ mod tests {
         assert!(addrs.contains(&TargetAddr::new(a2, 1, 0)), "does not contain addr: {addrs:?}");
 
         // Insert another instance of the a2 address, but with a new scope_id, and ensure that the new scope is used.
-        let t3 = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
+        let t3 = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
         t3.addrs_insert(TargetAddr::new(a2.clone(), 3, 0));
         let merged_target = tc.merge_insert(t3);
         assert_eq!(merged_target.addrs().len(), 2);
@@ -1331,8 +1354,12 @@ mod tests {
     async fn test_target_collection_no_scopeless_ipv6() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("bananas");
-        let t1 = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
-        let t2 = Target::new_with_time(&nodename, Utc.ymd(2014, 11, 2).and_hms(13, 2, 1));
+        let t1 = Target::new_with_time(
+            &nodename,
+            Utc.with_ymd_and_hms(2014, 10, 31, 9, 10, 12).unwrap(),
+        );
+        let t2 =
+            Target::new_with_time(&nodename, Utc.with_ymd_and_hms(2014, 11, 2, 13, 2, 1).unwrap());
         let a1 = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
         let a2 = IpAddr::V6(Ipv6Addr::new(
             0xfe80, 0x0000, 0x0000, 0x0000, 0xb412, 0xb455, 0x1337, 0xfeed,
@@ -1342,7 +1369,10 @@ mod tests {
         tc.merge_insert(t2);
         let merged_target = tc.merge_insert(t1);
         assert_eq!(merged_target.addrs().len(), 1);
-        assert_eq!(*merged_target.last_response.borrow(), Utc.ymd(2014, 11, 2).and_hms(13, 2, 1));
+        assert_eq!(
+            *merged_target.last_response.borrow(),
+            Utc.with_ymd_and_hms(2014, 11, 2, 13, 2, 1).unwrap()
+        );
         assert!(merged_target.addrs().contains(&TargetAddr::new(a1, 0, 0)));
         assert!(!merged_target.addrs().contains(&TargetAddr::new(a2, 0, 0)));
     }
