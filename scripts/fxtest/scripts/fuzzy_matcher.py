@@ -4,9 +4,8 @@
 # found in the LICENSE file.
 
 import argparse
-from collections import defaultdict
 import colorama
-from colorama import Fore, Style
+import dataclasses
 import jellyfish
 import json
 import os
@@ -14,14 +13,15 @@ import re
 import sys
 import time
 import typing
-import dataclasses
+from collections import defaultdict
+from colorama import Fore, Style
 
 colorama.init(strip=bool(os.getenv("NO_COLOR", None)))
 
 DEFAULT_THRESHOLD = 0.75
 
 
-def command(args: argparse.Namespace):
+def command(args: argparse.Namespace) -> None:
     """Fuzzy match build targets and tests.
 
     Example: fx search-tests my-component
@@ -120,9 +120,7 @@ def command(args: argparse.Namespace):
     return
 
 
-def color_output(
-    styles: typing.Union[str, typing.List[str]], content: str, enabled: bool
-) -> str:
+def color_output(styles: str | list[str], content: str, enabled: bool) -> str:
     """Utility function to wrap a string with color styles.
 
     Args:
@@ -153,9 +151,7 @@ class TimingTracker:
     This class is a ContextManager that tracks timing for wrapper operations.
     """
 
-    _tracked_timing: typing.List[
-        typing.Tuple[str, typing.Union[float, None]]
-    ] = []
+    _tracked_timing: list[tuple[str, float | None]] = []
 
     def __init__(self, operation_name: str) -> None:
         """Initialize a timing tracker instance.
@@ -167,12 +163,12 @@ class TimingTracker:
         self._slot: int | None = None
         self._start: float | None = None
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self._slot = len(TimingTracker._tracked_timing)
         self._start = time.monotonic()
         TimingTracker._tracked_timing.append((self._operation_name, None))
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: object) -> None:
         assert self._slot is not None
         assert self._start is not None
         TimingTracker._tracked_timing[self._slot] = (
@@ -181,12 +177,12 @@ class TimingTracker:
         )
 
     @staticmethod
-    def reset():
+    def reset() -> None:
         """Reset all globally recorded timings."""
         TimingTracker._tracked_timing = []
 
     @staticmethod
-    def print_timings():
+    def print_timings() -> None:
         """Print all accumulated timings to stdout."""
         print("Debug timings:")
         for name, maybe_duration in TimingTracker._tracked_timing:
@@ -208,10 +204,10 @@ class Matcher:
         threshold: The threshold for a match in the range [0,1]
     """
 
-    def __init__(self, threshold: float):
+    def __init__(self, threshold: float) -> None:
         self.threshold: float = threshold
 
-    def match(self, s1: str, s2: str) -> typing.Optional[float]:
+    def match(self, s1: str, s2: str) -> float | None:
         """Calculate the similarity of two strings
 
         Args:
@@ -256,7 +252,7 @@ class Suggestion:
     similarity: float
     full_suggestion: str
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Suggestion({self.matched_name}, {self.similarity}, {self.full_suggestion})"
 
 
@@ -279,7 +275,7 @@ class SearchLocations:
 class BuildFileMatcher:
     """Given a source directory, support searching for matching targets."""
 
-    def __init__(self, source_directory: str):
+    def __init__(self, source_directory: str) -> None:
         # We do not want to recurse into these directories, because
         # they contain a lot of files and no relevant BUILD.gn files
         # containing tests.
@@ -319,7 +315,7 @@ class BuildFileMatcher:
             r"component_name\s*=\s*\"([^\"]+)\""
         )
 
-        parse_results: typing.List[typing.Dict[str, typing.List[str]]] = []
+        parse_results: list[dict[str, list[str]]] = []
         with TimingTracker("..Parse BUILD.gn files"):
             parse_results = list(
                 map(
@@ -329,19 +325,15 @@ class BuildFileMatcher:
             )
 
         with TimingTracker("..Collect results"):
-            name_to_target: defaultdict[str, typing.List[str]] = defaultdict(
-                list
-            )
+            name_to_target: defaultdict[str, list[str]] = defaultdict(list)
             for result in parse_results:
                 for key, value in result.items():
                     name_to_target[key] += value
-            self._name_to_target: typing.Dict[str, typing.List[str]] = dict(
-                name_to_target
-            )
+            self._name_to_target: dict[str, list[str]] = dict(name_to_target)
 
     def _parse_build_file(
         self, build_file: str, source_directory: str
-    ) -> typing.Dict[str, typing.List[str]]:
+    ) -> dict[str, list[str]]:
         """Parse a build file into a mapping from name to referencing build targets.
 
         The output of this method is used to provide a set of names
@@ -397,7 +389,7 @@ class BuildFileMatcher:
 
             # Iterate over test components in the file, and keep track
             # of what we find in a list of (target, name) pairs.
-            components_in_file: typing.List[typing.Tuple[str, str]] = []
+            components_in_file: list[tuple[str, str]] = []
             component_finds = re.finditer(self._component_finder, contents)
             for find in component_finds:
                 component_target_name = find.group(1)
@@ -495,7 +487,7 @@ class BuildFileMatcher:
 
     def find_matches(
         self, search_term: str, matcher: Matcher
-    ) -> typing.List[Suggestion]:
+    ) -> list[Suggestion]:
         """Find matches within build files.
 
         Params:
@@ -505,7 +497,7 @@ class BuildFileMatcher:
         Returns:
             A list of Suggestions from BUILD.gn files.
         """
-        matches: typing.List[Suggestion] = []
+        matches: list[Suggestion] = []
 
         for name, targets in self._name_to_target.items():
             options = [name] + targets
@@ -529,16 +521,16 @@ class BuildFileMatcher:
 class TestsFileMatcher:
     """Given a tests.json file path, supports searching for matching tests."""
 
-    def __init__(self, tests_json_file: str):
+    def __init__(self, tests_json_file: str) -> None:
         with open(tests_json_file, "r") as f:
             contents = json.load(f)
-            self.names: typing.Dict[str, typing.List[str]] = dict()
+            self.names: dict[str, list[str]] = dict()
             TOOLCHAIN_REGEX = re.compile(
                 r"\(//build/toolchain:[^\)]*\)$", re.MULTILINE
             )
             for entry in contents:
-                labels: typing.List[str] = []
-                test: typing.Dict[str, typing.Any] = entry["test"]
+                labels: list[str] = []
+                test: dict[str, typing.Any] = entry["test"]
                 for label_name in ["label", "component_label", "package_label"]:
                     if label_name in test:
                         # Filter out the toolchain suffix on paths
@@ -551,14 +543,14 @@ class TestsFileMatcher:
             r"fuchsia-pkg://fuchsia\.com/([^/#]+)#?"
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"TestFileMatcher(name_count={len(self.names)})"
 
     def find_matches(
         self,
         target: str,
         matcher: Matcher,
-    ) -> typing.List[Suggestion]:
+    ) -> list[Suggestion]:
         """Find matches within a tests.json file.
 
         Parameters:
@@ -568,7 +560,7 @@ class TestsFileMatcher:
         Returns:
             A list of Suggestions from the tests.json file.
         """
-        matches: typing.List[Suggestion] = []
+        matches: list[Suggestion] = []
         for name, labels in self.names.items():
             # Match on the entire package URL by default.
             options = [name]
@@ -632,7 +624,7 @@ def create_search_locations() -> SearchLocations:
     return SearchLocations(fuchsia_directory, tests_json_file)
 
 
-def main(args_list=None):
+def main(args_list: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Fuzzy match and suggest tests in the Fuchsia build."
     )
@@ -673,7 +665,8 @@ def main(args_list=None):
 
     args = parser.parse_args(args_list)
 
-    return command(args)
+    command(args)
+    return 0
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ if (is_host) {
   ]
 
   python_binary("fuzzy_matcher") {
+    enable_mypy = true
     main_source = "fuzzy_matcher.py"
 
     sources = [ "fuzzy_matcher.py" ]
@@ -27,6 +28,7 @@ if (is_host) {
   }
 
   python_host_test("test_fuzzy_matcher") {
+    enable_mypy = true
     main_source = "test_fuzzy_matcher.py"
     sources = [
       "fuzzy_matcher.py",
