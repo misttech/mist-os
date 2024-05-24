@@ -1635,8 +1635,8 @@ LIBC_NO_SAFESTACK static void update_tls_size(void) {
 static dl_start_return_t __dls3(void* start_arg);
 static dl_start_return_t __dls2tail(void* start_arg);
 
-LIBC_NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_return_t
-__dls2(void* start_arg, void* vdso_map) {
+LIBC_NO_SAFESTACK NO_ASAN __attribute__((__visibility__("hidden"))) dl_start_return_t __dls2(
+    void* start_arg, void* vdso_map) {
   ldso.l_map.l_addr = (uintptr_t)__ehdr_start;
 
   Ehdr* ehdr = (void*)ldso.l_map.l_addr;
@@ -2769,7 +2769,27 @@ zx_status_t __sanitizer_change_code_protection(uintptr_t addr, size_t len, bool 
 // The _dl_rdlock is held or equivalent.
 void _dl_locked_report_globals(sanitizer_memory_snapshot_callback_t* callback, void* callback_arg) {
   for (struct dso* mod = head; mod != NULL; mod = dso_next(mod)) {
-    _dl_phdr_report_globals(callback, callback_arg, mod->l_map.l_addr, mod->phdr, mod->phnum);
+    for (unsigned int i = 0; i < mod->phnum; ++i) {
+      const Phdr* ph = &mod->phdr[i];
+      // Report every nonempty writable segment.
+      if (ph->p_type == PT_LOAD && (ph->p_flags & PF_W)) {
+        uintptr_t start = ph->p_vaddr;
+        uintptr_t end = start + ph->p_memsz;
+        // If this segment contains the RELRO region, exclude that leading
+        // range of the segment.  With lld behavior, that's the entire segment
+        // because RELRO gets a separate aligned segment.  With GNU behavior,
+        // it's just a leading portion of the main writable segment.  lld uses
+        // a page-rounded p_memsz for PT_GNU_RELRO (with the actual size in
+        // p_filesz) unlike GNU linkers (where p_memsz==p_filesz), so
+        // relro_end might actually be past end.
+        if (mod->relro_start >= start && mod->relro_start <= end) {
+          start = mod->relro_end < end ? mod->relro_end : end;
+        }
+        if (start < end) {
+          callback(laddr(mod, start), end - start, callback_arg);
+        }
+      }
+    }
   }
 }
 

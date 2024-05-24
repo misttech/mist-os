@@ -194,7 +194,6 @@ template("libc_source_set") {
         }
         configs += libc_configs + set_configs
         deps = []
-        include_dirs = []
         forward_variables_from(set_vars, "*")
         if (defined(invoker.non_test_vars)) {
           forward_variables_from(invoker.non_test_vars, "*")
@@ -204,22 +203,6 @@ template("libc_source_set") {
         }
         if (suffix != "") {
           configs += [ "$libc:llvm-libc-function-attr.config" ]
-        }
-        if (basic_abi) {
-          # The basic ABI code has to be hermetic with respect to potentially
-          # COMDAT'able inlines so that its calls can never go to full compiler
-          # ABI code that's also linked in and wins in COMDAT de-duplication.
-          # Redefining the LIBC_INLINE* macros handles this for the llvm-libc
-          # inlines.
-          #
-          # Note this is plumbed directly as include_dirs in the source_set()
-          # so that it comes before all the include_dirs plumbs via configs.
-          # If this instead used non_test_deps to point at a group with
-          # public_configs pointing at a config(), then those include_dirs
-          # would come after all the ones from configs used to compile libc.
-          # This needs to preempt those, so it should come first as
-          # include_dirs et al directly in a target like source_set() do.
-          include_dirs += [ "include-preempt-hermetic" ]
         }
       }
     }

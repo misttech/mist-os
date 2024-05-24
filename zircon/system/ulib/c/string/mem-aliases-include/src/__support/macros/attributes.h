@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef PREEMPT_HERMETIC_SRC___SUPPORT_MACROS_ATTRIBUTES_H_
-#define PREEMPT_HERMETIC_SRC___SUPPORT_MACROS_ATTRIBUTES_H_
+#ifndef SRC___SUPPORT_MACROS_ATTRIBUTES_H_
+#define SRC___SUPPORT_MACROS_ATTRIBUTES_H_
 
 // This interposes on the llvm-libc "src/__support/macros/attributes.h" header
 // to redefine the LIBC_INLINE macro.
@@ -36,4 +36,4 @@
 #define LIBC_INLINE_VAR inline
 #endif
 
-#endif  // PREEMPT_HERMETIC_SRC___SUPPORT_MACROS_ATTRIBUTES_H_
+#endif  // SRC___SUPPORT_MACROS_ATTRIBUTES_H_
