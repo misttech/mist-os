@@ -835,62 +835,71 @@ TEST_F(EfiDevicePartitionerTests, OnStopRebootBootloader) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt_dev));
 
-  FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
-  zx::result svc = fake_svc.svc();
-  EXPECT_OK(svc);
+  {
+    auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
+    ASSERT_OK(pauser);
 
-  zx::result partitioner_status = CreatePartitioner(gpt_dev.get(), std::move(svc.value()));
-  ASSERT_OK(partitioner_status);
-  std::unique_ptr<paver::DevicePartitioner> partitioner = std::move(partitioner_status.value());
-  ASSERT_OK(partitioner->InitPartitionTables());
+    FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
+    zx::result svc = fake_svc.svc();
+    EXPECT_OK(svc);
 
-  // Set Termination system state to "reboot to bootloader"
-  fake_svc.fake_system_shutdown_state().SetTerminationSystemState(
-      SystemPowerState::kRebootBootloader);
+    zx::result partitioner_status = CreatePartitioner(gpt_dev.get(), std::move(svc.value()));
+    ASSERT_OK(partitioner_status);
+    std::unique_ptr<paver::DevicePartitioner> partitioner = std::move(partitioner_status.value());
+    ASSERT_OK(partitioner->InitPartitionTables());
 
-  // Trigger OnStop event that should set one shot flag
-  ASSERT_OK(partitioner->OnStop());
+    // Set Termination system state to "reboot to bootloader"
+    fake_svc.fake_system_shutdown_state().SetTerminationSystemState(
+        SystemPowerState::kRebootBootloader);
 
-  // Verify ABR flags
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
-  ASSERT_OK(partition);
-  auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
-  ASSERT_OK(abr_partition_client);
-  auto abr_flags_res = abr_partition_client.value()->GetAndClearOneShotFlags();
-  ASSERT_OK(abr_flags_res);
-  EXPECT_TRUE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
-  EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+    // Trigger OnStop event that should set one shot flag
+    ASSERT_OK(partitioner->OnStop());
+
+    // Verify ABR flags
+    auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+    ASSERT_OK(partition);
+    auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
+    ASSERT_OK(abr_partition_client);
+    auto abr_flags_res = abr_partition_client.value()->GetAndClearOneShotFlags();
+    ASSERT_OK(abr_flags_res);
+    EXPECT_TRUE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
+    EXPECT_FALSE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+  }
 }
 
 TEST_F(EfiDevicePartitionerTests, OnStopRebootRecovery) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt_dev));
+  {
+    auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
+    ASSERT_OK(pauser);
 
-  FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
-  zx::result svc = fake_svc.svc();
-  EXPECT_OK(svc);
+    FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
+    zx::result svc = fake_svc.svc();
+    EXPECT_OK(svc);
 
-  zx::result partitioner_status = CreatePartitioner(gpt_dev.get(), std::move(svc.value()));
-  ASSERT_OK(partitioner_status);
-  std::unique_ptr<paver::DevicePartitioner> partitioner = std::move(partitioner_status.value());
-  ASSERT_OK(partitioner->InitPartitionTables());
+    zx::result partitioner_status = CreatePartitioner(gpt_dev.get(), std::move(svc.value()));
+    ASSERT_OK(partitioner_status);
+    std::unique_ptr<paver::DevicePartitioner> partitioner = std::move(partitioner_status.value());
+    ASSERT_OK(partitioner->InitPartitionTables());
 
-  // Set Termination system state to "reboot to bootloader"
-  fake_svc.fake_system_shutdown_state().SetTerminationSystemState(
-      SystemPowerState::kRebootRecovery);
+    // Set Termination system state to "reboot to bootloader"
+    fake_svc.fake_system_shutdown_state().SetTerminationSystemState(
+        SystemPowerState::kRebootRecovery);
 
-  // Trigger OnStop event that should set one shot flag
-  ASSERT_OK(partitioner->OnStop());
+    // Trigger OnStop event that should set one shot flag
+    ASSERT_OK(partitioner->OnStop());
 
-  // Verify ABR flags
-  auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
-  ASSERT_OK(partition);
-  auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
-  ASSERT_OK(abr_partition_client);
-  auto abr_flags_res = abr_partition_client.value()->GetAndClearOneShotFlags();
-  ASSERT_OK(abr_flags_res);
-  EXPECT_FALSE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
-  EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+    // Verify ABR flags
+    auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
+    ASSERT_OK(partition);
+    auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition.value()));
+    ASSERT_OK(abr_partition_client);
+    auto abr_flags_res = abr_partition_client.value()->GetAndClearOneShotFlags();
+    ASSERT_OK(abr_flags_res);
+    EXPECT_FALSE(AbrIsOneShotBootloaderBootSet(abr_flags_res.value()));
+    EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
+  }
 }
 
 class FixedDevicePartitionerTests : public zxtest::Test {
