@@ -52,7 +52,7 @@
 //   E& error_value()            // Error value.
 //   E&& error_value()           // Error value.
 //   error<E> take_error()       // Generates a fit::error() which can be implicitly converted to a
-//                               // fit::result with a different "success" vluae type (or
+//                               // fit::result with a different "success" value type (or
 //                               // fit::result<E>).
 
 namespace fit {
