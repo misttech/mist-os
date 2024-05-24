@@ -142,9 +142,9 @@ fuchsia_driver_component("sysmem") {
 fuchsia_structured_config_values("config_values") {
   cm_label = ":manifest"
   values = {
-    driver_sysmem_protected_memory_size_override =
+    protected_memory_size_override =
         driver_sysmem_protected_memory_size_override
-    driver_sysmem_contiguous_memory_size_override =
+    contiguous_memory_size_override =
         driver_sysmem_contiguous_memory_size_override
   }
 }

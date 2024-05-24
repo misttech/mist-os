@@ -30,57 +30,6 @@
 namespace sysmem_driver {
 namespace {
 
-TEST(Device, OverrideCommandLine) {
-  sysmem_driver::Driver sysmem_ctx;
-  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  sysmem_driver::Device sysmem{fake_parent.get(), &sysmem_ctx};
-
-  const char* kCommandLine = "test.device.commandline";
-
-  int64_t value;
-  zx_status_t status;
-
-  value = 10;
-  fake_parent->SetVariable(kCommandLine, "5");
-  status = sysmem.OverrideSizeFromCommandLine(kCommandLine, &value);
-  EXPECT_OK(status);
-  EXPECT_EQ(5, value);
-
-  value = 11;
-  fake_parent->SetVariable(kCommandLine, "65537");
-  status = sysmem.OverrideSizeFromCommandLine(kCommandLine, &value);
-  EXPECT_OK(status);
-  EXPECT_EQ(65537, value);
-
-  // Trailing characters should cause the entire value to be ignored.
-  value = 12;
-  fake_parent->SetVariable(kCommandLine, "65536a");
-  status = sysmem.OverrideSizeFromCommandLine(kCommandLine, &value);
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, status);
-  EXPECT_EQ(12, value);
-
-  // Empty values should be ignored.
-  value = 13;
-  fake_parent->SetVariable(kCommandLine, "");
-  status = sysmem.OverrideSizeFromCommandLine(kCommandLine, &value);
-  EXPECT_OK(status);
-  EXPECT_EQ(13, value);
-
-  // Negative values are allowed (these get interpreted as a percentage of physical RAM), but only
-  // up to 99% is allowed.
-  value = 14;
-  fake_parent->SetVariable(kCommandLine, "-100");
-  status = sysmem.OverrideSizeFromCommandLine(kCommandLine, &value);
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, status);
-  EXPECT_EQ(14, value);
-
-  value = 15;
-  fake_parent->SetVariable(kCommandLine, "-99");
-  status = sysmem.OverrideSizeFromCommandLine(kCommandLine, &value);
-  EXPECT_OK(status);
-  EXPECT_EQ(-99, value);
-}
-
 TEST(Device, GuardPageCommandLine) {
   sysmem_driver::Driver sysmem_ctx;
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();

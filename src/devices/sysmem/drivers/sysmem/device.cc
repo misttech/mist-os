@@ -279,27 +279,6 @@ Device::~Device() {
   DdkUnbindInternal();
 }
 
-zx_status_t Device::OverrideSizeFromCommandLine(const char* name, int64_t* memory_size) {
-  char pool_arg[32];
-  auto status = device_get_variable(parent(), name, pool_arg, sizeof(pool_arg), nullptr);
-  if (status != ZX_OK || strlen(pool_arg) == 0)
-    return ZX_OK;
-  char* end = nullptr;
-  int64_t override_size = strtoll(pool_arg, &end, 10);
-  // Check that entire string was used and there isn't garbage at the end.
-  if (*end != '\0') {
-    DRIVER_ERROR("Ignoring flag %s with invalid size \"%s\"", name, pool_arg);
-    return ZX_ERR_INVALID_ARGS;
-  }
-  DRIVER_INFO("Flag %s overriding size to %ld", name, override_size);
-  if (override_size < -99) {
-    DRIVER_ERROR("Flag %s specified too-large percentage: %" PRId64, name, -override_size);
-    return ZX_ERR_INVALID_ARGS;
-  }
-  *memory_size = override_size;
-  return ZX_OK;
-}
-
 zx::result<std::string> Device::GetFromCommandLine(const char* name) {
   char arg[32];
   auto status = device_get_variable(parent(), name, arg, sizeof(arg), nullptr);
@@ -653,22 +632,6 @@ zx_status_t Device::Bind() {
   }
   cmdline_protected_ranges_disable_dynamic_ = protected_ranges_disable_dynamic.value();
 
-  // TODO(b/333399746): Remove OverrideSizeFromCommandLine() calls once the kernel command line
-  // arguments "driver.sysmem.protected_memory_size" and "driver.sysmem.contiguous_memory_size" are
-  // no longer set in any Fuchsia build.
-  status =
-      OverrideSizeFromCommandLine("driver.sysmem.protected_memory_size", &protected_memory_size);
-  if (status != ZX_OK) {
-    // OverrideSizeFromCommandLine() already printed an error.
-    return status;
-  }
-  status =
-      OverrideSizeFromCommandLine("driver.sysmem.contiguous_memory_size", &contiguous_memory_size);
-  if (status != ZX_OK) {
-    // OverrideSizeFromCommandLine() already printed an error.
-    return status;
-  }
-
   zx_handle_t structured_config_vmo;
   status = device_get_config_vmo(parent_, &structured_config_vmo);
   if (status != ZX_OK) {
@@ -679,11 +642,11 @@ zx_status_t Device::Bind() {
     DRIVER_DEBUG("Skipping config: config vmo handle does not exist");
   } else {
     auto config = sysmem_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo));
-    if (config.driver_sysmem_protected_memory_size_override() >= 0) {
-      protected_memory_size = config.driver_sysmem_protected_memory_size_override();
+    if (config.protected_memory_size_override() >= 0) {
+      protected_memory_size = config.protected_memory_size_override();
     }
-    if (config.driver_sysmem_contiguous_memory_size_override() >= 0) {
-      contiguous_memory_size = config.driver_sysmem_contiguous_memory_size_override();
+    if (config.protected_memory_size_override() >= 0) {
+      contiguous_memory_size = config.protected_memory_size_override();
     }
   }
 

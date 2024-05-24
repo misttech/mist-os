@@ -76,7 +76,6 @@ class Device final : public DdkDeviceType,
   // ~unique_ptr<Device>. The destructor is also called by some tests.
   ~Device();
 
-  [[nodiscard]] zx_status_t OverrideSizeFromCommandLine(const char* name, int64_t* memory_size);
   [[nodiscard]] zx::result<std::string> GetFromCommandLine(const char* name);
   [[nodiscard]] zx::result<bool> GetBoolFromCommandLine(const char* name, bool default_value);
   [[nodiscard]] zx_status_t GetContiguousGuardParameters(
