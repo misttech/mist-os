@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/testing/stubs/power_broker_topology.h"
 #include "src/developer/forensics/testing/stubs/system_activity_governor.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
@@ -32,34 +33,50 @@ using ::testing::HasSubstr;
 namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
 
-constexpr uint8_t kPowerLevelActive = 1u;
-
 class WakeLeaseTest : public UnitTestFixture {
  protected:
   WakeLeaseTest() : executor_(dispatcher()) {}
 
   async::Executor& GetExecutor() { return executor_; }
 
+  template <typename Impl>
+  static std::optional<std::tuple<fidl::ClientEnd<fps::ActivityGovernor>, std::unique_ptr<Impl>>>
+  CreateSag(async_dispatcher_t* dispatcher) {
+    auto endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
+    if (!endpoints.is_ok()) {
+      return std::nullopt;
+    }
+
+    auto stub = std::make_unique<Impl>(std::move(endpoints->server), dispatcher);
+    return std::make_tuple(std::move(endpoints->client), std::move(stub));
+  }
+
+  template <typename Impl>
+  static std::optional<std::tuple<fidl::ClientEnd<fpb::Topology>, std::unique_ptr<Impl>>>
+  CreateTopology(async_dispatcher_t* dispatcher) {
+    auto endpoints = fidl::CreateEndpoints<fpb::Topology>();
+    if (!endpoints.is_ok()) {
+      return std::nullopt;
+    }
+
+    auto stub = std::make_unique<Impl>(std::move(endpoints->server), dispatcher);
+    return std::make_tuple(std::move(endpoints->client), std::move(stub));
+  }
+
  private:
   async::Executor executor_;
 };
 
-// TODO(https://fxbug.dev/341104129): Create helper method for creating stubs.
 TEST_F(WakeLeaseTest, AddsElementSuccessfully) {
-  auto sag_endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
-  ASSERT_TRUE(sag_endpoints.is_ok());
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernor>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
 
-  auto sag = std::make_unique<stubs::SystemActivityGovernor>(std::move(sag_endpoints->server),
-                                                             dispatcher());
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(dispatcher());
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
 
-  auto topology_endpoints = fidl::CreateEndpoints<fpb::Topology>();
-  ASSERT_TRUE(topology_endpoints.is_ok());
-
-  auto topology = std::make_unique<stubs::PowerBrokerTopology>(
-      std::move(topology_endpoints->server), dispatcher());
-
-  WakeLease wake_lease(dispatcher(), std::move(sag_endpoints->client),
-                       std::move(topology_endpoints->client));
+  WakeLease wake_lease(dispatcher(), std::move(sag_client), std::move(topology_client));
 
   bool add_element_returned = false;
   GetExecutor().schedule_task(
@@ -83,20 +100,15 @@ TEST_F(WakeLeaseTest, AddsElementSuccessfully) {
 }
 
 TEST_F(WakeLeaseTest, GetPowerElementsFails) {
-  auto sag_endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
-  ASSERT_TRUE(sag_endpoints.is_ok());
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernorClosesConnection>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
 
-  auto sag = std::make_unique<stubs::SystemActivityGovernorClosesConnection>(
-      std::move(sag_endpoints->server), dispatcher());
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(dispatcher());
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
 
-  auto topology_endpoints = fidl::CreateEndpoints<fpb::Topology>();
-  ASSERT_TRUE(topology_endpoints.is_ok());
-
-  auto topology = std::make_unique<stubs::PowerBrokerTopology>(
-      std::move(topology_endpoints->server), dispatcher());
-
-  WakeLease wake_lease(dispatcher(), std::move(sag_endpoints->client),
-                       std::move(topology_endpoints->client));
+  WakeLease wake_lease(dispatcher(), std::move(sag_client), std::move(topology_client));
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
@@ -110,20 +122,15 @@ TEST_F(WakeLeaseTest, GetPowerElementsFails) {
 }
 
 TEST_F(WakeLeaseTest, GetPowerElementsNoSagPowerElements) {
-  auto sag_endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
-  ASSERT_TRUE(sag_endpoints.is_ok());
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernorNoPowerElements>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
 
-  auto sag = std::make_unique<stubs::SystemActivityGovernorNoPowerElements>(
-      std::move(sag_endpoints->server), dispatcher());
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(dispatcher());
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
 
-  auto topology_endpoints = fidl::CreateEndpoints<fpb::Topology>();
-  ASSERT_TRUE(topology_endpoints.is_ok());
-
-  auto topology = std::make_unique<stubs::PowerBrokerTopology>(
-      std::move(topology_endpoints->server), dispatcher());
-
-  WakeLease wake_lease(dispatcher(), std::move(sag_endpoints->client),
-                       std::move(topology_endpoints->client));
+  WakeLease wake_lease(dispatcher(), std::move(sag_client), std::move(topology_client));
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
@@ -137,20 +144,15 @@ TEST_F(WakeLeaseTest, GetPowerElementsNoSagPowerElements) {
 }
 
 TEST_F(WakeLeaseTest, GetPowerElementsNoTokens) {
-  auto sag_endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
-  ASSERT_TRUE(sag_endpoints.is_ok());
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernorNoTokens>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
 
-  auto sag = std::make_unique<stubs::SystemActivityGovernorNoTokens>(
-      std::move(sag_endpoints->server), dispatcher());
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(dispatcher());
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
 
-  auto topology_endpoints = fidl::CreateEndpoints<fpb::Topology>();
-  ASSERT_TRUE(topology_endpoints.is_ok());
-
-  auto topology = std::make_unique<stubs::PowerBrokerTopology>(
-      std::move(topology_endpoints->server), dispatcher());
-
-  WakeLease wake_lease(dispatcher(), std::move(sag_endpoints->client),
-                       std::move(topology_endpoints->client));
+  WakeLease wake_lease(dispatcher(), std::move(sag_client), std::move(topology_client));
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
@@ -164,20 +166,16 @@ TEST_F(WakeLeaseTest, GetPowerElementsNoTokens) {
 }
 
 TEST_F(WakeLeaseTest, AddElementFails) {
-  auto sag_endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
-  ASSERT_TRUE(sag_endpoints.is_ok());
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernor>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
 
-  auto sag = std::make_unique<stubs::SystemActivityGovernor>(std::move(sag_endpoints->server),
-                                                             dispatcher());
+  auto topology_client_and_stub =
+      CreateTopology<stubs::PowerBrokerTopologyClosesConnection>(dispatcher());
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
 
-  auto topology_endpoints = fidl::CreateEndpoints<fpb::Topology>();
-  ASSERT_TRUE(topology_endpoints.is_ok());
-
-  auto topology = std::make_unique<stubs::PowerBrokerTopologyClosesConnection>(
-      std::move(topology_endpoints->server), dispatcher());
-
-  WakeLease wake_lease(dispatcher(), std::move(sag_endpoints->client),
-                       std::move(topology_endpoints->client));
+  WakeLease wake_lease(dispatcher(), std::move(sag_client), std::move(topology_client));
 
   std::optional<Error> error;
   GetExecutor().schedule_task(
@@ -192,20 +190,15 @@ TEST_F(WakeLeaseTest, AddElementFails) {
 using WakeLeaseDeathTest = WakeLeaseTest;
 
 TEST_F(WakeLeaseDeathTest, AddElementDiesIfCalledTwice) {
-  auto sag_endpoints = fidl::CreateEndpoints<fps::ActivityGovernor>();
-  ASSERT_TRUE(sag_endpoints.is_ok());
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernor>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
 
-  auto sag = std::make_unique<stubs::SystemActivityGovernor>(std::move(sag_endpoints->server),
-                                                             dispatcher());
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(dispatcher());
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
 
-  auto topology_endpoints = fidl::CreateEndpoints<fpb::Topology>();
-  ASSERT_TRUE(topology_endpoints.is_ok());
-
-  auto topology = std::make_unique<stubs::PowerBrokerTopology>(
-      std::move(topology_endpoints->server), dispatcher());
-
-  WakeLease wake_lease(dispatcher(), std::move(sag_endpoints->client),
-                       std::move(topology_endpoints->client));
+  WakeLease wake_lease(dispatcher(), std::move(sag_client), std::move(topology_client));
 
   GetExecutor().schedule_task(wake_lease.AddPowerElement("exceptions-element-001"));
   RunLoopUntilIdle();

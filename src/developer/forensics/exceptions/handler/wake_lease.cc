@@ -13,6 +13,7 @@
 
 #include <utility>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/utils/errors.h"
 
 namespace forensics::exceptions::handler {
@@ -20,16 +21,6 @@ namespace {
 
 namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
-
-// The valid power levels for the exceptions power element.
-enum class PowerLevels : uint8_t {
-  // The exceptions power element is not active.
-  // System suspension is allowed.
-  kInactive = 0u,
-  // The exceptions power element is active.
-  // System suspension is not allowed.
-  kActive = 1u
-};
 
 class SagEventHandler : public fidl::AsyncEventHandler<fps::ActivityGovernor> {
  public:
@@ -54,18 +45,18 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
                                const std::string& element_name) {
   fpb::LevelDependency dependency(
       /*dependency_type=*/fpb::DependencyType::kPassive,
-      /*dependent_level=*/static_cast<uint8_t>(PowerLevels::kActive),
+      /*dependent_level=*/kPowerLevelActive,
       /*requires_token=*/std::move(requires_token),
       /*requires_level=*/
       fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling));
 
   fpb::ElementSchema schema;
   schema.element_name(element_name)
-      .initial_current_level(static_cast<uint8_t>(PowerLevels::kInactive))
+      .initial_current_level(kPowerLevelInactive)
       .lessor_channel(std::move(server_end))
       .valid_levels(std::vector<uint8_t>({
-          static_cast<uint8_t>(PowerLevels::kInactive),
-          static_cast<uint8_t>(PowerLevels::kActive),
+          kPowerLevelInactive,
+          kPowerLevelActive,
       }));
 
   std::optional<std::vector<fpb::LevelDependency>>& dependencies = schema.dependencies();

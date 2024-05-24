@@ -28,6 +28,14 @@ constexpr const char kCrashProcessStateKey[] = "crash.process.state";
 constexpr const char kSuspendEnabledFlag[] = "--suspend_enabled";
 constexpr const char kNoSuspendEnabledFlag[] = "--nosuspend_enabled";
 
+// The exceptions power element is not active.
+// System suspension is allowed.
+constexpr uint8_t kPowerLevelInactive = 0u;
+
+// The exceptions power element is active.
+// System suspension is not allowed.
+constexpr uint8_t kPowerLevelActive = 1u;
+
 }  // namespace exceptions
 }  // namespace forensics
 

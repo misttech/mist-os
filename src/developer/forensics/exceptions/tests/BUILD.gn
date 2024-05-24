@@ -133,6 +133,7 @@ executable("wake_lease_unittest_exe") {
   sources = [ "wake_lease_unittest.cc" ]
 
   deps = [
+    "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/exceptions/handler:lib",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
