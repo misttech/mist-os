@@ -56,6 +56,8 @@ options:
   All other flags before -- are forwarded to the reproxy bootstrap.
 
 environment variables:
+  FX_BUILD_RBE_STATS: set to 1 to print a summary of RBE actions
+    after the build (caching, races, downloads...).
   FX_REMOTE_BUILD_METRICS: set to 0 to skip anything related to RBE metrics
     This was easier than plumbing flags through all possible paths
     that call 'fx build'.
