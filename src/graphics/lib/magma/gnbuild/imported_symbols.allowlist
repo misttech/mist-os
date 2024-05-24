@@ -475,6 +475,7 @@ zx_pager_create
 zx_pager_create_vmo
 zx_pager_detach_vmo
 zx_port_cancel
+zx_port_cancel_key
 zx_port_create
 zx_port_queue
 zx_port_wait
