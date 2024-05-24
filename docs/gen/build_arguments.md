@@ -1132,7 +1132,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:196
+From //build/toolchain/rbe.gni:208
 
 ### compress_debuginfo
 
@@ -1297,7 +1297,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:191
+From //build/toolchain/rbe.gni:203
 
 ### cxx_rbe_download_obj_files
 
@@ -1309,7 +1309,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:203
+From //build/toolchain/rbe.gni:215
 
 ### cxx_rbe_enable
 
@@ -1322,7 +1322,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:144
+From //build/toolchain/rbe.gni:156
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1330,7 +1330,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:144
+From //build/toolchain/rbe.gni:156
 
 ### cxx_rbe_exec_strategy
 
@@ -1353,7 +1353,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:167
+From //build/toolchain/rbe.gni:179
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1363,7 +1363,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:149
+From //build/toolchain/rbe.gni:161
 
 ### data_filesystem_format
 
@@ -4431,7 +4431,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:250
+From //build/toolchain/rbe.gni:262
 
 ### link_rbe_download_unstripped_outputs
 
@@ -4441,7 +4441,7 @@ that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:255
+From //build/toolchain/rbe.gni:267
 
 ### link_rbe_enable
 
@@ -4455,7 +4455,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:212
+From //build/toolchain/rbe.gni:224
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4463,7 +4463,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:212
+From //build/toolchain/rbe.gni:224
 
 ### link_rbe_exec_strategy
 
@@ -4486,7 +4486,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:230
+From //build/toolchain/rbe.gni:242
 
 ### llvm_prefix
 
@@ -7009,6 +7009,17 @@ From //zircon/kernel/phys/qemu.gni:130
 
 From //src/recovery/system/system_recovery_args.gni:11
 
+### rbe_extra_reproxy_configs
+
+Additional reproxy configuration files.
+These are effectively concatenated with the main `reproxy_config_file`
+in order of appearance.  Settings in later files in this list take
+precedence over those earlier in the list.
+
+**Current value (from the default):** `[]`
+
+From //build/toolchain/rbe.gni:28
+
 ### recovery_label
 
 Allows a product to specify the recovery image used in the zirconr slot.
@@ -7147,7 +7158,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:132
+From //build/toolchain/rbe.gni:144
 
 ### rust_incremental
 
@@ -7214,7 +7225,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:119
+From //build/toolchain/rbe.gni:131
 
 ### rust_rbe_download_rlibs
 
@@ -7223,7 +7234,7 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:136
+From //build/toolchain/rbe.gni:148
 
 ### rust_rbe_download_unstripped_binaries
 
@@ -7235,7 +7246,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:126
+From //build/toolchain/rbe.gni:138
 
 ### rust_rbe_enable
 
@@ -7247,7 +7258,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:75
+From //build/toolchain/rbe.gni:87
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7255,7 +7266,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:75
+From //build/toolchain/rbe.gni:87
 
 ### rust_rbe_exec_strategy
 
@@ -7278,7 +7289,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:93
+From //build/toolchain/rbe.gni:105
 
 ### rust_v0_symbol_mangling
 
@@ -7830,7 +7841,7 @@ From //src/starnix/kernel/args.gni:10
 
 Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/starnix/kernel/args.gni:13
 
