@@ -633,14 +633,8 @@ impl<
 }
 
 /// A marker trait for bindings types at the IP layer.
-pub trait IpLayerBindingsTypes:
-    FilterBindingsTypes + IcmpBindingsTypes + IpStateBindingsTypes
-{
-}
-impl<BT: FilterBindingsTypes + IcmpBindingsTypes + IpStateBindingsTypes> IpLayerBindingsTypes
-    for BT
-{
-}
+pub trait IpLayerBindingsTypes: IcmpBindingsTypes + IpStateBindingsTypes {}
+impl<BT: IcmpBindingsTypes + IpStateBindingsTypes> IpLayerBindingsTypes for BT {}
 
 /// The execution context for the IP layer.
 pub trait IpLayerContext<
@@ -1041,9 +1035,6 @@ impl Ipv4StateBuilder {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
-            filter: RwLock::new(crate::filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(
-                bindings_ctx,
-            )),
         }
     }
 }
@@ -1069,9 +1060,6 @@ impl Ipv6StateBuilder {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
             slaac_counters: Default::default(),
-            filter: RwLock::new(crate::filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(
-                bindings_ctx,
-            )),
         }
     }
 }
@@ -1080,16 +1068,11 @@ pub struct Ipv4State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     pub(super) inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
     pub(super) next_packet_id: AtomicU16,
-    pub(super) filter: RwLock<crate::filter::State<Ipv4, BT>>,
 }
 
 impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     Ipv4State<StrongDeviceId, BT>
 {
-    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, BT>> {
-        &self.filter
-    }
-
     pub(crate) fn inner(&self) -> &IpStateInner<Ipv4, StrongDeviceId, BT> {
         &self.inner
     }
@@ -1117,7 +1100,6 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     pub(super) inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     pub(super) icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
     pub(super) slaac_counters: SlaacCounters,
-    pub(super) filter: RwLock<crate::filter::State<Ipv6, BT>>,
 }
 
 impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
@@ -1125,10 +1107,6 @@ impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 {
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.slaac_counters
-    }
-
-    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv6, BT>> {
-        &self.filter
     }
 
     pub(crate) fn inner(&self) -> &IpStateInner<Ipv6, StrongDeviceId, BT> {
@@ -1181,6 +1159,15 @@ impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<RawIpSocket
     type Lock = RwLock<RawIpSocketMap<I, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.raw_sockets)
+    }
+}
+
+impl<I: IpLayerIpExt, D, BT: IpLayerBindingsTypes> OrderedLockAccess<crate::filter::State<I, BT>>
+    for IpStateInner<I, D, BT>
+{
+    type Lock = RwLock<crate::filter::State<I, BT>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.filter)
     }
 }
 
@@ -1285,11 +1272,11 @@ impl Inspectable for Ipv6RxCounters {
 
 /// Marker trait for the bindings types required by the IP layer's inner state.
 pub trait IpStateBindingsTypes:
-    PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes
+    PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes + FilterBindingsTypes
 {
 }
 impl<BT> IpStateBindingsTypes for BT where
-    BT: PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes
+    BT: PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes + FilterBindingsTypes
 {
 }
 
@@ -1301,6 +1288,7 @@ pub struct IpStateInner<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> {
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
     raw_sockets: RwLock<RawIpSocketMap<I, BT>>,
+    filter: RwLock<crate::filter::State<I, BT>>,
 }
 
 impl<I: IpLayerIpExt, DeviceId, BT: IpStateBindingsTypes> IpStateInner<I, DeviceId, BT> {
@@ -1331,6 +1319,9 @@ impl<I: IpLayerIpExt, DeviceId, BC: TimerContext + IpStateBindingsTypes>
             pmtu_cache: Mutex::new(PmtuCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
             counters: Default::default(),
             raw_sockets: Default::default(),
+            filter: RwLock::new(crate::filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(
+                bindings_ctx,
+            )),
         }
     }
 }

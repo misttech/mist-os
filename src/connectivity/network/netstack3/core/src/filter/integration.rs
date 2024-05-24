@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_order::{lock::RwLockFor, relation::LockBefore, wrap::prelude::*};
+use lock_order::{
+    lock::{DelegatedOrderedLockAccess, LockLevelFor},
+    relation::LockBefore,
+    wrap::prelude::*,
+};
 use net_types::{
     ip::{Ip, Ipv4, Ipv6},
     NonMappedAddr, SpecifiedAddr,
@@ -10,12 +14,13 @@ use net_types::{
 use packet_formats::ip::IpExt;
 
 use crate::{
+    device::DeviceId,
     filter::{
         FilterBindingsContext, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
         NatContext, State,
     },
-    ip::IpDeviceStateContext,
-    BindingsContext, CoreCtx, StackState,
+    ip::{IpDeviceStateContext, IpLayerIpExt, IpStateInner},
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
 pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsContext> {
@@ -79,24 +84,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv4>>
     }
 }
 
-impl<I: IpExt, BC: BindingsContext> RwLockFor<crate::lock_ordering::FilterState<I>>
-    for StackState<BC>
+impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<State<I, BT>>
+    for StackState<BT>
 {
-    type Data = State<I, BC>;
-
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, State<I, BC>>
-    where
-        Self: 'l;
-
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, State<I, BC>>
-    where
-        Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.filter().read()
+    type Inner = IpStateInner<I, DeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        self.inner_ip_state()
     }
+}
 
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.filter().write()
-    }
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::FilterState<I>
+{
+    type Data = State<I, BT>;
 }

@@ -4,7 +4,7 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 
 use crate::{
     api::CoreApi,
@@ -13,7 +13,6 @@ use crate::{
         arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
         PureIpDeviceCounters, WeakDeviceId,
     },
-    filter::FilterBindingsTypes,
     ip::{
         self,
         device::nud::NudCounters,
@@ -22,7 +21,6 @@ use crate::{
         IpCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State,
     },
     socket::datagram,
-    sync::RwLock,
     time::TimerId,
     transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
@@ -98,22 +96,6 @@ impl<BT: BindingsTypes> StackState<BT> {
             |IpInvariant(state)| state.ipv4.as_ref().counters(),
             |IpInvariant(state)| state.ipv6.as_ref().counters(),
         )
-    }
-
-    pub(crate) fn filter<I: packet_formats::ip::IpExt>(
-        &self,
-    ) -> &RwLock<crate::filter::State<I, BT>> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Wrap<'a, I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>(
-            &'a RwLock<crate::filter::State<I, BT>>,
-        );
-        let Wrap(state) = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| Wrap(state.ipv4.filter()),
-            |IpInvariant(state)| Wrap(state.ipv6.filter()),
-        );
-        state
     }
 
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
