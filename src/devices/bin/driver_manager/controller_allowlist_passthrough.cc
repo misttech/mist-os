@@ -193,7 +193,11 @@ void ControllerAllowlistPassthrough::GetTopologicalPath(
   if (compat_client_.is_valid()) {
     compat_client_->GetTopologicalPath().ThenExactlyOnce(
         [completer = completer.ToAsync()](auto &result) mutable {
-          completer.Reply(*result.Unwrap());
+          if (!result.ok()) {
+            completer.ReplyError(result.status());
+            return;
+          }
+          completer.Reply(result.value());
         });
   } else {
     std::shared_ptr locked_node = node_.lock();
