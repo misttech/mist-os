@@ -163,8 +163,22 @@ void FileConnection::GetAttr(GetAttrCompleter::Sync& completer) {
 }
 
 void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
-  zx::result result = Connection::NodeUpdateAttributes(request->flags, request->attributes);
-  completer.Reply(result.status_value());
+  VnodeAttributesUpdate update =
+      VnodeAttributesUpdate::FromIo1(request->attributes, request->flags);
+  completer.Reply(Connection::NodeUpdateAttributes(update).status_value());
+}
+
+void FileConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
+                                   GetAttributesCompleter::Sync& completer) {
+  internal::NodeAttributeBuilder builder;
+  zx::result attrs = builder.Build(*vnode(), request->query);
+  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+}
+
+void FileConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
+                                      UpdateAttributesCompleter::Sync& completer) {
+  VnodeAttributesUpdate update = VnodeAttributesUpdate::FromIo2(*request);
+  completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
 void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {

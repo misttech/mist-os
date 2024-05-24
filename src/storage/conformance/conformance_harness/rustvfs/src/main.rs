@@ -91,7 +91,6 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_rename: true,
                     supports_get_token: true,
                     supports_unlink: true,
-                    supports_get_attributes: true,
                     supports_open2: true,
                     supports_directory_watchers: true,
                     supports_append: true,
@@ -101,12 +100,9 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                         | fio::NodeAttributesQuery::STORAGE_SIZE
                         | fio::NodeAttributesQuery::LINK_COUNT
                         | fio::NodeAttributesQuery::ID,
-
                     // Unsupported options:
                     supports_link: false, // Link is not supported using a pseudo filesystem.
                     supports_link_into: false,
-                    // Pseudo-files don't support mutable attributes.
-                    supports_update_attributes: false,
                 };
                 responder.send(&config)?;
                 continue;

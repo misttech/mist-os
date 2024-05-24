@@ -63,14 +63,6 @@ type Io1Config = struct {
     /// Supports fuchsia.io's Open2 method.
     supports_open2 bool;
 
-    /// Supports fuchsia.io's GetAttributes method.
-    // TODO(https://fxbug.dev/340626555): Remove this when all harnesses support GetAttributes.
-    supports_get_attributes bool;
-
-    /// Supports fuchsia.io's UpdateAttributes method.
-    // TODO(https://fxbug.dev/340626555): Remove this when all harnesses support UpdateAttributes.
-    supports_update_attributes bool;
-
     /// Supports fuchsia.io's LinkInto method.
     supports_link_into bool;
 
@@ -80,8 +72,8 @@ type Io1Config = struct {
     /// Files can be opened in append mode.
     supports_append bool;
 
-    /// The set of attributes the filesystem supports. If mutable attributes are reported, they must
-    /// allow being updating via SetAttr/UpdateAttributes.
+    /// The set of attributes the filesystem supports. If mutable attributes are reported, the
+    /// harness must support [`fuchsia.io/Node.SetAttr`] and [`fuchsia.io/Node.UpdateAttributes`].
     supported_attributes fuchsia.io.NodeAttributesQuery;
 };
 

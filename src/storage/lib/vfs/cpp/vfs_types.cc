@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/fit/function.h>
 
-#include <type_traits>
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace fio = fuchsia_io;
 
@@ -194,6 +194,61 @@ zx::result<VnodeProtocol> NegotiateProtocol(fio::NodeProtocolKinds supported,
     return zx::error(ZX_ERR_NOT_FILE);
   }
   return zx::error(ZX_ERR_WRONG_TYPE);
+}
+
+// Helper function to reduce verbosity in |NodeAttributes::Build| impl below. Returns an external
+// (non-owning) |fidl::ObjectView| to |obj|.
+template <typename T>
+fidl::ObjectView<T> ExternalView(T& obj) {
+  return fidl::ObjectView<T>::FromExternal(&obj);
+}
+
+zx::result<fio::wire::NodeAttributes2> NodeAttributeBuilder::Build(const Vnode& vnode,
+                                                                   fio::NodeAttributesQuery query) {
+  zx::result vnode_attrs = vnode.GetAttributes();
+  if (vnode_attrs.is_error()) {
+    return vnode_attrs.take_error();
+  }
+  attributes = *vnode_attrs;
+  // Immutable attributes:
+  auto immutable_builder = ImmutableAttrs::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<ImmutableAttrs>>::FromExternal(&immutable_frame));
+  if (query & fio::NodeAttributesQuery::kProtocols) {
+    protocols = vnode.GetProtocols();
+    immutable_builder.protocols(ExternalView(protocols));
+  }
+  if (query & fio::NodeAttributesQuery::kAbilities) {
+    abilities = vnode.GetAbilities();
+    immutable_builder.abilities(ExternalView(abilities));
+  }
+  if (query & fio::NodeAttributesQuery::kContentSize && attributes.content_size) {
+    immutable_builder.content_size(ExternalView(*attributes.content_size));
+  }
+  if (query & fio::NodeAttributesQuery::kStorageSize && attributes.storage_size) {
+    immutable_builder.storage_size(ExternalView(*attributes.storage_size));
+  }
+  if (query & fio::NodeAttributesQuery::kLinkCount && attributes.link_count) {
+    immutable_builder.link_count(ExternalView(*attributes.link_count));
+  }
+  if (query & fio::NodeAttributesQuery::kId && attributes.id) {
+    immutable_builder.id(ExternalView(*attributes.id));
+  }
+  // Mutable attributes:
+  // TODO(https://fxbug.dev/340626555): Support other io2 attributes.
+  auto mutable_builder = MutableAttrs::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<MutableAttrs>>::FromExternal(&mutable_frame));
+
+  if (query & fio::NodeAttributesQuery::kCreationTime && attributes.creation_time) {
+    mutable_builder.creation_time(ExternalView(*attributes.creation_time));
+  }
+  if (query & fio::NodeAttributesQuery::kModificationTime && attributes.modification_time) {
+    mutable_builder.modification_time(ExternalView(*attributes.modification_time));
+  }
+  // Build the wire table, which is now valid as long as this object remains in scope.
+  return zx::ok(NodeAttributes2{
+      .mutable_attributes = mutable_builder.Build(),
+      .immutable_attributes = immutable_builder.Build(),
+  });
 }
 
 }  // namespace internal

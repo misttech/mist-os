@@ -59,6 +59,8 @@ zx_status_t VnodeDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out)
 zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
   return zx::ok(fs::VnodeAttributes{
       .id = ino_,
+      .content_size = 0,
+      .storage_size = 0,
       .link_count = link_count_,
       .creation_time = create_time_,
       .modification_time = modify_time_,

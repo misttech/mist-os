@@ -136,17 +136,31 @@ void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
 }
 
 void DirectoryConnection::GetAttr(GetAttrCompleter::Sync& completer) {
-  zx::result result = vnode()->GetAttributes();
-  if (result.is_error()) {
-    completer.Reply(result.status_value(), fio::wire::NodeAttributes());
+  zx::result attrs = vnode()->GetAttributes();
+  if (attrs.is_ok()) {
+    completer.Reply(ZX_OK, attrs->ToIoV1NodeAttributes());
   } else {
-    completer.Reply(ZX_OK, result.value().ToIoV1NodeAttributes());
+    completer.Reply(attrs.error_value(), fio::wire::NodeAttributes());
   }
 }
 
 void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) {
-  zx::result result = Connection::NodeUpdateAttributes(request->flags, request->attributes);
-  completer.Reply(result.status_value());
+  VnodeAttributesUpdate update =
+      VnodeAttributesUpdate::FromIo1(request->attributes, request->flags);
+  completer.Reply(Connection::NodeUpdateAttributes(update).status_value());
+}
+
+void DirectoryConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
+                                        GetAttributesCompleter::Sync& completer) {
+  internal::NodeAttributeBuilder builder;
+  zx::result attrs = builder.Build(*vnode(), request->query);
+  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+}
+
+void DirectoryConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
+                                           UpdateAttributesCompleter::Sync& completer) {
+  VnodeAttributesUpdate update = VnodeAttributesUpdate::FromIo2(*request);
+  completer.Reply(Connection::NodeUpdateAttributes(update));
 }
 
 void DirectoryConnection::GetFlags(GetFlagsCompleter::Sync& completer) {

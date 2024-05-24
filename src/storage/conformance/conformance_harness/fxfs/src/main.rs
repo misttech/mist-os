@@ -72,8 +72,6 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_get_token: true,
                     supports_unlink: true,
                     supports_open2: true,
-                    supports_get_attributes: true,
-                    supports_update_attributes: true,
                     supports_link_into: true,
                     supports_directory_watchers: true,
                     supports_append: true,

@@ -95,23 +95,15 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
   }
 }
 
-zx::result<> Connection::NodeUpdateAttributes(fio::NodeAttributeFlags flags,
-                                              const fio::wire::NodeAttributes& attributes) {
-  FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our rights: ", rights(), ", incoming flags: ", flags);
+zx::result<> Connection::NodeUpdateAttributes(const VnodeAttributesUpdate& update) {
+  FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our rights: ", rights(),
+                        ", setting attributes: ", update.AttributesQuery(),
+                        ", supported attributes: ", vnode_->SupportedMutableAttributes());
   if (!(rights_ & fio::Rights::kUpdateAttributes)) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
-  fs::VnodeAttributesUpdate update;
-  if (flags & fio::NodeAttributeFlags::kCreationTime) {
-    update.creation_time = attributes.creation_time;
-  }
-  if (flags & fio::NodeAttributeFlags::kModificationTime) {
-    update.modification_time = attributes.modification_time;
-  }
-  FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] Setting attributes: ", update.AttributesQuery(),
-                        ", supported attributes: ", vnode_->SupportedMutableAttributes());
   // Check that the Vnode allows setting the attributes we are updating.
-  if (update.AttributesQuery() - vnode_->SupportedMutableAttributes()) {
+  if (update.Query() - vnode_->SupportedMutableAttributes()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   return vnode_->UpdateAttributes(update);

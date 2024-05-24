@@ -27,6 +27,8 @@ PseudoDir::~PseudoDir() {
 
 zx::result<VnodeAttributes> PseudoDir::GetAttributes() const {
   return zx::ok(fs::VnodeAttributes{
+      .content_size = 0,
+      .storage_size = 0,
       .mode = V_TYPE_DIR | V_IRUSR,
   });
 }

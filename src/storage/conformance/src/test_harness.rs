@@ -80,11 +80,30 @@ impl TestHarness {
             | fio::Abilities::MODIFY_DIRECTORY
     }
 
-    /// True if the harness supports all attributes the io1 SetAttr method supports.
-    pub fn supports_set_attr(&self) -> bool {
-        self.config.supported_attributes.contains(
-            fio::NodeAttributesQuery::CREATION_TIME | fio::NodeAttributesQuery::MODIFICATION_TIME,
-        )
+    /// Returns true if the harness supports at least one mutable attribute, false otherwise.
+    ///
+    /// *NOTE*: To allow testing both the io1 SetAttrs and io2 UpdateAttributes methods, harnesses
+    /// that support mutable attributes must support [`fio::NodeAttributesQuery::CREATION_TIME`]
+    /// and [`fio::NodeAttributesQuery::MODIFICATION_TIME`].
+    pub fn supports_mutable_attrs(&self) -> bool {
+        let all_mutable_attrs: fio::NodeAttributesQuery = fio::NodeAttributesQuery::ACCESS_TIME
+            | fio::NodeAttributesQuery::MODIFICATION_TIME
+            | fio::NodeAttributesQuery::CREATION_TIME
+            | fio::NodeAttributesQuery::MODE
+            | fio::NodeAttributesQuery::GID
+            | fio::NodeAttributesQuery::UID
+            | fio::NodeAttributesQuery::RDEV;
+        if self.config.supported_attributes.intersects(all_mutable_attrs) {
+            assert!(
+                self.config.supported_attributes.contains(
+                    fio::NodeAttributesQuery::CREATION_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME
+                ),
+                "Harnesses must support at least CREATION_TIME if attributes are mutable."
+            );
+            return true;
+        }
+        false
     }
 }
 

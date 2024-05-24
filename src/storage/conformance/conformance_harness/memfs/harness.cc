@@ -84,8 +84,10 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_unlink(true);
     config.supports_directory_watchers(true);
     config.supports_append(true);
-    config.supported_attributes(fio::NodeAttributesQuery::kChangeTime |
-                                fio::NodeAttributesQuery::kModificationTime);
+    config.supported_attributes(
+        fio::NodeAttributesQuery::kCreationTime | fio::NodeAttributesQuery::kModificationTime |
+        fio::NodeAttributesQuery::kContentSize | fio::NodeAttributesQuery::kStorageSize |
+        fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kLinkCount);
 
     completer.Reply(config);
   }

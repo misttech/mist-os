@@ -78,6 +78,18 @@ void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
   completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 
+void NodeConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
+                                   GetAttributesCompleter::Sync& completer) {
+  internal::NodeAttributeBuilder builder;
+  zx::result attrs = builder.Build(*vnode(), request->query);
+  completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
+}
+
+void NodeConnection::UpdateAttributes(fio::wire::MutableNodeAttributes* request,
+                                      UpdateAttributesCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_BAD_HANDLE);
+}
+
 void NodeConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   completer.Reply(ZX_OK, fio::OpenFlags::kNodeReference);
 }

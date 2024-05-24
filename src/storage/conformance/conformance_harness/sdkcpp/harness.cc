@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 
+namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
 zx_status_t DummyWriter(const std::vector<uint8_t>&) { return ZX_OK; }
@@ -42,19 +43,10 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
+    config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
+                                fio::NodeAttributesQuery::kStorageSize);
 
-    // Unsupported options:
-    config.supports_create(false);
-    config.supports_executable_file(false);
-    config.supports_rename(false);
-    config.supports_link(false);
-    config.supports_unlink(false);
-    config.supports_get_attributes(false);
-    config.supports_update_attributes(false);
-    config.supports_directory_watchers(false);
-    config.supports_open2(false);
     // TODO(https://fxbug.dev/324112857): Support append when adding Open2.
-    config.supports_append(false);
 
     completer.Reply(std::move(config));
   }

@@ -24,6 +24,7 @@
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vmo_file.h"
 
+namespace fio = fuchsia::io;
 namespace fio_test = fuchsia::io::test;
 
 zx_status_t DummyWriter(std::string_view input) { return ZX_OK; }
@@ -55,6 +56,8 @@ class TestHarness : public fio_test::Io1Harness {
     config.supports_get_backing_memory = true;
     config.supports_remote_dir = true;
     config.supports_get_token = true;
+    config.supported_attributes =
+        fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE;
     // TODO(https://fxbug.dev/324112857): Support append mode when adding open2 support.
 
     callback(config);

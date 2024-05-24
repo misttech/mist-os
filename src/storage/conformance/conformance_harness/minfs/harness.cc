@@ -77,8 +77,12 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     config.supports_unlink = true;
     config.supports_directory_watchers = true;
     config.supports_append = true;
-    config.supported_attributes = fuchsia::io::NodeAttributesQuery::CHANGE_TIME |
-                                  fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME;
+    config.supported_attributes = fuchsia::io::NodeAttributesQuery::CREATION_TIME |
+                                  fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME |
+                                  fuchsia::io::NodeAttributesQuery::ID |
+                                  fuchsia::io::NodeAttributesQuery::CONTENT_SIZE |
+                                  fuchsia::io::NodeAttributesQuery::STORAGE_SIZE |
+                                  fuchsia::io::NodeAttributesQuery::LINK_COUNT;
 
     callback(config);
   }

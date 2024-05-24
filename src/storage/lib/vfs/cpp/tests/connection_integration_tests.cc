@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -46,6 +46,7 @@ class FileOrDirectory : public fs::Vnode {
 
   zx::result<fs::VnodeAttributes> GetAttributes() const final {
     return zx::ok(fs::VnodeAttributes{
+        .id = 1234,
         .modification_time = modification_time_,
     });
   }
@@ -268,8 +269,6 @@ TEST_F(ConnectionTest, FileGetSetFlagsOnFile) {
   }
 }
 
-// TODO(https://fxbug.dev/340626555): Add equivalent io2 test for GetAttributes/UpdateAttributes
-// when these methods are supported by the C++ VFS.
 TEST_F(ConnectionTest, GetSetIo1Attrs) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();
@@ -310,6 +309,60 @@ TEST_F(ConnectionTest, GetSetIo1Attrs) {
     auto io1_attrs = fidl::WireCall(fc->client)->GetAttr();
     ASSERT_OK(io1_attrs.status());
     EXPECT_EQ(io1_attrs->attributes.modification_time, 1234);
+  }
+}
+
+// Test that the io2 GetAttributes and UpdateAttributes methods work as expected.
+TEST_F(ConnectionTest, GetUpdateIo2Attrs) {
+  // Create connection to vfs
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+
+  // Connect to File
+  zx::result fc = fidl::CreateEndpoints<fio::File>();
+  ASSERT_OK(fc.status_value());
+  ASSERT_OK(fdio_open_at(
+      root.client.channel().get(), "file_or_dir",
+      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable),
+      fc->server.TakeChannel().release()));
+  auto client = fidl::SyncClient(std::move(fc->client));
+  // Our test Vnode only reports a hard-coded ID in addition to protocols/abilities.
+  fio::ImmutableNodeAttributes expected_immutable_attrs = fio::ImmutableNodeAttributes();
+  expected_immutable_attrs.id() = 1234;
+  expected_immutable_attrs.abilities() = FileOrDirectory().GetAbilities();
+  expected_immutable_attrs.protocols() = FileOrDirectory().GetProtocols();
+  // Our test Vnode only supports modification time, and should default-initialize it to zero.
+  fio::MutableNodeAttributes expected_mutable_attrs = fio::MutableNodeAttributes();
+  expected_mutable_attrs.modification_time() = 0;
+  {
+    auto attrs = client->GetAttributes(fio::NodeAttributesQuery::kMask);
+    ASSERT_TRUE(attrs.is_ok());
+    EXPECT_EQ(attrs->immutable_attributes(), expected_immutable_attrs);
+    EXPECT_EQ(attrs->mutable_attributes(), expected_mutable_attrs);
+  }
+
+  // Ensure we can't set creation time.
+  {
+    fio::MutableNodeAttributes update = fio::MutableNodeAttributes();
+    update.creation_time() = 0;
+    auto result = client->UpdateAttributes(update);
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // Update modification time.
+  expected_mutable_attrs.modification_time() = 1234;
+  {
+    auto result = client->UpdateAttributes(expected_mutable_attrs);
+    ASSERT_TRUE(result.is_ok());
+  }
+
+  // Check modification time was updated and other attributes remain unchanged.
+  {
+    auto attrs = client->GetAttributes(fio::NodeAttributesQuery::kMask);
+    ASSERT_TRUE(attrs.is_ok());
+    EXPECT_EQ(attrs->immutable_attributes(), expected_immutable_attrs);
+    EXPECT_EQ(attrs->mutable_attributes(), expected_mutable_attrs);
   }
 }
 

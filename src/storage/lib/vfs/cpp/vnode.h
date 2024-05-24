@@ -96,11 +96,14 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Returns the set of all protocols supported by the vnode.
   virtual fuchsia_io::NodeProtocolKinds GetProtocols() const = 0;
 
+  // Returns the set of operations the vnode supports. The default implementation assumes files are
+  // readable/writable, and directories are immutable.
+  virtual fuchsia_io::Abilities GetAbilities() const;
+
   // Returns true if the vnode supports at least one protocol specified in |protocols|.
   bool Supports(fuchsia_io::NodeProtocolKinds protocols) const {
     return static_cast<bool>(GetProtocols() & protocols);
   }
-
   // To be overridden by implementations to check that it is valid to access the vnode with the
   // given |rights|. The default implementation always returns true. The vnode will only be opened
   // for a particular request if the validation passes.
