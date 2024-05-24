@@ -45,8 +45,8 @@ sdk_source_set("cpp") {
 
     deps = [
       ":backend_fuchsia_globals",
-      "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_hlcpp",
-      "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+      "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_cpp",
+      "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
       "//sdk/lib/syslog/structured_backend",
@@ -133,8 +133,8 @@ test("logging_cpp_unittests") {
   ]
   if (is_fuchsia) {
     deps += [
-      "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
-      "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+      "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",
+      "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//src/diagnostics/lib/cpp-log-tester:cpp-log-tester",
       "//src/lib/diagnostics/accessor2logger",
       "//src/lib/fsl",
