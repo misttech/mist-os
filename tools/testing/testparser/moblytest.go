@@ -22,17 +22,13 @@ const (
 	moblyTestPreamblePatternStr         = `^======== Mobly config content ========$`
 	moblyTestResultYAMLHeaderPatternStr = `^\[=====MOBLY RESULTS=====\]$`
 	moblyTestCaseType                   = "Record"
+	moblySummaryType                    = "Summary"
 )
 
 var (
 	moblyTestPreamblePattern         = regexp.MustCompile(moblyTestPreamblePatternStr)
 	moblyTestResultYAMLHeaderPattern = regexp.MustCompile(moblyTestResultYAMLHeaderPatternStr)
 )
-
-type moblyTestList struct {
-	RequestedTests []string `yaml:"Requested Tests"`
-	Type           string   `yaml:"Type"`
-}
 
 type moblyTestCase struct {
 	BeginTimeMillis int `yaml:"Begin Time"`
@@ -75,13 +71,9 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 	reader := bytes.NewReader(data)
 	d := yaml.NewDecoder(reader)
 
-	// Mobly's result YAML file contains multiple YAML documents.
-	// The first record contains a list of all tests that are expected to run.
-	var testList moblyTestList
-	if err := d.Decode(&testList); err != nil {
-		fmt.Fprintf(os.Stderr, "Error unmarshaling YAML for Mobly test list: %s\n", err)
-		return res
-	}
+	// Mobly reports a "summary" record at the end of the YAML document. Its
+	// presence means that the Mobly test ran to completion.
+	summarySeen := false
 
 	// Since yaml.Unmarshal() is only capable of parsing a single document,
 	// we use a for-loop and yaml.Decoder() to handle the remaining documents.
@@ -99,6 +91,9 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 
 		// Skip records that are not test cases.
 		if tc.Type != moblyTestCaseType {
+			if tc.Type == moblySummaryType {
+				summarySeen = true
+			}
 			continue
 		}
 
@@ -130,14 +125,12 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 		})
 	}
 
-	if len(testList.RequestedTests) == 0 || len(testList.RequestedTests) != len(res) {
-		// Generate a synthetic result if there's an unexpected number of tests
-		// requested (scheduled to run) or reported (actually run). This may
-		// occur on infra timeout where the requested tests are recorded but
-		// their test results are not.
+	if !summarySeen {
+		// Generate a synthetic result if the summary record is not seen which
+		// is indicative of an infra test timeout.
 		res = append(res, runtests.TestCaseResult{
 			DisplayName: "TestparserError",
-			FailReason:  fmt.Sprintf("Unexpected number of requested/reported test results [requested: %d, reported: %d]", len(testList.RequestedTests), len(res)),
+			FailReason:  fmt.Sprintf("[TestparserError] Missing Mobly summary record - potental infra timeout."),
 			SuiteName:   "Synthetic",
 			CaseName:    "Synthetic",
 			Status:      runtests.TestAborted,

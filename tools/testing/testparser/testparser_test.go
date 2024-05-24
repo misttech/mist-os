@@ -1494,7 +1494,7 @@ UID: null
 		},
 		{
 			DisplayName: "TestparserError",
-			FailReason:  "Unexpected number of requested/reported test results [requested: 4, reported: 1]",
+			FailReason:  "[TestparserError] Missing Mobly summary record - potental infra timeout.",
 			SuiteName:   "Synthetic",
 			CaseName:    "Synthetic",
 			Status:      runtests.TestAborted,
