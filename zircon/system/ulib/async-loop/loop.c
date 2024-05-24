@@ -16,7 +16,6 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
-#include <zircon/availability.h>
 #include <zircon/listnode.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/hypervisor.h>
@@ -121,7 +120,7 @@ static void async_loop_invoke_epilogue(async_loop_t* loop);
 static_assert(sizeof(list_node_t) <= sizeof(async_state_t), "async_state_t too small");
 
 #define TO_NODE(type, ptr) ((list_node_t*)&ptr->state)
-#define FROM_NODE(type, ptr) ((type*)((char*)(ptr) - offsetof(type, state)))
+#define FROM_NODE(type, ptr) ((type*)((char*)(ptr)-offsetof(type, state)))
 
 static inline list_node_t* wait_to_node(async_wait_t* wait) { return TO_NODE(async_wait_t, wait); }
 
@@ -221,7 +220,7 @@ static void async_loop_cancel_all(async_loop_t* loop) {
   while ((node = list_remove_head(&loop->wait_list))) {
     mtx_unlock(&loop->lock);
     async_wait_t* wait = node_to_wait(node);
-    // Since the wait is being canceled, it would make sense to call zx_port_cancel_key()
+    // Since the wait is being canceled, it would make sense to call zx_port_cancel()
     // here before invoking the callback to ensure that the waited-upon handle is
     // no longer attached to the port.  However, the port is about to be destroyed
     // so we can optimize that step away.
@@ -587,23 +586,11 @@ static zx_status_t async_loop_cancel_wait(async_dispatcher_t* async, async_wait_
   // Next, cancel the wait.  This may be racing with another thread that
   // has read the wait's packet but not yet dispatched it.  So if we fail
   // to cancel then we assume we lost the race.
-  uint64_t key = (uint64_t)wait;
-#if FUCHSIA_API_LEVEL_AT_LEAST(20)
-  uint32_t options = 0;
-  zx_status_t status = zx_port_cancel_key(loop->port, options, key);
-#else   // FUCHSIA_API_LEVEL_AT_LEAST(20)
-  zx_status_t status = zx_port_cancel(loop->port, wait->object, key);
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(20)
+  zx_status_t status = zx_port_cancel(loop->port, wait->object, (uintptr_t)wait);
   if (status == ZX_OK) {
     list_delete(node);
   } else {
-    ZX_ASSERT_MSG(status == ZX_ERR_NOT_FOUND,
-#if FUCHSIA_API_LEVEL_AT_LEAST(20)
-                  "zx_port_cancel_key: status=%d",
-#else   // FUCHSIA_API_LEVEL_AT_LEAST(20)
-                  "zx_port_cancel: status=%d",
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(20)
-                  status);
+    ZX_ASSERT_MSG(status == ZX_ERR_NOT_FOUND, "zx_port_cancel: status=%d", status);
   }
 
   mtx_unlock(&loop->lock);
@@ -749,10 +736,10 @@ static zx_status_t async_loop_cancel_paged_vmo(async_paged_vmo_t* paged_vmo) {
 }
 
 static void async_loop_insert_task_locked(async_loop_t* loop, async_task_t* task) {
-  // TODO(https://fxbug.dev/42105840): We assume that tasks are inserted in quasi-monotonic order
-  // and that insertion into the task queue will typically take no more than a few steps. If this
-  // assumption proves false and the cost of insertion becomes a problem, we should consider using a
-  // more efficient representation for maintaining order.
+  // TODO(https://fxbug.dev/42105840): We assume that tasks are inserted in quasi-monotonic order and
+  // that insertion into the task queue will typically take no more than a few steps.
+  // If this assumption proves false and the cost of insertion becomes a problem, we
+  // should consider using a more efficient representation for maintaining order.
   list_node_t* node;
   for (node = loop->task_list.prev; node != &loop->task_list; node = node->prev) {
     if (task->deadline >= node_to_task(node)->deadline)
@@ -788,16 +775,9 @@ static void async_loop_restart_timer_locked(async_loop_t* loop) {
       // ZX_ERR_NOT_FOUND can happen here when a pending timer fires and
       // the packet is picked up by port_wait in another thread but has
       // not reached dispatch.
-#if FUCHSIA_API_LEVEL_AT_LEAST(20)
-      uint32_t options = 0;
-      status = zx_port_cancel_key(loop->port, options, KEY_CONTROL);
-      ZX_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_NOT_FOUND, "zx_port_cancel_key: status=%d",
-                    status);
-#else   // FUCHSIA_API_LEVEL_AT_LEAST(20)
       status = zx_port_cancel(loop->port, loop->timer, KEY_CONTROL);
       ZX_ASSERT_MSG(status == ZX_OK || status == ZX_ERR_NOT_FOUND, "zx_port_cancel: status=%d",
                     status);
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(20)
       loop->timer_armed = false;
     }
 
