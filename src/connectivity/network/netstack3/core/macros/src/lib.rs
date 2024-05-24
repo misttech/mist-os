@@ -170,7 +170,7 @@ fn context_ip_bounds_inner(attr: TokenStream, input: TokenStream) -> syn::Result
     };
     let where_clause = generics.make_where_clause();
     where_clause.predicates.push(syn::parse_quote! {
-        for<'a> #ns3_core::UnlockedCoreCtx<'a, #bindings_ctx>:
+        for<'macro_lifetime> #ns3_core::UnlockedCoreCtx<'macro_lifetime, #bindings_ctx>:
             #ns3_core::CoreContext< #ip_ident, #bindings_ctx >
     });
     where_clause.predicates.push(syn::parse_quote! {
