@@ -107,6 +107,7 @@ rustc_library_with_features("netstack3-core") {
     "src/lock_ordering.rs",
     "src/marker.rs",
     "src/socket/datagram.rs",
+    "src/socket/datagram/spec_context.rs",
     "src/state.rs",
     "src/testutil.rs",
     "src/time.rs",

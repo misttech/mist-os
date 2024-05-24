@@ -49,16 +49,22 @@ use crate::{
     },
     socket::{
         datagram::{
-            self, BoundSocketState as DatagramBoundSocketState,
+            self,
+            spec_context::{
+                DatagramSpecBoundStateContext, DatagramSpecStateContext,
+                DualStackDatagramSpecBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
+            },
+            BoundSocketState as DatagramBoundSocketState,
             BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet,
-            DatagramSocketSpec, DatagramStateContext, DualStackConnState,
+            DatagramSocketSpec, DatagramStateContext, DualStackConnState, DualStackConverter,
             DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
             ExpectedUnboundError, InUseError, IpExt, IpOptions,
-            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
-            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
-            SocketInfo, SocketState as DatagramSocketState, WrapOtherStackIpOptions,
+            MulticastMembershipInterfaceSelector, NonDualStackConverter,
+            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
+            SetMulticastMembershipError, SocketHopLimits, SocketInfo,
+            SocketState as DatagramSocketState, WrapOtherStackIpOptions,
             WrapOtherStackIpOptionsMut,
         },
         AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr,
@@ -1245,7 +1251,7 @@ pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
 pub trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
-pub(crate) trait DualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
+pub trait DualStackBoundStateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callbacks to methods.
@@ -1381,14 +1387,17 @@ fn receive_ip_packet<
 
     let recipients = StateContext::<I, _>::with_bound_state_context(core_ctx, |core_ctx| {
         let device_weak = device.downgrade();
-        DatagramBoundStateContext::with_bound_sockets(core_ctx, |_core_ctx, bound_sockets| {
-            lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
-                .map(|result| match result {
-                    LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
-                })
-                // Collect into an array on the stack.
-                .collect::<Recipients<_>>()
-        })
+        DatagramBoundStateContext::<_, _, Udp<_>>::with_bound_sockets(
+            core_ctx,
+            |_core_ctx, bound_sockets| {
+                lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
+                    .map(|result| match result {
+                        LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
+                    })
+                    // Collect into an array on the stack.
+                    .collect::<Recipients<_>>()
+            },
+        )
     });
 
     let was_delivered = recipients.into_iter().fold(false, |was_delivered, lookup_result| {
@@ -1439,13 +1448,13 @@ fn try_deliver<
                 DatagramBoundSocketStateType::Connected { state, sharing: _ } => {
                     match BoundStateContext::dual_stack_context(core_ctx) {
                         MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(state) {
+                            match dual_stack.ds_converter().convert(state) {
                                 DualStackConnState::ThisStack(state) => state.should_receive(),
                                 DualStackConnState::OtherStack(state) => state.should_receive(),
                             }
                         }
                         MaybeDualStack::NotDualStack(not_dual_stack) => {
-                            not_dual_stack.converter().convert(state).should_receive()
+                            not_dual_stack.nds_converter().convert(state).should_receive()
                         }
                     }
                 }
@@ -1671,7 +1680,11 @@ impl<I, C> UdpApi<I, C>
 where
     I: IpExt,
     C: ContextPair,
-    C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
+    C::CoreContext: StateContext<I, C::BindingsContext>
+        + CounterContext<UdpCounters<I>>
+        // NB: This bound is somewhat redundant to StateContext but it helps the
+        // compiler know we're using UDP datagram sockets.
+        + DatagramStateContext<I, C::BindingsContext, Udp<C::BindingsContext>>,
     C::BindingsContext:
         UdpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
@@ -2345,66 +2358,66 @@ pub enum SendError {
     RemotePortUnset,
 }
 
-impl<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>, CC: StateContext<I, BC>>
-    DatagramStateContext<I, BC, Udp<BC>> for CC
+impl<I: IpExt, BC: UdpBindingsContext<I, CC::DeviceId>, CC: StateContext<I, BC>>
+    DatagramSpecStateContext<I, CC, BC> for Udp<BC>
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
 
-    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
-        &mut self,
+    fn with_all_sockets_mut<O, F: FnOnce(&mut UdpSocketSet<I, CC::WeakDeviceId, BC>) -> O>(
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        StateContext::with_all_sockets_mut(self, cb)
+        StateContext::with_all_sockets_mut(core_ctx, cb)
     }
 
-    fn with_all_sockets<O, F: FnOnce(&UdpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
-        &mut self,
+    fn with_all_sockets<O, F: FnOnce(&UdpSocketSet<I, CC::WeakDeviceId, BC>) -> O>(
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        StateContext::with_all_sockets(self, cb)
+        StateContext::with_all_sockets(core_ctx, cb)
     }
 
     fn with_socket_state<
         O,
-        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &UdpSocketState<I, Self::WeakDeviceId, BC>) -> O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &UdpSocketState<I, CC::WeakDeviceId, BC>) -> O,
     >(
-        &mut self,
-        id: &UdpSocketId<I, Self::WeakDeviceId, BC>,
+        core_ctx: &mut CC,
+        id: &UdpSocketId<I, CC::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        StateContext::with_socket_state(self, id, cb)
+        StateContext::with_socket_state(core_ctx, id, cb)
     }
 
     fn with_socket_state_mut<
         O,
-        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut UdpSocketState<I, Self::WeakDeviceId, BC>) -> O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut UdpSocketState<I, CC::WeakDeviceId, BC>) -> O,
     >(
-        &mut self,
-        id: &UdpSocketId<I, Self::WeakDeviceId, BC>,
+        core_ctx: &mut CC,
+        id: &UdpSocketId<I, CC::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        StateContext::with_socket_state_mut(self, id, cb)
+        StateContext::with_socket_state_mut(core_ctx, id, cb)
     }
 
     fn for_each_socket<
         F: FnMut(
             &mut Self::SocketsStateCtx<'_>,
-            &UdpSocketId<I, Self::WeakDeviceId, BC>,
-            &UdpSocketState<I, Self::WeakDeviceId, BC>,
+            &UdpSocketId<I, CC::WeakDeviceId, BC>,
+            &UdpSocketState<I, CC::WeakDeviceId, BC>,
         ),
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) {
-        StateContext::for_each_socket(self, cb)
+        StateContext::for_each_socket(core_ctx, cb)
     }
 }
 
 impl<
         I: IpExt,
-        BC: UdpBindingsContext<I, Self::DeviceId>,
+        BC: UdpBindingsContext<I, CC::DeviceId>,
         CC: BoundStateContext<I, BC> + UdpStateContext,
-    > DatagramBoundStateContext<I, BC, Udp<BC>> for CC
+    > DatagramSpecBoundStateContext<I, CC, BC> for Udp<BC>
 {
     type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
 
@@ -2414,16 +2427,16 @@ impl<
             &mut Self::IpSocketsCtx<'_>,
             &DatagramBoundSockets<
                 I,
-                Self::WeakDeviceId,
+                CC::WeakDeviceId,
                 UdpAddrSpec,
                 UdpSocketMapStateSpec<I, CC::WeakDeviceId, BC>,
             >,
         ) -> O,
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        self.with_bound_sockets(|core_ctx, BoundSockets { bound_sockets }| {
+        core_ctx.with_bound_sockets(|core_ctx, BoundSockets { bound_sockets }| {
             cb(core_ctx, bound_sockets)
         })
     }
@@ -2434,16 +2447,16 @@ impl<
             &mut Self::IpSocketsCtx<'_>,
             &mut DatagramBoundSockets<
                 I,
-                Self::WeakDeviceId,
+                CC::WeakDeviceId,
                 UdpAddrSpec,
                 UdpSocketMapStateSpec<I, CC::WeakDeviceId, BC>,
             >,
         ) -> O,
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        self.with_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets }| {
+        core_ctx.with_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets }| {
             cb(core_ctx, bound_sockets)
         })
     }
@@ -2451,47 +2464,46 @@ impl<
     type DualStackContext = CC::DualStackContext;
     type NonDualStackContext = CC::NonDualStackContext;
     fn dual_stack_context(
-        &mut self,
+        core_ctx: &mut CC,
     ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-        BoundStateContext::dual_stack_context(self)
+        BoundStateContext::dual_stack_context(core_ctx)
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        self.with_transport_context(cb)
+        core_ctx.with_transport_context(cb)
     }
 }
 
 impl<
         BC: UdpBindingsContext<Ipv6, CC::DeviceId> + UdpBindingsContext<Ipv4, CC::DeviceId>,
         CC: DualStackBoundStateContext<Ipv6, BC> + UdpStateContext,
-    > DualStackDatagramBoundStateContext<Ipv6, BC, Udp<BC>> for CC
+    > DualStackDatagramSpecBoundStateContext<Ipv6, CC, BC> for Udp<BC>
 {
     type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
     fn dual_stack_enabled(
-        &self,
-        state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, Udp<BC>>>,
+        _core_ctx: &CC,
+        state: &impl AsRef<IpOptions<Ipv6, CC::WeakDeviceId, Udp<BC>>>,
     ) -> bool {
         let DualStackSocketState { dual_stack_enabled, .. } = state.as_ref().other_stack();
         *dual_stack_enabled
     }
 
     fn to_other_socket_options<'a>(
-        &self,
-        state: &'a IpOptions<Ipv6, Self::WeakDeviceId, Udp<BC>>,
-    ) -> &'a DatagramSocketOptions<Ipv4, Self::WeakDeviceId> {
+        _core_ctx: &CC,
+        state: &'a IpOptions<Ipv6, CC::WeakDeviceId, Udp<BC>>,
+    ) -> &'a DatagramSocketOptions<Ipv4, CC::WeakDeviceId> {
         &state.other_stack().socket_options
     }
 
-    type Converter = ();
-    fn converter(&self) -> Self::Converter {
+    fn ds_converter(_core_ctx: &CC) -> impl DualStackConverter<Ipv6, CC::WeakDeviceId, Self> {
         ()
     }
 
     fn to_other_bound_socket_id(
-        &self,
+        _core_ctx: &CC,
         id: &UdpSocketId<Ipv6, CC::WeakDeviceId, BC>,
     ) -> EitherIpSocket<CC::WeakDeviceId, Udp<BC>> {
         EitherIpSocket::V6(id.clone())
@@ -2501,14 +2513,14 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut UdpBoundSocketMap<Ipv6, Self::WeakDeviceId, BC>,
-            &mut UdpBoundSocketMap<Ipv4, Self::WeakDeviceId, BC>,
+            &mut UdpBoundSocketMap<Ipv6, CC::WeakDeviceId, BC>,
+            &mut UdpBoundSocketMap<Ipv4, CC::WeakDeviceId, BC>,
         ) -> O,
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        self.with_both_bound_sockets_mut(
+        core_ctx.with_both_bound_sockets_mut(
             |core_ctx,
              BoundSockets { bound_sockets: bound_first },
              BoundSockets { bound_sockets: bound_second }| {
@@ -2521,32 +2533,31 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut UdpBoundSocketMap<Ipv4, Self::WeakDeviceId, BC>,
+            &mut UdpBoundSocketMap<Ipv4, CC::WeakDeviceId, BC>,
         ) -> O,
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        self.with_other_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets }| {
+        core_ctx.with_other_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets }| {
             cb(core_ctx, bound_sockets)
         })
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        self.with_transport_context(|core_ctx| cb(core_ctx))
+        core_ctx.with_transport_context(|core_ctx| cb(core_ctx))
     }
 }
 
 impl<
         BC: UdpBindingsContext<Ipv4, CC::DeviceId>,
         CC: BoundStateContext<Ipv4, BC> + NonDualStackBoundStateContext<Ipv4, BC> + UdpStateContext,
-    > NonDualStackDatagramBoundStateContext<Ipv4, BC, Udp<BC>> for CC
+    > NonDualStackDatagramSpecBoundStateContext<Ipv4, CC, BC> for Udp<BC>
 {
-    type Converter = ();
-    fn converter(&self) -> Self::Converter {
+    fn nds_converter(_core_ctx: &CC) -> impl NonDualStackConverter<Ipv4, CC::WeakDeviceId, Self> {
         ()
     }
 }

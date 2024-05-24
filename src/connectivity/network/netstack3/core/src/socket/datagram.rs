@@ -60,6 +60,8 @@ use crate::{
     sync::{RemoveResourceResultWithContext, RwLock},
 };
 
+pub(crate) mod spec_context;
+
 /// Datagram demultiplexing map.
 pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 
@@ -547,7 +549,7 @@ pub struct DatagramFlowId<A: IpAddress, RI> {
     pub(crate) remote_id: RI,
 }
 
-pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
+pub trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callback provided to methods.
@@ -602,7 +604,15 @@ pub(crate) trait DatagramStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     );
 }
 
-pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
+/// A convenient alias for the BoundSockets type to shorten type signatures.
+type BoundSocketsFromSpec<I, CC, S> = BoundSockets<
+    I,
+    <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+    <S as DatagramSocketSpec>::AddrSpec,
+    <S as DatagramSocketSpec>::SocketMapSpec<I, <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+>;
+
+pub trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callback provided to methods.
@@ -643,15 +653,7 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: Dat
     /// Calls the function with an immutable reference to the datagram sockets.
     fn with_bound_sockets<
         O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &BoundSocketsFromSpec<I, Self, S>) -> O,
     >(
         &mut self,
         cb: F,
@@ -660,15 +662,7 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: Dat
     /// Calls the function with a mutable reference to the datagram sockets.
     fn with_bound_sockets_mut<
         O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut BoundSocketsFromSpec<I, Self, S>) -> O,
     >(
         &mut self,
         cb: F,
@@ -692,6 +686,49 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: Dat
         cb: F,
     ) -> O;
 }
+
+/// A marker trait for the requirements of
+/// [`DualStackDatagramBoundStateContext::ds_converter`].
+pub trait DualStackConverter<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>:
+    'static
+    + OwnedOrRefsBidirectionalConverter<
+        S::ListenerIpAddr<I>,
+        DualStackListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+    >
+    + OwnedOrRefsBidirectionalConverter<
+        S::ConnIpAddr<I>,
+        DualStackConnIpAddr<
+            I::Addr,
+            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        >,
+    >
+    + OwnedOrRefsBidirectionalConverter<S::ConnState<I, D>, DualStackConnState<I, D, S>>
+{
+}
+
+impl<I, D, S, O> DualStackConverter<I, D, S> for O
+where
+    I: IpExt,
+    D: WeakDeviceIdentifier,
+    S: DatagramSocketSpec,
+    O: 'static
+        + OwnedOrRefsBidirectionalConverter<
+            S::ListenerIpAddr<I>,
+            DualStackListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+        >
+        + OwnedOrRefsBidirectionalConverter<
+            S::ConnIpAddr<I>,
+            DualStackConnIpAddr<
+                I::Addr,
+                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+            >,
+        >
+        + OwnedOrRefsBidirectionalConverter<S::ConnState<I, D>, DualStackConnState<I, D, S>>,
+{
+}
+
 /// Provides access to dual-stack socket state.
 pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
     DeviceIdContext<AnyDevice>
@@ -718,32 +755,9 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
         debug_assert!(self.dual_stack_enabled(state), "socket must be dual-stack enabled")
     }
 
-    /// A type for converting between address types.
-    ///
-    /// This allows converting between the possibly-dual-stack
-    /// `S::ListenerIpAddr<I>` and the concrete dual-stack
-    /// [`DualStackListenerIpAddr`].
-    type Converter: OwnedOrRefsBidirectionalConverter<
-            S::ListenerIpAddr<I>,
-            DualStackListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-        > + OwnedOrRefsBidirectionalConverter<
-            S::ConnIpAddr<I>,
-            DualStackConnIpAddr<
-                I::Addr,
-                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-            >,
-        > + OwnedOrRefsBidirectionalConverter<
-            S::ConnState<I, Self::WeakDeviceId>,
-            DualStackConnState<I, Self::WeakDeviceId, S>,
-        >;
-
-    /// Returns an instance of a type that implements [`BidirectionalConverter`]
+    /// Returns an instance of a type that implements [`DualStackConverter`]
     /// for addresses.
-    ///
-    /// The returned object can be used to convert between the
-    /// `S::ListenerIpAddr<I>` and the appropriate [`DualStackListenerIpAddr`].
-    fn converter(&self) -> Self::Converter;
+    fn ds_converter(&self) -> impl DualStackConverter<I, Self::WeakDeviceId, S>;
 
     /// Converts a socket ID to a bound socket ID.
     ///
@@ -763,18 +777,8 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-            &mut BoundSockets<
-                I::OtherVersion,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
-            >,
+            &mut BoundSocketsFromSpec<I, Self, S>,
+            &mut BoundSocketsFromSpec<I::OtherVersion, Self, S>,
         ) -> O,
     >(
         &mut self,
@@ -787,12 +791,7 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I::OtherVersion,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
-            >,
+            &mut BoundSocketsFromSpec<I::OtherVersion, Self, S>,
         ) -> O,
     >(
         &mut self,
@@ -806,36 +805,55 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
     ) -> O;
 }
 
-/// Provides access to socket state for a single IP version.
-pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
-    DeviceIdContext<AnyDevice>
+/// A marker trait for the requirements of
+/// [`NonDualStackDatagramBoundStateContext::nds_converter`].
+pub trait NonDualStackConverter<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>:
+    'static
+    + OwnedOrRefsBidirectionalConverter<
+        S::ListenerIpAddr<I>,
+        ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+    >
+    + OwnedOrRefsBidirectionalConverter<
+        S::ConnIpAddr<I>,
+        ConnIpAddr<
+            I::Addr,
+            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        >,
+    >
+    + OwnedOrRefsBidirectionalConverter<S::ConnState<I, D>, ConnState<I, I, D, S>>
 {
-    /// A type for converting between address types.
-    ///
-    /// This allows converting between the possibly-dual-stack
-    /// `S::ListenerIpAddr<I>` and the concrete not-dual-stack
-    /// [``ListenerIpAddr`].
-    type Converter: OwnedOrRefsBidirectionalConverter<
+}
+
+impl<I, D, S, O> NonDualStackConverter<I, D, S> for O
+where
+    I: IpExt,
+    D: WeakDeviceIdentifier,
+    S: DatagramSocketSpec,
+    O: 'static
+        + OwnedOrRefsBidirectionalConverter<
             S::ListenerIpAddr<I>,
             ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
-        > + OwnedOrRefsBidirectionalConverter<
+        >
+        + OwnedOrRefsBidirectionalConverter<
             S::ConnIpAddr<I>,
             ConnIpAddr<
                 I::Addr,
                 <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
                 <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
-        > + OwnedOrRefsBidirectionalConverter<
-            S::ConnState<I, Self::WeakDeviceId>,
-            ConnState<I, I, Self::WeakDeviceId, S>,
-        >;
+        >
+        + OwnedOrRefsBidirectionalConverter<S::ConnState<I, D>, ConnState<I, I, D, S>>,
+{
+}
 
-    /// Returns an instance of a type that implements [`BidirectionalConverter`]
+/// Provides access to socket state for a single IP version.
+pub(crate) trait NonDualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec>:
+    DeviceIdContext<AnyDevice>
+{
+    /// Returns an instance of a type that implements [`NonDualStackConverter`]
     /// for addresses.
-    ///
-    /// The returned object can be used to convert between the
-    /// `S::ListenerIpAddr<I>` and the appropriate `ListenerIpAddr`.
-    fn converter(&self) -> Self::Converter;
+    fn nds_converter(&self) -> impl NonDualStackConverter<I, Self::WeakDeviceId, S>;
 }
 
 pub(crate) trait DatagramStateBindingsContext<I: Ip, S>:
@@ -1507,7 +1525,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> RemoveOperation<I
                 sharing,
             } => Remove::Listener {
                 concrete_addr: ListenerAddr {
-                    ip: core_ctx.converter().convert(ip.clone()),
+                    ip: core_ctx.nds_converter().convert(ip.clone()),
                     device: device.clone(),
                 },
                 ip_options: ip_options.clone(),
@@ -1522,7 +1540,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> RemoveOperation<I
                     clear_device_on_disconnect: _,
                     shutdown: _,
                     extra: _,
-                } = core_ctx.converter().convert(state);
+                } = core_ctx.nds_converter().convert(state);
                 Remove::Connected {
                     concrete_addr: addr.clone(),
                     ip_options: ip_options.clone(),
@@ -1649,7 +1667,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> DualStackRemoveOp
                 sharing,
             } => {
                 let ListenerAddr { ip, device } = addr.clone();
-                match (core_ctx.converter().convert(ip), core_ctx.dual_stack_enabled(&ip_options)) {
+                match (
+                    core_ctx.ds_converter().convert(ip),
+                    core_ctx.dual_stack_enabled(&ip_options),
+                ) {
                     // Dual-stack enabled, bound in both stacks.
                     (DualStackListenerIpAddr::BothStacks(identifier), true) => {
                         DualStackRemove::ListenerBothStacks {
@@ -1688,7 +1709,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> DualStackRemoveOp
                 }
             }
             BoundSocketStateType::Connected { state, sharing } => {
-                match core_ctx.converter().convert(state) {
+                match core_ctx.ds_converter().convert(state) {
                     DualStackConnState::ThisStack(state) => {
                         let ConnState {
                             addr,
@@ -2330,8 +2351,10 @@ fn listen_inner<
     let bound_addr: ListenerAddr<S::ListenerIpAddr<I>, CC::WeakDeviceId> = match bound_operation {
         BoundOperation::OnlyCurrentStack(either_dual_stack, addr) => {
             let converter = match either_dual_stack {
-                MaybeDualStack::DualStack(ds) => MaybeDualStack::DualStack(ds.converter()),
-                MaybeDualStack::NotDualStack(nds) => MaybeDualStack::NotDualStack(nds.converter()),
+                MaybeDualStack::DualStack(ds) => MaybeDualStack::DualStack(ds.ds_converter()),
+                MaybeDualStack::NotDualStack(nds) => {
+                    MaybeDualStack::NotDualStack(nds.nds_converter())
+                }
             };
             core_ctx
                 .with_bound_sockets_mut(|core_ctx, bound| {
@@ -2377,9 +2400,12 @@ fn listen_inner<
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
                     ListenerAddr {
-                        ip: core_ctx.converter().convert_back(DualStackListenerIpAddr::OtherStack(
-                            ListenerIpAddr { addr, identifier },
-                        )),
+                        ip: core_ctx.ds_converter().convert_back(
+                            DualStackListenerIpAddr::OtherStack(ListenerIpAddr {
+                                addr,
+                                identifier,
+                            }),
+                        ),
                         device,
                     }
                 })
@@ -2420,7 +2446,7 @@ fn listen_inner<
                 })
                 .map(|(identifier, device)| ListenerAddr {
                     ip: core_ctx
-                        .converter()
+                        .ds_converter()
                         .convert_back(DualStackListenerIpAddr::BothStacks(identifier)),
                     device,
                 })
@@ -2660,7 +2686,8 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
                         state: ListenerState { ip_options, addr: ListenerAddr { ip, device } },
                         sharing,
                     } => {
-                        let ListenerIpAddr { addr, identifier } = core_ctx.converter().convert(ip);
+                        let ListenerIpAddr { addr, identifier } =
+                            core_ctx.nds_converter().convert(ip);
                         SingleStackConnectOperation {
                             params: ConnectParameters {
                                 local_ip: addr.clone(),
@@ -2691,7 +2718,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
                                 },
                             clear_device_on_disconnect: _,
                             extra: _,
-                        } = core_ctx.converter().convert(state);
+                        } = core_ctx.nds_converter().convert(state);
                         SingleStackConnectOperation {
                             params: ConnectParameters {
                                 local_ip: Some(local_ip.clone()),
@@ -2820,7 +2847,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
                         state: ListenerState { ip_options, addr: ListenerAddr { ip, device } },
                         sharing,
                     } => {
-                        match (remote_ip, core_ctx.converter().convert(ip)) {
+                        match (remote_ip, core_ctx.ds_converter().convert(ip)) {
                             // Disallow connecting to the other stack because the
                             // existing socket state is in this stack.
                             (
@@ -2934,7 +2961,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
                         }
                     }
                     BoundSocketStateType::Connected { state, sharing } => {
-                        match (remote_ip, core_ctx.converter().convert(state)) {
+                        match (remote_ip, core_ctx.ds_converter().convert(state)) {
                             // Disallow connecting to the other stack because the
                             // existing socket state is in this stack.
                             (
@@ -3144,7 +3171,7 @@ pub(crate) fn connect<
                 let connect_op = DualStackConnectOperation::new_from_state(
                     ds, id, state, remote_ip, remote_id, extra,
                 )?;
-                let converter = ds.converter();
+                let converter = ds.ds_converter();
                 let (conn_state, sharing) =
                     ds.with_both_bound_sockets_mut(|core_ctx, bound, other_bound| {
                         connect_op.apply(core_ctx, bindings_ctx, bound, other_bound)
@@ -3155,7 +3182,7 @@ pub(crate) fn connect<
                 let connect_op = SingleStackConnectOperation::new_from_state(
                     nds, id, state, remote_ip, remote_id, extra,
                 );
-                let converter = nds.converter();
+                let converter = nds.nds_converter();
                 let (conn_state, sharing) =
                     core_ctx.with_bound_sockets_mut(|core_ctx, bound| {
                         connect_op.apply(core_ctx, bindings_ctx, bound)
@@ -3215,14 +3242,14 @@ pub(crate) fn disconnect_connected<
 
         let clear_device_on_disconnect = match core_ctx.dual_stack_context() {
             MaybeDualStack::DualStack(dual_stack) => match dual_stack
-                .converter()
+                .ds_converter()
                 .convert(conn_state)
             {
                 DualStackConnState::ThisStack(conn_state) => conn_state.clear_device_on_disconnect,
                 DualStackConnState::OtherStack(conn_state) => conn_state.clear_device_on_disconnect,
             },
             MaybeDualStack::NotDualStack(not_dual_stack) => {
-                not_dual_stack.converter().convert(conn_state).clear_device_on_disconnect
+                not_dual_stack.nds_converter().convert(conn_state).clear_device_on_disconnect
             }
         };
 
@@ -3298,7 +3325,8 @@ fn disconnect_to_listener<
 ) -> BoundSocketState<I, CC::WeakDeviceId, S> {
     let (ip_options, sharing, device) = match core_ctx.dual_stack_context() {
         MaybeDualStack::NotDualStack(nds) => {
-            let ListenerIpAddr { addr, identifier } = nds.converter().convert(listener_ip.clone());
+            let ListenerIpAddr { addr, identifier } =
+                nds.nds_converter().convert(listener_ip.clone());
             let remove_op = SingleStackRemoveOperation::new_from_state(nds, id, socket_state);
             core_ctx.with_bound_sockets_mut(|_core_ctx, bound| {
                 let (ip_options, sharing, mut device) =
@@ -3322,7 +3350,7 @@ fn disconnect_to_listener<
             let remove_op = DualStackRemoveOperation::new_from_state(ds, id, socket_state);
             let other_id = ds.to_other_bound_socket_id(id);
             let id = S::make_bound_socket_map_id(id);
-            let converter = ds.converter();
+            let converter = ds.ds_converter();
             ds.with_both_bound_sockets_mut(|_core_ctx, bound, other_bound| {
                 let (ip_options, sharing, mut device) =
                     remove_op.apply(bound, other_bound).into_options_sharing_and_device();
@@ -3403,8 +3431,8 @@ pub(crate) fn shutdown_connected<
         };
         let (shutdown_send, shutdown_receive) = which.to_send_receive();
         let Shutdown { send, receive } = match core_ctx.dual_stack_context() {
-            MaybeDualStack::DualStack(ds) => ds.converter().convert(state).as_mut(),
-            MaybeDualStack::NotDualStack(nds) => nds.converter().convert(state).as_mut(),
+            MaybeDualStack::DualStack(ds) => ds.ds_converter().convert(state).as_mut(),
+            MaybeDualStack::NotDualStack(nds) => nds.nds_converter().convert(state).as_mut(),
         };
         *send |= shutdown_send;
         *receive |= shutdown_receive;
@@ -3433,8 +3461,8 @@ pub(crate) fn get_shutdown_connected<
             }
         };
         let Shutdown { send, receive } = match core_ctx.dual_stack_context() {
-            MaybeDualStack::DualStack(ds) => ds.converter().convert(state).as_ref(),
-            MaybeDualStack::NotDualStack(nds) => nds.converter().convert(state).as_ref(),
+            MaybeDualStack::DualStack(ds) => ds.ds_converter().convert(state).as_ref(),
+            MaybeDualStack::NotDualStack(nds) => nds.nds_converter().convert(state).as_ref(),
         };
         ShutdownType::from_send_receive(*send, *receive)
     })
@@ -3514,7 +3542,8 @@ pub(crate) fn send_conn<
         }
 
         let (shutdown, operation) = match core_ctx.dual_stack_context() {
-            MaybeDualStack::DualStack(dual_stack) => match dual_stack.converter().convert(state) {
+            MaybeDualStack::DualStack(dual_stack) => match dual_stack.ds_converter().convert(state)
+            {
                 DualStackConnState::ThisStack(ConnState {
                     socket,
                     ip_options,
@@ -3556,7 +3585,7 @@ pub(crate) fn send_conn<
                     shutdown,
                     addr: ConnAddr { ip, device: _ },
                     extra: _,
-                } = not_dual_stack.converter().convert(state);
+                } = not_dual_stack.nds_converter().convert(state);
                 (
                     shutdown,
                     Operation::SendToThisStack((
@@ -3576,7 +3605,7 @@ pub(crate) fn send_conn<
             Operation::SendToThisStack((SendParams { socket, ip, options }, core_ctx)) => {
                 let packet =
                     S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
-                core_ctx.with_transport_context(|core_ctx| {
+                DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
                     core_ctx
                         .send_ip_packet(bindings_ctx, &socket, packet, None, options)
                         .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
@@ -3585,11 +3614,14 @@ pub(crate) fn send_conn<
             Operation::SendToOtherStack((SendParams { socket, ip, options }, dual_stack)) => {
                 let packet = S::make_packet::<I::OtherVersion, _>(body, &ip)
                     .map_err(SendError::SerializeError)?;
-                dual_stack.with_transport_context::<_, _>(|core_ctx| {
-                    core_ctx
-                        .send_ip_packet(bindings_ctx, &socket, packet, None, options)
-                        .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
-                })
+                DualStackDatagramBoundStateContext::with_transport_context::<_, _>(
+                    dual_stack,
+                    |core_ctx| {
+                        core_ctx
+                            .send_ip_packet(bindings_ctx, &socket, packet, None, options)
+                            .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
+                    },
+                )
             }
             Operation::_Phantom((never, _)) => match never {},
         }
@@ -3675,7 +3707,7 @@ pub(crate) fn send_to<
                         sharing: _,
                     } => {
                         let ListenerIpAddr { addr, identifier } =
-                            nds.converter().convert(ip.clone());
+                            nds.nds_converter().convert(ip.clone());
                         (
                             Operation::SendToThisStack((
                                 SendOneshotParameters {
@@ -3703,7 +3735,7 @@ pub(crate) fn send_to<
                                     device,
                                 },
                             extra: _,
-                        } = nds.converter().convert(state);
+                        } = nds.nds_converter().convert(state);
                         (
                             Operation::SendToThisStack((
                                 SendOneshotParameters {
@@ -3725,7 +3757,7 @@ pub(crate) fn send_to<
                 BoundSocketStateType::Listener {
                     state: ListenerState { ip_options, addr: ListenerAddr { ip, device } },
                     sharing: _,
-                } => match (ds.converter().convert(ip), remote_ip) {
+                } => match (ds.ds_converter().convert(ip), remote_ip) {
                     (DualStackListenerIpAddr::ThisStack(_), DualStackRemoteIp::OtherStack(_)) => {
                         return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
                     }
@@ -3802,7 +3834,7 @@ pub(crate) fn send_to<
                     ),
                 },
                 BoundSocketStateType::Connected { state, sharing: _ } => {
-                    match (ds.converter().convert(state), remote_ip) {
+                    match (ds.ds_converter().convert(state), remote_ip) {
                         (DualStackConnState::ThisStack(_), DualStackRemoteIp::OtherStack(_)) => {
                             return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
                         }
@@ -4218,7 +4250,7 @@ pub(crate) fn set_device<
                             state:
                                 ListenerState { ip_options: _, addr: ListenerAddr { ip, device } },
                             sharing: _,
-                        } => match ds.converter().convert(ip) {
+                        } => match ds.ds_converter().convert(ip) {
                             DualStackListenerIpAddr::ThisStack(ip) => Operation::ThisStack {
                                 params: SetBoundDeviceParameters::Listener { ip, device },
                                 core_ctx,
@@ -4236,7 +4268,7 @@ pub(crate) fn set_device<
                             }
                         },
                         BoundSocketStateType::Connected { state, sharing: _ } => {
-                            match ds.converter().convert(state) {
+                            match ds.ds_converter().convert(state) {
                                 DualStackConnState::ThisStack(state) => Operation::ThisStack {
                                     params: SetBoundDeviceParameters::Connected(state),
                                     core_ctx,
@@ -4255,7 +4287,7 @@ pub(crate) fn set_device<
                             sharing: _,
                         } => Operation::ThisStack {
                             params: SetBoundDeviceParameters::Listener {
-                                ip: nds.converter().convert(ip),
+                                ip: nds.nds_converter().convert(ip),
                                 device,
                             },
                             core_ctx,
@@ -4263,7 +4295,7 @@ pub(crate) fn set_device<
                         BoundSocketStateType::Connected { state, sharing: _ } => {
                             Operation::ThisStack {
                                 params: SetBoundDeviceParameters::Connected(
-                                    nds.converter().convert(state),
+                                    nds.nds_converter().convert(state),
                                 ),
                                 core_ctx,
                             }
@@ -4565,7 +4597,7 @@ pub(crate) fn get_options_device<
                 BoundSocketStateType::Connected { state, sharing: _ } => {
                     match core_ctx.dual_stack_context() {
                         MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(state) {
+                            match dual_stack.ds_converter().convert(state) {
                                 DualStackConnState::ThisStack(state) => {
                                     get_options_device_from_conn_state(state)
                                 }
@@ -4577,7 +4609,7 @@ pub(crate) fn get_options_device<
                         }
                         MaybeDualStack::NotDualStack(not_dual_stack) => {
                             get_options_device_from_conn_state(
-                                not_dual_stack.converter().convert(state),
+                                not_dual_stack.nds_converter().convert(state),
                             )
                         }
                     }
@@ -4611,7 +4643,7 @@ fn get_options_mut<
                 BoundSocketStateType::Connected { state, sharing: _ } => {
                     match core_ctx.dual_stack_context() {
                         MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(state) {
+                            match dual_stack.ds_converter().convert(state) {
                                 DualStackConnState::ThisStack(state) => state.as_mut(),
                                 DualStackConnState::OtherStack(state) => {
                                     dual_stack.assert_dual_stack_enabled(state);
@@ -4620,7 +4652,7 @@ fn get_options_mut<
                             }
                         }
                         MaybeDualStack::NotDualStack(not_dual_stack) => {
-                            not_dual_stack.converter().convert(state).as_mut()
+                            not_dual_stack.nds_converter().convert(state).as_mut()
                         }
                     }
                 }
@@ -4895,27 +4927,23 @@ pub(crate) mod testutil {
     use net_types::{ip::IpAddr, Witness};
 
     use crate::{
-        context::{testutil::FakeBindingsCtx, CtxPair},
-        device::testutil::FakeStrongDeviceId,
-        ip::socket::testutil::FakeDeviceConfig,
-        testutil::TestIpExt,
+        context::CtxPair, device::testutil::FakeStrongDeviceId,
+        ip::socket::testutil::FakeDeviceConfig, testutil::TestIpExt,
     };
 
     // Helper function to ensure the Fake CoreCtx and BindingsCtx are setup with
     // [`FakeDeviceConfig`] (one per provided device), with remote/local IPs
     // that support a connection to the given remote_ip.
     pub(crate) fn setup_fake_ctx_with_dualstack_conn_addrs<
-        TimerId,
-        Event: Debug,
-        BindingsCtxState: Default,
         CC,
+        BC: Default,
         D: FakeStrongDeviceId,
     >(
         local_ip: IpAddr,
         remote_ip: SpecifiedAddr<IpAddr>,
         devices: impl IntoIterator<Item = D>,
         core_ctx_builder: impl FnOnce(Vec<FakeDeviceConfig<D, SpecifiedAddr<IpAddr>>>) -> CC,
-    ) -> CtxPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>> {
+    ) -> CtxPair<CC, BC> {
         // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
         fn unmap_ip(addr: IpAddr) -> IpAddr {
             match addr {
@@ -5421,71 +5449,72 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId, I: DatagramIpExt<D>>
-        DatagramStateContext<I, FakeBindingsCtx, FakeStateSpec> for FakeCoreCtx<I, D>
+        spec_context::DatagramSpecStateContext<I, FakeCoreCtx<I, D>, FakeBindingsCtx>
+        for FakeStateSpec
     {
         type SocketsStateCtx<'a> = FakeDualStackCoreCtx<D>;
 
         fn with_all_sockets_mut<
             O,
-            F: FnOnce(&mut DatagramSocketSet<I, Self::WeakDeviceId, FakeStateSpec>) -> O,
+            F: FnOnce(&mut DatagramSocketSet<I, FakeWeakDeviceId<D>, FakeStateSpec>) -> O,
         >(
-            &mut self,
+            core_ctx: &mut FakeCoreCtx<I, D>,
             cb: F,
         ) -> O {
-            cb(&mut self.socket_set)
+            cb(&mut core_ctx.socket_set)
         }
 
         fn with_all_sockets<
             O,
-            F: FnOnce(&DatagramSocketSet<I, Self::WeakDeviceId, FakeStateSpec>) -> O,
+            F: FnOnce(&DatagramSocketSet<I, FakeWeakDeviceId<D>, FakeStateSpec>) -> O,
         >(
-            &mut self,
+            core_ctx: &mut FakeCoreCtx<I, D>,
             cb: F,
         ) -> O {
-            cb(&self.socket_set)
+            cb(&core_ctx.socket_set)
         }
 
         fn with_socket_state<
             O,
             F: FnOnce(
                 &mut Self::SocketsStateCtx<'_>,
-                &SocketState<I, Self::WeakDeviceId, FakeStateSpec>,
+                &SocketState<I, FakeWeakDeviceId<D>, FakeStateSpec>,
             ) -> O,
         >(
-            &mut self,
-            id: &Id<I, Self::WeakDeviceId>,
+            core_ctx: &mut FakeCoreCtx<I, D>,
+            id: &Id<I, FakeWeakDeviceId<D>>,
             cb: F,
         ) -> O {
-            cb(&mut self.dual_stack, &id.get())
+            cb(&mut core_ctx.dual_stack, &id.get())
         }
 
         fn with_socket_state_mut<
             O,
             F: FnOnce(
                 &mut Self::SocketsStateCtx<'_>,
-                &mut SocketState<I, Self::WeakDeviceId, FakeStateSpec>,
+                &mut SocketState<I, FakeWeakDeviceId<D>, FakeStateSpec>,
             ) -> O,
         >(
-            &mut self,
-            id: &Id<I, Self::WeakDeviceId>,
+            core_ctx: &mut FakeCoreCtx<I, D>,
+            id: &Id<I, FakeWeakDeviceId<D>>,
             cb: F,
         ) -> O {
-            cb(&mut self.dual_stack, &mut id.get_mut())
+            cb(&mut core_ctx.dual_stack, &mut id.get_mut())
         }
 
         fn for_each_socket<
             F: FnMut(
                 &mut Self::SocketsStateCtx<'_>,
-                &Id<I, Self::WeakDeviceId>,
-                &SocketState<I, Self::WeakDeviceId, FakeStateSpec>,
+                &Id<I, FakeWeakDeviceId<D>>,
+                &SocketState<I, FakeWeakDeviceId<D>, FakeStateSpec>,
             ),
         >(
-            &mut self,
+            core_ctx: &mut FakeCoreCtx<I, D>,
             mut cb: F,
         ) {
-            self.socket_set.keys().for_each(|id| {
+            core_ctx.socket_set.keys().for_each(|id| {
                 let id = Id::from(id.clone());
-                cb(&mut self.dual_stack, &id, &id.get());
+                cb(&mut core_ctx.dual_stack, &id, &id.get());
             })
         }
     }
@@ -5538,7 +5567,8 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId, I: Ip + DualStackContextsIpExt<D>>
-        DatagramBoundStateContext<I, FakeBindingsCtx, FakeStateSpec> for FakeDualStackCoreCtx<D>
+        spec_context::DatagramSpecBoundStateContext<I, FakeDualStackCoreCtx<D>, FakeBindingsCtx>
+        for FakeStateSpec
     {
         type IpSocketsCtx<'a> = InnerIpSocketCtx<D>;
         type DualStackContext = I::DualStackContext;
@@ -5550,16 +5580,16 @@ mod test {
                 &mut Self::IpSocketsCtx<'_>,
                 &BoundSockets<
                     I,
-                    Self::WeakDeviceId,
+                    FakeWeakDeviceId<D>,
                     FakeAddrSpec,
-                    FakeSocketMapStateSpec<I, Self::WeakDeviceId>,
+                    FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
             ) -> O,
         >(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
             cb: F,
         ) -> O {
-            let Self { bound_sockets, ip_socket_ctx } = self;
+            let FakeDualStackCoreCtx { bound_sockets, ip_socket_ctx } = core_ctx;
             cb(ip_socket_ctx, bound_sockets.as_ref())
         }
         fn with_bound_sockets_mut<
@@ -5568,51 +5598,58 @@ mod test {
                 &mut Self::IpSocketsCtx<'_>,
                 &mut BoundSockets<
                     I,
-                    Self::WeakDeviceId,
+                    FakeWeakDeviceId<D>,
                     FakeAddrSpec,
-                    FakeSocketMapStateSpec<I, Self::WeakDeviceId>,
+                    FakeSocketMapStateSpec<I, FakeWeakDeviceId<D>>,
                 >,
             ) -> O,
         >(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
             cb: F,
         ) -> O {
-            let Self { bound_sockets, ip_socket_ctx } = self;
+            let FakeDualStackCoreCtx { bound_sockets, ip_socket_ctx } = core_ctx;
             cb(ip_socket_ctx, bound_sockets.as_mut())
         }
 
         fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
             cb: F,
         ) -> O {
-            cb(&mut self.ip_socket_ctx)
+            cb(&mut core_ctx.ip_socket_ctx)
         }
 
         fn dual_stack_context(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-            I::dual_stack_context(self)
+            I::dual_stack_context(core_ctx)
         }
     }
 
     impl<D: FakeStrongDeviceId>
-        NonDualStackDatagramBoundStateContext<Ipv4, FakeBindingsCtx, FakeStateSpec>
-        for FakeDualStackCoreCtx<D>
+        spec_context::NonDualStackDatagramSpecBoundStateContext<
+            Ipv4,
+            FakeDualStackCoreCtx<D>,
+            FakeBindingsCtx,
+        > for FakeStateSpec
     {
-        type Converter = ();
-        fn converter(&self) -> Self::Converter {
+        fn nds_converter(
+            _core_ctx: &FakeDualStackCoreCtx<D>,
+        ) -> impl NonDualStackConverter<Ipv4, FakeWeakDeviceId<D>, Self> {
             ()
         }
     }
 
     impl<D: FakeStrongDeviceId>
-        DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx, FakeStateSpec>
-        for FakeDualStackCoreCtx<D>
+        spec_context::DualStackDatagramSpecBoundStateContext<
+            Ipv6,
+            FakeDualStackCoreCtx<D>,
+            FakeBindingsCtx,
+        > for FakeStateSpec
     {
         type IpSocketsCtx<'a> = InnerIpSocketCtx<D>;
         fn dual_stack_enabled(
-            &self,
-            _state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>>,
+            _core_ctx: &FakeDualStackCoreCtx<D>,
+            _state: &impl AsRef<IpOptions<Ipv6, FakeWeakDeviceId<D>, FakeStateSpec>>,
         ) -> bool {
             // For now, it's simplest to have dual-stack unconditionally enabled
             // for datagram tests. However, in the future this could be stateful
@@ -5621,26 +5658,21 @@ mod test {
         }
 
         fn to_other_socket_options<'a>(
-            &self,
-            state: &'a IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>,
-        ) -> &'a DatagramSocketOptions<Ipv4, Self::WeakDeviceId> {
+            _core_ctx: &FakeDualStackCoreCtx<D>,
+            state: &'a IpOptions<Ipv6, FakeWeakDeviceId<D>, FakeStateSpec>,
+        ) -> &'a DatagramSocketOptions<Ipv4, FakeWeakDeviceId<D>> {
             let IpOptions { other_stack, .. } = state;
             other_stack
         }
 
-        fn assert_dual_stack_enabled(
-            &self,
-            state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>>,
-        ) {
-            assert!(self.dual_stack_enabled(state))
-        }
-        type Converter = ();
-        fn converter(&self) -> Self::Converter {
+        fn ds_converter(
+            _core_ctx: &FakeDualStackCoreCtx<D>,
+        ) -> impl DualStackConverter<Ipv6, FakeWeakDeviceId<D>, Self> {
             ()
         }
 
         fn to_other_bound_socket_id(
-            &self,
+            _core_ctx: &FakeDualStackCoreCtx<D>,
             id: &Id<Ipv6, D::Weak>,
         ) -> EitherIpSocket<D::Weak, FakeStateSpec> {
             EitherIpSocket::V6(id.clone())
@@ -5650,24 +5682,15 @@ mod test {
             O,
             F: FnOnce(
                 &mut Self::IpSocketsCtx<'_>,
-                &mut BoundSockets<
-                    Ipv6,
-                    Self::WeakDeviceId,
-                    FakeAddrSpec,
-                    FakeSocketMapStateSpec<Ipv6, Self::WeakDeviceId>,
-                >,
-                &mut BoundSockets<
-                    Ipv4,
-                    Self::WeakDeviceId,
-                    FakeAddrSpec,
-                    FakeSocketMapStateSpec<Ipv4, Self::WeakDeviceId>,
-                >,
+                &mut BoundSocketsFromSpec<Ipv6, FakeDualStackCoreCtx<D>, FakeStateSpec>,
+                &mut BoundSocketsFromSpec<Ipv4, FakeDualStackCoreCtx<D>, FakeStateSpec>,
             ) -> O,
         >(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
             cb: F,
         ) -> O {
-            let Self { bound_sockets: FakeBoundSockets { v4, v6 }, ip_socket_ctx } = self;
+            let FakeDualStackCoreCtx { bound_sockets: FakeBoundSockets { v4, v6 }, ip_socket_ctx } =
+                core_ctx;
             cb(ip_socket_ctx, v6, v4)
         }
 
@@ -5675,26 +5698,21 @@ mod test {
             O,
             F: FnOnce(
                 &mut Self::IpSocketsCtx<'_>,
-                &mut BoundSockets<
-                    Ipv4,
-                    Self::WeakDeviceId,
-                    FakeAddrSpec,
-                    FakeSocketMapStateSpec<Ipv4, Self::WeakDeviceId>,
-                >,
+                &mut BoundSocketsFromSpec<Ipv4, FakeDualStackCoreCtx<D>, FakeStateSpec>,
             ) -> O,
         >(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
             cb: F,
         ) -> O {
-            let Self { bound_sockets, ip_socket_ctx } = self;
+            let FakeDualStackCoreCtx { bound_sockets, ip_socket_ctx } = core_ctx;
             cb(ip_socket_ctx, bound_sockets.as_mut())
         }
 
         fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-            &mut self,
+            core_ctx: &mut FakeDualStackCoreCtx<D>,
             cb: F,
         ) -> O {
-            cb(&mut self.ip_socket_ctx)
+            cb(&mut core_ctx.ip_socket_ctx)
         }
     }
 
@@ -5706,21 +5724,29 @@ mod test {
         );
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx, ());
+        let unbound = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
         const EXPECTED_HOP_LIMITS: HopLimits = HopLimits {
             unicast: const_unwrap_option(NonZeroU8::new(45)),
             multicast: const_unwrap_option(NonZeroU8::new(23)),
         };
 
-        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
-            *limits = SocketHopLimits {
-                unicast: Some(EXPECTED_HOP_LIMITS.unicast),
-                multicast: Some(EXPECTED_HOP_LIMITS.multicast),
-                version: IpVersionMarker::default(),
-            }
-        });
+        update_ip_hop_limit::<_, _, _, FakeStateSpec>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &unbound,
+            |limits| {
+                *limits = SocketHopLimits {
+                    unicast: Some(EXPECTED_HOP_LIMITS.unicast),
+                    multicast: Some(EXPECTED_HOP_LIMITS.multicast),
+                    version: IpVersionMarker::default(),
+                }
+            },
+        );
 
-        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), EXPECTED_HOP_LIMITS);
+        assert_eq!(
+            get_ip_hop_limits::<_, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
+            EXPECTED_HOP_LIMITS
+        );
     }
 
     #[ip_test]
@@ -5736,8 +5762,14 @@ mod test {
             ]));
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx, ());
-        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&device)).unwrap();
+        let unbound = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
+        set_device::<_, _, _, FakeStateSpec>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &unbound,
+            Some(&device),
+        )
+        .unwrap();
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
@@ -5748,13 +5780,16 @@ mod test {
             device_state.default_hop_limit = unicast;
         }
         assert_eq!(
-            get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound),
+            get_ip_hop_limits::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
             HopLimits { unicast, multicast }
         );
 
         // If the device is removed, use default hop limits.
         device.mark_removed();
-        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
+        assert_eq!(
+            get_ip_hop_limits::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
+            DEFAULT_HOP_LIMITS
+        );
     }
 
     #[ip_test]
@@ -5765,27 +5800,44 @@ mod test {
         );
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx, ());
-        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
+        let unbound = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
+        assert_eq!(
+            get_ip_hop_limits::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
+            DEFAULT_HOP_LIMITS
+        );
 
-        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
-            *limits = SocketHopLimits {
-                unicast: Some(const_unwrap_option(NonZeroU8::new(1))),
-                multicast: Some(const_unwrap_option(NonZeroU8::new(1))),
-                version: IpVersionMarker::default(),
-            }
-        });
+        update_ip_hop_limit::<I, _, _, FakeStateSpec>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &unbound,
+            |limits| {
+                *limits = SocketHopLimits {
+                    unicast: Some(const_unwrap_option(NonZeroU8::new(1))),
+                    multicast: Some(const_unwrap_option(NonZeroU8::new(1))),
+                    version: IpVersionMarker::default(),
+                }
+            },
+        );
 
         // The limits no longer match the default.
-        assert_ne!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
+        assert_ne!(
+            get_ip_hop_limits::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
+            DEFAULT_HOP_LIMITS
+        );
 
         // Clear the hop limits set on the socket.
-        update_ip_hop_limit(&mut core_ctx, &mut bindings_ctx, &unbound, |limits| {
-            *limits = Default::default()
-        });
+        update_ip_hop_limit::<I, _, _, FakeStateSpec>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &unbound,
+            |limits| *limits = Default::default(),
+        );
 
         // The values should be back at the defaults.
-        assert_eq!(get_ip_hop_limits(&mut core_ctx, &bindings_ctx, &unbound), DEFAULT_HOP_LIMITS);
+        assert_eq!(
+            get_ip_hop_limits::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
+            DEFAULT_HOP_LIMITS
+        );
     }
 
     #[ip_test]
@@ -5794,16 +5846,26 @@ mod test {
             FakeCoreCtx::<I, _>::new_with_sockets(Default::default(), Default::default());
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let unbound = create(&mut core_ctx, ());
+        let unbound = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
 
-        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, Some(&FakeDeviceId)).unwrap();
+        set_device::<I, _, _, FakeStateSpec>(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &unbound,
+            Some(&FakeDeviceId),
+        )
+        .unwrap();
         assert_eq!(
-            get_bound_device(&mut core_ctx, &bindings_ctx, &unbound),
+            get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
             Some(FakeWeakDeviceId(FakeDeviceId))
         );
 
-        set_device(&mut core_ctx, &mut bindings_ctx, &unbound, None).unwrap();
-        assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, &unbound), None);
+        set_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &mut bindings_ctx, &unbound, None)
+            .unwrap();
+        assert_eq!(
+            get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &unbound),
+            None
+        );
     }
 
     #[ip_test]
@@ -5817,10 +5879,10 @@ mod test {
         );
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let socket = create(&mut core_ctx, ());
+        let socket = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
         let body = Buf::new(Vec::new(), ..);
 
-        send_to(
+        send_to::<I, _, _, FakeStateSpec, _>(
             &mut core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -5830,7 +5892,7 @@ mod test {
         )
         .expect("succeeds");
         assert_matches!(
-            get_info(&mut core_ctx, &mut bindings_ctx, &socket),
+            get_info::<I, FakeStateSpec, _, _>(&mut core_ctx, &mut bindings_ctx, &socket),
             SocketInfo::Listener(_)
         );
     }
@@ -5847,11 +5909,11 @@ mod test {
             ]));
         let mut bindings_ctx = FakeBindingsCtx::default();
 
-        let socket = create(&mut core_ctx, ());
+        let socket = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
         let body = Buf::new(Vec::new(), ..);
 
         assert_matches!(
-            send_to(
+            send_to::<I, _, _, FakeStateSpec, _>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &socket,
@@ -5862,7 +5924,7 @@ mod test {
             Err(Either::Right(SendToError::CreateAndSend(_)))
         );
         assert_matches!(
-            get_info(&mut core_ctx, &mut bindings_ctx, &socket),
+            get_info::<I, FakeStateSpec, _, _>(&mut core_ctx, &mut bindings_ctx, &socket),
             SocketInfo::Listener(_)
         );
     }
@@ -5958,17 +6020,17 @@ mod test {
                 },
             ]));
 
-        let unbound = create(&mut core_ctx, ());
+        let unbound = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
 
-        assert!(!get_ip_transparent(&mut core_ctx, &unbound));
+        assert!(!get_ip_transparent::<I, _, _, FakeStateSpec>(&mut core_ctx, &unbound));
 
-        set_ip_transparent(&mut core_ctx, &unbound, true);
+        set_ip_transparent::<I, _, _, FakeStateSpec>(&mut core_ctx, &unbound, true);
 
-        assert!(get_ip_transparent(&mut core_ctx, &unbound));
+        assert!(get_ip_transparent::<I, _, _, FakeStateSpec>(&mut core_ctx, &unbound));
 
-        set_ip_transparent(&mut core_ctx, &unbound, false);
+        set_ip_transparent::<I, _, _, FakeStateSpec>(&mut core_ctx, &unbound, false);
 
-        assert!(!get_ip_transparent(&mut core_ctx, &unbound));
+        assert!(!get_ip_transparent::<I, _, _, FakeStateSpec>(&mut core_ctx, &unbound));
     }
 
     #[derive(Eq, PartialEq)]
@@ -6013,7 +6075,7 @@ mod test {
         remote_ip: SpecifiedAddr<I::Addr>,
     ) {
         let CtxPair { mut core_ctx, mut bindings_ctx } =
-            testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+            testutil::setup_fake_ctx_with_dualstack_conn_addrs::<_, FakeBindingsCtx, _>(
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
                 [FakeDeviceId {}],
@@ -6024,7 +6086,7 @@ mod test {
                 },
             );
 
-        let socket = create(&mut core_ctx, ());
+        let socket = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
         const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
         const ORIGINAL_REMOTE_PORT: u16 = 1234;
         const NEW_REMOTE_PORT: u16 = 5678;
@@ -6032,7 +6094,7 @@ mod test {
         // Setup the original socket state.
         match original {
             OriginalSocketState::Unbound => {}
-            OriginalSocketState::Listener => listen(
+            OriginalSocketState::Listener => listen::<I, _, _, FakeStateSpec>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &socket,
@@ -6040,7 +6102,7 @@ mod test {
                 Some(LOCAL_PORT),
             )
             .expect("listen should succeed"),
-            OriginalSocketState::Connected => connect(
+            OriginalSocketState::Connected => connect::<I, _, _, FakeStateSpec>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &socket,
@@ -6052,24 +6114,30 @@ mod test {
         }
 
         // Update the sharing state to generate conflicts during the call to `connect`.
-        core_ctx.with_socket_state_mut(&socket, |_core_ctx, state| {
-            let sharing = match state {
-                SocketState::Unbound(UnboundSocketState { device: _, sharing, ip_options: _ }) => {
-                    sharing
-                }
-                SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
-                    match socket_type {
+        core_ctx.with_socket_state_mut(
+            &socket,
+            |_core_ctx, state: &mut SocketState<I, _, FakeStateSpec>| {
+                let sharing = match state {
+                    SocketState::Unbound(UnboundSocketState {
+                        device: _,
+                        sharing,
+                        ip_options: _,
+                    }) => sharing,
+                    SocketState::Bound(BoundSocketState {
+                        socket_type,
+                        original_bound_addr: _,
+                    }) => match socket_type {
                         BoundSocketStateType::Connected { state: _, sharing } => sharing,
                         BoundSocketStateType::Listener { state: _, sharing } => sharing,
-                    }
-                }
-            };
-            *sharing = Sharing::ConnectionConflicts { remote_port: NEW_REMOTE_PORT };
-        });
+                    },
+                };
+                *sharing = Sharing::ConnectionConflicts { remote_port: NEW_REMOTE_PORT };
+            },
+        );
 
         // Try to connect and observe a conflict error.
         assert_matches!(
-            connect(
+            connect::<I, _, _, FakeStateSpec>(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 &socket,
@@ -6081,7 +6149,7 @@ mod test {
         );
 
         // Verify the original socket state is intact.
-        let info = get_info(&mut core_ctx, &mut bindings_ctx, &socket);
+        let info = get_info::<I, FakeStateSpec, _, _>(&mut core_ctx, &mut bindings_ctx, &socket);
         match original {
             OriginalSocketState::Unbound => assert_matches!(info, SocketInfo::Unbound),
             OriginalSocketState::Listener => {
@@ -6118,7 +6186,7 @@ mod test {
     fn set_get_shutdown_dualstack(remote_ip: Ipv6Addr, shutdown: ShutdownType) {
         let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote_ip should be specified");
         let CtxPair { mut core_ctx, mut bindings_ctx } =
-            testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+            testutil::setup_fake_ctx_with_dualstack_conn_addrs::<_, FakeBindingsCtx, _>(
                 Ipv6::UNSPECIFIED_ADDRESS.into(),
                 remote_ip.into(),
                 [FakeDeviceId {}],
@@ -6130,8 +6198,8 @@ mod test {
             );
 
         const REMOTE_PORT: u16 = 1234;
-        let socket = create(&mut core_ctx, ());
-        connect(
+        let socket = create::<Ipv6, FakeStateSpec, _, _>(&mut core_ctx, ());
+        connect::<Ipv6, _, _, FakeStateSpec>(
             &mut core_ctx,
             &mut bindings_ctx,
             &socket,
@@ -6140,11 +6208,30 @@ mod test {
             Default::default(),
         )
         .expect("connect should succeed");
-        assert_eq!(get_shutdown_connected(&mut core_ctx, &bindings_ctx, &socket), None);
+        assert_eq!(
+            get_shutdown_connected::<Ipv6, _, _, FakeStateSpec>(
+                &mut core_ctx,
+                &bindings_ctx,
+                &socket
+            ),
+            None
+        );
 
-        shutdown_connected(&mut core_ctx, &bindings_ctx, &socket, shutdown)
-            .expect("shutdown should succeed");
-        assert_eq!(get_shutdown_connected(&mut core_ctx, &bindings_ctx, &socket), Some(shutdown));
+        shutdown_connected::<Ipv6, _, _, FakeStateSpec>(
+            &mut core_ctx,
+            &bindings_ctx,
+            &socket,
+            shutdown,
+        )
+        .expect("shutdown should succeed");
+        assert_eq!(
+            get_shutdown_connected::<Ipv6, _, _, FakeStateSpec>(
+                &mut core_ctx,
+                &bindings_ctx,
+                &socket
+            ),
+            Some(shutdown)
+        );
     }
 
     #[ip_test]
@@ -6181,7 +6268,7 @@ mod test {
         const DEVICE_ID2: MultipleDevicesId = MultipleDevicesId::B;
 
         let CtxPair { mut core_ctx, mut bindings_ctx } =
-            testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+            testutil::setup_fake_ctx_with_dualstack_conn_addrs::<_, FakeBindingsCtx, _>(
                 local_ip.to_ip_addr(),
                 remote_ip.into(),
                 [DEVICE_ID1, DEVICE_ID2],
@@ -6195,15 +6282,15 @@ mod test {
         const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
         const REMOTE_PORT: u16 = 1234;
 
-        let socket1 = create(&mut core_ctx, ());
-        let socket2 = create(&mut core_ctx, ());
+        let socket1 = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
+        let socket2 = create::<I, FakeStateSpec, _, _>(&mut core_ctx, ());
 
         // Initialize each socket to the `original` state, and verify that their
         // device can be set.
         for (socket, device_id) in [(&socket1, DEVICE_ID1), (&socket2, DEVICE_ID2)] {
             match original {
                 OriginalSocketState::Unbound => {}
-                OriginalSocketState::Listener => listen(
+                OriginalSocketState::Listener => listen::<I, _, _, FakeStateSpec>(
                     &mut core_ctx,
                     &mut bindings_ctx,
                     &socket,
@@ -6211,7 +6298,7 @@ mod test {
                     Some(LOCAL_PORT),
                 )
                 .expect("listen should succeed"),
-                OriginalSocketState::Connected => connect(
+                OriginalSocketState::Connected => connect::<I, _, _, FakeStateSpec>(
                     &mut core_ctx,
                     &mut bindings_ctx,
                     &socket,
@@ -6222,11 +6309,19 @@ mod test {
                 .expect("connect should succeed"),
             }
 
-            assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, socket), None);
-            set_device(&mut core_ctx, &mut bindings_ctx, socket, Some(&device_id))
-                .expect("set device should succeed");
             assert_eq!(
-                get_bound_device(&mut core_ctx, &bindings_ctx, socket),
+                get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, socket),
+                None
+            );
+            set_device::<I, _, _, FakeStateSpec>(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                socket,
+                Some(&device_id),
+            )
+            .expect("set device should succeed");
+            assert_eq!(
+                get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, socket),
                 Some(FakeWeakDeviceId(device_id))
             );
         }
@@ -6236,25 +6331,33 @@ mod test {
         // the bound socket map)
         if original != OriginalSocketState::Unbound {
             assert_eq!(
-                set_device(&mut core_ctx, &mut bindings_ctx, &socket2, Some(&DEVICE_ID1)),
+                set_device::<I, _, _, FakeStateSpec>(
+                    &mut core_ctx,
+                    &mut bindings_ctx,
+                    &socket2,
+                    Some(&DEVICE_ID1)
+                ),
                 Err(SocketError::Local(LocalAddressError::AddressInUse))
             );
             // Verify both sockets still have their original device.
             assert_eq!(
-                get_bound_device(&mut core_ctx, &bindings_ctx, &socket1),
+                get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &socket1),
                 Some(FakeWeakDeviceId(DEVICE_ID1))
             );
             assert_eq!(
-                get_bound_device(&mut core_ctx, &bindings_ctx, &socket2),
+                get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &socket2),
                 Some(FakeWeakDeviceId(DEVICE_ID2))
             );
         }
 
         // Verify the device can be unset.
         // NB: Close socket2 first, otherwise socket 1 will conflict with it.
-        close(&mut core_ctx, &mut bindings_ctx, socket2).into_removed();
-        set_device(&mut core_ctx, &mut bindings_ctx, &socket1, None)
+        close::<I, FakeStateSpec, _, _>(&mut core_ctx, &mut bindings_ctx, socket2).into_removed();
+        set_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &mut bindings_ctx, &socket1, None)
             .expect("set device should succeed");
-        assert_eq!(get_bound_device(&mut core_ctx, &bindings_ctx, &socket1), None,);
+        assert_eq!(
+            get_bound_device::<I, _, _, FakeStateSpec>(&mut core_ctx, &bindings_ctx, &socket1),
+            None,
+        );
     }
 }

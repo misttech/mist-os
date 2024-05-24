@@ -41,9 +41,13 @@ use crate::{
     socket::{
         self,
         datagram::{
-            self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-            DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError,
-            SocketHopLimits,
+            self,
+            spec_context::{
+                DatagramSpecBoundStateContext, DatagramSpecStateContext,
+                NonDualStackDatagramSpecBoundStateContext,
+            },
+            DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
+            DatagramStateContext, ExpectedUnboundError, NonDualStackConverter, SocketHopLimits,
         },
         AddrVec, ConnAddr, ConnInfoAddr, ConnIpAddr, IncompatibleError, InsertError,
         ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketMapAddrSpec, SocketMapAddrStateSpec,
@@ -489,22 +493,21 @@ pub struct BoundSockets<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsT
     pub(crate) socket_map: IcmpBoundSockets<I, D, BT>,
 }
 
-impl<I, BC, CC> datagram::NonDualStackDatagramBoundStateContext<I, BC, Icmp<BC>> for CC
+impl<I, BC, CC> NonDualStackDatagramSpecBoundStateContext<I, CC, BC> for Icmp<BC>
 where
     I: IpExt + datagram::DualStackIpExt,
-    BC: IcmpBindingsContext<I, Self::DeviceId>,
+    BC: IcmpBindingsContext<I, CC::DeviceId>,
     CC: InnerIcmpContext<I, BC> + IcmpStateContext,
 {
-    type Converter = ();
-    fn converter(&self) -> Self::Converter {
+    fn nds_converter(_core_ctx: &CC) -> impl NonDualStackConverter<I, CC::WeakDeviceId, Self> {
         ()
     }
 }
 
-impl<I, BC, CC> DatagramBoundStateContext<I, BC, Icmp<BC>> for CC
+impl<I, BC, CC> DatagramSpecBoundStateContext<I, CC, BC> for Icmp<BC>
 where
     I: IpExt + datagram::DualStackIpExt,
-    BC: IcmpBindingsContext<I, Self::DeviceId>,
+    BC: IcmpBindingsContext<I, CC::DeviceId>,
     CC: InnerIcmpContext<I, BC> + IcmpStateContext,
 {
     type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
@@ -512,104 +515,103 @@ where
     // ICMP sockets doesn't support dual-stack operations.
     type DualStackContext = CC::DualStackContext;
 
-    type NonDualStackContext = Self;
+    type NonDualStackContext = CC;
 
     fn with_bound_sockets<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &IcmpBoundSockets<I, Self::WeakDeviceId, BC>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &IcmpBoundSockets<I, CC::WeakDeviceId, BC>) -> O,
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(self, |ctx, BoundSockets { socket_map }| {
-            cb(ctx, &socket_map)
-        })
+        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
+            core_ctx,
+            |ctx, BoundSockets { socket_map }| cb(ctx, &socket_map),
+        )
     }
 
     fn with_bound_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpBoundSockets<I, Self::WeakDeviceId, BC>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpBoundSockets<I, CC::WeakDeviceId, BC>) -> O,
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(self, |ctx, BoundSockets { socket_map }| {
-            cb(ctx, socket_map)
-        })
+        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
+            core_ctx,
+            |ctx, BoundSockets { socket_map }| cb(ctx, socket_map),
+        )
     }
 
     fn dual_stack_context(
-        &mut self,
+        core_ctx: &mut CC,
     ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-        MaybeDualStack::NotDualStack(self)
+        MaybeDualStack::NotDualStack(core_ctx)
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(self, |ctx, _sockets| cb(ctx))
+        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(core_ctx, |ctx, _sockets| cb(ctx))
     }
 }
 
-impl<I, BC, CC> DatagramStateContext<I, BC, Icmp<BC>> for CC
+impl<I, BC, CC> DatagramSpecStateContext<I, CC, BC> for Icmp<BC>
 where
     I: IpExt + datagram::DualStackIpExt,
-    BC: IcmpBindingsContext<I, Self::DeviceId>,
+    BC: IcmpBindingsContext<I, CC::DeviceId>,
     CC: StateContext<I, BC> + IcmpStateContext,
 {
     type SocketsStateCtx<'a> = CC::SocketStateCtx<'a>;
 
-    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
-        &mut self,
+    fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, CC::WeakDeviceId, BC>) -> O>(
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        StateContext::with_all_sockets_mut(self, cb)
+        StateContext::with_all_sockets_mut(core_ctx, cb)
     }
 
-    fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
-        &mut self,
+    fn with_all_sockets<O, F: FnOnce(&IcmpSocketSet<I, CC::WeakDeviceId, BC>) -> O>(
+        core_ctx: &mut CC,
         cb: F,
     ) -> O {
-        StateContext::with_all_sockets(self, cb)
+        StateContext::with_all_sockets(core_ctx, cb)
     }
 
     fn with_socket_state<
         O,
-        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &IcmpSocketState<I, Self::WeakDeviceId, BC>) -> O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &IcmpSocketState<I, CC::WeakDeviceId, BC>) -> O,
     >(
-        &mut self,
-        id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
+        core_ctx: &mut CC,
+        id: &IcmpSocketId<I, CC::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        StateContext::with_socket_state(self, id, cb)
+        StateContext::with_socket_state(core_ctx, id, cb)
     }
 
     fn with_socket_state_mut<
         O,
-        F: FnOnce(
-            &mut Self::SocketsStateCtx<'_>,
-            &mut IcmpSocketState<I, Self::WeakDeviceId, BC>,
-        ) -> O,
+        F: FnOnce(&mut Self::SocketsStateCtx<'_>, &mut IcmpSocketState<I, CC::WeakDeviceId, BC>) -> O,
     >(
-        &mut self,
-        id: &IcmpSocketId<I, Self::WeakDeviceId, BC>,
+        core_ctx: &mut CC,
+        id: &IcmpSocketId<I, CC::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        StateContext::with_socket_state_mut(self, id, cb)
+        StateContext::with_socket_state_mut(core_ctx, id, cb)
     }
 
     fn for_each_socket<
         F: FnMut(
             &mut Self::SocketsStateCtx<'_>,
-            &IcmpSocketId<I, Self::WeakDeviceId, BC>,
-            &IcmpSocketState<I, Self::WeakDeviceId, BC>,
+            &IcmpSocketId<I, CC::WeakDeviceId, BC>,
+            &IcmpSocketState<I, CC::WeakDeviceId, BC>,
         ),
     >(
-        &mut self,
+        core_ctx: &mut CC,
         cb: F,
     ) {
-        StateContext::for_each_socket(self, cb)
+        StateContext::for_each_socket(core_ctx, cb)
     }
 }
 
@@ -737,7 +739,11 @@ impl<I, C> IcmpEchoSocketApi<I, C>
 where
     I: datagram::IpExt,
     C: ContextPair,
-    C::CoreContext: StateContext<I, C::BindingsContext> + IcmpStateContext,
+    C::CoreContext: StateContext<I, C::BindingsContext>
+        + IcmpStateContext
+        // NB: This bound is somewhat redundant to StateContext but it helps the
+        // compiler know we're using ICMP datagram sockets.
+        + DatagramStateContext<I, C::BindingsContext, Icmp<C::BindingsContext>>,
     C::BindingsContext:
         IcmpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
