@@ -10,9 +10,10 @@ import argparse
 import json
 import os
 import sys
+from typing import Any
 
 
-def freeze_in_development_api_level(version_history_path):
+def freeze_in_development_api_level(version_history_path: str) -> None:
     try:
         # Update version_history.json to freeze the api level
         with open(version_history_path, "r+") as f:
@@ -25,7 +26,7 @@ def freeze_in_development_api_level(version_history_path):
         raise Exception("Did you run this from the source tree root?") from e
 
 
-def freeze_version_history(version_history):
+def freeze_version_history(version_history: dict[str, Any]) -> dict[str, Any]:
     """Updates version_history.json to make the in_development_api_level supported."""
     for level, info in version_history["data"]["api_levels"].items():
         if info["status"] == "in-development":
@@ -34,7 +35,7 @@ def freeze_version_history(version_history):
     return version_history
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     # This arg is necessary for the builder to work, even though it isn't used.
     parser.add_argument("--stamp-file")
@@ -42,6 +43,8 @@ def main():
     args = parser.parse_args()
 
     freeze_in_development_api_level(args.sdk_version_history)
+
+    return 0
 
 
 if __name__ == "__main__":
