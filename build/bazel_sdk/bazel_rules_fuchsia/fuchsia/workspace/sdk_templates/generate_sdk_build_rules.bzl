@@ -477,6 +477,10 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
     copts = _CC_LIBRARY_COPTS_OVERRIDES.get(target_name, [])
     alwayslink = target_name in _ALWAYSLINK_LIBS
 
+    srcs = meta["sources"]
+    verify_cc_head_api_level_name = _get_target_name(meta["name"]) + "_verify_cc_head_api_level"
+    if meta["stable"] == False:
+        srcs.append(":" + verify_cc_head_api_level_name)
     _merge_template(
         ctx,
         build_file,
@@ -486,11 +490,12 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
             "{{fidl_deps}}": _get_starlark_list(fidl_deps),
             "{{fidl_llcpp_deps}}": _get_starlark_list(fidl_llcpp_deps),
             "{{name}}": _get_target_name(meta["name"]),
-            "{{sources}}": _get_starlark_list(meta["sources"], remove_prefix = lib_base_path),
+            "{{sources}}": _get_starlark_list(srcs, remove_prefix = lib_base_path),
             "{{headers}}": _get_starlark_list(meta["headers"], remove_prefix = lib_base_path),
             "{{relative_include_dir}}": meta["include_dir"][len(lib_base_path):],
             "{{copts}}": _get_starlark_list(copts),
             "{{alwayslink}}": str(alwayslink),
+            "{{verify_cc_head_api_level_name}}": verify_cc_head_api_level_name,
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])

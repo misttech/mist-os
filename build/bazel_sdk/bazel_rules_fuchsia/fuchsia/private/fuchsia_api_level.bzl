@@ -100,3 +100,34 @@ fuchsia_api_level = rule(
         ),
     },
 )
+
+def _verify_cc_head_api_level_impl(ctx):
+    f = ctx.actions.declare_file(ctx.label.name + "__verify_head_api_level.cc")
+    ctx.actions.write(f, content = "")
+
+    if get_fuchsia_api_level(ctx) != "HEAD":
+        fail("You are trying to use an unstable API in a stable package.\n" +
+             "You must target HEAD in order to use this library: " + ctx.attr.library_name)
+
+    return DefaultInfo(
+        files = depset([f]),
+    )
+
+verify_cc_head_api_level = rule(
+    implementation = _verify_cc_head_api_level_impl,
+    doc = """Forces an unstable cc_library to only be used if targeting HEAD
+
+    This rule should only be used by the generated cc_library rules for sdk
+    elements. It will create an empty c++ file which can be added to the srcs
+    of the cc_library. The check will look at the Fuchsia API level and fail if
+    it is not head.
+    """,
+    attrs = {
+        "library_name": attr.string(mandatory = True),
+        "_fuchsia_api_level": attr.label(
+            # We have to explicitly depend on the @fuchsia_sdk target because
+            # this is used from the internal_sdk as well.
+            default = "@fuchsia_sdk//fuchsia:fuchsia_api_level",
+        ),
+    },
+)
