@@ -7,6 +7,7 @@
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
 #include "src/developer/debug/zxdb/expr/vector_register_format.h"
+#include "src/lib/files/path.h"
 
 namespace zxdb {
 
@@ -63,8 +64,8 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddList(ClientSettings::Target::kSourceMap, ClientSettings::Target::kSourceMapDescription,
                   // TODO(https://fxbug.dev/336868560): Fix the rust toolchain prebuilt to point
                   // DW_AT_comp_dir to the right place and remove this hack.
-                  {"/b/s/w/ir/x/w/fuchsia-third_party-rust=" + GetSelfPath() +
-                   "../../prebuilt/third_party/rust/linux-x64/lib/rustlib/src/rust"});
+                  {"/b/s/w/ir/x/w/fuchsia-third_party-rust=" + files::GetDirectoryName(GetSelfPath()) +
+                   "/../../../prebuilt/third_party/rust/linux-x64/lib/rustlib/src/rust"});
 
   schema->AddBool(ClientSettings::Thread::kDebugStepping,
                   ClientSettings::Thread::kDebugSteppingDescription, false);
