@@ -11,8 +11,13 @@
 #include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/weak_wrapper.h>
+
+#include <ktl/algorithm.h>
+#include <ktl/optional.h>
 
 #include <linux/errno.h>
 #include <linux/prctl.h>
@@ -90,8 +95,45 @@ fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int
                                             uint64_t arg2, uint64_t arg3, uint64_t arg4,
                                             uint64_t arg5) {
   switch (option) {
-    //case PR_SET_NAME:
-      //auto addr = UserAddress::from(arg2);
+    case PR_SET_VMA: {
+      if (arg2 != PR_SET_VMA_ANON_NAME) {
+        // track_stub !(TODO("https://fxbug.dev/322874826"), "prctl PR_SET_VMA", arg2);
+        return fit::error(errno(ENOSYS));
+      }
+      auto addr = UserAddress::from(arg3);
+      auto length = static_cast<size_t>(arg4);
+      auto name_addr = UserAddress::from(arg5);
+
+      auto name = ktl::optional<FsString>();
+      if (!name_addr.is_null()) {
+        auto uname = UserCString(UserAddress::from(arg5));
+        auto name_or_error = current_task.read_c_string_to_vec(uname, 256).map_error([](Errno e) {
+          // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
+          if (e == errno(ENAMETOOLONG)) {
+            return errno(EINVAL);
+          } else {
+            return e;
+          }
+        });
+        if (name_or_error.is_error())
+          return name_or_error.take_error();
+
+        auto fname = name_or_error.value();
+        if (ktl::any_of(fname.begin(), fname.end(), [](uint8_t b) {
+              return (b <= 0x1f) || (b >= 0x7f && b <= 0xff) || (b == '\\') || (b == '`') ||
+                     (b == '$') || (b == '[') || (b == ']');
+            })) {
+          return fit::error(errno(EINVAL));
+        }
+        name = fname;
+      }
+      auto result = current_task->mm()->set_mapping_name(addr, length, name);
+      if (result.is_error())
+        return result.take_error();
+      return fit::ok(starnix_syscalls::SUCCESS);
+    }
+    // case PR_SET_NAME:
+    // auto addr = UserAddress::from(arg2);
     default:
       return fit::error(errno(ENOSYS));
   }

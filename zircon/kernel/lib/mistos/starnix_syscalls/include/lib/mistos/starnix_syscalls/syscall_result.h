@@ -25,9 +25,13 @@ class SyscallResult {
   static SyscallResult From(uid_t value) { return SyscallResult(static_cast<uint64_t>(value)); }
   static SyscallResult From(size_t value) { return SyscallResult(static_cast<uint64_t>(value)); }
 
+  bool operator==(const SyscallResult& other) const { return value_ == other.value_; }
+
  private:
   uint64_t value_;
 };
+
+const SyscallResult SUCCESS = SyscallResult(0);
 
 }  // namespace starnix_syscalls
 

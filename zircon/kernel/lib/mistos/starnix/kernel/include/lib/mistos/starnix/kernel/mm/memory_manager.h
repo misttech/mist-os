@@ -9,6 +9,7 @@
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
@@ -99,7 +100,7 @@ enum class MappingNameType { None, Stack, Heap, Vdso, Vvar, File, Vma };
 struct MappingName {
   MappingNameType type;
   // NamespaceNode fileNode;
-  // FsString vmaName;
+  FsString vmaName;
 };
 
 struct PrivateAnonymous {};
@@ -160,8 +161,8 @@ struct MappingBacking {
 
 class Mapping : public fbl::RefCounted<Mapping> {
  public:
-  static zx_status_t New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
-                         MappingFlagsImpl flags, fbl::RefPtr<Mapping>* out);
+  static fbl::RefPtr<Mapping> New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
+                                  MappingFlagsImpl flags);
 
   const MappingName& name() const { return name_; }
   MappingName& name() { return name_; }
@@ -182,9 +183,11 @@ class Mapping : public fbl::RefCounted<Mapping> {
 #endif
   }
 
- private:
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Mapping);
+ public:
+  // C++
+  Mapping(const Mapping& other);
 
+ private:
   Mapping(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
           MappingName name);
 
@@ -386,14 +389,22 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   fit::result<Errno> protect(UserAddress addr, size_t length, ProtectionFlags prot_flags);
 
-  bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
-    return root_vmar == other->root_vmar;
-  }
+  fit::result<Errno> set_mapping_name(UserAddress addr, size_t length,
+                                      ktl::optional<FsString> name);
+
+  // #[cfg(test)]
+  fit::result<Errno, ktl::optional<FsString>> get_mapping_name(UserAddress addr);
 
   // #[cfg(test)]
   size_t get_mapping_count();
 
   UserAddress get_random_base(size_t length);
+
+ public:
+  /// impl MemoryManager
+  bool has_same_address_space(const fbl::RefPtr<MemoryManager>& other) const {
+    return root_vmar == other->root_vmar;
+  }
 
   fit::result<Errno, ktl::span<uint8_t>> unified_read_memory(const CurrentTask& current_task,
                                                              UserAddress addr,
