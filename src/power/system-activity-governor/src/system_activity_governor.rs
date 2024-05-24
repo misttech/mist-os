@@ -61,6 +61,8 @@ trait SuspendResumeListener {
     fn on_suspend(&self);
     /// Called after system suspension ends.
     async fn on_resume(&self);
+    /// Called when Suspender reports a suspend failure.
+    async fn on_suspend_fail(&self);
 }
 
 /// Controls access to execution_state and suspend management.
@@ -168,6 +170,7 @@ impl ExecutionStateManager {
     /// Attempts to suspend the system.
     async fn trigger_suspend(&self) {
         let listener = self.suspend_resume_listener.get().unwrap();
+        let mut suspend_failed = false;
         {
             tracing::debug!("trigger_suspend: acquiring inner lock");
             let inner = self.inner.lock().await;
@@ -209,6 +212,7 @@ impl ExecutionStateManager {
                             stats.success_count = stats.success_count.map(|c| c + 1);
                         } else {
                             tracing::warn!("Failed to suspend in Suspender");
+                            suspend_failed = true;
                             stats.fail_count = stats.fail_count.map(|c| c + 1);
                         }
                     }
@@ -227,13 +231,18 @@ impl ExecutionStateManager {
                 true
             });
         }
-        // At this point, the suspend request is no longer in flight and has
-        // been handled. With `inner` going out of scope, other tasks can modify
-        // flags and update the power level of execution_state. This is needed
-        // in order to allow listeners to request power level changes when they
-        // get the `ActivityGovernorListener::OnResume` call.
-
-        listener.on_resume().await;
+        // At this point, the suspend request is no longer in flight and has been handled. With
+        // `inner` going out of scope, other tasks can modify flags and update the power level of
+        // execution_state.
+        if suspend_failed {
+            // This is needed in order to allow listener to request power level changes when they
+            // process the suspend failure.
+            listener.on_suspend_fail().await;
+        } else {
+            // This is needed in order to allow listeners to request power level changes when they
+            // get the `ActivityGovernorListener::OnResume` call.
+            listener.on_resume().await;
+        }
     }
 }
 
@@ -948,6 +957,15 @@ impl SuspendResumeListener for SystemActivityGovernor {
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
             let _ = l.on_resume().await;
+        }
+    }
+
+    async fn on_suspend_fail(&self) {
+        // A client may call RegisterListener while handling on_suspend_fail which may cause another
+        // mutable borrow of listeners. Clone the listeners to prevent this.
+        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
+        for l in listeners {
+            let _ = l.on_suspend_fail().await;
         }
     }
 }

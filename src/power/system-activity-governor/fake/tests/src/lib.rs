@@ -158,6 +158,9 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
                 }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    responder.send().unwrap();
+                }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
                 }

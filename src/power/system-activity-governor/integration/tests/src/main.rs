@@ -1006,6 +1006,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
                 }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    responder.send().unwrap();
+                }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
                 }
@@ -1118,6 +1121,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    responder.send().unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
@@ -1234,6 +1240,117 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
 }
 
 #[fuchsia::test]
+async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    let suspend_controller = create_suspend_topology(&realm).await?;
+    // Trigger "boot complete" logic.
+    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
+
+    let (listener_client_end, mut listener_stream) =
+        fidl::endpoints::create_request_stream().unwrap();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
+    let (on_suspend_fail_tx, mut on_suspend_fail_rx) = mpsc::channel(1);
+
+    fasync::Task::local(async move {
+        let mut on_suspend_tx = on_suspend_tx;
+        let mut on_suspend_fail_tx = on_suspend_fail_tx;
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
+                    on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
+                    on_suspend_fail_tx.try_send(suspend_lease).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    drop(suspend_lease);
+
+    // OnSuspend should have been called.
+    on_suspend_rx.next().await.unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: None,
+            suspend_overhead: None,
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // At this point, the listener should have raised the execution_state power level to 2.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 2u64,
+                },
+                application_activity: {
+                    power_level: 1u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 0u64,
+                fail_count: 1u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: -1i64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    // Drop the lease and wait for suspend,
+    on_suspend_fail_rx.next().await.unwrap();
+
+    // OnSuspend should be called again.
+    on_suspend_rx.next().await.unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+
+    Ok(())
+}
+
+#[fuchsia::test]
 async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Result<()> {
     let (realm, _) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
@@ -1279,6 +1396,9 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
             match req {
                 fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                     on_resume_tx.start_send(lease(&suspend_controller, 1).await.unwrap()).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {}
