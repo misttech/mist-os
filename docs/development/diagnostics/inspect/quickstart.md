@@ -425,8 +425,7 @@ a value. The callback function is invoked when the property value is read.
 
 * {C++}
 
-  You can use `inspect::StringReference` to reduce the memory footprint
-  of an Inspect hierarchy that has a lot of repeated data. For instance,
+  The names of nodes and properties automatically use string interning.
 
   ```cpp
   using inspect::Inspector;
@@ -438,31 +437,7 @@ a value. The callback function is invoked when the property value is read.
   }
   ```
 
-  Will include 100 copies of the string `"child"` in your inspect
-  output.
-
-  Alternatively,
-
-  ```cpp
-  using inspect::Inspector;
-  using inspect::StringReference;
-
-  namespace {
-    const StringReference kChild("child");
-  }
-
-  Inspector inspector;
-  for (int i = 0; i < 100; i++) {
-    inspector.GetRoot().CreateChild(kChild, &inspector)
-  }
-  ```
-
   Will generate only one copy of `"child"` which is referenced 100 times.
-
-  This saves 16 bytes for each child node, and has a cost of 32 bytes
-  for the shared data. The net result is a savings of 1568 bytes.
-
-  This pattern is recommended anywhere a global constant key would be used.
 
 * {Rust}
 
