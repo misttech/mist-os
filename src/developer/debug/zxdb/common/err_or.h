@@ -5,88 +5,54 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_COMMON_ERR_OR_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_COMMON_ERR_OR_H_
 
-#include <lib/syslog/cpp/macros.h>
-
-#include <variant>
-
 #include "lib/fit/function.h"
+#include "src/developer/debug/shared/result.h"
 #include "src/developer/debug/zxdb/common/err.h"
 
 namespace zxdb {
 
+// Specialization of the generic Result class that uses an Err.
 template <typename T>
 class ErrOr {
-  using Variant = std::variant<Err, T>;
-
  public:
   // The Err must be set when constructing this object in an error state.
-  ErrOr(Err e) : variant_(std::move(e)) { FX_DCHECK(err().has_error()); }
+  ErrOr(Err e) : inner_(debug::Result<T, Err>(std::move(e))) {
+    FX_DCHECK(inner_.err().has_error());
+  }
 
-  // Constructs with a value.
-  ErrOr(T v) : variant_(std::move(v)) {}
+  ErrOr(T t) : inner_(debug::Result<T, Err>(std::move(t))) {}
 
-  bool ok() const { return !std::holds_alternative<Err>(variant_); }
-  bool has_error() const { return std::holds_alternative<Err>(variant_); }
+  bool ok() const { return inner_.ok(); }
+  bool has_error() const { return inner_.has_error(); }
 
-  // Requires that has_error be true or this function will crash. See also err_or_empty().
   const Err& err() const {
-    FX_DCHECK(has_error());
-    FX_DCHECK(std::get<Err>(variant_).has_error());  // Err should be set if present.
-    return std::get<Err>(variant_);
+    // |inner_| will assert if there is no error. This assert is to make sure that the Err is not
+    // ErrType::kNone.
+    FX_DCHECK(inner_.err().has_error());
+    return inner_.err();
   }
 
-  // Requires that has_error be false or this function will crash. See also [take_]value_or_empty().
-  const T& value() const {
-    FX_DCHECK(!has_error());
-    return std::get<T>(variant_);
-  }
-  T& value() {
-    FX_DCHECK(!has_error());
-    return std::get<T>(variant_);
-  }
-  T take_value() {  // Destructively moves the value out.
-    FX_DCHECK(!has_error());
-    return std::move(std::get<T>(variant_));
-  }
+  const T& value() const { return inner_.value(); }
+  T& value() { return inner_.value(); }
+  T take_value() { return std::move(inner_.take_value()); }
 
-  // Implicit converstion to bool indicating "OK".
-  explicit operator bool() const { return ok(); }
+  // Implicit conversion to bool indicating "OK".
+  explicit operator bool() const { return inner_.ok(); }
 
-  // These functions are designed for integrating with code that uses an (Err, T) pair. If this
-  // class isn't in the corresponding state, default constructs the missing object.
-  //
-  // The value version can optionally destructively move the value out (with the "take" variant)
-  // since some values are inefficient to copy and often this is used in a context where the value
-  // is no longer needed.
-  //
-  // The Err version does not allow destructive moving because it would leave this object in an
-  // inconsistent state where the error object is stored in the variant, but err().has_error() is
-  // not set. We assume that errors are unusual so are not worth optimizing for saving one string
-  // copy to avoid this.
   Err err_or_empty() const {  // Makes a copy of the error.
-    if (has_error())
-      return std::get<Err>(variant_);
+    if (inner_.has_error())
+      return inner_.err();
     return Err();
   }
   T value_or_empty() const {  // Makes a copy of the value.
-    if (!has_error())
-      return std::get<T>(variant_);
-    return T();
+    return inner_.value_or_empty();
   }
   T take_value_or_empty() {  // Destructively moves the value out.
-    if (!has_error())
-      return std::move(std::get<T>(variant_));
-    return T();
+    return std::move(inner_.take_value_or_empty());
   }
 
   // Comparators for unit tests.
-  bool operator==(const ErrOr<T>& other) const {
-    if (ok() != other.ok())
-      return false;
-    if (ok())
-      return value() == other.value();
-    return err() == other.err();
-  }
+  bool operator==(const ErrOr<T>& other) const { return inner_ == other.inner_; }
   bool operator!=(const ErrOr<T>& other) const { return !operator==(other); }
 
   // Adapts an old-style callback that takes two parameters and returns a newer one that takes an
@@ -98,7 +64,7 @@ class ErrOr {
   }
 
  private:
-  Variant variant_;
+  debug::Result<T, Err> inner_;
 };
 
 }  // namespace zxdb
