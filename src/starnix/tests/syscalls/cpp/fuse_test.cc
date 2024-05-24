@@ -1146,6 +1146,27 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
   fd.reset();
 }
 
+TEST_F(FuseServerTest, RevalidateEnoent) {
+  auto server = std::make_shared<FuseServer>();
+  ASSERT_TRUE(Mount(server));
+
+  std::string file = GetMountDir() + "/file";
+  {
+    test_helper::ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT));
+    ASSERT_TRUE(fd.is_valid());
+  }
+
+  server->fs().RootDir()->RemoveChild("file");
+
+  // We removed `file` from behind Starnix's back; we should be able to recreate the file.  Starnix
+  // should try and revalidate the file which will result in ENOENT, which should cause it to loop
+  // around.
+  {
+    test_helper::ScopedFD fd(open(file.c_str(), O_WRONLY | O_CREAT | O_EXCL));
+    ASSERT_TRUE(fd.is_valid());
+  }
+}
+
 // Run the checks in a separate thread where we drop the |CAP_DAC_OVERRIDE|
 // capability which bypasses file permission checks. See capabilities(7).
 template <typename F>

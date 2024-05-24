@@ -30,7 +30,7 @@ use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,
     errno, errno_from_code, error,
-    errors::{Errno, EINTR, EINVAL, ENOSYS},
+    errors::{Errno, EINTR, EINVAL, ENOENT, ENOSYS},
     file_mode::{Access, FileMode},
     mode, off_t,
     open_flags::OpenFlags,
@@ -960,12 +960,7 @@ impl DirEntryOps for FuseDirEntry {
         let parent = dir_entry.parent().expect("non-root nodes always has a parent");
         let parent = FuseNode::from_node(&parent.node);
         let name = dir_entry.local_name();
-        let response = parent.connection.lock().execute_operation(
-            current_task,
-            parent.nodeid,
-            FuseOperation::Lookup { name },
-        )?;
-        let FuseResponse::Entry(uapi::fuse_entry_out {
+        let uapi::fuse_entry_out {
             nodeid,
             generation,
             entry_valid,
@@ -973,9 +968,21 @@ impl DirEntryOps for FuseDirEntry {
             attr,
             attr_valid,
             attr_valid_nsec,
-        }) = response
-        else {
-            return error!(EINVAL);
+        } = match parent.connection.lock().execute_operation(
+            current_task,
+            parent.nodeid,
+            FuseOperation::Lookup { name },
+        ) {
+            Ok(FuseResponse::Entry(entry)) => entry,
+            Ok(_) => return error!(EINVAL),
+            Err(errno) => {
+                if errno == ENOENT {
+                    // The entry no longer exists.
+                    return Ok(false);
+                } else {
+                    return Err(errno);
+                };
+            }
         };
 
         if (nodeid != node.nodeid) || (generation != node.generation) {
