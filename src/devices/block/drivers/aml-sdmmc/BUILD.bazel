@@ -79,7 +79,7 @@ fuchsia_cc_driver(
 
 fuchsia_component_manifest(
     name = "manifest",
-    src = "meta/aml-sdmmc-no-banjo.cml",
+    src = "meta/aml-sdmmc.cml",
 )
 
 fuchsia_driver_component(
