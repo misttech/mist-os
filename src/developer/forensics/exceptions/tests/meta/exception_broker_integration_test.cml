@@ -19,6 +19,10 @@
             name: "exception_handler",
             url: "#meta/exceptions.cm",
         },
+        {
+            name: "config_suspend_disabled",
+            url: "#meta/config_suspend_disabled.cm",
+        },
     ],
     use: [
         {
@@ -70,6 +74,11 @@
             from: "parent",
             to: "#exception_handler",
             rights: [ "rw*" ],
+        },
+        {
+            from: "#config_suspend_disabled",
+            to: "#exception_handler",
+            config: "fuchsia.power.SuspendEnabled",
         },
     ],
 }

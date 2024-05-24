@@ -44,6 +44,8 @@ source_set("lib") {
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
+
+  deps = [ ":constants" ]
 }
 
 source_set("main") {
@@ -54,6 +56,7 @@ source_set("main") {
 
   deps = [
     ":lib",
+    "//src/developer/forensics:exceptions_config",
     "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/utils/component",
   ]

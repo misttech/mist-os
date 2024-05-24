@@ -107,7 +107,9 @@ class HandlerTest : public UnitTestFixture {
   void HandleException(
       zx::exception exception, zx::duration component_lookup_timeout,
       CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
-    handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout);
+    // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
+    handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout,
+                                               /*suspend_enabled=*/false);
 
     zx::process process;
     exception.get_process(&process);
@@ -123,7 +125,9 @@ class HandlerTest : public UnitTestFixture {
   void HandleException(
       zx::process process, zx::thread thread, zx::duration component_lookup_timeout,
       CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
-    handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout);
+    // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
+    handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout,
+                                               /*suspend_enabled=*/false);
 
     handler_->Send(zx::exception{}, std::move(process), std::move(thread), std::move(callback));
     RunLoopUntilIdle();

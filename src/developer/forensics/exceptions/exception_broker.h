@@ -27,7 +27,7 @@ class ExceptionBroker : public fuchsia::exception::Handler {
   static std::unique_ptr<ExceptionBroker> Create(async_dispatcher_t* dispatcher,
                                                  inspect::Node* inspect_root,
                                                  size_t max_num_handlers,
-                                                 zx::duration exception_ttl,
+                                                 zx::duration exception_ttl, bool suspend_enabled,
                                                  const char* override_filepath = nullptr);
 
   // fuchsia.exception.Handler implementation.
@@ -42,7 +42,7 @@ class ExceptionBroker : public fuchsia::exception::Handler {
 
  private:
   ExceptionBroker(async_dispatcher_t* dispatcher, inspect::Node* inspect_root,
-                  size_t max_num_handlers, zx::duration exception_ttl);
+                  size_t max_num_handlers, zx::duration exception_ttl, bool suspend_enabled);
   void AddToLimbo(zx::exception exception, fuchsia::exception::ExceptionInfo info);
 
   HandlerManager handler_manager_;

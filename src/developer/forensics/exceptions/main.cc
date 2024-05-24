@@ -7,6 +7,7 @@
 
 #include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/exceptions/exception_broker.h"
+#include "src/developer/forensics/exceptions_config.h"
 #include "src/developer/forensics/utils/component/component.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
@@ -30,8 +31,11 @@ int main() {
 
   forensics::component::Component component;
 
-  auto broker = ExceptionBroker::Create(component.Dispatcher(), component.InspectRoot(),
-                                        kMaxNumExceptionHandlers, kExceptionTtl);
+  const exceptions_config::Config config = exceptions_config::Config::TakeFromStartupHandle();
+  auto broker =
+      ExceptionBroker::Create(component.Dispatcher(), component.InspectRoot(),
+                              kMaxNumExceptionHandlers, kExceptionTtl, config.suspend_enabled());
+
   if (!broker)
     return EXIT_FAILURE;
 

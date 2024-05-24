@@ -21,8 +21,9 @@ using ProcessLaunchFailureTest = UnitTestFixture;
 // subprocesses and ended up handling the same exception in an unterminated loop. For more
 // information, see https://fxbug.dev/42137293.
 TEST_F(ProcessLaunchFailureTest, HandleOnlyOnce) {
+  // TODO(https://fxbug.dev/333110044): Test with suspend enabled + disabled.
   HandlerManager handler_manager(dispatcher(), CrashCounter(&InspectRoot()), 1u,
-                                 zx::duration::infinite());
+                                 zx::duration::infinite(), /*suspend_enabled=*/false);
   handler_manager.Handle(zx::exception{});
 }
 

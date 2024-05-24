@@ -35,7 +35,7 @@ std::string ExtractHandlerIndex(const std::string& process_name) {
 
 }  // namespace
 
-int main(const std::string& process_name) {
+int main(const std::string& process_name, const std::string& suspend_enabled_flag) {
   using forensics::exceptions::kComponentLookupTimeout;
   using Binding = fidl::Binding<forensics::exceptions::handler::CrashReporter,
                                 std::unique_ptr<fuchsia::exception::internal::CrashReporter>>;
@@ -53,7 +53,8 @@ int main(const std::string& process_name) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   auto crash_reporter = std::make_unique<forensics::exceptions::handler::CrashReporter>(
-      loop.dispatcher(), sys::ServiceDirectory::CreateFromNamespace(), kComponentLookupTimeout);
+      loop.dispatcher(), sys::ServiceDirectory::CreateFromNamespace(), kComponentLookupTimeout,
+      suspend_enabled_flag == kSuspendEnabledFlag);
 
   Binding crash_reporter_binding(std::move(crash_reporter), std::move(channel), loop.dispatcher());
   crash_reporter_binding.set_error_handler([&loop](const zx_status_t status) {

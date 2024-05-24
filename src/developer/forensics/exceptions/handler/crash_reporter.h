@@ -24,7 +24,7 @@ namespace handler {
 class CrashReporter : public fuchsia::exception::internal::CrashReporter {
  public:
   CrashReporter(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
-                zx::duration component_lookup_timeout);
+                zx::duration component_lookup_timeout, bool suspend_enabled);
 
   // |fuchsia::exception::internal::CrashReporter|
   virtual void Send(zx::exception exception, zx::process crashed_proces, zx::thread crashed_thread,

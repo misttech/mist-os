@@ -133,6 +133,11 @@
             ],
         },
         {
+            from: "parent",
+            to: "#exceptions",
+            config: "fuchsia.power.SuspendEnabled",
+        },
+        {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "#cobalt",
             to: "#network",

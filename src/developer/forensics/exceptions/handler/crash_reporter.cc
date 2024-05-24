@@ -95,11 +95,16 @@ fpromise::promise<> Delay(async_dispatcher_t* dispatcher, const zx::duration dur
 
 CrashReporter::CrashReporter(async_dispatcher_t* dispatcher,
                              std::shared_ptr<sys::ServiceDirectory> services,
-                             zx::duration component_lookup_timeout)
+                             zx::duration component_lookup_timeout, bool suspend_enabled)
     : dispatcher_(dispatcher),
       executor_(dispatcher_),
       services_(std::move(services)),
-      component_lookup_timeout_(component_lookup_timeout) {}
+      component_lookup_timeout_(component_lookup_timeout) {
+  if (suspend_enabled) {
+    // TODO(https://fxbug.dev/333110044): Acquire wake lease.
+    FX_LOGS(INFO) << "Suspend enabled";
+  }
+}
 
 void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
                          zx::thread crashed_thread, SendCallback callback) {

@@ -7,14 +7,16 @@ namespace forensics {
 namespace exceptions {
 
 HandlerManager::HandlerManager(async_dispatcher_t* dispatcher, CrashCounter crash_counter,
-                               size_t max_num_handlers, zx::duration exception_ttl)
+                               size_t max_num_handlers, zx::duration exception_ttl,
+                               bool suspend_enabled)
     : dispatcher_(dispatcher),
       crash_counter_(std::move(crash_counter)),
       exception_ttl_(exception_ttl) {
   handlers_.reserve(max_num_handlers);
   for (size_t i = 0; i < max_num_handlers; ++i) {
     handlers_.emplace_back(
-        dispatcher_, /*log_moniker=*/
+        dispatcher_, suspend_enabled,
+        /*log_moniker=*/
         [crash_counter = &crash_counter_](const std::string& moniker) {
           crash_counter->Increment(moniker);
         },

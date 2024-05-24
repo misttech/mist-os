@@ -190,16 +190,23 @@ fuchsia_component("exception_broker_config_test") {
   ]
 }
 
+# TODO(https://fxbug.dev/333110044): Test with suspend enabled/disabled.
 fuchsia_test_component("exception_broker_integration_test") {
   manifest = "meta/exception_broker_integration_test.cml"
 
   deps = [
+    ":config_suspend_disabled",
     ":crasher",
     ":exception_broker_integration_test_exe",
   ]
 
   # Depends on config_data which is a system capability.
   test_type = "system"
+}
+
+fuchsia_component_manifest("config_suspend_disabled") {
+  component_name = "config_suspend_disabled"
+  manifest = "meta/config_suspend_disabled.cml"
 }
 
 fuchsia_component("exception_broker_unittest") {

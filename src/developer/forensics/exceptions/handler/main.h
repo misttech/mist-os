@@ -11,7 +11,7 @@ namespace forensics {
 namespace exceptions {
 namespace handler {
 
-int main(const std::string& process_name);
+int main(const std::string& process_name, const std::string& suspend_enabled_flag);
 
 }  // namespace handler
 }  // namespace exceptions

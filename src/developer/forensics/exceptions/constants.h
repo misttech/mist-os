@@ -25,6 +25,9 @@ constexpr zx::duration kFileReportTimeout{zx::sec(15)};
 
 constexpr const char kCrashProcessStateKey[] = "crash.process.state";
 
+constexpr const char kSuspendEnabledFlag[] = "--suspend_enabled";
+constexpr const char kNoSuspendEnabledFlag[] = "--nosuspend_enabled";
+
 }  // namespace exceptions
 }  // namespace forensics
 

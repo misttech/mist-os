@@ -20,7 +20,7 @@ namespace exceptions {
 class ProcessHandler {
  public:
   using LogMonikerFn = fit::function<void(const std::string&)>;
-  ProcessHandler(async_dispatcher_t* dispatcher, LogMonikerFn log_moniker,
+  ProcessHandler(async_dispatcher_t* dispatcher, bool suspend_enabled, LogMonikerFn log_moniker,
                  fit::closure on_available);
   ~ProcessHandler();
 
@@ -31,6 +31,7 @@ class ProcessHandler {
 
  private:
   async_dispatcher_t* dispatcher_;
+  bool suspend_enabled_;
   LogMonikerFn log_moniker_;
   fit::closure on_available_;
 
