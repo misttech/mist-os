@@ -15,14 +15,15 @@ use crate::{
     time::utc,
     vfs::{
         buffers::InputBuffer,
+        file_system::SeLinuxContexts,
         fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
         fs_node_impl_not_dir,
         fuse::{new_fuse_fs, new_fusectl_fs},
         socket::{SocketAddress, SocketHandle, UnixSocket},
         CheckAccessReason, DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MultiContextOptions, PathBuilder,
-        RenameFlags, SeLinuxContexts, SimpleFileNode, SymlinkTarget, UnlinkKind,
+        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode,
+        SymlinkTarget, UnlinkKind,
     },
 };
 use fidl_fuchsia_io as fio;
@@ -710,11 +711,7 @@ impl FileSystemCreator for Arc<Kernel> {
                 // TODO(http://b/320436714): use hard-coded security context only for SELinux Fake
                 // mode once SELinux is implemented for the file subsystem.
                 if self.security_server.is_some() {
-                    let context = SeLinuxContexts::Multi(MultiContextOptions {
-                        def: Some(b"u:object_r:tmpfs:s0".into()),
-                        fs: None,
-                        root: None,
-                    });
+                    let context = SeLinuxContexts::from_defcontext(b"u:object_r:tmpfs:s0".into());
                     fs.selinux_context
                         .set(context)
                         .expect("initialize tmpfs selinux security context");

@@ -1,3 +1,7 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,8 +9,8 @@
 use crate::{
     task::{CurrentTask, Kernel},
     vfs::{
-        fs_args, DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        FsString, WeakFsNodeHandle, XattrOp,
+        file_system::SeLinuxContexts, fs_args, DirEntry, DirEntryHandle, FsNode, FsNodeHandle,
+        FsNodeInfo, FsNodeOps, FsStr, FsString, WeakFsNodeHandle, XattrOp,
     },
 };
 use linked_hash_map::LinkedHashMap;
@@ -21,7 +25,6 @@ use starnix_uapi::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
-    ops::Deref,
     sync::{Arc, Weak},
 };
 
@@ -91,71 +94,6 @@ impl FileSystemOptions {
         }
         self.source.as_ref()
     }
-}
-
-/// SELinux security context-related filesystem mount options. These options are documented in the
-/// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
-/// the `mount(8)` manpage.
-#[derive(Clone, Debug)]
-pub enum SeLinuxContexts {
-    /// The value of the `context=[security-context]` mount option. This option cannot be used in
-    /// conjunction with any other security context-related options. This option sets the security
-    /// context for the filesystem (superblock), the inode for its mountpoint, and the inode for
-    /// every file-like object in the filesystem. Among other things, this option overrides
-    /// the `"security.selinux"`-keyed extended attribute values for file-like objects in this
-    /// filesystem.
-    Context(FsString),
-    /// The value of the `(def|fs|root)context=[security-context]` mount options.
-    Multi(MultiContextOptions),
-}
-
-impl SeLinuxContexts {
-    pub fn try_from_mount_options(
-        options: &HashMap<FsString, FsString>,
-    ) -> Result<Option<Self>, Errno> {
-        let context_options = options
-            .into_iter()
-            .filter(|(key, _value)| {
-                ***key == b"context"
-                    || ***key == b"fscontext"
-                    || ***key == b"defcontext"
-                    || ***key == b"rootcontext"
-            })
-            .collect::<HashMap<_, _>>();
-
-        if let Some(context) = context_options.get(&&FsString::from(b"context")) {
-            // The `context` option is incompatible with all other `*context` options.
-            if context_options.len() > 1 {
-                return error!(EINVAL);
-            }
-            let context = *context;
-            Ok(Some(Self::Context(context.clone())))
-        } else if context_options.len() > 0 {
-            let get_option_value = |key: &[u8]| -> Option<FsString> {
-                context_options.get(&&FsString::from(key)).map(Deref::deref).map(Clone::clone)
-            };
-            let def = get_option_value(b"defcontext");
-            let fs = get_option_value(b"fscontext");
-            let root = get_option_value(b"rootcontext");
-            Ok(Some(Self::Multi(MultiContextOptions { def, fs, root })))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct MultiContextOptions {
-    /// The value of the `defcontext=[security-context]` mount option. This security context is used
-    /// to override the default security context used for file-like objects in the filesystem when
-    /// no other rules specify what security context should be used.
-    pub def: Option<FsString>,
-    /// The value of the `fscontext=[security-context]` mount option. This option is used to label
-    /// the filesystem (superblock) itself.
-    pub fs: Option<FsString>,
-    /// The value of the `rootcontext=[security-context]` mount option. This option is used to
-    /// (re)label the inode located at the filesystem mountpoint.
-    pub root: Option<FsString>,
 }
 
 struct LruCache {
@@ -261,28 +199,17 @@ impl FileSystem {
         current_task: &CurrentTask,
         node: &FsNodeHandle,
     ) -> WeakFsNodeHandle {
-        match self.selinux_context.get() {
-            Some(SeLinuxContexts::Context(context)) => {
+        if let Some(contexts) = self.selinux_context.get() {
+            let context = contexts.context().or(contexts.defcontext());
+            if let Some(context) = context {
                 let _ = node.ops().set_xattr(
                     node,
                     current_task,
                     "security.selinux".into(),
-                    context.as_ref(),
+                    context,
                     XattrOp::Create,
                 );
             }
-            Some(SeLinuxContexts::Multi(MultiContextOptions { def: Some(defcontext), .. })) => {
-                // TODO: Integrate with appropriate algorithm to label node; `defcontext=` mount
-                // option is a default that is used after other policy lookups are tried.
-                let _ = node.ops().set_xattr(
-                    node,
-                    current_task,
-                    "security.selinux".into(),
-                    defcontext.as_ref(),
-                    XattrOp::Create,
-                );
-            }
-            _ => {}
         }
         Arc::downgrade(node)
     }
