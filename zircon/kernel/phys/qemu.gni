@@ -96,6 +96,7 @@ if (current_cpu == "x64") {
       target_type = "linuxbiboot_executable"
       target_second_environment = phys_toolchain
       deps = []
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-bi-boot-shim($environment)" ]
       timeout = qemu_short_timeout
     },
   ]

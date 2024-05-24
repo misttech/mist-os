@@ -13,4 +13,4 @@
 #endif
 
 // Declared in legacy-boot-shim.h
-const char* kLegacyShimName = "linux-x86-boot-shim[" ARCH "]";
+const char* kLegacyShimName = "linux-x86-boot-shim[" BI ARCH "]";

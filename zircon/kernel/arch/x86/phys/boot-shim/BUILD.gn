@@ -32,6 +32,7 @@ legacy_shims = [
 
 linux_thin_shims = [
   # The 32-bit Linux/x896 shim can be booted directly by QEMU and others.
+  # It supports the 16-bit and 32-bit Linux/x86 boot protocols.
   {
     # TODO(https://fxbug.dev/335547883): Rename this to .32 or something
     # when the biboot is ready to be the default.
@@ -40,12 +41,21 @@ linux_thin_shims = [
   },
 
   # The 64-bit Linux/x86 shim can be booted directly by crosvm and others.
+  # It supports only the 64-bit Linux/x86 boot protocol.
   {
     name = "linux-x86-64-boot-shim"
     format = "linuxboot64"
   },
 ]
 legacy_shims += linux_thin_shims
+
+legacy_shims += [
+  # The best of both worlds!  This supports 16-bit, 32-bit, or 64-bit boots.
+  {
+    name = "linux-x86-bi-boot-shim"
+    format = "linuxbiboot"
+  },
+]
 
 group("boot-shim") {
   deps = []
@@ -127,14 +137,23 @@ if (toolchain_environment == "kernel.phys32" ||
           toolchain_variant.base == qemu.environment) {
         shim_executable(shim.name) {
           sources = [ "linux-x86-boot-shim.cc" ]
+          defines = [ "BI=\"\"" ]
           deps = [
             ":legacy-boot-shim",
             "..:${shim.format}",
-            "//zircon/kernel/phys:symbolize",
           ]
         }
       }
     }
+  }
+
+  shim_executable("linux-x86-bi-boot-shim") {
+    import = "../linuxbiboot_executable.gni"
+    target_type = "linuxbiboot_executable"
+
+    sources = [ "linux-x86-boot-shim.cc" ]
+    defines = [ "BI=\"[bi]\"" ]
+    deps = [ ":legacy-boot-shim" ]
   }
 
   if (toolchain_environment == "kernel.phys32") {
@@ -143,7 +162,6 @@ if (toolchain_environment == "kernel.phys32" ||
       deps = [
         ":legacy-boot-shim",
         "..:multiboot",
-        "//zircon/kernel/phys:symbolize",
       ]
 
       # Everything should find this via the //:images build API.
