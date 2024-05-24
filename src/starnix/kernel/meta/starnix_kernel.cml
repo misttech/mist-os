@@ -40,6 +40,11 @@
             path: "/boot/kernel",
         },
         {
+            directory: "dev-hrtimer",
+            rights: [ "r*" ],
+            path: "/dev/class/hrtimer",
+        },
+        {
             directory: "dev-gpu",
             rights: [ "r*" ],
             path: "/dev/class/gpu",

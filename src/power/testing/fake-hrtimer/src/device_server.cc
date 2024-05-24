@@ -20,15 +20,20 @@ using fuchsia_hardware_hrtimer::TimerProperties;
 
 DeviceServer::DeviceServer() = default;
 
-void DeviceServer::Start(StartRequest& _request, StartCompleter::Sync& completer) {
+void DeviceServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
   completer.Reply(zx::ok());
-}
-
-void DeviceServer::Stop(StopRequest& _request, StopCompleter::Sync& completer) {
-  completer.Reply(zx::ok());
+  std::this_thread::sleep_for(
+      std::chrono::nanoseconds(request.resolution().duration().value() * (request.ticks() + 1)));
   if (event_) {
     event_->signal(0, ZX_EVENT_SIGNALED);
   }
+}
+
+void DeviceServer::Stop(StopRequest& _request, StopCompleter::Sync& completer) {
+  if (event_) {
+    event_->reset();
+  }
+  completer.Reply(zx::ok());
 }
 
 void DeviceServer::GetTicksLeft(GetTicksLeftRequest& _request,

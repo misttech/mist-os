@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 #include <stdint.h>
+#include <sys/poll.h>
 #include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
 
+#include <chrono>
+#include <ctime>
 #include <thread>
 
 #include <gtest/gtest.h>
@@ -27,7 +30,10 @@ void run_timerfd_test(clockid_t clock_id) {
   its.it_value.tv_sec += 1;
   EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &its, nullptr));
 
-  std::this_thread::sleep_for(std::chrono::seconds(1));
+  // Test polling on the timer expiration signal.
+  pollfd pfd = {.fd = fd, .events = POLLIN};
+  ASSERT_EQ(poll(&pfd, 1, -1), 1);
+  EXPECT_EQ(pfd.revents, POLLIN);
 
   uint64_t val = 0;
   EXPECT_EQ(ssize_t(sizeof(val)), read(fd, &val, sizeof(val))) << errno;
@@ -47,6 +53,27 @@ void run_timerfd_test(clockid_t clock_id) {
   val = 0;
   EXPECT_EQ(ssize_t(sizeof(val)), read(fd, &val, sizeof(val))) << errno;
   EXPECT_EQ(1u, val);  // Timer went off one time.
+
+  // Update the time should clear the previous signal.
+  ASSERT_EQ(0, clock_gettime(CLOCK_REALTIME, &begin));
+  its.it_value = begin;
+  its.it_value.tv_sec += 1;
+  EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &its, nullptr));
+  std::this_thread::sleep_for(std::chrono::seconds(2));
+  its.it_value.tv_sec += 2;
+  EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &its, nullptr));
+  ASSERT_EQ(poll(&pfd, 1, 0), 0);
+  ASSERT_EQ(poll(&pfd, 1, -1), 1);
+
+  // Stop the timer should clear the previous signal.
+  ASSERT_EQ(0, clock_gettime(CLOCK_REALTIME, &begin));
+  its.it_value = begin;
+  its.it_value.tv_sec += 1;
+  EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &its, nullptr));
+  std::this_thread::sleep_for(std::chrono::seconds(2));
+  struct itimerspec itempty = {};
+  EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &itempty, nullptr));
+  ASSERT_EQ(poll(&pfd, 1, 0), 0);
 
   close(fd);
 }
