@@ -132,6 +132,7 @@ async fn default_gateway() {
         |fnet_routes_ext::InstalledRoute {
              route: fnet_routes_ext::Route { destination, action, properties: _ },
              effective_properties: _,
+             table_id: _,
          }| {
             match action {
                 fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {

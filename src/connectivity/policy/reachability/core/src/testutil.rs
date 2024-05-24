@@ -64,6 +64,7 @@ fn to_installed_route<I: ip::Ip>(
         effective_properties: fnet_routes_ext::EffectiveRouteProperties {
             metric: ARBITRARY_METRIC,
         },
+        table_id: 0,
     }
 }
 

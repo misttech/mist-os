@@ -909,11 +909,13 @@ async fn do_route_list<C: NetCliDepsConnector>(
         let mut t = Table::new();
         t.set_format(format::FormatBuilder::new().padding(2, 2).build());
 
-        t.set_titles(row!["Destination", "Gateway", "NICID", "Metric"]);
+        // TODO(https://fxbug.dev/342413894): Populate the table name.
+        t.set_titles(row!["Destination", "Gateway", "NICID", "Metric", "TableId"]);
         fn write_route<I: net_types::ip::Ip>(t: &mut Table, route: froutes_ext::InstalledRoute<I>) {
             let froutes_ext::InstalledRoute {
                 route: froutes_ext::Route { destination, action, properties: _ },
                 effective_properties: froutes_ext::EffectiveRouteProperties { metric },
+                table_id,
             } = route;
             let (device_id, next_hop) = match action {
                 froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
@@ -927,7 +929,7 @@ async fn do_route_list<C: NetCliDepsConnector>(
             };
             let next_hop = next_hop.map(|next_hop| next_hop.to_string());
             let next_hop = next_hop.as_ref().map_or("-", |s| s.as_str());
-            let () = add_row(t, row![destination, next_hop, device_id, metric]);
+            let () = add_row(t, row![destination, next_hop, device_id, metric, table_id]);
         }
 
         v4_routes.sort();
@@ -3102,10 +3104,10 @@ mac               -
     }
 
     fn wanted_route_list_tabular() -> String {
-        "Destination      Gateway        NICID    Metric
-         1.1.1.0/24       1.1.1.2        3        4
-         10.10.10.0/24    10.10.10.20    30       40
-         fe80::/64        -              300      400
+        "Destination      Gateway        NICID    Metric    TableId
+         1.1.1.0/24       1.1.1.2        3        4         0
+         10.10.10.0/24    10.10.10.20    30       40        1
+         fe80::/64        -              300      400       2
          "
         .to_string()
     }
@@ -3153,6 +3155,7 @@ mac               -
                     metric: Some(4),
                     ..Default::default()
                 }),
+                table_id: Some(0),
                 ..Default::default()
             }),
             froutes::EventV4::Existing(froutes::InstalledRouteV4 {
@@ -3174,6 +3177,7 @@ mac               -
                     metric: Some(40),
                     ..Default::default()
                 }),
+                table_id: Some(1),
                 ..Default::default()
             }),
             froutes::EventV4::Idle(froutes::Empty),
@@ -3198,6 +3202,7 @@ mac               -
                     metric: Some(400),
                     ..Default::default()
                 }),
+                table_id: Some(2),
                 ..Default::default()
             }),
             froutes::EventV6::Idle(froutes::Empty),

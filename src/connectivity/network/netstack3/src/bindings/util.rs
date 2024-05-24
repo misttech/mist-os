@@ -50,6 +50,7 @@ use tracing::debug;
 
 use crate::bindings::{
     devices::BindingId,
+    routes,
     socket::{IntoErrno, IpSockAddrExt, SockAddr},
     BindingsCtx,
 };
@@ -1177,16 +1178,19 @@ impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
     }
 }
 
-impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
-    for Entry<I::Addr, DeviceId<BindingsCtx>>
-{
+pub(crate) struct EntryAndTableId<I: Ip> {
+    pub(crate) entry: Entry<I::Addr, DeviceId<BindingsCtx>>,
+    pub(crate) table_id: routes::TableId<I>,
+}
+
+impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>> for EntryAndTableId<I> {
     type Error = Never;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
         self,
         ctx: &C,
     ) -> Result<fnet_routes_ext::InstalledRoute<I>, Never> {
-        let Entry { subnet, device, gateway, metric } = self;
+        let EntryAndTableId { entry: Entry { subnet, device, gateway, metric }, table_id } = self;
         let device: BindingId = device.try_into_fidl_with_ctx(ctx)?;
         let specified_metric = match metric {
             Metric::ExplicitMetric(value) => {
@@ -1212,6 +1216,7 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
             effective_properties: fnet_routes_ext::EffectiveRouteProperties {
                 metric: metric.value().into(),
             },
+            table_id: table_id.into(),
         })
     }
 }

@@ -33,7 +33,10 @@ use net_types::{
 };
 use netstack3_core::routes::AddableMetric;
 
-use crate::bindings::{util::TryIntoFidlWithContext, BindingsCtx, Ctx, IpExt};
+use crate::bindings::{
+    util::{EntryAndTableId, TryIntoFidlWithContext},
+    BindingsCtx, Ctx, IpExt,
+};
 
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
@@ -683,7 +686,7 @@ where
                     )
                 }
             }
-            let installed_route = entry
+            let installed_route = EntryAndTableId { entry, table_id }
                 .try_into_fidl_with_ctx(ctx.bindings_ctx())
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
@@ -697,7 +700,10 @@ where
             // Clone the Ctx so we can capture it in the mapping iterator. This
             // is cheaper than collecting into a Vec to eliminate the borrow.
             let mut ctx_clone = ctx.clone();
-            let removed = removed.map(|(entry, _generation)| to_entry::<I>(&mut ctx_clone, entry));
+            let removed = removed.map(|(entry, _generation)| EntryAndTableId {
+                entry: to_entry::<I>(&mut ctx_clone, entry),
+                table_id,
+            });
             notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table)
                 .await;
         }
@@ -709,13 +715,13 @@ where
 async fn notify_removed_routes<I: Ip>(
     bindings_ctx: &crate::bindings::BindingsCtx,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
-    removed_routes: impl IntoIterator<Item = netstack3_core::routes::Entry<I::Addr, DeviceId>>,
+    removed_routes: impl IntoIterator<Item = EntryAndTableId<I>>,
     table: &Table<I::Addr>,
 ) {
     let mut devices_with_default_routes: Option<HashSet<_>> = None;
     let mut already_notified_devices = HashSet::new();
 
-    for entry in removed_routes {
+    for EntryAndTableId { entry, table_id } in removed_routes {
         if entry.subnet.prefix() == 0 {
             // Check if there are now no default routes on this device.
             let devices_with_default_routes = (&mut devices_with_default_routes)
@@ -741,8 +747,9 @@ async fn notify_removed_routes<I: Ip>(
                 )
             }
         }
-        let installed_route =
-            entry.try_into_fidl_with_ctx(bindings_ctx).expect("failed to convert route to FIDL");
+        let installed_route = EntryAndTableId { entry, table_id }
+            .try_into_fidl_with_ctx(bindings_ctx)
+            .expect("failed to convert route to FIDL");
         dispatcher
             .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
                 installed_route,

@@ -2295,7 +2295,11 @@ async fn dhcpv4_client_restarts_after_delay() {
                 let find_default_route =
                     |routes: &HashSet<fnet_routes_ext::InstalledRoute<Ipv4>>| {
                         routes.iter().find_map(
-                            |fnet_routes_ext::InstalledRoute { route, effective_properties: _ }| {
+                            |fnet_routes_ext::InstalledRoute {
+                                 route,
+                                 effective_properties: _,
+                                 table_id: _,
+                             }| {
                                 (route.destination.prefix() == 0).then_some(route.clone())
                             },
                         )

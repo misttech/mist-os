@@ -563,6 +563,7 @@ mod tests {
                 },
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: 0 },
+            table_id: 0,
         }
     }
 

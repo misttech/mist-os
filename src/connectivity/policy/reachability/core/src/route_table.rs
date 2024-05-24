@@ -36,6 +36,9 @@ impl<I: Ip> TryFrom<fnet_routes_ext::InstalledRoute<I>> for Route {
         fnet_routes_ext::InstalledRoute {
             route: fnet_routes_ext::Route { destination, action, properties: _ },
             effective_properties: _,
+            // TODO(https://fxbug.dev/342634598): Reachability monitor should
+            // use the route table for the network it is monitoring.
+            table_id: _,
         }: fnet_routes_ext::InstalledRoute<I>,
     ) -> Result<Self, Self::Error> {
         match action {

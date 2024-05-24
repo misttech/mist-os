@@ -17,6 +17,11 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 )
 
+const (
+	V4MainRouteTableId = 0
+	V6MainRouteTableId = 1
+)
+
 // Route must have exclusively value types in order to be used as a map key with
 // the expected semantics (no pointers).
 type Route[A IpAddress] struct {

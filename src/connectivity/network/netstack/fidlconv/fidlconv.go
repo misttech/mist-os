@@ -395,6 +395,7 @@ func ToInstalledRoute(route routetypes.ExtendedRoute) InstalledRoute {
 		var installedRoute fnetRoutes.InstalledRouteV4
 		installedRoute.SetRoute(innerRoute)
 		installedRoute.SetEffectiveProperties(effectiveProperties)
+		installedRoute.SetTableId(V4MainRouteTableId)
 		return InstalledRoute{
 			Version: routetypes.IPv4,
 			V4:      installedRoute,
@@ -427,6 +428,7 @@ func ToInstalledRoute(route routetypes.ExtendedRoute) InstalledRoute {
 		var installedRoute fnetRoutes.InstalledRouteV6
 		installedRoute.SetRoute(innerRoute)
 		installedRoute.SetEffectiveProperties(effectiveProperties)
+		installedRoute.SetTableId(V6MainRouteTableId)
 		return InstalledRoute{
 			Version: routetypes.IPv6,
 			V6:      installedRoute,

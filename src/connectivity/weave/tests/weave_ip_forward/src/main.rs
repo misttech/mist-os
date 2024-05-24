@@ -144,6 +144,7 @@ async fn run_fuchsia_node() -> Result<(), Error> {
         let fnet_routes_ext::InstalledRoute {
             route: fnet_routes_ext::Route { destination, action, properties: _ },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+            table_id: _,
         } = route;
         let (outbound_interface, next_hop) = match action {
             fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
