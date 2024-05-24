@@ -4,7 +4,7 @@
 
 use camino::Utf8PathBuf;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Diagnostics configuration options for the diagnostics area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
@@ -43,19 +43,43 @@ pub struct ArchivistPipeline {
     pub files: Vec<Utf8PathBuf>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, JsonSchema)]
+#[derive(Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(into = "String")]
 pub enum PipelineType {
-    /// A pipeline that makes all diagnostics data visible.
-    /// This is not available on user builds.
-    All,
     /// A pipeline for feedback data.
     Feedback,
-    /// A pipeline for legacy metrics.
-    LegacyMetrics,
-    /// A pipeline for LoWPAN metrics.
-    Lowpan,
+    /// A custom pipeline.
+    Custom(String),
+}
+
+impl Serialize for PipelineType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Feedback => serializer.serialize_str("feedback"),
+            Self::Custom(s) => serializer.serialize_str(&s),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PipelineType {
+    fn deserialize<D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let variant = String::deserialize(de)?.to_lowercase();
+        match variant.as_str() {
+            "feedback" => Ok(PipelineType::Feedback),
+            "lowpan" => Ok(PipelineType::Custom("lowpan".into())),
+            "legacy_metrics" => Ok(PipelineType::Custom("legacy_metrics".into())),
+            other => {
+                Err(D::Error::unknown_variant(other, &["feedback", "lowpan", "legacy_metrics"]))
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for PipelineType {
@@ -64,10 +88,8 @@ impl std::fmt::Display for PipelineType {
             f,
             "{}",
             match self {
-                Self::All => "all",
                 Self::Feedback => "feedback",
-                Self::LegacyMetrics => "legacy_metrics",
-                Self::Lowpan => "lowpan",
+                Self::Custom(name) => &name,
             }
         )
     }
@@ -77,14 +99,6 @@ impl From<PipelineType> for String {
     fn from(t: PipelineType) -> Self {
         t.to_string()
     }
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename = "snake_case")]
-pub enum ArchivistPipelineName {
-    Feedback,
-    Lowpan,
-    LegacyMetrics,
 }
 
 /// Diagnostics configuration options for the sampler configuration area.
