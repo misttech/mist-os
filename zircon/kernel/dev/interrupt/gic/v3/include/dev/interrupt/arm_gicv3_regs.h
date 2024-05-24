@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
-#define ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
+#ifndef ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
+#define ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
 
 #include <lib/mmio-ptr/mmio-ptr.h>
 
@@ -103,6 +103,11 @@ inline void arm_gicv3_write64(uint64_t reg, uint64_t value) {
 #define GICD_PIDR2_ARCHREV_SHIFT 4
 #define GICD_PIDR2_ARCHREV_MASK 0xf
 
+/* GICR_WAKER bit definitions and masks */
+
+#define WAKER_CHILDREN_ASLEEP BIT_32(2)
+#define WAKER_PROCESSOR_SLEEP BIT_32(1)
+
 /* redistributor registers */
 
 #define GICR_SGI_OFFSET (GICR_OFFSET + 0x10000)
@@ -175,4 +180,4 @@ static inline void gic_write_sgi1r(uint64_t val) {
   __dsb(ARM_MB_SY);
 }
 
-#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
+#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
