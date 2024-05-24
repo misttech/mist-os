@@ -88,7 +88,11 @@ pub async fn validate_routes(
 }
 
 fn format(report: &RouteReport) -> Row {
-    let capability = textwrap::fill(&report.capability, CAPABILITY_COLUMN_WIDTH);
+    let capability = match report.availability {
+        Some(cm_rust::Availability::Required) | None => report.capability.clone(),
+        Some(availability) => format!("{} ({})", report.capability, availability),
+    };
+    let capability = textwrap::fill(&capability, CAPABILITY_COLUMN_WIDTH);
     let (mark, summary) = if let Some(summary) = &report.error_summary {
         let mark = ansi_term::Color::Red.paint("[✗]");
         let summary = textwrap::fill(summary, SUMMARY_COLUMN_WIDTH);
