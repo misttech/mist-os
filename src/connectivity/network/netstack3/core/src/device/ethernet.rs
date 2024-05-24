@@ -48,11 +48,11 @@ use crate::{
         WeakDeviceIdentifier,
     },
     ip::{
-        device::nud::{
+        nud::{
             LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId,
             NudUserConfig,
         },
-        types::IpTypesIpExt,
+        IpTypesIpExt,
     },
     routes::WrapBroadcastMarker,
     sync::{Mutex, RwLock},
@@ -921,8 +921,8 @@ mod tests {
             testutil::{FakeDeviceId, FakeWeakDeviceId},
             DeviceSendFrameError,
         },
-        ip::device::nud::{
-            self, api::NeighborApi, DelegateNudContext, DynamicNeighborUpdateSource,
+        ip::nud::{
+            self, DelegateNudContext, DynamicNeighborUpdateSource, NeighborApi,
             UseDelegateNudContext,
         },
         testutil::{IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V4},
@@ -1225,7 +1225,7 @@ mod tests {
 
     impl UseDelegateNudContext for FakeCoreCtx {}
     impl DelegateNudContext<Ipv4> for FakeCoreCtx {
-        type Delegate = ArpNudCtx<Self>;
+        type Delegate<T> = ArpNudCtx<T>;
     }
 
     impl ArpConfigContext for FakeInnerCtx {

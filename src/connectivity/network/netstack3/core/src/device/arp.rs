@@ -26,7 +26,7 @@ use crate::{
     },
     counters::Counter,
     device::{link::LinkDevice, DeviceIdContext, FrameDestination, WeakDeviceIdentifier},
-    ip::device::nud::{
+    ip::nud::{
         self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
         NudBindingsTypes, NudConfigContext, NudContext, NudHandler, NudSenderContext, NudState,
         NudTimerId, NudUserConfig,
@@ -558,7 +558,7 @@ fn handle_packet<
 // TODO(https://fxbug.dev/42075782): allow this default to be overridden.
 //
 // [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_TIMER_DEFAULT.get();
+const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::nud::RETRANS_TIMER_DEFAULT.get();
 
 fn send_arp_request<
     D: ArpDevice,
@@ -655,7 +655,7 @@ mod tests {
             link::testutil::FakeLinkDeviceId,
             testutil::{FakeDeviceId, FakeWeakDeviceId},
         },
-        ip::device::nud::{
+        ip::nud::{
             testutil::{
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
@@ -833,9 +833,9 @@ mod tests {
         }
     }
 
-    impl UseDelegateNudContext for FakeCoreCtxImpl {}
-    impl DelegateNudContext<Ipv4> for FakeCoreCtxImpl {
-        type Delegate = ArpNudCtx<Self>;
+    impl UseDelegateNudContext for FakeArpCtx {}
+    impl DelegateNudContext<Ipv4> for FakeArpCtx {
+        type Delegate<T> = ArpNudCtx<T>;
     }
 
     impl NudIcmpContext<Ipv4, EthernetLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {

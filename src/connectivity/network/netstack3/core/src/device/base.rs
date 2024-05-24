@@ -36,7 +36,7 @@ use crate::{
     },
     filter::FilterBindingsTypes,
     inspect::Inspectable,
-    ip::device::nud::{LinkResolutionContext, NudCounters},
+    ip::nud::{LinkResolutionContext, NudCounters},
     sync::RwLock,
     Inspector,
 };

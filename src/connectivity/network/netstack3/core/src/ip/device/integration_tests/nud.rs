@@ -45,15 +45,12 @@ use crate::{
     },
     ip::{
         self,
-        device::{
-            nud::{
-                self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete,
-                NeighborState, NudConfigContext, NudContext, NudHandler, Reachable, Stale,
-            },
-            slaac::SlaacConfiguration,
-            Ipv6DeviceConfigurationUpdate,
-        },
+        device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration},
         icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT},
+        nud::{
+            self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete,
+            NeighborState, NudConfigContext, NudContext, NudHandler, Reachable, Stale,
+        },
     },
     routes::{AddableEntry, AddableMetric},
     testutil::{
@@ -688,7 +685,7 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: Ip + TestIpExt + I
     {
         net.with_context(ctx, |ctx| {
             let (mut core_ctx, bindings_ctx) = ctx.contexts();
-            ip::forwarding::testutil::add_route::<I, _, _>(
+            ip::testutil::add_route::<I, _, _>(
                 &mut core_ctx,
                 bindings_ctx,
                 AddableEntry {

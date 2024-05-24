@@ -27,16 +27,12 @@ use crate::{
     },
     ip::{
         device::{
-            api::SetIpAddressPropertiesError,
-            config::UpdateIpConfigurationError,
-            dad::DadTimerId,
-            nud::{self, LinkResolutionResult},
-            router_solicitation::RsTimerId,
-            slaac::SlaacConfiguration,
-            AddressRemovedReason, IpAddressId as _, IpDeviceConfiguration, IpDeviceFlags,
-            IpDeviceStateContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
+            AddressRemovedReason, DadTimerId, IpAddressId as _, IpDeviceConfiguration,
+            IpDeviceFlags, IpDeviceStateContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, RsTimerId,
+            SetIpAddressPropertiesError, SlaacConfiguration, UpdateIpConfigurationError,
         },
-        gmp::{mld::MldTimerId, GmpDelayedReportTimerId},
+        gmp::MldTimerId,
+        nud::{self, LinkResolutionResult},
         IpAddressState, IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
         Ipv6DeviceConfigurationUpdate, Lifetime,
     },
@@ -282,27 +278,24 @@ fn enable_disable_ipv6() {
             ),
             (
                 TimerId(TimerIdInner::Ipv6Device(
-                    Ipv6DeviceTimerId::Dad(DadTimerId {
-                        device_id: device_id.downgrade(),
-                        addr: IpDeviceStateContext::<Ipv6, _>::get_address_id(
+                    Ipv6DeviceTimerId::Dad(DadTimerId::new(
+                        device_id.downgrade(),
+                        IpDeviceStateContext::<Ipv6, _>::get_address_id(
                             &mut ctx.core_ctx(),
                             &device_id,
                             ll_addr.ipv6_unicast_addr().into(),
                         )
                         .unwrap()
                         .downgrade(),
-                    })
+                    ))
                     .into(),
                 )),
                 ..,
             ),
             (
                 TimerId(TimerIdInner::Ipv6Device(
-                    Ipv6DeviceTimerId::Mld(MldTimerId(GmpDelayedReportTimerId {
-                        device: device_id.downgrade(),
-                        _marker: Default::default(),
-                    }))
-                    .into(),
+                    Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade()))
+                        .into(),
                 )),
                 ..,
             ),

@@ -42,21 +42,14 @@ use crate::{
     },
     ip::{
         self,
-        base::{AddressStatus, IpDeviceStateContext},
         device::{
-            config::{
-                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-                Ipv6DeviceConfigurationUpdate,
-            },
-            slaac::SlaacConfiguration,
-            IpDeviceAddr,
+            IpDeviceAddr, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
         },
-        reassembly::FragmentTimerId,
         socket::IpSocketContext,
-        types::{AddableEntryEither, AddableMetric, RawMetric, ResolvedRoute, RoutableIpAddr},
-        types::{Destination, NextHop},
-        DropReason, IpLayerTimerId, Ipv4PresentAddressStatus, ReceivePacketAction,
-        ResolveRouteError,
+        AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason, FragmentTimerId,
+        IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus, NextHop, RawMetric,
+        ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
     },
     testutil::{
         new_rng, new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _,

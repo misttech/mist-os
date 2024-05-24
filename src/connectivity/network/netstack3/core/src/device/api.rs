@@ -37,7 +37,7 @@ use crate::{
             IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
             IpDeviceTimerId, Ipv6DeviceConfigurationContext,
         },
-        types::RawMetric,
+        RawMetric,
     },
     sync::RemoveResourceResultWithContext,
     Inspector,

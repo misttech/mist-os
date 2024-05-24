@@ -11,11 +11,11 @@ use crate::{
     device::{arp::ArpCounters, DeviceCounters, EthernetDeviceCounters},
     inspect::Inspector,
     ip::{
-        device::nud::{NudCounters, NudCountersInner},
         icmp::{
             IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
             NdpRxCounters, NdpTxCounters,
         },
+        nud::{NudCounters, NudCountersInner},
         IpCounters, IpLayerIpExt,
     },
     transport::{

@@ -11,25 +11,13 @@ use net_types::{
     ip::{Ip, Ipv4, Ipv6},
     NonMappedAddr, SpecifiedAddr,
 };
-use packet_formats::ip::IpExt;
 
 use crate::{
     device::DeviceId,
-    filter::{
-        FilterBindingsContext, FilterContext, FilterHandler, FilterImpl, FilterIpContext,
-        NatContext, State,
-    },
-    ip::{IpDeviceStateContext, IpLayerIpExt, IpStateInner},
+    filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State},
+    ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
-
-pub trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsContext> {
-    type Handler<'a>: FilterHandler<I, BC>
-    where
-        Self: 'a;
-
-    fn filter_handler(&mut self) -> Self::Handler<'_>;
-}
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>

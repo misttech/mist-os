@@ -24,21 +24,19 @@ use crate::{
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId, WeakDeviceIdentifier},
     ip::{
+        self,
         device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
-        forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
-            self,
-            socket::{IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSockets},
-            IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
+            self, IcmpIpTransportContext, IcmpRxCounters, IcmpSocketId, IcmpSocketSet,
+            IcmpSocketState, IcmpSockets, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
             Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
         },
-        path_mtu::{PmtuCache, PmtuContext},
         raw::RawIpSocketMap,
-        reassembly::{FragmentContext, IpPacketFragmentCache},
-        IpCounters, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
-        IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
-        MulticastMembershipHandler, ResolveRouteError, TransparentLocalDelivery,
-        TransportReceiveError,
+        ForwardingTable, FragmentContext, IpCounters, IpDeviceStateContext,
+        IpForwardingDeviceContext, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
+        IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
+        IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
+        ResolveRouteError, TransparentLocalDelivery, TransportReceiveError,
     },
     routes::ResolvedRoute,
     socket::{datagram, SocketIpAddr},
@@ -93,7 +91,7 @@ where
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     ) {
-        crate::ip::device::join_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
+        ip::device::join_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
     }
 
     fn leave_multicast_group(
@@ -102,7 +100,7 @@ where
         device: &Self::DeviceId,
         addr: MulticastAddr<I::Addr>,
     ) {
-        crate::ip::device::leave_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
+        ip::device::leave_ip_multicast::<I, _, _>(self, bindings_ctx, device, addr)
     }
 
     fn select_device_for_multicast_group(
@@ -111,7 +109,7 @@ where
     ) -> Result<Self::DeviceId, ResolveRouteError> {
         let remote_ip = SocketIpAddr::new_from_multicast(addr);
         let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
-            crate::ip::resolve_route_to_destination(self, None, None, Some(remote_ip))?;
+            ip::resolve_route_to_destination(self, None, None, Some(remote_ip))?;
         // NB: Because the original address is multicast, it cannot be assigned
         // to a local interface. Thus local delivery should never be requested.
         debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);
@@ -450,7 +448,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::socket::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
+            &mut icmp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
@@ -543,7 +541,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::socket::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
+            &mut icmp::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
         ) -> O,
     >(
         &mut self,
@@ -571,7 +569,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<I>>
             + LockBefore<crate::lock_ordering::TcpDemux<I>>
             + LockBefore<crate::lock_ordering::UdpBoundMap<I>>,
-    > icmp::socket::StateContext<I, BC> for CoreCtx<'_, BC, L>
+    > icmp::IcmpSocketStateContext<I, BC> for CoreCtx<'_, BC, L>
 {
     type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketState<I>>;
 
@@ -710,8 +708,7 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
-    DelegatedOrderedLockAccess<icmp::socket::BoundSockets<I, WeakDeviceId<BT>, BT>>
-    for StackState<BT>
+    DelegatedOrderedLockAccess<icmp::BoundSockets<I, WeakDeviceId<BT>, BT>> for StackState<BT>
 {
     type Inner = IcmpSockets<I, WeakDeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
@@ -722,7 +719,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::IcmpBoundMap<I>
 {
-    type Data = icmp::socket::BoundSockets<I, WeakDeviceId<BT>, BT>;
+    type Data = icmp::BoundSockets<I, WeakDeviceId<BT>, BT>;
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>

@@ -5029,8 +5029,8 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeCoreCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkSpec,
-                FakeTimerCtx, InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
+                FakeCoreCtx, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeTimerCtx,
+                InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
                 WithFakeTimerContext,
             },
             ContextProvider, InstantContext, ReferenceNotifiers,
@@ -5043,8 +5043,9 @@ mod tests {
         },
         filter::{FilterBindingsTypes, TransportPacketSerializer},
         ip::{
-            device::{nud::LinkResolutionContext, state::IpDeviceStateIpExt},
+            device::IpDeviceStateIpExt,
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
+            nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
             socket::{
                 testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
                 IpSockSendError, IpSocketBindingsContext, MmsError, SendOptions,

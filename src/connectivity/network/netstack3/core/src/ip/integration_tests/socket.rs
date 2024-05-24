@@ -35,8 +35,7 @@ use crate::{
             DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
             IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
         },
-        types::{AddableEntryEither, AddableMetric, RawMetric},
-        IpDeviceContext, ResolveRouteError,
+        AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric, ResolveRouteError,
     },
     socket::SocketIpAddr,
     testutil::{
@@ -487,7 +486,7 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
     assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
     // Make sure that sending on an unroutable socket fails.
-    ip::forwarding::testutil::del_routes_to_subnet::<I, _, _>(
+    ip::testutil::del_routes_to_subnet::<I, _, _>(
         &mut core_ctx.context(),
         &mut bindings_ctx,
         subnet,

@@ -22,11 +22,11 @@ use crate::{
     ip::{
         self,
         device::{
-            config::IpDeviceConfigurationHandler,
-            nud::{NudBindingsContext, NudContext},
-            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
+            IpDeviceIpExt,
         },
         icmp::{IcmpBindingsContext, IcmpBindingsTypes},
+        nud::{NudBindingsContext, NudContext},
         raw::{RawIpSocketMapContext, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
         socket::IpSocketContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
@@ -73,7 +73,7 @@ pub trait CoreContext<I, BC>:
     transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
     + TcpContext<I, BC>
-    + ip::icmp::socket::StateContext<I, BC>
+    + ip::icmp::IcmpSocketStateContext<I, BC>
     + ip::icmp::IcmpStateContext
     + IpLayerContext<I, BC>
     + NudContext<I, EthernetLinkDevice, BC>
@@ -99,7 +99,7 @@ where
     O: transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
-        + ip::icmp::socket::StateContext<I, BC>
+        + ip::icmp::IcmpSocketStateContext<I, BC>
         + ip::icmp::IcmpStateContext
         + IpLayerContext<I, BC>
         + NudContext<I, EthernetLinkDevice, BC>

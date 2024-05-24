@@ -20,6 +20,11 @@ _all_core_crates = [
   "filter:netstack3-filter-instrumented",
   "filter:netstack3-filter-loom",
   "filter:netstack3-filter-testutils",
+  "ip:netstack3-ip",
+  "ip:netstack3-ip-benchmarks",
+  "ip:netstack3-ip-instrumented",
+  "ip:netstack3-ip-loom",
+  "ip:netstack3-ip-testutils",
   "sync:netstack3-sync",
   "sync:netstack3-sync-instrumented",
   "sync:netstack3-sync-loom",
@@ -63,51 +68,22 @@ rustc_library_with_features("netstack3-core") {
     "src/device/socket/integration_tests.rs",
     "src/device/state.rs",
     "src/filter/integration.rs",
-    "src/ip/api.rs",
-    "src/ip/base.rs",
-    "src/ip/device.rs",
-    "src/ip/device/api.rs",
-    "src/ip/device/config.rs",
-    "src/ip/device/dad.rs",
     "src/ip/device/integration.rs",
     "src/ip/device/integration_tests/base.rs",
     "src/ip/device/integration_tests/ndp.rs",
     "src/ip/device/integration_tests/nud.rs",
     "src/ip/device/integration_tests/route_discovery.rs",
     "src/ip/device/integration_tests/slaac.rs",
-    "src/ip/device/nud.rs",
-    "src/ip/device/nud/api.rs",
-    "src/ip/device/opaque_iid.rs",
-    "src/ip/device/route_discovery.rs",
-    "src/ip/device/router_solicitation.rs",
-    "src/ip/device/slaac.rs",
-    "src/ip/device/state.rs",
-    "src/ip/forwarding.rs",
-    "src/ip/gmp.rs",
-    "src/ip/gmp/igmp.rs",
-    "src/ip/gmp/integration_tests.rs",
-    "src/ip/gmp/mld.rs",
-    "src/ip/icmp.rs",
-    "src/ip/icmp/integration_tests.rs",
-    "src/ip/icmp/socket.rs",
     "src/ip/integration.rs",
     "src/ip/integration_tests/base.rs",
     "src/ip/integration_tests/forwarding.rs",
+    "src/ip/integration_tests/gmp.rs",
+    "src/ip/integration_tests/icmp.rs",
     "src/ip/integration_tests/socket.rs",
-    "src/ip/ipv6.rs",
-    "src/ip/path_mtu.rs",
-    "src/ip/raw.rs",
     "src/ip/raw/integration.rs",
-    "src/ip/raw/protocol.rs",
-    "src/ip/raw/state.rs",
-    "src/ip/reassembly.rs",
-    "src/ip/socket.rs",
-    "src/ip/types.rs",
     "src/lib.rs",
     "src/lock_ordering.rs",
     "src/marker.rs",
-    "src/socket/datagram.rs",
-    "src/socket/datagram/spec_context.rs",
     "src/state.rs",
     "src/testutil.rs",
     "src/time.rs",
@@ -151,17 +127,14 @@ rustc_library_with_features("netstack3-core") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",
-    "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
-    "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
   ]
-  _testutil_deps = [ "//third_party/rust_crates:assert_matches" ]
+  _testutil_deps = [ "//third_party/rust_crates:zerocopy" ]
   test_deps = [
     "//src/connectivity/lib/ip-test-macro",
     "//src/connectivity/lib/net-declare",
@@ -178,6 +151,7 @@ rustc_library_with_features("netstack3-core") {
       deps += [
         "base:netstack3-base",
         "filter:netstack3-filter",
+        "ip:netstack3-ip",
         "sync:netstack3-sync",
       ]
     },
@@ -192,11 +166,13 @@ rustc_library_with_features("netstack3-core") {
       non_test_deps = [
         "base:netstack3-base-instrumented",
         "filter:netstack3-filter-instrumented",
+        "ip:netstack3-ip-instrumented",
         "sync:netstack3-sync-instrumented",
       ]
       test_deps += [
         "base:netstack3-base-testutils",
         "filter:netstack3-filter-testutils",
+        "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
         "//third_party/rust_crates:scopeguard",
       ]
@@ -227,10 +203,12 @@ rustc_library_with_features("netstack3-core") {
       _core_deps = [
         "base:netstack3-base-testutils",
         "filter:netstack3-filter-testutils",
+        "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
       ]
 
       deps += _core_deps
+      deps += _testutil_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - _core_deps
@@ -246,6 +224,7 @@ rustc_library_with_features("netstack3-core") {
       _core_deps = [
         "base:netstack3-base-benchmarks",
         "filter:netstack3-filter-benchmarks",
+        "ip:netstack3-ip-benchmarks",
         "sync:netstack3-sync",
       ]
       deps += _core_deps
@@ -273,9 +252,11 @@ rustc_library_with_features("netstack3-core") {
         _core_deps = [
           "base:netstack3-base-loom",
           "filter:netstack3-filter-loom",
+          "ip:netstack3-ip-loom",
           "sync:netstack3-sync-loom",
         ]
         deps += _core_deps
+        deps += _testutil_deps
 
         # Guard against bad crate variants.
         assert_no_deps = _all_core_crates - _core_deps
@@ -361,6 +342,7 @@ group("tests") {
     ":netstack3-core-test-package",
     "base:tests",
     "filter:tests",
+    "ip:tests",
     "lock-order:tests",
     "macros:tests",
     "sync:tests",

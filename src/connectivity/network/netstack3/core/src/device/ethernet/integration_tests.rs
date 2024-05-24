@@ -34,10 +34,8 @@ use crate::{
     ip::{
         self,
         device::{
-            api::AddIpAddrSubnetError,
-            config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
-            slaac::SlaacConfiguration,
-            IpAddressId as _,
+            AddIpAddrSubnetError, IpAddressId as _, IpDeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
         },
     },
     testutil::{

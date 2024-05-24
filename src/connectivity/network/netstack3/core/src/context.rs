@@ -58,10 +58,13 @@ pub use netstack3_base::{
 // individually so it's easier to split things into separate crates and avoids
 // playing whack-a-mole with single markers that work for some traits/crates but
 // not others.
-impl<BC: BindingsContext, L> crate::ip::base::UseTransportIpContextBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::base::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::socket::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::socket::UseDeviceIpSocketHandlerBlanket
+impl<BC: BindingsContext, L> crate::ip::marker::UseTransportIpContextBlanket
+    for CoreCtx<'_, BC, L>
+{
+}
+impl<BC: BindingsContext, L> crate::ip::marker::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> crate::ip::marker::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> crate::ip::marker::UseDeviceIpSocketHandlerBlanket
     for CoreCtx<'_, BC, L>
 {
 }
@@ -181,61 +184,10 @@ mod locked {
 /// Fake implementations of context traits.
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
-    use alloc::sync::Arc;
-    use core::fmt::Debug;
-
-    #[cfg(test)]
-    use crate::filter::{FilterBindingsContext, FilterHandlerProvider};
-    use crate::{
-        device::link::LinkDevice,
-        ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
-        sync::Mutex,
-    };
-
     pub use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
         FakeInstantCtx, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeTimerCtx,
         FakeTimerCtxExt, FakeTracingCtx, InstantAndData, PendingFrame, PendingFrameData,
         StepResult, WithFakeFrameContext, WithFakeTimerContext,
     };
-
-    impl<D: LinkDevice, Id, Event: Debug, State, FrameMeta> LinkResolutionContext<D>
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        type Notifier = FakeLinkResolutionNotifier<D>;
-    }
-
-    /// A fake implementation of [`LinkResolutionNotifier`].
-    #[derive(Debug)]
-    pub struct FakeLinkResolutionNotifier<D: LinkDevice>(
-        Arc<Mutex<Option<Result<D::Address, crate::error::AddressResolutionFailed>>>>,
-    );
-
-    impl<D: LinkDevice> LinkResolutionNotifier<D> for FakeLinkResolutionNotifier<D> {
-        type Observer =
-            Arc<Mutex<Option<Result<D::Address, crate::error::AddressResolutionFailed>>>>;
-
-        fn new() -> (Self, Self::Observer) {
-            let inner = Arc::new(Mutex::new(None));
-            (Self(inner.clone()), inner)
-        }
-
-        fn notify(self, result: Result<D::Address, crate::error::AddressResolutionFailed>) {
-            let Self(inner) = self;
-            let mut inner = inner.lock();
-            assert_eq!(*inner, None, "resolved link address was set more than once");
-            *inner = Some(result);
-        }
-    }
-
-    #[cfg(test)]
-    impl<I: packet_formats::ip::IpExt, BC: FilterBindingsContext, S, Meta, DeviceId>
-        FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
-    {
-        type Handler<'a> = crate::filter::NoopImpl where Self: 'a;
-
-        fn filter_handler(&mut self) -> Self::Handler<'_> {
-            crate::filter::NoopImpl
-        }
-    }
 }

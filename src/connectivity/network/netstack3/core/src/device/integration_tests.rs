@@ -27,13 +27,9 @@ use crate::{
     },
     error, for_any_device_id,
     ip::device::{
-        api::AddIpAddrSubnetError,
-        config::{
-            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate,
-        },
-        slaac::SlaacConfiguration,
-        state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
+        AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
+        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
+        Lifetime, SlaacConfiguration,
     },
     testutil::{
         CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,

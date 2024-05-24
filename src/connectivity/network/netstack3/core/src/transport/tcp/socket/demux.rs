@@ -29,7 +29,7 @@ use crate::{
     error::NotFoundError,
     filter::TransportPacketSerializer,
     ip::{
-        base::TransparentLocalDelivery, socket::MmsError, IpSockCreationError, IpTransportContext,
+        socket::MmsError, IpSockCreationError, IpTransportContext, TransparentLocalDelivery,
         TransportIpContext, TransportReceiveError,
     },
     socket::{

@@ -15,9 +15,9 @@ use crate::{
     },
     ip::{
         self,
-        device::nud::NudCounters,
-        device::slaac::SlaacCounters,
+        device::SlaacCounters,
         icmp::{IcmpState, NdpCounters},
+        nud::NudCounters,
         IpCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State,
     },
     socket::datagram,
@@ -107,7 +107,7 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn ndp_counters(&self) -> &NdpCounters {
-        &self.ipv6.icmp().ndp_counters
+        &self.ipv6.icmp.ndp_counters
     }
 
     pub(crate) fn device_counters(&self) -> &DeviceCounters {
@@ -135,17 +135,17 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
-        &self.ipv6.slaac_counters()
+        &self.ipv6.slaac_counters
     }
 
     pub(crate) fn inner_ip_state<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {
-        I::map_ip((), |()| self.ipv4.inner(), |()| self.ipv6.inner())
+        I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
 
     pub(crate) fn inner_icmp_state<I: ip::IpExt + datagram::DualStackIpExt>(
         &self,
     ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
-        I::map_ip((), |()| &self.ipv4.icmp().inner, |()| &self.ipv6.icmp().inner)
+        I::map_ip((), |()| &self.ipv4.icmp.inner, |()| &self.ipv6.icmp.inner)
     }
 }
 

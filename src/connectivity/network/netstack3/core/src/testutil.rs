@@ -34,6 +34,7 @@ use net_types::{
     },
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
+use netstack3_filter::FilterTimerId;
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
@@ -60,20 +61,18 @@ use crate::{
         PureIpWeakDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
         WeakDeviceId,
     },
-    filter::{FilterBindingsTypes, FilterTimerId},
+    filter::FilterBindingsTypes,
     ip::{
+        self,
         device::{
-            config::{
-                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-                Ipv6DeviceConfigurationUpdate,
-            },
-            nud::{self, LinkResolutionContext, LinkResolutionNotifier},
-            IpDeviceEvent,
+            IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate,
         },
-        icmp::socket::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
+        icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
+        nud::{self, LinkResolutionContext, LinkResolutionNotifier},
         raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes},
-        types::{AddableEntry, AddableMetric, RawMetric},
-        IpDeviceConfiguration, IpLayerEvent, IpLayerTimerId,
+        AddRouteError, AddableEntryEither, AddableMetric, IpDeviceConfiguration, IpLayerEvent,
+        IpLayerTimerId, RawMetric,
     },
     state::{StackState, StackStateBuilder},
     sync::{DynDebugReferences, Mutex},
@@ -227,7 +226,7 @@ where
         A::Version: crate::IpExt,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::ip::device::join_ip_multicast::<A::Version, _, _>(
+        ip::device::join_ip_multicast::<A::Version, _, _>(
             core_ctx,
             bindings_ctx,
             device,
@@ -246,7 +245,7 @@ where
         A::Version: crate::IpExt,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::ip::device::leave_ip_multicast::<A::Version, _, _>(
+        ip::device::leave_ip_multicast::<A::Version, _, _>(
             core_ctx,
             bindings_ctx,
             device,
@@ -265,7 +264,7 @@ where
     where
         A::Version: crate::IpExt,
     {
-        use crate::ip::{
+        use ip::{
             AddressStatus, IpDeviceStateContext, IpLayerIpExt, Ipv4PresentAddressStatus,
             Ipv6PresentAddressStatus,
         };
@@ -314,10 +313,10 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         match I::VERSION {
             IpVersion::V4 => {
-                crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+                ip::receive_ipv4_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
             }
             IpVersion::V6 => {
-                crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+                ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
             }
         }
     }
@@ -325,23 +324,15 @@ where
     /// Add a route directly to the forwarding table.
     pub fn add_route(
         &mut self,
-        entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
-    ) -> Result<(), crate::ip::forwarding::AddRouteError> {
+        entry: AddableEntryEither<crate::device::DeviceId<BC>>,
+    ) -> Result<(), AddRouteError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match entry {
-            crate::ip::types::AddableEntryEither::V4(entry) => {
-                crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
-                    core_ctx,
-                    bindings_ctx,
-                    entry,
-                )
+            AddableEntryEither::V4(entry) => {
+                ip::testutil::add_route::<Ipv4, _, _>(core_ctx, bindings_ctx, entry)
             }
-            crate::ip::types::AddableEntryEither::V6(entry) => {
-                crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(
-                    core_ctx,
-                    bindings_ctx,
-                    entry,
-                )
+            AddableEntryEither::V6(entry) => {
+                ip::testutil::add_route::<Ipv6, _, _>(core_ctx, bindings_ctx, entry)
             }
         }
     }
@@ -354,32 +345,20 @@ where
     ) -> Result<(), crate::error::NotFoundError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         match subnet {
-            SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
-                Ipv4,
-                _,
-                _,
-            >(core_ctx, bindings_ctx, subnet),
-            SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
-                Ipv6,
-                _,
-                _,
-            >(core_ctx, bindings_ctx, subnet),
+            SubnetEither::V4(subnet) => {
+                ip::testutil::del_routes_to_subnet::<Ipv4, _, _>(core_ctx, bindings_ctx, subnet)
+            }
+            SubnetEither::V6(subnet) => {
+                ip::testutil::del_routes_to_subnet::<Ipv6, _, _>(core_ctx, bindings_ctx, subnet)
+            }
         }
     }
 
     /// Deletes all routes targeting `device`.
     pub(crate) fn del_device_routes(&mut self, device: &DeviceId<BC>) {
         let (core_ctx, bindings_ctx) = self.contexts();
-        crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
-            core_ctx,
-            bindings_ctx,
-            device,
-        );
-        crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(
-            core_ctx,
-            bindings_ctx,
-            device,
-        );
+        ip::testutil::del_device_routes::<Ipv4, _, _>(core_ctx, bindings_ctx, device);
+        ip::testutil::del_device_routes::<Ipv6, _, _>(core_ctx, bindings_ctx, device);
     }
 
     /// Removes all of the routes through the device, then removes the device.
@@ -879,15 +858,19 @@ impl DeferredResourceRemovalContext for FakeBindingsCtx {
     }
 }
 
+/// A link resolution notifier that ignores all notifications.
+#[derive(Debug)]
+pub struct NoOpLinkResolutionNotifier;
+
 impl<D: LinkDevice> LinkResolutionContext<D> for FakeBindingsCtx {
-    type Notifier = ();
+    type Notifier = NoOpLinkResolutionNotifier;
 }
 
-impl<D: LinkDevice> LinkResolutionNotifier<D> for () {
+impl<D: LinkDevice> LinkResolutionNotifier<D> for NoOpLinkResolutionNotifier {
     type Observer = ();
 
     fn new() -> (Self, Self::Observer) {
-        ((), ())
+        (NoOpLinkResolutionNotifier, ())
     }
 
     fn notify(self, _result: Result<D::Address, crate::error::AddressResolutionFailed>) {}
@@ -1159,7 +1142,7 @@ impl FakeCtxBuilder {
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
             ctx.test_api()
-                .add_route(crate::ip::types::AddableEntryEither::without_gateway(
+                .add_route(AddableEntryEither::without_gateway(
                     subnet,
                     device.clone().into(),
                     AddableMetric::ExplicitMetric(RawMetric(0)),
@@ -1333,36 +1316,6 @@ pub enum DispatchedEvent {
     NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>),
 }
 
-impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>
-    for IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, I, FakeInstant>
-{
-    fn from(
-        e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>,
-    ) -> IpDeviceEvent<WeakDeviceId<FakeBindingsCtx>, I, FakeInstant> {
-        match e {
-            IpDeviceEvent::AddressAdded { device, addr, state, valid_until } => {
-                IpDeviceEvent::AddressAdded { device: device.downgrade(), addr, state, valid_until }
-            }
-            IpDeviceEvent::AddressRemoved { device, addr, reason } => {
-                IpDeviceEvent::AddressRemoved { device: device.downgrade(), addr, reason }
-            }
-            IpDeviceEvent::AddressStateChanged { device, addr, state } => {
-                IpDeviceEvent::AddressStateChanged { device: device.downgrade(), addr, state }
-            }
-            IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
-                IpDeviceEvent::EnabledChanged { device: device.downgrade(), ip_enabled }
-            }
-            IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => {
-                IpDeviceEvent::AddressPropertiesChanged {
-                    device: device.downgrade(),
-                    addr,
-                    valid_until,
-                }
-            }
-        }
-    }
-}
-
 /// A tuple of device ID and IP version.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -1381,58 +1334,15 @@ pub enum DispatchedFrame {
 
 impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>> for DispatchedEvent {
     fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>) -> DispatchedEvent {
-        I::map_ip(
-            e,
-            |e| DispatchedEvent::IpDeviceIpv4(e.into()),
-            |e| DispatchedEvent::IpDeviceIpv6(e.into()),
-        )
-    }
-}
-
-impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>>
-    for IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, I>
-{
-    fn from(
-        e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>,
-    ) -> IpLayerEvent<WeakDeviceId<FakeBindingsCtx>, I> {
-        match e {
-            IpLayerEvent::AddRoute(AddableEntry { subnet, device, gateway, metric }) => {
-                IpLayerEvent::AddRoute(AddableEntry {
-                    subnet,
-                    device: device.downgrade(),
-                    gateway,
-                    metric,
-                })
-            }
-            IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
-                IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway }
-            }
-        }
+        let e = e.map_device(|d| d.downgrade());
+        I::map_ip(e, |e| DispatchedEvent::IpDeviceIpv4(e), |e| DispatchedEvent::IpDeviceIpv6(e))
     }
 }
 
 impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>> for DispatchedEvent {
     fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>) -> DispatchedEvent {
-        I::map_ip(
-            e,
-            |e| DispatchedEvent::IpLayerIpv4(e.into()),
-            |e| DispatchedEvent::IpLayerIpv6(e.into()),
-        )
-    }
-}
-
-impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>>
-    for nud::Event<Mac, EthernetWeakDeviceId<FakeBindingsCtx>, I, FakeInstant>
-{
-    fn from(
-        nud::Event { device, kind, addr, at }: nud::Event<
-            Mac,
-            EthernetDeviceId<FakeBindingsCtx>,
-            I,
-            FakeInstant,
-        >,
-    ) -> Self {
-        Self { device: device.downgrade(), kind, addr, at }
+        let e = e.map_device(|d| d.downgrade());
+        I::map_ip(e, |e| DispatchedEvent::IpLayerIpv4(e), |e| DispatchedEvent::IpLayerIpv6(e))
     }
 }
 
@@ -1442,11 +1352,8 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
     fn from(
         e: nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInstant>,
     ) -> DispatchedEvent {
-        I::map_ip(
-            e,
-            |e| DispatchedEvent::NeighborIpv4(e.into()),
-            |e| DispatchedEvent::NeighborIpv6(e.into()),
-        )
+        let e = e.map_device(|d| d.downgrade());
+        I::map_ip(e, |e| DispatchedEvent::NeighborIpv4(e), |e| DispatchedEvent::NeighborIpv6(e))
     }
 }
 

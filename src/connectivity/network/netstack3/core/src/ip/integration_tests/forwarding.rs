@@ -17,8 +17,7 @@ use crate::{
     },
     error::NotFoundError,
     ip::{
-        forwarding::AddRouteError,
-        types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric},
+        AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
     },
     testutil::{CtxPairExt as _, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC},
     StackStateBuilder,

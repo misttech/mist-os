@@ -31,13 +31,11 @@ use crate::{
         FrameDestination,
     },
     ip::{
+        self,
         device::{
-            opaque_iid::StableIidSecret,
-            slaac::{
-                self, InnerSlaacTimerId, SlaacConfiguration, TemporarySlaacAddressConfiguration,
-            },
-            testutil::with_assigned_ipv6_addr_subnets,
-            IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+            testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId,
+            IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
+            StableIidSecret, TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
         },
         icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
     },
@@ -162,7 +160,7 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
         ),
     );
 
-    let stable_addr_sub = slaac::testutil::calculate_addr_sub(
+    let stable_addr_sub = ip::device::testutil::calculate_slaac_addr_sub(
         SUBNET,
         local_mac.to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC),
     );
@@ -211,7 +209,8 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
     let temp_addr_preferred_until_start =
         temp_addr_preferred_until_end - ((ONE_HOUR.get() * 3) / 5);
 
-    let timers = slaac::testutil::collect_slaac_timers_integration(&mut ctx.core_ctx(), &device_id);
+    let timers =
+        ip::device::testutil::collect_slaac_timers_integration(&mut ctx.core_ctx(), &device_id);
     assert_eq!(
         timers.get(&InnerSlaacTimerId::InvalidateSlaacAddress { addr: stable_addr_sub.addr() }),
         Some(&stable_addr_lifetime_until)
@@ -232,8 +231,8 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
     assert!(timers
         .get(&InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet: temp_addr_sub })
         .is_some_and(|time| {
-            (temp_addr_preferred_until_start - slaac::MIN_REGEN_ADVANCE.get()
-                ..temp_addr_preferred_until_end - slaac::MIN_REGEN_ADVANCE.get())
+            (temp_addr_preferred_until_start - SLAAC_MIN_REGEN_ADVANCE.get()
+                ..temp_addr_preferred_until_end - SLAAC_MIN_REGEN_ADVANCE.get())
                 .contains(time)
         }));
     // Disabling IP should remove all the SLAAC addresses.

@@ -16,13 +16,11 @@ use crate::{
     },
     filter::FilterApi,
     ip::{
-        api::{RoutesAnyApi, RoutesApi},
-        device::{
-            api::{DeviceIpAnyApi, DeviceIpApi},
-            nud::api::NeighborApi,
-        },
-        icmp::socket::IcmpEchoSocketApi,
+        device::{DeviceIpAnyApi, DeviceIpApi},
+        icmp::IcmpEchoSocketApi,
+        nud::NeighborApi,
         raw::RawIpSocketApi,
+        RoutesAnyApi, RoutesApi,
     },
     time::TimerId,
     transport::{tcp::socket::TcpApi, udp::UdpApi},

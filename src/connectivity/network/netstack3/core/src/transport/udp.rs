@@ -17,7 +17,7 @@ use core::{
 
 use derivative::Derivative;
 use either::Either;
-use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
+use lock_order::lock::DelegatedOrderedLockAccess;
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
@@ -42,29 +42,24 @@ use crate::{
     error::{LocalAddressError, SocketError, ZonedAddressError},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{
-        base::TransparentLocalDelivery,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        HopLimits, IpTransportContext, MulticastMembershipHandler, TransportIpContext,
-        TransportReceiveError,
+        HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
+        TransportIpContext, TransportReceiveError,
     },
     socket::{
         datagram::{
-            self,
-            spec_context::{
-                DatagramSpecBoundStateContext, DatagramSpecStateContext,
-                DualStackDatagramSpecBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
-            },
-            BoundSocketState as DatagramBoundSocketState,
+            self, BoundSocketState as DatagramBoundSocketState,
             BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet,
-            DatagramSocketSpec, DatagramStateContext, DualStackConnState, DualStackConverter,
-            DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
-            ExpectedUnboundError, InUseError, IpExt, IpOptions,
-            MulticastMembershipInterfaceSelector, NonDualStackConverter,
-            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
-            SetMulticastMembershipError, SocketHopLimits, SocketInfo,
-            SocketState as DatagramSocketState, WrapOtherStackIpOptions,
+            DatagramSocketSpec, DatagramSpecBoundStateContext, DatagramSpecStateContext,
+            DatagramStateContext, DualStackConnState, DualStackConverter,
+            DualStackDatagramBoundStateContext, DualStackDatagramSpecBoundStateContext,
+            DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError,
+            IpExt, IpOptions, MulticastMembershipInterfaceSelector, NonDualStackConverter,
+            NonDualStackDatagramBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
+            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
+            SocketInfo, SocketState as DatagramSocketState, WrapOtherStackIpOptions,
             WrapOtherStackIpOptionsMut,
         },
         AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr,
@@ -998,22 +993,22 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Debug for UdpSocke
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>
-    OrderedLockAccess<UdpSocketState<I, D, BT>> for UdpSocketId<I, D, BT>
+    DelegatedOrderedLockAccess<UdpSocketState<I, D, BT>> for UdpSocketId<I, D, BT>
 {
-    type Lock = RwLock<UdpSocketState<I, D, BT>>;
-    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+    type Inner = datagram::ReferenceState<I, D, Udp<BT>>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
         let Self(rc) = self;
-        OrderedLockRef::new(&rc.state)
+        &*rc
     }
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, BT> {
-    #[cfg(any(test, feature = "testutils"))]
     /// Returns the inner state for this socket, sidestepping locking
     /// mechanisms.
+    #[cfg(any(test, feature = "testutils"))]
     pub fn state(&self) -> &RwLock<UdpSocketState<I, D, BT>> {
         let Self(rc) = self;
-        &rc.state
+        rc.state()
     }
 
     /// Returns a means to debug outstanding references to this socket.
@@ -1031,7 +1026,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, 
     /// Returns external data associated with this socket.
     pub fn external_data(&self) -> &BT::ExternalData<I> {
         let Self(rc) = self;
-        &rc.external_data
+        rc.external_data()
     }
 }
 
@@ -1575,7 +1570,11 @@ fn try_dual_stack_deliver<
 ///
 /// Implementing this marker trait for a type enables a blanket implementation
 /// of `IpTransportContext` given the other requirements are met.
-pub trait UseUdpIpTransportContextBlanket {}
+// For some reason rustc insists that this trait is not used, but it's required
+// to mark types that want the blanket impl. This should be lifted when this
+// type is pulled into the UDP crate and the trait is exported.
+#[allow(unused)]
+pub(crate) trait UseUdpIpTransportContextBlanket {}
 
 impl<
         I: IpExt,
@@ -2599,7 +2598,7 @@ mod tests {
         },
         error::RemoteAddressError,
         ip::{
-            device::state::IpDeviceStateIpExt,
+            device::IpDeviceStateIpExt,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             ResolveRouteError, SendIpPacketMeta,
@@ -6943,7 +6942,7 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::create_primary_id(());
+            let primary = datagram::testutil::create_primary_id(());
             let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
@@ -7005,7 +7004,7 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::create_primary_id(());
+            let primary = datagram::testutil::create_primary_id(());
             let id = UdpSocketId(crate::sync::PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id

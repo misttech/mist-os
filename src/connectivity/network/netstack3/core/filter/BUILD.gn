@@ -82,7 +82,7 @@ rustc_library_with_features("netstack3-filter") {
       {
         target_name = "netstack3-filter-loom"
         testonly = true
-        features = []
+        features = [ "testutils" ]
         deps += [
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
         ]

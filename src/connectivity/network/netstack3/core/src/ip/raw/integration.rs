@@ -23,19 +23,19 @@ impl<
 {
     fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I>) -> O>(
         &mut self,
-        RawIpSocketId(state_rc): &RawIpSocketId<I, BT>,
+        id: &RawIpSocketId<I, BT>,
         cb: F,
     ) -> O {
-        let mut locked = self.adopt(&**state_rc);
+        let mut locked = self.adopt(id.state());
         let guard = locked.read_lock_with::<lock_ordering::RawIpSocketState<I>, _>(|c| c.right());
         cb(&guard)
     }
     fn with_locked_state_mut<O, F: FnOnce(&mut RawIpSocketLockedState<I>) -> O>(
         &mut self,
-        RawIpSocketId(state_rc): &RawIpSocketId<I, BT>,
+        id: &RawIpSocketId<I, BT>,
         cb: F,
     ) -> O {
-        let mut locked = self.adopt(&**state_rc);
+        let mut locked = self.adopt(id.state());
         let mut guard =
             locked.write_lock_with::<lock_ordering::RawIpSocketState<I>, _>(|c| c.right());
         cb(&mut guard)

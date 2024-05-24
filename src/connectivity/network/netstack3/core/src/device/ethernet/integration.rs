@@ -51,11 +51,11 @@ use crate::{
         EthernetDeviceCounters, EthernetDeviceId, EthernetWeakDeviceId,
     },
     ip::{
-        device::nud::{
+        icmp::NdpCounters,
+        nud::{
             DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext,
             NudState, NudUserConfig, UseDelegateNudContext,
         },
-        icmp::NdpCounters,
     },
     socket::SocketIpAddr,
     BindingsContext, BindingsTypes, CoreCtx,
@@ -422,7 +422,7 @@ impl<BT: BindingsTypes, L> UseDelegateNudContext for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     DelegateNudContext<Ipv4> for CoreCtx<'_, BC, L>
 {
-    type Delegate = ArpNudCtx<Self>;
+    type Delegate<T> = ArpNudCtx<T>;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv4>>>
