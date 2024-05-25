@@ -837,8 +837,220 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
   return fit::ok(brk.current);
 }
 
-fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target) const {
+fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target) {
   // return fit::error(errno(1));
+  // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on pager-backed
+  // VMOs we can remove the hack below (which also won't be performant). For now, as a workaround,
+  // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
+
+  struct VmoWrapper : public fbl::SinglyLinkedListable<ktl::unique_ptr<VmoWrapper>> {
+    zx::ArcVmo vmo;
+
+    // Required to instantiate fbl::DefaultKeyedObjectTraits.
+    zx_koid_t GetKey() const {
+      zx_info_handle_basic_t info;
+      zx_status_t status =
+          (*vmo)->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+      if (status != ZX_OK) {
+        impossible_error(status);
+      }
+      return info.koid;
+    }
+
+    // Required to instantiate fbl::DefaultHashTraits.
+    static size_t GetHash(zx_koid_t key) { return key; }
+  };
+
+  struct VmoInfo : public fbl::SinglyLinkedListable<ktl::unique_ptr<VmoInfo>> {
+    zx::ArcVmo vmo;
+    uint64_t size;
+    // Indicates whether or not the VMO needs to be replaced on the parent as well.
+    bool needs_snapshot_on_parent;
+
+    // Required to instantiate fbl::DefaultKeyedObjectTraits.
+    zx_koid_t GetKey() const {
+      zx_info_handle_basic_t info;
+      zx_status_t status =
+          (*vmo)->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+      if (status != ZX_OK) {
+        impossible_error(status);
+      }
+      return info.koid;
+    }
+
+    // Required to instantiate fbl::DefaultHashTraits.
+    static size_t GetHash(zx_koid_t key) { return key; }
+  };
+
+  // Clones the `vmo` and returns the `VmoInfo` with the clone.
+  auto clone_vmo = [](const zx::ArcVmo& vmo,
+                      zx_rights_t rights) -> fit::result<Errno, ktl::unique_ptr<VmoInfo>> {
+    zx_info_vmo_t info = {};
+    zx_status_t status = (*vmo)->get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      impossible_error(status);
+    }
+    bool pager_backed = (info.flags & ZX_INFO_VMO_PAGER_BACKED) == ZX_INFO_VMO_PAGER_BACKED;
+    if (pager_backed && !((rights & ZX_RIGHT_WRITE) == ZX_RIGHT_WRITE)) {
+      fbl::AllocChecker ac;
+      auto vmo_info = ktl::unique_ptr<VmoInfo>(new (&ac) VmoInfo{
+          .vmo = vmo, .size = info.size_bytes, .needs_snapshot_on_parent = false});
+      ASSERT(ac.check());
+      return fit::ok(ktl::move(vmo_info));
+    } else {
+      zx::vmo cloned_vmo;
+      status = (*vmo)->create_child(
+          (pager_backed ? ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE : ZX_VMO_CHILD_SNAPSHOT) |
+              ZX_VMO_CHILD_RESIZABLE,
+          0, info.size_bytes, &cloned_vmo);
+      if (status != ZX_OK) {
+        return fit::error(get_errno_for_map_err(status));
+      }
+      if ((rights & ZX_RIGHT_EXECUTE) == ZX_RIGHT_EXECUTE) {
+        status = cloned_vmo.replace_as_executable({}, &cloned_vmo);
+        if (status != ZX_OK) {
+          impossible_error(status);
+        }
+      }
+      fbl::AllocChecker ac;
+      zx::ArcVmo arc_vmo = fbl::AdoptRef(new (&ac) zx::Arc<zx::vmo>(ktl::move(cloned_vmo)));
+      ASSERT(ac.check());
+      auto vmo_info =
+          ktl::unique_ptr<VmoInfo>(new (&ac) VmoInfo{.vmo = ktl::move(arc_vmo),
+                                                     .size = info.size_bytes,
+                                                     .needs_snapshot_on_parent = pager_backed});
+      ASSERT(ac.check());
+      return fit::ok(ktl::move(vmo_info));
+    }
+  };
+
+  auto snapshot_vmo = [](const zx::ArcVmo& vmo, uint64_t size,
+                         zx_rights_t rights) -> fit::result<Errno, ktl::unique_ptr<VmoWrapper>> {
+    zx::vmo cloned_vmo;
+    zx_status_t status = (*vmo)->create_child(
+        ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_RESIZABLE, 0, size, &cloned_vmo);
+    if (status != ZX_OK) {
+      return fit::error(get_errno_for_map_err(status));
+    }
+    if ((rights & ZX_RIGHT_EXECUTE) == ZX_RIGHT_EXECUTE) {
+      status = cloned_vmo.replace_as_executable({}, &cloned_vmo);
+      if (status != ZX_OK) {
+        impossible_error(status);
+      }
+    }
+    fbl::AllocChecker ac;
+    zx::ArcVmo arc_vmo = fbl::AdoptRef(new (&ac) zx::Arc<zx::vmo>(ktl::move(cloned_vmo)));
+    ASSERT(ac.check());
+    auto vmo_info = ktl::unique_ptr<VmoWrapper>(new (&ac) VmoWrapper{.vmo = ktl::move(arc_vmo)});
+    ASSERT(ac.check());
+    return fit::ok(ktl::move(vmo_info));
+  };
+
+  auto& _state = *state.Write();
+  auto target_state = target->state.Write();
+
+  fbl::HashTable<zx_koid_t, ktl::unique_ptr<VmoInfo>> child_vmos;
+  fbl::HashTable<zx_koid_t, ktl::unique_ptr<VmoWrapper>> replaced_vmos;
+
+  for (auto& [range, mapping] : _state.mappings.iter()) {
+    if (mapping.flags_.contains(MappingFlagsEnum::DONTFORK)) {
+      continue;
+    }
+
+    auto result = ktl::visit(
+        MappingBacking::overloaded{
+            [&, &crange = range,
+             &cmapping = mapping](MappingBackingVmo& backing) -> fit::result<Errno> {
+              auto vmo_offset = backing.vmo_offset_ + (crange.start - backing.base_);
+              auto length = crange.end - crange.start;
+
+              zx::ArcVmo target_vmo;
+              if (cmapping.flags_.contains(MappingFlagsEnum::SHARED) ||
+                  cmapping.name_.type == MappingNameType::Vvar) {
+                // Note that the Vvar is a special mapping that behaves like a shared mapping
+                // but is private to each process.
+                target_vmo = backing.vmo_;
+              } else if (cmapping.flags_.contains(MappingFlagsEnum::WIPEONFORK)) {
+                auto vmo_or_error = create_anonymous_mapping_vmo(length);
+                if (vmo_or_error.is_error()) {
+                  return vmo_or_error.take_error();
+                }
+                target_vmo = vmo_or_error.value();
+              } else {
+                zx_info_handle_basic_t basic_info;
+                zx_status_t status = (*backing.vmo_)
+                                         ->get_info(ZX_INFO_HANDLE_BASIC, &basic_info,
+                                                    sizeof(basic_info), nullptr, nullptr);
+                if (status != ZX_OK) {
+                  impossible_error(status);
+                }
+
+                VmoInfo info;
+                auto const child_it = child_vmos.find(basic_info.koid);
+                if (child_it == child_vmos.end()) {
+                  auto vmo_or_error = clone_vmo(backing.vmo_, basic_info.rights);
+                  if (vmo_or_error.is_error())
+                    return vmo_or_error.take_error();
+                  auto& value_ref = vmo_or_error.value();
+                  info.vmo = value_ref->vmo;
+                  info.size = value_ref->size;
+                  info.needs_snapshot_on_parent = value_ref->needs_snapshot_on_parent;
+                  child_vmos.insert(ktl::move(vmo_or_error.value()));
+                } else {
+                  const auto& entry = child_it;
+                  info.vmo = entry->vmo;
+                  info.size = entry->size;
+                  info.needs_snapshot_on_parent = entry->needs_snapshot_on_parent;
+                }
+
+                if (info.needs_snapshot_on_parent) {
+                  zx::ArcVmo replaced_vmo;
+                  auto replaced_it = replaced_vmos.find(basic_info.koid);
+                  if (replaced_it == replaced_vmos.end()) {
+                    auto vmo_or_error = snapshot_vmo(backing.vmo_, info.size, basic_info.rights);
+                    if (vmo_or_error.is_error())
+                      return vmo_or_error.take_error();
+                    replaced_vmo = vmo_or_error.value()->vmo;
+                    replaced_vmos.insert(ktl::move(vmo_or_error.value()));
+                  } else {
+                    replaced_vmo = replaced_it->vmo;
+                  }
+
+                  auto add_or_error = map_in_vmar(
+                      _state.user_vmar, _state.user_vmar_info,
+                      {DesiredAddressType::FixedOverwrite, crange.start}, replaced_vmo->as_ref(),
+                      vmo_offset, length, cmapping.flags_, false);
+                  if (add_or_error.is_error()) {
+                    return add_or_error.take_error();
+                  }
+                  backing.vmo_ = ktl::move(replaced_vmo);
+                }
+                target_vmo = info.vmo;
+              }
+
+              fbl::Vector<Mapping> released_mappings;
+              auto add_or_error = target_state->map_vmo(
+                  {DesiredAddressType::Fixed, crange.start}, target_vmo, vmo_offset, length,
+                  cmapping.flags_, false, cmapping.name_, released_mappings);
+              if (add_or_error.is_error()) {
+                return add_or_error.take_error();
+              }
+              ASSERT(released_mappings.is_empty());
+              return fit::ok();
+            },
+            [](PrivateAnonymous&) { return fit::result<Errno>(fit::error(errno(ENOSYS))); },
+        },
+        mapping.backing_.variant);
+
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+
+  (*target_state).forkable_state_ = _state.forkable_state_;
+
+  // let self_dumpable = *self.dumpable.lock(locked);
+  //*target.dumpable.lock(locked) = self_dumpable;
   return fit::ok();
 }
 

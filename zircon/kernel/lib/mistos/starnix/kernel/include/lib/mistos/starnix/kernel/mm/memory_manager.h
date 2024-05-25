@@ -433,9 +433,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
 
   fit::result<Errno, UserAddress> set_brk(const CurrentTask& current_task, UserAddress addr);
 
-  fit::result<Errno> snapshot_to(fbl::RefPtr<MemoryManager>& target) const;
-
-  // fn snapshot_vmo
+  fit::result<Errno> snapshot_to(fbl::RefPtr<MemoryManager>& target);
 
   fit::result<zx_status_t> exec(/*NamespaceNode exe_node*/);
 

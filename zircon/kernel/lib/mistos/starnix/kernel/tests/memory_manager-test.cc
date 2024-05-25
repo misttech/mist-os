@@ -7,11 +7,14 @@
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
+#include <lib/mistos/starnix/kernel/task/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
+#include <lib/mistos/zx/vmo.h>
 #include <zircon/syscalls.h>
 
 #include <tuple>
@@ -22,6 +25,8 @@
 #include <fbl/vector.h>
 #include <lockdep/guard.h>
 #include <zxtest/zxtest.h>
+
+#include <linux/prctl.h>
 
 using namespace starnix_uapi;
 using namespace starnix::testing;
@@ -683,6 +688,32 @@ TEST(MemoryManager, test_unmap_middle) {
                  },
                  mapping.backing_.variant);
     }
+  }
+}
+
+TEST(MemoryManager, test_preserve_name_snapshot) {
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+
+  auto name_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  ASSERT_TRUE((*current_task).write_memory(name_addr, {(uint8_t*)"foo\0", 4}).is_ok());
+
+  auto mapping_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+
+  ASSERT_EQ(starnix_syscalls::SUCCESS, sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME,
+                                                 mapping_addr.ptr(), PAGE_SIZE, name_addr.ptr()));
+
+  auto target = create_task(kernel, "another-task");
+
+  auto result = current_task->mm()->snapshot_to(target->mm());
+  ASSERT_TRUE(result.is_ok(), "snapshot_to failed error %d", result.error_value().error_code());
+
+  {
+    auto state = target->mm()->state.Read();
+
+    auto pair = state->mappings.get(mapping_addr);
+    ASSERT_TRUE(pair.has_value());
+    auto [range, mapping] = pair.value();
+    ASSERT_EQ(fbl::String("foo"), mapping.name_.vmaName);
   }
 }
 
