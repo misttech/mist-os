@@ -95,30 +95,60 @@ struct DesiredAddress {
 };
 
 // Define MappingName enum
-enum class MappingNameType { None, Stack, Heap, Vdso, Vvar, File, Vma };
+enum class MappingNameType {
+  /// No name.
+  None,
+
+  /// This mapping is the initial stack.
+  Stack,
+
+  /// This mapping is the heap.
+  Heap,
+
+  /// This mapping is the vdso.
+  Vdso,
+
+  /// This mapping is the vvar.
+  Vvar,
+
+  /// The file backing this mapping.
+  File,
+
+  /// The name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
+  /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no
+  /// name and can be reset to the unnamed state by passing NULL to
+  /// prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
+  Vma,
+};
 
 struct MappingName {
   MappingNameType type;
+
   // NamespaceNode fileNode;
+
   FsString vmaName;
 };
 
-struct PrivateAnonymous {};
+struct PrivateAnonymous {
+  bool operator==(const PrivateAnonymous& other) const { return false; }
+};
 
 struct MappingBackingVmo {
+ private:
   // The base address of this mapping.
   //
   // Keep in mind that the mapping might be trimmed in the RangeMap if the
   // part of the mapping is unmapped, which means the base might extend
   // before the currently valid portion of the mapping.
-  UserAddress base;
+  UserAddress base_;
 
   // The VMO that contains the memory used in this mapping.
-  zx::ArcVmo vmo;
+  zx::ArcVmo vmo_;
 
   // The offset in the VMO that corresponds to the base address.
-  uint64_t vmo_offset;
+  uint64_t vmo_offset_;
 
+ public:
   // impl MappingBackingVmo
 
   /// Reads exactly `bytes.len()` bytes of memory from `addr`.
@@ -126,17 +156,31 @@ struct MappingBackingVmo {
   /// # Parameters
   /// - `addr`: The address to read data from.
   /// - `bytes`: The byte array to read into.
-  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr, ktl::span<uint8_t>& bytes);
+  fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
+                                                     ktl::span<uint8_t>& bytes) const;
 
   /// Writes the provided bytes to `addr`.
   ///
   /// # Parameters
   /// - `addr`: The address to write to.
   /// - `bytes`: The bytes to write to the VMO.
-  fit::result<Errno> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes);
+  fit::result<Errno> write_memory(UserAddress addr, const ktl::span<const uint8_t>& bytes) const;
 
   // Converts a `UserAddress` to an offset in this mapping's VMO.
-  uint64_t address_to_offset(UserAddress addr);
+  uint64_t address_to_offset(UserAddress addr) const;
+
+ public:
+  // C++
+  MappingBackingVmo(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset)
+      : base_(base), vmo_(ktl::move(vmo)), vmo_offset_(vmo_offset) {}
+
+  bool operator==(const MappingBackingVmo& other) const {
+    return base_ == other.base_ && vmo_ == other.vmo_ && vmo_offset_ == other.vmo_offset_;
+  }
+
+ private:
+  friend class MemoryManager;
+  friend struct MemoryManagerState;
 };
 
 struct MappingBacking {
@@ -147,6 +191,8 @@ struct MappingBacking {
 
   // Constructor for PrivateAnonymous
   MappingBacking() : variant(PrivateAnonymous{}) {}
+
+  bool operator==(const MappingBacking& other) const { return variant == other.variant; }
 
   // Helpers from the reference documentation for std::visit<>, to allow
   // visit-by-overload of the std::variant<> returned by GetLastReference():
@@ -159,38 +205,8 @@ struct MappingBacking {
   overloaded(Ts...) -> overloaded<Ts...>;
 };
 
-class Mapping : public fbl::RefCounted<Mapping> {
- public:
-  static fbl::RefPtr<Mapping> New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
-                                  MappingFlagsImpl flags);
-
-  const MappingName& name() const { return name_; }
-  MappingName& name() { return name_; }
-
-  MappingBacking& backing() { return backing_; }
-
-  MappingFlags flags() const { return flags_; }
-
-  bool can_read() { return flags_.contains(MappingFlagsEnum::READ); }
-  bool can_write() { return flags_.contains(MappingFlagsEnum::WRITE); }
-  bool can_exec() { return flags_.contains(MappingFlagsEnum::EXEC); }
-
-  bool private_anonymous() {
-#if STARNIX_ANON_ALLOCS
-#else
-    return flags_.contains(MappingFlagsEnum::SHARED) &&
-           flags_.contains(MappingFlagsEnum::ANONYMOUS);
-#endif
-  }
-
- public:
-  // C++
-  Mapping(const Mapping& other);
-
+struct Mapping {
  private:
-  Mapping(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
-          MappingName name);
-
   // Object backing this mapping.
   MappingBacking backing_;
 
@@ -211,6 +227,52 @@ class Mapping : public fbl::RefCounted<Mapping> {
 
   /// Lock guard held to prevent this file from being written while it's being executed.
   // file_write_guard: FileWriteGuardRef,
+
+ public:
+  /// impl Mapping
+  static Mapping New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags);
+
+  // fn with_name
+
+  /// Converts a `UserAddress` to an offset in this mapping's VMO.
+  // fn address_to_offset(&self, addr: UserAddress) -> u64 {
+
+  bool can_read() const { return flags_.contains(MappingFlagsEnum::READ); }
+  bool can_write() const { return flags_.contains(MappingFlagsEnum::WRITE); }
+  bool can_exec() const { return flags_.contains(MappingFlagsEnum::EXEC); }
+
+  bool private_anonymous() const {
+#if STARNIX_ANON_ALLOCS
+#else
+    return !flags_.contains(MappingFlagsEnum::SHARED) &&
+           flags_.contains(MappingFlagsEnum::ANONYMOUS);
+#endif
+  }
+
+ public:
+  // C++
+  Mapping() : flags_(MappingFlags::empty()) {}
+  Mapping(const Mapping& other) = default;
+  Mapping(Mapping&& other) = default;
+  Mapping& operator=(const Mapping& other) = default;
+
+  bool operator==(const Mapping& other) const { return backing_ == other.backing_; }
+
+  // const MappingName& name() const { return name_; }
+
+  // MappingName& name() { return name_; }
+
+  // MappingBacking& backing() { return backing_; }
+
+  // MappingFlags flags() const { return flags_; }
+
+ private:
+  ZXTEST_FRIEND_TEST(MemoryManager, test_preserve_name_snapshot);
+  friend class MemoryManager;
+  friend struct MemoryManagerState;
+
+  Mapping(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
+          MappingName name);
 };
 
 struct MemoryManagerState {
@@ -227,7 +289,7 @@ struct MemoryManagerState {
   /// The memory mappings currently used by this address space.
   ///
   /// The mappings record which VMO backs each address.
-  util::RangeMap<UserAddress, fbl::RefPtr<Mapping>> mappings;
+  util::RangeMap<UserAddress, Mapping> mappings;
 
   /// VMO backing private, anonymous memory allocations in this address space.
   // #[cfg(feature = "alternate_anon_allocs")]
@@ -241,9 +303,10 @@ struct MemoryManagerState {
   // pub aio_contexts: AioContexts,
 
   /// impl MemoryManagerState
-  fit::result<Errno, UserAddress> map_anonymous(
-      DesiredAddress addr, size_t length, ProtectionFlags prot_flags, MappingOptionsFlags options,
-      MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
+  fit::result<Errno, UserAddress> map_anonymous(DesiredAddress addr, size_t length,
+                                                ProtectionFlags prot_flags,
+                                                MappingOptionsFlags options, MappingName name,
+                                                fbl::Vector<Mapping>& released_mappings);
 
   fit::result<Errno, UserAddress> map_internal(DesiredAddress addr, const zx::vmo& vmo,
                                                uint64_t vmo_offset, size_t length,
@@ -253,10 +316,9 @@ struct MemoryManagerState {
   fit::result<Errno, UserAddress> map_vmo(DesiredAddress addr, zx::ArcVmo vmo, uint64_t vmo_offset,
                                           size_t length, MappingFlags flags, bool populate,
                                           MappingName name,
-                                          fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
+                                          fbl::Vector<Mapping>& released_mappings);
 
-  fit::result<Errno> unmap(UserAddress, size_t length,
-                           fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
+  fit::result<Errno> unmap(UserAddress, size_t length, fbl::Vector<Mapping>& released_mappings);
 
  public:
   MemoryManagerForkableState* operator->() { return &forkable_state_; }
@@ -268,15 +330,15 @@ struct MemoryManagerState {
 
   bool check_has_unauthorized_splits(UserAddress addr, size_t length);
 
-  fit::result<Errno, fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>>>
-  get_contiguous_mappings_at(UserAddress addr, size_t length) const;
+  fit::result<Errno, fbl::Vector<ktl::pair<Mapping, size_t>>> get_contiguous_mappings_at(
+      UserAddress addr, size_t length) const;
 
   UserAddress max_address() const;
 
   fit::result<Errno> protect(UserAddress addr, size_t length, ProtectionFlags prot_flags);
 
   fit::result<Errno> update_after_unmap(UserAddress addr, size_t length,
-                                        fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings);
+                                        fbl::Vector<Mapping>& released_mappings);
 
   /// Reads exactly `bytes.len()` bytes of memory.
   ///
@@ -292,7 +354,7 @@ struct MemoryManagerState {
   /// - `addr`: The address to read data from.
   /// - `bytes`: The byte array to read into.
   fit::result<Errno, ktl::span<uint8_t>> read_mapping_memory(UserAddress addr,
-                                                             fbl::RefPtr<Mapping>& mapping,
+                                                             const Mapping& mapping,
                                                              ktl::span<uint8_t>& bytes) const;
 
   /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
@@ -327,7 +389,7 @@ struct MemoryManagerState {
   /// # Parameters
   /// - `addr`: The address to write to.
   /// - `bytes`: The bytes to write to the VMO.
-  fit::result<Errno> write_mapping_memory(UserAddress addr, fbl::RefPtr<Mapping>& mapping,
+  fit::result<Errno> write_mapping_memory(UserAddress addr, const Mapping& mapping,
                                           const ktl::span<const uint8_t>& bytes) const;
 };
 

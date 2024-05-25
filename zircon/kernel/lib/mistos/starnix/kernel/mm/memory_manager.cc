@@ -142,7 +142,7 @@ namespace starnix {
 
 fit::result<Errno, UserAddress> MemoryManagerState::map_anonymous(
     DesiredAddress addr, size_t length, ProtectionFlags prot_flags, MappingOptionsFlags options,
-    MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
+    MappingName name, fbl::Vector<Mapping>& released_mappings) {
   auto result = create_anonymous_mapping_vmo(length);
   if (result.is_error()) {
     return result.take_error();
@@ -173,8 +173,9 @@ fit::result<Errno> MemoryManagerState::validate_addr(DesiredAddress addr, size_t
 
 fit::result<Errno, UserAddress> MemoryManagerState::map_vmo(
     DesiredAddress addr, zx::ArcVmo vmo, uint64_t vmo_offset, size_t length, MappingFlags flags,
-    bool populate, MappingName name, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
-  LTRACEF("length %zu flags 0x%x populate %s\n", length, flags.bits(), populate ? "true" : "false");
+    bool populate, MappingName name, fbl::Vector<Mapping>& released_mappings) {
+  LTRACEF("addr 0x%lx length %zu flags 0x%x populate %s\n", addr.address.ptr(), length,
+          flags.bits(), populate ? "true" : "false");
   auto va = validate_addr(addr, length);
   if (va.is_error())
     return va.take_error();
@@ -191,9 +192,9 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_vmo(
       return uau.take_error();
   }
 
-  fbl::RefPtr<Mapping> mapping = Mapping::New(mapped_addr.value(), ktl::move(vmo), vmo_offset,
-                                              MappingFlagsImpl(flags) /*, file_write_guard*/);
-  mapping->name() = name;
+  auto mapping = Mapping::New(mapped_addr.value(), ktl::move(vmo), vmo_offset,
+                              MappingFlagsImpl(flags) /*, file_write_guard*/);
+  mapping.name_ = name;
   mappings.insert({mapped_addr.value(), end}, mapping);
 
   if (flags.contains(MappingFlagsEnum::GROWSDOWN)) {
@@ -244,9 +245,9 @@ bool MemoryManagerState::check_has_unauthorized_splits(UserAddress addr, size_t 
 //   only partially mapped.
 //
 // Returns EFAULT if the requested range overflows or extends past the end of the vmar.
-fit::result<Errno, fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>>>
+fit::result<Errno, fbl::Vector<ktl::pair<Mapping, size_t>>>
 MemoryManagerState::get_contiguous_mappings_at(UserAddress addr, size_t length) const {
-  fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>> result;
+  fbl::Vector<ktl::pair<Mapping, size_t>> result;
   UserAddress end_addr;
   if (auto r = addr.checked_add(length); r) {
     end_addr = r.value();
@@ -295,7 +296,7 @@ UserAddress MemoryManagerState::max_address() const {
 
 // Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.
 fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
-                                             fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
+                                             fbl::Vector<Mapping>& released_mappings) {
   if (!addr.is_aligned(PAGE_SIZE)) {
     return fit::error(errno(EINVAL));
   }
@@ -342,8 +343,8 @@ fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
 // File-backed mappings don't need to have their VMOs modified.
 //
 // Unmapped mappings are placed in `released_mappings`.
-fit::result<Errno> MemoryManagerState::update_after_unmap(
-    UserAddress addr, size_t length, fbl::Vector<fbl::RefPtr<Mapping>>& released_mappings) {
+fit::result<Errno> MemoryManagerState::update_after_unmap(UserAddress addr, size_t length,
+                                                          fbl::Vector<Mapping>& released_mappings) {
   UserAddress end_addr;
   if (auto result = addr.checked_add(length); result) {
     end_addr = result.value();
@@ -371,54 +372,60 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(
 #else
 
   // Find the private, anonymous mapping that will get its tail cut off by this unmap call.
-  auto truncated_head =
-      [&]() -> ktl::optional<ktl::pair<util::Range<UserAddress>, fbl::RefPtr<Mapping>>> {
+  auto truncated_head = [&]() -> ktl::optional<ktl::pair<util::Range<UserAddress>, Mapping>> {
     if (auto pair = mappings.get(addr); pair) {
-      if (pair->first.start != addr && pair->second->private_anonymous()) {
-        return ktl::pair(util::Range<UserAddress>({pair->first.start, addr}), pair->second);
+      auto& [range, mapping] = pair.value();
+      if (range.start != addr && mapping.private_anonymous()) {
+        return ktl::pair(util::Range<UserAddress>{range.start, addr}, mapping);
       }
     }
     return ktl::nullopt;
   }();
 
   // Find the private, anonymous mapping that will get its head cut off by this unmap call.
-  auto truncated_tail =
-      [&]() -> ktl::optional<ktl::pair<util::Range<UserAddress>, fbl::RefPtr<Mapping>>> {
+  auto truncated_tail = [&]() -> ktl::optional<ktl::pair<util::Range<UserAddress>, Mapping>> {
     if (auto pair = mappings.get(end_addr); pair) {
-      if (pair->first.end != end_addr && pair->second->private_anonymous()) {
-        return ktl::pair(util::Range<UserAddress>({end_addr, pair->first.end}), pair->second);
+      auto& [range, mapping] = pair.value();
+      if (range.end != end_addr && mapping.private_anonymous()) {
+        return ktl::pair(util::Range<UserAddress>{end_addr, range.end}, mapping);
       }
     }
     return ktl::nullopt;
   }();
 
   // Remove the original range of mappings from our map.
-  auto vec = mappings.remove(util::Range<UserAddress>({addr, end_addr}));
+  auto vec = mappings.remove(util::Range<UserAddress>{addr, end_addr});
   ktl::copy(vec.begin(), vec.end(), util::back_inserter(released_mappings));
 
   if (truncated_tail) {
     auto [range, mapping] = truncated_tail.value();
-
-    auto& backing = ktl::get<MappingBackingVmo>(mapping->backing().variant);
+    auto& backing = ktl::get<MappingBackingVmo>(mapping.backing_.variant);
     // Create and map a child COW VMO mapping that represents the truncated tail.
-    auto child_vmo_offset = static_cast<uint64_t>(range.start - backing.base) + backing.vmo_offset;
+    zx_info_handle_basic_t vmo_info;
+    zx_status_t status = backing.vmo_->as_ref().get_info(ZX_INFO_HANDLE_BASIC, &vmo_info,
+                                                         sizeof(vmo_info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      impossible_error(status);
+    }
+    auto child_vmo_offset =
+        static_cast<uint64_t>(range.start - backing.base_) + backing.vmo_offset_;
     auto child_length = range.end - range.start;
     zx::vmo child_vmo;
-    if (zx_status_t status =
-            backing.vmo->as_ref().create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE,
-                                               child_vmo_offset, child_length, &child_vmo);
+    if (status = backing.vmo_->as_ref().create_child(ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_RESIZABLE,
+                                                     child_vmo_offset, child_length, &child_vmo);
         status != ZX_OK) {
       return fit::error(MemoryManager::get_errno_for_map_err(status));
     }
 
     // Update the mapping.
     fbl::AllocChecker ac;
-    backing.vmo = fbl::MakeRefCountedChecked<zx::Arc<zx::vmo>>(&ac, ktl::move(child_vmo));
-    backing.base = range.start;
-    backing.vmo_offset = 0;
+    backing.vmo_ = fbl::MakeRefCountedChecked<zx::Arc<zx::vmo>>(&ac, ktl::move(child_vmo));
+    ASSERT(ac.check());
+    backing.base_ = range.start;
+    backing.vmo_offset_ = 0;
 
     auto result = map_internal({DesiredAddressType::FixedOverwrite, range.start},
-                               backing.vmo->as_ref(), 0, child_length, mapping->flags(), false);
+                               backing.vmo_->as_ref(), 0, child_length, mapping.flags_, false);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -429,15 +436,16 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(
 
   if (truncated_head) {
     auto [range, mapping] = truncated_head.value();
-    auto& backing = ktl::get<MappingBackingVmo>(mapping->backing().variant);
+    auto& backing = ktl::get<MappingBackingVmo>(mapping.backing_.variant);
 
     // Resize the VMO of the head mapping, whose tail was cut off.
     auto new_mapping_size = static_cast<uint64_t>(range.end - range.start);
-    auto new_vmo_size = backing.vmo_offset + new_mapping_size;
-    if (zx_status_t status = backing.vmo->as_ref().set_size(new_vmo_size); status != ZX_OK) {
+    auto new_vmo_size = backing.vmo_offset_ + new_mapping_size;
+    if (zx_status_t status = backing.vmo_->as_ref().set_size(new_vmo_size); status != ZX_OK) {
       return fit::error(MemoryManager::get_errno_for_map_err(status));
     }
   }
+
   return fit::ok();
 #endif
 }
@@ -475,19 +483,19 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
 }
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_mapping_memory(
-    UserAddress addr, fbl::RefPtr<Mapping>& mapping, ktl::span<uint8_t>& bytes) const {
+    UserAddress addr, const Mapping& mapping, ktl::span<uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
-  if (!mapping->can_read()) {
+  if (!mapping.can_read()) {
     return fit::error(errno(EFAULT));
   }
 
   return ktl::visit(MappingBacking::overloaded{
-                        [](PrivateAnonymous&) {
+                        [](const PrivateAnonymous&) {
                           return fit::result<Errno, ktl::span<uint8_t>>(fit::error(errno(EFAULT)));
                         },
-                        [&](MappingBackingVmo& m) { return m.read_memory(addr, bytes); },
+                        [&](const MappingBackingVmo& m) { return m.read_memory(addr, bytes); },
                     },
-                    mapping->backing().variant);
+                    mapping.backing_.variant);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory_partial(
@@ -562,24 +570,24 @@ fit::result<Errno, size_t> MemoryManagerState::write_memory(
 }
 
 fit::result<Errno> MemoryManagerState::write_mapping_memory(
-    UserAddress addr, fbl::RefPtr<Mapping>& mapping, const ktl::span<const uint8_t>& bytes) const {
+    UserAddress addr, const Mapping& mapping, const ktl::span<const uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
-  if (!mapping->can_write()) {
+  if (!mapping.can_write()) {
     return fit::error(errno(EFAULT));
   }
 
   return ktl::visit(
       MappingBacking::overloaded{
-          [](PrivateAnonymous&) { return fit::result<Errno>(fit::error(errno(EFAULT))); },
-          [&](MappingBackingVmo& m) { return m.write_memory(addr, bytes); },
+          [](const PrivateAnonymous&) { return fit::result<Errno>(fit::error(errno(EFAULT))); },
+          [&](const MappingBackingVmo& m) { return m.write_memory(addr, bytes); },
       },
-      mapping->backing().variant);
+      mapping.backing_.variant);
 }
 
-fit::result<Errno, ktl::span<uint8_t>> MappingBackingVmo::read_memory(UserAddress addr,
-                                                                      ktl::span<uint8_t>& bytes) {
+fit::result<Errno, ktl::span<uint8_t>> MappingBackingVmo::read_memory(
+    UserAddress addr, ktl::span<uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
-  if (zx_status_t status = vmo->as_ref().read(bytes.data(), address_to_offset(addr), bytes.size());
+  if (zx_status_t status = vmo_->as_ref().read(bytes.data(), address_to_offset(addr), bytes.size());
       status != ZX_OK) {
     return fit::error(errno(EFAULT));
   }
@@ -587,9 +595,10 @@ fit::result<Errno, ktl::span<uint8_t>> MappingBackingVmo::read_memory(UserAddres
 }
 
 fit::result<Errno> MappingBackingVmo::write_memory(UserAddress addr,
-                                                   const ktl::span<const uint8_t>& bytes) {
+                                                   const ktl::span<const uint8_t>& bytes) const {
   LTRACEF("addr 0x%lx data %p size 0x%zx\n", addr.ptr(), bytes.data(), bytes.size());
-  if (zx_status_t status = vmo->as_ref().write(bytes.data(), address_to_offset(addr), bytes.size());
+  if (zx_status_t status =
+          vmo_->as_ref().write(bytes.data(), address_to_offset(addr), bytes.size());
       status != ZX_OK) {
     LTRACEF("error to write in vmo %d\n", status);
     return fit::error(errno(EFAULT));
@@ -597,27 +606,22 @@ fit::result<Errno> MappingBackingVmo::write_memory(UserAddress addr,
   return fit::ok();
 }
 
-uint64_t MappingBackingVmo::address_to_offset(UserAddress addr) {
-  return static_cast<uint64_t>(addr.ptr() - base.ptr()) + vmo_offset;
+uint64_t MappingBackingVmo::address_to_offset(UserAddress addr) const {
+  return static_cast<uint64_t>(addr.ptr() - base_.ptr()) + vmo_offset_;
 }
 
-fbl::RefPtr<Mapping> Mapping::New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
-                                  MappingFlagsImpl flags) {
+Mapping Mapping::New(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset,
+                     MappingFlagsImpl flags) {
   LTRACEF("base 0x%lx vmo %p vmo_offset %lu flags 0x%x\n", base.ptr(), vmo.get(), vmo_offset,
           flags.bits());
-  fbl::AllocChecker ac;
-  fbl::RefPtr<Mapping> mapping = fbl::AdoptRef(
-      new (&ac) Mapping(base, ktl::move(vmo), vmo_offset, flags, {MappingNameType::None}));
-  ASSERT(ac.check());
-  return mapping;
+  return Mapping(base, ktl::move(vmo), vmo_offset, flags, {MappingNameType::None});
 }
 
 Mapping::Mapping(UserAddress base, zx::ArcVmo vmo, uint64_t vmo_offset, MappingFlagsImpl flags,
                  MappingName name)
-    : backing_(MappingBackingVmo({base, ktl::move(vmo), vmo_offset})), flags_(flags), name_(name) {}
-
-Mapping::Mapping(const Mapping& other)
-    : backing_(other.backing_), flags_(other.flags_), name_(other.name_) {}
+    : backing_(MappingBackingVmo(base, ktl::move(vmo), vmo_offset)),
+      flags_(flags),
+      name_(ktl::move(name)) {}
 
 Errno MemoryManager::get_errno_for_map_err(zx_status_t status) {
   switch (status) {
@@ -650,7 +654,7 @@ fit::result<Errno, UserAddress> MemoryManager::map_vmo(DesiredAddress addr, zx::
   auto flags = MappingFlagsImpl::from_prot_flags_and_options(prot_flags, options);
 
   //  Unmapped mappings must be released after the state is unlocked.
-  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<Mapping> released_mappings;
   fit::result<Errno, UserAddress> result = fit::error(errno(EINVAL));
 
   {
@@ -716,7 +720,7 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
   uint64_t rlimit_data =
       ktl::min(kProgramBreakLimit, current_task->thread_group->get_rlimit({ResourceEnum::DATA}));
 
-  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<Mapping> released_mappings;
   auto _state = state.Write();
 
   // Ensure that there is address-space set aside for the program break.
@@ -773,14 +777,14 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
     auto delta = old_end - new_end;
     auto vmo_offset = old_end - brk.base;
 
-    zx_status_t status = ktl::visit(MappingBacking::overloaded{
-                                        [](PrivateAnonymous&) { return ZX_ERR_NOT_SUPPORTED; },
-                                        [&](MappingBackingVmo& m) {
-                                          return m.vmo->as_ref().op_range(
-                                              ZX_VMO_OP_ZERO, vmo_offset, delta, nullptr, 0);
-                                        },
-                                    },
-                                    mapping->backing().variant);
+    zx_status_t status = ktl::visit(
+        MappingBacking::overloaded{
+            [](const PrivateAnonymous&) { return ZX_ERR_NOT_SUPPORTED; },
+            [&](const MappingBackingVmo& m) {
+              return m.vmo_->as_ref().op_range(ZX_VMO_OP_ZERO, vmo_offset, delta, nullptr, 0);
+            },
+        },
+        mapping.backing_.variant);
 
     if (status != ZX_OK) {
       return fit::error(impossible_error(status));
@@ -796,14 +800,14 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
 
     zx_status_t status =
         ktl::visit(MappingBacking::overloaded{
-                       [](PrivateAnonymous&) { return ZX_ERR_NOT_SUPPORTED; },
-                       [&](MappingBackingVmo& m) {
+                       [](const PrivateAnonymous&) { return ZX_ERR_NOT_SUPPORTED; },
+                       [&](const MappingBackingVmo& m) {
                          return _state->user_vmar.map(
                              ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC,
-                             old_end - base_addr, m.vmo->as_ref(), vmo_offset, delta, nullptr);
+                             old_end - base_addr, m.vmo_->as_ref(), vmo_offset, delta, nullptr);
                        },
                    },
-                   mapping->backing().variant);
+                   mapping.backing_.variant);
 
     if (status == ZX_OK) {
       _state->mappings.insert({brk.base, new_end}, mapping);
@@ -923,7 +927,7 @@ fit::result<Errno, size_t> MemoryManager::vmo_write_memory(
 }
 
 fit::result<Errno> MemoryManager::unmap(UserAddress addr, size_t length) {
-  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<Mapping> released_mappings;
   {
     auto _state = state.Write();
     auto result = _state->unmap(addr, length, released_mappings);
@@ -962,17 +966,9 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
 
   auto _state = state.Write();
 
-  fbl::Vector<ktl::pair<util::Range<UserAddress>, fbl::RefPtr<Mapping>>> mappings_in_range;
+  fbl::Vector<ktl::pair<util::Range<UserAddress>, Mapping>> mappings_in_range;
   auto mappings = _state->mappings.intersection(util::Range<UserAddress>({addr, end.value()}));
-  ktl::transform(mappings.begin(), mappings.end(), util::back_inserter(mappings_in_range),
-                 [](const ktl::pair<util::Range<UserAddress>, fbl::RefPtr<Mapping>>& pair) {
-                   // Clone the mapping
-                   fbl::AllocChecker ac;
-                   auto mapping_clone = fbl::MakeRefCountedChecked<Mapping>(&ac, *pair.second);
-                   ASSERT(ac.check());
-                   return ktl::pair<util::Range<UserAddress>, fbl::RefPtr<Mapping>>{pair.first,
-                                                                                    mapping_clone};
-                 });
+  ktl::copy(mappings.begin(), mappings.end(), util::back_inserter(mappings_in_range));
 
   if (mappings_in_range.is_empty()) {
     return fit::error(errno(EINVAL));
@@ -987,7 +983,7 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
   // combination with merging of adjacent mappings. Instead, make a copy, change the copy,
   // and insert the copy.
   for (auto [range, mapping] : mappings_in_range) {
-    if (mapping->name().type == MappingNameType::File) {
+    if (mapping.name_.type == MappingNameType::File) {
       // It's invalid to assign a name to a file-backed mapping.
       return fit::error(errno(EBADF));
     }
@@ -1001,14 +997,16 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
           MappingBacking::overloaded{
               [&, &crange = range, &cmapping = mapping](MappingBackingVmo& backing) {
                 // Shrink the range of the named mapping to only the named area.
-                backing.vmo_offset = start_split_length;
-                auto new_mapping = Mapping::New(crange.start, backing.vmo, backing.vmo_offset,
-                                                MappingFlagsImpl(cmapping->flags()));
+                backing.vmo_offset_ = start_split_length;
+                auto new_mapping = Mapping::New(crange.start, backing.vmo_, backing.vmo_offset_,
+                                                MappingFlagsImpl(cmapping.flags_));
                 return new_mapping;
               },
-              [](PrivateAnonymous&) { return fbl::RefPtr<Mapping>(); },
+              [](PrivateAnonymous&) {
+                return Mapping::New(0, zx::ArcVmo(), 0, MappingFlagsImpl(MappingFlags::empty()));
+              },
           },
-          mapping->backing().variant);
+          mapping.backing_.variant);
 
       _state->mappings.insert(start_split_range, start_split_mapping);
       range = util::Range<UserAddress>{addr, range.end};
@@ -1041,24 +1039,26 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
       // last mapping to have an unnamed mapping after the named region.
       auto tail_range = util::Range<UserAddress>{end.value(), range.end};
       auto tail_offset = range.end - end.value();
-      auto tail_mapping = ktl::visit(MappingBacking::overloaded{
-                                         [&, &cmapping = mapping](MappingBackingVmo& backing) {
-                                           auto new_mapping =
-                                               Mapping::New(end.value(), backing.vmo,
-                                                            backing.vmo_offset + tail_offset,
-                                                            MappingFlagsImpl(cmapping->flags()));
-                                           return new_mapping;
-                                         },
-                                         [](PrivateAnonymous&) { return fbl::RefPtr<Mapping>(); },
-                                     },
-                                     mapping->backing().variant);
+      auto tail_mapping = ktl::visit(
+          MappingBacking::overloaded{
+              [&, &cmapping = mapping](MappingBackingVmo& backing) {
+                auto new_mapping =
+                    Mapping::New(end.value(), backing.vmo_, backing.vmo_offset_ + tail_offset,
+                                 MappingFlagsImpl(cmapping.flags_));
+                return new_mapping;
+              },
+              [](PrivateAnonymous&) {
+                return Mapping::New(0, zx::ArcVmo(), 0, MappingFlagsImpl(MappingFlags::empty()));
+              },
+          },
+          mapping.backing_.variant);
 
       _state->mappings.insert(tail_range, tail_mapping);
       range.end = end.value();
     }
 
     if (name.has_value()) {
-      mapping->name() = MappingName{MappingNameType::Vma, name.value()};
+      mapping.name_ = MappingName{MappingNameType::Vma, name.value()};
     }
     _state->mappings.insert(range, mapping);
   }
@@ -1080,8 +1080,8 @@ fit::result<Errno, ktl::optional<FsString>> MemoryManager::get_mapping_name(User
     return fit::error(errno(EFAULT));
   }
   auto& [range, mapping] = pair.value();
-  if (mapping->name().type == MappingNameType::Vma) {
-    return fit::ok(mapping->name().vmaName);
+  if (mapping.name_.type == MappingNameType::Vma) {
+    return fit::ok(mapping.name_.vmaName);
   } else {
     return fit::ok(ktl::nullopt);
   }
@@ -1092,7 +1092,7 @@ fit::result<Errno, UserAddress> MemoryManager::map_anonymous(DesiredAddress addr
                                                              MappingOptionsFlags options,
                                                              MappingName name) {
   LTRACE;
-  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<Mapping> released_mappings;
   fit::result<Errno, UserAddress> result = fit::error(errno(EINVAL));
 
   {

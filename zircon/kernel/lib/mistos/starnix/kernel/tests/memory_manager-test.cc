@@ -170,15 +170,14 @@ TEST(MemoryManager, test_get_contiguous_mappings_at) {
     auto mm_state = mm->state.Read();
 
     auto [map_a, map_b, map_c,
-          map_d] = [&mm_state]() -> std::tuple<fbl::RefPtr<Mapping>, fbl::RefPtr<Mapping>,
-                                               fbl::RefPtr<Mapping>, fbl::RefPtr<Mapping>> {
+          map_d] = [&mm_state]() -> std::tuple<Mapping, Mapping, Mapping, Mapping> {
       auto map = mm_state->mappings.iter();
       auto it = map.begin();
       return std::make_tuple((*it).second, (*++it).second, (*++it).second, (*++it).second);
     }();
 
     fbl::AllocChecker ac;
-    fbl::Vector<ktl::pair<fbl::RefPtr<Mapping>, size_t>> expected;
+    fbl::Vector<ktl::pair<Mapping, size_t>> expected;
 
     // Verify result when requesting a whole mapping or portions of it.
     expected.push_back({map_a, page_size}, &ac);
@@ -452,7 +451,7 @@ TEST(MemoryManager, test_unmap_returned_mappings) {
   auto mm = current_task->mm();
   auto addr = map_memory(*current_task, 0, PAGE_SIZE * 2);
 
-  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<Mapping> released_mappings;
   auto unmap_result = mm->state.Write()->unmap(addr, PAGE_SIZE, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(released_mappings.size(), 1);
@@ -464,7 +463,7 @@ TEST(MemoryManager, test_unmap_returns_multiple_mappings) {
   auto addr = map_memory(*current_task, 0, PAGE_SIZE);
   map_memory(*current_task, addr.ptr() + 2 * PAGE_SIZE, PAGE_SIZE);
 
-  fbl::Vector<fbl::RefPtr<Mapping>> released_mappings;
+  fbl::Vector<Mapping> released_mappings;
   auto unmap_result = mm->state.Write()->unmap(addr, PAGE_SIZE * 3, released_mappings);
   ASSERT_TRUE(unmap_result.is_ok());
   ASSERT_EQ(released_mappings.size(), 2);
