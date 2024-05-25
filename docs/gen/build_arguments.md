@@ -2675,7 +2675,7 @@ TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/boot_test.gni:12
+From //build/testing/boot_tests/boot_test.gni:13
 
 ### disable_cuckoo_tests
 
@@ -2701,7 +2701,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:91
+From //zircon/kernel/params.gni:92
 
 ### discoverable_package_labels
 
@@ -2839,7 +2839,7 @@ Enable kernel lock dependency tracking.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:37
+From //zircon/kernel/params.gni:38
 
 ### enable_lock_dep_metadata_only
 
@@ -2847,7 +2847,7 @@ Enable kernel lock dependency metadata only (ignored if enable_lock_dep is true)
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:40
+From //zircon/kernel/params.gni:41
 
 ### enable_lock_dep_tests
 
@@ -2858,7 +2858,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:152
+From //zircon/kernel/params.gni:153
 
 ### enable_mdns_trace
 
@@ -3114,7 +3114,7 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:115
+From //zircon/kernel/params.gni:116
 
 ### escher_test_for_glsl_spirv_mismatch
 
@@ -3165,7 +3165,7 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:144
+From //zircon/kernel/params.gni:145
 
 ### exported_package_labels
 
@@ -3441,7 +3441,7 @@ TODO(johngro): document
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:73
+From //zircon/kernel/params.gni:74
 
 ### fvm_partition
 
@@ -4115,31 +4115,31 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:132
+From //zircon/kernel/params.gni:133
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:133
+From //zircon/kernel/params.gni:134
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:134
+From //zircon/kernel/params.gni:135
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:135
+From //zircon/kernel/params.gni:136
 
 ### kernel_base
 
 **Current value (from the default):** `"0xffffffff00000000"`
 
-From //zircon/kernel/params.gni:28
+From //zircon/kernel/params.gni:29
 
 ### kernel_debug_level
 
@@ -4152,7 +4152,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:103
+From //zircon/kernel/params.gni:104
 
 ### kernel_debug_print_level
 
@@ -4164,7 +4164,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:110
+From //zircon/kernel/params.gni:111
 
 ### kernel_extra_defines
 
@@ -4173,7 +4173,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:95
+From //zircon/kernel/params.gni:96
 
 ### kernel_extra_deps
 
@@ -4192,7 +4192,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:138
+From //zircon/kernel/params.gni:139
 
 ### kernel_version_string
 
@@ -4515,7 +4515,7 @@ Enable lock contention tracing.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:43
+From //zircon/kernel/params.gni:44
 
 ### log_startup_sleep
 
@@ -5489,7 +5489,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:122
+From //zircon/kernel/params.gni:123
 
 ### pgo_profile_path
 
@@ -7001,7 +7001,7 @@ Valid alternatives vary by machine, but include "linuxboot".
 
 **Current value (from the default):** `"linuxboot"`
 
-From //zircon/kernel/phys/qemu.gni:130
+From //zircon/kernel/phys/qemu.gni:131
 
 ### qr_codes_path
 
@@ -7348,7 +7348,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"dOMdgoh_YpbZdAueXRKQWs84Pk_qEI9tafcKW2spkRoC"`
+**Current value (from the default):** `"uMZ7FTsDPXul0QhF5rSabB0D1w7qjAGYbarpQUHyERoC"`
 
 From //build/rust/config.gni:38
 
@@ -7367,7 +7367,7 @@ debugging changes to the scheduler's behavior.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:60
+From //zircon/kernel/params.gni:61
 
 ### scheduler_lock_spin_tracing_compressed
 
@@ -7378,7 +7378,7 @@ data.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:70
+From //zircon/kernel/params.gni:71
 
 ### scheduler_lock_spin_tracing_enabled
 
@@ -7387,7 +7387,7 @@ performance analysis.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:64
+From //zircon/kernel/params.gni:65
 
 ### scheduler_queue_tracing_enabled
 
@@ -7396,7 +7396,7 @@ analysis.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:56
+From //zircon/kernel/params.gni:57
 
 ### scheduler_tracing_level
 
@@ -7410,7 +7410,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:52
+From //zircon/kernel/params.gni:53
 
 ### scudo_default_options
 
@@ -7773,7 +7773,7 @@ From //third_party/perfetto/gn/perfetto.gni:342
 
 **Current value (from the default):** `16`
 
-From //zircon/kernel/params.gni:20
+From //zircon/kernel/params.gni:21
 
 ### spinel_platform_header
 
@@ -8300,7 +8300,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:141
+From //zircon/kernel/params.gni:142
 
 ### use_gigaboot
 
@@ -8532,6 +8532,14 @@ is meant solely for developer debugging.
 
 From //build/images/args.gni:170
 
+### verify_depfile
+
+Controls whether the build runs the depfile verifier
+
+**Current value (from the default):** `true`
+
+From //build/rust/build.gni:19
+
 ### vim3_mcu_fan_default_level
 
 The default fan level used by the VIM3 MCU driver.
@@ -8593,7 +8601,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:87
+From //zircon/kernel/params.gni:88
 
 ### vulkan_host_runtime_dir
 
@@ -8621,7 +8629,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:78
+From //zircon/kernel/params.gni:79
 
 ### warn_on_sdk_changes
 
