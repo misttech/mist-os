@@ -63,7 +63,7 @@ template("qemu_shim_test") {
     }
     assert(defined(qemu_kernel), "$qemu_boot_format not in $qemu_boot_formats")
 
-    device_types = [ "QEMU" ]
+    environments = [ qemu_env ]
 
     forward_variables_from(invoker, "*")
   }

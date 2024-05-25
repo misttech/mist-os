@@ -5,6 +5,7 @@
 import("//build/testing/boot_tests/boot_test.gni")
 import("//build/testing/boot_tests/kernel_zbi_test.gni")
 import("//build/testing/boot_tests/zbi_test_executable.gni")
+import("//zircon/kernel/params.gni")
 
 group("boot_tests") {
   testonly = true
@@ -64,14 +65,7 @@ if (current_toolchain == default_toolchain) {
   kernel_zbi_test("early-boot-single-process-test") {
     generate_cuckoo = false
     deps = [ ":early-boot-single-process-test-bin" ]
-    device_types = [
-      "AEMU",
-      "Astro",
-      "QEMU",
-      "Intel NUC Kit NUC7i5DNHE",
-      "Intel NUC Kit NUC11TNHv5",
-      "Sherlock",
-    ]
+    environments = kernel_test_environments
   }
 
   kernel_zbi_test("early-boot-multiple-process-test") {
@@ -80,13 +74,6 @@ if (current_toolchain == default_toolchain) {
       ":early-boot-multiple-process-test-bin",
       "data-publisher:early-boot-data-publisher-bin",
     ]
-    device_types = [
-      "AEMU",
-      "Astro",
-      "QEMU",
-      "Intel NUC Kit NUC7i5DNHE",
-      "Intel NUC Kit NUC11TNHv5",
-      "Sherlock",
-    ]
+    environments = kernel_test_environments
   }
 }

@@ -34,26 +34,6 @@ template("_cuckoo_product_bundle") {
   assert(current_toolchain == default_toolchain)
   assert(defined(invoker.kernel_zbi))
 
-  target_environments = [ emu_env ]
-  if (defined(invoker.device_types)) {
-    # Translate `device_types` to environments.
-    target_environments = []
-    foreach(device_type, invoker.device_types) {
-      target_environments += [
-        {
-          dimensions = {
-            device_type = device_type
-          }
-        },
-      ]
-    }
-  }
-
-  if ((!defined(invoker.disabled) && disable_cuckoo_tests) ||
-      (defined(invoker.disabled) && invoker.disabled)) {
-    target_environments = []
-  }
-
   main_target = target_name
   assembled_system_target = "${target_name}.assembled_system"
   stub_test_target = "${target_name}.test"
@@ -67,7 +47,13 @@ template("_cuckoo_product_bundle") {
       "//src/sys/early_boot_instrumentation/test:early-boot-collector-stub",
     ]
     test_specs = {
-      environments = target_environments
+      if ((defined(invoker.disabled) && invoker.disabled) ||
+          disable_cuckoo_tests) {
+        # A disabled test is marked by an empty environments list.
+        environments = []
+      } else {
+        forward_variables_from(invoker, [ "environments" ])
+      }
       isolated = true
       product_bundle = main_target
 
@@ -180,8 +166,8 @@ template("_cuckoo_product_bundle") {
 #   * `${target_name}.cuckoo.assembled_system`
 #     Specifies a "cuckoo assembled system": an `assembled_system()` that
 #     contains a test package with a stub test component, and which boots the
-#     associated ZBI to a full Fuchsia system. This subtarget is only emitted if
-#     `generate_cuckoo = true`.
+#     associated ZBI to a full Fuchsia system. This subtarget is only emitted
+#     if `generate_cuckoo = true`.
 #
 # Parameters
 #
@@ -191,13 +177,7 @@ template("_cuckoo_product_bundle") {
 #     - Type: boolean
 #     - Default: `kernel_zbi_test_generates_cuckoo`
 #
-#   * disabled
-#     - Optional:  When true, the generated images and the test tied to them are
-#       treated as disabled, that is, they will not be automatically executed.
-#     - Type: boolean
-#     - Default: false
-#
-# Additionally supports all parameters from `zbi_test()`.
+# See zbi_test() for additional parameters.
 template("kernel_zbi_test") {
   generate_cuckoo = generate_cuckoo_tests
   if (defined(invoker.generate_cuckoo)) {
@@ -214,8 +194,8 @@ template("kernel_zbi_test") {
         forward_variables_from(invoker,
                                [
                                  "disabled",
+                                 "environments",
                                  "timeout",
-                                 "device_types",
                                ])
         kernel_zbi = ":$main_target.zbi"
         kernel_image_name = "$main_target"

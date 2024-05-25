@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/config/zircon/levels.gni")
+import("//build/testing/environments.gni")
 
 # TODO(https://fxbug.dev/42146261): Get rid of zircon_kernel_disable_asserts
 import("//build/zircon/build_args.gni")
@@ -152,12 +153,12 @@ declare_args() {
   enable_lock_dep_tests = enable_lock_dep
 }
 
-kernel_test_device_types = [
-  "AEMU",
-  "Astro",
-  "QEMU",
-  "Intel NUC Kit NUC7i5DNHE",
-  "Intel NUC Kit NUC11TNHv5",
-  "Sherlock",
-  "Vim3",
+kernel_test_environments = [
+  aemu_env,
+  astro_env,
+  qemu_env,
+  nuc7_env,
+  nuc11_env,
+  sherlock_env,
+  vim3_env,
 ]

@@ -60,12 +60,6 @@ template("phys_zbi_test") {
     args = []
     deps = test_deps
 
-    # TODO(mcgrathr): enable on hardware too
-    device_types = [
-      "AEMU",
-      "QEMU",
-    ]
-
     if (defined(invoker.timeout)) {
       if (invoker.timeout != false) {
         timeout = invoker.timeout

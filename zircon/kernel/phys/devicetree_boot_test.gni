@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/testing/boot_tests/boot_test.gni")
+import("//build/testing/environments.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 
 # Defines a boot test comprised of a Linux kernel payload, where early
@@ -58,7 +59,7 @@ template("devicetree_boot_test") {
       forward_variables_from(invoker, [ "timeout" ])
       visibility = public_visibility
 
-      device_types = [ "QEMU" ]
+      environments = [ qemu_env ]
       qemu_kernel = ":$executable_target"
     }
   } else {

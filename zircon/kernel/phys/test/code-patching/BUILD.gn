@@ -115,12 +115,6 @@ zbi_test("zbi-self-code-patching-test") {
     ":code-patches-test",
     ":zbi-self-code-patching-test.executable",
   ]
-
-  # TODO(mcgrathr): enable on hardware too
-  device_types = [
-    "AEMU",
-    "QEMU",
-  ]
 }
 
 physload_binary_test("elf-code-patching-test") {

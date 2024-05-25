@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/sdk/product_bundle.gni")
+import("//build/testing/environments.gni")
 import("//build/testing/test_spec.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
@@ -26,9 +27,9 @@ boot_test_success_string =
 # cuckoo tests.
 default_boot_test_timeout_secs = 600
 
-_all_emu_types = [
-  "QEMU",
-  "AEMU",
+_all_emu_envs = [
+  qemu_env,
+  aemu_env,
 ]
 
 # Helper template defining a boot test for a particular host architecture. This
@@ -107,8 +108,14 @@ template("_boot_test") {
                              "assert_no_deps",
                              "data_deps",
                              "deps",
+                             "environments",
                              "visibility",
                            ])
+
+    if ((defined(invoker.disabled) && invoker.disabled) || disable_boot_tests) {
+      # A disabled test is marked by an empty environments list.
+      environments = []
+    }
 
     timeout_secs = timeout_secs
 
@@ -128,17 +135,6 @@ template("_boot_test") {
     }
     if (defined(invoker.zbi)) {
       deps += [ invoker.zbi ]
-    }
-
-    environments = []
-    foreach(device_type, invoker.device_types) {
-      environments += [
-        {
-          dimensions = {
-            device_type = device_type
-          }
-        },
-      ]
     }
   }
 }
@@ -170,11 +166,9 @@ template("_boot_test") {
 #
 # Parameters:
 #
-#  * device_types
-#    - Required: A list of device types on which this test is meant to run.
-#      The full set of device types can be found in
-#      //build/testing/environments.gni. An empty list signifies a disabled
-#      test.
+#  * environments
+#    - Required: A list of environments from those defined as `*_env` variables
+#      in //build/testing/environments.gni.
 #    - Type: list of strings
 #
 #  * zbi, qemu_kernel, vbmeta, efi_disk
@@ -202,16 +196,12 @@ template("_boot_test") {
 #    - Optional: Usual GN meanings.
 #
 template("boot_test") {
-  assert(defined(invoker.device_types),
-         "boot_test(\"$target_name\") must define `device_types`")
+  assert(defined(invoker.environments),
+         "boot_test(\"$target_name\") must define `environments`")
   assert(
       defined(invoker.zbi) || defined(invoker.qemu_kernel) ||
           defined(invoker.vbmeta) || defined(invoker.efi_disk),
       "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
-  if ((!defined(invoker.disabled) && disable_boot_tests) ||
-      (defined(invoker.disabled) && invoker.disabled)) {
-    invoker.device_types = []
-  }
 
   main_target = target_name
   image_manifest_target = "_boot_test.${target_name}.image_manifest"
@@ -352,17 +342,16 @@ template("boot_test") {
   #
   # TODO(mcgrathr): No riscv64 hosts are available yet.
   if (host_cpu != target_cpu && target_cpu != "riscv64") {
-    hw_types = invoker.device_types + _all_emu_types - _all_emu_types
-    emu_types = invoker.device_types - hw_types
+    hw_envs = invoker.environments + _all_emu_envs - _all_emu_envs
+    emu_envs = invoker.environments - hw_envs
 
     common_params = {
       forward_variables_from(invoker,
                              "*",
                              [
                                "assert_no_deps",
-                               "device_types",
+                               "environments",
                                "visibility",
-                               "disabled",
                              ])
       visibility = [ ":*" ]
       output_name = main_target
@@ -372,13 +361,13 @@ template("boot_test") {
 
     _boot_test("$main_target.emu") {
       cpu_for_host = target_cpu
-      device_types = emu_types
+      environments = emu_envs
       forward_variables_from(common_params, "*")
     }
 
     _boot_test("$main_target.hw") {
       cpu_for_host = host_cpu
-      device_types = hw_types
+      environments = hw_envs
       forward_variables_from(common_params, "*")
     }
 

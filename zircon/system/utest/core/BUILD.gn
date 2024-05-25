@@ -8,6 +8,7 @@ import("//build/test.gni")
 import("//build/testing/boot_tests/kernel_zbi_test.gni")
 import("//build/testing/boot_tests/zbi_test_executable.gni")
 import("//build/testing/bootfs_test.gni")
+import("//build/testing/environments.gni")
 import("//build/toolchain/rbe.gni")
 import("//zircon/kernel/params.gni")
 
@@ -193,7 +194,8 @@ template("core_tests") {
     forward_variables_from(invoker,
                            [
                              "args",
-                             "device_types",
+                             "disabled",
+                             "environments",
                              "timeout",
                              "generate_cuckoo",
                            ])
@@ -258,7 +260,7 @@ if (is_fuchsia) {
 boot_tests = [ ":core-tests" ]
 
 core_tests("core-tests") {
-  device_types = kernel_test_device_types
+  environments = kernel_test_environments
 }
 
 # If we are building for x64, make sure to run the core tests on a system which
@@ -269,7 +271,7 @@ if (current_cpu == "x64") {
     args = [ "kernel.wallclock=hpet" ]
 
     # NUC11 HPET is unreliable, do not include it, see https://chat.google.com/room/AAAAOlfJ3J8/S_Law3cxzwQ
-    device_types = [ "Intel NUC Kit NUC7i5DNHE" ]
+    environments = [ nuc7_env ]
 
     # core-hpet test is taking longer than 14mins. Bump the timeout to 16mins
     # as a mitigation.
@@ -280,38 +282,38 @@ if (current_cpu == "x64") {
 }
 
 if (current_cpu == "arm64") {
-  _smccc11_device_types = [
-    "AEMU",
-    "Astro",
-    "QEMU",
-    "Sherlock",
+  _smccc11_environments = [
+    aemu_env,
+    astro_env,
+    qemu_env,
+    sherlock_env,
   ]
   foreach(alternate,
           [
             {
               option = "auto"
-              device_types = kernel_test_device_types
+              environments = kernel_test_environments
             },
             {
               option = "arch3"
-              device_types = _smccc11_device_types
+              environments = _smccc11_environments
             },
             {
               option = "arch1"
-              device_types = _smccc11_device_types
+              environments = _smccc11_environments
             },
             {
               option = "psci"
-              device_types = _smccc11_device_types
+              environments = _smccc11_environments
             },
             {
               option = "smccc10"
-              device_types = kernel_test_device_types
+              environments = kernel_test_environments
             },
           ]) {
     core_tests("core-tests-workaround-${alternate.option}") {
       args = [ "kernel.arm64.alternate-vbar=${alternate.option}" ]
-      device_types = alternate.device_types
+      environments = alternate.environments
     }
     boot_tests += [ ":core-tests-workaround-${alternate.option}" ]
   }
@@ -320,7 +322,7 @@ if (current_cpu == "arm64") {
 # TODO(https://fxbug.dev/42170495): Remove once migration is complete.
 core_tests("core-tests-serial-migration") {
   args = [ "kernel.experimental.serial_migration=true" ]
-  device_types = [ "QEMU" ]
+  environments = [ qemu_env ]
 }
 boot_tests += [ ":core-tests-serial-migration" ]
 

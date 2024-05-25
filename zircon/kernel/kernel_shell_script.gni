@@ -58,7 +58,7 @@ template("kernel_shell_script") {
 #     space with `+` as expected for the `kernel.shell.script` boot option.
 #     - Type: list(string)
 #
-#   * deps, visibility, device_types
+#   * deps, disabled, environments, visibility
 #     - Optional: See zbi_test().
 #
 template("kernel_shell_script_test") {
@@ -68,7 +68,8 @@ template("kernel_shell_script_test") {
   zbi_test(main_target) {
     forward_variables_from(invoker,
                            [
-                             "device_types",
+                             "disabled",
+                             "environments",
                              "visibility",
                            ])
 
