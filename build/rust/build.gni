@@ -14,6 +14,9 @@ declare_args() {
   # into its own exclusive directory. This requires
   # `rustc_use_response_file = true` due to the command-line bloat this causes.
   rust_one_rlib_per_dir = true
+
+  # Controls whether the build runs the depfile verifier
+  verify_depfile = true
 }
 
 assert(

@@ -108,6 +108,7 @@ $fx set \
     --args 'rustc_use_response_files = false' \
     --args 'rust_one_rlib_per_dir = false' \
     --args 'restat_rust = false' \
+    --args 'verify_depfile = false' \
     --args 'debuginfo = "none"' \
     --with '//bundles/buildbot/minimal' \
     workbench_eng.x64 \

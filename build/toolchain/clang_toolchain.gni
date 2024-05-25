@@ -308,16 +308,18 @@ template("clang_toolchain") {
     if (enable_rust) {
       rustc = "${rebased_rustc_prefix}/bin/rustc"
     }
-    verify_depfile = string_join(" ",
-                                 [
-                                   rebase_path(python_exe_src, root_build_dir),
+    if (verify_depfile) {
+      depfile_verifier = string_join(
+              " ",
+              [
+                rebase_path(python_exe_src, root_build_dir),
 
-                                   # Speed up startup time by not searching for
-                                   # site packages.
-                                   "-S",
-                                   rebase_path("//build/gn/verify_depfile.py",
-                                               root_build_dir),
-                                 ])
+                # Speed up startup time by not searching for
+                # site packages.
+                "-S",
+                rebase_path("//build/gn/verify_depfile.py", root_build_dir),
+              ])
+    }
 
     use_buildidtool =
         invoker.toolchain_os == "linux" || invoker.toolchain_os == "fuchsia"
@@ -706,8 +708,10 @@ template("clang_toolchain") {
         } else {
           command += " {{rustdeps}} {{externs}}"
         }
-        command +=
-            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        if (verify_depfile) {
+          command +=
+              " && $depfile_verifier -t \"{{label}}\" -d $depfile {{sources}}"
+        }
 
         # Append command suffix and expand {{STRIP_ARGS}} and {{REMOTE_STRIP_PREFIX}}
         if (invoker.toolchain_os == "mac") {
@@ -869,8 +873,10 @@ template("clang_toolchain") {
         } else {
           command += " {{rustdeps}} {{externs}}"
         }
-        command +=
-            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        if (verify_depfile) {
+          command +=
+              " && $depfile_verifier -t \"{{label}}\" -d $depfile {{sources}}"
+        }
 
         description = "RUST {{output}}"
         outputs = [ rlib ]
@@ -907,8 +913,10 @@ template("clang_toolchain") {
         } else {
           command += " {{rustdeps}} {{externs}}"
         }
-        command +=
-            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        if (verify_depfile) {
+          command +=
+              " && $depfile_verifier -t \"{{label}}\" -d $depfile {{sources}}"
+        }
 
         description = "RUST {{output}}"
 
@@ -987,8 +995,10 @@ template("clang_toolchain") {
         } else {
           command += " {{rustdeps}} {{externs}}"
         }
-        command +=
-            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        if (verify_depfile) {
+          command +=
+              " && $depfile_verifier -t \"{{label}}\" -d $depfile {{sources}}"
+        }
 
         description = "RUST {{output}}"
         outputs = [ _main_output ]
