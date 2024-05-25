@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/mistos/starnix/kernel/mm/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/syscalls.h>
@@ -33,6 +34,14 @@ TEST(Task, test_prctl_set_vma_anon_name) {
 
   ASSERT_EQ(fbl::String("test-name"),
             (*current_task)->mm()->get_mapping_name(mapped_address + 24u));
+
+  auto munmap_result = sys_munmap(*current_task, mapped_address, PAGE_SIZE);
+  ASSERT_TRUE(munmap_result.is_ok(), "failed to unmap memory [error = %d]",
+              munmap_result.error_value().error_code());
+
+  auto mapping_name_result = current_task->mm()->get_mapping_name(mapped_address + 24u);
+  ASSERT_TRUE(mapping_name_result.is_error());
+  ASSERT_EQ(errno(EFAULT), mapping_name_result.error_value());
 }
 
 TEST(Task, test_set_vma_name_special_chars) {

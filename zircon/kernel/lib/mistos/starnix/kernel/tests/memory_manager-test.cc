@@ -469,4 +469,221 @@ TEST(MemoryManager, test_unmap_returns_multiple_mappings) {
   ASSERT_EQ(released_mappings.size(), 2);
 }
 
+/// Maps two pages, then unmaps the first page.
+/// The second page should be re-mapped with a new child COW VMO.
+TEST(MemoryManager, test_unmap_beginning) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+
+  auto addr = map_memory(*current_task, UserAddress(), PAGE_SIZE * 2);
+
+  zx::ArcVmo original_vmo;
+  {
+    auto _state = mm->state.Read();
+    auto pair = _state->mappings.get(addr);
+    ASSERT_TRUE(pair.has_value(), "mapping");
+
+    auto& [range, mapping] = pair.value();
+    ASSERT_EQ(range.start, addr);
+    ASSERT_EQ(range.end, addr + (PAGE_SIZE * 2u));
+
+    // #[cfg(feature = "alternate_anon_allocs")]
+    //     let _ = mapping;
+    // #[cfg(not(feature = "alternate_anon_allocs"))]
+    original_vmo = ktl::visit(MappingBacking::overloaded{
+                                  [](PrivateAnonymous&) { return zx::ArcVmo(); },
+                                  [&](MappingBackingVmo& backing) -> zx::ArcVmo {
+                                    EXPECT_EQ(addr, backing.base_);
+                                    EXPECT_EQ(0, backing.vmo_offset_);
+                                    uint64_t size;
+                                    EXPECT_OK((*backing.vmo_)->get_size(&size));
+                                    EXPECT_EQ(PAGE_SIZE * 2, size);
+                                    return backing.vmo_;
+                                  },
+                              },
+                              mapping.backing_.variant);
+  }  // namespace starnix
+
+  ASSERT_TRUE(mm->unmap(addr, PAGE_SIZE).is_ok());
+
+  {
+    auto _state = mm->state.Read();
+
+    // The first page should be unmapped.
+    ASSERT_FALSE(_state->mappings.get(addr).has_value());
+
+    // The second page should be a new child COW VMO.
+    auto pair = _state->mappings.get(addr + static_cast<size_t>(PAGE_SIZE));
+    ASSERT_TRUE(pair.has_value(), "second page");
+    auto& [range, mapping] = pair.value();
+    ASSERT_EQ(range.start, addr + static_cast<size_t>(PAGE_SIZE));
+    ASSERT_EQ(range.end, addr + (PAGE_SIZE * 2u));
+
+    // #[cfg(not(feature = "alternate_anon_allocs"))]
+    ktl::visit(MappingBacking::overloaded{
+                   [](PrivateAnonymous&) {},
+                   [&](MappingBackingVmo& backing) {
+                     EXPECT_EQ(addr + static_cast<size_t>(PAGE_SIZE), backing.base_);
+                     EXPECT_EQ(0, backing.vmo_offset_);
+                     uint64_t size;
+                     EXPECT_OK((*backing.vmo_)->get_size(&size));
+                     EXPECT_EQ(PAGE_SIZE, size);
+                   },
+               },
+               mapping.backing_.variant);
+  }
+}
+
+/// Maps two pages, then unmaps the second page.
+/// The first page's VMO should be shrunk.
+TEST(MemoryManager, test_unmap_end) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+
+  auto addr = map_memory(*current_task, UserAddress(), PAGE_SIZE * 2);
+
+  zx::ArcVmo original_vmo;
+  {
+    auto _state = mm->state.Read();
+    auto pair = _state->mappings.get(addr);
+    ASSERT_TRUE(pair.has_value(), "mapping");
+
+    auto& [range, mapping] = pair.value();
+    ASSERT_EQ(range.start, addr);
+    ASSERT_EQ(range.end, addr + (PAGE_SIZE * 2u));
+
+    // #[cfg(feature = "alternate_anon_allocs")]
+    //     let _ = mapping;
+    // #[cfg(not(feature = "alternate_anon_allocs"))]
+    original_vmo = ktl::visit(MappingBacking::overloaded{
+                                  [](PrivateAnonymous&) { return zx::ArcVmo(); },
+                                  [&](MappingBackingVmo& backing) -> zx::ArcVmo {
+                                    EXPECT_EQ(addr, backing.base_);
+                                    EXPECT_EQ(0, backing.vmo_offset_);
+                                    uint64_t size;
+                                    EXPECT_OK((*backing.vmo_)->get_size(&size));
+                                    EXPECT_EQ(PAGE_SIZE * 2, size);
+                                    return backing.vmo_;
+                                  },
+                              },
+                              mapping.backing_.variant);
+  }  // namespace starnix
+
+  ASSERT_TRUE(mm->unmap(addr + static_cast<size_t>(PAGE_SIZE), PAGE_SIZE).is_ok());
+
+  {
+    auto _state = mm->state.Read();
+
+    // The second page should be unmapped.
+    ASSERT_FALSE(_state->mappings.get(addr + static_cast<size_t>(PAGE_SIZE)).has_value());
+
+    // The first page's VMO should be the same as the original, only shrunk.
+    auto pair = _state->mappings.get(addr);
+    ASSERT_TRUE(pair.has_value(), "first page");
+    auto& [range, mapping] = pair.value();
+    ASSERT_EQ(range.start, addr);
+    ASSERT_EQ(range.end, addr + static_cast<size_t>(PAGE_SIZE));
+
+    // #[cfg(not(feature = "alternate_anon_allocs"))]
+    ktl::visit(MappingBacking::overloaded{
+                   [](PrivateAnonymous&) {},
+                   [&](MappingBackingVmo& backing) {
+                     EXPECT_EQ(addr, backing.base_);
+                     EXPECT_EQ(0, backing.vmo_offset_);
+                     uint64_t size;
+                     EXPECT_OK((*backing.vmo_)->get_size(&size));
+                     EXPECT_EQ(PAGE_SIZE, size);
+                   },
+               },
+               mapping.backing_.variant);
+  }
+}
+
+/// Maps three pages, then unmaps the middle page.
+/// The last page should be re-mapped with a new COW child VMO.
+/// The first page's VMO should be shrunk,
+TEST(MemoryManager, test_unmap_middle) {
+  auto [kernel, current_task] = create_kernel_and_task();
+  auto mm = current_task->mm();
+
+  auto addr = map_memory(*current_task, UserAddress(), PAGE_SIZE * 3u);
+
+  zx::ArcVmo original_vmo;
+  {
+    auto _state = mm->state.Read();
+    auto pair = _state->mappings.get(addr);
+    ASSERT_TRUE(pair.has_value(), "mapping");
+    auto& [range, mapping] = pair.value();
+    ASSERT_EQ(range.start, addr);
+    ASSERT_EQ(range.end, addr + (PAGE_SIZE * 3u));
+
+    // #[cfg(feature = "alternate_anon_allocs")]
+    //     let _ = mapping;
+    // #[cfg(not(feature = "alternate_anon_allocs"))]
+    original_vmo = ktl::visit(MappingBacking::overloaded{
+                                  [](PrivateAnonymous&) { return zx::ArcVmo(); },
+                                  [&](MappingBackingVmo& backing) -> zx::ArcVmo {
+                                    EXPECT_EQ(addr, backing.base_);
+                                    EXPECT_EQ(0, backing.vmo_offset_);
+                                    uint64_t size;
+                                    EXPECT_OK((*backing.vmo_)->get_size(&size));
+                                    EXPECT_EQ(PAGE_SIZE * 3, size);
+                                    return backing.vmo_;
+                                  },
+                              },
+                              mapping.backing_.variant);
+  }  // namespace starnix
+
+  ASSERT_TRUE(mm->unmap(addr + static_cast<size_t>(PAGE_SIZE), PAGE_SIZE).is_ok());
+
+  {
+    auto _state = mm->state.Read();
+
+    // The middle page should be unmapped.
+    ASSERT_FALSE(_state->mappings.get(addr + static_cast<size_t>(PAGE_SIZE)).has_value());
+
+    {
+      auto pair = _state->mappings.get(addr);
+      ASSERT_TRUE(pair.has_value(), "first page");
+      auto& [range, mapping] = pair.value();
+      ASSERT_EQ(range.start, addr);
+      ASSERT_EQ(range.end, addr + static_cast<size_t>(PAGE_SIZE));
+
+      // #[cfg(not(feature = "alternate_anon_allocs"))]
+      ktl::visit(MappingBacking::overloaded{
+                     [](PrivateAnonymous&) {},
+                     [&](MappingBackingVmo& backing) {
+                       EXPECT_EQ(addr, backing.base_);
+                       EXPECT_EQ(0, backing.vmo_offset_);
+                       uint64_t size;
+                       EXPECT_OK((*backing.vmo_)->get_size(&size));
+                       EXPECT_EQ(PAGE_SIZE, size);
+                     },
+                 },
+                 mapping.backing_.variant);
+    }
+
+    {
+      auto pair = _state->mappings.get(addr + PAGE_SIZE * 2u);
+      ASSERT_TRUE(pair.has_value(), "last page");
+      auto& [range, mapping] = pair.value();
+      ASSERT_EQ(range.start, addr + PAGE_SIZE * 2u);
+      ASSERT_EQ(range.end, addr + PAGE_SIZE * 3u);
+
+      // #[cfg(not(feature = "alternate_anon_allocs"))]
+      ktl::visit(MappingBacking::overloaded{
+                     [](PrivateAnonymous&) {},
+                     [&](MappingBackingVmo& backing) {
+                       EXPECT_EQ(addr + PAGE_SIZE * 2u, backing.base_);
+                       EXPECT_EQ(0, backing.vmo_offset_);
+                       uint64_t size;
+                       EXPECT_OK((*backing.vmo_)->get_size(&size));
+                       EXPECT_EQ(PAGE_SIZE, size);
+                     },
+                 },
+                 mapping.backing_.variant);
+    }
+  }
+}
+
 }  // namespace starnix

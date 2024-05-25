@@ -23,6 +23,7 @@
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/types.h>
 
 #include <optional>
@@ -301,7 +302,11 @@ fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
     return fit::error(errno(EINVAL));
   }
 
-  if (ROUNDUP_PAGE_SIZE(length) == 0) {
+  auto length_or_error = round_up_to_system_page_size(length);
+  if (length_or_error.is_error()) {
+    return length_or_error.take_error();
+  }
+  if (length_or_error.value() == 0) {
     return fit::error(errno(EINVAL));
   }
 
@@ -311,7 +316,7 @@ fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
 
   // Unmap the range, including the the tail of any range that would have been split. This
   // operation is safe because we're operating on another process.
-  zx_status_t status = user_vmar.unmap(addr.ptr(), length);
+  zx_status_t status = user_vmar.unmap(addr.ptr(), length_or_error.value());
   switch (status) {
     case ZX_OK:
     case ZX_ERR_NOT_FOUND:
@@ -322,7 +327,11 @@ fit::result<Errno> MemoryManagerState::unmap(UserAddress addr, size_t length,
       return fit::error<Errno>(impossible_error(status));
   }
 
-  return update_after_unmap(addr, length, released_mappings);
+  auto result = update_after_unmap(addr, length_or_error.value(), released_mappings);
+  if (result.is_error())
+    return result.take_error();
+
+  return fit::ok();
 }
 
 // Updates `self.mappings` after the specified range was unmaped.
@@ -415,6 +424,13 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(UserAddress addr, size
                                                      child_vmo_offset, child_length, &child_vmo);
         status != ZX_OK) {
       return fit::error(MemoryManager::get_errno_for_map_err(status));
+    }
+
+    if ((vmo_info.rights & ZX_RIGHT_EXECUTE) == ZX_RIGHT_EXECUTE) {
+      status = child_vmo.replace_as_executable({}, &child_vmo);
+      if (status != ZX_OK) {
+        impossible_error(status);
+      }
     }
 
     // Update the mapping.

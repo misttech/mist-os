@@ -179,6 +179,9 @@ struct MappingBackingVmo {
   }
 
  private:
+  ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_beginning);
+  ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_end);
+  ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_middle);
   friend class MemoryManager;
   friend struct MemoryManagerState;
 };
@@ -267,6 +270,9 @@ struct Mapping {
   // MappingFlags flags() const { return flags_; }
 
  private:
+  ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_beginning);
+  ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_end);
+  ZXTEST_FRIEND_TEST(MemoryManager, test_unmap_middle);
   ZXTEST_FRIEND_TEST(MemoryManager, test_preserve_name_snapshot);
   friend class MemoryManager;
   friend struct MemoryManagerState;
